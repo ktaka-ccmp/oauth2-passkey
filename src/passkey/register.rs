@@ -10,8 +10,8 @@ use ciborium::value::{Integer, Value as CborValue};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::AppState;
-use crate::{
+use crate::passkey::AppState;
+use crate::passkey::{
     base64url_decode, generate_challenge, AttestationObject, AuthenticatorSelection,
     PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential,
 };
@@ -222,7 +222,7 @@ fn extract_credential_public_key(
     let attestation_obj = parse_attestation_object(&reg_data.response.attestation_object)?;
 
     // Verify attestation based on format
-    crate::attestation::verify_attestation(&attestation_obj, &decoded_client_data, state)?;
+    crate::passkey::attestation::verify_attestation(&attestation_obj, &decoded_client_data, state)?;
 
     // Extract public key from authenticator data
     let public_key = extract_public_key_from_auth_data(&attestation_obj.auth_data)?;

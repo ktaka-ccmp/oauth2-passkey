@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{
+use crate::passkey::{
     base64url_decode, generate_challenge, AppState, PublicKeyCredentialUserEntity, StoredChallenge,
 };
 
