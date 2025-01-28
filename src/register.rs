@@ -15,7 +15,7 @@ use crate::{
 };
 use crate::AppState;
 
-pub(crate) fn router(state: AppState) -> Router {
+pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/start", post(start_registration))
         .route(
@@ -221,7 +221,7 @@ fn extract_credential_public_key(
     let attestation_obj = parse_attestation_object(&reg_data.response.attestation_object)?;
 
     // Verify attestation based on format
-    crate::passkey::attestation::verify_attestation(&attestation_obj, &decoded_client_data, state)?;
+    crate::attestation::verify_attestation(&attestation_obj, &decoded_client_data, state)?;
 
     // Extract public key from authenticator data
     let public_key = extract_public_key_from_auth_data(&attestation_obj.auth_data)?;

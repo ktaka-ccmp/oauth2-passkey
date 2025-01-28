@@ -6,7 +6,7 @@ use webpki::EndEntityCert;
 use x509_parser::{certificate::X509Certificate, prelude::*, time::ASN1Time};
 
 // use crate::passkey::AttestationObject;
-use crate::passkey::{AppState, AttestationObject, AuthenticatorSelection};
+use crate::{AppState, AttestationObject, AuthenticatorSelection};
 
 // Constants for FIDO OIDs id-fido-gen-ce-aaguid
 const OID_FIDO_GEN_CE_AAGUID: &str = "1.3.6.1.4.1.45724.1.1.4";
