@@ -1,0 +1,21 @@
+[package]
+name = "libpasskey"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+askama = { version = "0.12.1", features = ["serde-json", "with-axum"] }
+askama_axum = "0.4.0"
+axum = { version = "0.7.9", features = ["http2", "macros", "multipart"] }
+base64 = "0.22.1"
+ciborium = "0.2.2"
+dotenv = "0.15.0"
+oid-registry = { version = "0.7.1", features = ["crypto", "ms_spc", "x500", "x509"] }
+ring = { version = "0.17.8", features = ["std"] }
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.133"
+thiserror = "2.0.11"
+tokio = { version = "1.42.0", features = ["bytes", "fs", "io-std", "macros", "net", "parking_lot", "rt-multi-thread", "signal", "sync", "time", "tracing"] }
+uuid = { version = "1.11.0", features = ["atomic", "md5", "sha1", "v4"] }
+webpki = { version = "0.22.4", features = ["std"] }
+x509-parser = { version = "0.16.0", features = ["validate", "verify"] }
