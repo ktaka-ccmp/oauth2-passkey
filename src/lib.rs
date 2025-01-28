@@ -69,7 +69,8 @@ fn base64url_decode(input: &str) -> Result<Vec<u8>, base64::DecodeError> {
 fn generate_challenge() -> Vec<u8> {
     let rng = ring::rand::SystemRandom::new();
     let mut challenge = vec![0u8; 32];
-    rng.fill(&mut challenge).expect("Failed to generate random challenge");
+    rng.fill(&mut challenge)
+        .expect("Failed to generate random challenge");
     challenge
 }
 

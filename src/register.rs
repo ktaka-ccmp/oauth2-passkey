@@ -10,10 +10,11 @@ use ciborium::value::{Integer, Value as CborValue};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    base64url_decode, generate_challenge, AttestationObject, AuthenticatorSelection, PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential
-};
 use crate::AppState;
+use crate::{
+    base64url_decode, generate_challenge, AttestationObject, AuthenticatorSelection,
+    PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential,
+};
 
 pub fn router(state: AppState) -> Router {
     Router::new()

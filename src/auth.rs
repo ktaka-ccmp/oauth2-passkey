@@ -32,7 +32,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{base64url_decode, generate_challenge, AppState, PublicKeyCredentialUserEntity, StoredChallenge};
+use crate::{
+    base64url_decode, generate_challenge, AppState, PublicKeyCredentialUserEntity, StoredChallenge,
+};
 
 pub fn router(state: AppState) -> Router {
     Router::new()
