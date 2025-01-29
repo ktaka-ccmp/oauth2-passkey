@@ -1,15 +1,12 @@
-use axum::http::StatusCode;
 use ciborium::value::{Integer, Value as CborValue};
 use ring::{digest, signature::UnparsedPublicKey};
 use std::time::SystemTime;
 use webpki::EndEntityCert;
 use x509_parser::{certificate::X509Certificate, prelude::*, time::ASN1Time};
 
-// use crate::passkey::AttestationObject;
-use crate::{
-    config::AuthenticatorSelection,
-    passkey::{AppState, AttestationObject},
-};
+use crate::config::AuthenticatorSelection;
+use crate::errors::WebAuthnError;
+use crate::passkey::{AppState, AttestationObject};
 
 // Constants for FIDO OIDs id-fido-gen-ce-aaguid
 const OID_FIDO_GEN_CE_AAGUID: &str = "1.3.6.1.4.1.45724.1.1.4";
@@ -22,7 +19,7 @@ pub(super) fn verify_attestation(
     attestation: &AttestationObject,
     client_data: &[u8],
     state: &AppState,
-) -> Result<(), (StatusCode, String)> {
+) -> Result<(), WebAuthnError> {
     let client_data_hash = digest::digest(&digest::SHA256, client_data);
 
     match attestation.fmt.as_str() {
@@ -45,15 +42,9 @@ pub(super) fn verify_attestation(
                 client_data_hash.as_ref(),
                 &attestation.att_stmt,
             )
-            .map_err(|e| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    format!("Attestation verification failed: {:?}", e),
-                )
-            })
+            .map_err(|e| WebAuthnError::Other(format!("Attestation verification failed: {:?}", e)))
         }
-        _ => Err((
-            StatusCode::BAD_REQUEST,
+        _ => Err(WebAuthnError::Other(
             "Unsupported attestation format".to_string(),
         )),
     }
@@ -63,19 +54,18 @@ fn verify_none_attestation(
     attestation: &AttestationObject,
     authenticator_selection: &AuthenticatorSelection,
     rp_id: &str,
-) -> Result<(), (StatusCode, String)> {
+) -> Result<(), WebAuthnError> {
     // Verify attStmt is empty
     if !attestation.att_stmt.is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "attStmt must be empty for none attestation".into(),
+        return Err(WebAuthnError::Other(
+            "attStmt must be empty for none attestation".to_string(),
         ));
     }
 
     // Verify RP ID hash
     let rp_id_hash = digest::digest(&digest::SHA256, rp_id.as_bytes());
     if attestation.auth_data[..32] != rp_id_hash.as_ref()[..] {
-        return Err((StatusCode::BAD_REQUEST, "Invalid RP ID hash".into()));
+        return Err(WebAuthnError::Other("Invalid RP ID hash".to_string()));
     }
 
     // Check flags
@@ -85,21 +75,21 @@ fn verify_none_attestation(
     let has_attested_cred_data = (flags & 0x40) != 0;
 
     if !user_present {
-        return Err((StatusCode::BAD_REQUEST, "User Present flag not set".into()));
+        return Err(WebAuthnError::Other(
+            "User Present flag not set".to_string(),
+        ));
     }
 
     // Check UV flag if requested
     if authenticator_selection.user_verification == "required" && !user_verified {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "User Verification required but flag not set".into(),
+        return Err(WebAuthnError::Other(
+            "User Verification required but flag not set".to_string(),
         ));
     }
 
     if !has_attested_cred_data {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "No attested credential data".into(),
+        return Err(WebAuthnError::Other(
+            "No attested credential data".to_string(),
         ));
     }
 
@@ -116,14 +106,9 @@ fn verify_none_attestation(
 
     // Verify COSE key format
     let public_key_cbor: CborValue = ciborium::de::from_reader(&attestation.auth_data[pos..])
-        .map_err(|e| {
-            (
-                StatusCode::BAD_REQUEST,
-                format!("Invalid public key CBOR: {}", e),
-            )
-        })?;
+        .map_err(|e| WebAuthnError::Other(format!("Invalid public key CBOR: {}", e)))?;
 
-    extract_public_key_coords(&public_key_cbor).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    extract_public_key_coords(&public_key_cbor).map_err(WebAuthnError::Other)?;
 
     Ok(())
 }

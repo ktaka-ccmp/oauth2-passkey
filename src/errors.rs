@@ -62,3 +62,30 @@ impl From<anyhow::Error> for PasskeyError {
 //         PasskeyError::Config(format!("Environment variable error: {}", err))
 //     }
 // }
+
+#[derive(Debug, Error)]
+pub enum WebAuthnError {
+    #[error("Invalid client data: {0}")]
+    InvalidClientData(String),
+
+    #[error("Invalid challenge: {0}")]
+    InvalidChallenge(String),
+
+    #[error("Invalid authenticator: {0}")]
+    InvalidAuthenticator(String),
+
+    #[error("Invalid signature: {0}")]
+    InvalidSignature(String),
+
+    #[error("Storage error: {0}")]
+    StorageError(String),
+
+    #[error("Other error: {0}")]
+    Other(String),
+}
+
+impl From<WebAuthnError> for (u16, String) {
+    fn from(err: WebAuthnError) -> Self {
+        (400, err.to_string())
+    }
+}

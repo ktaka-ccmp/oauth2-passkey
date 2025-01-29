@@ -1,66 +1,58 @@
-use axum::{extract::State, http::StatusCode, Json};
-
 use base64::engine::{general_purpose::URL_SAFE, Engine};
 use ring::{digest, signature::UnparsedPublicKey};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use uuid::Uuid;
 
-use crate::passkey::{
-    base64url_decode, generate_challenge, AppState, PublicKeyCredentialUserEntity, StoredChallenge,
-};
+use crate::errors::WebAuthnError;
+use crate::passkey::{base64url_decode, generate_challenge};
+use crate::passkey::{AppState, PublicKeyCredentialUserEntity, StoredChallenge};
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticationOptions {
-    challenge: String,
-    timeout: u32,
-    rp_id: String,
-    allow_credentials: Vec<AllowCredential>,
-    user_verification: String,
-    auth_id: String,
+    pub challenge: String,
+    pub timeout: u32,
+    pub rp_id: String,
+    pub allow_credentials: Vec<AllowCredential>,
+    pub user_verification: String,
+    pub auth_id: String,
 }
 
 #[derive(Serialize, Debug)]
-struct AllowCredential {
-    #[serde(rename = "type")]
-    type_: String,
-    id: String,
+pub struct AllowCredential {
+    pub type_: String,
+    pub id: String,
 }
 
 #[allow(unused)]
 #[derive(Deserialize, Debug)]
 pub struct AuthenticatorResponse {
-    id: String,
-    raw_id: String,
-    response: AuthenticatorAssertionResponse,
-    #[serde(rename = "type")]
-    type_: String,
-    auth_id: String,
-    authenticator_attachment: Option<String>,
+    pub id: String,
+    pub raw_id: String,
+    pub response: AuthenticatorAssertionResponse,
+    pub authenticator_attachment: Option<String>,
+    pub auth_id: String,
 }
 
 #[derive(Deserialize, Debug)]
-struct AuthenticatorAssertionResponse {
-    authenticator_data: String,
-    client_data_json: String,
-    signature: String,
-    user_handle: Option<String>,
+pub struct AuthenticatorAssertionResponse {
+    pub client_data_json: String,
+    pub authenticator_data: String,
+    pub signature: String,
+    pub user_handle: Option<String>,
 }
 
-pub async fn start_authentication(State(state): State<AppState>) -> Json<AuthenticationOptions> {
+pub async fn start_authentication(state: &AppState) -> AuthenticationOptions {
     let challenge = generate_challenge();
-
-    let user_info = PublicKeyCredentialUserEntity {
-        id: "".to_string(),
-        name: "".to_string(),
-        display_name: "".to_string(),
-    };
-
     let auth_id = Uuid::new_v4().to_string();
+
     let stored_challenge = StoredChallenge {
         challenge: challenge.clone().unwrap_or_default(),
-        user: user_info,
+        user: PublicKeyCredentialUserEntity {
+            id: auth_id.clone(),
+            name: "temp".to_string(),
+            display_name: "temp".to_string(),
+        },
         timestamp: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -85,26 +77,128 @@ pub async fn start_authentication(State(state): State<AppState>) -> Json<Authent
 
     #[cfg(debug_assertions)]
     println!("Auth options: {:?}", auth_option);
-    Json(auth_option)
+    auth_option
 }
 
-#[derive(Debug, Error)]
-pub enum WebAuthnError {
-    #[error("Invalid client data: {0}")]
-    InvalidClientData(String),
-    #[error("Invalid challenge: {0}")]
-    InvalidChallenge(String),
-    #[error("Invalid authenticator: {0}")]
-    InvalidAuthenticator(String),
-    #[error("Invalid signature: {0}")]
-    InvalidSignature(String),
-    #[error("Storage error: {0}")]
-    StorageError(String),
-}
+pub async fn verify_authentication(
+    state: &AppState,
+    auth_response: AuthenticatorResponse,
+) -> Result<String, WebAuthnError> {
+    #[cfg(debug_assertions)]
+    println!(
+        "Starting authentication verification for response: {:?}",
+        auth_response
+    );
 
-impl From<WebAuthnError> for (StatusCode, String) {
-    fn from(err: WebAuthnError) -> Self {
-        (StatusCode::BAD_REQUEST, err.to_string())
+    // Get stored challenge and verify auth
+    let mut store = state.store.lock().await;
+    let stored_challenge = store
+        .challenges
+        .get(&auth_response.auth_id)
+        .ok_or(WebAuthnError::StorageError("Challenge not found".into()))?;
+
+    #[cfg(debug_assertions)]
+    println!("Found stored challenge: {:?}", stored_challenge);
+
+    // Parse and verify client data
+    #[cfg(debug_assertions)]
+    println!(
+        "Parsing client data: {}",
+        &auth_response.response.client_data_json
+    );
+
+    let client_data = ParsedClientData::from_base64(&auth_response.response.client_data_json)?;
+
+    #[cfg(debug_assertions)]
+    println!("Parsed client data: {:?}", client_data);
+
+    client_data.verify(state, &stored_challenge.challenge)?;
+
+    // Parse and verify authenticator data
+    #[cfg(debug_assertions)]
+    println!(
+        "Parsing authenticator data: {}",
+        &auth_response.response.authenticator_data
+    );
+
+    let auth_data = AuthenticatorData::from_base64(&auth_response.response.authenticator_data)?;
+
+    #[cfg(debug_assertions)]
+    println!("Parsed authenticator data: {:?}", auth_data);
+
+    auth_data.verify(state)?;
+
+    // Get credential then public key
+    let credential = store
+        .credentials
+        .get(&auth_response.id)
+        .ok_or(WebAuthnError::InvalidSignature("Unknown credential".into()))?;
+
+    #[cfg(debug_assertions)]
+    println!("Found credential: {:?}", credential);
+
+    let user_handle = auth_response
+        .response
+        .user_handle
+        .as_ref()
+        .and_then(|handle| {
+            base64url_decode(handle)
+                .ok()
+                .and_then(|decoded| String::from_utf8(decoded).ok())
+        })
+        .unwrap_or("default".to_string());
+
+    #[cfg(debug_assertions)]
+    println!("user_info stored in credential: {:?}", &credential.user);
+    #[cfg(debug_assertions)]
+    println!("user_handle received from client: {:?}", &user_handle);
+
+    let display_name = credential.user.display_name.as_str().to_owned();
+
+    if credential.user.id != user_handle {
+        return Err(WebAuthnError::InvalidSignature(
+            "User handle mismatch".into(),
+        ));
+    }
+
+    let verification_algorithm = &ring::signature::ECDSA_P256_SHA256_ASN1;
+    let public_key = UnparsedPublicKey::new(verification_algorithm, &credential.public_key);
+
+    // Signature
+    let signature = base64url_decode(&auth_response.response.signature)
+        .map_err(|e| WebAuthnError::InvalidSignature(format!("Invalid signature: {}", e)))?;
+
+    #[cfg(debug_assertions)]
+    println!("Decoded signature length: {}", signature.len());
+
+    // Prepare signed data
+    let client_data_hash = digest::digest(&digest::SHA256, &client_data.raw_data);
+    let mut signed_data = Vec::new();
+
+    signed_data.extend_from_slice(&auth_data.raw_data);
+    signed_data.extend_from_slice(client_data_hash.as_ref());
+
+    #[cfg(debug_assertions)]
+    println!("Signed data length: {}", signed_data.len());
+
+    // Verify signature using public key
+    match public_key.verify(&signed_data, &signature) {
+        Ok(_) => {
+            #[cfg(debug_assertions)]
+            println!("Signature verification successful");
+
+            // Cleanup and return success
+            store.challenges.remove(&auth_response.auth_id);
+            Ok(display_name)
+        }
+        Err(e) => {
+            #[cfg(debug_assertions)]
+            println!("Signature verification failed: {:?}", e);
+
+            Err(WebAuthnError::InvalidSignature(
+                "Signature verification failed".into(),
+            ))
+        }
     }
 }
 
@@ -228,142 +322,5 @@ impl AuthenticatorData {
         }
 
         Ok(())
-    }
-}
-
-pub async fn verify_authentication(
-    State(state): State<AppState>,
-    Json(auth_response): Json<AuthenticatorResponse>,
-) -> Result<String, (StatusCode, String)> {
-    #[cfg(debug_assertions)]
-    println!(
-        "Starting authentication verification for response: {:?}",
-        auth_response
-    );
-
-    // Get stored challenge and verify auth
-    let mut store = state.store.lock().await;
-    let stored_challenge = store
-        .challenges
-        .get(&auth_response.auth_id)
-        .ok_or(WebAuthnError::StorageError("Challenge not found".into()))?;
-
-    #[cfg(debug_assertions)]
-    println!("Found stored challenge: {:?}", stored_challenge);
-
-    // Verify authenticator attachment if specified
-    let expected = state
-        .config
-        .authenticator_selection
-        .authenticator_attachment
-        .clone();
-
-    let received = auth_response.authenticator_attachment.unwrap_or_default();
-
-    #[cfg(debug_assertions)]
-    println!(
-        "Expected attachment: {:?}, received attachment: {:?}",
-        expected, received
-    );
-
-    if expected != received {
-        return Err(WebAuthnError::InvalidAuthenticator("Invalid attachment".into()).into());
-    }
-
-    // Parse and verify client data
-    #[cfg(debug_assertions)]
-    println!(
-        "Parsing client data: {}",
-        &auth_response.response.client_data_json
-    );
-
-    let client_data = ParsedClientData::from_base64(&auth_response.response.client_data_json)?;
-
-    #[cfg(debug_assertions)]
-    println!("Parsed client data: {:?}", client_data);
-
-    client_data.verify(&state, &stored_challenge.challenge)?;
-
-    // Parse and verify authenticator data
-    #[cfg(debug_assertions)]
-    println!(
-        "Parsing authenticator data: {}",
-        &auth_response.response.authenticator_data
-    );
-
-    let auth_data = AuthenticatorData::from_base64(&auth_response.response.authenticator_data)?;
-
-    #[cfg(debug_assertions)]
-    println!("Parsed authenticator data: {:?}", auth_data);
-
-    auth_data.verify(&state)?;
-
-    // Get credential then public key
-    let credential = store
-        .credentials
-        .get(&auth_response.id)
-        .ok_or(WebAuthnError::InvalidSignature("Unknown credential".into()))?;
-
-    #[cfg(debug_assertions)]
-    println!("Found credential: {:?}", credential);
-
-    let user_handle = auth_response
-        .response
-        .user_handle
-        .as_ref()
-        .and_then(|handle| {
-            base64url_decode(handle)
-                .ok()
-                .and_then(|decoded| String::from_utf8(decoded).ok())
-        })
-        .unwrap_or("default".to_string());
-
-    #[cfg(debug_assertions)]
-    println!("user_info stored in credential: {:?}", &credential.user);
-    #[cfg(debug_assertions)]
-    println!("user_handle received from client: {:?}", &user_handle);
-
-    let display_name = credential.user.display_name.as_str().to_owned();
-
-    if credential.user.id != user_handle {
-        return Err(WebAuthnError::InvalidSignature("User handle mismatch".into()).into());
-    }
-
-    let verification_algorithm = &ring::signature::ECDSA_P256_SHA256_ASN1;
-    let public_key = UnparsedPublicKey::new(verification_algorithm, &credential.public_key);
-
-    // Signature
-    let signature = base64url_decode(&auth_response.response.signature)
-        .map_err(|e| WebAuthnError::InvalidSignature(format!("Invalid signature: {}", e)))?;
-
-    #[cfg(debug_assertions)]
-    println!("Decoded signature length: {}", signature.len());
-
-    // Prepare signed data
-    let client_data_hash = digest::digest(&digest::SHA256, &client_data.raw_data);
-    let mut signed_data = Vec::new();
-
-    signed_data.extend_from_slice(&auth_data.raw_data);
-    signed_data.extend_from_slice(client_data_hash.as_ref());
-
-    #[cfg(debug_assertions)]
-    println!("Signed data length: {}", signed_data.len());
-
-    // Verify signature using public key
-    match public_key.verify(&signed_data, &signature) {
-        Ok(_) => {
-            #[cfg(debug_assertions)]
-            println!("Signature verification successful");
-
-            // Cleanup and return success
-            store.challenges.remove(&auth_response.auth_id);
-            Ok(display_name)
-        }
-        Err(e) => {
-            #[cfg(debug_assertions)]
-            println!("Signature verification failed: {:?}", e);
-
-            Err(WebAuthnError::InvalidSignature("Signature verification failed".into()).into())
-        }
     }
 }

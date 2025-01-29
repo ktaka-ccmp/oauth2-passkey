@@ -9,6 +9,10 @@ use tokio::sync::Mutex;
 use crate::config::Config;
 use crate::errors::PasskeyError;
 
+pub(crate) mod attestation;
+pub mod auth;
+pub mod register;
+
 #[derive(Default)]
 struct AuthStore {
     challenges: HashMap<String, StoredChallenge>,
@@ -23,7 +27,7 @@ struct StoredChallenge {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-struct PublicKeyCredentialUserEntity {
+pub struct PublicKeyCredentialUserEntity {
     id: String,
     name: String,
     #[serde(rename = "displayName")]
@@ -60,10 +64,6 @@ struct AttestationObject {
 }
 
 // Public things
-pub(crate) mod attestation;
-pub mod auth;
-pub mod register;
-
 #[derive(Clone)]
 pub struct AppState {
     store: Arc<Mutex<AuthStore>>,

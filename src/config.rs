@@ -3,14 +3,6 @@ use std::env;
 
 use crate::errors::PasskeyError;
 
-#[derive(Serialize, Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum UserVerificationRequirement {
-    Required,
-    Preferred,
-    Discouraged,
-}
-
 #[derive(Clone, Debug)]
 pub struct Config {
     pub origin: String,

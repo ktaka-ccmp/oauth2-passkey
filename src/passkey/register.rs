@@ -1,67 +1,60 @@
-use axum::{extract::State, http::StatusCode, Json};
-
 use base64::engine::{general_purpose::URL_SAFE, Engine};
 use ciborium::value::{Integer, Value as CborValue};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::passkey::AppState;
-use crate::{
-    config::AuthenticatorSelection,
-    passkey::{
-        base64url_decode, generate_challenge, AttestationObject, PublicKeyCredentialUserEntity,
-        StoredChallenge, StoredCredential,
-    },
+use crate::config::AuthenticatorSelection;
+use crate::errors::WebAuthnError;
+use crate::passkey::{base64url_decode, generate_challenge};
+use crate::passkey::{
+    AppState, AttestationObject, PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential,
 };
 
 #[derive(Serialize, Debug)]
-struct PubKeyCredParam {
+pub struct PubKeyCredParam {
     #[serde(rename = "type")]
-    type_: String,
-    alg: i32,
+    pub type_: String,
+    pub alg: i32,
 }
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct RegistrationOptions {
-    challenge: String,
-    rp_id: String,
-    rp: RelyingParty,
-    user: PublicKeyCredentialUserEntity,
-    pub_key_cred_params: Vec<PubKeyCredParam>,
-    authenticator_selection: AuthenticatorSelection,
-    timeout: u32,
-    attestation: String,
+    pub challenge: String,
+    pub rp_id: String,
+    pub rp: RelyingParty,
+    pub user: PublicKeyCredentialUserEntity,
+    pub pub_key_cred_params: Vec<PubKeyCredParam>,
+    pub authenticator_selection: AuthenticatorSelection,
+    pub timeout: u32,
+    pub attestation: String,
 }
 
 #[derive(Serialize, Debug)]
-struct RelyingParty {
-    name: String,
-    id: String,
+pub struct RelyingParty {
+    pub name: String,
+    pub id: String,
 }
 
 #[allow(unused)]
 #[derive(Deserialize, Debug)]
 pub struct RegisterCredential {
-    id: String,
-    raw_id: String,
-    response: AuthenticatorAttestationResponse,
+    pub id: String,
+    pub raw_id: String,
+    pub response: AuthenticatorAttestationResponse,
     #[serde(rename = "type")]
-    type_: String,
-    username: Option<String>,
-    user_handle: Option<String>,
+    pub type_: String,
+    pub username: Option<String>,
+    pub user_handle: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
-struct AuthenticatorAttestationResponse {
-    client_data_json: String,
-    attestation_object: String,
+pub struct AuthenticatorAttestationResponse {
+    pub client_data_json: String,
+    pub attestation_object: String,
 }
 
-pub async fn start_registration(
-    State(state): State<AppState>,
-    Json(username): Json<String>,
-) -> Json<RegistrationOptions> {
+pub async fn start_registration(state: &AppState, username: String) -> RegistrationOptions {
     println!("Registering user: {}", username);
 
     let user_info = PublicKeyCredentialUserEntity {
@@ -109,55 +102,47 @@ pub async fn start_registration(
         attestation: "direct".to_string(),
     };
 
-    #[cfg(not(debug_assertions))]
-    println!("Debugging disabled");
-
     #[cfg(debug_assertions)]
     println!("Registration options: {:?}", options);
 
-    Json(options)
+    options
 }
 
 pub async fn finish_registration(
-    State(state): State<AppState>,
-    Json(reg_data): Json<RegisterCredential>,
-) -> Result<&'static str, (StatusCode, String)> {
+    state: &AppState,
+    reg_data: RegisterCredential,
+) -> Result<&'static str, WebAuthnError> {
     println!("Registering user: {:?}", reg_data);
     let mut store = state.store.lock().await;
 
-    verify_client_data(&state, &reg_data, &store).await?;
+    verify_client_data(state, &reg_data, &store)?;
 
-    let public_key = extract_credential_public_key(&reg_data, &state)?;
+    let public_key = extract_credential_public_key(&reg_data, state)?;
 
     // Decode and store credential
     let credential_id = base64url_decode(&reg_data.raw_id).map_err(|e| {
-        (
-            StatusCode::BAD_REQUEST,
-            format!("Failed to decode credential ID: {}", e),
-        )
+        WebAuthnError::InvalidClientData(format!("Failed to decode credential ID: {}", e))
     })?;
 
-    let user_handle = reg_data.user_handle.as_ref().ok_or((
-        StatusCode::BAD_REQUEST,
-        "User handle is missing".to_string(),
-    ))?;
+    let user_handle = reg_data
+        .user_handle
+        .as_ref()
+        .ok_or(WebAuthnError::InvalidClientData(
+            "User handle is missing".to_string(),
+        ))?;
     let stored_user = store
         .challenges
         .get(user_handle)
-        .ok_or((
-            StatusCode::BAD_REQUEST,
+        .ok_or(WebAuthnError::StorageError(
             "No challenge found for this user".to_string(),
         ))?
         .user
         .clone();
 
-    // let username = stored_user.name.clone();
-
     // Store using base64url encoded credential_id as the key
-    // let credential_id_str = URL_SAFE.encode(&credential_id);
     let credential_id_str = reg_data.raw_id.clone();
     store.credentials.insert(
-        credential_id_str, // Use this as the key instead of reg_data.id
+        credential_id_str,
         StoredCredential {
             credential_id,
             public_key,
@@ -175,28 +160,19 @@ pub async fn finish_registration(
 fn extract_credential_public_key(
     reg_data: &RegisterCredential,
     state: &AppState,
-) -> Result<Vec<u8>, (StatusCode, String)> {
+) -> Result<Vec<u8>, WebAuthnError> {
     let decoded_client_data =
         base64url_decode(&reg_data.response.client_data_json).map_err(|e| {
-            (
-                StatusCode::BAD_REQUEST,
-                format!("Failed to decode client data: {}", e),
-            )
+            WebAuthnError::InvalidClientData(format!("Failed to decode client data: {}", e))
         })?;
 
     let decoded_client_data_json = String::from_utf8(decoded_client_data.clone())
         .map_err(|e| {
-            (
-                StatusCode::BAD_REQUEST,
-                format!("Client data is not valid UTF-8: {}", e),
-            )
+            WebAuthnError::InvalidClientData(format!("Client data is not valid UTF-8: {}", e))
         })
         .and_then(|s: String| {
             serde_json::from_str::<serde_json::Value>(&s).map_err(|e| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    format!("Failed to parse client data JSON: {}", e),
-                )
+                WebAuthnError::InvalidClientData(format!("Failed to parse client data JSON: {}", e))
             })
         })?;
 
@@ -213,18 +189,13 @@ fn extract_credential_public_key(
     Ok(public_key)
 }
 
-fn parse_attestation_object(
-    attestation_base64: &str,
-) -> Result<AttestationObject, (StatusCode, String)> {
+fn parse_attestation_object(attestation_base64: &str) -> Result<AttestationObject, WebAuthnError> {
     let attestation_bytes = base64url_decode(attestation_base64).map_err(|e| {
-        (
-            StatusCode::BAD_REQUEST,
-            format!("Failed to decode attestation object: {}", e),
-        )
+        WebAuthnError::InvalidClientData(format!("Failed to decode attestation object: {}", e))
     })?;
 
     let attestation_cbor: CborValue = ciborium::de::from_reader(&attestation_bytes[..])
-        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid CBOR data: {}", e)))?;
+        .map_err(|e| WebAuthnError::InvalidClientData(format!("Invalid CBOR data: {}", e)))?;
 
     if let CborValue::Map(map) = attestation_cbor {
         let mut fmt = None;
@@ -266,26 +237,23 @@ fn parse_attestation_object(
                 auth_data: d,
                 att_stmt: s,
             }),
-            _ => Err((
-                StatusCode::BAD_REQUEST,
+            _ => Err(WebAuthnError::InvalidClientData(
                 "Missing required attestation data".to_string(),
             )),
         }
     } else {
-        Err((
-            StatusCode::BAD_REQUEST,
+        Err(WebAuthnError::InvalidClientData(
             "Invalid attestation format".to_string(),
         ))
     }
 }
 
-fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<Vec<u8>, (StatusCode, String)> {
+fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<Vec<u8>, WebAuthnError> {
     // Check attested credential data flag
     let flags = auth_data[32];
     let has_attested_cred_data = (flags & 0x40) != 0;
     if !has_attested_cred_data {
-        return Err((
-            StatusCode::BAD_REQUEST,
+        return Err(WebAuthnError::InvalidClientData(
             "No attested credential data present".to_string(),
         ));
     }
@@ -305,12 +273,11 @@ fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<Vec<u8>, (Statu
     Ok(public_key)
 }
 
-fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], (StatusCode, String)> {
+fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], WebAuthnError> {
     let mut pos = 37; // Skip RP ID hash (32) + flags (1) + counter (4)
 
     if auth_data.len() < pos + 18 {
-        return Err((
-            StatusCode::BAD_REQUEST,
+        return Err(WebAuthnError::InvalidClientData(
             "Authenticator data too short".to_string(),
         ));
     }
@@ -322,15 +289,13 @@ fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], (StatusCode, String)
     pos += 2;
 
     if cred_id_len == 0 || cred_id_len > 1024 {
-        return Err((
-            StatusCode::BAD_REQUEST,
+        return Err(WebAuthnError::InvalidClientData(
             "Invalid credential ID length".to_string(),
         ));
     }
 
     if auth_data.len() < pos + cred_id_len {
-        return Err((
-            StatusCode::BAD_REQUEST,
+        return Err(WebAuthnError::InvalidClientData(
             "Authenticator data too short for credential ID".to_string(),
         ));
     }
@@ -340,15 +305,9 @@ fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], (StatusCode, String)
     Ok(&auth_data[pos..])
 }
 
-fn extract_key_coordinates(
-    credential_data: &[u8],
-) -> Result<(Vec<u8>, Vec<u8>), (StatusCode, String)> {
-    let public_key_cbor: CborValue = ciborium::de::from_reader(credential_data).map_err(|e| {
-        (
-            StatusCode::BAD_REQUEST,
-            format!("Invalid public key CBOR: {}", e),
-        )
-    })?;
+fn extract_key_coordinates(credential_data: &[u8]) -> Result<(Vec<u8>, Vec<u8>), WebAuthnError> {
+    let public_key_cbor: CborValue = ciborium::de::from_reader(credential_data)
+        .map_err(|e| WebAuthnError::InvalidClientData(format!("Invalid public key CBOR: {}", e)))?;
 
     if let CborValue::Map(map) = public_key_cbor {
         let mut x_coord = None;
@@ -370,90 +329,84 @@ fn extract_key_coordinates(
 
         match (x_coord, y_coord) {
             (Some(x), Some(y)) => Ok((x, y)),
-            _ => Err((
-                StatusCode::BAD_REQUEST,
+            _ => Err(WebAuthnError::InvalidClientData(
                 "Missing or invalid key coordinates".to_string(),
             )),
         }
     } else {
-        Err((
-            StatusCode::BAD_REQUEST,
+        Err(WebAuthnError::InvalidClientData(
             "Invalid public key format".to_string(),
         ))
     }
 }
 
-async fn verify_client_data(
+fn verify_client_data(
     state: &AppState,
     reg_data: &RegisterCredential,
     store: &tokio::sync::MutexGuard<'_, super::AuthStore>,
-) -> Result<(), (StatusCode, String)> {
+) -> Result<(), WebAuthnError> {
     // Decode and verify client data
     let decoded_client_data =
         base64url_decode(&reg_data.response.client_data_json).map_err(|e| {
-            (
-                StatusCode::BAD_REQUEST,
-                format!("Failed to decode client data: {}", e),
-            )
+            WebAuthnError::InvalidClientData(format!("Failed to decode client data: {}", e))
         })?;
 
     let client_data_str = String::from_utf8(decoded_client_data.clone()).map_err(|e| {
-        (
-            StatusCode::BAD_REQUEST,
-            format!("Client data is not valid UTF-8: {}", e),
-        )
+        WebAuthnError::InvalidClientData(format!("Client data is not valid UTF-8: {}", e))
     })?;
 
     let client_data: serde_json::Value = serde_json::from_str(&client_data_str).map_err(|e| {
-        (
-            StatusCode::BAD_REQUEST,
-            format!("Invalid client data JSON: {}", e),
-        )
+        WebAuthnError::InvalidClientData(format!("Invalid client data JSON: {}", e))
     })?;
 
-    let origin = client_data["origin"].as_str().ok_or((
-        StatusCode::BAD_REQUEST,
-        "Missing origin in client data".to_string(),
-    ))?;
+    let origin = client_data["origin"]
+        .as_str()
+        .ok_or(WebAuthnError::InvalidClientData(
+            "Missing origin in client data".to_string(),
+        ))?;
 
     if origin != state.config.origin {
-        return Err((StatusCode::BAD_REQUEST, "Invalid origin".to_string()));
+        return Err(WebAuthnError::InvalidClientData(
+            "Invalid origin".to_string(),
+        ));
     }
 
-    let type_ = client_data["type"].as_str().ok_or((
-        StatusCode::BAD_REQUEST,
-        "Missing type in client data".to_string(),
-    ))?;
+    let type_ = client_data["type"]
+        .as_str()
+        .ok_or(WebAuthnError::InvalidClientData(
+            "Missing type in client data".to_string(),
+        ))?;
 
     if type_ != "webauthn.create" {
-        return Err((StatusCode::BAD_REQUEST, "Invalid type".to_string()));
+        return Err(WebAuthnError::InvalidClientData("Invalid type".to_string()));
     }
 
-    let challenge = client_data["challenge"].as_str().ok_or((
-        StatusCode::BAD_REQUEST,
-        "Missing challenge in client data".to_string(),
-    ))?;
+    let challenge = client_data["challenge"]
+        .as_str()
+        .ok_or(WebAuthnError::InvalidClientData(
+            "Missing challenge in client data".to_string(),
+        ))?;
 
     let decoded_challenge = base64url_decode(challenge).map_err(|e| {
-        (
-            StatusCode::BAD_REQUEST,
-            format!("Failed to decode challenge: {}", e),
-        )
+        WebAuthnError::InvalidClientData(format!("Failed to decode challenge: {}", e))
     })?;
 
-    let user_handle = reg_data.user_handle.as_ref().ok_or((
-        StatusCode::BAD_REQUEST,
-        "User handle is missing".to_string(),
-    ))?;
+    let user_handle = reg_data
+        .user_handle
+        .as_ref()
+        .ok_or(WebAuthnError::InvalidClientData(
+            "User handle is missing".to_string(),
+        ))?;
 
-    let stored_challenge = store.challenges.get(user_handle).ok_or((
-        StatusCode::BAD_REQUEST,
-        "No challenge found for this user".to_string(),
-    ))?;
+    let stored_challenge = store
+        .challenges
+        .get(user_handle)
+        .ok_or(WebAuthnError::StorageError(
+            "No challenge found for this user".to_string(),
+        ))?;
 
     if decoded_challenge != stored_challenge.challenge {
-        return Err((
-            StatusCode::BAD_REQUEST,
+        return Err(WebAuthnError::InvalidClientData(
             "Challenge verification failed".to_string(),
         ));
     }
