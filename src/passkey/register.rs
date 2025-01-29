@@ -1,9 +1,4 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    routing::{post, Router},
-    Json,
-};
+use axum::{extract::State, http::StatusCode, Json};
 
 use base64::engine::{general_purpose::URL_SAFE, Engine};
 use ciborium::value::{Integer, Value as CborValue};
@@ -19,21 +14,6 @@ use crate::{
     },
 };
 
-pub fn router(state: AppState) -> Router {
-    Router::new()
-        .route("/start", post(start_registration))
-        .route(
-            "/finish",
-            post(|state, json| async move {
-                match finish_registration(state, json).await {
-                    Ok(message) => (StatusCode::OK, message.to_string()),
-                    Err((status, message)) => (status, message),
-                }
-            }),
-        )
-        .with_state(state)
-}
-
 #[derive(Serialize, Debug)]
 struct PubKeyCredParam {
     #[serde(rename = "type")]
@@ -43,7 +23,7 @@ struct PubKeyCredParam {
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct RegistrationOptions {
+pub struct RegistrationOptions {
     challenge: String,
     rp_id: String,
     rp: RelyingParty,
@@ -62,7 +42,7 @@ struct RelyingParty {
 
 #[allow(unused)]
 #[derive(Deserialize, Debug)]
-struct RegisterCredential {
+pub struct RegisterCredential {
     id: String,
     raw_id: String,
     response: AuthenticatorAttestationResponse,
@@ -78,7 +58,7 @@ struct AuthenticatorAttestationResponse {
     attestation_object: String,
 }
 
-async fn start_registration(
+pub async fn start_registration(
     State(state): State<AppState>,
     Json(username): Json<String>,
 ) -> Json<RegistrationOptions> {
@@ -138,7 +118,7 @@ async fn start_registration(
     Json(options)
 }
 
-async fn finish_registration(
+pub async fn finish_registration(
     State(state): State<AppState>,
     Json(reg_data): Json<RegisterCredential>,
 ) -> Result<&'static str, (StatusCode, String)> {

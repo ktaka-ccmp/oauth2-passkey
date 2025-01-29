@@ -1,30 +1,4 @@
-/// This module handles the authentication process using WebAuthn.
-/// It provides routes for starting and verifying authentication.
-///
-/// The main components are:
-/// - `router`: Sets up the routes for authentication.
-/// - `start_authentication`: Initiates the authentication process by generating a challenge.
-/// - `verify_authentication`: Verifies the authentication response from the client.
-///
-/// # Structures
-/// - `AuthenticationOptions`: Represents the options for authentication.
-/// - `AllowCredential`: Represents allowed credentials for authentication.
-/// - `AuthenticateCredential`: Represents the credential data received from the client.
-/// - `AuthenticatorAssertionResponse`: Represents the response from the authenticator.
-///
-/// # Functions
-/// - `start_authentication`: Generates a challenge and returns authentication options.
-/// - `verify_authentication`: Verifies the client's response to the authentication challenge.
-///
-/// # Errors
-/// The functions return appropriate HTTP status codes and error messages in case of failures,
-/// such as invalid client data, challenge verification failure, invalid origin, and invalid signature.
-use axum::{
-    extract::State,
-    http::StatusCode,
-    routing::{post, Router},
-    Json,
-};
+use axum::{extract::State, http::StatusCode, Json};
 
 use base64::engine::{general_purpose::URL_SAFE, Engine};
 use ring::{digest, signature::UnparsedPublicKey};
@@ -36,24 +10,9 @@ use crate::passkey::{
     base64url_decode, generate_challenge, AppState, PublicKeyCredentialUserEntity, StoredChallenge,
 };
 
-pub fn router(state: AppState) -> Router {
-    Router::new()
-        .route("/start", post(start_authentication))
-        .route(
-            "/verify",
-            post(|state, json| async move {
-                match verify_authentication(state, json).await {
-                    Ok(message) => (StatusCode::OK, message.to_string()),
-                    Err((status, message)) => (status, message),
-                }
-            }),
-        )
-        .with_state(state)
-}
-
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct AuthenticationOptions {
+pub struct AuthenticationOptions {
     challenge: String,
     timeout: u32,
     rp_id: String,
@@ -71,7 +30,7 @@ struct AllowCredential {
 
 #[allow(unused)]
 #[derive(Deserialize, Debug)]
-struct AuthenticatorResponse {
+pub struct AuthenticatorResponse {
     id: String,
     raw_id: String,
     response: AuthenticatorAssertionResponse,
@@ -89,7 +48,7 @@ struct AuthenticatorAssertionResponse {
     user_handle: Option<String>,
 }
 
-async fn start_authentication(State(state): State<AppState>) -> Json<AuthenticationOptions> {
+pub async fn start_authentication(State(state): State<AppState>) -> Json<AuthenticationOptions> {
     let challenge = generate_challenge();
 
     let user_info = PublicKeyCredentialUserEntity {
@@ -111,24 +70,11 @@ async fn start_authentication(State(state): State<AppState>) -> Json<Authenticat
     let mut store = state.store.lock().await;
     store.challenges.insert(auth_id.clone(), stored_challenge);
 
-    // let allow_credentials: Vec<_> = store
-    //     .credentials
-    //     .keys()
-    //     .map(|id| AllowCredential {
-    //         type_: "public-key".to_string(),
-    //         id: id.clone(), // ID is already base64url encoded
-    //     })
-    //     .collect();
-
-    // let allow_credentials: Vec<AllowCredential> = Vec::new();
-    // #[cfg(debug_assertions)]
-    // println!("Available credentials: {:?}", allow_credentials);
-
     let auth_option = AuthenticationOptions {
         challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
         timeout: 60000,
         rp_id: state.config.rp_id.clone(),
-        allow_credentials: vec![],
+        allow_credentials: vec![], // Empty for resident keys
         user_verification: state
             .config
             .authenticator_selection
@@ -210,18 +156,25 @@ impl ParsedClientData {
 
         // Verify origin
         if self.origin != state.config.origin {
-            return Err(WebAuthnError::InvalidClientData("Invalid origin".into()));
+            return Err(WebAuthnError::InvalidClientData(format!(
+                "Invalid origin. Expected: {}, Got: {}",
+                state.config.origin, self.origin
+            )));
         }
 
-        // Verify type
+        // Verify type for authentication
         if self.type_ != "webauthn.get" {
-            return Err(WebAuthnError::InvalidClientData("Invalid type".into()));
+            return Err(WebAuthnError::InvalidClientData(format!(
+                "Invalid type. Expected 'webauthn.get', Got: {}",
+                self.type_
+            )));
         }
 
         Ok(())
     }
 }
 
+#[derive(Debug)]
 struct AuthenticatorData {
     rp_id_hash: Vec<u8>,
     flags: u8,
@@ -250,41 +203,53 @@ impl AuthenticatorData {
         // Verify RP ID hash
         let expected_hash = digest::digest(&digest::SHA256, state.config.rp_id.as_bytes());
         if self.rp_id_hash != expected_hash.as_ref() {
+            return Err(WebAuthnError::InvalidAuthenticator(format!(
+                "Invalid RP ID hash. Expected: {:?}, Got: {:?}",
+                expected_hash.as_ref(),
+                self.rp_id_hash
+            )));
+        }
+
+        // Check user presence flag
+        if self.flags & 0x01 == 0 {
             return Err(WebAuthnError::InvalidAuthenticator(
-                "Invalid RP ID hash".into(),
+                "User presence flag not set".into(),
             ));
         }
 
-        // Verify user presence
-        if self.flags & 0x01 != 0x01 {
-            return Err(WebAuthnError::InvalidAuthenticator(
-                "User presence not verified".into(),
-            ));
-        }
-
-        // Verify user verification if required
+        // Check user verification flag if required
         if state.config.authenticator_selection.user_verification == "required"
-            && self.flags & 0x04 != 0x04
+            && self.flags & 0x04 == 0
         {
-            return Err(WebAuthnError::InvalidAuthenticator(
-                "User verification required".into(),
-            ));
+            return Err(WebAuthnError::InvalidAuthenticator(format!(
+                "User verification required but flag not set. Flags: {:02x}",
+                self.flags
+            )));
         }
 
         Ok(())
     }
 }
 
-async fn verify_authentication(
+pub async fn verify_authentication(
     State(state): State<AppState>,
     Json(auth_response): Json<AuthenticatorResponse>,
 ) -> Result<String, (StatusCode, String)> {
+    #[cfg(debug_assertions)]
+    println!(
+        "Starting authentication verification for response: {:?}",
+        auth_response
+    );
+
     // Get stored challenge and verify auth
     let mut store = state.store.lock().await;
     let stored_challenge = store
         .challenges
         .get(&auth_response.auth_id)
         .ok_or(WebAuthnError::StorageError("Challenge not found".into()))?;
+
+    #[cfg(debug_assertions)]
+    println!("Found stored challenge: {:?}", stored_challenge);
 
     // Verify authenticator attachment if specified
     let expected = state
@@ -306,18 +271,41 @@ async fn verify_authentication(
     }
 
     // Parse and verify client data
+    #[cfg(debug_assertions)]
+    println!(
+        "Parsing client data: {}",
+        &auth_response.response.client_data_json
+    );
+
     let client_data = ParsedClientData::from_base64(&auth_response.response.client_data_json)?;
+
+    #[cfg(debug_assertions)]
+    println!("Parsed client data: {:?}", client_data);
+
     client_data.verify(&state, &stored_challenge.challenge)?;
 
     // Parse and verify authenticator data
+    #[cfg(debug_assertions)]
+    println!(
+        "Parsing authenticator data: {}",
+        &auth_response.response.authenticator_data
+    );
+
     let auth_data = AuthenticatorData::from_base64(&auth_response.response.authenticator_data)?;
+
+    #[cfg(debug_assertions)]
+    println!("Parsed authenticator data: {:?}", auth_data);
+
     auth_data.verify(&state)?;
 
-    // #1. Get credential then public key
+    // Get credential then public key
     let credential = store
         .credentials
         .get(&auth_response.id)
         .ok_or(WebAuthnError::InvalidSignature("Unknown credential".into()))?;
+
+    #[cfg(debug_assertions)]
+    println!("Found credential: {:?}", credential);
 
     let user_handle = auth_response
         .response
@@ -344,24 +332,38 @@ async fn verify_authentication(
     let verification_algorithm = &ring::signature::ECDSA_P256_SHA256_ASN1;
     let public_key = UnparsedPublicKey::new(verification_algorithm, &credential.public_key);
 
-    // #2. Signature
+    // Signature
     let signature = base64url_decode(&auth_response.response.signature)
         .map_err(|e| WebAuthnError::InvalidSignature(format!("Invalid signature: {}", e)))?;
 
-    // #3. Prepare signed data
+    #[cfg(debug_assertions)]
+    println!("Decoded signature length: {}", signature.len());
+
+    // Prepare signed data
     let client_data_hash = digest::digest(&digest::SHA256, &client_data.raw_data);
     let mut signed_data = Vec::new();
 
     signed_data.extend_from_slice(&auth_data.raw_data);
     signed_data.extend_from_slice(client_data_hash.as_ref());
 
-    // Verify signature using #1, #2 and #3
-    public_key
-        .verify(&signed_data, &signature)
-        .map_err(|_| WebAuthnError::InvalidSignature("Signature verification failed".into()))?;
+    #[cfg(debug_assertions)]
+    println!("Signed data length: {}", signed_data.len());
 
-    // Cleanup and return success
-    store.challenges.remove(&auth_response.auth_id);
+    // Verify signature using public key
+    match public_key.verify(&signed_data, &signature) {
+        Ok(_) => {
+            #[cfg(debug_assertions)]
+            println!("Signature verification successful");
 
-    Ok(display_name)
+            // Cleanup and return success
+            store.challenges.remove(&auth_response.auth_id);
+            Ok(display_name)
+        }
+        Err(e) => {
+            #[cfg(debug_assertions)]
+            println!("Signature verification failed: {:?}", e);
+
+            Err(WebAuthnError::InvalidSignature("Signature verification failed".into()).into())
+        }
+    }
 }
