@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::config::AuthenticatorSelection;
-use crate::errors::WebAuthnError;
+use crate::errors::PasskeyError;
 use crate::passkey::{base64url_decode, generate_challenge};
 use crate::passkey::{
     AppState, AttestationObject, PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential,
@@ -111,7 +111,7 @@ pub async fn start_registration(state: &AppState, username: String) -> Registrat
 pub async fn finish_registration(
     state: &AppState,
     reg_data: RegisterCredential,
-) -> Result<&'static str, WebAuthnError> {
+) -> Result<&'static str, PasskeyError> {
     println!("Registering user: {:?}", reg_data);
     let mut store = state.store.lock().await;
 
@@ -120,20 +120,19 @@ pub async fn finish_registration(
     let public_key = extract_credential_public_key(&reg_data, state)?;
 
     // Decode and store credential
-    let credential_id = base64url_decode(&reg_data.raw_id).map_err(|e| {
-        WebAuthnError::InvalidClientData(format!("Failed to decode credential ID: {}", e))
-    })?;
+    let credential_id = base64url_decode(&reg_data.raw_id)
+        .map_err(|e| PasskeyError::Format(format!("Failed to decode credential ID: {}", e)))?;
 
     let user_handle = reg_data
         .user_handle
         .as_ref()
-        .ok_or(WebAuthnError::InvalidClientData(
+        .ok_or(PasskeyError::ClientData(
             "User handle is missing".to_string(),
         ))?;
     let stored_user = store
         .challenges
         .get(user_handle)
-        .ok_or(WebAuthnError::StorageError(
+        .ok_or(PasskeyError::Storage(
             "No challenge found for this user".to_string(),
         ))?
         .user
@@ -160,19 +159,15 @@ pub async fn finish_registration(
 fn extract_credential_public_key(
     reg_data: &RegisterCredential,
     state: &AppState,
-) -> Result<Vec<u8>, WebAuthnError> {
-    let decoded_client_data =
-        base64url_decode(&reg_data.response.client_data_json).map_err(|e| {
-            WebAuthnError::InvalidClientData(format!("Failed to decode client data: {}", e))
-        })?;
+) -> Result<Vec<u8>, PasskeyError> {
+    let decoded_client_data = base64url_decode(&reg_data.response.client_data_json)
+        .map_err(|e| PasskeyError::Format(format!("Failed to decode client data: {}", e)))?;
 
     let decoded_client_data_json = String::from_utf8(decoded_client_data.clone())
-        .map_err(|e| {
-            WebAuthnError::InvalidClientData(format!("Client data is not valid UTF-8: {}", e))
-        })
+        .map_err(|e| PasskeyError::Format(format!("Client data is not valid UTF-8: {}", e)))
         .and_then(|s: String| {
             serde_json::from_str::<serde_json::Value>(&s).map_err(|e| {
-                WebAuthnError::InvalidClientData(format!("Failed to parse client data JSON: {}", e))
+                PasskeyError::Format(format!("Failed to parse client data JSON: {}", e))
             })
         })?;
 
@@ -189,13 +184,12 @@ fn extract_credential_public_key(
     Ok(public_key)
 }
 
-fn parse_attestation_object(attestation_base64: &str) -> Result<AttestationObject, WebAuthnError> {
-    let attestation_bytes = base64url_decode(attestation_base64).map_err(|e| {
-        WebAuthnError::InvalidClientData(format!("Failed to decode attestation object: {}", e))
-    })?;
+fn parse_attestation_object(attestation_base64: &str) -> Result<AttestationObject, PasskeyError> {
+    let attestation_bytes = base64url_decode(attestation_base64)
+        .map_err(|e| PasskeyError::Format(format!("Failed to decode attestation object: {}", e)))?;
 
     let attestation_cbor: CborValue = ciborium::de::from_reader(&attestation_bytes[..])
-        .map_err(|e| WebAuthnError::InvalidClientData(format!("Invalid CBOR data: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Invalid CBOR data: {}", e)))?;
 
     if let CborValue::Map(map) = attestation_cbor {
         let mut fmt = None;
@@ -237,23 +231,23 @@ fn parse_attestation_object(attestation_base64: &str) -> Result<AttestationObjec
                 auth_data: d,
                 att_stmt: s,
             }),
-            _ => Err(WebAuthnError::InvalidClientData(
+            _ => Err(PasskeyError::Format(
                 "Missing required attestation data".to_string(),
             )),
         }
     } else {
-        Err(WebAuthnError::InvalidClientData(
+        Err(PasskeyError::Format(
             "Invalid attestation format".to_string(),
         ))
     }
 }
 
-fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<Vec<u8>, WebAuthnError> {
+fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<Vec<u8>, PasskeyError> {
     // Check attested credential data flag
     let flags = auth_data[32];
     let has_attested_cred_data = (flags & 0x40) != 0;
     if !has_attested_cred_data {
-        return Err(WebAuthnError::InvalidClientData(
+        return Err(PasskeyError::AuthenticatorData(
             "No attested credential data present".to_string(),
         ));
     }
@@ -264,7 +258,7 @@ fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<Vec<u8>, WebAut
     // Extract public key coordinates
     let (x_coord, y_coord) = extract_key_coordinates(credential_data)?;
 
-    // Format public key
+    // Concatenate x and y coordinates for public key
     let mut public_key = Vec::with_capacity(65);
     public_key.push(0x04); // Uncompressed point format
     public_key.extend_from_slice(&x_coord);
@@ -273,11 +267,11 @@ fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<Vec<u8>, WebAut
     Ok(public_key)
 }
 
-fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], WebAuthnError> {
+fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], PasskeyError> {
     let mut pos = 37; // Skip RP ID hash (32) + flags (1) + counter (4)
 
     if auth_data.len() < pos + 18 {
-        return Err(WebAuthnError::InvalidClientData(
+        return Err(PasskeyError::Format(
             "Authenticator data too short".to_string(),
         ));
     }
@@ -289,13 +283,13 @@ fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], WebAuthnError> {
     pos += 2;
 
     if cred_id_len == 0 || cred_id_len > 1024 {
-        return Err(WebAuthnError::InvalidClientData(
+        return Err(PasskeyError::Format(
             "Invalid credential ID length".to_string(),
         ));
     }
 
     if auth_data.len() < pos + cred_id_len {
-        return Err(WebAuthnError::InvalidClientData(
+        return Err(PasskeyError::Format(
             "Authenticator data too short for credential ID".to_string(),
         ));
     }
@@ -305,9 +299,9 @@ fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], WebAuthnError> {
     Ok(&auth_data[pos..])
 }
 
-fn extract_key_coordinates(credential_data: &[u8]) -> Result<(Vec<u8>, Vec<u8>), WebAuthnError> {
+fn extract_key_coordinates(credential_data: &[u8]) -> Result<(Vec<u8>, Vec<u8>), PasskeyError> {
     let public_key_cbor: CborValue = ciborium::de::from_reader(credential_data)
-        .map_err(|e| WebAuthnError::InvalidClientData(format!("Invalid public key CBOR: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Invalid public key CBOR: {}", e)))?;
 
     if let CborValue::Map(map) = public_key_cbor {
         let mut x_coord = None;
@@ -329,12 +323,12 @@ fn extract_key_coordinates(credential_data: &[u8]) -> Result<(Vec<u8>, Vec<u8>),
 
         match (x_coord, y_coord) {
             (Some(x), Some(y)) => Ok((x, y)),
-            _ => Err(WebAuthnError::InvalidClientData(
+            _ => Err(PasskeyError::Format(
                 "Missing or invalid key coordinates".to_string(),
             )),
         }
     } else {
-        Err(WebAuthnError::InvalidClientData(
+        Err(PasskeyError::Format(
             "Invalid public key format".to_string(),
         ))
     }
@@ -344,69 +338,64 @@ fn verify_client_data(
     state: &AppState,
     reg_data: &RegisterCredential,
     store: &tokio::sync::MutexGuard<'_, super::AuthStore>,
-) -> Result<(), WebAuthnError> {
+) -> Result<(), PasskeyError> {
     // Decode and verify client data
-    let decoded_client_data =
-        base64url_decode(&reg_data.response.client_data_json).map_err(|e| {
-            WebAuthnError::InvalidClientData(format!("Failed to decode client data: {}", e))
+    let decoded_client_data = base64url_decode(&reg_data.response.client_data_json)
+        .map_err(|e| PasskeyError::Format(format!("Failed to decode client data: {}", e)))?;
+
+    let client_data_str = String::from_utf8(decoded_client_data.clone())
+        .map_err(|e| PasskeyError::Format(format!("Client data is not valid UTF-8: {}", e)))
+        .and_then(|s: String| {
+            serde_json::from_str::<serde_json::Value>(&s).map_err(|e| {
+                PasskeyError::Format(format!("Failed to parse client data JSON: {}", e))
+            })
         })?;
 
-    let client_data_str = String::from_utf8(decoded_client_data.clone()).map_err(|e| {
-        WebAuthnError::InvalidClientData(format!("Client data is not valid UTF-8: {}", e))
-    })?;
-
-    let client_data: serde_json::Value = serde_json::from_str(&client_data_str).map_err(|e| {
-        WebAuthnError::InvalidClientData(format!("Invalid client data JSON: {}", e))
-    })?;
-
-    let origin = client_data["origin"]
+    let origin = client_data_str["origin"]
         .as_str()
-        .ok_or(WebAuthnError::InvalidClientData(
+        .ok_or(PasskeyError::ClientData(
             "Missing origin in client data".to_string(),
         ))?;
 
     if origin != state.config.origin {
-        return Err(WebAuthnError::InvalidClientData(
-            "Invalid origin".to_string(),
-        ));
+        return Err(PasskeyError::ClientData("Invalid origin".to_string()));
     }
 
-    let type_ = client_data["type"]
+    let type_ = client_data_str["type"]
         .as_str()
-        .ok_or(WebAuthnError::InvalidClientData(
+        .ok_or(PasskeyError::ClientData(
             "Missing type in client data".to_string(),
         ))?;
 
     if type_ != "webauthn.create" {
-        return Err(WebAuthnError::InvalidClientData("Invalid type".to_string()));
+        return Err(PasskeyError::ClientData("Invalid type".to_string()));
     }
 
-    let challenge = client_data["challenge"]
+    let challenge = client_data_str["challenge"]
         .as_str()
-        .ok_or(WebAuthnError::InvalidClientData(
+        .ok_or(PasskeyError::ClientData(
             "Missing challenge in client data".to_string(),
         ))?;
 
-    let decoded_challenge = base64url_decode(challenge).map_err(|e| {
-        WebAuthnError::InvalidClientData(format!("Failed to decode challenge: {}", e))
-    })?;
+    let decoded_challenge = base64url_decode(challenge)
+        .map_err(|e| PasskeyError::Format(format!("Failed to decode challenge: {}", e)))?;
 
     let user_handle = reg_data
         .user_handle
         .as_ref()
-        .ok_or(WebAuthnError::InvalidClientData(
+        .ok_or(PasskeyError::ClientData(
             "User handle is missing".to_string(),
         ))?;
 
     let stored_challenge = store
         .challenges
         .get(user_handle)
-        .ok_or(WebAuthnError::StorageError(
+        .ok_or(PasskeyError::Storage(
             "No challenge found for this user".to_string(),
         ))?;
 
     if decoded_challenge != stored_challenge.challenge {
-        return Err(WebAuthnError::InvalidClientData(
+        return Err(PasskeyError::Challenge(
             "Challenge verification failed".to_string(),
         ));
     }

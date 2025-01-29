@@ -45,7 +45,9 @@ struct StoredCredential {
 fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
     let padding_len = (4 - input.len() % 4) % 4;
     let padded = format!("{}{}", input, "=".repeat(padding_len));
-    Ok(URL_SAFE.decode(padded)?)
+    let decoded = URL_SAFE.decode(padded)
+        .map_err(|_| PasskeyError::Format("Failed to decode base64url".to_string()))?;
+    Ok(decoded)
 }
 
 fn generate_challenge() -> Result<Vec<u8>, PasskeyError> {

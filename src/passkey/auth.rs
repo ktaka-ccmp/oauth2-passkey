@@ -3,7 +3,7 @@ use ring::{digest, signature::UnparsedPublicKey};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::errors::WebAuthnError;
+use crate::errors::PasskeyError;
 use crate::passkey::{base64url_decode, generate_challenge};
 use crate::passkey::{AppState, PublicKeyCredentialUserEntity, StoredChallenge};
 
@@ -83,7 +83,7 @@ pub async fn start_authentication(state: &AppState) -> AuthenticationOptions {
 pub async fn verify_authentication(
     state: &AppState,
     auth_response: AuthenticatorResponse,
-) -> Result<String, WebAuthnError> {
+) -> Result<String, PasskeyError> {
     #[cfg(debug_assertions)]
     println!(
         "Starting authentication verification for response: {:?}",
@@ -95,7 +95,7 @@ pub async fn verify_authentication(
     let stored_challenge = store
         .challenges
         .get(&auth_response.auth_id)
-        .ok_or(WebAuthnError::StorageError("Challenge not found".into()))?;
+        .ok_or(PasskeyError::Storage("Challenge not found".into()))?;
 
     #[cfg(debug_assertions)]
     println!("Found stored challenge: {:?}", stored_challenge);
@@ -132,7 +132,7 @@ pub async fn verify_authentication(
     let credential = store
         .credentials
         .get(&auth_response.id)
-        .ok_or(WebAuthnError::InvalidSignature("Unknown credential".into()))?;
+        .ok_or(PasskeyError::Authentication("Unknown credential".into()))?;
 
     #[cfg(debug_assertions)]
     println!("Found credential: {:?}", credential);
@@ -156,9 +156,7 @@ pub async fn verify_authentication(
     let display_name = credential.user.display_name.as_str().to_owned();
 
     if credential.user.id != user_handle {
-        return Err(WebAuthnError::InvalidSignature(
-            "User handle mismatch".into(),
-        ));
+        return Err(PasskeyError::Authentication("User handle mismatch".into()));
     }
 
     let verification_algorithm = &ring::signature::ECDSA_P256_SHA256_ASN1;
@@ -166,7 +164,7 @@ pub async fn verify_authentication(
 
     // Signature
     let signature = base64url_decode(&auth_response.response.signature)
-        .map_err(|e| WebAuthnError::InvalidSignature(format!("Invalid signature: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Invalid signature: {}", e)))?;
 
     #[cfg(debug_assertions)]
     println!("Decoded signature length: {}", signature.len());
@@ -195,7 +193,7 @@ pub async fn verify_authentication(
             #[cfg(debug_assertions)]
             println!("Signature verification failed: {:?}", e);
 
-            Err(WebAuthnError::InvalidSignature(
+            Err(PasskeyError::Verification(
                 "Signature verification failed".into(),
             ))
         }
@@ -211,46 +209,46 @@ struct ParsedClientData {
 }
 
 impl ParsedClientData {
-    fn from_base64(client_data_json: &str) -> Result<Self, WebAuthnError> {
+    fn from_base64(client_data_json: &str) -> Result<Self, PasskeyError> {
         let raw_data = base64url_decode(client_data_json)
-            .map_err(|e| WebAuthnError::InvalidClientData(format!("Failed to decode: {}", e)))?;
+            .map_err(|e| PasskeyError::Format(format!("Failed to decode: {}", e)))?;
 
         let data_str = String::from_utf8(raw_data.clone())
-            .map_err(|e| WebAuthnError::InvalidClientData(format!("Invalid UTF-8: {}", e)))?;
+            .map_err(|e| PasskeyError::Format(format!("Invalid UTF-8: {}", e)))?;
 
         let data: serde_json::Value = serde_json::from_str(&data_str)
-            .map_err(|e| WebAuthnError::InvalidClientData(format!("Invalid JSON: {}", e)))?;
+            .map_err(|e| PasskeyError::Format(format!("Invalid JSON: {}", e)))?;
 
         let challenge = base64url_decode(
             data["challenge"]
                 .as_str()
-                .ok_or_else(|| WebAuthnError::InvalidClientData("Missing challenge".into()))?,
+                .ok_or_else(|| PasskeyError::ClientData("Missing challenge".into()))?,
         )
-        .map_err(|e| WebAuthnError::InvalidClientData(format!("Invalid challenge: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Invalid challenge: {}", e)))?;
 
         Ok(Self {
             challenge,
             origin: data["origin"]
                 .as_str()
-                .ok_or_else(|| WebAuthnError::InvalidClientData("Missing origin".into()))?
+                .ok_or_else(|| PasskeyError::ClientData("Missing origin".into()))?
                 .to_string(),
             type_: data["type"]
                 .as_str()
-                .ok_or_else(|| WebAuthnError::InvalidClientData("Missing type".into()))?
+                .ok_or_else(|| PasskeyError::ClientData("Missing type".into()))?
                 .to_string(),
             raw_data,
         })
     }
 
-    fn verify(&self, state: &AppState, stored_challenge: &[u8]) -> Result<(), WebAuthnError> {
+    fn verify(&self, state: &AppState, stored_challenge: &[u8]) -> Result<(), PasskeyError> {
         // Verify challenge
         if self.challenge != stored_challenge {
-            return Err(WebAuthnError::InvalidChallenge("Challenge mismatch".into()));
+            return Err(PasskeyError::Challenge("Challenge mismatch".into()));
         }
 
         // Verify origin
         if self.origin != state.config.origin {
-            return Err(WebAuthnError::InvalidClientData(format!(
+            return Err(PasskeyError::ClientData(format!(
                 "Invalid origin. Expected: {}, Got: {}",
                 state.config.origin, self.origin
             )));
@@ -258,7 +256,7 @@ impl ParsedClientData {
 
         // Verify type for authentication
         if self.type_ != "webauthn.get" {
-            return Err(WebAuthnError::InvalidClientData(format!(
+            return Err(PasskeyError::ClientData(format!(
                 "Invalid type. Expected 'webauthn.get', Got: {}",
                 self.type_
             )));
@@ -276,12 +274,12 @@ struct AuthenticatorData {
 }
 
 impl AuthenticatorData {
-    fn from_base64(auth_data: &str) -> Result<Self, WebAuthnError> {
+    fn from_base64(auth_data: &str) -> Result<Self, PasskeyError> {
         let data = base64url_decode(auth_data)
-            .map_err(|e| WebAuthnError::InvalidAuthenticator(format!("Failed to decode: {}", e)))?;
+            .map_err(|e| PasskeyError::Format(format!("Failed to decode: {}", e)))?;
 
         if data.len() < 37 {
-            return Err(WebAuthnError::InvalidAuthenticator(
+            return Err(PasskeyError::AuthenticatorData(
                 "Authenticator data too short".into(),
             ));
         }
@@ -293,11 +291,11 @@ impl AuthenticatorData {
         })
     }
 
-    fn verify(&self, state: &AppState) -> Result<(), WebAuthnError> {
+    fn verify(&self, state: &AppState) -> Result<(), PasskeyError> {
         // Verify RP ID hash
         let expected_hash = digest::digest(&digest::SHA256, state.config.rp_id.as_bytes());
         if self.rp_id_hash != expected_hash.as_ref() {
-            return Err(WebAuthnError::InvalidAuthenticator(format!(
+            return Err(PasskeyError::AuthenticatorData(format!(
                 "Invalid RP ID hash. Expected: {:?}, Got: {:?}",
                 expected_hash.as_ref(),
                 self.rp_id_hash
@@ -306,7 +304,7 @@ impl AuthenticatorData {
 
         // Check user presence flag
         if self.flags & 0x01 == 0 {
-            return Err(WebAuthnError::InvalidAuthenticator(
+            return Err(PasskeyError::AuthenticatorData(
                 "User presence flag not set".into(),
             ));
         }
@@ -315,7 +313,7 @@ impl AuthenticatorData {
         if state.config.authenticator_selection.user_verification == "required"
             && self.flags & 0x04 == 0
         {
-            return Err(WebAuthnError::InvalidAuthenticator(format!(
+            return Err(PasskeyError::AuthenticatorData(format!(
                 "User verification required but flag not set. Flags: {:02x}",
                 self.flags
             )));
