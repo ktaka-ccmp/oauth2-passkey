@@ -6,7 +6,10 @@ use webpki::EndEntityCert;
 use x509_parser::{certificate::X509Certificate, prelude::*, time::ASN1Time};
 
 // use crate::passkey::AttestationObject;
-use crate::passkey::{AppState, AttestationObject, AuthenticatorSelection};
+use crate::{
+    config::AuthenticatorSelection,
+    passkey::{AppState, AttestationObject},
+};
 
 // Constants for FIDO OIDs id-fido-gen-ce-aaguid
 const OID_FIDO_GEN_CE_AAGUID: &str = "1.3.6.1.4.1.45724.1.1.4";
@@ -374,9 +377,7 @@ fn extract_public_key_coords(public_key_cbor: &CborValue) -> Result<(Vec<u8>, Ve
         let key_type_val = Integer::from(EC2_KEY_TYPE);
         let alg_val = Integer::from(ES256_ALG);
 
-        if key_type.map_or(true, |k| k != &key_type_val)
-            || algorithm.map_or(true, |a| a != &alg_val)
-        {
+        if (key_type != Some(&key_type_val)) || (algorithm != Some(&alg_val)) {
             return Err("Invalid key type or algorithm".to_string());
         }
 

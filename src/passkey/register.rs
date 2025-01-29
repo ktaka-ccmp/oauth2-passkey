@@ -11,9 +11,12 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::passkey::AppState;
-use crate::passkey::{
-    base64url_decode, generate_challenge, AttestationObject, AuthenticatorSelection,
-    PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential,
+use crate::{
+    config::AuthenticatorSelection,
+    passkey::{
+        base64url_decode, generate_challenge, AttestationObject, PublicKeyCredentialUserEntity,
+        StoredChallenge, StoredCredential,
+    },
 };
 
 pub fn router(state: AppState) -> Router {
@@ -90,7 +93,7 @@ async fn start_registration(
     let challenge = generate_challenge();
 
     let stored_challenge = StoredChallenge {
-        challenge: challenge.clone(),
+        challenge: challenge.clone().unwrap_or_default(),
         user: user_info.clone(),
         timestamp: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -104,7 +107,7 @@ async fn start_registration(
         .insert(user_info.id.clone(), stored_challenge);
 
     let options = RegistrationOptions {
-        challenge: URL_SAFE.encode(&challenge),
+        challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
         rp_id: state.config.rp_id.clone(),
         rp: RelyingParty {
             name: "Passkey Demo".to_string(),

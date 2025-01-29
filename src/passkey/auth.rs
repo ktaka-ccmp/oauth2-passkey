@@ -100,7 +100,7 @@ async fn start_authentication(State(state): State<AppState>) -> Json<Authenticat
 
     let auth_id = Uuid::new_v4().to_string();
     let stored_challenge = StoredChallenge {
-        challenge: challenge.clone(),
+        challenge: challenge.clone().unwrap_or_default(),
         user: user_info,
         timestamp: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -125,7 +125,7 @@ async fn start_authentication(State(state): State<AppState>) -> Json<Authenticat
     // println!("Available credentials: {:?}", allow_credentials);
 
     let auth_option = AuthenticationOptions {
-        challenge: URL_SAFE.encode(&challenge),
+        challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
         timeout: 60000,
         rp_id: state.config.rp_id.clone(),
         allow_credentials: vec![],
@@ -293,7 +293,7 @@ async fn verify_authentication(
         .authenticator_attachment
         .clone();
 
-    let received = auth_response.authenticator_attachment.as_deref();
+    let received = auth_response.authenticator_attachment.unwrap_or_default();
 
     #[cfg(debug_assertions)]
     println!(
@@ -301,7 +301,7 @@ async fn verify_authentication(
         expected, received
     );
 
-    if expected.is_some() && expected.as_deref() != received {
+    if expected != received {
         return Err(WebAuthnError::InvalidAuthenticator("Invalid attachment".into()).into());
     }
 
