@@ -1,6 +1,6 @@
-use super::{ChallengeStore, CredentialStore};
 use crate::errors::PasskeyError;
 use crate::passkey::{StoredChallenge, StoredCredential};
+use crate::storage::{ChallengeStore, CredentialStore};
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -22,19 +22,22 @@ impl ChallengeStore for InMemoryChallengeStore {
 
     async fn store_challenge(
         &mut self,
-        user_id: String,
+        challenge_id: String,
         challenge: StoredChallenge,
     ) -> Result<(), PasskeyError> {
-        self.challenges.insert(user_id, challenge);
+        self.challenges.insert(challenge_id, challenge);
         Ok(())
     }
 
-    async fn get_challenge(&self, user_id: &str) -> Result<Option<StoredChallenge>, PasskeyError> {
-        Ok(self.challenges.get(user_id).cloned())
+    async fn get_challenge(
+        &self,
+        challenge_id: &str,
+    ) -> Result<Option<StoredChallenge>, PasskeyError> {
+        Ok(self.challenges.get(challenge_id).cloned())
     }
 
-    async fn remove_challenge(&mut self, user_id: &str) -> Result<(), PasskeyError> {
-        self.challenges.remove(user_id);
+    async fn remove_challenge(&mut self, challenge_id: &str) -> Result<(), PasskeyError> {
+        self.challenges.remove(challenge_id);
         Ok(())
     }
 }
@@ -47,26 +50,26 @@ impl CredentialStore for InMemoryCredentialStore {
 
     async fn store_credential(
         &mut self,
-        user_id: String,
+        credential_id: String,
         credential: StoredCredential,
     ) -> Result<(), PasskeyError> {
-        self.credentials.insert(user_id, credential);
+        self.credentials.insert(credential_id, credential);
         Ok(())
     }
 
     async fn get_credential(
         &self,
-        user_id: &str,
+        credential_id: &str,
     ) -> Result<Option<StoredCredential>, PasskeyError> {
-        Ok(self.credentials.get(user_id).cloned())
+        Ok(self.credentials.get(credential_id).cloned())
     }
 
     async fn update_credential_counter(
         &mut self,
-        user_id: &str,
+        credential_id: &str,
         new_counter: u32,
     ) -> Result<(), PasskeyError> {
-        if let Some(credential) = self.credentials.get_mut(user_id) {
+        if let Some(credential) = self.credentials.get_mut(credential_id) {
             credential.counter = new_counter;
             Ok(())
         } else {

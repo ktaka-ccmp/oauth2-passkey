@@ -23,7 +23,7 @@ pub struct RegistrationOptions {
     pub challenge: String,
     pub rp_id: String,
     pub rp: RelyingParty,
-    pub user: PublicKeyCredentialUserEntity,
+    pub(crate) user: PublicKeyCredentialUserEntity,
     pub pub_key_cred_params: Vec<PubKeyCredParam>,
     pub authenticator_selection: AuthenticatorSelection,
     pub timeout: u32,

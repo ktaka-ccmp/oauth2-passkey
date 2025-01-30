@@ -9,12 +9,12 @@ use crate::config::Config;
 use crate::errors::PasskeyError;
 use crate::storage::{ChallengeStore, ChallengeStoreType, CredentialStore, CredentialStoreType};
 
-pub(crate) mod attestation;
+mod attestation;
 pub mod auth;
 pub mod register;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub struct PublicKeyCredentialUserEntity {
+pub(crate) struct PublicKeyCredentialUserEntity {
     pub id: String,
     pub name: String,
     #[serde(rename = "displayName")]
@@ -22,21 +22,21 @@ pub struct PublicKeyCredentialUserEntity {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct StoredChallenge {
+pub(crate) struct StoredChallenge {
     pub challenge: Vec<u8>,
     pub user: PublicKeyCredentialUserEntity,
     pub timestamp: u64,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct StoredCredential {
+pub(crate) struct StoredCredential {
     pub credential_id: Vec<u8>,
     pub public_key: Vec<u8>,
     pub counter: u32,
     pub user: PublicKeyCredentialUserEntity,
 }
 
-pub(crate) fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
+fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
     let padding_len = (4 - input.len() % 4) % 4;
     let padded = format!("{}{}", input, "=".repeat(padding_len));
     let decoded = URL_SAFE
@@ -45,7 +45,7 @@ pub(crate) fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
     Ok(decoded)
 }
 
-pub(crate) fn generate_challenge() -> Result<Vec<u8>, PasskeyError> {
+fn generate_challenge() -> Result<Vec<u8>, PasskeyError> {
     let rng = ring::rand::SystemRandom::new();
     let mut challenge = vec![0u8; 32];
     rng.fill(&mut challenge)
@@ -54,10 +54,10 @@ pub(crate) fn generate_challenge() -> Result<Vec<u8>, PasskeyError> {
 }
 
 #[derive(Debug)]
-pub(crate) struct AttestationObject {
-    pub fmt: String,
-    pub auth_data: Vec<u8>,
-    pub att_stmt: Vec<(CborValue, CborValue)>,
+struct AttestationObject {
+    fmt: String,
+    auth_data: Vec<u8>,
+    att_stmt: Vec<(CborValue, CborValue)>,
 }
 
 // Public things
