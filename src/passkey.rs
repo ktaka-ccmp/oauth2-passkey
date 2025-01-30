@@ -2,55 +2,50 @@ use base64::engine::{general_purpose::URL_SAFE, Engine};
 use ciborium::value::Value as CborValue;
 use ring::rand::SecureRandom;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::config::Config;
 use crate::errors::PasskeyError;
+use crate::storage::{ChallengeStore, ChallengeStoreType, CredentialStore, CredentialStoreType};
 
 pub(crate) mod attestation;
 pub mod auth;
 pub mod register;
 
-#[derive(Default)]
-struct AuthStore {
-    challenges: HashMap<String, StoredChallenge>,
-    credentials: HashMap<String, StoredCredential>,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-struct StoredChallenge {
-    challenge: Vec<u8>,
-    user: PublicKeyCredentialUserEntity,
-    timestamp: u64,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct PublicKeyCredentialUserEntity {
-    id: String,
-    name: String,
+    pub id: String,
+    pub name: String,
     #[serde(rename = "displayName")]
-    display_name: String,
+    pub display_name: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-struct StoredCredential {
-    credential_id: Vec<u8>,
-    public_key: Vec<u8>,
-    counter: u32,
-    user: PublicKeyCredentialUserEntity,
+pub struct StoredChallenge {
+    pub challenge: Vec<u8>,
+    pub user: PublicKeyCredentialUserEntity,
+    pub timestamp: u64,
 }
 
-fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct StoredCredential {
+    pub credential_id: Vec<u8>,
+    pub public_key: Vec<u8>,
+    pub counter: u32,
+    pub user: PublicKeyCredentialUserEntity,
+}
+
+pub(crate) fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
     let padding_len = (4 - input.len() % 4) % 4;
     let padded = format!("{}{}", input, "=".repeat(padding_len));
-    let decoded = URL_SAFE.decode(padded)
+    let decoded = URL_SAFE
+        .decode(padded)
         .map_err(|_| PasskeyError::Format("Failed to decode base64url".to_string()))?;
     Ok(decoded)
 }
 
-fn generate_challenge() -> Result<Vec<u8>, PasskeyError> {
+pub(crate) fn generate_challenge() -> Result<Vec<u8>, PasskeyError> {
     let rng = ring::rand::SystemRandom::new();
     let mut challenge = vec![0u8; 32];
     rng.fill(&mut challenge)
@@ -59,25 +54,43 @@ fn generate_challenge() -> Result<Vec<u8>, PasskeyError> {
 }
 
 #[derive(Debug)]
-struct AttestationObject {
-    fmt: String,
-    auth_data: Vec<u8>,
-    att_stmt: Vec<(CborValue, CborValue)>,
+pub(crate) struct AttestationObject {
+    pub fmt: String,
+    pub auth_data: Vec<u8>,
+    pub att_stmt: Vec<(CborValue, CborValue)>,
 }
 
 // Public things
 #[derive(Clone)]
 pub struct AppState {
-    store: Arc<Mutex<AuthStore>>,
+    challenge_store: Arc<Mutex<Box<dyn ChallengeStore>>>,
+    credential_store: Arc<Mutex<Box<dyn CredentialStore>>>,
     config: Config,
 }
 
-pub async fn app_state() -> Result<AppState, PasskeyError> {
-    let config = Config::from_env()?;
-    config.validate()?;
+impl AppState {
+    pub async fn new() -> Result<Self, PasskeyError> {
+        Self::with_store_types(ChallengeStoreType::Memory, CredentialStoreType::Memory).await
+    }
 
-    Ok(AppState {
-        store: Arc::new(Mutex::new(AuthStore::default())),
-        config,
-    })
+    pub async fn with_store_types(
+        challenge_store_type: ChallengeStoreType,
+        credential_store_type: CredentialStoreType,
+    ) -> Result<Self, PasskeyError> {
+        let config = Config::from_env()?;
+        config.validate()?;
+
+        let challenge_store = challenge_store_type.create_store().await?;
+        let credential_store = credential_store_type.create_store().await?;
+
+        // Initialize the stores
+        challenge_store.init().await?;
+        credential_store.init().await?;
+
+        Ok(Self {
+            challenge_store: Arc::new(Mutex::new(challenge_store)),
+            credential_store: Arc::new(Mutex::new(credential_store)),
+            config,
+        })
+    }
 }

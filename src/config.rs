@@ -7,6 +7,7 @@ use crate::errors::PasskeyError;
 pub struct Config {
     pub origin: String,
     pub rp_id: String,
+    pub rp_name: String,
     pub authenticator_selection: AuthenticatorSelection,
     pub timeout: u32,
     pub challenge_timeout_seconds: u64,
@@ -36,6 +37,8 @@ impl Config {
             .next()
             .unwrap_or(&origin)
             .to_string();
+
+        let rp_name = env::var("PASSKEY_RP_NAME").unwrap_or(origin.clone());
 
         let timeout = env::var("PASSKEY_TIMEOUT")
             .map(|v| v.parse::<u32>())
@@ -114,6 +117,7 @@ impl Config {
         Ok(Config {
             origin,
             rp_id,
+            rp_name,
             timeout,
             challenge_timeout_seconds: challenge_timeout,
             authenticator_selection: AuthenticatorSelection {

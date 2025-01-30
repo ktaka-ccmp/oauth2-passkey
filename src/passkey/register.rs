@@ -54,7 +54,10 @@ pub struct AuthenticatorAttestationResponse {
     pub attestation_object: String,
 }
 
-pub async fn start_registration(state: &AppState, username: String) -> RegistrationOptions {
+pub async fn start_registration(
+    state: &AppState,
+    username: String,
+) -> Result<RegistrationOptions, PasskeyError> {
     println!("Registering user: {}", username);
 
     let user_info = PublicKeyCredentialUserEntity {
@@ -74,16 +77,17 @@ pub async fn start_registration(state: &AppState, username: String) -> Registrat
             .as_secs(),
     };
 
-    let mut store = state.store.lock().await;
-    store
-        .challenges
-        .insert(user_info.id.clone(), stored_challenge);
+    // Store the challenge
+    let mut challenge_store = state.challenge_store.lock().await;
+    challenge_store
+        .store_challenge(user_info.id.clone(), stored_challenge)
+        .await?;
 
     let options = RegistrationOptions {
         challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
         rp_id: state.config.rp_id.clone(),
         rp: RelyingParty {
-            name: "Passkey Demo".to_string(),
+            name: state.config.rp_name.clone(),
             id: state.config.rp_id.clone(),
         },
         user: user_info,
@@ -105,17 +109,18 @@ pub async fn start_registration(state: &AppState, username: String) -> Registrat
     #[cfg(debug_assertions)]
     println!("Registration options: {:?}", options);
 
-    options
+    Ok(options)
 }
 
 pub async fn finish_registration(
     state: &AppState,
     reg_data: RegisterCredential,
-) -> Result<&'static str, PasskeyError> {
+) -> Result<String, PasskeyError> {
     println!("Registering user: {:?}", reg_data);
-    let mut store = state.store.lock().await;
+    let mut challenge_store = state.challenge_store.lock().await;
+    let mut credential_store = state.credential_store.lock().await;
 
-    verify_client_data(state, &reg_data, &store)?;
+    verify_client_data(state, &reg_data, &challenge_store).await?;
 
     let public_key = extract_credential_public_key(&reg_data, state)?;
 
@@ -125,35 +130,39 @@ pub async fn finish_registration(
 
     let user_handle = reg_data
         .user_handle
-        .as_ref()
+        .as_deref()
         .ok_or(PasskeyError::ClientData(
             "User handle is missing".to_string(),
         ))?;
-    let stored_user = store
-        .challenges
-        .get(user_handle)
-        .ok_or(PasskeyError::Storage(
-            "No challenge found for this user".to_string(),
-        ))?
-        .user
-        .clone();
+
+    let stored_challenge =
+        challenge_store
+            .get_challenge(user_handle)
+            .await?
+            .ok_or(PasskeyError::Storage(
+                "No challenge found for this user".to_string(),
+            ))?;
+
+    let stored_user = stored_challenge.user.clone();
 
     // Store using base64url encoded credential_id as the key
     let credential_id_str = reg_data.raw_id.clone();
-    store.credentials.insert(
-        credential_id_str,
-        StoredCredential {
-            credential_id,
-            public_key,
-            counter: 0,
-            user: stored_user,
-        },
-    );
+    credential_store
+        .store_credential(
+            credential_id_str,
+            StoredCredential {
+                credential_id,
+                public_key,
+                counter: 0,
+                user: stored_user,
+            },
+        )
+        .await?;
 
     // Remove used challenge
-    store.challenges.remove(user_handle);
+    challenge_store.remove_challenge(user_handle).await?;
 
-    Ok("Registration successful")
+    Ok("Registration successful".to_string())
 }
 
 fn extract_credential_public_key(
@@ -334,10 +343,10 @@ fn extract_key_coordinates(credential_data: &[u8]) -> Result<(Vec<u8>, Vec<u8>),
     }
 }
 
-fn verify_client_data(
+async fn verify_client_data(
     state: &AppState,
     reg_data: &RegisterCredential,
-    store: &tokio::sync::MutexGuard<'_, super::AuthStore>,
+    store: &tokio::sync::MutexGuard<'_, Box<dyn crate::storage::ChallengeStore>>,
 ) -> Result<(), PasskeyError> {
     // Decode and verify client data
     let decoded_client_data = base64url_decode(&reg_data.response.client_data_json)
@@ -382,14 +391,14 @@ fn verify_client_data(
 
     let user_handle = reg_data
         .user_handle
-        .as_ref()
+        .as_deref()
         .ok_or(PasskeyError::ClientData(
             "User handle is missing".to_string(),
         ))?;
 
     let stored_challenge = store
-        .challenges
-        .get(user_handle)
+        .get_challenge(user_handle)
+        .await?
         .ok_or(PasskeyError::Storage(
             "No challenge found for this user".to_string(),
         ))?;

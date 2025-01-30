@@ -26,6 +26,9 @@ pub enum PasskeyError {
     #[error("Verification error: {0}")]
     Verification(String),
 
+    #[error("Not found error: {0}")]
+    NotFound(String),
+
     #[error("Crypto error: {0}")]
     Crypto(String),
 

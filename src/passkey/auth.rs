@@ -42,7 +42,7 @@ pub struct AuthenticatorAssertionResponse {
     pub user_handle: Option<String>,
 }
 
-pub async fn start_authentication(state: &AppState) -> AuthenticationOptions {
+pub async fn start_authentication(state: &AppState) -> Result<AuthenticationOptions, PasskeyError> {
     let challenge = generate_challenge();
     let auth_id = Uuid::new_v4().to_string();
 
@@ -59,8 +59,10 @@ pub async fn start_authentication(state: &AppState) -> AuthenticationOptions {
             .as_secs(),
     };
 
-    let mut store = state.store.lock().await;
-    store.challenges.insert(auth_id.clone(), stored_challenge);
+    let mut challenge_store = state.challenge_store.lock().await;
+    challenge_store
+        .store_challenge(auth_id.clone(), stored_challenge)
+        .await?;
 
     let auth_option = AuthenticationOptions {
         challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
@@ -77,7 +79,7 @@ pub async fn start_authentication(state: &AppState) -> AuthenticationOptions {
 
     #[cfg(debug_assertions)]
     println!("Auth options: {:?}", auth_option);
-    auth_option
+    Ok(auth_option)
 }
 
 pub async fn verify_authentication(
@@ -91,10 +93,13 @@ pub async fn verify_authentication(
     );
 
     // Get stored challenge and verify auth
-    let mut store = state.store.lock().await;
-    let stored_challenge = store
-        .challenges
-        .get(&auth_response.auth_id)
+    let mut challenge_store = state.challenge_store.lock().await;
+    let credential_store = state.credential_store.lock().await;
+
+    // let mut store = state.store.lock().await;
+    let stored_challenge = challenge_store
+        .get_challenge(&auth_response.auth_id)
+        .await?
         .ok_or(PasskeyError::Storage("Challenge not found".into()))?;
 
     #[cfg(debug_assertions)]
@@ -129,9 +134,9 @@ pub async fn verify_authentication(
     auth_data.verify(state)?;
 
     // Get credential then public key
-    let credential = store
-        .credentials
-        .get(&auth_response.id)
+    let credential = credential_store
+        .get_credential(&auth_response.id)
+        .await?
         .ok_or(PasskeyError::Authentication("Unknown credential".into()))?;
 
     #[cfg(debug_assertions)]
@@ -186,7 +191,9 @@ pub async fn verify_authentication(
             println!("Signature verification successful");
 
             // Cleanup and return success
-            store.challenges.remove(&auth_response.auth_id);
+            challenge_store
+                .remove_challenge(&auth_response.auth_id)
+                .await?;
             Ok(display_name)
         }
         Err(e) => {
