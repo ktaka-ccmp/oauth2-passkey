@@ -10,36 +10,36 @@ use crate::passkey::{AppState, PublicKeyCredentialUserEntity, StoredChallenge};
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticationOptions {
-    pub challenge: String,
-    pub timeout: u32,
-    pub rp_id: String,
-    pub allow_credentials: Vec<AllowCredential>,
-    pub user_verification: String,
-    pub auth_id: String,
+    challenge: String,
+    timeout: u32,
+    rp_id: String,
+    allow_credentials: Vec<AllowCredential>,
+    user_verification: String,
+    auth_id: String,
 }
 
 #[derive(Serialize, Debug)]
-pub struct AllowCredential {
-    pub type_: String,
-    pub id: String,
+struct AllowCredential {
+    type_: String,
+    id: String,
 }
 
 #[allow(unused)]
 #[derive(Deserialize, Debug)]
 pub struct AuthenticatorResponse {
-    pub id: String,
-    pub raw_id: String,
-    pub response: AuthenticatorAssertionResponse,
-    pub authenticator_attachment: Option<String>,
-    pub auth_id: String,
+    id: String,
+    raw_id: String,
+    response: AuthenticatorAssertionResponse,
+    authenticator_attachment: Option<String>,
+    auth_id: String,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct AuthenticatorAssertionResponse {
-    pub client_data_json: String,
-    pub authenticator_data: String,
-    pub signature: String,
-    pub user_handle: Option<String>,
+struct AuthenticatorAssertionResponse {
+    client_data_json: String,
+    authenticator_data: String,
+    signature: String,
+    user_handle: Option<String>,
 }
 
 pub async fn start_authentication(state: &AppState) -> Result<AuthenticationOptions, PasskeyError> {

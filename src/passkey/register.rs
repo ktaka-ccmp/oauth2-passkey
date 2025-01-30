@@ -11,47 +11,47 @@ use crate::passkey::{
 };
 
 #[derive(Serialize, Debug)]
-pub struct PubKeyCredParam {
+struct PubKeyCredParam {
     #[serde(rename = "type")]
-    pub type_: String,
-    pub alg: i32,
+    type_: String,
+    alg: i32,
 }
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct RegistrationOptions {
-    pub challenge: String,
-    pub rp_id: String,
-    pub rp: RelyingParty,
-    pub(crate) user: PublicKeyCredentialUserEntity,
-    pub pub_key_cred_params: Vec<PubKeyCredParam>,
-    pub authenticator_selection: AuthenticatorSelection,
-    pub timeout: u32,
-    pub attestation: String,
+    challenge: String,
+    rp_id: String,
+    rp: RelyingParty,
+    user: PublicKeyCredentialUserEntity,
+    pub_key_cred_params: Vec<PubKeyCredParam>,
+    authenticator_selection: AuthenticatorSelection,
+    timeout: u32,
+    attestation: String,
 }
 
 #[derive(Serialize, Debug)]
-pub struct RelyingParty {
-    pub name: String,
-    pub id: String,
+struct RelyingParty {
+    name: String,
+    id: String,
 }
 
 #[allow(unused)]
 #[derive(Deserialize, Debug)]
 pub struct RegisterCredential {
-    pub id: String,
-    pub raw_id: String,
-    pub response: AuthenticatorAttestationResponse,
+    id: String,
+    raw_id: String,
+    response: AuthenticatorAttestationResponse,
     #[serde(rename = "type")]
-    pub type_: String,
-    pub username: Option<String>,
-    pub user_handle: Option<String>,
+    type_: String,
+    username: Option<String>,
+    user_handle: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct AuthenticatorAttestationResponse {
-    pub client_data_json: String,
-    pub attestation_object: String,
+struct AuthenticatorAttestationResponse {
+    client_data_json: String,
+    attestation_object: String,
 }
 
 pub async fn start_registration(
