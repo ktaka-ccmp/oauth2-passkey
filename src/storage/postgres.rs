@@ -1,17 +1,16 @@
 use async_trait::async_trait;
-use sqlx::{Pool, Row, Sqlite};
+use sqlx::{Pool, Postgres, Row};
 
 use crate::errors::PasskeyError;
 use crate::passkey::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
-use crate::storage::{ChallengeStore, CredentialStore};
 
-pub(crate) struct SqliteChallengeStore {
-    pool: Pool<Sqlite>,
+pub struct PostgresChallengeStore {
+    pool: Pool<Postgres>,
 }
 
-impl SqliteChallengeStore {
-    pub async fn connect(database_path: &str) -> Result<Self, PasskeyError> {
-        let pool = sqlx::SqlitePool::connect(database_path)
+impl PostgresChallengeStore {
+    pub async fn connect(database_url: &str) -> Result<Self, PasskeyError> {
+        let pool = sqlx::PgPool::connect(database_url)
             .await
             .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
@@ -19,10 +18,10 @@ impl SqliteChallengeStore {
             r#"
             CREATE TABLE IF NOT EXISTS challenges (
                 challenge_id TEXT PRIMARY KEY,
-                challenge BLOB NOT NULL,
+                challenge BYTEA NOT NULL,
                 user_name TEXT NOT NULL,
                 user_display_name TEXT NOT NULL,
-                timestamp INTEGER NOT NULL
+                timestamp BIGINT NOT NULL
             )
             "#,
         )
@@ -35,16 +34,16 @@ impl SqliteChallengeStore {
 }
 
 #[async_trait]
-impl ChallengeStore for SqliteChallengeStore {
+impl super::ChallengeStore for PostgresChallengeStore {
     async fn init(&self) -> Result<(), PasskeyError> {
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS challenges (
                 challenge_id TEXT PRIMARY KEY,
-                challenge BLOB NOT NULL,
+                challenge BYTEA NOT NULL,
                 user_name TEXT NOT NULL,
                 user_display_name TEXT NOT NULL,
-                timestamp INTEGER NOT NULL
+                timestamp BIGINT NOT NULL
             )
             "#,
         )
@@ -62,13 +61,18 @@ impl ChallengeStore for SqliteChallengeStore {
     ) -> Result<(), PasskeyError> {
         sqlx::query(
             r#"
-            INSERT INTO challenges (challenge_id, challenge, user_name, user_display_name, timestamp)
-            VALUES (?1, ?2, ?3, ?4, ?5)
-            ON CONFLICT(challenge_id) DO UPDATE SET
-                challenge = ?2,
-                user_name = ?3,
-                user_display_name = ?4,
-                timestamp = ?5
+            INSERT INTO challenges (
+                challenge_id,
+                challenge,
+                user_name,
+                user_display_name,
+                timestamp
+            ) VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (challenge_id) DO UPDATE SET
+                challenge = $2,
+                user_name = $3,
+                user_display_name = $4,
+                timestamp = $5
             "#,
         )
         .bind(&challenge_id)
@@ -91,7 +95,7 @@ impl ChallengeStore for SqliteChallengeStore {
             r#"
             SELECT challenge, user_name, user_display_name, timestamp
             FROM challenges
-            WHERE challenge_id = ?1
+            WHERE challenge_id = $1
             "#,
         )
         .bind(challenge_id)
@@ -119,7 +123,7 @@ impl ChallengeStore for SqliteChallengeStore {
         sqlx::query(
             r#"
             DELETE FROM challenges
-            WHERE challenge_id = ?1
+            WHERE challenge_id = $1
             "#,
         )
         .bind(challenge_id)
@@ -131,13 +135,13 @@ impl ChallengeStore for SqliteChallengeStore {
     }
 }
 
-pub struct SqliteCredentialStore {
-    pool: Pool<Sqlite>,
+pub struct PostgresCredentialStore {
+    pool: Pool<Postgres>,
 }
 
-impl SqliteCredentialStore {
-    pub async fn connect(database_path: &str) -> Result<Self, PasskeyError> {
-        let pool = sqlx::SqlitePool::connect(database_path)
+impl PostgresCredentialStore {
+    pub async fn connect(database_url: &str) -> Result<Self, PasskeyError> {
+        let pool = sqlx::PgPool::connect(database_url)
             .await
             .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
@@ -145,8 +149,8 @@ impl SqliteCredentialStore {
             r#"
             CREATE TABLE IF NOT EXISTS credentials (
                 credential_id TEXT PRIMARY KEY,
-                credential_id_blob BLOB NOT NULL,
-                public_key BLOB NOT NULL,
+                credential_id_blob BYTEA NOT NULL,
+                public_key BYTEA NOT NULL,
                 counter INTEGER NOT NULL,
                 user_handle TEXT NOT NULL,
                 user_name TEXT NOT NULL,
@@ -163,14 +167,14 @@ impl SqliteCredentialStore {
 }
 
 #[async_trait]
-impl CredentialStore for SqliteCredentialStore {
+impl super::CredentialStore for PostgresCredentialStore {
     async fn init(&self) -> Result<(), PasskeyError> {
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS credentials (
                 credential_id TEXT PRIMARY KEY,
-                credential_id_blob BLOB NOT NULL,
-                public_key BLOB NOT NULL,
+                credential_id_blob BYTEA NOT NULL,
+                public_key BYTEA NOT NULL,
                 counter INTEGER NOT NULL,
                 user_handle TEXT NOT NULL,
                 user_name TEXT NOT NULL,
@@ -206,7 +210,7 @@ impl CredentialStore for SqliteCredentialStore {
                 user_handle,
                 user_name,
                 user_display_name
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
             "#,
         )
         .bind(&credential_id)
@@ -235,7 +239,7 @@ impl CredentialStore for SqliteCredentialStore {
 
         let row = sqlx::query(
             r#"
-            SELECT * FROM credentials WHERE credential_id = ?1
+            SELECT * FROM credentials WHERE credential_id = $1
             "#,
         )
         .bind(credential_id)
@@ -262,18 +266,18 @@ impl CredentialStore for SqliteCredentialStore {
 
     async fn update_credential_counter(
         &mut self,
-        user_id: &str,
+        credential_id: &str,
         new_counter: u32,
     ) -> Result<(), PasskeyError> {
         sqlx::query(
             r#"
             UPDATE credentials
-            SET counter = ?1
-            WHERE user_id = ?2
+            SET counter = $1
+            WHERE credential_id = $2
             "#,
         )
         .bind(new_counter as i32)
-        .bind(user_id)
+        .bind(credential_id)
         .execute(&self.pool)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -295,12 +299,12 @@ impl CredentialStore for SqliteCredentialStore {
             .into_iter()
             .map(|r| {
                 let user_info = PublicKeyCredentialUserEntity {
-                    id: r.get("user_id"),
+                    id: r.get("user_handle"),
                     name: r.get("user_name"),
                     display_name: r.get("user_display_name"),
                 };
                 StoredCredential {
-                    credential_id: r.get("credential_id"),
+                    credential_id: r.get("credential_id_blob"),
                     public_key: r.get("public_key"),
                     counter: r.get::<i32, _>("counter") as u32,
                     user: user_info,

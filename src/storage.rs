@@ -3,20 +3,21 @@ use crate::passkey::{StoredChallenge, StoredCredential};
 use async_trait::async_trait;
 
 mod memory;
+mod postgres;
 mod sqlite;
 
 #[derive(Clone, Debug)]
 pub enum ChallengeStoreType {
     Memory,
     Sqlite { path: String },
-    // Postgres { url: String },
+    Postgres { url: String },
 }
 
 #[derive(Clone, Debug)]
 pub enum CredentialStoreType {
     Memory,
     Sqlite { path: String },
-    // Postgres { url: String },
+    Postgres { url: String },
 }
 
 impl ChallengeStoreType {
@@ -25,9 +26,10 @@ impl ChallengeStoreType {
             ChallengeStoreType::Memory => Ok(Box::new(memory::InMemoryChallengeStore::default())),
             ChallengeStoreType::Sqlite { path } => {
                 Ok(Box::new(sqlite::SqliteChallengeStore::connect(path).await?))
-            } // ChallengeStoreType::Postgres { url } => {
-              //     Ok(Box::new(PostgresChallengeStore::new(url).await?))
-              // }
+            }
+            ChallengeStoreType::Postgres { url } => Ok(Box::new(
+                postgres::PostgresChallengeStore::connect(url).await?,
+            )),
         }
     }
 }
@@ -38,9 +40,10 @@ impl CredentialStoreType {
             CredentialStoreType::Memory => Ok(Box::new(memory::InMemoryCredentialStore::default())),
             CredentialStoreType::Sqlite { path } => Ok(Box::new(
                 sqlite::SqliteCredentialStore::connect(path).await?,
-            )), // CredentialStoreType::Postgres { url } => {
-                //     Ok(Box::new(PostgresCredentialStore::new(url).await?))
-                // }
+            )),
+            CredentialStoreType::Postgres { url } => Ok(Box::new(
+                postgres::PostgresCredentialStore::connect(url).await?,
+            )),
         }
     }
 }

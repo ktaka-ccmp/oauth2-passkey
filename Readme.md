@@ -32,6 +32,7 @@ cd axum-passkey
 Create .env file
 
 ```text
+PASSKEY_AUTHENTICATOR_ATTACHMENT='platform'
 ORIGIN='http://localhost:3001'
 ```
 
