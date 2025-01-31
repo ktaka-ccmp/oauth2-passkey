@@ -70,7 +70,12 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new() -> Result<Self, PasskeyError> {
-        Self::with_store_types(ChallengeStoreType::Memory, CredentialStoreType::Memory).await
+        // dotenv::dotenv().ok();
+        Self::with_store_types(
+            ChallengeStoreType::from_env()?,
+            CredentialStoreType::from_env()?,
+        )
+        .await
     }
 
     pub async fn with_store_types(

@@ -7,12 +7,13 @@ use crate::passkey::{StoredChallenge, StoredCredential};
 const CHALLENGE_PREFIX: &str = "challenge:";
 const CREDENTIAL_PREFIX: &str = "credential:";
 
-pub struct RedisChallengeStore {
+pub(crate) struct RedisChallengeStore {
     client: redis::Client,
 }
 
 impl RedisChallengeStore {
-    pub async fn connect(url: &str) -> Result<Self, PasskeyError> {
+    pub(crate) async fn connect(url: &str) -> Result<Self, PasskeyError> {
+        println!("Connecting to Redis at {} for challenges", url);
         let client = redis::Client::open(url).map_err(|e| PasskeyError::Storage(e.to_string()))?;
         Ok(Self { client })
     }
@@ -26,7 +27,7 @@ impl super::ChallengeStore for RedisChallengeStore {
             .client
             .get_multiplexed_async_connection()
             .await
-            .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+            .map_err(|e| PasskeyError::Storage(format!("Redis connection error: {}", e)))?;
         Ok(())
     }
 
@@ -92,12 +93,13 @@ impl super::ChallengeStore for RedisChallengeStore {
     }
 }
 
-pub struct RedisCredentialStore {
+pub(crate) struct RedisCredentialStore {
     client: redis::Client,
 }
 
 impl RedisCredentialStore {
-    pub async fn connect(url: &str) -> Result<Self, PasskeyError> {
+    pub(crate) async fn connect(url: &str) -> Result<Self, PasskeyError> {
+        println!("Connecting to Redis at {} for credentials", url);
         let client = redis::Client::open(url).map_err(|e| PasskeyError::Storage(e.to_string()))?;
         Ok(Self { client })
     }

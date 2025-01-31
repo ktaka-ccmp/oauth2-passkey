@@ -4,14 +4,30 @@ use crate::storage::{ChallengeStore, CredentialStore};
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-#[derive(Default)]
-pub struct InMemoryChallengeStore {
+pub(crate) struct InMemoryChallengeStore {
     challenges: HashMap<String, StoredChallenge>,
 }
 
-#[derive(Default)]
-pub struct InMemoryCredentialStore {
+impl InMemoryChallengeStore {
+    pub(crate) fn new() -> Self {
+        println!("Creating new in-memory challenge store");
+        Self {
+            challenges: HashMap::new(),
+        }
+    }
+}
+
+pub(crate) struct InMemoryCredentialStore {
     credentials: HashMap<String, StoredCredential>,
+}
+
+impl InMemoryCredentialStore {
+    pub(crate) fn new() -> Self {
+        println!("Creating new in-memory credential store");
+        Self {
+            credentials: HashMap::new(),
+        }
+    }
 }
 
 #[async_trait]

@@ -10,7 +10,11 @@ pub(crate) struct SqliteChallengeStore {
 }
 
 impl SqliteChallengeStore {
-    pub async fn connect(database_path: &str) -> Result<Self, PasskeyError> {
+    pub(crate) async fn connect(database_path: &str) -> Result<Self, PasskeyError> {
+        println!(
+            "Connecting to Sqlite database at {} for challenges",
+            database_path
+        );
         let pool = sqlx::SqlitePool::connect(database_path)
             .await
             .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -131,12 +135,16 @@ impl ChallengeStore for SqliteChallengeStore {
     }
 }
 
-pub struct SqliteCredentialStore {
+pub(crate) struct SqliteCredentialStore {
     pool: Pool<Sqlite>,
 }
 
 impl SqliteCredentialStore {
-    pub async fn connect(database_path: &str) -> Result<Self, PasskeyError> {
+    pub(crate) async fn connect(database_path: &str) -> Result<Self, PasskeyError> {
+        println!(
+            "Connecting to Sqlite database at {} for credentials",
+            database_path
+        );
         let pool = sqlx::SqlitePool::connect(database_path)
             .await
             .map_err(|e| PasskeyError::Storage(e.to_string()))?;

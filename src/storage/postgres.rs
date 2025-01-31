@@ -4,12 +4,16 @@ use sqlx::{Pool, Postgres, Row};
 use crate::errors::PasskeyError;
 use crate::passkey::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
 
-pub struct PostgresChallengeStore {
+pub(crate) struct PostgresChallengeStore {
     pool: Pool<Postgres>,
 }
 
 impl PostgresChallengeStore {
-    pub async fn connect(database_url: &str) -> Result<Self, PasskeyError> {
+    pub(crate) async fn connect(database_url: &str) -> Result<Self, PasskeyError> {
+        println!(
+            "Connecting to Postgres database at {} for challenges",
+            database_url
+        );
         let pool = sqlx::PgPool::connect(database_url)
             .await
             .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -135,12 +139,16 @@ impl super::ChallengeStore for PostgresChallengeStore {
     }
 }
 
-pub struct PostgresCredentialStore {
+pub(crate) struct PostgresCredentialStore {
     pool: Pool<Postgres>,
 }
 
 impl PostgresCredentialStore {
-    pub async fn connect(database_url: &str) -> Result<Self, PasskeyError> {
+    pub(crate) async fn connect(database_url: &str) -> Result<Self, PasskeyError> {
+        println!(
+            "Connecting to Postgres database at {} for credentials",
+            database_url
+        );
         let pool = sqlx::PgPool::connect(database_url)
             .await
             .map_err(|e| PasskeyError::Storage(e.to_string()))?;
