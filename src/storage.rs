@@ -4,32 +4,38 @@ use async_trait::async_trait;
 
 mod memory;
 mod postgres;
+mod redis;
 mod sqlite;
 
 #[derive(Clone, Debug)]
 pub enum ChallengeStoreType {
     Memory,
-    Sqlite { path: String },
+    Sqlite { url: String },
     Postgres { url: String },
+    Redis { url: String },
 }
 
 #[derive(Clone, Debug)]
 pub enum CredentialStoreType {
     Memory,
-    Sqlite { path: String },
+    Sqlite { url: String },
     Postgres { url: String },
+    Redis { url: String },
 }
 
 impl ChallengeStoreType {
     pub(crate) async fn create_store(&self) -> Result<Box<dyn ChallengeStore>, PasskeyError> {
         match self {
             ChallengeStoreType::Memory => Ok(Box::new(memory::InMemoryChallengeStore::default())),
-            ChallengeStoreType::Sqlite { path } => {
-                Ok(Box::new(sqlite::SqliteChallengeStore::connect(path).await?))
+            ChallengeStoreType::Sqlite { url } => {
+                Ok(Box::new(sqlite::SqliteChallengeStore::connect(url).await?))
             }
             ChallengeStoreType::Postgres { url } => Ok(Box::new(
                 postgres::PostgresChallengeStore::connect(url).await?,
             )),
+            ChallengeStoreType::Redis { url } => {
+                Ok(Box::new(redis::RedisChallengeStore::connect(url).await?))
+            }
         }
     }
 }
@@ -38,12 +44,15 @@ impl CredentialStoreType {
     pub(crate) async fn create_store(&self) -> Result<Box<dyn CredentialStore>, PasskeyError> {
         match self {
             CredentialStoreType::Memory => Ok(Box::new(memory::InMemoryCredentialStore::default())),
-            CredentialStoreType::Sqlite { path } => Ok(Box::new(
-                sqlite::SqliteCredentialStore::connect(path).await?,
-            )),
+            CredentialStoreType::Sqlite { url } => {
+                Ok(Box::new(sqlite::SqliteCredentialStore::connect(url).await?))
+            }
             CredentialStoreType::Postgres { url } => Ok(Box::new(
                 postgres::PostgresCredentialStore::connect(url).await?,
             )),
+            CredentialStoreType::Redis { url } => {
+                Ok(Box::new(redis::RedisCredentialStore::connect(url).await?))
+            }
         }
     }
 }
