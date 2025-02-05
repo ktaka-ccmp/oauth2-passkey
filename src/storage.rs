@@ -159,6 +159,11 @@ pub(crate) trait CredentialStore: Send + Sync + 'static {
         credential_id: &str,
     ) -> Result<Option<StoredCredential>, PasskeyError>;
 
+    async fn get_credentials_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Vec<StoredCredential>, PasskeyError>;
+
     async fn update_credential_counter(
         &mut self,
         credential_id: &str,

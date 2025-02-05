@@ -203,6 +203,17 @@ impl super::CredentialStore for RedisCredentialStore {
         Ok(())
     }
 
+    async fn get_credentials_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Vec<StoredCredential>, PasskeyError> {
+        let all_credentials = self.get_all_credentials().await?;
+        Ok(all_credentials
+            .into_iter()
+            .filter(|credential| credential.user.name == username)
+            .collect())
+    }
+
     async fn get_all_credentials(&self) -> Result<Vec<StoredCredential>, PasskeyError> {
         let mut conn = self
             .client

@@ -289,6 +289,42 @@ impl CredentialStore for SqliteCredentialStore {
         Ok(())
     }
 
+    async fn get_credentials_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Vec<StoredCredential>, PasskeyError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT credential_id, credential, public_key, counter, user_handle, user_name, user_display_name
+            FROM credentials
+            WHERE user_name = ?1
+            "#,
+        )
+        .bind(username)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+        let credentials = rows
+            .into_iter()
+            .map(|r| {
+                let user_info = PublicKeyCredentialUserEntity {
+                    id: r.get("user_handle"),
+                    name: r.get("user_name"),
+                    display_name: r.get("user_display_name"),
+                };
+                StoredCredential {
+                    credential_id: r.get("credential"),
+                    public_key: r.get("public_key"),
+                    counter: r.get::<i32, _>("counter") as u32,
+                    user: user_info,
+                }
+            })
+            .collect();
+
+        Ok(credentials)
+    }
+
     async fn get_all_credentials(&self) -> Result<Vec<StoredCredential>, PasskeyError> {
         let rows = sqlx::query(
             r#"

@@ -80,6 +80,18 @@ impl CredentialStore for InMemoryCredentialStore {
         Ok(self.credentials.get(credential_id).cloned())
     }
 
+    async fn get_credentials_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Vec<StoredCredential>, PasskeyError> {
+        Ok(self
+            .credentials
+            .values()
+            .filter(|credential| credential.user.name == username)
+            .cloned()
+            .collect())
+    }
+
     async fn update_credential_counter(
         &mut self,
         credential_id: &str,

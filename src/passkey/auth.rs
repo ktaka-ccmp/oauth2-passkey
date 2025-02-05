@@ -21,7 +21,7 @@ pub struct AuthenticationOptions {
 #[derive(Serialize, Debug)]
 struct AllowCredential {
     type_: String,
-    id: String,
+    id: Vec<u8>,
 }
 
 #[allow(unused)]
@@ -42,7 +42,72 @@ struct AuthenticatorAssertionResponse {
     user_handle: Option<String>,
 }
 
-pub async fn start_authentication(state: &AppState) -> Result<AuthenticationOptions, PasskeyError> {
+pub async fn start_authentication(
+    state: &AppState,
+    username: Option<String>,
+) -> Result<AuthenticationOptions, PasskeyError> {
+    let mut allow_credentials = Vec::new();
+    match username {
+        Some(username) => {
+            let credential_store = state.credential_store.lock().await;
+            let credentials = credential_store
+                .get_credentials_by_username(&username)
+                .await?;
+
+            for credential in credentials {
+                allow_credentials.push(AllowCredential {
+                    type_: "public-key".to_string(),
+                    id: credential.credential_id,
+                });
+            }
+        }
+        None => {
+            // allow_credentials = vec![];
+        }
+    }
+
+    let challenge = generate_challenge();
+    let auth_id = Uuid::new_v4().to_string();
+
+    let stored_challenge = StoredChallenge {
+        challenge: challenge.clone().unwrap_or_default(),
+        user: PublicKeyCredentialUserEntity {
+            id: auth_id.clone(),
+            name: "temp".to_string(),
+            display_name: "temp".to_string(),
+        },
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+    };
+
+    let mut challenge_store = state.challenge_store.lock().await;
+    challenge_store
+        .store_challenge(auth_id.clone(), stored_challenge)
+        .await?;
+
+    let auth_option = AuthenticationOptions {
+        challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
+        timeout: 60000,
+        rp_id: state.config.rp_id.clone(),
+        allow_credentials,
+        user_verification: state
+            .config
+            .authenticator_selection
+            .user_verification
+            .clone(),
+        auth_id,
+    };
+
+    #[cfg(debug_assertions)]
+    println!("Auth options: {:?}", auth_option);
+    Ok(auth_option)
+}
+
+pub async fn _start_authentication(
+    state: &AppState,
+) -> Result<AuthenticationOptions, PasskeyError> {
     let challenge = generate_challenge();
     let auth_id = Uuid::new_v4().to_string();
 
