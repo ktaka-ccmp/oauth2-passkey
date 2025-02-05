@@ -42,12 +42,12 @@ impl Config {
 
         let timeout = env::var("PASSKEY_TIMEOUT")
             .map(|v| v.parse::<u32>())
-            .unwrap_or(Ok(60000))
+            .unwrap_or(Ok(60))
             .map_err(|e| PasskeyError::Config(format!("Invalid timeout value: {}", e)))?;
 
         let challenge_timeout = env::var("PASSKEY_CHALLENGE_TIMEOUT")
             .map(|v| v.parse::<u64>())
-            .unwrap_or(Ok(300))
+            .unwrap_or(Ok(60))
             .map_err(|e| PasskeyError::Config(format!("Invalid challenge timeout value: {}", e)))?;
 
         let _authenticator_attachment = env::var("PASSKEY_AUTHENTICATOR_ATTACHMENT").map_or(

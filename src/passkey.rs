@@ -26,6 +26,7 @@ pub(crate) struct StoredChallenge {
     pub challenge: Vec<u8>,
     pub user: PublicKeyCredentialUserEntity,
     pub timestamp: u64,
+    pub ttl: u64,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

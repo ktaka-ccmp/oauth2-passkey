@@ -26,7 +26,8 @@ impl SqliteChallengeStore {
                 challenge BLOB NOT NULL,
                 user_name TEXT NOT NULL,
                 user_display_name TEXT NOT NULL,
-                timestamp INTEGER NOT NULL
+                timestamp INTEGER NOT NULL,
+                ttl INTEGER NOT NULL
             )
             "#,
         )
@@ -48,7 +49,8 @@ impl ChallengeStore for SqliteChallengeStore {
                 challenge BLOB NOT NULL,
                 user_name TEXT NOT NULL,
                 user_display_name TEXT NOT NULL,
-                timestamp INTEGER NOT NULL
+                timestamp INTEGER NOT NULL,
+                ttl INTEGER NOT NULL
             )
             "#,
         )
@@ -66,13 +68,14 @@ impl ChallengeStore for SqliteChallengeStore {
     ) -> Result<(), PasskeyError> {
         sqlx::query(
             r#"
-            INSERT INTO challenges (challenge_id, challenge, user_name, user_display_name, timestamp)
-            VALUES (?1, ?2, ?3, ?4, ?5)
+            INSERT INTO challenges (challenge_id, challenge, user_name, user_display_name, timestamp, ttl)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             ON CONFLICT(challenge_id) DO UPDATE SET
                 challenge = ?2,
                 user_name = ?3,
                 user_display_name = ?4,
-                timestamp = ?5
+                timestamp = ?5,
+                ttl = ?6
             "#,
         )
         .bind(&challenge_id)
@@ -93,7 +96,7 @@ impl ChallengeStore for SqliteChallengeStore {
     ) -> Result<Option<StoredChallenge>, PasskeyError> {
         let row = sqlx::query(
             r#"
-            SELECT challenge, user_name, user_display_name, timestamp
+            SELECT challenge, user_name, user_display_name, timestamp, ttl
             FROM challenges
             WHERE challenge_id = ?1
             "#,
@@ -113,6 +116,7 @@ impl ChallengeStore for SqliteChallengeStore {
                 challenge: r.get("challenge"),
                 user: user_info,
                 timestamp: r.get::<i64, _>("timestamp") as u64,
+                ttl: r.get::<i64, _>("ttl") as u64,
             }
         });
 

@@ -1,6 +1,7 @@
 use base64::engine::{general_purpose::URL_SAFE, Engine};
 use ciborium::value::{Integer, Value as CborValue};
 use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 use uuid::Uuid;
 
 use crate::config::AuthenticatorSelection;
@@ -75,6 +76,7 @@ pub async fn start_registration(
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs(),
+        ttl: state.config.challenge_timeout_seconds,
     };
 
     // Store the challenge
@@ -102,7 +104,7 @@ pub async fn start_registration(
             },
         ],
         authenticator_selection: state.config.authenticator_selection.clone(),
-        timeout: 60000,
+        timeout: state.config.timeout * 1000, // Convert seconds to milliseconds
         attestation: "direct".to_string(),
     };
 
@@ -402,6 +404,23 @@ async fn verify_client_data(
         .ok_or(PasskeyError::Storage(
             "No challenge found for this user".to_string(),
         ))?;
+
+    // Validate challenge TTL
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let age = now - stored_challenge.timestamp;
+    let timeout = stored_challenge
+        .ttl
+        .min(state.config.challenge_timeout_seconds);
+    if age > timeout {
+        println!(
+            "Challenge expired after {} seconds (timeout: {})",
+            age, timeout
+        );
+        return Err(PasskeyError::Authentication("Challenge has expired".into()));
+    }
 
     if decoded_challenge != stored_challenge.challenge {
         return Err(PasskeyError::Challenge(

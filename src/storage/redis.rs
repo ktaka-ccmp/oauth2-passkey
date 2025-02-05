@@ -47,7 +47,7 @@ impl super::ChallengeStore for RedisChallengeStore {
             serde_json::to_string(&challenge).map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
         let _: () = conn
-            .set_ex(&key, value, challenge.timestamp)
+            .set_ex(&key, value, challenge.ttl)
             .await
             .map_err(|e| PasskeyError::Storage(e.to_string()))?;
         Ok(())
