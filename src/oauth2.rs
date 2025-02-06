@@ -2,12 +2,16 @@ use anyhow::{Context, Result};
 use async_session::{MemoryStore, Session, SessionStore};
 use axum::{
     extract::{FromRef, FromRequestParts, OptionalFromRequestParts},
-    http::{header::SET_COOKIE, HeaderMap},
+    // http::header::SET_COOKIE,
     response::{IntoResponse, Redirect, Response},
     RequestPartsExt,
 };
 use axum_extra::{headers, TypedHeader};
-use http::{request::Parts, StatusCode};
+use http::{
+    header::{HeaderMap, SET_COOKIE},
+    request::Parts,
+    StatusCode,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -230,7 +234,7 @@ struct OidcTokenResponse {
 pub async fn authorized(
     auth_response: &AuthResponse,
     state: AppState,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<(HeaderMap, Redirect), AppError> {
     let mut headers = HeaderMap::new();
     header_set_cookie(
         &mut headers,
