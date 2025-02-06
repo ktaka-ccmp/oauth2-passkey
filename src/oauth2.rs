@@ -127,7 +127,7 @@ impl FromRef<AppState> for SessionParams {
 pub struct User {
     family_name: String,
     pub name: String,
-    picture: String,
+    pub picture: String,
     email: String,
     given_name: String,
     id: String,
