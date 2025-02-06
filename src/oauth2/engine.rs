@@ -1,15 +1,12 @@
 use anyhow::{Context, Result};
 use async_session::{MemoryStore, Session, SessionStore};
 use axum::{
-    extract::{FromRef, FromRequestParts, OptionalFromRequestParts},
-    // http::header::SET_COOKIE,
+    extract::FromRef,
     response::{IntoResponse, Redirect, Response},
-    RequestPartsExt,
 };
-use axum_extra::{headers, TypedHeader};
+use axum_extra::headers;
 use http::{
     header::{HeaderMap, SET_COOKIE},
-    request::Parts,
     StatusCode,
 };
 
@@ -24,7 +21,7 @@ use url::Url;
 use chrono::{DateTime, Duration, Utc};
 use rand::{rng, Rng};
 
-use std::{convert::Infallible, env};
+use std::env;
 
 use crate::oauth2::idtoken::{verify_idtoken, IdInfo};
 
@@ -48,7 +45,7 @@ static OAUTH2_QUERY_STRING: &str = "response_type=code\
 // prompt: none, consent, select_account
 
 // "__Host-" prefix are added to make cookies "host-only".
-static SESSION_COOKIE_NAME: &str = "__Host-SessionId";
+pub(super) static SESSION_COOKIE_NAME: &str = "__Host-SessionId";
 static CSRF_COOKIE_NAME: &str = "__Host-CsrfId";
 static SESSION_COOKIE_MAX_AGE: i64 = 600; // 10 minutes
 static CSRF_COOKIE_MAX_AGE: i64 = 60; // 60 seconds
@@ -537,62 +534,6 @@ async fn exchange_code_for_token(
     let id_token = response_json.id_token.clone().unwrap();
     println!("Response JSON: {:#?}", response_json);
     Ok((access_token, id_token))
-}
-
-pub struct AuthRedirect;
-
-impl IntoResponse for AuthRedirect {
-    fn into_response(self) -> Response {
-        println!("AuthRedirect called.");
-        Redirect::temporary("/").into_response()
-    }
-}
-
-impl<S> FromRequestParts<S> for User
-where
-    MemoryStore: FromRef<S>,
-    S: Send + Sync,
-{
-    // If anything goes wrong or no session is found, redirect to the auth page
-    type Rejection = AuthRedirect;
-
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let store = MemoryStore::from_ref(state);
-        let cookies = parts
-            .extract::<TypedHeader<headers::Cookie>>()
-            .await
-            .map_err(|_| AuthRedirect)?;
-
-        // Get session from cookie
-        let session_cookie = cookies.get(SESSION_COOKIE_NAME).ok_or(AuthRedirect)?;
-        let session = store
-            .load_session(session_cookie.to_string())
-            .await
-            .map_err(|_| AuthRedirect)?;
-
-        // Get user data from session
-        let session = session.ok_or(AuthRedirect)?;
-        let user = session.get::<User>("user").ok_or(AuthRedirect)?;
-        Ok(user)
-    }
-}
-
-impl<S> OptionalFromRequestParts<S> for User
-where
-    MemoryStore: FromRef<S>,
-    S: Send + Sync,
-{
-    type Rejection = Infallible;
-
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &S,
-    ) -> Result<Option<Self>, Self::Rejection> {
-        match <User as FromRequestParts<S>>::from_request_parts(parts, state).await {
-            Ok(res) => Ok(Some(res)),
-            Err(AuthRedirect) => Ok(None),
-        }
-    }
 }
 
 // Use anyhow, define error and enable '?'
