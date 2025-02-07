@@ -144,12 +144,17 @@ async fn get_pkce_verifier(
         String::from_utf8(URL_SAFE.decode(&auth_response.state).unwrap()).unwrap();
     let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)?;
 
-    let token_store = state.token_store.lock().await;
+    let mut token_store = state.token_store.lock().await;
 
     let pkce_session = token_store
         .get(&state_in_response.pkce_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("PKCE Session not found"))?;
+
+    token_store
+        .remove(&state_in_response.pkce_id)
+        .await
+        .expect("Failed to remove PKCE session");
 
     let pkce_verifier = pkce_session.token.clone();
     println!("PKCE Verifier: {:#?}", pkce_verifier);
@@ -243,7 +248,7 @@ pub async fn csrf_checks(
     query: &AuthResponse,
     headers: HeaderMap,
 ) -> Result<(), AppError> {
-    let token_store = state.token_store.lock().await;
+    let mut token_store = state.token_store.lock().await;
 
     let csrf_id = cookies
         .get(CSRF_COOKIE_NAME)
@@ -252,6 +257,11 @@ pub async fn csrf_checks(
         .get(csrf_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("CSRF Session not found in Session Store"))?;
+
+    token_store
+        .remove(csrf_id)
+        .await
+        .expect("Failed to remove PKCE session");
 
     let user_agent = headers
         .get(axum::http::header::USER_AGENT)
