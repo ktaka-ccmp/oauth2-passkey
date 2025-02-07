@@ -11,6 +11,8 @@ use http::{
 };
 
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 // use http::HeaderValue;
 // use tower_http::cors::CorsLayer;
@@ -24,6 +26,7 @@ use rand::{rng, Rng};
 use std::env;
 
 use crate::oauth2::idtoken::{verify_idtoken, IdInfo};
+use crate::storage::{SessionStoreType, TokenStoreType};
 
 static OAUTH2_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 static OAUTH2_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
@@ -47,10 +50,10 @@ static OAUTH2_QUERY_STRING: &str = "response_type=code\
 // "__Host-" prefix are added to make cookies "host-only".
 pub(super) static SESSION_COOKIE_NAME: &str = "__Host-SessionId";
 static CSRF_COOKIE_NAME: &str = "__Host-CsrfId";
-static SESSION_COOKIE_MAX_AGE: i64 = 600; // 10 minutes
-static CSRF_COOKIE_MAX_AGE: i64 = 60; // 60 seconds
+static SESSION_COOKIE_MAX_AGE: u64 = 600; // 10 minutes
+static CSRF_COOKIE_MAX_AGE: u64 = 60; // 60 seconds
 
-pub async fn app_state_init() -> AppState {
+pub async fn app_state_init() -> Result<AppState, AppError> {
     // `MemoryStore` is just used as an example. Don't use this in production.
     let store = MemoryStore::new();
 
@@ -73,19 +76,28 @@ pub async fn app_state_init() -> AppState {
         csrf_cookie_max_age: CSRF_COOKIE_MAX_AGE,
     };
 
-    AppState {
+    let token_store = TokenStoreType::from_env()?.create_store().await?;
+    let session_store = SessionStoreType::from_env()?.create_store().await?;
+
+    // Initialize the stores
+    token_store.init().await?;
+    session_store.init().await?;
+
+    Ok(AppState {
         store,
+        token_store: Arc::new(Mutex::new(token_store)),
+        session_store: Arc::new(Mutex::new(session_store)),
         oauth2_params,
         session_params,
-    }
+    })
 }
 
 #[derive(Clone, Debug)]
 pub struct SessionParams {
     pub session_cookie_name: String,
     pub csrf_cookie_name: String,
-    pub session_cookie_max_age: i64,
-    pub csrf_cookie_max_age: i64,
+    pub session_cookie_max_age: u64,
+    pub csrf_cookie_max_age: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -94,13 +106,15 @@ pub struct OAuth2Params {
     pub client_secret: String,
     pub redirect_uri: String,
     pub auth_url: String,
-    token_url: String,
+    pub token_url: String,
     pub query_string: String,
 }
 
 #[derive(Clone)]
 pub struct AppState {
     pub store: MemoryStore,
+    pub(crate) token_store: Arc<Mutex<Box<dyn crate::storage::CacheStoreToken>>>,
+    pub(crate) session_store: Arc<Mutex<Box<dyn crate::storage::CacheStoreSession>>>,
     pub oauth2_params: OAuth2Params,
     pub session_params: SessionParams,
 }
@@ -108,6 +122,12 @@ pub struct AppState {
 impl FromRef<AppState> for MemoryStore {
     fn from_ref(state: &AppState) -> Self {
         state.store.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<Mutex<Box<dyn crate::storage::CacheStoreSession>>> {
+    fn from_ref(state: &AppState) -> Self {
+        state.session_store.clone()
     }
 }
 
@@ -124,7 +144,7 @@ impl FromRef<AppState> for SessionParams {
 }
 
 // The user data we'll get back from Google
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     family_name: String,
     pub name: String,
@@ -265,9 +285,9 @@ pub async fn authorized(
         return Err(anyhow::anyhow!("ID mismatch").into());
     }
 
-    let max_age = SESSION_COOKIE_MAX_AGE;
+    let max_age = SESSION_COOKIE_MAX_AGE as i64;
     let expires_at = Utc::now() + Duration::seconds(max_age);
-    let session_id = create_and_store_session(user_data, &state.store, expires_at).await?;
+    let session_id = create_and_store_session(user_data, &state, expires_at).await?;
     header_set_cookie(
         &mut headers,
         SESSION_COOKIE_NAME.to_string(),
@@ -459,9 +479,49 @@ pub fn header_set_cookie(
     Ok(headers)
 }
 
+use ring::rand::SecureRandom;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct StoredSession {
+    pub(crate) user: User,
+    expires_at: DateTime<Utc>,
+    pub(crate) ttl: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct StoredToken {
+    expires_at: DateTime<Utc>,
+    pub(crate) ttl: u64,
+}
+
 async fn create_and_store_session(
     user_data: User,
-    store: &MemoryStore,
+    state: &AppState,
+    expires_at: DateTime<Utc>,
+) -> Result<String, AppError> {
+    let session_id = gen_random_string()?;
+    let stored_session = StoredSession {
+        user: user_data,
+        expires_at,
+        ttl: SESSION_COOKIE_MAX_AGE,
+    };
+
+    let mut session_store = state.session_store.lock().await;
+    session_store.put(&session_id, stored_session).await?;
+
+    Ok(session_id)
+}
+
+fn gen_random_string() -> Result<String, AppError> {
+    let rng = ring::rand::SystemRandom::new();
+    let mut session_id = vec![0u8; 32];
+    rng.fill(&mut session_id)?;
+    Ok(URL_SAFE.encode(session_id))
+}
+
+async fn _create_and_store_session(
+    user_data: User,
+    store: &AppState,
     expires_at: DateTime<Utc>,
 ) -> Result<String, AppError> {
     let mut session = Session::new();
@@ -471,6 +531,7 @@ async fn create_and_store_session(
     session.set_expiry(expires_at);
     println!("Session: {:#?}", session);
     let session_id = store
+        .store
         .store_session(session)
         .await
         .context("failed to store session")?

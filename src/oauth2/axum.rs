@@ -1,4 +1,3 @@
-use async_session::{MemoryStore, SessionStore};
 use axum::{
     extract::{FromRef, FromRequestParts, OptionalFromRequestParts},
     response::{IntoResponse, Redirect, Response},
@@ -11,6 +10,9 @@ use std::convert::Infallible;
 
 use super::engine::{self, User};
 
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
 pub struct AuthRedirect;
 
 impl IntoResponse for AuthRedirect {
@@ -22,13 +24,13 @@ impl IntoResponse for AuthRedirect {
 
 impl<S> FromRequestParts<S> for User
 where
-    MemoryStore: FromRef<S>,
+    Arc<Mutex<Box<dyn crate::storage::CacheStoreSession>>>: FromRef<S>,
     S: Send + Sync,
 {
     type Rejection = AuthRedirect;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let store = MemoryStore::from_ref(state);
+        let store = Arc::<Mutex<Box<dyn crate::storage::CacheStoreSession>>>::from_ref(state);
         let cookies = parts
             .extract::<TypedHeader<headers::Cookie>>()
             .await
@@ -38,21 +40,21 @@ where
         let session_cookie = cookies
             .get(engine::SESSION_COOKIE_NAME)
             .ok_or(AuthRedirect)?;
-        let session = store
-            .load_session(session_cookie.to_string())
+        let store_guard = store.lock().await;
+        let session = store_guard
+            .get(session_cookie)
             .await
             .map_err(|_| AuthRedirect)?;
 
         // Get user data from session
-        let session = session.ok_or(AuthRedirect)?;
-        let user = session.get::<User>("user").ok_or(AuthRedirect)?;
-        Ok(user)
+        let stored_session = session.ok_or(AuthRedirect)?;
+        Ok(stored_session.user)
     }
 }
 
 impl<S> OptionalFromRequestParts<S> for User
 where
-    MemoryStore: FromRef<S>,
+    Arc<Mutex<Box<dyn crate::storage::CacheStoreSession>>>: FromRef<S>,
     S: Send + Sync,
 {
     type Rejection = Infallible;

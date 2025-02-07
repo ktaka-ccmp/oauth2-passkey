@@ -1,82 +1,73 @@
 use crate::oauth2::AppError;
+use crate::oauth2::{StoredSession, StoredToken};
+use crate::storage::{CacheStoreSession, CacheStoreToken};
+use async_trait::async_trait;
 use std::collections::HashMap;
 
 pub(crate) struct InMemoryTokenStore {
-    token: HashMap<String, StoredToken>,
+    entry: HashMap<String, StoredToken>,
 }
 
 impl InMemoryTokenStore {
     pub(crate) fn new() -> Self {
         println!("Creating new in-memory token store");
         Self {
-            token: HashMap::new(),
+            entry: HashMap::new(),
         }
     }
 }
 
+#[async_trait]
+impl CacheStoreToken for InMemoryTokenStore {
+    async fn init(&self) -> Result<(), AppError> {
+        Ok(()) // Nothing to initialize for in-memory store
+    }
+
+    async fn put(&mut self, key: &str, value: StoredToken) -> Result<(), AppError> {
+        self.entry.insert(key.to_owned(), value);
+        Ok(())
+    }
+
+    async fn get(&self, key: &str) -> Result<Option<StoredToken>, AppError> {
+        Ok(self.entry.get(key).cloned())
+    }
+
+    async fn remove(&mut self, key: &str) -> Result<(), AppError> {
+        self.entry.remove(key);
+        Ok(())
+    }
+}
+
 pub(crate) struct InMemorySessionStore {
-    session: HashMap<String, StoredSession>,
+    entry: HashMap<String, StoredSession>,
 }
 
 impl InMemorySessionStore {
     pub(crate) fn new() -> Self {
         println!("Creating new in-memory session store");
         Self {
-            session: HashMap::new(),
+            entry: HashMap::new(),
         }
     }
 }
 
-impl TokenStore for InMemoryTokenStore {
+#[async_trait]
+impl CacheStoreSession for InMemorySessionStore {
     async fn init(&self) -> Result<(), AppError> {
         Ok(()) // Nothing to initialize for in-memory store
     }
 
-    async fn store_token(
-        &mut self,
-        token_id: String,
-        token: StoredToken,
-    ) -> Result<(), AppError> {
-        self.token.insert(token_id, token);
+    async fn put(&mut self, key: &str, value: StoredSession) -> Result<(), AppError> {
+        self.entry.insert(key.to_owned(), value);
         Ok(())
     }
 
-    async fn get_token(
-        &self,
-        token_id: &str,
-    ) -> Result<Option<StoredToken>, AppError> {
-        Ok(self.token.get(token_id).cloned())
+    async fn get(&self, key: &str) -> Result<Option<StoredSession>, AppError> {
+        Ok(self.entry.get(key).cloned())
     }
 
-    async fn remove_token(&mut self, token_id: &str) -> Result<(), AppError> {
-        self.token.remove(token_id);
-        Ok(())
-    }
-}
-
-impl SessionStore for InMemorySessionStore {
-    async fn init(&self) -> Result<(), AppError> {
-        Ok(()) // Nothing to initialize for in-memory store
-    }
-
-    async fn store_session(
-        &mut self,
-        session_id: String,
-        session: StoredSession,
-    ) -> Result<(), AppError> {
-        self.session.insert(session_id, session);
-        Ok(())
-    }
-
-    async fn get_session(
-        &self,
-        session_id: &str,
-    ) -> Result<Option<StoredSession>, AppError> {
-        Ok(self.session.get(session_id).cloned())
-    }
-
-    async fn remove_session(&mut self, session_id: &str) -> Result<(), AppError> {
-        self.session.remove(session_id);
+    async fn remove(&mut self, key: &str) -> Result<(), AppError> {
+        self.entry.remove(key);
         Ok(())
     }
 }

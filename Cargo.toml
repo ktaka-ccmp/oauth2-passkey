@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.95"
 async-session = "3.0.0"
+redis = { version = "0.28.2", features = ["tokio-comp"] }
 axum = "0.8.1"
 axum-extra = "0.10.0"
 base64 = "0.22.1"
@@ -25,3 +26,6 @@ thiserror = "2.0.11"
 tokio = { workspace = true }
 tracing = { workspace = true }
 url = "2.5.4"
+dotenv = "0.15.0"
+ring = "0.17.8"
+async-trait = "0.1.86"
