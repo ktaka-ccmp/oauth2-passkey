@@ -139,7 +139,7 @@ impl SessionStoreType {
 // }
 
 #[async_trait]
-pub(crate) trait CacheStoreToken: Send + Sync + 'static {
+pub trait CacheStoreToken: Send + Sync + 'static {
     /// Initialize the store. This is called when the store is created.
     async fn init(&self) -> Result<(), AppError>;
 

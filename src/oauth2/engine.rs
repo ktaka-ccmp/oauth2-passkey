@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use async_session::{MemoryStore, Session, SessionStore};
 use axum::{
     extract::FromRef,
     response::{IntoResponse, Redirect, Response},
@@ -21,7 +20,7 @@ use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use url::Url;
 
 use chrono::{DateTime, Duration, Utc};
-use rand::{rng, Rng};
+use ring::rand::SecureRandom;
 
 use std::env;
 
@@ -54,9 +53,6 @@ static SESSION_COOKIE_MAX_AGE: u64 = 600; // 10 minutes
 static CSRF_COOKIE_MAX_AGE: u64 = 60; // 60 seconds
 
 pub async fn app_state_init() -> Result<AppState, AppError> {
-    // `MemoryStore` is just used as an example. Don't use this in production.
-    let store = MemoryStore::new();
-
     let oauth2_params = OAuth2Params {
         client_id: env::var("CLIENT_ID").expect("Missing CLIENT_ID!"),
         client_secret: env::var("CLIENT_SECRET").expect("Missing CLIENT_SECRET!"),
@@ -84,7 +80,6 @@ pub async fn app_state_init() -> Result<AppState, AppError> {
     session_store.init().await?;
 
     Ok(AppState {
-        store,
         token_store: Arc::new(Mutex::new(token_store)),
         session_store: Arc::new(Mutex::new(session_store)),
         oauth2_params,
@@ -112,17 +107,10 @@ pub struct OAuth2Params {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub store: MemoryStore,
-    pub(crate) token_store: Arc<Mutex<Box<dyn crate::storage::CacheStoreToken>>>,
+    pub token_store: Arc<Mutex<Box<dyn crate::storage::CacheStoreToken>>>,
     pub(crate) session_store: Arc<Mutex<Box<dyn crate::storage::CacheStoreSession>>>,
     pub oauth2_params: OAuth2Params,
     pub session_params: SessionParams,
-}
-
-impl FromRef<AppState> for MemoryStore {
-    fn from_ref(state: &AppState) -> Self {
-        state.store.clone()
-    }
 }
 
 impl FromRef<AppState> for Arc<Mutex<Box<dyn crate::storage::CacheStoreSession>>> {
@@ -163,11 +151,12 @@ struct StateParams {
     pkce_id: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct TokenData {
+#[derive(Serialize, Clone, Deserialize, Debug)]
+pub struct StoredToken {
     token: String,
     expires_at: DateTime<Utc>,
     user_agent: Option<String>,
+    pub(crate) ttl: u64,
 }
 
 pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> String {
@@ -182,51 +171,38 @@ pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> St
 }
 
 pub async fn generate_store_token(
-    session_key: &str,
     expires_at: DateTime<Utc>,
     user_agent: Option<String>,
-    store: &MemoryStore,
+    state: &AppState,
 ) -> Result<(String, String), AppError> {
-    let token: String = rng()
-        .sample_iter(&rand::distr::Alphanumeric)
-        .take(32)
-        .map(char::from)
-        .collect();
+    let token = gen_random_string(32)?;
+    let token_id = gen_random_string(32)?;
 
-    let token_data = TokenData {
+    let token_data = StoredToken {
         token: token.clone(),
         expires_at,
         user_agent,
+        ttl: CSRF_COOKIE_MAX_AGE,
     };
 
-    let mut session = Session::new();
-    session.insert(session_key, token_data)?;
-    session.set_expiry(expires_at);
+    let mut token_store = state.token_store.lock().await;
+    token_store.put(&token_id, token_data.clone()).await?;
 
-    let session_id = store
-        .store_session(session)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Failed to store session"))?;
-
-    Ok((token, session_id))
+    Ok((token, token_id))
 }
 
 pub async fn delete_session_from_store(
     cookies: headers::Cookie,
     cookie_name: String,
-    store: &MemoryStore,
+    state: &AppState,
 ) -> Result<(), AppError> {
+    let mut session_store = state.session_store.lock().await;
+
     if let Some(cookie) = cookies.get(&cookie_name) {
-        if let Some(session) = store
-            .load_session(cookie.to_string())
-            .await
-            .context("failed to load session")?
-        {
-            store
-                .destroy_session(session)
-                .await
-                .context("failed to destroy session")?;
-        }
+        session_store.remove(cookie).await.map_err(|e| {
+            println!("Error removing session: {}", e);
+            e
+        })?;
     };
     Ok(())
 }
@@ -307,14 +283,14 @@ async fn get_pkce_verifier(
     let decoded_state_string =
         String::from_utf8(URL_SAFE.decode(&auth_response.state).unwrap()).unwrap();
     let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)?;
-    let session = state
-        .store
-        .load_session(state_in_response.pkce_id)
+
+    let token_store = state.token_store.lock().await;
+
+    let pkce_session = token_store
+        .get(&state_in_response.pkce_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("PKCE Session not found"))?;
-    let pkce_session: TokenData = session
-        .get("pkce_session")
-        .ok_or_else(|| anyhow::anyhow!("No pkce data in session"))?;
+
     let pkce_verifier = pkce_session.token.clone();
     println!("PKCE Verifier: {:#?}", pkce_verifier);
     Ok(pkce_verifier)
@@ -326,7 +302,7 @@ async fn user_from_verified_idtoken(
     auth_response: &AuthResponse,
 ) -> Result<User, AppError> {
     let idinfo = verify_idtoken(id_token, state.oauth2_params.client_id.clone()).await?;
-    verify_nonce(auth_response, idinfo.clone(), &state.store).await?;
+    verify_nonce(auth_response, idinfo.clone(), state).await?;
     let user_data_idtoken = User {
         family_name: idinfo.family_name,
         name: idinfo.name,
@@ -343,19 +319,18 @@ async fn user_from_verified_idtoken(
 async fn verify_nonce(
     auth_response: &AuthResponse,
     idinfo: IdInfo,
-    store: &MemoryStore,
+    state: &AppState,
 ) -> Result<(), AppError> {
     let decoded_state_string =
         String::from_utf8(URL_SAFE.decode(&auth_response.state).unwrap()).unwrap();
     let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)?;
 
-    let session = store
-        .load_session(state_in_response.nonce_id)
+    let mut token_store = state.token_store.lock().await;
+
+    let nonce_session = token_store
+        .get(&state_in_response.nonce_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Nonce Session not found"))?;
-    let nonce_session: TokenData = session
-        .get("nonce_session")
-        .ok_or_else(|| anyhow::anyhow!("No nonce data in session"))?;
 
     println!("Nonce Data: {:#?}", nonce_session);
 
@@ -370,10 +345,10 @@ async fn verify_nonce(
         return Err(anyhow::anyhow!("Nonce mismatch").into());
     }
 
-    store
-        .destroy_session(session)
+    token_store
+        .remove(&state_in_response.nonce_id)
         .await
-        .context("failed to destroy nonce session")?;
+        .expect("Failed to remove nonce session");
 
     Ok(())
 }
@@ -404,20 +379,19 @@ pub async fn validate_origin(headers: &HeaderMap, auth_url: &str) -> Result<(), 
 
 pub async fn csrf_checks(
     cookies: headers::Cookie,
-    store: &MemoryStore,
+    state: &AppState,
     query: &AuthResponse,
     headers: HeaderMap,
 ) -> Result<(), AppError> {
+    let token_store = state.token_store.lock().await;
+
     let csrf_id = cookies
         .get(CSRF_COOKIE_NAME)
         .ok_or_else(|| anyhow::anyhow!("No CSRF session cookie found"))?;
-    let session = store
-        .load_session(csrf_id.to_string())
+    let csrf_session = token_store
+        .get(csrf_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("CSRF Session not found in Session Store"))?;
-    let csrf_session: TokenData = session
-        .get("csrf_session")
-        .ok_or_else(|| anyhow::anyhow!("No CSRF data in session"))?;
 
     let user_agent = headers
         .get(axum::http::header::USER_AGENT)
@@ -479,17 +453,9 @@ pub fn header_set_cookie(
     Ok(headers)
 }
 
-use ring::rand::SecureRandom;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct StoredSession {
     pub(crate) user: User,
-    expires_at: DateTime<Utc>,
-    pub(crate) ttl: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StoredToken {
     expires_at: DateTime<Utc>,
     pub(crate) ttl: u64,
 }
@@ -499,7 +465,7 @@ async fn create_and_store_session(
     state: &AppState,
     expires_at: DateTime<Utc>,
 ) -> Result<String, AppError> {
-    let session_id = gen_random_string()?;
+    let session_id = gen_random_string(32)?;
     let stored_session = StoredSession {
         user: user_data,
         expires_at,
@@ -512,31 +478,11 @@ async fn create_and_store_session(
     Ok(session_id)
 }
 
-fn gen_random_string() -> Result<String, AppError> {
+fn gen_random_string(len: usize) -> Result<String, AppError> {
     let rng = ring::rand::SystemRandom::new();
-    let mut session_id = vec![0u8; 32];
+    let mut session_id = vec![0u8; len];
     rng.fill(&mut session_id)?;
     Ok(URL_SAFE.encode(session_id))
-}
-
-async fn _create_and_store_session(
-    user_data: User,
-    store: &AppState,
-    expires_at: DateTime<Utc>,
-) -> Result<String, AppError> {
-    let mut session = Session::new();
-    session
-        .insert("user", &user_data)
-        .context("failed in inserting serialized value into session")?;
-    session.set_expiry(expires_at);
-    println!("Session: {:#?}", session);
-    let session_id = store
-        .store
-        .store_session(session)
-        .await
-        .context("failed to store session")?
-        .context("unexpected error retrieving cookie value")?;
-    Ok(session_id)
 }
 
 async fn fetch_user_data_from_google(access_token: String) -> Result<User, AppError> {
