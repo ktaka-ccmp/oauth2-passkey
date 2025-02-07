@@ -4,11 +4,11 @@ use axum::{
     RequestPartsExt,
 };
 use axum_extra::{headers, TypedHeader};
-use http::request::Parts;
+use http::{request::Parts, StatusCode};
 
 use std::convert::Infallible;
 
-use super::engine::{self, User};
+use super::engine::{self, AppError, AppState, OAuth2Params, SessionParams, User};
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -67,5 +67,33 @@ where
             Ok(res) => Ok(Some(res)),
             Err(AuthRedirect) => Ok(None),
         }
+    }
+}
+
+impl FromRef<AppState> for Arc<Mutex<Box<dyn crate::storage::CacheStoreSession>>> {
+    fn from_ref(state: &AppState) -> Self {
+        state.session_store.clone()
+    }
+}
+
+impl FromRef<AppState> for OAuth2Params {
+    fn from_ref(state: &AppState) -> Self {
+        state.oauth2_params.clone()
+    }
+}
+
+impl FromRef<AppState> for SessionParams {
+    fn from_ref(state: &AppState) -> Self {
+        state.session_params.clone()
+    }
+}
+
+// Tell axum how to convert `AppError` into a response.
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        tracing::error!("Application error: {:#}", self.0);
+
+        let message = self.0.to_string();
+        (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
     }
 }

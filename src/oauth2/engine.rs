@@ -1,13 +1,6 @@
 use anyhow::{Context, Result};
-use axum::{
-    extract::FromRef,
-    response::{IntoResponse, Redirect, Response},
-};
-use axum_extra::headers;
-use http::{
-    header::{HeaderMap, SET_COOKIE},
-    StatusCode,
-};
+use headers::Cookie;
+use http::header::{HeaderMap, SET_COOKIE};
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -113,24 +106,6 @@ pub struct AppState {
     pub session_params: SessionParams,
 }
 
-impl FromRef<AppState> for Arc<Mutex<Box<dyn crate::storage::CacheStoreSession>>> {
-    fn from_ref(state: &AppState) -> Self {
-        state.session_store.clone()
-    }
-}
-
-impl FromRef<AppState> for OAuth2Params {
-    fn from_ref(state: &AppState) -> Self {
-        state.oauth2_params.clone()
-    }
-}
-
-impl FromRef<AppState> for SessionParams {
-    fn from_ref(state: &AppState) -> Self {
-        state.session_params.clone()
-    }
-}
-
 // The user data we'll get back from Google
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
@@ -192,7 +167,7 @@ pub async fn generate_store_token(
 }
 
 pub async fn delete_session_from_store(
-    cookies: headers::Cookie,
+    cookies: Cookie,
     cookie_name: String,
     state: &AppState,
 ) -> Result<(), AppError> {
@@ -224,10 +199,7 @@ struct OidcTokenResponse {
     id_token: Option<String>,
 }
 
-pub async fn authorized(
-    auth_response: &AuthResponse,
-    state: AppState,
-) -> Result<(HeaderMap, Redirect), AppError> {
+pub async fn create_new_session(state: AppState, user_data: User) -> Result<HeaderMap, AppError> {
     let mut headers = HeaderMap::new();
     header_set_cookie(
         &mut headers,
@@ -236,31 +208,6 @@ pub async fn authorized(
         Utc::now() - Duration::seconds(86400),
         -86400,
     )?;
-
-    let pkce_verifier = get_pkce_verifier(auth_response, &state).await?;
-
-    let (access_token, id_token) = exchange_code_for_token(
-        state.oauth2_params.clone(),
-        auth_response.code.clone(),
-        pkce_verifier,
-    )
-    .await?;
-
-    // println!("Access Token: {:#?}", access_token);
-    // println!("ID Token: {:#?}", id_token);
-
-    let user_data = user_from_verified_idtoken(id_token, &state, auth_response).await?;
-
-    // Optional check for user data from userinfo endpoint
-    let user_data_userinfo = fetch_user_data_from_google(access_token).await?;
-
-    #[cfg(debug_assertions)]
-    println!("User Data from Userinfo: {:#?}", user_data_userinfo);
-
-    if user_data.id != user_data_userinfo.id {
-        return Err(anyhow::anyhow!("ID mismatch").into());
-    }
-
     let max_age = SESSION_COOKIE_MAX_AGE as i64;
     let expires_at = Utc::now() + Duration::seconds(max_age);
     let session_id = create_and_store_session(user_data, &state, expires_at).await?;
@@ -271,9 +218,30 @@ pub async fn authorized(
         expires_at,
         max_age,
     )?;
+    #[cfg(debug_assertions)]
     println!("Headers: {:#?}", headers);
+    Ok(headers)
+}
 
-    Ok((headers, Redirect::to("/popup_close")))
+pub async fn get_user_oidc_oauth2(
+    auth_response: &AuthResponse,
+    state: &AppState,
+) -> Result<User, AppError> {
+    let pkce_verifier = get_pkce_verifier(auth_response, state).await?;
+    let (access_token, id_token) = exchange_code_for_token(
+        state.oauth2_params.clone(),
+        auth_response.code.clone(),
+        pkce_verifier,
+    )
+    .await?;
+    let user_data = user_from_verified_idtoken(id_token, state, auth_response).await?;
+    let user_data_userinfo = fetch_user_data_from_google(access_token).await?;
+    #[cfg(debug_assertions)]
+    println!("User Data from Userinfo: {:#?}", user_data_userinfo);
+    if user_data.id != user_data_userinfo.id {
+        return Err(anyhow::anyhow!("ID mismatch").into());
+    }
+    Ok(user_data)
 }
 
 async fn get_pkce_verifier(
@@ -378,7 +346,7 @@ pub async fn validate_origin(headers: &HeaderMap, auth_url: &str) -> Result<(), 
 }
 
 pub async fn csrf_checks(
-    cookies: headers::Cookie,
+    cookies: Cookie,
     state: &AppState,
     query: &AuthResponse,
     headers: HeaderMap,
@@ -546,21 +514,11 @@ async fn exchange_code_for_token(
 // Use anyhow, define error and enable '?'
 // For a simplified example of using anyhow in axum check /examples/anyhow-error-response
 #[derive(Debug)]
-pub struct AppError(anyhow::Error);
+pub struct AppError(pub(crate) anyhow::Error);
 
 impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-// Tell axum how to convert `AppError` into a response.
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        tracing::error!("Application error: {:#}", self.0);
-
-        let message = self.0.to_string();
-        (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
     }
 }
 
