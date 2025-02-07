@@ -75,7 +75,7 @@ impl SessionStoreType {
     pub fn from_env() -> Result<Self, AppError> {
         dotenv::dotenv().ok();
 
-        let store_type = env::var("PASSKEY_SESSION_STORE")
+        let store_type = env::var("OAUTH2_SESSION_STORE")
             .unwrap_or_else(|_| "memory".to_string())
             .to_lowercase();
 
