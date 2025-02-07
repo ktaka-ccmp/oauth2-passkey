@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Context;
 use headers::Cookie;
 use http::header::HeaderMap;
 
@@ -7,15 +7,19 @@ use serde::{Deserialize, Serialize};
 // use http::HeaderValue;
 // use tower_http::cors::CorsLayer;
 
-use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+use base64::{
+    engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD},
+    Engine as _,
+};
 use url::Url;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
+use sha2::{Digest, Sha256};
 
+use crate::common::{gen_random_string, header_set_cookie, AppError};
 use crate::oauth2::idtoken::{verify_idtoken, IdInfo};
-use crate::common::{AppError, gen_random_string};
-use crate::types::{AppState, StateParams, StoredToken, User, OAuth2Params};
 use crate::oauth2::{CSRF_COOKIE_MAX_AGE, CSRF_COOKIE_NAME, OAUTH2_USERINFO_URL};
+use crate::types::{AppState, OAuth2Params, StateParams, StoredToken, User};
 
 pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> String {
     let state_params = StateParams {
@@ -64,6 +68,51 @@ struct OidcTokenResponse {
     refresh_token: Option<String>,
     scope: String,
     id_token: Option<String>,
+}
+
+pub async fn prepare_oauth2_auth_request(
+    state: AppState,
+    headers: HeaderMap,
+) -> Result<(String, HeaderMap), AppError> {
+    let expires_at = Utc::now()
+        + Duration::seconds(state.session_params.csrf_cookie_max_age.try_into().unwrap());
+    let user_agent = headers
+        .get(axum::http::header::USER_AGENT)
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("Unknown")
+        .to_string();
+    let (csrf_token, csrf_id) = generate_store_token(expires_at, Some(user_agent), &state).await?;
+    let (nonce_token, nonce_id) = generate_store_token(expires_at, None, &state).await?;
+    let (pkce_token, pkce_id) = generate_store_token(expires_at, None, &state).await?;
+    #[cfg(debug_assertions)]
+    println!("PKCE ID: {:?}, PKCE verifier: {:?}", pkce_id, pkce_token);
+    let pkce_challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(pkce_token.as_bytes()));
+    #[cfg(debug_assertions)]
+    println!("PKCE Challenge: {:#?}", pkce_challenge);
+    let encoded_state = encode_state(csrf_token, nonce_id, pkce_id);
+    let auth_url = format!(
+        "{}?{}&client_id={}&redirect_uri={}&state={}&nonce={}\
+        &code_challenge={}&code_challenge_method={}",
+        state.oauth2_params.auth_url,
+        state.oauth2_params.query_string,
+        state.oauth2_params.client_id,
+        state.oauth2_params.redirect_uri,
+        encoded_state,
+        nonce_token,
+        pkce_challenge,
+        "S256"
+    );
+    #[cfg(debug_assertions)]
+    println!("Auth URL: {:#?}", auth_url);
+    let mut headers = HeaderMap::new();
+    header_set_cookie(
+        &mut headers,
+        state.session_params.csrf_cookie_name.to_string(),
+        csrf_id,
+        expires_at,
+        state.session_params.csrf_cookie_max_age.try_into()?,
+    )?;
+    Ok((auth_url, headers))
 }
 
 pub async fn get_user_oidc_oauth2(
@@ -304,4 +353,3 @@ async fn exchange_code_for_token(
     println!("Response JSON: {:#?}", response_json);
     Ok((access_token, id_token))
 }
-

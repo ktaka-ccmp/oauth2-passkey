@@ -6,11 +6,11 @@ mod session;
 pub use engine::*;
 pub use session::*;
 
-use crate::types::*;
 use crate::common::AppError;
 use crate::storage::{SessionStoreType, TokenStoreType};
+use crate::types::*;
 
-use std::{sync::Arc, env};
+use std::{env, sync::Arc};
 use tokio::sync::Mutex;
 
 static OAUTH2_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -72,4 +72,3 @@ pub async fn app_state_init() -> Result<AppState, AppError> {
         session_params,
     })
 }
-

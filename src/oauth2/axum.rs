@@ -10,9 +10,9 @@ use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::types::{AppState, OAuth2Params, SessionParams, User};
 use crate::common::AppError;
 use crate::oauth2::SESSION_COOKIE_NAME;
+use crate::types::{AppState, OAuth2Params, SessionParams, User};
 
 pub struct AuthRedirect;
 
@@ -38,9 +38,7 @@ where
             .map_err(|_| AuthRedirect)?;
 
         // Get session from cookie
-        let session_cookie = cookies
-            .get(SESSION_COOKIE_NAME)
-            .ok_or(AuthRedirect)?;
+        let session_cookie = cookies.get(SESSION_COOKIE_NAME).ok_or(AuthRedirect)?;
         let store_guard = store.lock().await;
         let session = store_guard
             .get(session_cookie)

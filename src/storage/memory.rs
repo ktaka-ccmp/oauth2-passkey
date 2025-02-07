@@ -1,6 +1,6 @@
 use crate::common::AppError;
-use crate::types::{StoredSession, StoredToken};
 use crate::storage::{CacheStoreSession, CacheStoreToken};
+use crate::types::{StoredSession, StoredToken};
 use async_trait::async_trait;
 use std::collections::HashMap;
 

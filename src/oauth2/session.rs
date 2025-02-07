@@ -1,17 +1,35 @@
-use http::header::{HeaderMap, SET_COOKIE};
 use chrono::{DateTime, Duration, Utc};
 use headers::Cookie;
-
-use anyhow::Context;
-use axum_extra::headers;
+use http::header::HeaderMap;
 
 // use http::HeaderValue;
 // use tower_http::cors::CorsLayer;
 
+use crate::common::{gen_random_string, header_set_cookie, AppError};
 use crate::oauth2::User;
-use crate::oauth2::{SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, SESSION_COOKIE_MAX_AGE};
+use crate::oauth2::{CSRF_COOKIE_NAME, SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
 use crate::types::{AppState, StoredSession};
-use crate::common::{AppError, gen_random_string};
+
+pub async fn prepare_logout_response(
+    state: AppState,
+    cookies: headers::Cookie,
+) -> Result<HeaderMap, AppError> {
+    let mut headers = HeaderMap::new();
+    header_set_cookie(
+        &mut headers,
+        state.session_params.session_cookie_name.to_string(),
+        "value".to_string(),
+        Utc::now() - Duration::seconds(86400),
+        -86400,
+    )?;
+    delete_session_from_store(
+        cookies,
+        state.session_params.session_cookie_name.to_string(),
+        &state,
+    )
+    .await?;
+    Ok(headers)
+}
 
 pub async fn create_new_session(state: AppState, user_data: User) -> Result<HeaderMap, AppError> {
     let mut headers = HeaderMap::new();
@@ -55,23 +73,6 @@ async fn create_and_store_session(
     Ok(session_id)
 }
 
-pub fn header_set_cookie(
-    headers: &mut HeaderMap,
-    name: String,
-    value: String,
-    _expires_at: DateTime<Utc>,
-    max_age: i64,
-) -> Result<&HeaderMap, AppError> {
-    let cookie =
-        format!("{name}={value}; SameSite=Lax; Secure; HttpOnly; Path=/; Max-Age={max_age}");
-    println!("Cookie: {:#?}", cookie);
-    headers.append(
-        SET_COOKIE,
-        cookie.parse().context("failed to parse cookie")?,
-    );
-    Ok(headers)
-}
-
 pub async fn delete_session_from_store(
     cookies: Cookie,
     cookie_name: String,
@@ -87,5 +88,3 @@ pub async fn delete_session_from_store(
     };
     Ok(())
 }
-
-
