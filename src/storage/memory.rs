@@ -1,5 +1,5 @@
-use crate::oauth2::AppError;
-use crate::oauth2::{StoredSession, StoredToken};
+use crate::common::AppError;
+use crate::types::{StoredSession, StoredToken};
 use crate::storage::{CacheStoreSession, CacheStoreToken};
 use async_trait::async_trait;
 use std::collections::HashMap;

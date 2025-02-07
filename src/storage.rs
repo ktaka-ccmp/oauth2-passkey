@@ -1,5 +1,5 @@
-use crate::oauth2::AppError;
-use crate::oauth2::{StoredSession, StoredToken};
+use crate::common::AppError;
+use crate::types::{StoredSession, StoredToken};
 use async_trait::async_trait;
 use std::env;
 
@@ -139,7 +139,7 @@ impl SessionStoreType {
 // }
 
 #[async_trait]
-pub trait CacheStoreToken: Send + Sync + 'static {
+pub(crate) trait CacheStoreToken: Send + Sync + 'static {
     /// Initialize the store. This is called when the store is created.
     async fn init(&self) -> Result<(), AppError>;
 
