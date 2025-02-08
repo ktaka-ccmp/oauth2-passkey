@@ -7,7 +7,7 @@ edition = "2021"
 anyhow = "1.0.95"
 redis = { version = "0.28.2", features = ["tokio-comp"] }
 axum = "0.8.1"
-axum-extra = "0.10.0"
+axum-extra = { version = "0.10.0", features = ["typed-header"] }
 chrono = { version = "0.4.39", features = ["serde"] }
 dashmap = "6.1.0"
 http = "1.2.0"
