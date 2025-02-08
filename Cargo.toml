@@ -1,0 +1,20 @@
+[workspace]
+members = [
+    "liboauth2",
+    "demo",
+    "libsession",
+    "libpasskey"
+]
+
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+liboauth2 = { path = "./liboauth2" }
+libpasskey = { path = "./libpasskey" }
+libsession = { path = "./libsession" }
+axum = { version = "0.8", features = ["http2", "macros", "multipart"] }
+tokio = { version = "1.43", features = ["bytes", "fs", "io-std", "macros", "parking_lot", "rt-multi-thread", "signal-hook-registry", "socket2", "sync", "time", "tracing"] }
