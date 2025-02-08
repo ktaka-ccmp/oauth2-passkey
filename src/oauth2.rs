@@ -39,16 +39,20 @@ static SESSION_COOKIE_MAX_AGE: u64 = 600; // 10 minutes
 static CSRF_COOKIE_MAX_AGE: u64 = 60; // 60 seconds
 
 pub async fn app_state_init() -> Result<AppState, AppError> {
+    let oauth2_root = env::var("OAUTH2_ROOT").expect("Missing OAUTH2_ROOT!");
+
     let oauth2_params = OAuth2Params {
         client_id: env::var("CLIENT_ID").expect("Missing CLIENT_ID!"),
         client_secret: env::var("CLIENT_SECRET").expect("Missing CLIENT_SECRET!"),
         redirect_uri: format!(
-            "{}/auth/authorized",
-            env::var("ORIGIN").expect("Missing ORIGIN!")
+            "{}{}/authorized",
+            env::var("ORIGIN").expect("Missing ORIGIN!"),
+            oauth2_root
         ),
         auth_url: OAUTH2_AUTH_URL.to_string(),
         token_url: OAUTH2_TOKEN_URL.to_string(),
         query_string: OAUTH2_QUERY_STRING.to_string(),
+        oauth2_root: oauth2_root,
     };
 
     let session_params = SessionParams {
