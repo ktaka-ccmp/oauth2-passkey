@@ -1,0 +1,12 @@
+[package]
+name = "demo"
+version = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+askama = "0.12.1"
+axum = { workspace = true }
+axum-core = "0.5.0"
+tokio = { workspace = true }
+
+libpasskey.workspace = true
