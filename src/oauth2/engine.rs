@@ -2,8 +2,6 @@ use anyhow::Context;
 use headers::Cookie;
 use http::header::HeaderMap;
 
-use serde::{Deserialize, Serialize};
-
 // use http::HeaderValue;
 // use tower_http::cors::CorsLayer;
 
@@ -19,7 +17,9 @@ use sha2::{Digest, Sha256};
 use crate::common::{gen_random_string, header_set_cookie, AppError};
 use crate::oauth2::idtoken::{verify_idtoken, IdInfo};
 use crate::oauth2::{CSRF_COOKIE_MAX_AGE, CSRF_COOKIE_NAME, OAUTH2_USERINFO_URL};
-use crate::types::{AppState, OAuth2Params, StateParams, StoredToken, User};
+use crate::types::{
+    AppState, AuthResponse, OAuth2Params, OidcTokenResponse, StateParams, StoredToken, User,
+};
 
 pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> String {
     let state_params = StateParams {
@@ -51,23 +51,6 @@ pub async fn generate_store_token(
     token_store.put(&token_id, token_data.clone()).await?;
 
     Ok((token, token_id))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AuthResponse {
-    code: String,
-    pub state: String,
-    _id_token: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct OidcTokenResponse {
-    access_token: String,
-    token_type: String,
-    expires_in: u64,
-    refresh_token: Option<String>,
-    scope: String,
-    id_token: Option<String>,
 }
 
 pub async fn prepare_oauth2_auth_request(
