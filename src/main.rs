@@ -1,11 +1,11 @@
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use dotenv::dotenv;
-use std::{env, net::SocketAddr, path::PathBuf};
+use std::{env, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::task::JoinHandle;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use liboauth2::oauth2::app_state_init;
+use liboauth2::init_oauth2_state;
 
 #[derive(Clone, Copy)]
 struct Ports {
@@ -24,20 +24,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let oauth2_state: AppState = app_state_init().await.unwrap_or_else(|e| {
-        eprintln!("Failed to initialize AppState: {e}");
-        std::process::exit(1);
+    let session_state = libsession::session_state_init().await.unwrap_or_else(|e| {
+        eprintln!("Failed to initialize SessionState: {e}");
+        std::process::exit(1)
     });
 
+    let oauth2_state: OAuth2State = init_oauth2_state(Arc::new(session_state.clone()))
+        .await
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to initialize OAuth2State: {e}");
+            std::process::exit(1);
+        });
+
+    let app_state = AppState {
+        session_state,
+        oauth2_state: oauth2_state.clone(),
+    };
     let app = Router::new()
         .route("/", get(index))
         .route("/protected", get(protected))
+        .with_state(app_state.clone())
         .nest(
             &oauth2_state.oauth2_params.oauth2_route_prefix,
-            liboauth2::axum::router(oauth2_state.clone()),
+            liboauth2::router(oauth2_state.clone()),
         )
         .with_state(oauth2_state);
-    // .layer(cors)
 
     let ports = Ports {
         http: 3001,
@@ -88,8 +99,66 @@ fn spawn_https_server(port: u16, app: Router) -> JoinHandle<()> {
 
 use anyhow::Result;
 use askama::Template;
-use axum::{extract::State, http::StatusCode, response::Html};
-use liboauth2::types::{AppState, User};
+use axum::extract::FromRef;
+use axum::http::request::Parts;
+use axum::{
+    extract::{FromRequestParts, State},
+    http::StatusCode,
+    response::Html,
+};
+use liboauth2::OAuth2State;
+use libsession::{SessionState, User};
+
+#[derive(Clone)]
+struct AppState {
+    session_state: SessionState,
+    oauth2_state: OAuth2State,
+}
+
+impl FromRef<AppState> for SessionState {
+    fn from_ref(app_state: &AppState) -> SessionState {
+        app_state.session_state.clone()
+    }
+}
+
+impl FromRef<AppState> for OAuth2State {
+    fn from_ref(app_state: &AppState) -> OAuth2State {
+        app_state.oauth2_state.clone()
+    }
+}
+
+// Extract SessionState from AppState for User extractor
+impl FromRequestParts<AppState> for User {
+    type Rejection = (StatusCode, String);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        User::from_request_parts(parts, &state.session_state)
+            .await
+            .map_err(|_| (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()))
+    }
+}
+
+// Extract SessionState from AppState for Option<User> extractor
+impl FromRequestParts<AppState> for Option<User> {
+    type Rejection = (StatusCode, String);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        Option::<User>::from_request_parts(parts, &state.session_state)
+            .await
+            .map_err(|_| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
+            })
+    }
+}
 
 #[derive(Template)]
 #[template(path = "index_user.j2")]
@@ -112,6 +181,7 @@ struct ProtectedTemplate<'a> {
     auth_route_prefix: &'a str,
 }
 
+#[axum::debug_handler(state = AppState)]
 pub(crate) async fn index(
     State(s): State<AppState>,
     user: Option<User>,
@@ -121,7 +191,7 @@ pub(crate) async fn index(
             let message = format!("Hey {}!", u.name);
             let template = IndexTemplateUser {
                 message: &message,
-                auth_route_prefix: &s.oauth2_params.oauth2_route_prefix,
+                auth_route_prefix: &s.oauth2_state.oauth2_params.oauth2_route_prefix,
             };
             let html = Html(
                 template
@@ -134,7 +204,7 @@ pub(crate) async fn index(
             let message = "Click the Login button below.".to_string();
             let template = IndexTemplateAnon {
                 message: &message,
-                auth_route_prefix: &s.oauth2_params.oauth2_route_prefix,
+                auth_route_prefix: &s.oauth2_state.oauth2_params.oauth2_route_prefix,
             };
             let html = Html(
                 template
@@ -146,14 +216,14 @@ pub(crate) async fn index(
     }
 }
 
-#[axum::debug_handler]
+#[axum::debug_handler(state = AppState)]
 async fn protected(
     State(s): State<AppState>,
     user: User,
 ) -> Result<Html<String>, (StatusCode, String)> {
     let template = ProtectedTemplate {
         user,
-        auth_route_prefix: &s.oauth2_params.oauth2_route_prefix,
+        auth_route_prefix: &s.oauth2_state.oauth2_params.oauth2_route_prefix,
     };
     let html = Html(
         template
