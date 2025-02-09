@@ -19,7 +19,7 @@ pub struct OAuth2Params {
     pub auth_url: String,
     pub(crate) token_url: String,
     pub query_string: String,
-    pub oauth2_root: String,
+    pub oauth2_route_prefix: String,
 }
 
 #[derive(Clone)]
