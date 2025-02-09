@@ -14,11 +14,12 @@ use url::Url;
 use chrono::{DateTime, Duration, Utc};
 use sha2::{Digest, Sha256};
 
-use crate::common::{gen_random_string, header_set_cookie, AppError};
+use crate::common::{gen_random_string, header_set_cookie};
+use crate::config::{CSRF_COOKIE_MAX_AGE, CSRF_COOKIE_NAME, OAUTH2_USERINFO_URL};
+use crate::errors::AppError;
 use crate::oauth2::idtoken::{verify_idtoken, IdInfo};
-use crate::oauth2::{CSRF_COOKIE_MAX_AGE, CSRF_COOKIE_NAME, OAUTH2_USERINFO_URL};
 use crate::types::{
-    AppState, AuthResponse, OAuth2Params, OidcTokenResponse, StateParams, StoredToken, User,
+    AuthResponse, OAuth2Params, OAuth2State, OidcTokenResponse, StateParams, StoredToken, User,
 };
 
 pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> String {
@@ -35,7 +36,7 @@ pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> St
 pub async fn generate_store_token(
     expires_at: DateTime<Utc>,
     user_agent: Option<String>,
-    state: &AppState,
+    state: &OAuth2State,
 ) -> Result<(String, String), AppError> {
     let token = gen_random_string(32)?;
     let token_id = gen_random_string(32)?;
@@ -54,11 +55,11 @@ pub async fn generate_store_token(
 }
 
 pub async fn prepare_oauth2_auth_request(
-    state: AppState,
+    state: OAuth2State,
     headers: HeaderMap,
 ) -> Result<(String, HeaderMap), AppError> {
-    let expires_at = Utc::now()
-        + Duration::seconds(state.session_params.csrf_cookie_max_age.try_into().unwrap());
+    let expires_at =
+        Utc::now() + Duration::seconds(state.oauth2_params.csrf_cookie_max_age.try_into().unwrap());
     let user_agent = headers
         .get(axum::http::header::USER_AGENT)
         .and_then(|h| h.to_str().ok())
@@ -90,17 +91,17 @@ pub async fn prepare_oauth2_auth_request(
     let mut headers = HeaderMap::new();
     header_set_cookie(
         &mut headers,
-        state.session_params.csrf_cookie_name.to_string(),
+        state.oauth2_params.csrf_cookie_name.to_string(),
         csrf_id,
         expires_at,
-        state.session_params.csrf_cookie_max_age.try_into()?,
+        state.oauth2_params.csrf_cookie_max_age.try_into()?,
     )?;
     Ok((auth_url, headers))
 }
 
 pub async fn get_user_oidc_oauth2(
     auth_response: &AuthResponse,
-    state: &AppState,
+    state: &OAuth2State,
 ) -> Result<User, AppError> {
     let pkce_verifier = get_pkce_verifier(auth_response, state).await?;
     let (access_token, id_token) = exchange_code_for_token(
@@ -121,7 +122,7 @@ pub async fn get_user_oidc_oauth2(
 
 async fn get_pkce_verifier(
     auth_response: &AuthResponse,
-    state: &AppState,
+    state: &OAuth2State,
 ) -> Result<String, AppError> {
     let decoded_state_string =
         String::from_utf8(URL_SAFE.decode(&auth_response.state).unwrap()).unwrap();
@@ -146,7 +147,7 @@ async fn get_pkce_verifier(
 
 async fn user_from_verified_idtoken(
     id_token: String,
-    state: &AppState,
+    state: &OAuth2State,
     auth_response: &AuthResponse,
 ) -> Result<User, AppError> {
     let idinfo = verify_idtoken(id_token, state.oauth2_params.client_id.clone()).await?;
@@ -167,7 +168,7 @@ async fn user_from_verified_idtoken(
 async fn verify_nonce(
     auth_response: &AuthResponse,
     idinfo: IdInfo,
-    state: &AppState,
+    state: &OAuth2State,
 ) -> Result<(), AppError> {
     let decoded_state_string =
         String::from_utf8(URL_SAFE.decode(&auth_response.state).unwrap()).unwrap();
@@ -227,7 +228,7 @@ pub async fn validate_origin(headers: &HeaderMap, auth_url: &str) -> Result<(), 
 
 pub async fn csrf_checks(
     cookies: Cookie,
-    state: &AppState,
+    state: &OAuth2State,
     query: &AuthResponse,
     headers: HeaderMap,
 ) -> Result<(), AppError> {

@@ -4,14 +4,6 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 #[derive(Clone, Debug)]
-pub struct SessionParams {
-    pub session_cookie_name: String,
-    pub csrf_cookie_name: String,
-    pub session_cookie_max_age: u64,
-    pub csrf_cookie_max_age: u64,
-}
-
-#[derive(Clone, Debug)]
 pub struct OAuth2Params {
     pub client_id: String,
     pub client_secret: String,
@@ -20,14 +12,15 @@ pub struct OAuth2Params {
     pub(crate) token_url: String,
     pub query_string: String,
     pub oauth2_route_prefix: String,
+    pub csrf_cookie_name: String,
+    pub csrf_cookie_max_age: u64,
 }
 
 #[derive(Clone)]
-pub struct AppState {
+pub struct OAuth2State {
     pub(crate) token_store: Arc<Mutex<Box<dyn crate::storage::CacheStoreToken>>>,
-    pub(crate) session_store: Arc<Mutex<Box<dyn crate::storage::CacheStoreSession>>>,
     pub oauth2_params: OAuth2Params,
-    pub session_params: SessionParams,
+    pub session_state: Arc<libsession::SessionState>,
 }
 
 // The user data we'll get back from Google
@@ -55,13 +48,6 @@ pub(crate) struct StoredToken {
     pub(crate) token: String,
     pub(crate) expires_at: DateTime<Utc>,
     pub(crate) user_agent: Option<String>,
-    pub(crate) ttl: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StoredSession {
-    pub(crate) user: User,
-    pub(crate) expires_at: DateTime<Utc>,
     pub(crate) ttl: u64,
 }
 

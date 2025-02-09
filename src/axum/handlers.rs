@@ -20,12 +20,14 @@ impl<T, E: std::fmt::Display> IntoResponseError<T> for Result<T, E> {
 }
 
 use crate::oauth2::{
-    create_new_session, csrf_checks, delete_session_from_store, get_user_oidc_oauth2,
-    prepare_logout_response, prepare_oauth2_auth_request, validate_origin,
+    csrf_checks, get_user_oidc_oauth2, prepare_oauth2_auth_request, validate_origin,
 };
-use crate::types::{AppState, AuthResponse};
+use crate::types::{AuthResponse, OAuth2State};
 
-pub fn router(state: AppState) -> Router<AppState> {
+use libsession::User as SessionUser;
+use libsession::{create_new_session, delete_session_from_store, prepare_logout_response};
+
+pub fn router(state: OAuth2State) -> Router<OAuth2State> {
     Router::new()
         .route("/google", get(google_auth))
         .route("/oauth2.js", get(oauth2_js))
@@ -52,7 +54,7 @@ pub(crate) async fn popup_close() -> Result<Html<String>, (StatusCode, String)> 
 }
 
 pub(crate) async fn oauth2_js(
-    State(state): State<AppState>,
+    State(state): State<OAuth2State>,
 ) -> Result<(HeaderMap, String), (StatusCode, String)> {
     let template = OAuth2JsTemplate {
         auth_route_prefix: &state.oauth2_params.oauth2_route_prefix,
@@ -68,7 +70,7 @@ pub(crate) async fn oauth2_js(
 }
 
 pub(crate) async fn google_auth(
-    State(state): State<AppState>,
+    State(state): State<OAuth2State>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
     let (auth_url, headers) = prepare_oauth2_auth_request(state, headers)
@@ -79,17 +81,17 @@ pub(crate) async fn google_auth(
 }
 
 pub async fn logout(
-    State(state): State<AppState>,
+    State(state): State<OAuth2State>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let headers = prepare_logout_response(state, cookies)
+    let headers = prepare_logout_response((*state.session_state).clone(), cookies)
         .await
         .into_response_error()?;
     Ok((headers, Redirect::to("/")))
 }
 
 pub async fn post_authorized(
-    State(state): State<AppState>,
+    State(state): State<OAuth2State>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
     Form(form): Form<AuthResponse>,
@@ -97,7 +99,7 @@ pub async fn post_authorized(
     #[cfg(debug_assertions)]
     println!(
         "Cookies: {:#?}",
-        cookies.get(&state.session_params.csrf_cookie_name)
+        cookies.get(&state.oauth2_params.csrf_cookie_name)
     );
 
     validate_origin(&headers, &state.oauth2_params.auth_url)
@@ -116,7 +118,7 @@ pub async fn post_authorized(
 
 pub async fn get_authorized(
     Query(query): Query<AuthResponse>,
-    State(state): State<AppState>,
+    State(state): State<OAuth2State>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
@@ -129,8 +131,12 @@ pub async fn get_authorized(
 
     delete_session_from_store(
         cookies,
-        state.session_params.session_cookie_name.to_string(),
-        &state,
+        state
+            .session_state
+            .session_params
+            .session_cookie_name
+            .to_string(),
+        &(*state.session_state).clone(),
     )
     .await
     .into_response_error()?;
@@ -140,13 +146,25 @@ pub async fn get_authorized(
 
 async fn authorized(
     auth_response: &AuthResponse,
-    state: AppState,
+    state: OAuth2State,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
     let user_data = get_user_oidc_oauth2(auth_response, &state)
         .await
         .into_response_error()?;
     let oauth2_route_prefix = state.oauth2_params.oauth2_route_prefix.to_string();
-    let headers = create_new_session(state, user_data)
+    // Convert User to SessionUser
+    let session_user = SessionUser {
+        family_name: user_data.family_name,
+        name: user_data.name,
+        picture: user_data.picture,
+        email: user_data.email,
+        given_name: user_data.given_name,
+        id: user_data.id,
+        hd: user_data.hd,
+        verified_email: user_data.verified_email,
+    };
+
+    let headers = create_new_session((*state.session_state).clone(), session_user)
         .await
         .into_response_error()?;
 
