@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/", get(index))
         .route("/protected", get(protected))
         .nest(
-            &oauth2_state.oauth2_params.oauth2_root,
+            &oauth2_state.oauth2_params.oauth2_route_prefix,
             handlers::router(oauth2_state.clone()),
         )
         .with_state(oauth2_state);
@@ -121,7 +121,7 @@ pub(crate) async fn index(
     match user {
         Some(u) => {
             let message = format!("Hey {}!", u.name);
-            let template = IndexTemplateUser { message: &message, auth_root: &s.oauth2_params.oauth2_root };
+            let template = IndexTemplateUser { message: &message, auth_root: &s.oauth2_params.oauth2_route_prefix };
             let html = Html(
                 template
                     .render()
@@ -131,7 +131,7 @@ pub(crate) async fn index(
         }
         None => {
             let message = "Click the Login button below.".to_string();
-            let template = IndexTemplateAnon { message: &message, auth_root: &s.oauth2_params.oauth2_root };
+            let template = IndexTemplateAnon { message: &message, auth_root: &s.oauth2_params.oauth2_route_prefix };
             let html = Html(
                 template
                     .render()
@@ -147,7 +147,7 @@ async fn protected(
     State(s): State<AppState>,
     user: User,
 ) -> Result<Html<String>, (StatusCode, String)> {
-    let template = ProtectedTemplate { user, auth_root: &s.oauth2_params.oauth2_root };
+    let template = ProtectedTemplate { user, auth_root: &s.oauth2_params.oauth2_route_prefix };
     let html = Html(
         template
             .render()

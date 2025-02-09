@@ -122,10 +122,10 @@ async fn authorized(
     let user_data = get_user_oidc_oauth2(auth_response, &state)
         .await
         .into_response_error()?;
-    let oauth2_root = state.oauth2_params.oauth2_root.to_string();
+    let oauth2_route_prefix = state.oauth2_params.oauth2_route_prefix.to_string();
     let headers = create_new_session(state, user_data)
         .await
         .into_response_error()?;
 
-    Ok((headers, Redirect::to(&format!("{}/popup_close", &oauth2_root))))
+    Ok((headers, Redirect::to(&format!("{}/popup_close", &oauth2_route_prefix))))
 }
