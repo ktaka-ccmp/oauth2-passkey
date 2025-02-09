@@ -1,4 +1,3 @@
-mod axum;
 mod engine;
 mod idtoken;
 mod session;
@@ -39,7 +38,8 @@ static SESSION_COOKIE_MAX_AGE: u64 = 600; // 10 minutes
 static CSRF_COOKIE_MAX_AGE: u64 = 60; // 60 seconds
 
 pub async fn app_state_init() -> Result<AppState, AppError> {
-    let oauth2_route_prefix = env::var("OAUTH2_ROUTE_PREFIX").expect("Missing OAUTH2_ROUTE_PREFIX!");
+    let oauth2_route_prefix =
+        env::var("OAUTH2_ROUTE_PREFIX").expect("Missing OAUTH2_ROUTE_PREFIX!");
 
     let oauth2_params = OAuth2Params {
         client_id: env::var("CLIENT_ID").expect("Missing CLIENT_ID!"),
