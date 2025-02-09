@@ -127,5 +127,8 @@ async fn authorized(
         .await
         .into_response_error()?;
 
-    Ok((headers, Redirect::to(&format!("{}/popup_close", &oauth2_route_prefix))))
+    Ok((
+        headers,
+        Redirect::to(&format!("{}/popup_close", &oauth2_route_prefix)),
+    ))
 }
