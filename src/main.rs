@@ -7,8 +7,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use liboauth2::oauth2::app_state_init;
 
-mod handlers;
-
 #[derive(Clone, Copy)]
 struct Ports {
     http: u16,
@@ -36,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/protected", get(protected))
         .nest(
             &oauth2_state.oauth2_params.oauth2_route_prefix,
-            handlers::router(oauth2_state.clone()),
+            liboauth2::axum::router(oauth2_state.clone()),
         )
         .with_state(oauth2_state);
     // .layer(cors)
@@ -97,21 +95,21 @@ use liboauth2::types::{AppState, User};
 #[template(path = "index_user.j2")]
 struct IndexTemplateUser<'a> {
     message: &'a str,
-    auth_root: &'a str,
+    auth_route_prefix: &'a str,
 }
 
 #[derive(Template)]
 #[template(path = "index_anon.j2")]
 struct IndexTemplateAnon<'a> {
     message: &'a str,
-    auth_root: &'a str,
+    auth_route_prefix: &'a str,
 }
 
 #[derive(Template)]
 #[template(path = "protected.j2")]
 struct ProtectedTemplate<'a> {
     user: User,
-    auth_root: &'a str,
+    auth_route_prefix: &'a str,
 }
 
 pub(crate) async fn index(
@@ -123,7 +121,7 @@ pub(crate) async fn index(
             let message = format!("Hey {}!", u.name);
             let template = IndexTemplateUser {
                 message: &message,
-                auth_root: &s.oauth2_params.oauth2_route_prefix,
+                auth_route_prefix: &s.oauth2_params.oauth2_route_prefix,
             };
             let html = Html(
                 template
@@ -136,7 +134,7 @@ pub(crate) async fn index(
             let message = "Click the Login button below.".to_string();
             let template = IndexTemplateAnon {
                 message: &message,
-                auth_root: &s.oauth2_params.oauth2_route_prefix,
+                auth_route_prefix: &s.oauth2_params.oauth2_route_prefix,
             };
             let html = Html(
                 template
@@ -155,7 +153,7 @@ async fn protected(
 ) -> Result<Html<String>, (StatusCode, String)> {
     let template = ProtectedTemplate {
         user,
-        auth_root: &s.oauth2_params.oauth2_route_prefix,
+        auth_route_prefix: &s.oauth2_params.oauth2_route_prefix,
     };
     let html = Html(
         template
