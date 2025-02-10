@@ -24,6 +24,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    // Initialize the OAuth2 library
+    liboauth2::init().await?;
+
     let app = Router::new()
         .route("/", get(index))
         .route("/protected", get(protected))
