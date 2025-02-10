@@ -64,8 +64,7 @@ impl TokenStoreType {
 #[async_trait]
 pub(crate) trait CacheStoreToken: Send + Sync + 'static {
     /// Initialize the store. This is called when the store is created.
-    async fn init(&self) -> Result<(), AppError>;
-
+    // async fn init(&self) -> Result<(), AppError>;
     /// Put a token into the store.
     async fn put(&mut self, key: &str, value: StoredToken) -> Result<(), AppError>;
 

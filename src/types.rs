@@ -1,13 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
-#[derive(Clone)]
-pub struct OAuth2State {
-    pub(crate) token_store: Arc<Mutex<Box<dyn crate::storage::CacheStoreToken>>>,
-    pub session_state: Arc<libsession::SessionState>,
-}
+#[derive(Clone, Default)]
+pub struct OAuth2State;
 
 // The user data we'll get back from Google
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -20,9 +20,9 @@ impl InMemoryTokenStore {
 
 #[async_trait]
 impl CacheStoreToken for InMemoryTokenStore {
-    async fn init(&self) -> Result<(), AppError> {
-        Ok(()) // Nothing to initialize for in-memory store
-    }
+    // async fn init(&self) -> Result<(), AppError> {
+    //     Ok(()) // Nothing to initialize for in-memory store
+    // }
 
     async fn put(&mut self, key: &str, value: StoredToken) -> Result<(), AppError> {
         self.entry.insert(key.to_owned(), value);

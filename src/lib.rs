@@ -1,4 +1,5 @@
 mod axum;
+mod client;
 mod common;
 mod config;
 mod errors;
@@ -7,5 +8,5 @@ mod storage;
 mod types;
 
 pub use axum::router;
-pub use config::{oauth2_state_init, OAUTH2_ROUTE_PREFIX};
+pub use config::OAUTH2_ROUTE_PREFIX;
 pub use types::OAuth2State;

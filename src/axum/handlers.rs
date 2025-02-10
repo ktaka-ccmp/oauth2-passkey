@@ -1,6 +1,6 @@
 use askama::Template;
 use axum::{
-    extract::{Form, Query, State},
+    extract::{Form, Query},
     http::{HeaderMap, StatusCode},
     response::{Html, Redirect},
     routing::get,
@@ -25,21 +25,20 @@ use crate::config::{OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ROUTE_PREFI
 use crate::oauth2::{
     csrf_checks, get_user_oidc_oauth2, prepare_oauth2_auth_request, validate_origin,
 };
-use crate::types::{AuthResponse, OAuth2State};
+use crate::types::AuthResponse;
 
 use libsession::{
     create_new_session, delete_session_from_store, prepare_logout_response, User as SessionUser,
     SESSION_COOKIE_NAME,
 };
 
-pub fn router(state: OAuth2State) -> Router<OAuth2State> {
+pub fn router() -> Router {
     Router::new()
         .route("/google", get(google_auth))
         .route("/oauth2.js", get(oauth2_js))
         .route("/authorized", get(get_authorized).post(post_authorized))
         .route("/popup_close", get(popup_close))
         .route("/logout", get(logout))
-        .with_state(state)
 }
 
 #[derive(Template)]
@@ -73,10 +72,9 @@ pub(crate) async fn oauth2_js() -> Result<(HeaderMap, String), (StatusCode, Stri
 }
 
 pub(crate) async fn google_auth(
-    State(state): State<OAuth2State>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (auth_url, headers) = prepare_oauth2_auth_request(state, headers)
+    let (auth_url, headers) = prepare_oauth2_auth_request(headers)
         .await
         .into_response_error()?;
 
@@ -84,17 +82,15 @@ pub(crate) async fn google_auth(
 }
 
 pub async fn logout(
-    State(state): State<OAuth2State>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let headers = prepare_logout_response((*state.session_state).clone(), cookies)
+    let headers = prepare_logout_response(cookies)
         .await
         .into_response_error()?;
     Ok((headers, Redirect::to("/")))
 }
 
 pub async fn post_authorized(
-    State(state): State<OAuth2State>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
     Form(form): Form<AuthResponse>,
@@ -116,38 +112,32 @@ pub async fn post_authorized(
         ));
     }
 
-    authorized(&form, state).await
+    authorized(&form).await
 }
 
 pub async fn get_authorized(
     Query(query): Query<AuthResponse>,
-    State(state): State<OAuth2State>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
     validate_origin(&headers, OAUTH2_AUTH_URL.as_str())
         .await
         .into_response_error()?;
-    csrf_checks(cookies.clone(), &state, &query, headers)
+    csrf_checks(cookies.clone(), &query, headers)
         .await
         .into_response_error()?;
 
-    delete_session_from_store(
-        cookies,
-        SESSION_COOKIE_NAME.to_string(),
-        &(*state.session_state).clone(),
-    )
-    .await
-    .into_response_error()?;
+    delete_session_from_store(cookies, SESSION_COOKIE_NAME.to_string())
+        .await
+        .into_response_error()?;
 
-    authorized(&query, state).await
+    authorized(&query).await
 }
 
 async fn authorized(
     auth_response: &AuthResponse,
-    state: OAuth2State,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let user_data = get_user_oidc_oauth2(auth_response, &state)
+    let user_data = get_user_oidc_oauth2(auth_response)
         .await
         .into_response_error()?;
 
@@ -163,7 +153,7 @@ async fn authorized(
         verified_email: user_data.verified_email,
     };
 
-    let mut headers = create_new_session((*state.session_state).clone(), session_user)
+    let mut headers = create_new_session(session_user)
         .await
         .into_response_error()?;
 

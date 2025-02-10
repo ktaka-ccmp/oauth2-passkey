@@ -1,13 +1,8 @@
-use std::{
-    env,
-    sync::{Arc, LazyLock},
-};
+use std::{env, sync::LazyLock};
 use tokio::sync::Mutex;
 
-use crate::errors::AppError;
-use crate::storage::TokenStoreType;
-use crate::types::*;
-use libsession::SessionState;
+use crate::storage::memory::InMemoryTokenStore;
+use crate::storage::CacheStoreToken;
 
 // static OAUTH2_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 // static OAUTH2_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
@@ -87,12 +82,5 @@ pub(crate) static OAUTH2_GOOGLE_CLIENT_SECRET: LazyLock<String> = LazyLock::new(
     std::env::var("OAUTH2_GOOGLE_CLIENT_SECRET").expect("OAUTH2_GOOGLE_CLIENT_SECRET must be set")
 });
 
-pub async fn oauth2_state_init(session_state: Arc<SessionState>) -> Result<OAuth2State, AppError> {
-    let token_store = TokenStoreType::from_env()?.create_store().await?;
-    token_store.init().await?;
-
-    Ok(OAuth2State {
-        token_store: Arc::new(Mutex::new(token_store)),
-        session_state,
-    })
-}
+pub(crate) static TOKEN_STORE: LazyLock<Mutex<Box<dyn CacheStoreToken>>> =
+    LazyLock::new(|| Mutex::new(Box::new(InMemoryTokenStore::new())));

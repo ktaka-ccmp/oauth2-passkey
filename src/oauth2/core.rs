@@ -18,11 +18,11 @@ use crate::common::{gen_random_string, header_set_cookie};
 use crate::config::{
     OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_GOOGLE_CLIENT_ID,
     OAUTH2_GOOGLE_CLIENT_SECRET, OAUTH2_QUERY_STRING, OAUTH2_REDIRECT_URI, OAUTH2_TOKEN_URL,
-    OAUTH2_USERINFO_URL,
+    OAUTH2_USERINFO_URL, TOKEN_STORE,
 };
 use crate::errors::AppError;
 use crate::oauth2::idtoken::{verify_idtoken, IdInfo};
-use crate::types::{AuthResponse, OAuth2State, OidcTokenResponse, StateParams, StoredToken, User};
+use crate::types::{AuthResponse, OidcTokenResponse, StateParams, StoredToken, User};
 
 pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> String {
     let state_params = StateParams {
@@ -38,7 +38,6 @@ pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> St
 pub async fn generate_store_token(
     expires_at: DateTime<Utc>,
     user_agent: Option<String>,
-    state: &OAuth2State,
 ) -> Result<(String, String), AppError> {
     let token = gen_random_string(32)?;
     let token_id = gen_random_string(32)?;
@@ -50,14 +49,16 @@ pub async fn generate_store_token(
         ttl: *OAUTH2_CSRF_COOKIE_MAX_AGE,
     };
 
-    let mut token_store = state.token_store.lock().await;
-    token_store.put(&token_id, token_data.clone()).await?;
+    TOKEN_STORE
+        .lock()
+        .await
+        .put(&token_id, token_data.clone())
+        .await?;
 
     Ok((token, token_id))
 }
 
 pub async fn prepare_oauth2_auth_request(
-    state: OAuth2State,
     headers: HeaderMap,
 ) -> Result<(String, HeaderMap), AppError> {
     let expires_at = Utc::now() + Duration::seconds((*OAUTH2_CSRF_COOKIE_MAX_AGE) as i64);
@@ -66,9 +67,9 @@ pub async fn prepare_oauth2_auth_request(
         .and_then(|h| h.to_str().ok())
         .unwrap_or("Unknown")
         .to_string();
-    let (csrf_token, csrf_id) = generate_store_token(expires_at, Some(user_agent), &state).await?;
-    let (nonce_token, nonce_id) = generate_store_token(expires_at, None, &state).await?;
-    let (pkce_token, pkce_id) = generate_store_token(expires_at, None, &state).await?;
+    let (csrf_token, csrf_id) = generate_store_token(expires_at, Some(user_agent)).await?;
+    let (nonce_token, nonce_id) = generate_store_token(expires_at, None).await?;
+    let (pkce_token, pkce_id) = generate_store_token(expires_at, None).await?;
     #[cfg(debug_assertions)]
     println!("PKCE ID: {:?}, PKCE verifier: {:?}", pkce_id, pkce_token);
     let pkce_challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(pkce_token.as_bytes()));
@@ -100,14 +101,11 @@ pub async fn prepare_oauth2_auth_request(
     Ok((auth_url, headers))
 }
 
-pub async fn get_user_oidc_oauth2(
-    auth_response: &AuthResponse,
-    state: &OAuth2State,
-) -> Result<User, AppError> {
-    let pkce_verifier = get_pkce_verifier(auth_response, state).await?;
+pub async fn get_user_oidc_oauth2(auth_response: &AuthResponse) -> Result<User, AppError> {
+    let pkce_verifier = get_pkce_verifier(auth_response).await?;
     let (access_token, id_token) =
         exchange_code_for_token(auth_response.code.clone(), pkce_verifier).await?;
-    let user_data = user_from_verified_idtoken(id_token, state, auth_response).await?;
+    let user_data = user_from_verified_idtoken(id_token, auth_response).await?;
     let user_data_userinfo = fetch_user_data_from_google(access_token).await?;
     #[cfg(debug_assertions)]
     println!("User Data from Userinfo: {:#?}", user_data_userinfo);
@@ -117,22 +115,21 @@ pub async fn get_user_oidc_oauth2(
     Ok(user_data)
 }
 
-async fn get_pkce_verifier(
-    auth_response: &AuthResponse,
-    state: &OAuth2State,
-) -> Result<String, AppError> {
+async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, AppError> {
     let decoded_state_string =
         String::from_utf8(URL_SAFE.decode(&auth_response.state).unwrap()).unwrap();
     let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)?;
 
-    let mut token_store = state.token_store.lock().await;
-
-    let pkce_session = token_store
+    let pkce_session = TOKEN_STORE
+        .lock()
+        .await
         .get(&state_in_response.pkce_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("PKCE Session not found"))?;
 
-    token_store
+    TOKEN_STORE
+        .lock()
+        .await
         .remove(&state_in_response.pkce_id)
         .await
         .expect("Failed to remove PKCE session");
@@ -144,11 +141,10 @@ async fn get_pkce_verifier(
 
 async fn user_from_verified_idtoken(
     id_token: String,
-    state: &OAuth2State,
     auth_response: &AuthResponse,
 ) -> Result<User, AppError> {
     let idinfo = verify_idtoken(id_token, OAUTH2_GOOGLE_CLIENT_ID.to_string()).await?;
-    verify_nonce(auth_response, idinfo.clone(), state).await?;
+    verify_nonce(auth_response, idinfo.clone()).await?;
     let user_data_idtoken = User {
         family_name: idinfo.family_name,
         name: idinfo.name,
@@ -162,18 +158,14 @@ async fn user_from_verified_idtoken(
     Ok(user_data_idtoken)
 }
 
-async fn verify_nonce(
-    auth_response: &AuthResponse,
-    idinfo: IdInfo,
-    state: &OAuth2State,
-) -> Result<(), AppError> {
+async fn verify_nonce(auth_response: &AuthResponse, idinfo: IdInfo) -> Result<(), AppError> {
     let decoded_state_string =
         String::from_utf8(URL_SAFE.decode(&auth_response.state).unwrap()).unwrap();
     let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)?;
 
-    let mut token_store = state.token_store.lock().await;
-
-    let nonce_session = token_store
+    let nonce_session = TOKEN_STORE
+        .lock()
+        .await
         .get(&state_in_response.nonce_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Nonce Session not found"))?;
@@ -191,7 +183,9 @@ async fn verify_nonce(
         return Err(anyhow::anyhow!("Nonce mismatch").into());
     }
 
-    token_store
+    TOKEN_STORE
+        .lock()
+        .await
         .remove(&state_in_response.nonce_id)
         .await
         .expect("Failed to remove nonce session");
@@ -225,21 +219,22 @@ pub async fn validate_origin(headers: &HeaderMap, auth_url: &str) -> Result<(), 
 
 pub async fn csrf_checks(
     cookies: Cookie,
-    state: &OAuth2State,
     query: &AuthResponse,
     headers: HeaderMap,
 ) -> Result<(), AppError> {
-    let mut token_store = state.token_store.lock().await;
-
     let csrf_id = cookies
         .get(OAUTH2_CSRF_COOKIE_NAME.as_str())
         .ok_or_else(|| anyhow::anyhow!("No CSRF session cookie found"))?;
-    let csrf_session = token_store
+    let csrf_session = TOKEN_STORE
+        .lock()
+        .await
         .get(csrf_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("CSRF Session not found in Session Store"))?;
 
-    token_store
+    TOKEN_STORE
+        .lock()
+        .await
         .remove(csrf_id)
         .await
         .expect("Failed to remove PKCE session");
@@ -288,7 +283,8 @@ pub async fn csrf_checks(
 }
 
 async fn fetch_user_data_from_google(access_token: String) -> Result<User, AppError> {
-    let response = reqwest::Client::new()
+    let client = crate::client::get_client();
+    let response = client
         .get(OAUTH2_USERINFO_URL)
         .bearer_auth(access_token)
         .send()
@@ -308,7 +304,8 @@ async fn exchange_code_for_token(
     code: String,
     code_verifier: String,
 ) -> Result<(String, String), AppError> {
-    let response = reqwest::Client::new()
+    let client = crate::client::get_client();
+    let response = client
         .post(OAUTH2_TOKEN_URL.as_str())
         .form(&[
             ("code", code),

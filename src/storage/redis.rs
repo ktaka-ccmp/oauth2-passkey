@@ -21,11 +21,11 @@ impl RedisTokenStore {
 
 #[async_trait]
 impl CacheStoreToken for RedisTokenStore {
-    async fn init(&self) -> Result<(), AppError> {
-        // Verify the connection works
-        let _conn = self.client.get_multiplexed_async_connection().await?;
-        Ok(())
-    }
+    // async fn init(&self) -> Result<(), AppError> {
+    //     // Verify the connection works
+    //     let _conn = self.client.get_multiplexed_async_connection().await?;
+    //     Ok(())
+    // }
 
     async fn put(&mut self, key: &str, value: StoredToken) -> Result<(), AppError> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
