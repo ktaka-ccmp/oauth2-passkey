@@ -15,12 +15,14 @@ use chrono::{DateTime, Duration, Utc};
 use sha2::{Digest, Sha256};
 
 use crate::common::{gen_random_string, header_set_cookie};
-use crate::config::{CSRF_COOKIE_MAX_AGE, CSRF_COOKIE_NAME, OAUTH2_USERINFO_URL};
+use crate::config::{
+    OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_GOOGLE_CLIENT_ID,
+    OAUTH2_GOOGLE_CLIENT_SECRET, OAUTH2_QUERY_STRING, OAUTH2_REDIRECT_URI, OAUTH2_TOKEN_URL,
+    OAUTH2_USERINFO_URL,
+};
 use crate::errors::AppError;
 use crate::oauth2::idtoken::{verify_idtoken, IdInfo};
-use crate::types::{
-    AuthResponse, OAuth2Params, OAuth2State, OidcTokenResponse, StateParams, StoredToken, User,
-};
+use crate::types::{AuthResponse, OAuth2State, OidcTokenResponse, StateParams, StoredToken, User};
 
 pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> String {
     let state_params = StateParams {
@@ -45,7 +47,7 @@ pub async fn generate_store_token(
         token: token.clone(),
         expires_at,
         user_agent,
-        ttl: CSRF_COOKIE_MAX_AGE,
+        ttl: *OAUTH2_CSRF_COOKIE_MAX_AGE,
     };
 
     let mut token_store = state.token_store.lock().await;
@@ -58,8 +60,7 @@ pub async fn prepare_oauth2_auth_request(
     state: OAuth2State,
     headers: HeaderMap,
 ) -> Result<(String, HeaderMap), AppError> {
-    let expires_at =
-        Utc::now() + Duration::seconds(state.oauth2_params.csrf_cookie_max_age.try_into().unwrap());
+    let expires_at = Utc::now() + Duration::seconds((*OAUTH2_CSRF_COOKIE_MAX_AGE) as i64);
     let user_agent = headers
         .get(axum::http::header::USER_AGENT)
         .and_then(|h| h.to_str().ok())
@@ -77,10 +78,10 @@ pub async fn prepare_oauth2_auth_request(
     let auth_url = format!(
         "{}?{}&client_id={}&redirect_uri={}&state={}&nonce={}\
         &code_challenge={}&code_challenge_method={}",
-        state.oauth2_params.auth_url,
-        state.oauth2_params.query_string,
-        state.oauth2_params.client_id,
-        state.oauth2_params.redirect_uri,
+        OAUTH2_AUTH_URL.as_str(),
+        OAUTH2_QUERY_STRING.as_str(),
+        OAUTH2_GOOGLE_CLIENT_ID.as_str(),
+        OAUTH2_REDIRECT_URI.as_str(),
         encoded_state,
         nonce_token,
         pkce_challenge,
@@ -91,10 +92,10 @@ pub async fn prepare_oauth2_auth_request(
     let mut headers = HeaderMap::new();
     header_set_cookie(
         &mut headers,
-        state.oauth2_params.csrf_cookie_name.to_string(),
+        OAUTH2_CSRF_COOKIE_NAME.to_string(),
         csrf_id,
         expires_at,
-        state.oauth2_params.csrf_cookie_max_age.try_into()?,
+        *OAUTH2_CSRF_COOKIE_MAX_AGE as i64,
     )?;
     Ok((auth_url, headers))
 }
@@ -104,12 +105,8 @@ pub async fn get_user_oidc_oauth2(
     state: &OAuth2State,
 ) -> Result<User, AppError> {
     let pkce_verifier = get_pkce_verifier(auth_response, state).await?;
-    let (access_token, id_token) = exchange_code_for_token(
-        state.oauth2_params.clone(),
-        auth_response.code.clone(),
-        pkce_verifier,
-    )
-    .await?;
+    let (access_token, id_token) =
+        exchange_code_for_token(auth_response.code.clone(), pkce_verifier).await?;
     let user_data = user_from_verified_idtoken(id_token, state, auth_response).await?;
     let user_data_userinfo = fetch_user_data_from_google(access_token).await?;
     #[cfg(debug_assertions)]
@@ -150,7 +147,7 @@ async fn user_from_verified_idtoken(
     state: &OAuth2State,
     auth_response: &AuthResponse,
 ) -> Result<User, AppError> {
-    let idinfo = verify_idtoken(id_token, state.oauth2_params.client_id.clone()).await?;
+    let idinfo = verify_idtoken(id_token, OAUTH2_GOOGLE_CLIENT_ID.to_string()).await?;
     verify_nonce(auth_response, idinfo.clone(), state).await?;
     let user_data_idtoken = User {
         family_name: idinfo.family_name,
@@ -235,7 +232,7 @@ pub async fn csrf_checks(
     let mut token_store = state.token_store.lock().await;
 
     let csrf_id = cookies
-        .get(CSRF_COOKIE_NAME)
+        .get(OAUTH2_CSRF_COOKIE_NAME.as_str())
         .ok_or_else(|| anyhow::anyhow!("No CSRF session cookie found"))?;
     let csrf_session = token_store
         .get(csrf_id)
@@ -308,17 +305,16 @@ async fn fetch_user_data_from_google(access_token: String) -> Result<User, AppEr
 }
 
 async fn exchange_code_for_token(
-    params: OAuth2Params,
     code: String,
     code_verifier: String,
 ) -> Result<(String, String), AppError> {
     let response = reqwest::Client::new()
-        .post(params.token_url)
+        .post(OAUTH2_TOKEN_URL.as_str())
         .form(&[
             ("code", code),
-            ("client_id", params.client_id.clone()),
-            ("client_secret", params.client_secret.clone()),
-            ("redirect_uri", params.redirect_uri.clone()),
+            ("client_id", OAUTH2_GOOGLE_CLIENT_ID.to_string()),
+            ("client_secret", OAUTH2_GOOGLE_CLIENT_SECRET.to_string()),
+            ("redirect_uri", OAUTH2_REDIRECT_URI.to_string()),
             ("grant_type", "authorization_code".to_string()),
             ("code_verifier", code_verifier),
         ])

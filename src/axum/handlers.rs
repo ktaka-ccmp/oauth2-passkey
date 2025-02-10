@@ -7,6 +7,7 @@ use axum::{
     Router,
 };
 use axum_extra::{headers, TypedHeader};
+use chrono::{Duration, Utc};
 
 // Helper trait for converting errors to a standard response error format
 trait IntoResponseError<T> {
@@ -19,13 +20,17 @@ impl<T, E: std::fmt::Display> IntoResponseError<T> for Result<T, E> {
     }
 }
 
+use crate::common::header_set_cookie;
+use crate::config::{OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ROUTE_PREFIX};
 use crate::oauth2::{
     csrf_checks, get_user_oidc_oauth2, prepare_oauth2_auth_request, validate_origin,
 };
 use crate::types::{AuthResponse, OAuth2State};
 
-use libsession::User as SessionUser;
-use libsession::{create_new_session, delete_session_from_store, prepare_logout_response};
+use libsession::{
+    create_new_session, delete_session_from_store, prepare_logout_response, User as SessionUser,
+    SESSION_COOKIE_NAME,
+};
 
 pub fn router(state: OAuth2State) -> Router<OAuth2State> {
     Router::new()
@@ -53,11 +58,9 @@ pub(crate) async fn popup_close() -> Result<Html<String>, (StatusCode, String)> 
     Ok(html)
 }
 
-pub(crate) async fn oauth2_js(
-    State(state): State<OAuth2State>,
-) -> Result<(HeaderMap, String), (StatusCode, String)> {
+pub(crate) async fn oauth2_js() -> Result<(HeaderMap, String), (StatusCode, String)> {
     let template = OAuth2JsTemplate {
-        auth_route_prefix: &state.oauth2_params.oauth2_route_prefix,
+        auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
     };
 
     let mut headers = HeaderMap::new();
@@ -99,10 +102,10 @@ pub async fn post_authorized(
     #[cfg(debug_assertions)]
     println!(
         "Cookies: {:#?}",
-        cookies.get(&state.oauth2_params.csrf_cookie_name)
+        cookies.get(OAUTH2_CSRF_COOKIE_NAME.as_str())
     );
 
-    validate_origin(&headers, &state.oauth2_params.auth_url)
+    validate_origin(&headers, OAUTH2_AUTH_URL.as_str())
         .await
         .into_response_error()?;
 
@@ -122,7 +125,7 @@ pub async fn get_authorized(
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    validate_origin(&headers, &state.oauth2_params.auth_url)
+    validate_origin(&headers, OAUTH2_AUTH_URL.as_str())
         .await
         .into_response_error()?;
     csrf_checks(cookies.clone(), &state, &query, headers)
@@ -131,11 +134,7 @@ pub async fn get_authorized(
 
     delete_session_from_store(
         cookies,
-        state
-            .session_state
-            .session_params
-            .session_cookie_name
-            .to_string(),
+        SESSION_COOKIE_NAME.to_string(),
         &(*state.session_state).clone(),
     )
     .await
@@ -151,7 +150,7 @@ async fn authorized(
     let user_data = get_user_oidc_oauth2(auth_response, &state)
         .await
         .into_response_error()?;
-    let oauth2_route_prefix = state.oauth2_params.oauth2_route_prefix.to_string();
+
     // Convert User to SessionUser
     let session_user = SessionUser {
         family_name: user_data.family_name,
@@ -164,12 +163,21 @@ async fn authorized(
         verified_email: user_data.verified_email,
     };
 
-    let headers = create_new_session((*state.session_state).clone(), session_user)
+    let mut headers = create_new_session((*state.session_state).clone(), session_user)
         .await
         .into_response_error()?;
 
+    let _ = header_set_cookie(
+        &mut headers,
+        OAUTH2_CSRF_COOKIE_NAME.to_string(),
+        "value".to_string(),
+        Utc::now() - Duration::seconds(86400),
+        -86400,
+    )
+    .into_response_error()?;
+
     Ok((
         headers,
-        Redirect::to(&format!("{}/popup_close", &oauth2_route_prefix)),
+        Redirect::to(&format!("{}/popup_close", OAUTH2_ROUTE_PREFIX.as_str())),
     ))
 }

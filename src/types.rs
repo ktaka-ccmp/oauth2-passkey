@@ -3,23 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-#[derive(Clone, Debug)]
-pub struct OAuth2Params {
-    pub client_id: String,
-    pub client_secret: String,
-    pub redirect_uri: String,
-    pub auth_url: String,
-    pub(crate) token_url: String,
-    pub query_string: String,
-    pub oauth2_route_prefix: String,
-    pub csrf_cookie_name: String,
-    pub csrf_cookie_max_age: u64,
-}
-
 #[derive(Clone)]
 pub struct OAuth2State {
     pub(crate) token_store: Arc<Mutex<Box<dyn crate::storage::CacheStoreToken>>>,
-    pub oauth2_params: OAuth2Params,
     pub session_state: Arc<libsession::SessionState>,
 }
 
