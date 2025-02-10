@@ -1,10 +1,8 @@
 use axum::{routing::get, Router};
 use dotenv::dotenv;
-use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use liboauth2::{oauth2_state_init, OAUTH2_ROUTE_PREFIX};
-use libsession::session_state_init;
+use liboauth2::OAUTH2_ROUTE_PREFIX;
 
 mod handlers;
 mod server;
@@ -13,7 +11,6 @@ mod state;
 use crate::{
     handlers::{index, protected},
     server::{spawn_http_server, spawn_https_server, Ports},
-    state::AppState,
 };
 
 #[tokio::main]
@@ -27,28 +24,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let session_state = session_state_init().await.unwrap_or_else(|e| {
-        eprintln!("Failed to initialize SessionState: {e}");
-        std::process::exit(1)
-    });
-
-    let oauth2_state = oauth2_state_init(Arc::new(session_state.clone()))
-        .await
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to initialize OAuth2State: {e}");
-            std::process::exit(1);
-        });
-
-    let app_state = AppState { session_state };
     let app = Router::new()
         .route("/", get(index))
         .route("/protected", get(protected))
-        .with_state(app_state.clone())
-        .nest(
-            OAUTH2_ROUTE_PREFIX.as_str(),
-            liboauth2::router(oauth2_state.clone()),
-        )
-        .with_state(oauth2_state);
+        .nest(OAUTH2_ROUTE_PREFIX.as_str(), liboauth2::router());
 
     let ports = Ports {
         http: 3001,
