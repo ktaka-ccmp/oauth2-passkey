@@ -6,7 +6,6 @@ use liboauth2::OAUTH2_ROUTE_PREFIX;
 
 mod handlers;
 mod server;
-mod state;
 
 use crate::{
     handlers::{index, protected},
