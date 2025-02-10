@@ -3,7 +3,7 @@ use headers::Cookie;
 use http::header::HeaderMap;
 
 use crate::common::{gen_random_string, header_set_cookie};
-use crate::config::{CSRF_COOKIE_NAME, SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
+use crate::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
 use crate::errors::AppError;
 use crate::types::{SessionState, StoredSession, User};
 
@@ -14,17 +14,12 @@ pub async fn prepare_logout_response(
     let mut headers = HeaderMap::new();
     header_set_cookie(
         &mut headers,
-        state.session_params.session_cookie_name.to_string(),
+        SESSION_COOKIE_NAME.to_string(),
         "value".to_string(),
         Utc::now() - Duration::seconds(86400),
         -86400,
     )?;
-    delete_session_from_store(
-        cookies,
-        state.session_params.session_cookie_name.to_string(),
-        &state,
-    )
-    .await?;
+    delete_session_from_store(cookies, SESSION_COOKIE_NAME.to_string(), &state).await?;
     Ok(headers)
 }
 
@@ -33,14 +28,7 @@ pub async fn create_new_session(
     user_data: User,
 ) -> Result<HeaderMap, AppError> {
     let mut headers = HeaderMap::new();
-    header_set_cookie(
-        &mut headers,
-        CSRF_COOKIE_NAME.to_string(),
-        "value".to_string(),
-        Utc::now() - Duration::seconds(86400),
-        -86400,
-    )?;
-    let max_age = SESSION_COOKIE_MAX_AGE as i64;
+    let max_age = *SESSION_COOKIE_MAX_AGE as i64;
     let expires_at = Utc::now() + Duration::seconds(max_age);
     let session_id = create_and_store_session(user_data, &state, expires_at).await?;
     header_set_cookie(
@@ -64,7 +52,7 @@ async fn create_and_store_session(
     let stored_session = StoredSession {
         user: user_data,
         expires_at,
-        ttl: SESSION_COOKIE_MAX_AGE,
+        ttl: *SESSION_COOKIE_MAX_AGE,
     };
 
     let mut session_store = state.session_store.lock().await;

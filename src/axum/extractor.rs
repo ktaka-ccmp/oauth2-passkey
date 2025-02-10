@@ -33,7 +33,9 @@ impl FromRequestParts<SessionState> for User {
             .map_err(|_| AuthRedirect)?;
 
         // Get session from cookie
-        let session_cookie = cookies.get(SESSION_COOKIE_NAME).ok_or(AuthRedirect)?;
+        let session_cookie = cookies
+            .get(SESSION_COOKIE_NAME.as_str())
+            .ok_or(AuthRedirect)?;
         let store_guard = store.lock().await;
         let session = store_guard
             .get(session_cookie)

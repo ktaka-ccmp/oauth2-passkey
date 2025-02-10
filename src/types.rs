@@ -3,18 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-#[derive(Clone, Debug)]
-pub struct SessionParams {
-    pub session_cookie_name: String,
-    pub csrf_cookie_name: String,
-    pub session_cookie_max_age: u64,
-    pub csrf_cookie_max_age: u64,
-}
-
 #[derive(Clone)]
 pub struct SessionState {
     pub(crate) session_store: Arc<Mutex<Box<dyn crate::storage::CacheStoreSession>>>,
-    pub session_params: SessionParams,
 }
 
 // The user data we'll get back from Google
