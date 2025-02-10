@@ -3,7 +3,7 @@ use dotenv::dotenv;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use liboauth2::oauth2_state_init;
+use liboauth2::{oauth2_state_init, OAUTH2_ROUTE_PREFIX};
 use libsession::session_state_init;
 
 mod handlers;
@@ -39,16 +39,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         });
 
-    let app_state = AppState {
-        session_state,
-        oauth2_state: oauth2_state.clone(),
-    };
+    let app_state = AppState { session_state };
     let app = Router::new()
         .route("/", get(index))
         .route("/protected", get(protected))
         .with_state(app_state.clone())
         .nest(
-            &oauth2_state.oauth2_params.oauth2_route_prefix,
+            OAUTH2_ROUTE_PREFIX.as_str(),
             liboauth2::router(oauth2_state.clone()),
         )
         .with_state(oauth2_state);

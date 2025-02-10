@@ -3,13 +3,11 @@ use axum::{
     http::request::Parts,
     response::{IntoResponse, Redirect, Response},
 };
-use liboauth2::OAuth2State;
 use libsession::{SessionState, User};
 
 #[derive(Clone)]
 pub(crate) struct AppState {
     pub(crate) session_state: SessionState,
-    pub(crate) oauth2_state: OAuth2State,
 }
 
 pub(crate) struct AuthRedirect;
