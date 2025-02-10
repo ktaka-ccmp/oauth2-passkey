@@ -1,4 +1,4 @@
-use axum::{routing::get, Router};
+use axum::{routing::get, Router, response::{IntoResponse, Redirect, Response}};
 use axum_server::tls_rustls::RustlsConfig;
 use dotenv::dotenv;
 use std::{env, net::SocketAddr, path::PathBuf, sync::Arc};
@@ -100,7 +100,6 @@ fn spawn_https_server(port: u16, app: Router) -> JoinHandle<()> {
 
 use anyhow::Result;
 use askama::Template;
-use axum::extract::FromRef;
 use axum::http::request::Parts;
 use axum::{
     extract::{FromRequestParts, State},
@@ -116,21 +115,17 @@ struct AppState {
     oauth2_state: OAuth2State,
 }
 
-impl FromRef<AppState> for SessionState {
-    fn from_ref(app_state: &AppState) -> SessionState {
-        app_state.session_state.clone()
-    }
-}
+pub struct AuthRedirect;
 
-impl FromRef<AppState> for OAuth2State {
-    fn from_ref(app_state: &AppState) -> OAuth2State {
-        app_state.oauth2_state.clone()
+impl IntoResponse for AuthRedirect {
+    fn into_response(self) -> Response {
+        Redirect::temporary("/").into_response()
     }
 }
 
 // Extract SessionState from AppState for User extractor
 impl FromRequestParts<AppState> for User {
-    type Rejection = (StatusCode, String);
+    type Rejection = AuthRedirect;
 
     async fn from_request_parts(
         parts: &mut Parts,
@@ -138,7 +133,7 @@ impl FromRequestParts<AppState> for User {
     ) -> Result<Self, Self::Rejection> {
         User::from_request_parts(parts, &state.session_state)
             .await
-            .map_err(|_| (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()))
+            .map_err(|_| AuthRedirect)
     }
 }
 
