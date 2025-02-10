@@ -1,5 +1,5 @@
 pub mod memory;
-mod redis;
+pub(crate) mod redis;
 mod traits;
 
 pub(crate) use memory::InMemorySessionStore;

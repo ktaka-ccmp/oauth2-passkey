@@ -27,7 +27,7 @@ pub(crate) struct StoredSession {
 #[derive(Clone, Debug)]
 pub(crate) enum SessionStoreType {
     Memory,
-    // Sqlite { url: String },
-    // Postgres { url: String },
+    Sqlite { url: String },
+    Postgres { url: String },
     Redis { url: String },
 }

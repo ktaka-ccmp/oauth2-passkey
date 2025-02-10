@@ -16,18 +16,16 @@ impl SessionStoreType {
 
         match store_type.as_str() {
             "memory" => Ok(SessionStoreType::Memory),
-            // "sqlite" => {
-            //     let url = env::var("OAUTH2_SESSION_SQLITE_URL").map_err(|_| {
-            //         AppError::Storage("OAUTH2_SESSION_SQLITE_URL not set".to_string())
-            //     })?;
-            //     Ok(SessionStoreType::Sqlite { url })
-            // }
-            // "postgres" => {
-            //     let url = env::var("OAUTH2_SESSION_POSTGRES_URL").map_err(|_| {
-            //         AppError::Storage("OAUTH2_SESSION_POSTGRES_URL not set".to_string())
-            //     })?;
-            //     Ok(SessionStoreType::Postgres { url })
-            // }
+            "sqlite" => {
+                let url = env::var("OAUTH2_SESSION_SQLITE_URL")
+                    .map_err(|_| anyhow::anyhow!("OAUTH2_SESSION_SQLITE_URL not set"))?;
+                Ok(SessionStoreType::Sqlite { url })
+            }
+            "postgres" => {
+                let url = env::var("OAUTH2_SESSION_POSTGRES_URL")
+                    .map_err(|_| anyhow::anyhow!("OAUTH2_SESSION_POSTGRES_URL not set"))?;
+                Ok(SessionStoreType::Postgres { url })
+            }
             "redis" => {
                 let url = env::var("OAUTH2_SESSION_REDIS_URL")?;
                 Ok(SessionStoreType::Redis { url })
@@ -40,23 +38,27 @@ impl SessionStoreType {
     }
 
     pub(crate) async fn create_store(&self) -> Result<Box<dyn CacheStoreSession>, AppError> {
-        match self {
-            SessionStoreType::Memory => Ok(Box::new(InMemorySessionStore::new())),
-            // SessionStoreType::Sqlite { url } => {
-            //     Ok(Box::new(sqlite::SqliteSessionStore::connect(url).await?))
-            // }
-            // SessionStoreType::Postgres { url } => Ok(Box::new(
-            //     postgres::PostgresSessionStore::connect(url).await?,
-            // )),
-            SessionStoreType::Redis { url } => Ok(Box::new(RedisSessionStore::connect(url).await?)),
-        }
+        let store: Box<dyn CacheStoreSession> = match self {
+            SessionStoreType::Memory => Box::new(InMemorySessionStore::new()),
+            SessionStoreType::Sqlite { url } => {
+                // TODO: Implement SqliteSessionStore
+                unimplemented!("SQLite support is not yet implemented")
+            }
+            SessionStoreType::Postgres { url } => {
+                // TODO: Implement PostgresSessionStore
+                unimplemented!("PostgreSQL support is not yet implemented")
+            }
+            SessionStoreType::Redis { url } => Box::new(RedisSessionStore::connect(url).await?),
+        };
+        store.init().await?;
+        Ok(store)
     }
 }
 
 #[async_trait]
 pub(crate) trait CacheStoreSession: Send + Sync + 'static {
     /// Initialize the store. This is called when the store is created.
-    // async fn init(&self) -> Result<(), AppError>;
+    async fn init(&self) -> Result<(), AppError>;
     async fn put(&mut self, key: &str, value: StoredSession) -> Result<(), AppError>;
 
     async fn get(&self, key: &str) -> Result<Option<StoredSession>, AppError>;

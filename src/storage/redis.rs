@@ -22,11 +22,11 @@ impl RedisSessionStore {
 
 #[async_trait]
 impl CacheStoreSession for RedisSessionStore {
-    // async fn init(&self) -> Result<(), AppError> {
-    //     // Verify the connection works
-    //     let _conn = self.client.get_multiplexed_async_connection().await?;
-    //     Ok(())
-    // }
+    async fn init(&self) -> Result<(), AppError> {
+        // Verify the connection works
+        let _conn = self.client.get_multiplexed_async_connection().await?;
+        Ok(())
+    }
 
     async fn put(&mut self, key: &str, value: StoredSession) -> Result<(), AppError> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;

@@ -19,9 +19,9 @@ impl InMemorySessionStore {
 
 #[async_trait]
 impl CacheStoreSession for InMemorySessionStore {
-    // async fn init(&self) -> Result<(), AppError> {
-    //     Ok(()) // Nothing to initialize for in-memory store
-    // }
+    async fn init(&self) -> Result<(), AppError> {
+        Ok(()) // Nothing to initialize for in-memory store
+    }
 
     async fn put(&mut self, key: &str, value: StoredSession) -> Result<(), AppError> {
         self.entry.insert(key.to_owned(), value);
