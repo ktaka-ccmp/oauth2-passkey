@@ -1,8 +1,10 @@
 use std::{env, sync::LazyLock};
 use tokio::sync::Mutex;
 
+use crate::errors::AppError;
 use crate::storage::memory::InMemoryTokenStore;
 use crate::storage::CacheStoreToken;
+use crate::types::TokenStoreType;
 
 // static OAUTH2_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 // static OAUTH2_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
@@ -84,3 +86,17 @@ pub(crate) static OAUTH2_GOOGLE_CLIENT_SECRET: LazyLock<String> = LazyLock::new(
 
 pub(crate) static TOKEN_STORE: LazyLock<Mutex<Box<dyn CacheStoreToken>>> =
     LazyLock::new(|| Mutex::new(Box::new(InMemoryTokenStore::new())));
+
+pub async fn init_token_store() -> Result<(), AppError> {
+    let store_type = TokenStoreType::from_env().unwrap_or_else(|e| {
+        eprintln!("Failed to initialize token store from environment: {}", e);
+        eprintln!("Falling back to in-memory store");
+        TokenStoreType::Memory
+    });
+
+    tracing::info!("Initializing token store with type: {:?}", store_type);
+    let store = store_type.create_store().await?;
+    *TOKEN_STORE.lock().await = store;
+    tracing::info!("Token store initialized successfully");
+    Ok(())
+}

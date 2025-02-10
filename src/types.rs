@@ -48,3 +48,11 @@ pub(crate) struct OidcTokenResponse {
     scope: String,
     pub(crate) id_token: Option<String>,
 }
+
+#[derive(Clone, Debug)]
+pub enum TokenStoreType {
+    Memory,
+    Sqlite { url: String },
+    Postgres { url: String },
+    Redis { url: String },
+}

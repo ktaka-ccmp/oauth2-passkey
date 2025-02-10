@@ -5,14 +5,7 @@ use crate::errors::AppError;
 use crate::types::StoredToken;
 
 use crate::storage::{memory::InMemoryTokenStore, redis::RedisTokenStore};
-
-#[derive(Clone, Debug)]
-pub enum TokenStoreType {
-    Memory,
-    // Sqlite { url: String },
-    // Postgres { url: String },
-    Redis { url: String },
-}
+use crate::types::TokenStoreType;
 
 impl TokenStoreType {
     pub fn from_env() -> Result<Self, AppError> {
@@ -24,18 +17,16 @@ impl TokenStoreType {
 
         match store_type.as_str() {
             "memory" => Ok(TokenStoreType::Memory),
-            // "sqlite" => {
-            //     let url = env::var("OAUTH2_TOKEN_SQLITE_URL").map_err(|_| {
-            //         AppError::Storage("OAUTH2_TOKEN_SQLITE_URL not set".to_string())
-            //     })?;
-            //     Ok(TokenStoreType::Sqlite { url })
-            // }
-            // "postgres" => {
-            //     let url = env::var("OAUTH2_TOKEN_POSTGRES_URL").map_err(|_| {
-            //         AppError::Storage("OAUTH2_TOKEN_POSTGRES_URL not set".to_string())
-            //     })?;
-            //     Ok(TokenStoreType::Postgres { url })
-            // }
+            "sqlite" => {
+                let url = env::var("OAUTH2_TOKEN_SQLITE_URL")
+                    .map_err(|_| anyhow::anyhow!("OAUTH2_TOKEN_SQLITE_URL not set"))?;
+                Ok(TokenStoreType::Sqlite { url })
+            }
+            "postgres" => {
+                let url = env::var("OAUTH2_TOKEN_POSTGRES_URL")
+                    .map_err(|_| anyhow::anyhow!("OAUTH2_TOKEN_POSTGRES_URL not set"))?;
+                Ok(TokenStoreType::Postgres { url })
+            }
             "redis" => {
                 let url = env::var("OAUTH2_TOKEN_REDIS_URL")?;
                 Ok(TokenStoreType::Redis { url })
@@ -48,23 +39,27 @@ impl TokenStoreType {
     }
 
     pub(crate) async fn create_store(&self) -> Result<Box<dyn CacheStoreToken>, AppError> {
-        match self {
-            TokenStoreType::Memory => Ok(Box::new(InMemoryTokenStore::new())),
-            // TokenStoreType::Sqlite { url } => {
-            //     Ok(Box::new(sqlite::SqliteTokenStore::connect(url).await?))
-            // }
-            // TokenStoreType::Postgres { url } => Ok(Box::new(
-            //     postgres::PostgresTokenStore::connect(url).await?,
-            // )),
-            TokenStoreType::Redis { url } => Ok(Box::new(RedisTokenStore::connect(url).await?)),
-        }
+        let store: Box<dyn CacheStoreToken> = match self {
+            TokenStoreType::Memory => Box::new(InMemoryTokenStore::new()),
+            TokenStoreType::Sqlite { url } => {
+                // TODO: Implement SqliteTokenStore
+                unimplemented!("SQLite support is not yet implemented")
+            }
+            TokenStoreType::Postgres { url } => {
+                // TODO: Implement PostgresTokenStore
+                unimplemented!("PostgreSQL support is not yet implemented")
+            }
+            TokenStoreType::Redis { url } => Box::new(RedisTokenStore::connect(url).await?),
+        };
+        store.init().await?;
+        Ok(store)
     }
 }
 
 #[async_trait]
 pub(crate) trait CacheStoreToken: Send + Sync + 'static {
     /// Initialize the store. This is called when the store is created.
-    // async fn init(&self) -> Result<(), AppError>;
+    async fn init(&self) -> Result<(), AppError>;
     /// Put a token into the store.
     async fn put(&mut self, key: &str, value: StoredToken) -> Result<(), AppError>;
 
