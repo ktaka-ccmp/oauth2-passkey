@@ -5,7 +5,8 @@ use std::{env, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::task::JoinHandle;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use liboauth2::init_oauth2_state;
+use liboauth2::oauth2_state_init;
+use libsession::session_state_init;
 
 #[derive(Clone, Copy)]
 struct Ports {
@@ -24,12 +25,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let session_state = libsession::session_state_init().await.unwrap_or_else(|e| {
+    let session_state = session_state_init().await.unwrap_or_else(|e| {
         eprintln!("Failed to initialize SessionState: {e}");
         std::process::exit(1)
     });
 
-    let oauth2_state: OAuth2State = init_oauth2_state(Arc::new(session_state.clone()))
+    let oauth2_state: OAuth2State = oauth2_state_init(Arc::new(session_state.clone()))
         .await
         .unwrap_or_else(|e| {
             eprintln!("Failed to initialize OAuth2State: {e}");
