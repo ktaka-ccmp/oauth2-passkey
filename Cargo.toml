@@ -6,8 +6,6 @@ edition = { workspace = true }
 [dependencies]
 askama = { version = "0.12.1", features = ["serde-json"] }
 axum = { version = "0.8", features = ["macros"] }
-axum-extra = { version = "0.9", features = ["cookie", "typed-header"] }
-headers = "0.4"
 axum-server = { version = "0.7.1", features = ["tls-rustls"] }
 dotenv = "0.15.0"
 http = "1.2.0"
@@ -17,5 +15,3 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 liboauth2 = { workspace = true }
 libsession = { workspace = true }
-anyhow = "1.0.95"
-async-trait = "0.1.77"
