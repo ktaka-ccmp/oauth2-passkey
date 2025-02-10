@@ -7,5 +7,5 @@ mod storage;
 mod types;
 
 pub use axum::router;
-pub use config::init_oauth2_state;
+pub use config::oauth2_state_init;
 pub use types::OAuth2State;

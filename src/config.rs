@@ -32,7 +32,7 @@ static OAUTH2_QUERY_STRING: &str = "response_type=code\
 pub(crate) static CSRF_COOKIE_NAME: &str = "__Host-CsrfId";
 pub(crate) static CSRF_COOKIE_MAX_AGE: u64 = 60; // 60 seconds
 
-pub async fn oauth2_state_init() -> Result<OAuth2State, AppError> {
+pub async fn oauth2_state_init(session_state: Arc<SessionState>) -> Result<OAuth2State, AppError> {
     let oauth2_route_prefix =
         env::var("OAUTH2_ROUTE_PREFIX").expect("Missing OAUTH2_ROUTE_PREFIX!");
 
@@ -55,22 +55,8 @@ pub async fn oauth2_state_init() -> Result<OAuth2State, AppError> {
     let token_store = TokenStoreType::from_env()?.create_store().await?;
     token_store.init().await?;
 
-    let session_state = libsession::session_state_init().await?;
     Ok(OAuth2State {
         token_store: Arc::new(Mutex::new(token_store)),
-        oauth2_params,
-        session_state: Arc::new(session_state),
-    })
-}
-
-pub async fn init_oauth2_state(session_state: Arc<SessionState>) -> anyhow::Result<OAuth2State> {
-    let config = oauth2_state_init().await?;
-    let oauth2_params = config.oauth2_params;
-
-    let token_store = config.token_store;
-
-    Ok(OAuth2State {
-        token_store,
         oauth2_params,
         session_state,
     })
