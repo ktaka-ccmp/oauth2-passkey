@@ -40,11 +40,11 @@ impl SessionStoreType {
     pub(crate) async fn create_store(&self) -> Result<Box<dyn CacheStoreSession>, AppError> {
         let store: Box<dyn CacheStoreSession> = match self {
             SessionStoreType::Memory => Box::new(InMemorySessionStore::new()),
-            SessionStoreType::Sqlite { url } => {
+            SessionStoreType::Sqlite { url: _url } => {
                 // TODO: Implement SqliteSessionStore
                 unimplemented!("SQLite support is not yet implemented")
             }
-            SessionStoreType::Postgres { url } => {
+            SessionStoreType::Postgres { url: _url } => {
                 // TODO: Implement PostgresSessionStore
                 unimplemented!("PostgreSQL support is not yet implemented")
             }
