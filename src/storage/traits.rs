@@ -56,8 +56,7 @@ impl SessionStoreType {
 #[async_trait]
 pub(crate) trait CacheStoreSession: Send + Sync + 'static {
     /// Initialize the store. This is called when the store is created.
-    async fn init(&self) -> Result<(), AppError>;
-
+    // async fn init(&self) -> Result<(), AppError>;
     async fn put(&mut self, key: &str, value: StoredSession) -> Result<(), AppError>;
 
     async fn get(&self, key: &str) -> Result<Option<StoredSession>, AppError>;

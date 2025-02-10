@@ -3,14 +3,11 @@ use headers::Cookie;
 use http::header::HeaderMap;
 
 use crate::common::{gen_random_string, header_set_cookie};
-use crate::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
+use crate::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME, SESSION_STORE};
 use crate::errors::AppError;
-use crate::types::{SessionState, StoredSession, User};
+use crate::types::{StoredSession, User};
 
-pub async fn prepare_logout_response(
-    state: SessionState,
-    cookies: headers::Cookie,
-) -> Result<HeaderMap, AppError> {
+pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderMap, AppError> {
     let mut headers = HeaderMap::new();
     header_set_cookie(
         &mut headers,
@@ -19,18 +16,15 @@ pub async fn prepare_logout_response(
         Utc::now() - Duration::seconds(86400),
         -86400,
     )?;
-    delete_session_from_store(cookies, SESSION_COOKIE_NAME.to_string(), &state).await?;
+    delete_session_from_store(cookies, SESSION_COOKIE_NAME.to_string()).await?;
     Ok(headers)
 }
 
-pub async fn create_new_session(
-    state: SessionState,
-    user_data: User,
-) -> Result<HeaderMap, AppError> {
+pub async fn create_new_session(user_data: User) -> Result<HeaderMap, AppError> {
     let mut headers = HeaderMap::new();
     let max_age = *SESSION_COOKIE_MAX_AGE as i64;
     let expires_at = Utc::now() + Duration::seconds(max_age);
-    let session_id = create_and_store_session(user_data, &state, expires_at).await?;
+    let session_id = create_and_store_session(user_data, expires_at).await?;
     header_set_cookie(
         &mut headers,
         SESSION_COOKIE_NAME.to_string(),
@@ -45,7 +39,6 @@ pub async fn create_new_session(
 
 async fn create_and_store_session(
     user_data: User,
-    state: &SessionState,
     expires_at: DateTime<Utc>,
 ) -> Result<String, AppError> {
     let session_id = gen_random_string(32)?;
@@ -55,7 +48,7 @@ async fn create_and_store_session(
         ttl: *SESSION_COOKIE_MAX_AGE,
     };
 
-    let mut session_store = state.session_store.lock().await;
+    let mut session_store = SESSION_STORE.lock().await;
     session_store.put(&session_id, stored_session).await?;
 
     Ok(session_id)
@@ -64,9 +57,8 @@ async fn create_and_store_session(
 pub async fn delete_session_from_store(
     cookies: Cookie,
     cookie_name: String,
-    state: &SessionState,
 ) -> Result<(), AppError> {
-    let mut session_store = state.session_store.lock().await;
+    let mut session_store = SESSION_STORE.lock().await;
 
     if let Some(cookie) = cookies.get(&cookie_name) {
         session_store.remove(cookie).await.map_err(|e| {

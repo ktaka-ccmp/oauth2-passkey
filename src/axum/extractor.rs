@@ -7,8 +7,8 @@ use axum_extra::{headers, TypedHeader};
 use http::request::Parts;
 use std::convert::Infallible;
 
-use crate::config::SESSION_COOKIE_NAME;
-use crate::types::{SessionState, User};
+use crate::config::{SESSION_COOKIE_NAME, SESSION_STORE};
+use crate::types::User;
 
 pub struct AuthRedirect;
 
@@ -19,14 +19,13 @@ impl IntoResponse for AuthRedirect {
     }
 }
 
-impl FromRequestParts<SessionState> for User {
+impl<S> FromRequestParts<S> for User
+where
+    S: Send + Sync,
+{
     type Rejection = AuthRedirect;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &SessionState,
-    ) -> Result<Self, Self::Rejection> {
-        let store = &state.session_store;
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let cookies = parts
             .extract::<TypedHeader<headers::Cookie>>()
             .await
@@ -36,7 +35,7 @@ impl FromRequestParts<SessionState> for User {
         let session_cookie = cookies
             .get(SESSION_COOKIE_NAME.as_str())
             .ok_or(AuthRedirect)?;
-        let store_guard = store.lock().await;
+        let store_guard = SESSION_STORE.lock().await;
         let session = store_guard
             .get(session_cookie)
             .await
@@ -48,14 +47,17 @@ impl FromRequestParts<SessionState> for User {
     }
 }
 
-impl OptionalFromRequestParts<SessionState> for User {
+impl<S> OptionalFromRequestParts<S> for User
+where
+    S: Send + Sync,
+{
     type Rejection = Infallible;
 
     async fn from_request_parts(
         parts: &mut Parts,
-        state: &SessionState,
+        _state: &S,
     ) -> Result<Option<Self>, Self::Rejection> {
-        match <User as FromRequestParts<SessionState>>::from_request_parts(parts, state).await {
+        match <User as FromRequestParts<S>>::from_request_parts(parts, _state).await {
             Ok(res) => Ok(Some(res)),
             Err(AuthRedirect) => Ok(None),
         }

@@ -1,8 +1,7 @@
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
 use tokio::sync::Mutex;
 
-use crate::errors::AppError;
-use crate::types::{SessionState, SessionStoreType};
+use crate::types::SessionStoreType;
 
 pub static SESSION_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
     std::env::var("SESSION_COOKIE_NAME")
@@ -16,11 +15,5 @@ pub static SESSION_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
         .unwrap_or(600) // Default to 10 minutes if not set or invalid
 });
 
-pub async fn session_state_init() -> Result<SessionState, AppError> {
-    let session_store = SessionStoreType::from_env()?.create_store().await?;
-    session_store.init().await?;
-
-    Ok(SessionState {
-        session_store: Arc::new(Mutex::new(session_store)),
-    })
-}
+pub(crate) static SESSION_STORE: LazyLock<Mutex<Box<dyn crate::storage::CacheStoreSession>>> =
+    LazyLock::new(|| Mutex::new(Box::new(crate::storage::memory::InMemorySessionStore::new())));
