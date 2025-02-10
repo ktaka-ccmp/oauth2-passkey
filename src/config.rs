@@ -2,8 +2,8 @@ use std::{env, sync::LazyLock};
 use tokio::sync::Mutex;
 
 use crate::errors::AppError;
-use crate::storage::memory::InMemoryTokenStore;
-use crate::storage::CacheStoreToken;
+use crate::storage::{CacheStoreToken, InMemoryTokenStore};
+
 use crate::types::TokenStoreType;
 
 // static OAUTH2_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -84,9 +84,36 @@ pub(crate) static OAUTH2_GOOGLE_CLIENT_SECRET: LazyLock<String> = LazyLock::new(
     std::env::var("OAUTH2_GOOGLE_CLIENT_SECRET").expect("OAUTH2_GOOGLE_CLIENT_SECRET must be set")
 });
 
+/// Global singleton for token storage. This follows a pattern where:
+/// 1. We initialize with a safe default (InMemoryTokenStore) when the library is first loaded
+/// 2. The actual implementation (Memory or Redis) is determined at runtime in init_token_store()
+/// 3. We use Box<dyn CacheStoreToken> to allow switching implementations through the same interface
+///
+/// Type structure:
+/// ```text
+/// static TOKEN_STORE: LazyLock<Mutex<Box<dyn CacheStoreToken>>>
+///     |                |      |    |
+///     |                |      |    +-- Trait object (can be InMemoryTokenStore or RedisTokenStore)
+///     |                |      +------- Heap allocation (Box)
+///     |                +-------------- Thread-safe interior mutability (Mutex)
+///     +-------------------------------- Lazy initialization (LazyLock)
+/// ```
+///
+/// Note on mutability:
+/// - The LazyLock, Mutex, and Box themselves cannot be replaced (they're part of the static)
+/// - However, we can change what the Box points to (the actual store implementation)
+/// - When we do '*TOKEN_STORE.lock().await = store', we're changing the contents at the
+///   memory location the Box points to, not the Box or static itself
+/// - The Mutex ensures this change happens safely across threads
 pub(crate) static TOKEN_STORE: LazyLock<Mutex<Box<dyn CacheStoreToken>>> =
     LazyLock::new(|| Mutex::new(Box::new(InMemoryTokenStore::new())));
 
+/// Initialize the token store based on environment configuration.
+/// This will:
+/// 1. Check environment variables for store configuration (OAUTH2_TOKEN_STORE, OAUTH2_TOKEN_REDIS_URL)
+/// 2. Create the appropriate store implementation (Memory or Redis)
+/// 3. Replace the default in-memory store in TOKEN_STORE with the configured implementation
+/// Initialize the token store based on environment configuration
 pub async fn init_token_store() -> Result<(), AppError> {
     let store_type = TokenStoreType::from_env().unwrap_or_else(|e| {
         eprintln!("Failed to initialize token store from environment: {}", e);

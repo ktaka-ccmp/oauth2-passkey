@@ -41,11 +41,11 @@ impl TokenStoreType {
     pub(crate) async fn create_store(&self) -> Result<Box<dyn CacheStoreToken>, AppError> {
         let store: Box<dyn CacheStoreToken> = match self {
             TokenStoreType::Memory => Box::new(InMemoryTokenStore::new()),
-            TokenStoreType::Sqlite { url } => {
+            TokenStoreType::Sqlite { url: _url } => {
                 // TODO: Implement SqliteTokenStore
                 unimplemented!("SQLite support is not yet implemented")
             }
-            TokenStoreType::Postgres { url } => {
+            TokenStoreType::Postgres { url: _url } => {
                 // TODO: Implement PostgresTokenStore
                 unimplemented!("PostgreSQL support is not yet implemented")
             }
