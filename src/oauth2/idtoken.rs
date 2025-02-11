@@ -103,7 +103,7 @@ struct CachedJwks {
 }
 
 const CACHE_MODE: &str = "moka";
-const CACHE_EXPIRATION: Duration = Duration::from_secs(60);
+const CACHE_EXPIRATION: Duration = Duration::from_secs(600);
 
 async fn fetch_jwks(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
     match CACHE_MODE {
