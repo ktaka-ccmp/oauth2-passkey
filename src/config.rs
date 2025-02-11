@@ -35,9 +35,9 @@ impl SingletonStore {
     /// Returns an error if attempting to set the store after it's already been initialized.
     fn set_store(&mut self, new_store: Box<dyn CacheStoreSession>) -> Result<(), AppError> {
         if self.initialized {
-            return Err(AppError::Configuration(
-                "Session store has already been initialized".into(),
-            ));
+            return Err(AppError(anyhow::anyhow!(
+                "Session store has already been initialized"
+            )));
         }
         self.store = new_store;
         self.initialized = true;
@@ -45,8 +45,8 @@ impl SingletonStore {
     }
 
     /// Get a reference to the underlying store
-    pub(crate) fn get_store(&self) -> &Box<dyn CacheStoreSession> {
-        &self.store
+    pub(crate) fn get_store(&self) -> &dyn CacheStoreSession {
+        &*self.store
     }
 
     /// Get a mutable reference to the underlying store, but only for operations
