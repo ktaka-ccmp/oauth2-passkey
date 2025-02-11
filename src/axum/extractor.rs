@@ -37,6 +37,7 @@ where
             .ok_or(AuthRedirect)?;
         let store_guard = SESSION_STORE.lock().await;
         let session = store_guard
+            .get_store()
             .get(session_cookie)
             .await
             .map_err(|_| AuthRedirect)?;

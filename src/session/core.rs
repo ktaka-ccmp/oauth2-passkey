@@ -48,8 +48,11 @@ async fn create_and_store_session(
         ttl: *SESSION_COOKIE_MAX_AGE,
     };
 
-    let mut session_store = SESSION_STORE.lock().await;
-    session_store.put(&session_id, stored_session).await?;
+    let mut store_guard = SESSION_STORE.lock().await;
+    store_guard
+        .get_store_mut()
+        .put(&session_id, stored_session)
+        .await?;
 
     Ok(session_id)
 }
@@ -58,13 +61,17 @@ pub async fn delete_session_from_store(
     cookies: Cookie,
     cookie_name: String,
 ) -> Result<(), AppError> {
-    let mut session_store = SESSION_STORE.lock().await;
+    let mut store_guard = SESSION_STORE.lock().await;
 
     if let Some(cookie) = cookies.get(&cookie_name) {
-        session_store.remove(cookie).await.map_err(|e| {
-            println!("Error removing session: {}", e);
-            e
-        })?;
+        store_guard
+            .get_store_mut()
+            .remove(cookie)
+            .await
+            .map_err(|e| {
+                println!("Error removing session: {}", e);
+                e
+            })?;
     };
     Ok(())
 }
