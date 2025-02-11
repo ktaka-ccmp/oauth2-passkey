@@ -6,10 +6,11 @@ mod session;
 mod storage;
 mod types;
 
-pub use config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
-pub use errors::AppError;
+// Re-export only what's necessary for the public API
+pub use config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};  // Required for cookie configuration
+pub use errors::AppError;                                       // Required for error handling
 pub use session::{create_new_session, delete_session_from_store, prepare_logout_response};
-pub use types::User;
+pub use types::User;                                           // Required for session data
 
 /// Initialize the session library.
 ///
