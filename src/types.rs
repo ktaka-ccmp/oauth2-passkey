@@ -1,9 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Default)]
-pub struct OAuth2State;
-
 // The user data we'll get back from Google
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {

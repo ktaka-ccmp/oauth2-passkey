@@ -7,9 +7,9 @@ mod oauth2;
 mod storage;
 mod types;
 
-pub use axum::router;
-pub use config::OAUTH2_ROUTE_PREFIX;
-pub use types::OAuth2State;
+// Re-export only what's necessary for the public API
+pub use axum::router;              // The main router function for nesting
+pub use config::OAUTH2_ROUTE_PREFIX; // Required for route configuration
 
 /// Initialize the OAuth2 library.
 ///
