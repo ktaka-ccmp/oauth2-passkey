@@ -52,6 +52,7 @@ pub async fn generate_store_token(
     TOKEN_STORE
         .lock()
         .await
+        .get_store_mut()
         .put(&token_id, token_data.clone())
         .await?;
 
@@ -123,6 +124,7 @@ async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, AppEr
     let pkce_session = TOKEN_STORE
         .lock()
         .await
+        .get_store()
         .get(&state_in_response.pkce_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("PKCE Session not found"))?;
@@ -130,6 +132,7 @@ async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, AppEr
     TOKEN_STORE
         .lock()
         .await
+        .get_store_mut()
         .remove(&state_in_response.pkce_id)
         .await
         .expect("Failed to remove PKCE session");
@@ -166,6 +169,7 @@ async fn verify_nonce(auth_response: &AuthResponse, idinfo: IdInfo) -> Result<()
     let nonce_session = TOKEN_STORE
         .lock()
         .await
+        .get_store()
         .get(&state_in_response.nonce_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Nonce Session not found"))?;
@@ -186,6 +190,7 @@ async fn verify_nonce(auth_response: &AuthResponse, idinfo: IdInfo) -> Result<()
     TOKEN_STORE
         .lock()
         .await
+        .get_store_mut()
         .remove(&state_in_response.nonce_id)
         .await
         .expect("Failed to remove nonce session");
@@ -228,6 +233,7 @@ pub async fn csrf_checks(
     let csrf_session = TOKEN_STORE
         .lock()
         .await
+        .get_store()
         .get(csrf_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("CSRF Session not found in Session Store"))?;
@@ -235,6 +241,7 @@ pub async fn csrf_checks(
     TOKEN_STORE
         .lock()
         .await
+        .get_store_mut()
         .remove(csrf_id)
         .await
         .expect("Failed to remove PKCE session");

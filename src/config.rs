@@ -84,35 +84,73 @@ pub(crate) static OAUTH2_GOOGLE_CLIENT_SECRET: LazyLock<String> = LazyLock::new(
     std::env::var("OAUTH2_GOOGLE_CLIENT_SECRET").expect("OAUTH2_GOOGLE_CLIENT_SECRET must be set")
 });
 
+/// A wrapper type that ensures the token store can only be set once
+pub(crate) struct SingletonStore {
+    store: Box<dyn CacheStoreToken>,
+    initialized: bool,
+}
+
+impl SingletonStore {
+    fn new(store: Box<dyn CacheStoreToken>) -> Self {
+        Self {
+            store,
+            initialized: false,
+        }
+    }
+
+    /// Set the store implementation. This can only be done once.
+    /// Returns an error if attempting to set the store after it's already been initialized.
+    fn set_store(&mut self, new_store: Box<dyn CacheStoreToken>) -> Result<(), AppError> {
+        if self.initialized {
+            return Err(AppError(anyhow::anyhow!(
+                "Token store has already been initialized"
+            )));
+        }
+        self.store = new_store;
+        self.initialized = true;
+        Ok(())
+    }
+
+    /// Get a reference to the underlying store
+    pub(crate) fn get_store(&self) -> &dyn CacheStoreToken {
+        &*self.store
+    }
+
+    /// Get a mutable reference to the underlying store, but only for operations
+    /// defined in the CacheStoreToken trait
+    pub(crate) fn get_store_mut(&mut self) -> &mut Box<dyn CacheStoreToken> {
+        &mut self.store
+    }
+}
+
 /// Global singleton for token storage. This follows a pattern where:
 /// 1. We initialize with a safe default (InMemoryTokenStore) when the library is first loaded
 /// 2. The actual implementation (Memory or Redis) is determined at runtime in init_token_store()
-/// 3. We use Box<dyn CacheStoreToken> to allow switching implementations through the same interface
+/// 3. We use SingletonStore to ensure the implementation can only be set once
 ///
 /// Type structure:
 /// ```text
-/// static TOKEN_STORE: LazyLock<Mutex<Box<dyn CacheStoreToken>>>
+/// static TOKEN_STORE: LazyLock<Mutex<SingletonStore>>
 ///     |                |      |    |
-///     |                |      |    +-- Trait object (can be InMemoryTokenStore or RedisTokenStore)
-///     |                |      +------- Heap allocation (Box)
-///     |                +-------------- Thread-safe interior mutability (Mutex)
-///     +-------------------------------- Lazy initialization (LazyLock)
+///     |                |      |    +-- Wrapper that ensures one-time initialization
+///     |                |      +------- Thread-safe interior mutability
+///     |                +-------------- Lazy initialization
+///     +-------------------------------- Static lifetime
 /// ```
 ///
 /// Note on mutability:
-/// - The LazyLock, Mutex, and Box themselves cannot be replaced (they're part of the static)
-/// - However, we can change what the Box points to (the actual store implementation)
-/// - When we do '*TOKEN_STORE.lock().await = store', we're changing the contents at the
-///   memory location the Box points to, not the Box or static itself
-/// - The Mutex ensures this change happens safely across threads
-pub(crate) static TOKEN_STORE: LazyLock<Mutex<Box<dyn CacheStoreToken>>> =
-    LazyLock::new(|| Mutex::new(Box::new(InMemoryTokenStore::new())));
+/// - The store implementation can only be set once through SingletonStore::set_store
+/// - Attempts to set the store after initialization will result in an error
+/// - The Mutex ensures thread-safe access to store operations
+pub(crate) static TOKEN_STORE: LazyLock<Mutex<SingletonStore>> =
+    LazyLock::new(|| Mutex::new(SingletonStore::new(Box::new(InMemoryTokenStore::new()))));
 
 /// Initialize the token store based on environment configuration.
 /// This will:
 /// 1. Check environment variables for store configuration (OAUTH2_TOKEN_STORE, OAUTH2_TOKEN_REDIS_URL)
 /// 2. Create the appropriate store implementation (Memory or Redis)
 /// 3. Replace the default in-memory store in TOKEN_STORE with the configured implementation
+///
 /// Initialize the token store based on environment configuration
 pub async fn init_token_store() -> Result<(), AppError> {
     let store_type = TokenStoreType::from_env().unwrap_or_else(|e| {
@@ -123,7 +161,7 @@ pub async fn init_token_store() -> Result<(), AppError> {
 
     tracing::info!("Initializing token store with type: {:?}", store_type);
     let store = store_type.create_store().await?;
-    *TOKEN_STORE.lock().await = store;
+    TOKEN_STORE.lock().await.set_store(store)?;
     tracing::info!("Token store initialized successfully");
     Ok(())
 }
