@@ -23,14 +23,16 @@ impl<T, E: std::fmt::Display> IntoResponseError<T> for Result<T, E> {
 use crate::common::header_set_cookie;
 use crate::config::{OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ROUTE_PREFIX};
 use crate::oauth2::{
-    csrf_checks, get_user_oidc_oauth2, prepare_oauth2_auth_request, validate_origin,
+    csrf_checks, get_idinfo_userinfo, prepare_oauth2_auth_request, validate_origin,
 };
 use crate::types::AuthResponse;
 
 use libsession::{
-    create_new_session, delete_session_from_store, prepare_logout_response, User as SessionUser,
-    SESSION_COOKIE_NAME,
+    create_new_session, delete_session_from_store, prepare_logout_response, SessionInfo,
+    SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME,
 };
+
+use libuserdb::{upsert_user, User as DbUser};
 
 pub fn router() -> Router {
     Router::new()
@@ -137,23 +139,26 @@ pub async fn get_authorized(
 async fn authorized(
     auth_response: &AuthResponse,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let user_data = get_user_oidc_oauth2(auth_response)
+    let (idinfo, _userinfo) = get_idinfo_userinfo(auth_response)
         .await
         .into_response_error()?;
 
-    // Convert User to SessionUser
-    let session_user = SessionUser {
-        family_name: user_data.family_name,
-        name: user_data.name,
-        picture: user_data.picture,
-        email: user_data.email,
-        given_name: user_data.given_name,
-        id: user_data.id,
-        hd: user_data.hd,
-        verified_email: user_data.verified_email,
+    // Convert GoogleUserInfo to DbUser and store it
+    // let user_userinfo = DbUser::from(userinfo);
+
+    // Convert GoogleIdInfo to DbUser and store it
+    let user_idinfo = DbUser::from(idinfo.clone());
+
+    // Store the user in the database
+    let user = upsert_user(user_idinfo).await.into_response_error()?;
+
+    // Create minimal session info
+    let session_info = SessionInfo {
+        user_id: user.id,
+        expires_at: Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64),
     };
 
-    let mut headers = create_new_session(session_user)
+    let mut headers = create_new_session(session_info)
         .await
         .into_response_error()?;
 

@@ -21,8 +21,8 @@ use crate::config::{
     OAUTH2_USERINFO_URL, TOKEN_STORE,
 };
 use crate::errors::AppError;
-use crate::oauth2::idtoken::{verify_idtoken, IdInfo};
-use crate::types::{AuthResponse, OidcTokenResponse, StateParams, StoredToken, User};
+use crate::oauth2::idtoken::{verify_idtoken, IdInfo as GoogleIdInfo};
+use crate::types::{AuthResponse, GoogleUserInfo, OidcTokenResponse, StateParams, StoredToken};
 
 pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> String {
     let state_params = StateParams {
@@ -102,18 +102,26 @@ pub async fn prepare_oauth2_auth_request(
     Ok((auth_url, headers))
 }
 
-pub async fn get_user_oidc_oauth2(auth_response: &AuthResponse) -> Result<User, AppError> {
+pub async fn get_idinfo_userinfo(
+    auth_response: &AuthResponse,
+) -> Result<(GoogleIdInfo, GoogleUserInfo), AppError> {
     let pkce_verifier = get_pkce_verifier(auth_response).await?;
     let (access_token, id_token) =
         exchange_code_for_token(auth_response.code.clone(), pkce_verifier).await?;
-    let user_data = user_from_verified_idtoken(id_token, auth_response).await?;
-    let user_data_userinfo = fetch_user_data_from_google(access_token).await?;
-    #[cfg(debug_assertions)]
-    println!("User Data from Userinfo: {:#?}", user_data_userinfo);
-    if user_data.id != user_data_userinfo.id {
+
+    let idinfo = verify_idtoken(id_token, OAUTH2_GOOGLE_CLIENT_ID.to_string()).await?;
+    verify_nonce(auth_response, idinfo.clone()).await?;
+
+    let userinfo = fetch_user_data_from_google(access_token).await?;
+
+    if idinfo.sub != userinfo.id {
+        println!(
+            "Id mismatch in IdInfo and Userinfo: \nIdInfo: {:#?}\nUserInfo: {:#?}",
+            idinfo, userinfo
+        );
         return Err(anyhow::anyhow!("ID mismatch").into());
     }
-    Ok(user_data)
+    Ok((idinfo, userinfo))
 }
 
 async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, AppError> {
@@ -142,26 +150,7 @@ async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, AppEr
     Ok(pkce_verifier)
 }
 
-async fn user_from_verified_idtoken(
-    id_token: String,
-    auth_response: &AuthResponse,
-) -> Result<User, AppError> {
-    let idinfo = verify_idtoken(id_token, OAUTH2_GOOGLE_CLIENT_ID.to_string()).await?;
-    verify_nonce(auth_response, idinfo.clone()).await?;
-    let user_data_idtoken = User {
-        family_name: idinfo.family_name,
-        name: idinfo.name,
-        picture: idinfo.picture.unwrap_or_default(),
-        email: idinfo.email,
-        given_name: idinfo.given_name,
-        id: idinfo.sub,
-        hd: idinfo.hd,
-        verified_email: idinfo.email_verified,
-    };
-    Ok(user_data_idtoken)
-}
-
-async fn verify_nonce(auth_response: &AuthResponse, idinfo: IdInfo) -> Result<(), AppError> {
+async fn verify_nonce(auth_response: &AuthResponse, idinfo: GoogleIdInfo) -> Result<(), AppError> {
     let decoded_state_string =
         String::from_utf8(URL_SAFE.decode(&auth_response.state).unwrap()).unwrap();
     let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)?;
@@ -289,7 +278,7 @@ pub async fn csrf_checks(
     Ok(())
 }
 
-async fn fetch_user_data_from_google(access_token: String) -> Result<User, AppError> {
+async fn fetch_user_data_from_google(access_token: String) -> Result<GoogleUserInfo, AppError> {
     let client = crate::client::get_client();
     let response = client
         .get(OAUTH2_USERINFO_URL)
@@ -301,8 +290,13 @@ async fn fetch_user_data_from_google(access_token: String) -> Result<User, AppEr
         .text()
         .await
         .context("failed to get response body")?;
-    let user_data: User =
-        serde_json::from_str(&response_body).context("failed to deserialize response body")?;
+    #[cfg(debug_assertions)]
+    println!("Response Body: {:#?}", response_body);
+    let user_data: GoogleUserInfo = serde_json::from_str(&response_body).context(format!(
+        "Failed to deserialize response body: {}",
+        response_body
+    ))?;
+    #[cfg(debug_assertions)]
     println!("User data: {:#?}", user_data);
     Ok(user_data)
 }

@@ -1,17 +1,63 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+
+use crate::oauth2::IdInfo as GoogleIdInfo;
+use libuserdb::User as DbUser;
 
 // The user data we'll get back from Google
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct User {
+pub struct GoogleUserInfo {
+    pub(crate) id: String,
     pub(crate) family_name: String,
     pub name: String,
-    pub picture: String,
+    pub picture: Option<String>,
     pub(crate) email: String,
     pub(crate) given_name: String,
-    pub(crate) id: String,
     pub(crate) hd: Option<String>,
     pub(crate) verified_email: bool,
+}
+
+impl From<GoogleUserInfo> for DbUser {
+    fn from(google_user: GoogleUserInfo) -> Self {
+        Self {
+            id: "_undefined".to_string(),
+            name: google_user.name,
+            email: google_user.email,
+            picture: google_user.picture,
+            provider: "google".to_string(),
+            provider_user_id: format!("google_{}", google_user.id),
+            metadata: json!({
+                "family_name": google_user.family_name,
+                "given_name": google_user.given_name,
+                "hd": google_user.hd,
+                "verified_email": google_user.verified_email,
+            }),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+}
+
+impl From<GoogleIdInfo> for DbUser {
+    fn from(idinfo: GoogleIdInfo) -> Self {
+        Self {
+            id: "_undefined".to_string(),
+            name: idinfo.name,
+            email: idinfo.email,
+            picture: idinfo.picture,
+            provider: "google".to_string(),
+            provider_user_id: format!("google_{}", idinfo.sub),
+            metadata: json!({
+                "family_name": idinfo.family_name,
+                "given_name": idinfo.given_name,
+                "hd": idinfo.hd,
+                "verified_email": idinfo.email_verified,
+            }),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
