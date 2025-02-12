@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use uuid::Uuid;
 
+use crate::common::{base64url_decode, generate_challenge};
+use crate::common::{AppState, PublicKeyCredentialUserEntity, StoredChallenge};
 use crate::errors::PasskeyError;
-use crate::passkey::{base64url_decode, generate_challenge};
-use crate::passkey::{AppState, PublicKeyCredentialUserEntity, StoredChallenge};
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]

@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use sqlx::{Pool, Postgres, Row};
 
+use crate::common::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
 use crate::errors::PasskeyError;
-use crate::passkey::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
 
 pub(crate) struct PostgresChallengeStore {
     pool: Pool<Postgres>,

@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use redis::{self, AsyncCommands};
 
+use crate::common::{StoredChallenge, StoredCredential};
 use crate::errors::PasskeyError;
-use crate::passkey::{StoredChallenge, StoredCredential};
 
 const CHALLENGE_PREFIX: &str = "challenge:";
 const CREDENTIAL_PREFIX: &str = "credential:";

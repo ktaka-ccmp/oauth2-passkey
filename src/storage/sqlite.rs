@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use sqlx::{Pool, Row, Sqlite};
 
+use crate::common::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
 use crate::errors::PasskeyError;
-use crate::passkey::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
 use crate::storage::{ChallengeStore, CredentialStore};
 
 pub(crate) struct SqliteChallengeStore {

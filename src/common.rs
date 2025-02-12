@@ -9,10 +9,6 @@ use crate::config::Config;
 use crate::errors::PasskeyError;
 use crate::storage::{ChallengeStore, ChallengeStoreType, CredentialStore, CredentialStoreType};
 
-mod attestation;
-pub mod auth;
-pub mod register;
-
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub(crate) struct PublicKeyCredentialUserEntity {
     pub id: String,
@@ -37,7 +33,7 @@ pub(crate) struct StoredCredential {
     pub user: PublicKeyCredentialUserEntity,
 }
 
-fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
+pub(crate) fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
     let padding_len = (4 - input.len() % 4) % 4;
     let padded = format!("{}{}", input, "=".repeat(padding_len));
     let decoded = URL_SAFE
@@ -46,7 +42,7 @@ fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
     Ok(decoded)
 }
 
-fn generate_challenge() -> Result<Vec<u8>, PasskeyError> {
+pub(crate) fn generate_challenge() -> Result<Vec<u8>, PasskeyError> {
     let rng = ring::rand::SystemRandom::new();
     let mut challenge = vec![0u8; 32];
     rng.fill(&mut challenge)
@@ -55,18 +51,18 @@ fn generate_challenge() -> Result<Vec<u8>, PasskeyError> {
 }
 
 #[derive(Debug)]
-struct AttestationObject {
-    fmt: String,
-    auth_data: Vec<u8>,
-    att_stmt: Vec<(CborValue, CborValue)>,
+pub(crate) struct AttestationObject {
+    pub(crate) fmt: String,
+    pub(crate) auth_data: Vec<u8>,
+    pub(crate) att_stmt: Vec<(CborValue, CborValue)>,
 }
 
 // Public things
 #[derive(Clone)]
 pub struct AppState {
-    challenge_store: Arc<Mutex<Box<dyn ChallengeStore>>>,
-    credential_store: Arc<Mutex<Box<dyn CredentialStore>>>,
-    config: Config,
+    pub(crate) challenge_store: Arc<Mutex<Box<dyn ChallengeStore>>>,
+    pub(crate) credential_store: Arc<Mutex<Box<dyn CredentialStore>>>,
+    pub(crate) config: Config,
 }
 
 impl AppState {

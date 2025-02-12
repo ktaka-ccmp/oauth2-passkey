@@ -1,5 +1,5 @@
+use crate::common::{StoredChallenge, StoredCredential};
 use crate::errors::PasskeyError;
-use crate::passkey::{StoredChallenge, StoredCredential};
 use crate::storage::{ChallengeStore, CredentialStore};
 use async_trait::async_trait;
 use std::collections::HashMap;

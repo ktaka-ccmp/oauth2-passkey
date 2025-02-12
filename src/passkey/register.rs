@@ -4,12 +4,12 @@ use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use uuid::Uuid;
 
-use crate::config::AuthenticatorSelection;
-use crate::errors::PasskeyError;
-use crate::passkey::{base64url_decode, generate_challenge};
-use crate::passkey::{
+use crate::common::{base64url_decode, generate_challenge};
+use crate::common::{
     AppState, AttestationObject, PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential,
 };
+use crate::config::AuthenticatorSelection;
+use crate::errors::PasskeyError;
 
 #[derive(Serialize, Debug)]
 struct PubKeyCredParam {

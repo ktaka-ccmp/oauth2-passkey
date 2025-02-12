@@ -1,7 +1,12 @@
+mod common;
 mod config;
 mod errors;
-pub mod passkey;
-pub mod storage;
+mod passkey;
+mod storage;
 
-pub use passkey::{auth, register, AppState};
-pub use storage::{ChallengeStoreType, CredentialStoreType};
+pub use common::AppState;
+pub use config::Config;
+pub use passkey::{
+    finish_registration, start_authentication, start_registration, verify_authentication,
+    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
+};

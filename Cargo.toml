@@ -8,7 +8,7 @@ async-trait = "0.1"
 base64 = "0.22.1"
 ciborium = "0.2.2"
 dotenv = "0.15.0"
-oid-registry = "0.8.0"
+oid-registry = "0.8.1"
 redis = { version = "0.28.2", features = ["tokio-comp"] }
 ring = { version = "0.17.8", features = ["std"] }
 serde = { version = "1.0.217", features = ["derive"] }
