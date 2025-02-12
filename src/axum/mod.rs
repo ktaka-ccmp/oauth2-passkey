@@ -1,1 +1,1 @@
-pub mod extractor;
+mod extractor;
