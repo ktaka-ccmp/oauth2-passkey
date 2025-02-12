@@ -1,0 +1,15 @@
+version: '3.9'
+
+services:
+  pg:
+    image: postgres:latest
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: passkey
+      POSTGRES_PASSWORD: passkey
+      POSTGRES_DB: passkey
+    volumes:
+      - ./data:/var/lib/postgresql/data
+#      - ./init.sql:/docker-entrypoint-initdb.d/index.sql
+    restart: always
