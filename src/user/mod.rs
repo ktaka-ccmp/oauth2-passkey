@@ -1,3 +1,4 @@
-pub mod core;
+mod core;
 
-pub use core::*;
+// Re-export only the specific functions needed for the public API
+pub use core::{get_user, upsert_user};
