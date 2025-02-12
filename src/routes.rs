@@ -5,16 +5,8 @@ use axum::{
     Router,
 };
 use libpasskey::{
-    passkey::{
-        auth::{
-            start_authentication, verify_authentication, AuthenticationOptions,
-            AuthenticatorResponse,
-        },
-        register::{
-            finish_registration, start_registration, RegisterCredential, RegistrationOptions,
-        },
-    },
-    AppState,
+    finish_registration, start_authentication, start_registration, verify_authentication, AppState,
+    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
 };
 
 pub fn router_register(state: AppState) -> Router {
