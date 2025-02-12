@@ -7,6 +7,8 @@ use axum_extra::{headers, TypedHeader};
 use http::request::Parts;
 use std::convert::Infallible;
 
+use libuserdb::get_user;
+
 use crate::config::{SESSION_COOKIE_NAME, SESSION_STORE};
 use crate::types::User;
 
@@ -25,7 +27,7 @@ where
 {
     type Rejection = AuthRedirect;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
         let cookies = parts
             .extract::<TypedHeader<headers::Cookie>>()
             .await
@@ -35,6 +37,7 @@ where
         let session_cookie = cookies
             .get(SESSION_COOKIE_NAME.as_str())
             .ok_or(AuthRedirect)?;
+
         let store_guard = SESSION_STORE.lock().await;
         let session = store_guard
             .get_store()
@@ -44,7 +47,13 @@ where
 
         // Get user data from session
         let stored_session = session.ok_or(AuthRedirect)?;
-        Ok(stored_session.user)
+
+        let user = get_user(&stored_session.info.user_id)
+            .await
+            .map_err(|_| AuthRedirect)?
+            .ok_or(AuthRedirect)?;
+
+        Ok(User::from(user))
     }
 }
 

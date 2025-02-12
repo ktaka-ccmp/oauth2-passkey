@@ -1,12 +1,13 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use headers::Cookie;
 use http::header::HeaderMap;
 
 use crate::common::{gen_random_string, header_set_cookie};
 use crate::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME, SESSION_STORE};
 use crate::errors::AppError;
-use crate::types::{StoredSession, User};
+use crate::types::{SessionInfo, StoredSession};
 
+/// Get user information from libuserdb for a given session
 pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderMap, AppError> {
     let mut headers = HeaderMap::new();
     header_set_cookie(
@@ -20,31 +21,26 @@ pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderM
     Ok(headers)
 }
 
-pub async fn create_new_session(user_data: User) -> Result<HeaderMap, AppError> {
+pub async fn create_new_session(session_info: SessionInfo) -> Result<HeaderMap, AppError> {
     let mut headers = HeaderMap::new();
-    let max_age = *SESSION_COOKIE_MAX_AGE as i64;
-    let expires_at = Utc::now() + Duration::seconds(max_age);
-    let session_id = create_and_store_session(user_data, expires_at).await?;
+    let expires_at = session_info.expires_at;
+    let session_id = create_and_store_session(session_info).await?;
     header_set_cookie(
         &mut headers,
         SESSION_COOKIE_NAME.to_string(),
         session_id,
         expires_at,
-        max_age,
+        *SESSION_COOKIE_MAX_AGE as i64,
     )?;
     #[cfg(debug_assertions)]
     println!("Headers: {:#?}", headers);
     Ok(headers)
 }
 
-async fn create_and_store_session(
-    user_data: User,
-    expires_at: DateTime<Utc>,
-) -> Result<String, AppError> {
+async fn create_and_store_session(session_info: SessionInfo) -> Result<String, AppError> {
     let session_id = gen_random_string(32)?;
     let stored_session = StoredSession {
-        user: user_data,
-        expires_at,
+        info: session_info,
         ttl: *SESSION_COOKIE_MAX_AGE,
     };
 
