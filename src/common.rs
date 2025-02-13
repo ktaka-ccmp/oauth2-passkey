@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::config::Config;
 use crate::errors::PasskeyError;
 use crate::storage::{ChallengeStore, ChallengeStoreType, CredentialStore, CredentialStoreType};
+use crate::types::Config;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub(crate) struct PublicKeyCredentialUserEntity {

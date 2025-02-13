@@ -1,26 +1,19 @@
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::sync::LazyLock;
+use tokio::sync::Mutex;
 
 use crate::errors::PasskeyError;
+use crate::types::{AuthenticatorSelection, Config};
 
-#[derive(Clone, Debug)]
-pub struct Config {
-    pub origin: String,
-    pub rp_id: String,
-    pub rp_name: String,
-    pub authenticator_selection: AuthenticatorSelection,
-    pub timeout: u32,
-    pub challenge_timeout_seconds: u64,
-}
+// pub(crate) static PASSKEY_STORE: LazyLock<Mutex<SingletonStore>> =
+//     LazyLock::new(|| Mutex::new(SingletonStore::new(Box::new(MemoryStore::new()))));
 
-#[derive(Serialize, Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AuthenticatorSelection {
-    pub authenticator_attachment: String,
-    pub resident_key: String,
-    pub user_verification: String,
-    pub require_resident_key: bool,
-}
+pub static PASSKEY_ROUTE_PREFIX: LazyLock<String> = LazyLock::new(|| {
+    std::env::var("PASSKEY_ROUTE_PREFIX")
+        .ok()
+        .unwrap_or("/passkey".to_string())
+});
 
 impl Config {
     /// Creates a new Config instance from environment variables

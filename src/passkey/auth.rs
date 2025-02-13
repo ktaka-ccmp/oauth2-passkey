@@ -4,26 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use uuid::Uuid;
 
+use super::types::{AllowCredential, AuthenticationOptions};
 use crate::common::{base64url_decode, generate_challenge};
 use crate::common::{AppState, PublicKeyCredentialUserEntity, StoredChallenge};
 use crate::errors::PasskeyError;
-
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct AuthenticationOptions {
-    challenge: String,
-    timeout: u32,
-    rp_id: String,
-    allow_credentials: Vec<AllowCredential>,
-    user_verification: String,
-    auth_id: String,
-}
-
-#[derive(Serialize, Debug)]
-struct AllowCredential {
-    type_: String,
-    id: Vec<u8>,
-}
 
 #[allow(unused)]
 #[derive(Deserialize, Debug)]

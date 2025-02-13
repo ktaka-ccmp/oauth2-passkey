@@ -6,8 +6,8 @@ use x509_parser::{certificate::X509Certificate, prelude::*, time::ASN1Time};
 
 use crate::common::AppState;
 use crate::common::AttestationObject;
-use crate::config::AuthenticatorSelection;
 use crate::errors::PasskeyError;
+use crate::types::AuthenticatorSelection;
 
 // Constants for FIDO OIDs id-fido-gen-ce-aaguid
 const OID_FIDO_GEN_CE_AAGUID: &str = "1.3.6.1.4.1.45724.1.1.4";

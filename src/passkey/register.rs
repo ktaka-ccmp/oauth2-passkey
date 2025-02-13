@@ -8,8 +8,8 @@ use crate::common::{base64url_decode, generate_challenge};
 use crate::common::{
     AppState, AttestationObject, PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential,
 };
-use crate::config::AuthenticatorSelection;
 use crate::errors::PasskeyError;
+use crate::types::AuthenticatorSelection;
 
 #[derive(Serialize, Debug)]
 struct PubKeyCredParam {
