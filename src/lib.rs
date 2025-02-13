@@ -33,6 +33,11 @@ pub use config::OAUTH2_ROUTE_PREFIX; // Required for route configuration
 /// }
 /// ```
 pub async fn init() -> Result<(), errors::AppError> {
+    // Validate required environment variables early
+    let _ = *config::OAUTH2_REDIRECT_URI; // This will validate ORIGIN
+    let _ = *config::OAUTH2_GOOGLE_CLIENT_ID;
+    let _ = *config::OAUTH2_GOOGLE_CLIENT_SECRET;
+
     config::init_token_store().await?;
     libsession::init().await?;
     libuserdb::init()
