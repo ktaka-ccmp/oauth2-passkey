@@ -57,15 +57,10 @@ impl UserStoreType {
 
 #[async_trait]
 pub(crate) trait UserStore: Send + Sync + 'static {
-    /// Initialize the store. This is called when the store is created.
     async fn init(&self) -> Result<(), AppError>;
-    /// Put a user into the store.
+
     async fn put(&mut self, key: &str, value: User) -> Result<(), AppError>;
-
-    /// Get a user from the store.
     async fn get(&self, key: &str) -> Result<Option<User>, AppError>;
-
-    /// Remove a user from the store.
     async fn remove(&mut self, key: &str) -> Result<(), AppError>;
 
     async fn get_by_subject(&self, subject: &str) -> Result<Vec<User>, AppError>;
