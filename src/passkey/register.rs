@@ -10,14 +10,14 @@ use super::types::{
 use crate::common::{base64url_decode, generate_challenge};
 use crate::config::{
     ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_STORE, PASSKEY_CHALLENGE_TIMEOUT,
-    PASSKEY_CREDENTIAL_STORE, PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID, PASSKEY_RP_NAME, PASSKEY_TIMEOUT,
-    PASSKEY_USER_VERIFICATION,
+    PASSKEY_CREDENTIAL_STORE, PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID,
+    PASSKEY_RP_NAME, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
 };
 use crate::errors::PasskeyError;
 use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
 
 pub async fn start_registration(username: String) -> Result<RegistrationOptions, PasskeyError> {
-    println!("Registering user: {}", username);
+    println!("start_registration user: {}", username);
 
     let user_info = PublicKeyCredentialUserEntity {
         id: Uuid::new_v4().to_string(),
@@ -81,9 +81,7 @@ pub async fn start_registration(username: String) -> Result<RegistrationOptions,
 }
 
 pub async fn finish_registration(reg_data: RegisterCredential) -> Result<String, PasskeyError> {
-    println!("Registering user: {:?}", reg_data);
-    let mut challenge_store = PASSKEY_CHALLENGE_STORE.lock().await;
-    let mut credential_store = PASSKEY_CREDENTIAL_STORE.lock().await;
+    println!("finish_registration user: {:?}", reg_data);
 
     verify_client_data(&reg_data).await?;
 
@@ -100,7 +98,9 @@ pub async fn finish_registration(reg_data: RegisterCredential) -> Result<String,
             "User handle is missing".to_string(),
         ))?;
 
-    let stored_challenge = challenge_store
+    let stored_challenge = PASSKEY_CHALLENGE_STORE
+        .lock()
+        .await
         .get_store()
         .get_challenge(user_handle)
         .await?
@@ -112,7 +112,10 @@ pub async fn finish_registration(reg_data: RegisterCredential) -> Result<String,
 
     // Store using base64url encoded credential_id as the key
     let credential_id_str = reg_data.raw_id.clone();
-    credential_store
+
+    PASSKEY_CREDENTIAL_STORE
+        .lock()
+        .await
         .get_store_mut()
         .store_credential(
             credential_id_str,
@@ -126,7 +129,9 @@ pub async fn finish_registration(reg_data: RegisterCredential) -> Result<String,
         .await?;
 
     // Remove used challenge
-    challenge_store
+    PASSKEY_CHALLENGE_STORE
+        .lock()
+        .await
         .get_store_mut()
         .remove_challenge(user_handle)
         .await?;
