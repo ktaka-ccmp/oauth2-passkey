@@ -1,12 +1,11 @@
 use async_trait::async_trait;
-use sqlx::{Pool, Postgres, Row};
+use sqlx::Row;
 
-use crate::common::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
+use super::traits::{ChallengeStore, CredentialStore};
+use super::types::{PostgresChallengeStore, PostgresCredentialStore};
+
 use crate::errors::PasskeyError;
-
-pub(crate) struct PostgresChallengeStore {
-    pool: Pool<Postgres>,
-}
+use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
 
 impl PostgresChallengeStore {
     pub(crate) async fn connect(database_url: &str) -> Result<Self, PasskeyError> {
@@ -39,7 +38,7 @@ impl PostgresChallengeStore {
 }
 
 #[async_trait]
-impl super::ChallengeStore for PostgresChallengeStore {
+impl ChallengeStore for PostgresChallengeStore {
     async fn init(&self) -> Result<(), PasskeyError> {
         sqlx::query(
             r#"
@@ -144,10 +143,6 @@ impl super::ChallengeStore for PostgresChallengeStore {
     }
 }
 
-pub(crate) struct PostgresCredentialStore {
-    pool: Pool<Postgres>,
-}
-
 impl PostgresCredentialStore {
     pub(crate) async fn connect(database_url: &str) -> Result<Self, PasskeyError> {
         println!(
@@ -180,7 +175,7 @@ impl PostgresCredentialStore {
 }
 
 #[async_trait]
-impl super::CredentialStore for PostgresCredentialStore {
+impl CredentialStore for PostgresCredentialStore {
     async fn init(&self) -> Result<(), PasskeyError> {
         sqlx::query(
             r#"

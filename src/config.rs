@@ -1,13 +1,8 @@
-use serde::{Deserialize, Serialize};
 use std::env;
 use std::sync::LazyLock;
-use tokio::sync::Mutex;
 
 use crate::errors::PasskeyError;
-use crate::types::{AuthenticatorSelection, Config};
-
-// pub(crate) static PASSKEY_STORE: LazyLock<Mutex<SingletonStore>> =
-//     LazyLock::new(|| Mutex::new(SingletonStore::new(Box::new(MemoryStore::new()))));
+use crate::passkey::{AuthenticatorSelection, Config};
 
 pub static PASSKEY_ROUTE_PREFIX: LazyLock<String> = LazyLock::new(|| {
     std::env::var("PASSKEY_ROUTE_PREFIX")

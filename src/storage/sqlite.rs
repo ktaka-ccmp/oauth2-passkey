@@ -1,13 +1,11 @@
 use async_trait::async_trait;
-use sqlx::{Pool, Row, Sqlite};
+use sqlx::Row;
 
-use crate::common::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
+use super::traits::{ChallengeStore, CredentialStore};
+use super::types::{SqliteChallengeStore, SqliteCredentialStore};
+
 use crate::errors::PasskeyError;
-use crate::storage::{ChallengeStore, CredentialStore};
-
-pub(crate) struct SqliteChallengeStore {
-    pool: Pool<Sqlite>,
-}
+use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
 
 impl SqliteChallengeStore {
     pub(crate) async fn connect(database_path: &str) -> Result<Self, PasskeyError> {
@@ -137,10 +135,6 @@ impl ChallengeStore for SqliteChallengeStore {
 
         Ok(())
     }
-}
-
-pub(crate) struct SqliteCredentialStore {
-    pool: Pool<Sqlite>,
 }
 
 impl SqliteCredentialStore {

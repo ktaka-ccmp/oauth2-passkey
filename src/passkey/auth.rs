@@ -1,31 +1,17 @@
 use base64::engine::{general_purpose::URL_SAFE, Engine};
 use ring::{digest, signature::UnparsedPublicKey};
-use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use uuid::Uuid;
 
-use super::types::{AllowCredential, AuthenticationOptions};
+use super::types::{
+    AllowCredential, AuthenticationOptions, AuthenticatorData, AuthenticatorResponse,
+    ParsedClientData,
+};
+
 use crate::common::{base64url_decode, generate_challenge};
-use crate::common::{AppState, PublicKeyCredentialUserEntity, StoredChallenge};
+use crate::types::{AppState, PublicKeyCredentialUserEntity, StoredChallenge};
+
 use crate::errors::PasskeyError;
-
-#[allow(unused)]
-#[derive(Deserialize, Debug)]
-pub struct AuthenticatorResponse {
-    id: String,
-    raw_id: String,
-    response: AuthenticatorAssertionResponse,
-    authenticator_attachment: Option<String>,
-    auth_id: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct AuthenticatorAssertionResponse {
-    client_data_json: String,
-    authenticator_data: String,
-    signature: String,
-    user_handle: Option<String>,
-}
 
 pub async fn start_authentication(
     state: &AppState,
@@ -233,14 +219,6 @@ pub async fn verify_authentication(
     }
 }
 
-#[derive(Debug)]
-struct ParsedClientData {
-    challenge: Vec<u8>,
-    origin: String,
-    type_: String,
-    raw_data: Vec<u8>,
-}
-
 impl ParsedClientData {
     fn from_base64(client_data_json: &str) -> Result<Self, PasskeyError> {
         let raw_data = base64url_decode(client_data_json)
@@ -297,13 +275,6 @@ impl ParsedClientData {
 
         Ok(())
     }
-}
-
-#[derive(Debug)]
-struct AuthenticatorData {
-    rp_id_hash: Vec<u8>,
-    flags: u8,
-    raw_data: Vec<u8>,
 }
 
 impl AuthenticatorData {

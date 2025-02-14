@@ -6,12 +6,17 @@ mod passkey;
 mod storage;
 mod types;
 
-pub use common::AppState;
-// pub use types::Config;
+// pub(crate) use storage::{
+//     ChallengeStore, ChallengeStoreType, CredentialStore, CredentialStoreType,
+// };
+// pub(crate) use errors::PasskeyError;
+
+pub use types::AppState;
+
+pub use axum::router;
+pub use config::PASSKEY_ROUTE_PREFIX; // Required for route configuration
+
 pub use passkey::{
     finish_registration, start_authentication, start_registration, verify_authentication,
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
 };
-
-pub use axum::router;
-pub use config::PASSKEY_ROUTE_PREFIX; // Required for route configuration

@@ -1,15 +1,14 @@
 use async_trait::async_trait;
 use redis::{self, AsyncCommands};
 
-use crate::common::{StoredChallenge, StoredCredential};
+use super::traits::{ChallengeStore, CredentialStore};
+use super::types::{RedisChallengeStore, RedisCredentialStore};
+
 use crate::errors::PasskeyError;
+use crate::types::{StoredChallenge, StoredCredential};
 
 const CHALLENGE_PREFIX: &str = "challenge:";
 const CREDENTIAL_PREFIX: &str = "credential:";
-
-pub(crate) struct RedisChallengeStore {
-    client: redis::Client,
-}
 
 impl RedisChallengeStore {
     pub(crate) async fn connect(url: &str) -> Result<Self, PasskeyError> {
@@ -20,7 +19,7 @@ impl RedisChallengeStore {
 }
 
 #[async_trait]
-impl super::ChallengeStore for RedisChallengeStore {
+impl ChallengeStore for RedisChallengeStore {
     async fn init(&self) -> Result<(), PasskeyError> {
         // Verify the connection works
         let _conn = self
@@ -93,10 +92,6 @@ impl super::ChallengeStore for RedisChallengeStore {
     }
 }
 
-pub(crate) struct RedisCredentialStore {
-    client: redis::Client,
-}
-
 impl RedisCredentialStore {
     pub(crate) async fn connect(url: &str) -> Result<Self, PasskeyError> {
         println!("Connecting to Redis at {} for credentials", url);
@@ -106,7 +101,7 @@ impl RedisCredentialStore {
 }
 
 #[async_trait]
-impl super::CredentialStore for RedisCredentialStore {
+impl CredentialStore for RedisCredentialStore {
     async fn init(&self) -> Result<(), PasskeyError> {
         // Verify the connection works
         let _conn = self

@@ -1,15 +1,10 @@
-use askama::Template;
-use axum::{
-    http::StatusCode,
-    response::Html,
-    routing::{get, post, Router},
-};
+use axum::routing::{get, post, Router};
 
 use super::handlers::{
     handle_finish_authentication, handle_finish_registration, handle_start_authentication,
     handle_start_registration, index,
 };
-use crate::common::AppState;
+use crate::types::AppState;
 
 pub fn router(passkey_state: AppState) -> Router {
     Router::new()

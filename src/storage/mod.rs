@@ -3,5 +3,7 @@ mod postgres;
 mod redis;
 mod sqlite;
 mod traits;
+mod types;
 
-pub(crate) use traits::{ChallengeStore, ChallengeStoreType, CredentialStore, CredentialStoreType};
+pub(crate) use traits::{ChallengeStore, CredentialStore};
+pub(crate) use types::{ChallengeStoreType, CredentialStoreType};

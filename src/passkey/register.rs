@@ -1,59 +1,14 @@
 use base64::engine::{general_purpose::URL_SAFE, Engine};
 use ciborium::value::{Integer, Value as CborValue};
-use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use uuid::Uuid;
 
-use crate::common::{base64url_decode, generate_challenge};
-use crate::common::{
-    AppState, AttestationObject, PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential,
+use super::types::{
+    AttestationObject, PubKeyCredParam, RegisterCredential, RegistrationOptions, RelyingParty,
 };
+use crate::common::{base64url_decode, generate_challenge};
 use crate::errors::PasskeyError;
-use crate::types::AuthenticatorSelection;
-
-#[derive(Serialize, Debug)]
-struct PubKeyCredParam {
-    #[serde(rename = "type")]
-    type_: String,
-    alg: i32,
-}
-
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct RegistrationOptions {
-    challenge: String,
-    rp_id: String,
-    rp: RelyingParty,
-    user: PublicKeyCredentialUserEntity,
-    pub_key_cred_params: Vec<PubKeyCredParam>,
-    authenticator_selection: AuthenticatorSelection,
-    timeout: u32,
-    attestation: String,
-}
-
-#[derive(Serialize, Debug)]
-struct RelyingParty {
-    name: String,
-    id: String,
-}
-
-#[allow(unused)]
-#[derive(Deserialize, Debug)]
-pub struct RegisterCredential {
-    id: String,
-    raw_id: String,
-    response: AuthenticatorAttestationResponse,
-    #[serde(rename = "type")]
-    type_: String,
-    username: Option<String>,
-    user_handle: Option<String>,
-}
-
-#[derive(Deserialize, Debug)]
-struct AuthenticatorAttestationResponse {
-    client_data_json: String,
-    attestation_object: String,
-}
+use crate::types::{AppState, PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
 
 pub async fn start_registration(
     state: &AppState,

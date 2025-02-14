@@ -1,30 +1,15 @@
-use crate::common::{StoredChallenge, StoredCredential};
 use crate::errors::PasskeyError;
+use crate::types::{StoredChallenge, StoredCredential};
 use async_trait::async_trait;
 use std::env;
 
-use crate::storage::{
-    memory::{InMemoryChallengeStore, InMemoryCredentialStore},
-    postgres::{PostgresChallengeStore, PostgresCredentialStore},
-    redis::{RedisChallengeStore, RedisCredentialStore},
-    sqlite::{SqliteChallengeStore, SqliteCredentialStore},
+use crate::storage::types::{
+    InMemoryChallengeStore, InMemoryCredentialStore, PostgresChallengeStore,
+    PostgresCredentialStore, RedisChallengeStore, RedisCredentialStore, SqliteChallengeStore,
+    SqliteCredentialStore,
 };
 
-#[derive(Clone, Debug)]
-pub enum ChallengeStoreType {
-    Memory,
-    Sqlite { url: String },
-    Postgres { url: String },
-    Redis { url: String },
-}
-
-#[derive(Clone, Debug)]
-pub enum CredentialStoreType {
-    Memory,
-    Sqlite { url: String },
-    Postgres { url: String },
-    Redis { url: String },
-}
+use super::types::{ChallengeStoreType, CredentialStoreType};
 
 impl ChallengeStoreType {
     pub fn from_env() -> Result<Self, PasskeyError> {

@@ -6,11 +6,13 @@ use axum::{
 };
 use axum_core::response::IntoResponse;
 
-use crate::{
-    finish_registration, start_authentication, start_registration, verify_authentication, AppState,
+use crate::passkey::{
+    finish_registration, start_authentication, start_registration, verify_authentication,
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
-    PASSKEY_ROUTE_PREFIX,
 };
+
+use crate::config::PASSKEY_ROUTE_PREFIX;
+use crate::types::AppState;
 
 #[derive(Template)]
 #[template(path = "index.html")]
