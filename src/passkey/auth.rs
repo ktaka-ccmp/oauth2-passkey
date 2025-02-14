@@ -9,19 +9,22 @@ use super::types::{
 };
 
 use crate::common::{base64url_decode, generate_challenge};
-use crate::types::{AppState, PublicKeyCredentialUserEntity, StoredChallenge};
-
+use crate::config::{
+    ORIGIN, PASSKEY_CHALLENGE_STORE, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_CREDENTIAL_STORE,
+    PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
+};
 use crate::errors::PasskeyError;
+use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge};
 
 pub async fn start_authentication(
-    state: &AppState,
     username: Option<String>,
 ) -> Result<AuthenticationOptions, PasskeyError> {
     let mut allow_credentials = Vec::new();
     match username {
         Some(username) => {
-            let credential_store = state.credential_store.lock().await;
+            let credential_store = PASSKEY_CREDENTIAL_STORE.lock().await;
             let credentials = credential_store
+                .get_store()
                 .get_credentials_by_username(&username)
                 .await?;
 
@@ -51,24 +54,21 @@ pub async fn start_authentication(
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs(),
-        ttl: state.config.challenge_timeout_seconds,
+        ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    let mut challenge_store = state.challenge_store.lock().await;
+    let mut challenge_store = PASSKEY_CHALLENGE_STORE.lock().await;
     challenge_store
+        .get_store_mut()
         .store_challenge(auth_id.clone(), stored_challenge)
         .await?;
 
     let auth_option = AuthenticationOptions {
         challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
-        timeout: state.config.timeout * 1000, // Convert seconds to milliseconds
-        rp_id: state.config.rp_id.clone(),
+        timeout: (*PASSKEY_TIMEOUT as u32) * 1000, // Convert seconds to milliseconds
+        rp_id: PASSKEY_RP_ID.to_string(),
         allow_credentials,
-        user_verification: state
-            .config
-            .authenticator_selection
-            .user_verification
-            .clone(),
+        user_verification: PASSKEY_USER_VERIFICATION.to_string(),
         auth_id,
     };
 
@@ -78,7 +78,6 @@ pub async fn start_authentication(
 }
 
 pub async fn verify_authentication(
-    state: &AppState,
     auth_response: AuthenticatorResponse,
 ) -> Result<String, PasskeyError> {
     #[cfg(debug_assertions)]
@@ -88,11 +87,12 @@ pub async fn verify_authentication(
     );
 
     // Get stored challenge and verify auth
-    let mut challenge_store = state.challenge_store.lock().await;
-    let credential_store = state.credential_store.lock().await;
+    let mut challenge_store = PASSKEY_CHALLENGE_STORE.lock().await;
+    let credential_store = PASSKEY_CREDENTIAL_STORE.lock().await;
 
     // let mut store = state.store.lock().await;
     let stored_challenge = challenge_store
+        .get_store()
         .get_challenge(&auth_response.auth_id)
         .await?
         .ok_or(PasskeyError::Storage("Challenge not found".into()))?;
@@ -103,9 +103,7 @@ pub async fn verify_authentication(
         .unwrap()
         .as_secs();
     let age = now - stored_challenge.timestamp;
-    let timeout = stored_challenge
-        .ttl
-        .min(state.config.challenge_timeout_seconds);
+    let timeout = stored_challenge.ttl.min(*PASSKEY_CHALLENGE_TIMEOUT as u64);
     if age > timeout {
         println!(
             "Challenge expired after {} seconds (timeout: {})",
@@ -129,7 +127,7 @@ pub async fn verify_authentication(
     #[cfg(debug_assertions)]
     println!("Parsed client data: {:?}", client_data);
 
-    client_data.verify(state, &stored_challenge.challenge)?;
+    client_data.verify(&stored_challenge.challenge)?;
 
     // Parse and verify authenticator data
     #[cfg(debug_assertions)]
@@ -143,10 +141,11 @@ pub async fn verify_authentication(
     #[cfg(debug_assertions)]
     println!("Parsed authenticator data: {:?}", auth_data);
 
-    auth_data.verify(state)?;
+    auth_data.verify()?;
 
     // Get credential then public key
     let credential = credential_store
+        .get_store()
         .get_credential(&auth_response.id)
         .await?
         .ok_or(PasskeyError::Authentication("Unknown credential".into()))?;
@@ -204,6 +203,7 @@ pub async fn verify_authentication(
 
             // Cleanup and return success
             challenge_store
+                .get_store_mut()
                 .remove_challenge(&auth_response.auth_id)
                 .await?;
             Ok(display_name)
@@ -251,17 +251,18 @@ impl ParsedClientData {
         })
     }
 
-    fn verify(&self, state: &AppState, stored_challenge: &[u8]) -> Result<(), PasskeyError> {
+    fn verify(&self, stored_challenge: &[u8]) -> Result<(), PasskeyError> {
         // Verify challenge
         if self.challenge != stored_challenge {
             return Err(PasskeyError::Challenge("Challenge mismatch".into()));
         }
 
         // Verify origin
-        if self.origin != state.config.origin {
+        if self.origin != ORIGIN.to_string() {
             return Err(PasskeyError::ClientData(format!(
                 "Invalid origin. Expected: {}, Got: {}",
-                state.config.origin, self.origin
+                ORIGIN.to_string(),
+                self.origin
             )));
         }
 
@@ -295,9 +296,9 @@ impl AuthenticatorData {
         })
     }
 
-    fn verify(&self, state: &AppState) -> Result<(), PasskeyError> {
+    fn verify(&self) -> Result<(), PasskeyError> {
         // Verify RP ID hash
-        let expected_hash = digest::digest(&digest::SHA256, state.config.rp_id.as_bytes());
+        let expected_hash = digest::digest(&digest::SHA256, PASSKEY_RP_ID.as_bytes());
         if self.rp_id_hash != expected_hash.as_ref() {
             return Err(PasskeyError::AuthenticatorData(format!(
                 "Invalid RP ID hash. Expected: {:?}, Got: {:?}",
@@ -314,7 +315,7 @@ impl AuthenticatorData {
         }
 
         // Check user verification flag if required
-        if state.config.authenticator_selection.user_verification == "required"
+        if PASSKEY_USER_VERIFICATION.to_string().to_lowercase() == "required"
             && self.flags & 0x04 == 0
         {
             return Err(PasskeyError::AuthenticatorData(format!(

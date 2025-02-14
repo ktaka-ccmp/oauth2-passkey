@@ -19,16 +19,6 @@ pub(super) struct AllowCredential {
     pub(super) id: Vec<u8>,
 }
 
-#[derive(Clone, Debug)]
-pub struct Config {
-    pub(crate) origin: String,
-    pub(crate) rp_id: String,
-    pub(crate) rp_name: String,
-    pub(crate) authenticator_selection: AuthenticatorSelection,
-    pub(crate) timeout: u32,
-    pub(crate) challenge_timeout_seconds: u64,
-}
-
 #[derive(Serialize, Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticatorSelection {

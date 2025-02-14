@@ -4,9 +4,9 @@ use std::time::SystemTime;
 use webpki::EndEntityCert;
 use x509_parser::{certificate::X509Certificate, prelude::*, time::ASN1Time};
 
-use super::types::{AttestationObject, AuthenticatorSelection};
+use super::types::AttestationObject;
+use crate::config::{PASSKEY_RP_ID, PASSKEY_USER_VERIFICATION};
 use crate::errors::PasskeyError;
-use crate::types::AppState;
 
 // Constants for FIDO OIDs id-fido-gen-ce-aaguid
 const OID_FIDO_GEN_CE_AAGUID: &str = "1.3.6.1.4.1.45724.1.1.4";
@@ -18,7 +18,6 @@ const COORD_LENGTH: usize = 32;
 pub(super) fn verify_attestation(
     attestation: &AttestationObject,
     client_data: &[u8],
-    state: &AppState,
 ) -> Result<(), PasskeyError> {
     let client_data_hash = digest::digest(&digest::SHA256, client_data);
 
@@ -27,11 +26,7 @@ pub(super) fn verify_attestation(
             // for platform authenticators
             #[cfg(debug_assertions)]
             println!("Using 'none' attestation format");
-            verify_none_attestation(
-                attestation,
-                &state.config.authenticator_selection,
-                &state.config.rp_id,
-            )
+            verify_none_attestation(attestation)
         }
         "packed" => {
             // for security keys
@@ -52,11 +47,7 @@ pub(super) fn verify_attestation(
     }
 }
 
-fn verify_none_attestation(
-    attestation: &AttestationObject,
-    authenticator_selection: &AuthenticatorSelection,
-    rp_id: &str,
-) -> Result<(), PasskeyError> {
+fn verify_none_attestation(attestation: &AttestationObject) -> Result<(), PasskeyError> {
     // Verify attStmt is empty
     if !attestation.att_stmt.is_empty() {
         return Err(PasskeyError::Format(
@@ -65,7 +56,7 @@ fn verify_none_attestation(
     }
 
     // Verify RP ID hash
-    let rp_id_hash = digest::digest(&digest::SHA256, rp_id.as_bytes());
+    let rp_id_hash = digest::digest(&digest::SHA256, PASSKEY_RP_ID.as_bytes());
     if attestation.auth_data[..32] != rp_id_hash.as_ref()[..] {
         return Err(PasskeyError::Verification("Invalid RP ID hash".to_string()));
     }
@@ -83,7 +74,7 @@ fn verify_none_attestation(
     }
 
     // Check UV flag if requested
-    if authenticator_selection.user_verification == "required" && !user_verified {
+    if *PASSKEY_USER_VERIFICATION == "required" && !user_verified {
         return Err(PasskeyError::AuthenticatorData(
             "User Verification required but flag not set".to_string(),
         ));
