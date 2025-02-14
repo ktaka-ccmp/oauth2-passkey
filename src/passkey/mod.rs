@@ -4,7 +4,7 @@ mod register;
 mod types;
 
 pub use types::{
-    AuthenticationOptions, AuthenticatorResponse,     RegisterCredential, RegistrationOptions,
+    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
 };
 
 pub use auth::{start_authentication, verify_authentication};

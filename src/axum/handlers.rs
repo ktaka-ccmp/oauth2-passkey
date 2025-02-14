@@ -1,9 +1,5 @@
 use askama::Template;
-use axum::{
-    extract::Json,
-    http::StatusCode,
-    response::Html,
-};
+use axum::{extract::Json, http::StatusCode, response::Html};
 use axum_core::response::IntoResponse;
 
 use crate::passkey::{

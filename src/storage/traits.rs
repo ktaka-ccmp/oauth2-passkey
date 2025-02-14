@@ -54,14 +54,11 @@ impl ChallengeStoreType {
             ChallengeStoreType::Postgres { url } => {
                 Box::new(PostgresChallengeStore::connect(url).await?)
             }
-            ChallengeStoreType::Redis { url } => {
-                Box::new(RedisChallengeStore::connect(url).await?)
-            }
+            ChallengeStoreType::Redis { url } => Box::new(RedisChallengeStore::connect(url).await?),
         };
         store.init().await?;
         Ok(store)
     }
-
 }
 
 impl CredentialStoreType {
