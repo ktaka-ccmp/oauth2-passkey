@@ -113,19 +113,25 @@
             }
         }
 
-        async function startRegistration() {
-            const username = document.getElementById('username').value;
-            if (!username) {
-                alert('Please enter a username');
-                return;
-            }
-
+        async function startRegistration(withUsername = true) {
             try {
-                const startResponse = await fetch('{{passkey_route_prefix}}/register/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(username)
-                });
+                let startResponse;
+                if (withUsername) {
+                    const username = document.getElementById('username').value;
+                    if (!username) {
+                        alert('Please enter a username');
+                        return;
+                    }
+                    startResponse = await fetch('{{passkey_route_prefix}}/register/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(username)
+                    });
+                } else {
+                    startResponse = await fetch('{{passkey_route_prefix}}/register/start', {
+                        method: 'GET',
+                    });
+                }
 
                 const options = await startResponse.json();
                 console.log('Registration options:', options);
@@ -142,9 +148,6 @@
                     publicKey: options
                 });
 
-                // console.log('Registration credential:', credential);
-                // console.log('Registration credential response clientDataJSON:', credential.response.clientDataJSON);
-
                 const credentialResponse = {
                     id: credential.id,
                     raw_id: arrayBufferToBase64URL(credential.rawId),
@@ -154,7 +157,6 @@
                         client_data_json: arrayBufferToBase64URL(credential.response.clientDataJSON)
                     },
                     user_handle: userHandle,
-                    // username: username
                 };
 
                 console.log('Registration response:', credentialResponse);

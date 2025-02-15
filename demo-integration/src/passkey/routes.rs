@@ -2,7 +2,7 @@ use axum::routing::{get, post, Router};
 
 use super::handlers::{
     handle_finish_authentication, handle_finish_registration, handle_start_authentication,
-    handle_start_registration, index,
+    handle_start_registration, handle_start_registration_get, index,
 };
 
 pub fn router() -> Router {
@@ -14,7 +14,10 @@ pub fn router() -> Router {
 
 pub fn router_register() -> Router {
     Router::new()
-        .route("/start", post(handle_start_registration))
+        .route(
+            "/start",
+            post(handle_start_registration).get(handle_start_registration_get),
+        )
         .route("/finish", post(handle_finish_registration))
 }
 

@@ -39,6 +39,13 @@
             Register New Passkey
         </button>
     </div>
+    <div id="auth-register" style="display: block">
+        <h1>RegisterPasskeyfromSession</h1>
+        <!-- Will show auth buttons based on state -->
+        <button onclick="startRegistration(false)" class="auth-button">
+            Register New Passkey
+        </button>
+    </div>
 </div>
 
 <div id="main-content">
@@ -100,7 +107,7 @@
                 </div>
                 <div style="text-align: right;">
                     <button onclick="this.parentElement.parentElement.parentElement.remove()" style="margin-right: 10px;">Cancel</button>
-                    <button onclick="startRegistration()">Register</button>
+                    <button onclick="startRegistration(true)">Register</button>
                 </div>
             </div>
         </div>
