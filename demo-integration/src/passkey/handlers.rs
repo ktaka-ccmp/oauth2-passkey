@@ -7,6 +7,7 @@ use libpasskey::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
 };
 
+use crate::session::AuthUser as User;
 use libpasskey::PASSKEY_ROUTE_PREFIX;
 
 #[derive(Template)]
@@ -20,6 +21,19 @@ pub(crate) async fn index() -> impl IntoResponse {
         passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
     };
     (StatusCode::OK, Html(template.render().unwrap())).into_response()
+}
+
+pub(crate) async fn handle_start_registration_get(user: Option<User>) -> Json<RegistrationOptions> {
+    match user {
+        None => {
+            panic!("Not logged in!");
+        }
+        Some(u) => Json(
+            start_registration(u.name.clone())
+                .await
+                .expect("Failed to start registration"),
+        ),
+    }
 }
 
 pub(crate) async fn handle_start_registration(

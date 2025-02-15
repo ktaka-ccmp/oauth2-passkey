@@ -1,7 +1,8 @@
 use askama::Template;
 use axum::{http::StatusCode, response::Html};
 use liboauth2::OAUTH2_ROUTE_PREFIX;
-use libsession::User;
+// use libsession::User;
+use super::session::AuthUser as User;
 
 #[derive(Template)]
 #[template(path = "index_user.j2")]

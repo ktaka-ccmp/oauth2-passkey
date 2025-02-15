@@ -7,7 +7,7 @@ use axum_extra::{headers, TypedHeader};
 use http::request::Parts;
 
 use libsession::User;
-use libsession::{SESSION_COOKIE_NAME, get_user_from_session, SessionError};
+use libsession::{get_user_from_session, SessionError, SESSION_COOKIE_NAME};
 
 pub struct AuthRedirect;
 
@@ -49,10 +49,8 @@ where
     type Rejection = AuthRedirect;
 
     async fn from_request_parts(parts: &mut Parts, _: &B) -> Result<Self, Self::Rejection> {
-        let cookies: TypedHeader<headers::Cookie> = parts
-            .extract()
-            .await
-            .map_err(|_| AuthRedirect)?;
+        let cookies: TypedHeader<headers::Cookie> =
+            parts.extract().await.map_err(|_| AuthRedirect)?;
 
         // Get session from cookie
         let session_cookie = cookies
@@ -61,7 +59,9 @@ where
             .to_string();
 
         // Convert libuserdb::User to libsession::User to AuthUser
-        let db_user: libuserdb::User = get_user_from_session(&session_cookie).await.map_err(AuthRedirect::from)?;
+        let db_user: libuserdb::User = get_user_from_session(&session_cookie)
+            .await
+            .map_err(AuthRedirect::from)?;
         let user: User = User::from(db_user);
         Ok(AuthUser::from(user))
     }
@@ -73,8 +73,12 @@ where
 {
     type Rejection = AuthRedirect;
 
-    async fn from_request_parts(parts: &mut Parts, state: &B) -> Result<Option<Self>, Self::Rejection> {
-        let result: Result<Self, Self::Rejection> = <AuthUser as FromRequestParts<B>>::from_request_parts(parts, state).await;
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &B,
+    ) -> Result<Option<Self>, Self::Rejection> {
+        let result: Result<Self, Self::Rejection> =
+            <AuthUser as FromRequestParts<B>>::from_request_parts(parts, state).await;
         Ok(result.ok())
     }
 }
