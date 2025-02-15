@@ -14,7 +14,11 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 liboauth2 = { workspace = true }
 libsession = { workspace = true }
 libpasskey = { workspace = true }
+libuserdb = { workspace = true }
 
 axum = { workspace = true }
 tokio = { workspace = true }
 rustls = { workspace = true }
+axum-core.workspace = true
+axum-extra = { workspace = true }
+chrono = { workspace = true }

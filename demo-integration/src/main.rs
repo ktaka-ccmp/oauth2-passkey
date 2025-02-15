@@ -8,6 +8,10 @@ use libpasskey::PASSKEY_ROUTE_PREFIX;
 mod handlers;
 mod server;
 
+mod oauth2;
+mod passkey;
+mod session;
+
 use crate::{
     handlers::{index, protected},
     server::{spawn_http_server, spawn_https_server, Ports},
@@ -37,11 +41,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/", get(index))
         .route("/protected", get(protected))
-        .nest(OAUTH2_ROUTE_PREFIX.as_str(), liboauth2::router())
-        .nest(
-            PASSKEY_ROUTE_PREFIX.as_str(),
-            libpasskey::router(),
-        );
+        .nest(OAUTH2_ROUTE_PREFIX.as_str(), oauth2::router())
+        .nest(PASSKEY_ROUTE_PREFIX.as_str(), passkey::router());
 
     let ports = Ports {
         http: 3001,
