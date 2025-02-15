@@ -29,7 +29,12 @@
         <dl>
             
             <dt>Picture URL</dt>
-            <dd><img src="{{ user.picture }}" alt="Profile picture" style="max-width: 100px; border-radius: 50%;"></dd>
+            <dd>
+            {% if user.picture.is_some() %}
+                <img src="{{ user.picture.as_ref().unwrap() }}" alt="Profile picture" style="max-width: 100px; border-radius: 50%;">
+            {% else %}
+            {% endif %}
+            </dd>
         </dl>
     </div>
 
