@@ -6,8 +6,8 @@ edition = { workspace = true }
 [dependencies]
 askama = { version = "0.12.1", features = ["serde-json"] }
 async-trait = "0.1"
-axum.workspace = true
-axum-core = "0.5.0"
+axum = { workspace = true }
+axum-core = { workspace = true }
 base64 = "0.22.1"
 ciborium = "0.2.2"
 dotenv = "0.15.0"

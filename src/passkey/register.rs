@@ -69,8 +69,8 @@ pub async fn start_registration(username: String) -> Result<RegistrationOptions,
                 alg: -257,
             },
         ],
-        authenticator_selection: authenticator_selection,
-        timeout: (*PASSKEY_TIMEOUT as u32) * 1000, // Convert seconds to milliseconds
+        authenticator_selection,
+        timeout: (*PASSKEY_TIMEOUT) * 1000, // Convert seconds to milliseconds
         attestation: "direct".to_string(),
     };
 

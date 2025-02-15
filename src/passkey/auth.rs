@@ -65,7 +65,7 @@ pub async fn start_authentication(
 
     let auth_option = AuthenticationOptions {
         challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
-        timeout: (*PASSKEY_TIMEOUT as u32) * 1000, // Convert seconds to milliseconds
+        timeout: (*PASSKEY_TIMEOUT) * 1000, // Convert seconds to milliseconds
         rp_id: PASSKEY_RP_ID.to_string(),
         allow_credentials,
         user_verification: PASSKEY_USER_VERIFICATION.to_string(),
@@ -258,11 +258,10 @@ impl ParsedClientData {
         }
 
         // Verify origin
-        if self.origin != ORIGIN.to_string() {
+        if self.origin != *ORIGIN {
             return Err(PasskeyError::ClientData(format!(
                 "Invalid origin. Expected: {}, Got: {}",
-                ORIGIN.to_string(),
-                self.origin
+                *ORIGIN, self.origin
             )));
         }
 
