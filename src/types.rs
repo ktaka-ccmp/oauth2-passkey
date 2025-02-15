@@ -12,18 +12,34 @@ pub struct SessionInfo {
 // User information from libuserdb
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
-    pub(crate) id: String,
-    pub(crate) email: String,
+    pub id: String,
+    pub email: String,
     pub name: String,
-    pub picture: String,
-    pub(crate) provider: String,
-    pub(crate) provider_user_id: String,
-    pub(crate) metadata: Value,
-    pub(crate) created_at: DateTime<Utc>,
-    pub(crate) updated_at: DateTime<Utc>,
+    pub picture: Option<String>,
+    pub provider: String,
+    pub provider_user_id: String,
+    pub metadata: Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 use libuserdb::User as DbUser;
+
+impl User {
+    pub fn into_db_user(self) -> DbUser {
+        DbUser {
+            id: self.id,
+            email: self.email,
+            name: self.name,
+            picture: self.picture,
+            provider: self.provider,
+            provider_user_id: self.provider_user_id,
+            metadata: self.metadata,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        }
+    }
+}
 
 impl From<DbUser> for User {
     fn from(db_user: DbUser) -> Self {
@@ -31,7 +47,7 @@ impl From<DbUser> for User {
             id: db_user.id,
             name: db_user.name,
             email: db_user.email,
-            picture: db_user.picture.unwrap_or_default(),
+            picture: db_user.picture,
             provider: db_user.provider,
             provider_user_id: db_user.provider_user_id,
             metadata: db_user.metadata,

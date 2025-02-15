@@ -10,7 +10,11 @@ mod types;
 pub use config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME}; // Required for cookie configuration
 pub use errors::{AppError, SessionError}; // Required for error handling
 pub use session::{
-    create_new_session, delete_session_from_store, get_user_from_session, prepare_logout_response,
+    // create_new_session,
+    create_session_with_user,
+    delete_session_from_store,
+    get_user_from_session,
+    prepare_logout_response,
 };
 pub use types::{SessionInfo, User}; // Required for session data
 
@@ -37,5 +41,9 @@ pub use types::{SessionInfo, User}; // Required for session data
 /// }
 /// ```
 pub async fn init() -> Result<(), AppError> {
-    config::init_session_store().await
+    config::init_session_store().await?;
+    libuserdb::init()
+        .await
+        .map_err(|e: libuserdb::AppError| errors::AppError::from(anyhow::anyhow!(e)))?;
+    Ok(())
 }
