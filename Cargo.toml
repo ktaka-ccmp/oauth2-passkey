@@ -20,6 +20,10 @@ liboauth2 = { path = "./liboauth2" }
 libpasskey = { path = "./libpasskey" }
 libsession = { path = "./libsession" }
 libuserdb = { path = "./libuserdb" }
+
 axum = { version = "0.8", features = ["http2", "macros", "multipart"] }
 tokio = { version = "1.43", features = ["bytes", "fs", "io-std", "macros", "parking_lot", "rt-multi-thread", "signal-hook-registry", "socket2", "sync", "time", "tracing"] }
 rustls = { version = "0.23.23", features = ["ring"] }
+axum-core = "0.5.0"
+axum-extra = { version = "0.10.0", features = ["typed-header"] }
+chrono = { version = "0.4.39", features = ["serde"] }
