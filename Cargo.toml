@@ -29,7 +29,6 @@ askama = { version = "0.12.1", features = ["serde-json"] }
 tracing = "0.1.41"
 
 libsession = { workspace = true }
-libuserdb = { workspace = true }
 axum = { workspace = true }
 axum-extra = { workspace = true }
 chrono = { workspace = true }

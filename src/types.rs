@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::oauth2::IdInfo as GoogleIdInfo;
-use libuserdb::User as DbUser;
+use libsession::User as SessionUser;
 
 // The user data we'll get back from Google
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,7 +18,7 @@ pub struct GoogleUserInfo {
     pub(crate) verified_email: bool,
 }
 
-impl From<GoogleUserInfo> for DbUser {
+impl From<GoogleUserInfo> for SessionUser {
     fn from(google_user: GoogleUserInfo) -> Self {
         Self {
             id: "_undefined".to_string(),
@@ -39,7 +39,7 @@ impl From<GoogleUserInfo> for DbUser {
     }
 }
 
-impl From<GoogleIdInfo> for DbUser {
+impl From<GoogleIdInfo> for SessionUser {
     fn from(idinfo: GoogleIdInfo) -> Self {
         Self {
             id: "_undefined".to_string(),

@@ -45,8 +45,5 @@ pub async fn init() -> Result<(), errors::AppError> {
 
     config::init_token_store().await?;
     libsession::init().await?;
-    libuserdb::init()
-        .await
-        .map_err(|e: libuserdb::AppError| errors::AppError::from(anyhow::anyhow!(e)))?;
     Ok(())
 }

@@ -28,11 +28,8 @@ use crate::oauth2::{
 use crate::types::AuthResponse;
 
 use libsession::{
-    create_new_session, delete_session_from_store, prepare_logout_response, SessionInfo,
-    SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME,
+    delete_session_from_store, prepare_logout_response, User as SessionUser, SESSION_COOKIE_NAME,
 };
-
-use libuserdb::{upsert_user, User as DbUser};
 
 pub fn router() -> Router {
     Router::new()
@@ -139,26 +136,20 @@ pub async fn get_authorized(
 async fn authorized(
     auth_response: &AuthResponse,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (idinfo, _userinfo) = get_idinfo_userinfo(auth_response)
+    let (idinfo, userinfo) = get_idinfo_userinfo(auth_response)
         .await
         .into_response_error()?;
 
     // Convert GoogleUserInfo to DbUser and store it
-    // let user_userinfo = DbUser::from(userinfo);
+    static OAUTH2_GOOGLE_USER: &str = "idinfo";
 
-    // Convert GoogleIdInfo to DbUser and store it
-    let user_idinfo = DbUser::from(idinfo.clone());
-
-    // Store the user in the database
-    let user = upsert_user(user_idinfo).await.into_response_error()?;
-
-    // Create minimal session info
-    let session_info = SessionInfo {
-        user_id: user.id,
-        expires_at: Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64),
+    let user_data = match OAUTH2_GOOGLE_USER {
+        "idinfo" => SessionUser::from(idinfo),
+        "userinfo" => SessionUser::from(userinfo),
+        _ => SessionUser::from(idinfo), // Default case
     };
 
-    let mut headers = create_new_session(session_info)
+    let mut headers = libsession::create_session_with_user(user_data)
         .await
         .into_response_error()?;
 
