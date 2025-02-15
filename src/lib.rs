@@ -9,7 +9,9 @@ mod types;
 // Re-export only what's necessary for the public API
 pub use config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME}; // Required for cookie configuration
 pub use errors::{AppError, SessionError}; // Required for error handling
-pub use session::{create_new_session, delete_session_from_store, get_user_from_session, prepare_logout_response};
+pub use session::{
+    create_new_session, delete_session_from_store, get_user_from_session, prepare_logout_response,
+};
 pub use types::{SessionInfo, User}; // Required for session data
 
 /// Initialize the session library.

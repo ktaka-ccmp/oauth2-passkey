@@ -47,7 +47,6 @@ impl std::error::Error for AppError {
     }
 }
 
-
 #[derive(Debug)]
 pub enum SessionError {
     SessionError,
