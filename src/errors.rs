@@ -46,3 +46,9 @@ impl std::error::Error for AppError {
         Some(self.0.as_ref())
     }
 }
+
+
+#[derive(Debug)]
+pub enum SessionError {
+    SessionError,
+}
