@@ -10,7 +10,7 @@ use crate::types::TokenStoreType;
 // static OAUTH2_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 pub(crate) static OAUTH2_USERINFO_URL: &str = "https://www.googleapis.com/userinfo/v2/me";
 
-pub(crate) static OAUTH2_AUTH_URL: LazyLock<String> = LazyLock::new(|| {
+pub static OAUTH2_AUTH_URL: LazyLock<String> = LazyLock::new(|| {
     env::var("OAUTH2_AUTH_URL")
         .ok()
         .unwrap_or("https://accounts.google.com/o/oauth2/v2/auth".to_string())
@@ -49,7 +49,7 @@ pub(crate) static OAUTH2_QUERY_STRING: LazyLock<String> = LazyLock::new(|| {
 
 // "__Host-" prefix are added to make cookies "host-only".
 
-pub(crate) static OAUTH2_CSRF_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
+pub static OAUTH2_CSRF_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
     std::env::var("OAUTH2_CSRF_COOKIE_NAME")
         .ok()
         .unwrap_or("__Host-CsrfId".to_string())

@@ -11,6 +11,11 @@ mod types;
 pub use axum::router; // The main router function for nesting
 pub use config::OAUTH2_ROUTE_PREFIX; // Required for route configuration
 
+pub use common::header_set_cookie;
+pub use config::{OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME};
+pub use oauth2::{csrf_checks, get_idinfo_userinfo, prepare_oauth2_auth_request, validate_origin};
+pub use types::AuthResponse;
+
 /// Initialize the OAuth2 library.
 ///
 /// This function must be called before using the library. It:

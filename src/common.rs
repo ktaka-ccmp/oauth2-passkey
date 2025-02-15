@@ -13,7 +13,7 @@ pub(crate) fn gen_random_string(len: usize) -> Result<String, AppError> {
     Ok(URL_SAFE.encode(session_id))
 }
 
-pub(crate) fn header_set_cookie(
+pub fn header_set_cookie(
     headers: &mut HeaderMap,
     name: String,
     value: String,
