@@ -14,6 +14,7 @@ pub struct User {
     pub metadata: Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    // pub credentials: Vec<Credential>,
 }
 
 /// Type of user store to use
