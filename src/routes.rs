@@ -1,9 +1,4 @@
-use axum::{
-    extract::Json,
-    http::StatusCode,
-    routing::post,
-    Router,
-};
+use axum::{extract::Json, http::StatusCode, routing::post, Router};
 use libpasskey::{
     finish_registration, start_authentication, start_registration, verify_authentication,
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
@@ -21,9 +16,7 @@ pub fn router_auth() -> Router {
         .route("/finish", post(handle_finish_authentication))
 }
 
-async fn handle_start_registration(
-    Json(username): Json<String>,
-) -> Json<RegistrationOptions> {
+async fn handle_start_registration(Json(username): Json<String>) -> Json<RegistrationOptions> {
     Json(
         start_registration(username)
             .await
