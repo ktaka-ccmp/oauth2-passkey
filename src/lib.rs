@@ -17,9 +17,19 @@ pub use axum::router;
 pub use config::PASSKEY_ROUTE_PREFIX; // Required for route configuration
 
 pub use passkey::{
-    finish_registration, start_authentication, start_registration, verify_authentication,
-    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
+    // start_registration_with_auth_user,
+    create_registration_options,
+    finish_registration,
+    start_authentication,
+    start_registration,
+    verify_authentication,
+    AuthenticationOptions,
+    AuthenticatorResponse,
+    RegisterCredential,
+    RegistrationOptions,
 };
+
+pub use types::PublicKeyCredentialUserEntity;
 
 pub async fn init() -> Result<(), errors::PasskeyError> {
     // Validate required environment variables early

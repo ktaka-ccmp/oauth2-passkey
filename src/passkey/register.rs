@@ -25,8 +25,15 @@ pub async fn start_registration(username: String) -> Result<RegistrationOptions,
         display_name: username.clone(),
     };
 
-    let challenge = generate_challenge();
+    let options = create_registration_options(user_info).await?;
 
+    Ok(options)
+}
+
+pub async fn create_registration_options(
+    user_info: PublicKeyCredentialUserEntity,
+) -> Result<RegistrationOptions, PasskeyError> {
+    let challenge = generate_challenge();
     let stored_challenge = StoredChallenge {
         challenge: challenge.clone().unwrap_or_default(),
         user: user_info.clone(),
@@ -36,21 +43,17 @@ pub async fn start_registration(username: String) -> Result<RegistrationOptions,
             .as_secs(),
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
-
-    // Store the challenge
     let mut challenge_store = PASSKEY_CHALLENGE_STORE.lock().await;
     challenge_store
         .get_store_mut()
         .store_challenge(user_info.id.clone(), stored_challenge)
         .await?;
-
     let authenticator_selection = AuthenticatorSelection {
         authenticator_attachment: PASSKEY_AUTHENTICATOR_ATTACHMENT.to_string(),
         resident_key: PASSKEY_RESIDENT_KEY.to_string(),
         require_resident_key: *PASSKEY_REQUIRE_RESIDENT_KEY,
         user_verification: PASSKEY_USER_VERIFICATION.to_string(),
     };
-
     let options = RegistrationOptions {
         challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
         rp_id: PASSKEY_RP_ID.to_string(),
