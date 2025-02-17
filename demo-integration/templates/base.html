@@ -49,6 +49,12 @@
                     body: username ? JSON.stringify(username) : "{}"
                 });
 
+                if (!startResponse.ok) {
+                    const errorText = await startResponse.text();
+                    alert('Authentication failed: ' + errorText);
+                    return;
+                }
+
                 const options = await startResponse.json();
                 console.log('Raw Authentication options:', options);
 
@@ -97,6 +103,12 @@
                     body: JSON.stringify(authResponse)
                 });
 
+                if (!verifyResponse.ok) {
+                    const errorText = await verifyResponse.text();
+                    alert('Authentication failed: ' + errorText);
+                    return;
+                }
+
                 if (verifyResponse.ok) {
                     // authStatus.textContent = "Welcome back!";
                     verifyResponse.text().then(function(text) {
@@ -133,6 +145,12 @@
                     });
                 }
 
+                if (!startResponse.ok) {
+                    const errorText = await startResponse.text();
+                    alert('Registration failed: ' + errorText);
+                    return;
+                }
+
                 const options = await startResponse.json();
                 console.log('Registration options:', options);
 
@@ -166,6 +184,12 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(credentialResponse)
                 });
+
+                if (!finishResponse.ok) {
+                    const errorText = await finishResponse.text();
+                    alert('Registration failed: ' + errorText);
+                    return;
+                }
 
                 if (finishResponse.ok) {
                     location.reload(); // Refresh to show authenticated state

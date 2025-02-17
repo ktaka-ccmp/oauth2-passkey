@@ -23,16 +23,13 @@ pub(crate) async fn index() -> impl IntoResponse {
     (StatusCode::OK, Html(template.render().unwrap())).into_response()
 }
 
-pub(crate) async fn handle_start_registration_get(user: Option<User>) -> Json<RegistrationOptions> {
+pub(crate) async fn handle_start_registration_get(user: Option<User>) -> Result<Json<RegistrationOptions>, (StatusCode, String)> {
     match user {
-        None => {
-            panic!("Not logged in!");
-        }
-        Some(u) => Json(
-            start_registration(u.name.clone())
-                .await
-                .expect("Failed to start registration"),
-        ),
+        None => Err((StatusCode::BAD_REQUEST, "Not logged in!".to_string())),
+        Some(u) => start_registration(u.name.clone())
+            .await
+            .map(Json)
+            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string())),
     }
 }
 
@@ -42,6 +39,7 @@ pub(crate) async fn handle_start_registration(
     Json(
         start_registration(username)
             .await
+            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
             .expect("Failed to start registration"),
     )
 }
