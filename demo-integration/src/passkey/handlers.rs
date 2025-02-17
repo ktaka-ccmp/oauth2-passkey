@@ -1,6 +1,10 @@
 use askama::Template;
-use axum::{extract::Json, http::StatusCode, response::Html};
-use axum_core::response::IntoResponse;
+use axum::{
+    extract::Json,
+    http::{header::CONTENT_TYPE, StatusCode},
+    response::{Html, IntoResponse},
+};
+use axum_core::response::Response;
 
 use libpasskey::{
     finish_registration, start_authentication, start_registration, verify_authentication,
@@ -73,4 +77,13 @@ pub(crate) async fn handle_finish_authentication(
     verify_authentication(auth_response)
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+}
+
+pub(crate) async fn serve_passkey_js() -> Response {
+    let js_content = include_str!("../../static/passkey.js");
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, "application/javascript")
+        .body(js_content.to_string().into())
+        .unwrap()
 }

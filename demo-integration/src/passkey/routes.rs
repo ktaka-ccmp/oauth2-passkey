@@ -2,12 +2,13 @@ use axum::routing::{get, post, Router};
 
 use super::handlers::{
     handle_finish_authentication, handle_finish_registration, handle_start_authentication,
-    handle_start_registration, handle_start_registration_get, index,
+    handle_start_registration, handle_start_registration_get, index, serve_passkey_js,
 };
 
 pub fn router() -> Router {
     Router::new()
         .route("/", get(index))
+        .route("/passkey.js", get(serve_passkey_js))
         .nest("/auth", router_auth())
         .nest("/register", router_register())
 }
