@@ -8,3 +8,4 @@
 8. I want to make the visibility of the library and modules as minimal as possible
 9. When we need more visibility I want to re-export necessary items only
 10. I want the commit messages reflecting the changes actually made
+11. Avoid using unwrap() or expect() unless absolutely reasonable.
