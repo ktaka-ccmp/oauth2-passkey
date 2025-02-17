@@ -3,6 +3,8 @@ use ciborium::value::{Integer, Value as CborValue};
 use std::time::SystemTime;
 use uuid::Uuid;
 
+use libsession::User as SessionUser;
+
 use super::types::{
     AttestationObject, AuthenticatorSelection, PubKeyCredParam, RegisterCredential,
     RegistrationOptions, RelyingParty,
@@ -26,6 +28,25 @@ pub async fn start_registration(username: String) -> Result<RegistrationOptions,
     };
 
     let options = create_registration_options(user_info).await?;
+
+    Ok(options)
+}
+
+pub async fn start_registration_with_auth_user(
+    user: SessionUser,
+) -> Result<RegistrationOptions, String> {
+    let user_info = PublicKeyCredentialUserEntity {
+        id: user.id.clone(),
+        name: user.email.clone(),
+        display_name: user.name.clone(),
+    };
+
+    #[cfg(debug_assertions)]
+    println!("User info: {:#?}", user_info);
+
+    let options = create_registration_options(user_info)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(options)
 }

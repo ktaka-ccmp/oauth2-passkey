@@ -8,9 +8,4 @@ pub use types::{
 };
 
 pub use auth::{start_authentication, verify_authentication};
-pub use register::{
-    // start_registration_with_auth_user,
-    create_registration_options,
-    finish_registration,
-    start_registration,
-};
+pub use register::{finish_registration, start_registration, start_registration_with_auth_user};

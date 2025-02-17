@@ -1,11 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub struct PublicKeyCredentialUserEntity {
-    pub id: String,
-    pub name: String,
+pub(super) struct PublicKeyCredentialUserEntity {
+    pub(super) id: String,
+    pub(super) name: String,
     #[serde(rename = "displayName")]
-    pub display_name: String,
+    pub(super) display_name: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
