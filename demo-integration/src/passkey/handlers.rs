@@ -6,12 +6,22 @@ use axum::{
 };
 
 use libpasskey::{
-    finish_registration, start_authentication, start_registration, verify_authentication,
-    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
+    // start_registration_with_auth_user,
+    create_registration_options,
+    finish_registration,
+    start_authentication,
+    start_registration,
+    verify_authentication,
+    AuthenticationOptions,
+    AuthenticatorResponse,
+    PublicKeyCredentialUserEntity,
+    RegisterCredential,
+    RegistrationOptions,
 };
 
-use crate::session::AuthUser as User;
+use crate::session::AuthUser;
 use libpasskey::PASSKEY_ROUTE_PREFIX;
+use libsession::User as SessionUser;
 
 #[derive(Template)]
 #[template(path = "index.j2")]
@@ -27,15 +37,37 @@ pub(crate) async fn index() -> impl IntoResponse {
 }
 
 pub(crate) async fn handle_start_registration_get(
-    user: Option<User>,
+    user: Option<AuthUser>,
 ) -> Result<Json<RegistrationOptions>, (StatusCode, String)> {
     match user {
         None => Err((StatusCode::BAD_REQUEST, "Not logged in!".to_string())),
-        Some(u) => start_registration(u.name.clone())
-            .await
-            .map(Json)
-            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string())),
+        Some(u) => {
+            #[cfg(debug_assertions)]
+            println!("User: {:#?}", u);
+
+            let options = start_registration_with_auth_user(u)
+                .await
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+            Ok(Json(options))
+        }
     }
+}
+
+async fn start_registration_with_auth_user(user: AuthUser) -> Result<RegistrationOptions, String> {
+    let user_info = PublicKeyCredentialUserEntity {
+        id: user.id.clone(),
+        name: user.email.clone(),
+        display_name: user.name.clone(),
+    };
+
+    #[cfg(debug_assertions)]
+    println!("User info: {:#?}", user_info);
+
+    let options = create_registration_options(user_info)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(options)
 }
 
 pub(crate) async fn handle_start_registration(
@@ -52,6 +84,8 @@ pub(crate) async fn handle_start_registration(
 pub(crate) async fn handle_finish_registration(
     Json(reg_data): Json<RegisterCredential>,
 ) -> Result<String, (StatusCode, String)> {
+    #[cfg(debug_assertions)]
+    println!("Registration data: {:#?}", reg_data);
     finish_registration(reg_data)
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))

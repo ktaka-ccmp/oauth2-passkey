@@ -25,7 +25,7 @@ impl From<SessionError> for AuthRedirect {
 }
 
 /// A local wrapper around libsession::User to allow implementing foreign traits
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AuthUser(User);
 
 impl std::ops::Deref for AuthUser {
