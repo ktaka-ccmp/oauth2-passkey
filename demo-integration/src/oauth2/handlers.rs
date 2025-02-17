@@ -1,13 +1,14 @@
 use askama::Template;
 use axum::{
     extract::{Form, Query},
-    http::{HeaderMap, StatusCode},
-    response::{Html, Redirect},
+    http::{header::CONTENT_TYPE, HeaderMap, StatusCode},
+    response::{Html, Redirect, Response},
     routing::get,
     Router,
 };
 use axum_extra::{headers, TypedHeader};
 use chrono::{Duration, Utc};
+// use axum_core::response::Response;
 
 // Helper trait for converting errors to a standard response error format
 trait IntoResponseError<T> {
@@ -32,8 +33,8 @@ use libsession::{
 
 pub fn router() -> Router {
     Router::new()
+        .route("/oauth2.js", get(serve_oauth2_js))
         .route("/google", get(google_auth))
-        .route("/oauth2.js", get(oauth2_js))
         .route("/authorized", get(get_authorized).post(post_authorized))
         .route("/popup_close", get(popup_close))
         .route("/logout", get(logout))
@@ -43,30 +44,19 @@ pub fn router() -> Router {
 #[template(path = "popup_close.j2")]
 struct PopupCloseTemplate;
 
-#[derive(Template)]
-#[template(path = "oauth2_js.j2")]
-struct OAuth2JsTemplate<'a> {
-    auth_route_prefix: &'a str,
-}
-
 pub(crate) async fn popup_close() -> Result<Html<String>, (StatusCode, String)> {
     let template = PopupCloseTemplate;
     let html = Html(template.render().into_response_error()?);
     Ok(html)
 }
 
-pub(crate) async fn oauth2_js() -> Result<(HeaderMap, String), (StatusCode, String)> {
-    let template = OAuth2JsTemplate {
-        auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
-    };
-
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        http::header::CONTENT_TYPE,
-        "application/javascript".parse().unwrap(),
-    );
-
-    Ok((headers, template.render().into_response_error()?))
+pub(crate) async fn serve_oauth2_js() -> Result<Response, (StatusCode, String)> {
+    let js_content = include_str!("../../static/oauth2.js");
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, "application/javascript")
+        .body(js_content.to_string().into())
+        .into_response_error()
 }
 
 pub(crate) async fn google_auth(

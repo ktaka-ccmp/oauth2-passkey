@@ -2,9 +2,8 @@ use askama::Template;
 use axum::{
     extract::Json,
     http::{header::CONTENT_TYPE, StatusCode},
-    response::{Html, IntoResponse},
+    response::{Html, IntoResponse, Response},
 };
-use axum_core::response::Response;
 
 use libpasskey::{
     finish_registration, start_authentication, start_registration, verify_authentication,
@@ -15,7 +14,7 @@ use crate::session::AuthUser as User;
 use libpasskey::PASSKEY_ROUTE_PREFIX;
 
 #[derive(Template)]
-#[template(path = "index.html")]
+#[template(path = "index.j2")]
 struct IndexTemplate {
     passkey_route_prefix: &'static str,
 }
@@ -27,7 +26,9 @@ pub(crate) async fn index() -> impl IntoResponse {
     (StatusCode::OK, Html(template.render().unwrap())).into_response()
 }
 
-pub(crate) async fn handle_start_registration_get(user: Option<User>) -> Result<Json<RegistrationOptions>, (StatusCode, String)> {
+pub(crate) async fn handle_start_registration_get(
+    user: Option<User>,
+) -> Result<Json<RegistrationOptions>, (StatusCode, String)> {
     match user {
         None => Err((StatusCode::BAD_REQUEST, "Not logged in!".to_string())),
         Some(u) => start_registration(u.name.clone())

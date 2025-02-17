@@ -4,7 +4,7 @@ function initOAuth2Popup() {
 
     function openPopup() {
         popupWindow = window.open(
-            `{{auth_route_prefix}}/google`,
+            `${AUTH_ROUTE_PREFIX}/google`,
             "PopupWindow",
             "width=400,height=520,left=1000,top=200,resizable=yes,scrollbars=yes"
         );
@@ -38,7 +38,7 @@ function initOAuth2Popup() {
         if (popupWindow) {
             try {
                 if (!popupWindow.closed) {
-                    {# popupWindow.close(); #}
+                    // popupWindow.close();
                 }
             } catch (e) {
                 // Handle COOP error silently
