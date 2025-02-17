@@ -6,17 +6,9 @@ use axum::{
 };
 
 use libpasskey::{
-    // start_registration_with_auth_user,
-    create_registration_options,
-    finish_registration,
-    start_authentication,
-    start_registration,
-    verify_authentication,
-    AuthenticationOptions,
-    AuthenticatorResponse,
-    PublicKeyCredentialUserEntity,
-    RegisterCredential,
-    RegistrationOptions,
+    finish_registration, start_authentication, start_registration,
+    start_registration_with_auth_user, verify_authentication, AuthenticationOptions,
+    AuthenticatorResponse, RegisterCredential, RegistrationOptions,
 };
 
 use crate::session::AuthUser;
@@ -45,29 +37,13 @@ pub(crate) async fn handle_start_registration_get(
             #[cfg(debug_assertions)]
             println!("User: {:#?}", u);
 
-            let options = start_registration_with_auth_user(u)
+            let session_user: SessionUser = (*u).clone();
+            let options = start_registration_with_auth_user(session_user)
                 .await
                 .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
             Ok(Json(options))
         }
     }
-}
-
-async fn start_registration_with_auth_user(user: AuthUser) -> Result<RegistrationOptions, String> {
-    let user_info = PublicKeyCredentialUserEntity {
-        id: user.id.clone(),
-        name: user.email.clone(),
-        display_name: user.name.clone(),
-    };
-
-    #[cfg(debug_assertions)]
-    println!("User info: {:#?}", user_info);
-
-    let options = create_registration_options(user_info)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    Ok(options)
 }
 
 pub(crate) async fn handle_start_registration(
