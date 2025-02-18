@@ -27,7 +27,7 @@ async fn handle_start_registration(Json(username): Json<String>) -> Json<Registr
 async fn handle_finish_registration(
     Json(reg_data): Json<RegisterCredential>,
 ) -> Result<String, (StatusCode, String)> {
-    finish_registration(reg_data)
+    finish_registration(&reg_data)
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
