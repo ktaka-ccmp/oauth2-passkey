@@ -1,7 +1,6 @@
 use base64::engine::{general_purpose::URL_SAFE, Engine};
 use ring::{digest, signature::UnparsedPublicKey};
 use std::time::SystemTime;
-use uuid::Uuid;
 
 use super::types::{
     AllowCredential, AuthenticationOptions, AuthenticatorData, AuthenticatorResponse,
@@ -10,30 +9,74 @@ use super::types::{
 
 use crate::common::{base64url_decode, generate_challenge};
 use crate::config::{
-    ORIGIN, PASSKEY_CHALLENGE_STORE, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_CREDENTIAL_STORE,
-    PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
+    ORIGIN, PASSKEY_CACHE_STORE, PASSKEY_CHALLENGE_STORE, PASSKEY_CHALLENGE_TIMEOUT,
+    PASSKEY_CREDENTIAL_STORE, PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
 };
 use crate::errors::PasskeyError;
-use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge};
+use crate::types::{
+    CacheData, PublicKeyCredentialUserEntity, StoredChallenge, UserIdCredentialIdStr,
+};
 
 pub async fn start_authentication(
     username: Option<String>,
 ) -> Result<AuthenticationOptions, PasskeyError> {
     let mut allow_credentials = Vec::new();
-    match username {
+    match username.clone() {
         Some(username) => {
-            let credential_store = PASSKEY_CREDENTIAL_STORE.lock().await;
-            let credentials = credential_store
+            let user_id = PASSKEY_CACHE_STORE
+                .lock()
+                .await
                 .get_store()
-                .get_credentials_by_username(&username)
-                .await?;
+                .get(&username)
+                .await?
+                .ok_or(PasskeyError::Storage("User not found".into()))?;
+            let user_id = match user_id {
+                CacheData::EmailUserId(id) => Ok(id.user_id),
+                _ => Err(PasskeyError::Format("Invalid user type".to_string())),
+            };
+            let user_id = user_id?;
 
-            for credential in credentials {
+            let credential_id_strs: Vec<UserIdCredentialIdStr> = PASSKEY_CACHE_STORE
+                .lock()
+                .await
+                .get_store()
+                .gets(&user_id)
+                .await?
+                .into_iter()
+                .filter_map(|data| {
+                    if let CacheData::UserIdCredentialIdStr(id_str) = data {
+                        Some(id_str)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            for credential in credential_id_strs {
                 allow_credentials.push(AllowCredential {
                     type_: "public-key".to_string(),
                     id: credential.credential_id,
                 });
             }
+
+            // let user = get_user_from_email(&username)
+            //     .await
+            //     .map_err(|_| PasskeyError::Storage("User not found".to_string()))?;
+            // #[cfg(debug_assertions)]
+            // println!("User: {:?}", user);
+
+            // let credential_store = PASSKEY_CREDENTIAL_STORE.lock().await;
+            // let credentials = credential_store
+            //     .get_store()
+            //     .get_credentials_by_username(&username)
+            //     .await?;
+
+            // for credential in credentials {
+            //     allow_credentials.push(AllowCredential {
+            //         type_: "public-key".to_string(),
+            //         id: credential.credential_id,
+            //     });
+            // }
         }
         None => {
             // allow_credentials = vec![];
@@ -41,12 +84,12 @@ pub async fn start_authentication(
     }
 
     let challenge = generate_challenge();
-    let auth_id = Uuid::new_v4().to_string();
+    let auth_id = crate::common::gen_random_string(16)?;
 
     let stored_challenge = StoredChallenge {
         challenge: challenge.clone().unwrap_or_default(),
         user: PublicKeyCredentialUserEntity {
-            id: auth_id.clone(),
+            id_handle: auth_id.clone(),
             name: "temp".to_string(),
             display_name: "temp".to_string(),
         },
@@ -171,7 +214,7 @@ pub async fn verify_authentication(
 
     let display_name = credential.user.display_name.as_str().to_owned();
 
-    if credential.user.id != user_handle {
+    if credential.user.id_handle != user_handle {
         return Err(PasskeyError::Authentication("User handle mismatch".into()));
     }
 

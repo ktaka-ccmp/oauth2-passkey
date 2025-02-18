@@ -1,15 +1,16 @@
-use crate::errors::PasskeyError;
-use crate::types::{StoredChallenge, StoredCredential};
 use async_trait::async_trait;
 use std::env;
 
+use crate::errors::PasskeyError;
+use crate::types::{CacheData, StoredChallenge, StoredCredential};
+
 use crate::storage::types::{
-    InMemoryChallengeStore, InMemoryCredentialStore, PostgresChallengeStore,
-    PostgresCredentialStore, RedisChallengeStore, RedisCredentialStore, SqliteChallengeStore,
-    SqliteCredentialStore,
+    InMemoryCacheStore, InMemoryChallengeStore, InMemoryCredentialStore, PostgresChallengeStore,
+    PostgresCredentialStore, RedisCacheStore, RedisChallengeStore, RedisCredentialStore,
+    SqliteChallengeStore, SqliteCredentialStore,
 };
 
-use super::types::{ChallengeStoreType, CredentialStoreType};
+use super::types::{CacheStoreType, ChallengeStoreType, CredentialStoreType};
 
 impl ChallengeStoreType {
     pub fn from_env() -> Result<Self, PasskeyError> {
@@ -160,4 +161,54 @@ pub(crate) trait CredentialStore: Send + Sync + 'static {
     ) -> Result<(), PasskeyError>;
 
     async fn get_all_credentials(&self) -> Result<Vec<StoredCredential>, PasskeyError>;
+}
+
+impl CacheStoreType {
+    pub fn from_env() -> Result<Self, PasskeyError> {
+        dotenv::dotenv().ok();
+
+        let store_type = env::var("PASSKEY_CACHE_STORE")
+            .unwrap_or_else(|_| "memory".to_string())
+            .to_lowercase();
+
+        match store_type.as_str() {
+            "memory" => Ok(CacheStoreType::Memory),
+            "redis" => {
+                let url = env::var("PASSKEY_CACHE_REDIS_URL").map_err(|_| {
+                    PasskeyError::Storage("PASSKEY_CACHE_REDIS_URL not set".to_string())
+                })?;
+                Ok(CacheStoreType::Redis { url })
+            }
+            _ => Err(PasskeyError::Storage(format!(
+                "Unknown cache store type: {}",
+                store_type
+            ))),
+        }
+    }
+
+    pub(crate) async fn create_store(&self) -> Result<Box<dyn CacheStore>, PasskeyError> {
+        let store: Box<dyn CacheStore> = match self {
+            CacheStoreType::Memory => Box::new(InMemoryCacheStore::new()),
+            CacheStoreType::Redis { url } => Box::new(RedisCacheStore::connect(url).await?),
+        };
+        store.init().await?;
+        Ok(store)
+    }
+}
+
+#[async_trait]
+pub(crate) trait CacheStore: Send + Sync + 'static {
+    /// Initialize the store. This is called when the store is created.
+    async fn init(&self) -> Result<(), PasskeyError>;
+    /// Put a token into the store.
+    async fn put(&mut self, key: &str, value: CacheData) -> Result<(), PasskeyError>;
+
+    /// Get a token from the store.
+    async fn get(&self, key: &str) -> Result<Option<CacheData>, PasskeyError>;
+
+    /// Get a token from the store.
+    async fn gets(&self, key: &str) -> Result<Vec<CacheData>, PasskeyError>;
+
+    /// Remove a token from the store.
+    async fn remove(&mut self, key: &str) -> Result<(), PasskeyError>;
 }

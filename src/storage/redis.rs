@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use redis::{self, AsyncCommands};
 
-use super::traits::{ChallengeStore, CredentialStore};
-use super::types::{RedisChallengeStore, RedisCredentialStore};
+use super::traits::{CacheStore, ChallengeStore, CredentialStore};
+use super::types::{RedisCacheStore, RedisChallengeStore, RedisCredentialStore};
 
 use crate::errors::PasskeyError;
-use crate::types::{StoredChallenge, StoredCredential};
+use crate::types::{CacheData, StoredChallenge, StoredCredential};
 
 const CHALLENGE_PREFIX: &str = "challenge:";
 const CREDENTIAL_PREFIX: &str = "credential:";
@@ -237,5 +237,75 @@ impl CredentialStore for RedisCredentialStore {
         }
 
         Ok(credentials)
+    }
+}
+
+const CACHE_PREFIX: &str = "cache:";
+
+impl RedisCacheStore {
+    pub(crate) async fn connect(url: &str) -> Result<Self, PasskeyError> {
+        println!("Connecting to Redis at {} for tokens", url);
+        let client = redis::Client::open(url).map_err(|e| PasskeyError::Storage(e.to_string()))?;
+        Ok(Self { client })
+    }
+}
+
+#[async_trait]
+impl CacheStore for RedisCacheStore {
+    async fn init(&self) -> Result<(), PasskeyError> {
+        // Verify the connection works
+        let _conn = self.client.get_multiplexed_async_connection().await?;
+        Ok(())
+    }
+
+    async fn put(&mut self, key: &str, value: CacheData) -> Result<(), PasskeyError> {
+        let mut conn = self.client.get_multiplexed_async_connection().await?;
+
+        let key = format!("{}{}", CACHE_PREFIX, key);
+        let value = serde_json::to_string(&value)?;
+        let _: () = conn.set(&key, value).await?;
+        // let ttl = 600; // 10 minute for testing
+        // let _: () = conn.expire(&key, ttl).await?;
+        // let _: () = conn.set_ex(&key, value, ttl).await?;
+
+        Ok(())
+    }
+
+    async fn get(&self, key: &str) -> Result<Option<CacheData>, PasskeyError> {
+        let mut conn = self.client.get_multiplexed_async_connection().await?;
+
+        let key = format!("{}{}", CACHE_PREFIX, key);
+        let value: Option<String> = conn.get(&key).await?;
+
+        match value {
+            Some(v) => Ok(Some(serde_json::from_str(&v)?)),
+            None => Ok(None),
+        }
+    }
+
+    async fn gets(&self, key: &str) -> Result<Vec<CacheData>, PasskeyError> {
+        let mut conn = self.client.get_multiplexed_async_connection().await?;
+
+        let key = format!("{}{}", CACHE_PREFIX, key);
+        let keys: Vec<String> = conn.keys(&key).await?;
+
+        let mut results = Vec::new();
+        for key in keys {
+            let value: Option<String> = conn.get(&key).await?;
+
+            if let Some(v) = value {
+                let data: CacheData = serde_json::from_str(&v)?;
+                results.push(data);
+            }
+        }
+        Ok(results)
+    }
+
+    async fn remove(&mut self, key: &str) -> Result<(), PasskeyError> {
+        let mut conn = self.client.get_multiplexed_async_connection().await?;
+
+        let key = format!("{}{}", CACHE_PREFIX, key);
+        let _: () = conn.del(&key).await?;
+        Ok(())
     }
 }

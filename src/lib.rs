@@ -17,9 +17,9 @@ pub use axum::router;
 pub use config::PASSKEY_ROUTE_PREFIX; // Required for route configuration
 
 pub use passkey::{
-    finish_registration, start_authentication, start_registration,
-    start_registration_with_auth_user, verify_authentication, AuthenticationOptions,
-    AuthenticatorResponse, RegisterCredential, RegistrationOptions,
+    finish_registration, finish_registration_with_auth_user, start_authentication,
+    start_registration, start_registration_with_auth_user, verify_authentication,
+    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
 };
 
 pub async fn init() -> Result<(), errors::PasskeyError> {
@@ -28,5 +28,6 @@ pub async fn init() -> Result<(), errors::PasskeyError> {
 
     config::init_challenge_store().await?;
     config::init_credential_store().await?;
+    config::init_cache_store().await?;
     Ok(())
 }

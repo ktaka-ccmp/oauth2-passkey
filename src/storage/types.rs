@@ -1,4 +1,4 @@
-use crate::types::{StoredChallenge, StoredCredential};
+use crate::types::{CacheData, StoredChallenge, StoredCredential};
 use sqlx::{Pool, Postgres, Sqlite};
 use std::collections::HashMap;
 
@@ -48,4 +48,18 @@ pub(crate) struct SqliteChallengeStore {
 
 pub(crate) struct SqliteCredentialStore {
     pub(super) pool: Pool<Sqlite>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum CacheStoreType {
+    Memory,
+    Redis { url: String },
+}
+
+pub(crate) struct InMemoryCacheStore {
+    pub(super) entry: HashMap<String, CacheData>,
+}
+
+pub(crate) struct RedisCacheStore {
+    pub(super) client: redis::Client,
 }

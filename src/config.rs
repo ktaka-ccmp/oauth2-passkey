@@ -3,8 +3,8 @@ use tokio::sync::Mutex;
 
 use crate::errors::PasskeyError;
 use crate::storage::{
-    ChallengeStore, ChallengeStoreType, CredentialStore, CredentialStoreType,
-    InMemoryChallengeStore, InMemoryCredentialStore,
+    CacheStore, CacheStoreType, ChallengeStore, ChallengeStoreType, CredentialStore,
+    CredentialStoreType, InMemoryCacheStore, InMemoryChallengeStore, InMemoryCredentialStore,
 };
 
 pub(crate) struct SingletonChallengeStore {
@@ -113,6 +113,59 @@ pub(crate) async fn init_credential_store() -> Result<(), PasskeyError> {
     PASSKEY_CREDENTIAL_STORE.lock().await.set_store(store)?;
     tracing::info!("Token store initialized successfully");
     Ok(())
+}
+
+pub(crate) static PASSKEY_CACHE_STORE: LazyLock<Mutex<SingletonCacheStore>> = LazyLock::new(|| {
+    Mutex::new(SingletonCacheStore::new(
+        Box::new(InMemoryCacheStore::new()),
+    ))
+});
+
+pub(crate) async fn init_cache_store() -> Result<(), PasskeyError> {
+    let store_type = CacheStoreType::from_env().unwrap_or_else(|e| {
+        eprintln!("Failed to initialize token store from environment: {}", e);
+        eprintln!("Falling back to in-memory store");
+        CacheStoreType::Memory
+    });
+
+    tracing::info!("Initializing cache store with type: {:?}", store_type);
+    let store = store_type.create_store().await?;
+    PASSKEY_CACHE_STORE.lock().await.set_store(store)?;
+    tracing::info!("Cache store initialized successfully");
+    Ok(())
+}
+
+pub(crate) struct SingletonCacheStore {
+    store: Box<dyn CacheStore>,
+    initialized: bool,
+}
+
+impl SingletonCacheStore {
+    fn new(store: Box<dyn CacheStore>) -> Self {
+        Self {
+            store,
+            initialized: false,
+        }
+    }
+
+    fn set_store(&mut self, new_store: Box<dyn CacheStore>) -> Result<(), PasskeyError> {
+        if self.initialized {
+            return Err(PasskeyError::Storage(
+                "Cache store has already been initialized".to_string(),
+            ));
+        }
+        self.store = new_store;
+        self.initialized = true;
+        Ok(())
+    }
+
+    pub(crate) fn get_store(&self) -> &dyn CacheStore {
+        &*self.store
+    }
+
+    pub(crate) fn get_store_mut(&mut self) -> &mut Box<dyn CacheStore> {
+        &mut self.store
+    }
 }
 
 pub static PASSKEY_ROUTE_PREFIX: LazyLock<String> = LazyLock::new(|| {

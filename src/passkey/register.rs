@@ -1,7 +1,6 @@
 use base64::engine::{general_purpose::URL_SAFE, Engine};
 use ciborium::value::{Integer, Value as CborValue};
 use std::time::SystemTime;
-use uuid::Uuid;
 
 use libsession::User as SessionUser;
 
@@ -11,18 +10,21 @@ use super::types::{
 };
 use crate::common::{base64url_decode, generate_challenge};
 use crate::config::{
-    ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_STORE, PASSKEY_CHALLENGE_TIMEOUT,
-    PASSKEY_CREDENTIAL_STORE, PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID,
-    PASSKEY_RP_NAME, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
+    ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CACHE_STORE, PASSKEY_CHALLENGE_STORE,
+    PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_CREDENTIAL_STORE, PASSKEY_REQUIRE_RESIDENT_KEY,
+    PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID, PASSKEY_RP_NAME, PASSKEY_TIMEOUT,
+    PASSKEY_USER_VERIFICATION,
 };
 use crate::errors::PasskeyError;
-use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
+use crate::types::{
+    CacheData, EmailUserId, PublicKeyCredentialUserEntity, SessionInfo, StoredChallenge,
+    StoredCredential, UserIdCredentialIdStr,
+};
 
 pub async fn start_registration(username: String) -> Result<RegistrationOptions, PasskeyError> {
     println!("start_registration user: {}", username);
 
-    let user_info = PublicKeyCredentialUserEntity {
-        id: Uuid::new_v4().to_string(),
+    let user_info = PublicKeyCredentialUserEntity {        id_handle: crate::common::gen_random_string(16)?,
         name: username.clone(),
         display_name: username.clone(),
     };
@@ -34,19 +36,26 @@ pub async fn start_registration(username: String) -> Result<RegistrationOptions,
 
 pub async fn start_registration_with_auth_user(
     user: SessionUser,
-) -> Result<RegistrationOptions, String> {
+) -> Result<RegistrationOptions, PasskeyError> {
     let user_info = PublicKeyCredentialUserEntity {
-        id: user.id.clone(),
+        id_handle: crate::common::gen_random_string(16)?,
         name: user.email.clone(),
         display_name: user.name.clone(),
     };
 
+    let session_info = CacheData::SessionInfo(SessionInfo { user });
+
+    PASSKEY_CACHE_STORE
+        .lock()
+        .await
+        .get_store_mut()
+        .put(&user_info.id_handle, session_info)
+        .await?;
+
     #[cfg(debug_assertions)]
     println!("User info: {:#?}", user_info);
 
-    let options = create_registration_options(user_info)
-        .await
-        .map_err(|e| e.to_string())?;
+    let options = create_registration_options(user_info).await?;
 
     Ok(options)
 }
@@ -64,17 +73,21 @@ pub async fn create_registration_options(
             .as_secs(),
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
-    let mut challenge_store = PASSKEY_CHALLENGE_STORE.lock().await;
-    challenge_store
+
+    PASSKEY_CHALLENGE_STORE
+        .lock()
+        .await
         .get_store_mut()
-        .store_challenge(user_info.id.clone(), stored_challenge)
+        .store_challenge(user_info.id_handle.clone(), stored_challenge)
         .await?;
+
     let authenticator_selection = AuthenticatorSelection {
         authenticator_attachment: PASSKEY_AUTHENTICATOR_ATTACHMENT.to_string(),
         resident_key: PASSKEY_RESIDENT_KEY.to_string(),
         require_resident_key: *PASSKEY_REQUIRE_RESIDENT_KEY,
         user_verification: PASSKEY_USER_VERIFICATION.to_string(),
     };
+
     let options = RegistrationOptions {
         challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
         rp_id: PASSKEY_RP_ID.to_string(),
@@ -104,12 +117,84 @@ pub async fn create_registration_options(
     Ok(options)
 }
 
-pub async fn finish_registration(reg_data: RegisterCredential) -> Result<String, PasskeyError> {
+pub async fn finish_registration_with_auth_user(
+    user: SessionUser,
+    reg_data: RegisterCredential,
+) -> Result<String, PasskeyError> {
+
+    let user_handle = reg_data
+        .user_handle
+        .as_deref()
+        .ok_or(PasskeyError::ClientData(
+            "User handle is missing".to_string(),
+        ))?;
+
+    let session_info = match PASSKEY_CACHE_STORE
+        .lock()
+        .await
+        .get_store_mut()
+        .get(user_handle)
+        .await?
+    {
+        Some(CacheData::SessionInfo(info)) => Ok(info),
+        _ => Err(PasskeyError::Format("Invalid session type".to_string())),
+    }?;
+
+    // Delete the session info from the store
+    PASSKEY_CACHE_STORE
+        .lock()
+        .await
+        .get_store_mut()
+        .remove(user_handle)
+        .await?;
+
+    // Verify the user is the same as the one used to start the registration
+    if user.id != session_info.user.id {
+        return Err(PasskeyError::Format("User ID mismatch".to_string()));
+    }
+
+    finish_registration(&reg_data).await?;
+
+    // Store email vs credential ID etc. in CacheStore
+    PASSKEY_CACHE_STORE
+        .lock()
+        .await
+        .get_store_mut()
+        .put(
+            &user.email.clone(),
+            CacheData::EmailUserId(EmailUserId {
+                email: user.email,
+                user_id: user.id.clone(),
+            }),
+        )
+        .await?;
+
+    let credential_id = base64url_decode(&reg_data.raw_id)
+        .map_err(|e| PasskeyError::Format(format!("Failed to decode credential ID: {}", e)))?;
+
+    PASSKEY_CACHE_STORE
+        .lock()
+        .await
+        .get_store_mut()
+        .put(
+            &user.id.clone(),
+            CacheData::UserIdCredentialIdStr(UserIdCredentialIdStr {
+                user_id: user.id,
+                credential_id_str: reg_data.raw_id,
+                credential_id,
+            }),
+        )
+        .await?;
+
+    Ok("Registration successful".to_string())
+}
+
+pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String, PasskeyError> {
     println!("finish_registration user: {:?}", reg_data);
 
-    verify_client_data(&reg_data).await?;
+    verify_client_data(reg_data).await?;
 
-    let public_key = extract_credential_public_key(&reg_data)?;
+    let public_key = extract_credential_public_key(reg_data)?;
 
     // Decode and store credential
     let credential_id = base64url_decode(&reg_data.raw_id)

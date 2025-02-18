@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use super::traits::{ChallengeStore, CredentialStore};
-use super::types::{InMemoryChallengeStore, InMemoryCredentialStore};
+use super::traits::{CacheStore, ChallengeStore, CredentialStore};
+use super::types::{InMemoryCacheStore, InMemoryChallengeStore, InMemoryCredentialStore};
 
 use crate::errors::PasskeyError;
-use crate::types::{StoredChallenge, StoredCredential};
+use crate::types::{CacheData, StoredChallenge, StoredCredential};
 
 impl InMemoryChallengeStore {
     pub(crate) fn new() -> Self {
@@ -21,6 +21,15 @@ impl InMemoryCredentialStore {
         println!("Creating new in-memory credential store");
         Self {
             credentials: HashMap::new(),
+        }
+    }
+}
+
+impl InMemoryCacheStore {
+    pub(crate) fn new() -> Self {
+        println!("Creating new in-memory cache store");
+        Self {
+            entry: HashMap::new(),
         }
     }
 }
@@ -102,5 +111,35 @@ impl CredentialStore for InMemoryCredentialStore {
 
     async fn get_all_credentials(&self) -> Result<Vec<StoredCredential>, PasskeyError> {
         Ok(self.credentials.values().cloned().collect())
+    }
+}
+
+#[async_trait]
+impl CacheStore for InMemoryCacheStore {
+    async fn init(&self) -> Result<(), PasskeyError> {
+        Ok(()) // Nothing to initialize for in-memory store
+    }
+
+    async fn put(&mut self, key: &str, value: CacheData) -> Result<(), PasskeyError> {
+        self.entry.insert(key.to_owned(), value);
+        Ok(())
+    }
+
+    async fn get(&self, key: &str) -> Result<Option<CacheData>, PasskeyError> {
+        Ok(self.entry.get(key).cloned())
+    }
+
+    async fn gets(&self, key: &str) -> Result<Vec<CacheData>, PasskeyError> {
+        let matching_entries = self
+            .entry
+            .iter()
+            .filter_map(|(k, v)| if k == key { Some(v.clone()) } else { None })
+            .collect();
+        Ok(matching_entries)
+    }
+
+    async fn remove(&mut self, key: &str) -> Result<(), PasskeyError> {
+        self.entry.remove(key);
+        Ok(())
     }
 }

@@ -17,6 +17,9 @@ pub enum PasskeyError {
     #[error("Storage error: {0}")]
     Storage(String),
 
+    #[error("Json conversion(Serde) error: {0}")]
+    Serde(String),
+
     #[error("Invalid client data: {0}")]
     ClientData(String),
 
@@ -37,4 +40,16 @@ pub enum PasskeyError {
 
     #[error("{0}")]
     Other(String),
+}
+
+impl From<redis::RedisError> for PasskeyError {
+    fn from(err: redis::RedisError) -> Self {
+        Self::Storage(err.to_string()) // Adjust this based on how you want to represent the error
+    }
+}
+
+impl From<serde_json::Error> for PasskeyError {
+    fn from(err: serde_json::Error) -> Self {
+        Self::Serde(err.to_string())
+    }
 }
