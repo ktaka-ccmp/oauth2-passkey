@@ -24,7 +24,8 @@ use crate::types::{
 pub async fn start_registration(username: String) -> Result<RegistrationOptions, PasskeyError> {
     println!("start_registration user: {}", username);
 
-    let user_info = PublicKeyCredentialUserEntity {        id_handle: crate::common::gen_random_string(16)?,
+    let user_info = PublicKeyCredentialUserEntity {
+        id_handle: crate::common::gen_random_string(16)?,
         name: username.clone(),
         display_name: username.clone(),
     };
@@ -121,7 +122,6 @@ pub async fn finish_registration_with_auth_user(
     user: SessionUser,
     reg_data: RegisterCredential,
 ) -> Result<String, PasskeyError> {
-
     let user_handle = reg_data
         .user_handle
         .as_deref()

@@ -7,7 +7,7 @@ use super::types::{
     ParsedClientData,
 };
 
-use crate::common::{base64url_decode, generate_challenge};
+use crate::common::{base64url_decode, email_to_user_id, generate_challenge};
 use crate::config::{
     ORIGIN, PASSKEY_CACHE_STORE, PASSKEY_CHALLENGE_STORE, PASSKEY_CHALLENGE_TIMEOUT,
     PASSKEY_CREDENTIAL_STORE, PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
@@ -23,18 +23,7 @@ pub async fn start_authentication(
     let mut allow_credentials = Vec::new();
     match username.clone() {
         Some(username) => {
-            let user_id = PASSKEY_CACHE_STORE
-                .lock()
-                .await
-                .get_store()
-                .get(&username)
-                .await?
-                .ok_or(PasskeyError::Storage("User not found".into()))?;
-            let user_id = match user_id {
-                CacheData::EmailUserId(id) => Ok(id.user_id),
-                _ => Err(PasskeyError::Format("Invalid user type".to_string())),
-            };
-            let user_id = user_id?;
+            let user_id = email_to_user_id(username).await?;
 
             let credential_id_strs: Vec<UserIdCredentialIdStr> = PASSKEY_CACHE_STORE
                 .lock()
@@ -212,7 +201,8 @@ pub async fn verify_authentication(
     #[cfg(debug_assertions)]
     println!("user_handle received from client: {:?}", &user_handle);
 
-    let display_name = credential.user.display_name.as_str().to_owned();
+    // let display_name = credential.user.display_name.as_str().to_owned();
+    let name = credential.user.name.as_str().to_owned();
 
     if credential.user.id_handle != user_handle {
         return Err(PasskeyError::Authentication("User handle mismatch".into()));
@@ -249,7 +239,7 @@ pub async fn verify_authentication(
                 .get_store_mut()
                 .remove_challenge(&auth_response.auth_id)
                 .await?;
-            Ok(display_name)
+            Ok(name)
         }
         Err(e) => {
             #[cfg(debug_assertions)]
@@ -260,6 +250,22 @@ pub async fn verify_authentication(
             ))
         }
     }
+}
+
+async fn create_session_from_name(name: &str) -> Result<(), PasskeyError> {
+    let user_id = PASSKEY_CACHE_STORE
+        .lock()
+        .await
+        .get_store()
+        .get(name)
+        .await?
+        .ok_or(PasskeyError::Storage("User not found".into()))?;
+    let user_id = match user_id {
+        CacheData::EmailUserId(id) => Ok(id.user_id),
+        _ => Err(PasskeyError::Format("Invalid user type".to_string())),
+    }?;
+
+    Ok(())
 }
 
 impl ParsedClientData {

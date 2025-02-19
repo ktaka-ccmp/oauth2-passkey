@@ -22,6 +22,8 @@ pub use passkey::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
 };
 
+pub use common::email_to_user_id;
+
 pub async fn init() -> Result<(), errors::PasskeyError> {
     // Validate required environment variables early
     let _ = *config::PASSKEY_RP_ID;
