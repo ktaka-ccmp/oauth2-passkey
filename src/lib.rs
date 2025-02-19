@@ -10,6 +10,7 @@ mod types;
 pub use config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME}; // Required for cookie configuration
 pub use errors::{AppError, SessionError}; // Required for error handling
 pub use session::{
+    create_session_with_uid,
     // create_new_session,
     create_session_with_user,
     delete_session_from_store,

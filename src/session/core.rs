@@ -83,9 +83,13 @@ pub async fn create_session_with_user(user_data: SessionUser) -> Result<HeaderMa
         .map_err(|e| AppError(anyhow::Error::from(e)))?
         .into();
 
+    create_session_with_uid(&user.id).await
+}
+
+pub async fn create_session_with_uid(user_id: &str) -> Result<HeaderMap, AppError> {
     // Create minimal session info
     let session_info = SessionInfo {
-        user_id: user.id,
+        user_id: user_id.to_string(),
         expires_at: Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64),
     };
 
