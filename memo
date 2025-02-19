@@ -1,0 +1,50 @@
+Registering user: a4
+Registration options: RegistrationOptions { challenge: "2cE-UvEVzXIR5OmwkJ_s-h83JtGw_IdwFkYQ1rkW_wE=", rp_id: "p3001.h.ccmp.jp", rp: RelyingParty { name: "https://p3001.h.ccmp.jp", id: "p
+3001.h.ccmp.jp" }, user: PublicKeyCredentialUserEntity { id: "c1888744-a0a5-4aa9-93db-a8713a81ee3e", name: "a4", display_name: "a4" }, pub_key_cred_params: [PubKeyCredParam { type_: "publ
+ic-key", alg: -7 }, PubKeyCredParam { type_: "public-key", alg: -257 }], authenticator_selection: AuthenticatorSelection { authenticator_attachment: "platform", resident_key: "required", 
+user_verification: "discouraged", require_resident_key: true }, timeout: 60000, attestation: "direct" }
+
+
+Registering user: RegisterCredential { id: "SkoG2Ds1jMviG-MrLhUnGw", raw_id: "SkoG2Ds1jMviG-MrLhUnGw", response: AuthenticatorAttestationResponse { client_data_json: "eyJ0eXBlIjoid2ViYXV0
+aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiMmNFLVV2RVZ6WElSNU9td2tKX3MtaDgzSnRHd19JZHdGa1lRMXJrV193RSIsIm9yaWdpbiI6Imh0dHBzOi8vcDMwMDEuaC5jY21wLmpwIiwiY3Jvc3NPcmlnaW4iOmZhbHNlLCJvdGhlcl9rZXlzX2Nhbl9
+iZV9hZGRlZF9oZXJlIjoiZG8gbm90IGNvbXBhcmUgY2xpZW50RGF0YUpTT04gYWdhaW5zdCBhIHRlbXBsYXRlLiBTZWUgaHR0cHM6Ly9nb28uZ2wveWFiUGV4In0", attestation_object: "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVi
+Uqk3A1Ad-ggXFHJPzhg-5JjwnuBim-LJhFqQwvypRk7FZAAAAAOqbjWZNAR0hPOS2tIy1ddQAEEpKBtg7NYzL4hvjKy4VJxulAQIDJiABIVgg4h9NcksgeAyfftH9qrbQMzVUcH5c0Dbrpb1x-oPONfoiWCD6OXgS708F1AXrxv7V41UE18LTgegOgg
+5ejWDcI2pmJQ" }, type_: "public-key", username: None, user_handle: Some("c1888744-a0a5-4aa9-93db-a8713a81ee3e") }
+
+
+
+=================
+
+Registering user: a5
+Registration options: RegistrationOptions { challenge: "eiqe5R4Xj40F_-RLsm1JOR-pTSUufhDQTjNqzkz0F9U=", rp_id: "p3001.h.ccmp.jp", rp: RelyingParty { name: "https://p3001.h.ccmp.jp", id: "p3001.h.ccmp.jp" }, user: PublicKeyCredentialUserEntity { id: "a6500a5e-30c1-4478-8189-3b431a84976e", name: "a5", display_name: "a5" }, pub_key_cred_params: [PubKeyCredParam { type_: "public-key", alg: -7 }, PubKeyCredParam { type_: "public-key", alg: -257 }], authenticator_selection: AuthenticatorSelection { authenticator_attachment: "platform", resident_key: "required", user_verification: "discouraged", require_resident_key: true }, timeout: 60000, attestation: "direct" }
+
+Registering user: RegisterCredential { id: "qz9iGj2e35LbL__IZeOLDA", raw_id: "qz9iGj2e35LbL__IZeOLDA", response: AuthenticatorAttestationResponse { client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiZWlxZTVSNFhqNDBGXy1STHNtMUpPUi1wVFNVdWZoRFFUak5xemt6MEY5VSIsIm9yaWdpbiI6Imh0dHBzOi8vcDMwMDEuaC5jY21wLmpwIiwiY3Jvc3NPcmlnaW4iOmZhbHNlLCJvdGhlcl9rZXlzX2Nhbl9iZV9hZGRlZF9oZXJlIjoiZG8gbm90IGNvbXBhcmUgY2xpZW50RGF0YUpTT04gYWdhaW5zdCBhIHRlbXBsYXRlLiBTZWUgaHR0cHM6Ly9nb28uZ2wveWFiUGV4In0", attestation_object: "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViUqk3A1Ad-ggXFHJPzhg-5JjwnuBim-LJhFqQwvypRk7FZAAAAAOqbjWZNAR0hPOS2tIy1ddQAEKs_Yho9nt-S2y__yGXjiwylAQIDJiABIVggqgVmZQz0mVMXh-_lY9iy3Qh2FYXN7lb_jbz6fMLCkvoiWCDNFufQGeW6XavnQyRHtAaHlunFweS0eMZcXBPtxaCNcA" }, type_: "public-key", username: None, user_handle: Some("a6500a5e-30c1-4478-8189-3b431a84976e") }
+
+Client data json: Object {"challenge": String("eiqe5R4Xj40F_-RLsm1JOR-pTSUufhDQTjNqzkz0F9U"), "crossOrigin": Bool(false), "origin": String("https://p3001.h.ccmp.jp"), "other_keys_can_be_added_here": String("do not compare clientDataJSON against a template. See https://goo.gl/yabPex"), "type": String("webauthn.create")}
+Attestation format: Some("none"), auth data: Some([170, 77, 192, 212, 7, 126, 130, 5, 197, 28, 147, 243, 134, 15, 185, 38, 60, 39, 184, 24, 166, 248, 178, 97, 22, 164, 48, 191, 42, 81, 147, 177, 89, 0, 0, 0, 0, 234, 155, 141, 102, 77, 1, 29, 33, 60, 228, 182, 180, 140, 181, 117, 212, 0, 16, 171, 63, 98, 26, 61, 158, 223, 146, 219, 47, 255, 200, 101, 227, 139, 12, 165, 1, 2, 3, 38, 32, 1, 33, 88, 32, 170, 5, 102, 101, 12, 244, 153, 83, 23, 135, 239, 229, 99, 216, 178, 221, 8, 118, 21, 133, 205, 238, 86, 255, 141, 188, 250, 124, 194, 194, 146, 250, 34, 88, 32, 205, 22, 231, 208, 25, 229, 186, 93, 171, 231, 67, 36, 71, 180, 6, 135, 150, 233, 197, 193, 228, 180, 120, 198, 92, 92, 19, 237, 197, 160, 141, 112]), attestation statement: Some([])
+Using 'none' attestation format
+AAGUID: [234, 155, 141, 102, 77, 1, 29, 33, 60, 228, 182, 180, 140, 181, 117, 212]
+
+
+Auth response: AuthenticatorResponse {
+    id: "hONksifjHU2yCqPofcWKJQ",
+    raw_id: "hONksifjHU2yCqPofcWKJQ",
+    response: AuthenticatorAssertionResponse {
+        client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiekR2bDU4YW9XeFNTRU51Y3NsTTI3eWF2Z0JEc1ZUcmQ2NXF1QUpXY3pBayIsIm9yaWdpbiI6Imh0dHBzOi8vcDMwMDEuaC5jY21wLmpwIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfQ",
+        authenticator_data: "qk3A1Ad-ggXFHJPzhg-5JjwnuBim-LJhFqQwvypRk7EZAAAAAA",
+        signature: "MEQCIGN3D84eWQcjrUUccyRpFAJ86YHejo-hhch55wc22RzOAiB8CfnWFhZgSgS56eX-_PEQbNpyNMZZAotMLHSdDDKPrQ",
+        user_handle: Some(
+            "MnBhME9PR0s0NDlMTlFfNTRLX24zZz09",
+        ),
+    },
+    authenticator_attachment: Some(
+        "platform",
+    ),
+    auth_id: "A2r2u74wbe7_PPNAn0nc3Q==",
+}
+
+
+Found credential: StoredCredential { credential_id: [132, 227, 100, 178, 39, 227, 29, 77, 178, 10, 163, 232, 125, 197, 138, 37], public_key: [4, 87, 159, 251, 111, 244, 72, 171, 10, 246, 206, 201, 239, 195, 5, 18, 101, 49, 150, 37, 2, 17, 127, 68, 130, 60, 150, 90, 25, 70, 160, 21, 126, 23, 67, 224, 155, 164, 177, 159, 25, 213, 3, 61, 122, 30, 171, 146, 215, 76, 173, 173, 196, 150, 181, 155, 63, 22, 17, 247, 70, 42, 25, 49, 3], counter: 0, user: PublicKeyCredentialUserEntity { id_handle: "2pa0OOGK449LNQ_54K_n3g==", name: "ktaka@ccmp.jp", display_name: "�����
+���" } }
+user_info stored in credential: PublicKeyCredentialUserEntity { id_handle: "2pa0OOGK449LNQ_54K_n3g==", name: "ktaka@ccmp.jp", display_name: "�����
+���" }

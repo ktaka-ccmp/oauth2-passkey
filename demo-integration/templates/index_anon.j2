@@ -13,7 +13,7 @@
         <h1>{{message}}</h1>
     </div>
     <div>
-        <button onclick="oauth2.openPopup()">Login</button>
+        Oauth2: <button onclick="oauth2.openPopup()">Login</button>
         <div id="status"></div>
 
         <script src="{{auth_route_prefix}}/oauth2.js"></script>
@@ -21,5 +21,25 @@
             const oauth2 = initOAuth2Popup();
         </script>
     </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                Passkey: <input
+                    type="text"
+                    id="username-input"
+                    placeholder="Enter username"
+                    style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;"
+                >
+                <button
+                    onclick="startAuthentication(true)"
+                    class="auth-button"
+                >
+                    Sign in with Username
+                </button>
+                    <script>
+        const PASSKEY_ROUTE_PREFIX = '{{passkey_route_prefix}}';
+    </script>
+        <script src="{{passkey_route_prefix}}/passkey.js"></script>
+            </div>
+
 </body>
 </html>
