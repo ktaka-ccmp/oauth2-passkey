@@ -152,9 +152,9 @@ async function startRegistration(withUsername = true) {
         console.log('Registration options:', options);
 
         // Convert base64url strings to Uint8Array
-        let userHandle = options.user.id;
+        let userHandle = options.user.id_handle;
         options.challenge = base64URLToUint8Array(options.challenge);
-        options.user.id = new TextEncoder().encode(options.user.id);
+        options.user.id = new TextEncoder().encode(userHandle); // Convert id_handle to Uint8Array and set to user.id
 
         console.log('Registration options:', options);
         console.log('Registration user handle:', userHandle);

@@ -59,10 +59,9 @@ where
             .to_string();
 
         // Convert libuserdb::User to libsession::User to AuthUser
-        let db_user: libuserdb::User = get_user_from_session(&session_cookie)
+        let user: User = get_user_from_session(&session_cookie)
             .await
             .map_err(AuthRedirect::from)?;
-        let user: User = User::from(db_user);
         Ok(AuthUser::from(user))
     }
 }

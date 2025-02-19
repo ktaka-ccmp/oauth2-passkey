@@ -6,14 +6,15 @@ use axum::{
 };
 
 use libpasskey::{
-    finish_registration, start_authentication, start_registration,
-    start_registration_with_auth_user, verify_authentication, AuthenticationOptions,
-    AuthenticatorResponse, RegisterCredential, RegistrationOptions,
+    finish_registration, finish_registration_with_auth_user, start_authentication,
+    start_registration, start_registration_with_auth_user, verify_authentication,
+    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
 };
 
 use crate::session::AuthUser;
 use libpasskey::PASSKEY_ROUTE_PREFIX;
 use libsession::User as SessionUser;
+use serde_json::Value;
 
 #[derive(Template)]
 #[template(path = "index.j2")]
@@ -58,28 +59,65 @@ pub(crate) async fn handle_start_registration(
 }
 
 pub(crate) async fn handle_finish_registration(
+    user: Option<AuthUser>,
     Json(reg_data): Json<RegisterCredential>,
 ) -> Result<String, (StatusCode, String)> {
     #[cfg(debug_assertions)]
     println!("Registration data: {:#?}", reg_data);
-    finish_registration(reg_data)
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+
+    match user {
+        None => finish_registration(&reg_data)
+            .await
+            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string())),
+        Some(u) => {
+            #[cfg(debug_assertions)]
+            println!("User: {:#?}", u);
+
+            finish_registration_with_auth_user((*u).clone(), reg_data)
+                .await
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+        }
+    }
 }
 
+// TODO: Remove
+// pub(crate) async fn handle_start_authentication(
+//     username: Result<Json<String>, axum::extract::rejection::JsonRejection>,
+// ) -> Json<AuthenticationOptions> {
+//     let username = match username {
+//         Ok(Json(username)) => Some(username),
+//         Err(_) => None,
+//     };
+
+//     Json(
+//         start_authentication(username)
+//             .await
+//             .expect("Failed to start authentication"),
+//     )
+// }
+
 pub(crate) async fn handle_start_authentication(
-    username: Result<Json<String>, axum::extract::rejection::JsonRejection>,
-) -> Json<AuthenticationOptions> {
-    let username = match username {
-        Ok(Json(username)) => Some(username),
-        Err(_) => None,
+    Json(username): Json<Value>,
+) -> Result<Json<AuthenticationOptions>, (StatusCode, String)> {
+    let username = if username.is_object() {
+        username
+            .get("username")
+            .and_then(|v| v.as_str())
+            .map(String::from)
+    } else if username.is_string() {
+        Some(username.as_str().unwrap().to_string()) // Directly use the string
+    } else {
+        None
     };
 
-    Json(
-        start_authentication(username)
-            .await
-            .expect("Failed to start authentication"),
-    )
+    match start_authentication(username).await {
+        Ok(auth_options) => Ok(Json(auth_options)),
+        Err(e) => {
+            #[cfg(debug_assertions)]
+            println!("Error: {:#?}", e);
+            Err((StatusCode::BAD_REQUEST, e.to_string()))
+        }
+    }
 }
 
 pub(crate) async fn handle_finish_authentication(
