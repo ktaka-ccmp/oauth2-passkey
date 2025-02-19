@@ -92,7 +92,7 @@ pub async fn create_session_with_user(user_data: SessionUser) -> Result<HeaderMa
     create_new_session(session_info).await
 }
 
-pub async fn get_user_from_session(session_cookie: &str) -> Result<DbUser, SessionError> {
+pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, SessionError> {
     let store_guard = SESSION_STORE.lock().await;
     let session = store_guard
         .get_store()
@@ -104,5 +104,6 @@ pub async fn get_user_from_session(session_cookie: &str) -> Result<DbUser, Sessi
         .await
         .map_err(|_| SessionError::SessionError)?
         .ok_or(SessionError::SessionError)?;
-    Ok(user)
+
+    Ok(SessionUser::from(user))
 }
