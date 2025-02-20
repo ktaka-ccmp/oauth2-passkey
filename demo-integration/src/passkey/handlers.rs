@@ -165,7 +165,6 @@ pub(crate) async fn conditional_ui() -> impl IntoResponse {
     (StatusCode::OK, Html(template.render().unwrap())).into_response()
 }
 
-
 pub(crate) async fn serve_conditional_ui_js() -> Response {
     let js_content = include_str!("../../static/conditional_ui.js");
     Response::builder()

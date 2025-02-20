@@ -1,9 +1,9 @@
 use axum::routing::{get, post, Router};
 
 use super::handlers::{
-    handle_finish_authentication, handle_finish_registration, handle_start_authentication,
-    handle_start_registration, handle_start_registration_get, index, serve_passkey_js,
-    conditional_ui, serve_conditional_ui_js,
+    conditional_ui, handle_finish_authentication, handle_finish_registration,
+    handle_start_authentication, handle_start_registration, handle_start_registration_get, index,
+    serve_conditional_ui_js, serve_passkey_js,
 };
 
 pub fn router() -> Router {
