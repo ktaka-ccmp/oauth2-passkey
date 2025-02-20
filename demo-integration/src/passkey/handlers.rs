@@ -1,20 +1,22 @@
 use askama::Template;
 use axum::{
     extract::Json,
-    http::{header::CONTENT_TYPE, StatusCode},
+    http::{header::CONTENT_TYPE, HeaderMap, StatusCode},
     response::{Html, IntoResponse, Response},
 };
 
 use libpasskey::{
-    finish_registration, finish_registration_with_auth_user, start_authentication,
-    start_registration, start_registration_with_auth_user, verify_authentication,
-    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
+    email_to_user_id, finish_registration, finish_registration_with_auth_user,
+    start_authentication, start_registration, start_registration_with_auth_user,
+    verify_authentication, AuthenticationOptions, AuthenticatorResponse, RegisterCredential,
+    RegistrationOptions,
 };
 
-use crate::session::AuthUser;
 use libpasskey::PASSKEY_ROUTE_PREFIX;
-use libsession::User as SessionUser;
+use libsession::{create_session_with_uid, User as SessionUser};
 use serde_json::Value;
+
+use crate::session::AuthUser;
 
 #[derive(Template)]
 #[template(path = "index.j2")]
@@ -122,14 +124,50 @@ pub(crate) async fn handle_start_authentication(
 
 pub(crate) async fn handle_finish_authentication(
     Json(auth_response): Json<AuthenticatorResponse>,
-) -> Result<String, (StatusCode, String)> {
-    verify_authentication(auth_response)
+) -> Result<(HeaderMap, String), (StatusCode, String)> {
+    #[cfg(debug_assertions)]
+    println!("Auth response: {:#?}", auth_response);
+
+    let name = verify_authentication(auth_response)
         .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+    let uid = email_to_user_id(name.clone())
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+    let headers = create_session_with_uid(&uid)
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+    Ok((headers, name))
 }
 
 pub(crate) async fn serve_passkey_js() -> Response {
     let js_content = include_str!("../../static/passkey.js");
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, "application/javascript")
+        .body(js_content.to_string().into())
+        .unwrap()
+}
+
+#[derive(Template)]
+#[template(path = "conditional_ui.j2")]
+struct ConditionalUiTemplate {
+    passkey_route_prefix: &'static str,
+}
+
+pub(crate) async fn conditional_ui() -> impl IntoResponse {
+    let template = ConditionalUiTemplate {
+        passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
+    };
+    (StatusCode::OK, Html(template.render().unwrap())).into_response()
+}
+
+
+pub(crate) async fn serve_conditional_ui_js() -> Response {
+    let js_content = include_str!("../../static/conditional_ui.js");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
