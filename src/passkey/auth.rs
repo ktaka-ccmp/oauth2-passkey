@@ -252,22 +252,6 @@ pub async fn verify_authentication(
     }
 }
 
-async fn create_session_from_name(name: &str) -> Result<(), PasskeyError> {
-    let user_id = PASSKEY_CACHE_STORE
-        .lock()
-        .await
-        .get_store()
-        .get(name)
-        .await?
-        .ok_or(PasskeyError::Storage("User not found".into()))?;
-    let user_id = match user_id {
-        CacheData::EmailUserId(id) => Ok(id.user_id),
-        _ => Err(PasskeyError::Format("Invalid user type".to_string())),
-    }?;
-
-    Ok(())
-}
-
 impl ParsedClientData {
     fn from_base64(client_data_json: &str) -> Result<Self, PasskeyError> {
         let raw_data = base64url_decode(client_data_json)
