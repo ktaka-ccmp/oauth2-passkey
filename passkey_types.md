@@ -25,6 +25,12 @@ pub(super) struct StoredChallenge {
     pub(super) timestamp: u64,
     pub(super) ttl: u64,
 }
+
+PublicKeyCredentialUserEntity {
+    id_handle: crate::common::gen_random_string(16)?,
+    name: user.email.clone(),
+    display_name: user.name.clone(),
+};
 ```
 
 ```rust
@@ -187,6 +193,13 @@ pub(super) struct StoredChallenge {
     pub(super) timestamp: u64,
     pub(super) ttl: u64,
 }
+
+user: PublicKeyCredentialUserEntity {
+    // id_handle: auth_id.clone(),
+    id_handle: "temp".to_string(),
+    name: "temp".to_string(),
+    display_name: "temp".to_string(),
+},
 ```
 
 ```rust
@@ -271,7 +284,7 @@ pub(super) struct AuthenticatorAssertionResponse {
     pub(super) client_data_json: String,
     pub(super) authenticator_data: String,
     pub(super) signature: String,
-    pub(super) user_handle: Option<String>, #### is this auth_id?
+    pub(super) user_handle: Option<String>, #### is this auth_id?-> no, its is somehow taken from stored credential in authenticator.
 }
 
 #[derive(Debug)]
