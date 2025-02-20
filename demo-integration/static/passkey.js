@@ -27,20 +27,11 @@ async function startAuthentication(withUsername = false) {
     const authActions = document.getElementById("auth-actions");
 
     try {
-        let username = null;
-        if (withUsername) {
-            const usernameInput = document.getElementById("username-input");
-            username = usernameInput.value.trim();
-            if (!username) {
-                alert("Please enter a username");
-                return;
-            }
-        }
-
         const startResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/auth/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: username ? JSON.stringify(username) : "{}"
+            body: "{}"
+            // body: username ? JSON.stringify(username) : "{}"
         });
 
         if (!startResponse.ok) {
@@ -98,21 +89,22 @@ async function startAuthentication(withUsername = false) {
         });
 
         if (!verifyResponse.ok) {
+            console.error('Authentication failed:', verifyResponse.status, verifyResponse.statusText);
             const errorText = await verifyResponse.text();
             alert('Authentication failed: ' + errorText);
             return;
         }
 
-        if (verifyResponse.ok) {
-            // authStatus.textContent = "Welcome back!";
-            verifyResponse.text().then(function(text) {
-                authStatus.textContent = `Welcome back ${text} !`;
-            });
-            authStatus.style.display = "block";
-            // authActions.style.display = "none";
-        } else {
-            throw new Error('Server verification failed');
-        }
+        // Response is OK, handle success
+        setTimeout(() => {
+            window.location.reload();
+        }, 100);  // Wait for 0.1 second before reloading
+
+        verifyResponse.text().then(function(text) {
+            if (authStatus) {
+                authStatus.textContent = `Welcome back ${text}!`;
+            }
+        });
     } catch (error) {
         console.error('Error during authentication:', error);
         alert('Authentication failed: ' + error.message);
@@ -196,3 +188,12 @@ async function startRegistration(withUsername = true) {
         alert('Registration failed: ' + error.message);
     }
 }
+
+document.getElementById('passkey-button').addEventListener('click', async () => {
+    try {
+        await startAuthentication(true);
+    } catch (error) {
+        console.error('Passkey authentication failed:', error);
+        alert('Failed to authenticate with passkey. Please try again.');
+    }
+});
