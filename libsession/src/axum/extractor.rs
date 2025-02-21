@@ -1,9 +1,9 @@
 use axum::{
+    RequestPartsExt,
     extract::{FromRequestParts, OptionalFromRequestParts},
     response::{IntoResponse, Redirect, Response},
-    RequestPartsExt,
 };
-use axum_extra::{headers, TypedHeader};
+use axum_extra::{TypedHeader, headers};
 use http::request::Parts;
 use std::convert::Infallible;
 

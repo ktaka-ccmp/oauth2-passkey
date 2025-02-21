@@ -3,8 +3,8 @@ use axum::{extract::Json, http::StatusCode, response::Html};
 use axum_core::response::IntoResponse;
 
 use crate::passkey::{
-    finish_registration, start_authentication, start_registration, verify_authentication,
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
+    finish_registration, start_authentication, start_registration, verify_authentication,
 };
 
 use crate::config::PASSKEY_ROUTE_PREFIX;

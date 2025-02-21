@@ -12,15 +12,9 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 liboauth2 = { workspace = true }
-libsession = { workspace = true }
 libpasskey = { workspace = true }
-libuserdb = { workspace = true }
 libaxum = { workspace = true }
 
 axum = { workspace = true }
 tokio = { workspace = true }
 rustls = { workspace = true }
-axum-core.workspace = true
-axum-extra = { workspace = true }
-chrono = { workspace = true }
-serde_json = "1.0.138"

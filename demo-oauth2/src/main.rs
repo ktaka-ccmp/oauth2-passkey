@@ -1,4 +1,4 @@
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use dotenv::dotenv;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -9,7 +9,7 @@ mod server;
 
 use crate::{
     handlers::{index, protected},
-    server::{spawn_http_server, spawn_https_server, Ports},
+    server::{Ports, spawn_http_server, spawn_https_server},
 };
 
 #[tokio::main]

@@ -1,12 +1,12 @@
 use askama::Template;
 use axum::{
+    Router,
     extract::{Form, Query},
     http::{HeaderMap, StatusCode},
     response::{Html, Redirect},
     routing::get,
-    Router,
 };
-use axum_extra::{headers, TypedHeader};
+use axum_extra::{TypedHeader, headers};
 use chrono::{Duration, Utc};
 
 // Helper trait for converting errors to a standard response error format
@@ -28,7 +28,7 @@ use crate::oauth2::{
 use crate::types::AuthResponse;
 
 use libsession::{
-    delete_session_from_store, prepare_logout_response, User as SessionUser, SESSION_COOKIE_NAME,
+    SESSION_COOKIE_NAME, User as SessionUser, delete_session_from_store, prepare_logout_response,
 };
 
 pub fn router() -> Router {

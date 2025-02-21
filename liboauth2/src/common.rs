@@ -1,5 +1,5 @@
 use anyhow::Context;
-use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use chrono::{DateTime, Utc};
 use http::header::{HeaderMap, SET_COOKIE};
 use ring::rand::SecureRandom;
