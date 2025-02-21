@@ -202,7 +202,10 @@ pub async fn verify_authentication(
     #[cfg(debug_assertions)]
     println!("user_handle received from client: {:?}", &user_handle);
     #[cfg(debug_assertions)]
-    println!("user_handle before decoding: {:?}", auth_response.response.user_handle);
+    println!(
+        "user_handle before decoding: {:?}",
+        auth_response.response.user_handle
+    );
 
     // let display_name = credential.user.display_name.as_str().to_owned();
     let name = credential.user.name.as_str().to_owned();
