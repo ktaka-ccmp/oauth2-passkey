@@ -1,13 +1,17 @@
 use askama::Template;
 use axum::{http::StatusCode, response::Html};
 use liboauth2::OAUTH2_ROUTE_PREFIX;
-use libsession::User;
+use libpasskey::PASSKEY_ROUTE_PREFIX;
+
+// use libsession::User;
+use super::session::AuthUser as User;
 
 #[derive(Template)]
 #[template(path = "index_user.j2")]
 struct IndexTemplateUser<'a> {
     message: &'a str,
     auth_route_prefix: &'a str,
+    passkey_route_prefix: &'a str,
 }
 
 #[derive(Template)]
@@ -15,6 +19,7 @@ struct IndexTemplateUser<'a> {
 struct IndexTemplateAnon<'a> {
     message: &'a str,
     auth_route_prefix: &'a str,
+    passkey_route_prefix: &'a str,
 }
 
 #[derive(Template)]
@@ -31,6 +36,7 @@ pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCod
             let template = IndexTemplateUser {
                 message: &message,
                 auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
+                passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
             };
             let html = Html(
                 template
@@ -44,6 +50,7 @@ pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCod
             let template = IndexTemplateAnon {
                 message: &message,
                 auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
+                passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
             };
             let html = Html(
                 template

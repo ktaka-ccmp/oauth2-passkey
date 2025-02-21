@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passkey Login - Conditional UI</title>
+    <style>
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Conditional UI</h1>
+        <form id="signin-form">
+            <div class="form-group">
+                <label for="username-input">Email</label>
+                <input type="email" id="username-input" name="username" 
+                       autocomplete="username webauthn"
+                       placeholder="Enter your email"
+                       required>
+            </div>
+        </form>
+    </div>
+    <script>
+        const PASSKEY_ROUTE_PREFIX = '{{passkey_route_prefix}}';
+    </script>
+    <script src="{{passkey_route_prefix}}/conditional_ui.js"></script>
+</body>
+</html>
