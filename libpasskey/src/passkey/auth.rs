@@ -78,8 +78,7 @@ pub async fn start_authentication(
     let stored_challenge = StoredChallenge {
         challenge: challenge.clone().unwrap_or_default(),
         user: PublicKeyCredentialUserEntity {
-            // id_handle: auth_id.clone(),
-            id_handle: "temp".to_string(),
+            user_handle: "temp".to_string(),
             name: "temp".to_string(),
             display_name: "temp".to_string(),
         },
@@ -210,7 +209,7 @@ pub async fn verify_authentication(
     // let display_name = credential.user.display_name.as_str().to_owned();
     let name = credential.user.name.as_str().to_owned();
 
-    if credential.user.id_handle != user_handle {
+    if credential.user.user_handle != user_handle {
         return Err(PasskeyError::Authentication("User handle mismatch".into()));
     }
 
