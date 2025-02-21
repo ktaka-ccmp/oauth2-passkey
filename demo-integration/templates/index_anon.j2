@@ -14,8 +14,8 @@
     <div>
         <h1>{{message}}</h1>
     </div>
-    <div>
-        Oauth2: <button onclick="oauth2.openPopup()">Login</button>
+    <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button onclick="oauth2.openPopup()">Google Oauth2</button>
         <div id="status"></div>
 
         <script src="{{auth_route_prefix}}/oauth2.js"></script>
@@ -25,10 +25,7 @@
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button id="passkey-button" class="mdc-button mdc-button--raised"
-            style="background-color: #1a73e8; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
-            <span class="mdc-button__label">Have Passkey?</span>
-        </button>
+        <button id="passkey-button">Have Passkey?</button>
     </div>
     <script>
         const PASSKEY_ROUTE_PREFIX = '{{passkey_route_prefix}}';

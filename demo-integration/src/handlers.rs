@@ -9,6 +9,7 @@ use super::session::AuthUser as User;
 #[derive(Template)]
 #[template(path = "index_user.j2")]
 struct IndexTemplateUser<'a> {
+    user: User,
     message: &'a str,
     auth_route_prefix: &'a str,
     passkey_route_prefix: &'a str,
@@ -34,6 +35,7 @@ pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCod
         Some(u) => {
             let message = format!("Hey {}!", u.name);
             let template = IndexTemplateUser {
+                user: u,
                 message: &message,
                 auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
                 passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
