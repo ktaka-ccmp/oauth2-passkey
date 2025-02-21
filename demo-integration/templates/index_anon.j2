@@ -5,9 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Index Page</title>
+
+    <script src="{{auth_route_prefix}}/oauth2.js"></script>
+    <script src="{{passkey_route_prefix}}/passkey.js"></script>
     <script>
+        const oauth2 = initOAuth2Popup();
         const AUTH_ROUTE_PREFIX = '{{auth_route_prefix}}';
+        const PASSKEY_ROUTE_PREFIX = '{{passkey_route_prefix}}';
     </script>
+
 </head>
 
 <body>
@@ -16,21 +22,12 @@
     </div>
     <div style="display: flex; gap: 10px; margin-top: 10px;">
         <button onclick="oauth2.openPopup()">Google Oauth2</button>
-        <div id="status"></div>
-
-        <script src="{{auth_route_prefix}}/oauth2.js"></script>
-        <script>
-            const oauth2 = initOAuth2Popup();
-        </script>
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button id="passkey-button">Have Passkey?</button>
+        <button onclick="startAuthentication(true)">Have Passkey?</button>
     </div>
-    <script>
-        const PASSKEY_ROUTE_PREFIX = '{{passkey_route_prefix}}';
-    </script>
-    <script src="{{passkey_route_prefix}}/passkey.js"></script>
+
     <div>
         <p>Or, <a href="{{passkey_route_prefix}}/conditional_ui">try conditional UI</a>.</p>
     </div>

@@ -18,19 +18,6 @@ use serde_json::Value;
 
 use crate::session::AuthUser;
 
-#[derive(Template)]
-#[template(path = "index.j2")]
-struct IndexTemplate {
-    passkey_route_prefix: &'static str,
-}
-
-pub(crate) async fn index() -> impl IntoResponse {
-    let template = IndexTemplate {
-        passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
-    };
-    (StatusCode::OK, Html(template.render().unwrap())).into_response()
-}
-
 pub(crate) async fn handle_start_registration_get(
     user: Option<AuthUser>,
 ) -> Result<Json<RegistrationOptions>, (StatusCode, String)> {
@@ -81,22 +68,6 @@ pub(crate) async fn handle_finish_registration(
         }
     }
 }
-
-// TODO: Remove
-// pub(crate) async fn handle_start_authentication(
-//     username: Result<Json<String>, axum::extract::rejection::JsonRejection>,
-// ) -> Json<AuthenticationOptions> {
-//     let username = match username {
-//         Ok(Json(username)) => Some(username),
-//         Err(_) => None,
-//     };
-
-//     Json(
-//         start_authentication(username)
-//             .await
-//             .expect("Failed to start authentication"),
-//     )
-// }
 
 pub(crate) async fn handle_start_authentication(
     Json(username): Json<Value>,

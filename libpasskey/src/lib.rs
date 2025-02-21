@@ -1,4 +1,4 @@
-mod axum;
+// mod axum;
 mod common;
 mod config;
 mod errors;
@@ -13,7 +13,7 @@ mod types;
 
 // pub use types::AppState;
 
-pub use axum::router;
+// pub use axum::router;
 pub use config::PASSKEY_ROUTE_PREFIX; // Required for route configuration
 
 pub use passkey::{
