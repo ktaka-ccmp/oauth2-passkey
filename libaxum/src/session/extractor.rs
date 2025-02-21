@@ -1,13 +1,13 @@
 use axum::{
+    RequestPartsExt,
     extract::{FromRequestParts, OptionalFromRequestParts},
     response::{IntoResponse, Redirect, Response},
-    RequestPartsExt,
 };
-use axum_extra::{headers, TypedHeader};
+use axum_extra::{TypedHeader, headers};
 use http::request::Parts;
 
 use libsession::User;
-use libsession::{get_user_from_session, SessionError, SESSION_COOKIE_NAME};
+use libsession::{SESSION_COOKIE_NAME, SessionError, get_user_from_session};
 
 pub struct AuthRedirect;
 

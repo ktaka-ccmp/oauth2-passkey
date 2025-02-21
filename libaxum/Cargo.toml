@@ -1,5 +1,5 @@
 [package]
-name = "demo-integration"
+name = "libaxum"
 version = { workspace = true }
 edition = { workspace = true }
 
@@ -15,7 +15,6 @@ liboauth2 = { workspace = true }
 libsession = { workspace = true }
 libpasskey = { workspace = true }
 libuserdb = { workspace = true }
-libaxum = { workspace = true }
 
 axum = { workspace = true }
 tokio = { workspace = true }

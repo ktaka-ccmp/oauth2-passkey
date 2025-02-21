@@ -4,7 +4,7 @@ use liboauth2::OAUTH2_ROUTE_PREFIX;
 use libpasskey::PASSKEY_ROUTE_PREFIX;
 
 // use libsession::User;
-use super::session::AuthUser as User;
+use libaxum::AuthUser as User;
 
 #[derive(Template)]
 #[template(path = "index_user.j2")]
