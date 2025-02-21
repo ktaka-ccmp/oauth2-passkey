@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,11 +10,9 @@
     </script>
     <script src="{{passkey_route_prefix}}/passkey.js"></script>
 </head>
+
 <body>
-    <div
-        id="auth-header"
-        style="padding: 10px; border-bottom: 1px solid #eee; margin-bottom: 20px"
-    >
+    <div id="auth-header" style="padding: 10px; border-bottom: 1px solid #eee; margin-bottom: 20px">
         <div id="passkey-status" style="display: none">
             <!-- Will show greeting when authenticated -->
         </div>
@@ -28,16 +27,9 @@
                 Sign in with Passkey
             </button>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <input
-                    type="text"
-                    id="username-input"
-                    placeholder="Enter username"
-                    style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;"
-                >
-                <button
-                    onclick="startAuthentication(true)"
-                    class="auth-button"
-                >
+                <input type="text" id="username-input" placeholder="Enter username"
+                    style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                <button onclick="startAuthentication(true)" class="auth-button">
                     Sign in with Username
                 </button>
             </div>
@@ -45,9 +37,9 @@
         <div id="auth-register" style="display: block">
             <!-- Will show auth buttons based on state -->
             {# <button onclick="showRegistrationModal()" class="auth-button"> #}
-            <button onclick="startRegistration(true)" class="auth-button">
-                Register New Passkey
-            </button>
+                <button onclick="startRegistration(true)" class="auth-button">
+                    Register New Passkey
+                </button>
         </div>
         <div id="auth-register" style="display: block">
             <h1>RegisterPasskeyfromSession</h1>
@@ -63,4 +55,5 @@
         <p>Welcome to our site. This is the main content that's always visible.</p>
     </div>
 </body>
+
 </html>

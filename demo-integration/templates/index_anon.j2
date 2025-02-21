@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,12 +9,13 @@
         const AUTH_ROUTE_PREFIX = '{{auth_route_prefix}}';
     </script>
 </head>
+
 <body>
     <div>
         <h1>{{message}}</h1>
     </div>
-    <div>
-        Oauth2: <button onclick="oauth2.openPopup()">Login</button>
+    <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button onclick="oauth2.openPopup()">Google Oauth2</button>
         <div id="status"></div>
 
         <script src="{{auth_route_prefix}}/oauth2.js"></script>
@@ -22,20 +24,17 @@
         </script>
     </div>
 
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <button
-                        id="passkey-button"
-                        class="mdc-button mdc-button--raised"
-                        style="background-color: #1a73e8; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;"
-                    >
-                        <span class="mdc-button__label">Have Passkey?</span>
-                    </button>
-                </div>
-                <script>
+    <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button id="passkey-button">Have Passkey?</button>
+    </div>
+    <script>
         const PASSKEY_ROUTE_PREFIX = '{{passkey_route_prefix}}';
     </script>
-        <script src="{{passkey_route_prefix}}/passkey.js"></script>
-        <div><p>Or, <a href="{{passkey_route_prefix}}/conditional_ui">try conditional UI</a>.</p></div>
+    <script src="{{passkey_route_prefix}}/passkey.js"></script>
+    <div>
+        <p>Or, <a href="{{passkey_route_prefix}}/conditional_ui">try conditional UI</a>.</p>
+    </div>
 
 </body>
+
 </html>
