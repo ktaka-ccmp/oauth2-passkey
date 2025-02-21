@@ -188,12 +188,3 @@ async function startRegistration(withUsername = true) {
         alert('Registration failed: ' + error.message);
     }
 }
-
-document.getElementById('passkey-button').addEventListener('click', async () => {
-    try {
-        await startAuthentication(true);
-    } catch (error) {
-        console.error('Passkey authentication failed:', error);
-        alert('Failed to authenticate with passkey. Please try again.');
-    }
-});

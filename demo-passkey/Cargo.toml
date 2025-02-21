@@ -10,4 +10,6 @@ axum-core = { workspace = true }
 tokio = { workspace = true }
 
 libpasskey.workspace = true
+libaxum.workspace = true
+
 dotenv = "0.15.0"

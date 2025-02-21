@@ -1,4 +1,4 @@
-mod axum;
+// mod axum;
 mod client;
 mod common;
 mod config;
@@ -8,7 +8,7 @@ mod storage;
 mod types;
 
 // Re-export only what's necessary for the public API
-pub use axum::router; // The main router function for nesting
+// pub use axum::router; // The main router function for nesting
 pub use config::OAUTH2_ROUTE_PREFIX; // Required for route configuration
 
 pub use common::header_set_cookie;

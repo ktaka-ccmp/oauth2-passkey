@@ -12,6 +12,7 @@ http = "1.2.0"
 tokio = { version = "1.43.0", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+rustls = { workspace = true }
 
+libaxum = { workspace = true }
 liboauth2 = { workspace = true }
-libsession = { workspace = true }
