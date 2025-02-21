@@ -6,8 +6,8 @@ use http::header::HeaderMap;
 // use tower_http::cors::CorsLayer;
 
 use base64::{
-    engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD},
     Engine as _,
+    engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD},
 };
 use url::Url;
 
@@ -21,7 +21,7 @@ use crate::config::{
     OAUTH2_USERINFO_URL, TOKEN_STORE,
 };
 use crate::errors::AppError;
-use crate::oauth2::idtoken::{verify_idtoken, IdInfo as GoogleIdInfo};
+use crate::oauth2::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
 use crate::types::{AuthResponse, GoogleUserInfo, OidcTokenResponse, StateParams, StoredToken};
 
 pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> String {

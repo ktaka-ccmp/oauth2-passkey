@@ -7,19 +7,21 @@ members = [
     "libsession",
     "libpasskey",
     "libuserdb",
+    "libaxum",
 ]
 
 resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [workspace.dependencies]
 liboauth2 = { path = "./liboauth2" }
 libpasskey = { path = "./libpasskey" }
 libsession = { path = "./libsession" }
 libuserdb = { path = "./libuserdb" }
+libaxum = { path = "./libaxum" }
 
 axum = { version = "0.8", features = ["http2", "macros", "multipart"] }
 tokio = { version = "1.43", features = ["bytes", "fs", "io-std", "macros", "parking_lot", "rt-multi-thread", "signal-hook-registry", "socket2", "sync", "time", "tracing"] }

@@ -1,4 +1,4 @@
-use base64::engine::{general_purpose::URL_SAFE, Engine};
+use base64::engine::{Engine, general_purpose::URL_SAFE};
 use ring::{digest, signature::UnparsedPublicKey};
 use std::time::SystemTime;
 

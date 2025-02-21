@@ -1,4 +1,4 @@
-use axum::routing::{get, post, Router};
+use axum::routing::{Router, get, post};
 
 use super::handlers::{
     handle_finish_authentication, handle_finish_registration, handle_start_authentication,

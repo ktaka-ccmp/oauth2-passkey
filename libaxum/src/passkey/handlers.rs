@@ -1,19 +1,19 @@
 use askama::Template;
 use axum::{
     extract::Json,
-    http::{header::CONTENT_TYPE, HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     response::{Html, IntoResponse, Response},
 };
 
 use libpasskey::{
+    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
     email_to_user_id, finish_registration, finish_registration_with_auth_user,
     start_authentication, start_registration, start_registration_with_auth_user,
-    verify_authentication, AuthenticationOptions, AuthenticatorResponse, RegisterCredential,
-    RegistrationOptions,
+    verify_authentication,
 };
 
 use libpasskey::PASSKEY_ROUTE_PREFIX;
-use libsession::{create_session_with_uid, User as SessionUser};
+use libsession::{User as SessionUser, create_session_with_uid};
 use serde_json::Value;
 
 use crate::session::AuthUser;

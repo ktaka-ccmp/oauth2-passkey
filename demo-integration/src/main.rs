@@ -1,20 +1,17 @@
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use dotenv::dotenv;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use libaxum::{oauth2_router, passkey_router};
 use liboauth2::OAUTH2_ROUTE_PREFIX;
 use libpasskey::PASSKEY_ROUTE_PREFIX;
 
 mod handlers;
 mod server;
 
-mod oauth2;
-mod passkey;
-mod session;
-
 use crate::{
     handlers::{index, protected},
-    server::{spawn_http_server, spawn_https_server, Ports},
+    server::{Ports, spawn_http_server, spawn_https_server},
 };
 
 #[tokio::main]
@@ -41,8 +38,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/", get(index))
         .route("/protected", get(protected))
-        .nest(OAUTH2_ROUTE_PREFIX.as_str(), oauth2::router())
-        .nest(PASSKEY_ROUTE_PREFIX.as_str(), passkey::router());
+        .nest(OAUTH2_ROUTE_PREFIX.as_str(), oauth2_router())
+        .nest(PASSKEY_ROUTE_PREFIX.as_str(), passkey_router());
 
     let ports = Ports {
         http: 3001,

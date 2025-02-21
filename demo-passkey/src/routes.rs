@@ -1,7 +1,7 @@
-use axum::{extract::Json, http::StatusCode, routing::post, Router};
+use axum::{Router, extract::Json, http::StatusCode, routing::post};
 use libpasskey::{
-    finish_registration, start_authentication, start_registration, verify_authentication,
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
+    finish_registration, start_authentication, start_registration, verify_authentication,
 };
 
 pub fn router_register() -> Router {

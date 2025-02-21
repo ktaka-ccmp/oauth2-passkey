@@ -2,7 +2,7 @@ use askama::Template;
 use axum::{
     http::StatusCode,
     response::Html,
-    routing::{get, Router},
+    routing::{Router, get},
 };
 use axum_core::response::IntoResponse;
 

@@ -2,7 +2,7 @@ use chrono::{Duration, Utc};
 use headers::Cookie;
 use http::header::HeaderMap;
 
-use libuserdb::{get_user, upsert_user, User as DbUser};
+use libuserdb::{User as DbUser, get_user, upsert_user};
 
 use crate::common::{gen_random_string, header_set_cookie};
 use crate::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME, SESSION_STORE};

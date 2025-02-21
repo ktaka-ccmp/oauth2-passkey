@@ -1,12 +1,12 @@
 use askama::Template;
 use axum::{
+    Router,
     extract::{Form, Query},
-    http::{header::CONTENT_TYPE, HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     response::{Html, Redirect, Response},
     routing::get,
-    Router,
 };
-use axum_extra::{headers, TypedHeader};
+use axum_extra::{TypedHeader, headers};
 use chrono::{Duration, Utc};
 // use axum_core::response::Response;
 
@@ -22,13 +22,13 @@ impl<T, E: std::fmt::Display> IntoResponseError<T> for Result<T, E> {
 }
 
 use liboauth2::{
-    csrf_checks, get_idinfo_userinfo, header_set_cookie, prepare_oauth2_auth_request,
-    validate_origin, AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ROUTE_PREFIX,
+    AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ROUTE_PREFIX, csrf_checks,
+    get_idinfo_userinfo, header_set_cookie, prepare_oauth2_auth_request, validate_origin,
 };
 
 use libsession::{
-    create_session_with_user, delete_session_from_store, prepare_logout_response,
-    User as SessionUser, SESSION_COOKIE_NAME,
+    SESSION_COOKIE_NAME, User as SessionUser, create_session_with_user, delete_session_from_store,
+    prepare_logout_response,
 };
 
 pub fn router() -> Router {
