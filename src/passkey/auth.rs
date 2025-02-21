@@ -78,7 +78,8 @@ pub async fn start_authentication(
     let stored_challenge = StoredChallenge {
         challenge: challenge.clone().unwrap_or_default(),
         user: PublicKeyCredentialUserEntity {
-            id_handle: auth_id.clone(),
+            // id_handle: auth_id.clone(),
+            id_handle: "temp".to_string(),
             name: "temp".to_string(),
             display_name: "temp".to_string(),
         },
@@ -200,6 +201,8 @@ pub async fn verify_authentication(
     println!("user_info stored in credential: {:?}", &credential.user);
     #[cfg(debug_assertions)]
     println!("user_handle received from client: {:?}", &user_handle);
+    #[cfg(debug_assertions)]
+    println!("user_handle before decoding: {:?}", auth_response.response.user_handle);
 
     // let display_name = credential.user.display_name.as_str().to_owned();
     let name = credential.user.name.as_str().to_owned();

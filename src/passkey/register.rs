@@ -44,6 +44,7 @@ pub async fn start_registration_with_auth_user(
         display_name: user.name.clone(),
     };
 
+    // Wrap user info in session info to match the cache store data type
     let session_info = CacheData::SessionInfo(SessionInfo { user });
 
     PASSKEY_CACHE_STORE
@@ -148,7 +149,7 @@ pub async fn finish_registration_with_auth_user(
         .remove(user_handle)
         .await?;
 
-    // Verify the user is the same as the one used to start the registration
+    // Verify the user is the same as the one in the cache store i.e. used to start the registration
     if user.id != session_info.user.id {
         return Err(PasskeyError::Format("User ID mismatch".to_string()));
     }
