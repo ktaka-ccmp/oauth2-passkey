@@ -25,7 +25,7 @@ pub async fn start_registration(username: String) -> Result<RegistrationOptions,
     println!("start_registration user: {}", username);
 
     let user_info = PublicKeyCredentialUserEntity {
-        id_handle: crate::common::gen_random_string(16)?,
+        user_handle: crate::common::gen_random_string(16)?,
         name: username.clone(),
         display_name: username.clone(),
     };
@@ -39,7 +39,7 @@ pub async fn start_registration_with_auth_user(
     user: SessionUser,
 ) -> Result<RegistrationOptions, PasskeyError> {
     let user_info = PublicKeyCredentialUserEntity {
-        id_handle: crate::common::gen_random_string(16)?,
+        user_handle: crate::common::gen_random_string(16)?,
         name: user.email.clone(),
         display_name: user.name.clone(),
     };
@@ -51,7 +51,7 @@ pub async fn start_registration_with_auth_user(
         .lock()
         .await
         .get_store_mut()
-        .put(&user_info.id_handle, session_info)
+        .put(&user_info.user_handle, session_info)
         .await?;
 
     #[cfg(debug_assertions)]
@@ -80,7 +80,7 @@ pub async fn create_registration_options(
         .lock()
         .await
         .get_store_mut()
-        .store_challenge(user_info.id_handle.clone(), stored_challenge)
+        .store_challenge(user_info.user_handle.clone(), stored_challenge)
         .await?;
 
     let authenticator_selection = AuthenticatorSelection {
@@ -133,7 +133,7 @@ pub async fn finish_registration_with_auth_user(
     let session_info = match PASSKEY_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
+        .get_store()
         .get(user_handle)
         .await?
     {

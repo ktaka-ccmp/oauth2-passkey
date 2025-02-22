@@ -87,6 +87,7 @@ impl ChallengeStore for PostgresChallengeStore {
         .bind(&challenge.user.name)
         .bind(&challenge.user.display_name)
         .bind(challenge.timestamp as i64)
+        .bind(challenge.ttl as i64)
         .execute(&self.pool)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -112,7 +113,7 @@ impl ChallengeStore for PostgresChallengeStore {
 
         let challenge = row.map(|r| {
             let user_info = PublicKeyCredentialUserEntity {
-                id_handle: challenge_id.to_string(),
+                user_handle: challenge_id.to_string(),
                 name: r.get("user_name"),
                 display_name: r.get("user_display_name"),
             };
@@ -225,7 +226,7 @@ impl CredentialStore for PostgresCredentialStore {
         .bind(&credential.credential_id)
         .bind(&credential.public_key)
         .bind(credential.counter as i32)
-        .bind(&credential.user.id_handle)
+        .bind(&credential.user.user_handle)
         .bind(&credential.user.name)
         .bind(&credential.user.display_name)
         .execute(&self.pool)
@@ -257,7 +258,7 @@ impl CredentialStore for PostgresCredentialStore {
 
         let credential = row.map(|r| {
             let user_info = PublicKeyCredentialUserEntity {
-                id_handle: r.get("user_handle"),
+                user_handle: r.get("user_handle"),
                 name: r.get("user_name"),
                 display_name: r.get("user_display_name"),
             };
@@ -313,7 +314,7 @@ impl CredentialStore for PostgresCredentialStore {
             .into_iter()
             .map(|r| {
                 let user_info = PublicKeyCredentialUserEntity {
-                    id_handle: r.get("user_handle"),
+                    user_handle: r.get("user_handle"),
                     name: r.get("user_name"),
                     display_name: r.get("user_display_name"),
                 };
@@ -343,7 +344,7 @@ impl CredentialStore for PostgresCredentialStore {
             .into_iter()
             .map(|r| {
                 let user_info = PublicKeyCredentialUserEntity {
-                    id_handle: r.get("user_handle"),
+                    user_handle: r.get("user_handle"),
                     name: r.get("user_name"),
                     display_name: r.get("user_display_name"),
                 };
