@@ -133,7 +133,7 @@ pub async fn finish_registration_with_auth_user(
     let session_info = match PASSKEY_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
+        .get_store()
         .get(user_handle)
         .await?
     {
