@@ -48,7 +48,7 @@ pub async fn start_registration_with_auth_user(
     let session_info = CacheData::SessionInfo(SessionInfo { user });
 
     PASSKEY_CACHE_STORE
-        .lock()
+        .write()
         .await
         .get_store_mut()
         .put(&user_info.user_handle, session_info)
@@ -77,7 +77,7 @@ pub async fn create_registration_options(
     };
 
     PASSKEY_CHALLENGE_STORE
-        .lock()
+        .write()
         .await
         .get_store_mut()
         .store_challenge(user_info.user_handle.clone(), stored_challenge)
@@ -131,7 +131,7 @@ pub async fn finish_registration_with_auth_user(
         ))?;
 
     let session_info = match PASSKEY_CACHE_STORE
-        .lock()
+        .read()
         .await
         .get_store()
         .get(user_handle)
@@ -143,7 +143,7 @@ pub async fn finish_registration_with_auth_user(
 
     // Delete the session info from the store
     PASSKEY_CACHE_STORE
-        .lock()
+        .write()
         .await
         .get_store_mut()
         .remove(user_handle)
@@ -158,7 +158,7 @@ pub async fn finish_registration_with_auth_user(
 
     // Store email vs credential ID etc. in CacheStore
     PASSKEY_CACHE_STORE
-        .lock()
+        .write()
         .await
         .get_store_mut()
         .put(
@@ -174,7 +174,7 @@ pub async fn finish_registration_with_auth_user(
         .map_err(|e| PasskeyError::Format(format!("Failed to decode credential ID: {}", e)))?;
 
     PASSKEY_CACHE_STORE
-        .lock()
+        .write()
         .await
         .get_store_mut()
         .put(
@@ -209,7 +209,7 @@ pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String
         ))?;
 
     let stored_challenge = PASSKEY_CHALLENGE_STORE
-        .lock()
+        .read()
         .await
         .get_store()
         .get_challenge(user_handle)
@@ -224,7 +224,7 @@ pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String
     let credential_id_str = reg_data.raw_id.clone();
 
     PASSKEY_CREDENTIAL_STORE
-        .lock()
+        .write()
         .await
         .get_store_mut()
         .store_credential(
@@ -240,7 +240,7 @@ pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String
 
     // Remove used challenge
     PASSKEY_CHALLENGE_STORE
-        .lock()
+        .write()
         .await
         .get_store_mut()
         .remove_challenge(user_handle)
@@ -473,7 +473,7 @@ async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), Passkey
             "User handle is missing".to_string(),
         ))?;
 
-    let challenge_store = PASSKEY_CHALLENGE_STORE.lock().await;
+    let challenge_store = PASSKEY_CHALLENGE_STORE.read().await;
 
     let stored_challenge = challenge_store
         .get_store()

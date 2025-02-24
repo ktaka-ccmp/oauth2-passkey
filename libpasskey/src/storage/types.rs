@@ -1,65 +1,81 @@
+use crate::errors::PasskeyError;
 use crate::types::{CacheData, StoredChallenge, StoredCredential};
-use sqlx::{Pool, Postgres, Sqlite};
+use libstorage::{StorageConfig, Store};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
-pub(crate) enum ChallengeStoreType {
+pub enum ChallengeStoreType {
     Memory,
-    Sqlite { url: String },
-    Postgres { url: String },
     Redis { url: String },
+    Postgres { url: String },
+    Sqlite { url: String },
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum CredentialStoreType {
+pub enum CredentialStoreType {
     Memory,
-    Sqlite { url: String },
-    Postgres { url: String },
     Redis { url: String },
-}
-
-pub(crate) struct InMemoryChallengeStore {
-    pub(super) challenges: HashMap<String, StoredChallenge>,
-}
-
-pub(crate) struct InMemoryCredentialStore {
-    pub(super) credentials: HashMap<String, StoredCredential>,
-}
-
-pub(crate) struct PostgresChallengeStore {
-    pub(super) pool: Pool<Postgres>,
-}
-
-pub(crate) struct PostgresCredentialStore {
-    pub(super) pool: Pool<Postgres>,
-}
-
-pub(crate) struct RedisChallengeStore {
-    pub(super) client: redis::Client,
-}
-
-pub(crate) struct RedisCredentialStore {
-    pub(super) client: redis::Client,
-}
-
-pub(crate) struct SqliteChallengeStore {
-    pub(super) pool: Pool<Sqlite>,
-}
-
-pub(crate) struct SqliteCredentialStore {
-    pub(super) pool: Pool<Sqlite>,
+    Postgres { url: String },
+    Sqlite { url: String },
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum CacheStoreType {
-    Memory,
-    Redis { url: String },
+pub enum CacheStoreType {
+    LibStorage,            // New variant for libstorage
+    Redis { url: String }, // Redis variant with URL
 }
 
-pub(crate) struct InMemoryCacheStore {
-    pub(super) entry: HashMap<String, CacheData>,
+pub struct InMemoryChallengeStore {
+    pub challenges: HashMap<String, StoredChallenge>,
 }
 
-pub(crate) struct RedisCacheStore {
-    pub(super) client: redis::Client,
+pub struct InMemoryCredentialStore {
+    pub credentials: HashMap<String, StoredCredential>,
+}
+
+#[derive(Default)]
+pub struct InMemoryCacheStore {
+    pub cache: HashMap<String, CacheData>,
+}
+
+pub struct PostgresChallengeStore {
+    pub pool: sqlx::PgPool,
+}
+
+pub struct PostgresCredentialStore {
+    pub pool: sqlx::PgPool,
+}
+
+pub struct RedisChallengeStore {
+    pub client: redis::Client,
+}
+
+pub struct RedisCredentialStore {
+    pub client: redis::Client,
+}
+
+pub struct RedisCacheStore {
+    pub client: redis::Client,
+}
+
+pub struct SqliteChallengeStore {
+    pub pool: sqlx::SqlitePool,
+}
+
+pub struct SqliteCredentialStore {
+    pub pool: sqlx::SqlitePool,
+}
+
+pub struct LibStorageCacheStore {
+    pub store: Box<dyn Store>,
+}
+
+impl LibStorageCacheStore {
+    pub async fn new(config: StorageConfig) -> Result<Self, PasskeyError> {
+        let store = config
+            .init_store()
+            .await
+            .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+        Ok(Self { store })
+    }
 }

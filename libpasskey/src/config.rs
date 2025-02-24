@@ -1,11 +1,13 @@
 use std::{env, sync::LazyLock};
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 use crate::errors::PasskeyError;
 use crate::storage::{
-    CacheStore, CacheStoreType, ChallengeStore, ChallengeStoreType, CredentialStore,
-    CredentialStoreType, InMemoryCacheStore, InMemoryChallengeStore, InMemoryCredentialStore,
+    CacheStore, ChallengeStore, ChallengeStoreType, CredentialStore, CredentialStoreType,
+    InMemoryCacheStore, InMemoryChallengeStore, InMemoryCredentialStore, LibStorageCacheStore,
 };
+
+use libstorage::StorageConfig;
 
 pub(crate) struct SingletonChallengeStore {
     store: Box<dyn ChallengeStore>,
@@ -40,9 +42,9 @@ impl SingletonChallengeStore {
     }
 }
 
-pub(crate) static PASSKEY_CHALLENGE_STORE: LazyLock<Mutex<SingletonChallengeStore>> =
+pub(crate) static PASSKEY_CHALLENGE_STORE: LazyLock<RwLock<SingletonChallengeStore>> =
     LazyLock::new(|| {
-        Mutex::new(SingletonChallengeStore::new(Box::new(
+        RwLock::new(SingletonChallengeStore::new(Box::new(
             InMemoryChallengeStore::new(),
         )))
     });
@@ -56,7 +58,7 @@ pub(crate) async fn init_challenge_store() -> Result<(), PasskeyError> {
 
     tracing::info!("Initializing token store with type: {:?}", store_type);
     let store = store_type.create_store().await?;
-    PASSKEY_CHALLENGE_STORE.lock().await.set_store(store)?;
+    PASSKEY_CHALLENGE_STORE.write().await.set_store(store)?;
     tracing::info!("Token store initialized successfully");
     Ok(())
 }
@@ -94,9 +96,9 @@ impl SingletonCredentialStore {
     }
 }
 
-pub(crate) static PASSKEY_CREDENTIAL_STORE: LazyLock<Mutex<SingletonCredentialStore>> =
+pub(crate) static PASSKEY_CREDENTIAL_STORE: LazyLock<RwLock<SingletonCredentialStore>> =
     LazyLock::new(|| {
-        Mutex::new(SingletonCredentialStore::new(Box::new(
+        RwLock::new(SingletonCredentialStore::new(Box::new(
             InMemoryCredentialStore::new(),
         )))
     });
@@ -110,28 +112,8 @@ pub(crate) async fn init_credential_store() -> Result<(), PasskeyError> {
 
     tracing::info!("Initializing token store with type: {:?}", store_type);
     let store = store_type.create_store().await?;
-    PASSKEY_CREDENTIAL_STORE.lock().await.set_store(store)?;
+    PASSKEY_CREDENTIAL_STORE.write().await.set_store(store)?;
     tracing::info!("Token store initialized successfully");
-    Ok(())
-}
-
-pub(crate) static PASSKEY_CACHE_STORE: LazyLock<Mutex<SingletonCacheStore>> = LazyLock::new(|| {
-    Mutex::new(SingletonCacheStore::new(
-        Box::new(InMemoryCacheStore::new()),
-    ))
-});
-
-pub(crate) async fn init_cache_store() -> Result<(), PasskeyError> {
-    let store_type = CacheStoreType::from_env().unwrap_or_else(|e| {
-        eprintln!("Failed to initialize token store from environment: {}", e);
-        eprintln!("Falling back to in-memory store");
-        CacheStoreType::Memory
-    });
-
-    tracing::info!("Initializing cache store with type: {:?}", store_type);
-    let store = store_type.create_store().await?;
-    PASSKEY_CACHE_STORE.lock().await.set_store(store)?;
-    tracing::info!("Cache store initialized successfully");
     Ok(())
 }
 
@@ -166,6 +148,22 @@ impl SingletonCacheStore {
     pub(crate) fn get_store_mut(&mut self) -> &mut Box<dyn CacheStore> {
         &mut self.store
     }
+}
+
+pub(crate) static PASSKEY_CACHE_STORE: LazyLock<RwLock<SingletonCacheStore>> =
+    LazyLock::new(|| {
+        RwLock::new(SingletonCacheStore::new(Box::new(
+            InMemoryCacheStore::default(),
+        )))
+    });
+
+pub(crate) async fn init_cache_store() -> Result<(), PasskeyError> {
+    let config = StorageConfig::from_env().map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    let store = LibStorageCacheStore::new(config).await?;
+    let mut cache_store = PASSKEY_CACHE_STORE.write().await;
+    cache_store.set_store(Box::new(store))?;
+    cache_store.get_store().init().await?;
+    Ok(())
 }
 
 pub static PASSKEY_ROUTE_PREFIX: LazyLock<String> = LazyLock::new(|| {

@@ -32,7 +32,7 @@ pub(crate) fn gen_random_string(len: usize) -> Result<String, PasskeyError> {
 
 pub async fn email_to_user_id(username: String) -> Result<String, PasskeyError> {
     let user_id = PASSKEY_CACHE_STORE
-        .lock()
+        .read()
         .await
         .get_store()
         .get(&username)

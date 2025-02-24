@@ -1,15 +1,14 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use super::traits::{CacheStore, ChallengeStore, CredentialStore};
-use super::types::{InMemoryCacheStore, InMemoryChallengeStore, InMemoryCredentialStore};
-
 use crate::errors::PasskeyError;
 use crate::types::{CacheData, StoredChallenge, StoredCredential};
 
+use super::traits::{CacheStore, ChallengeStore, CredentialStore};
+use super::types::{InMemoryCacheStore, InMemoryChallengeStore, InMemoryCredentialStore};
+
 impl InMemoryChallengeStore {
-    pub(crate) fn new() -> Self {
-        println!("Creating new in-memory challenge store");
+    pub fn new() -> Self {
         Self {
             challenges: HashMap::new(),
         }
@@ -17,8 +16,7 @@ impl InMemoryChallengeStore {
 }
 
 impl InMemoryCredentialStore {
-    pub(crate) fn new() -> Self {
-        println!("Creating new in-memory credential store");
+    pub fn new() -> Self {
         Self {
             credentials: HashMap::new(),
         }
@@ -26,10 +24,9 @@ impl InMemoryCredentialStore {
 }
 
 impl InMemoryCacheStore {
-    pub(crate) fn new() -> Self {
-        println!("Creating new in-memory cache store");
+    pub fn new() -> Self {
         Self {
-            entry: HashMap::new(),
+            cache: HashMap::new(),
         }
     }
 }
@@ -37,7 +34,7 @@ impl InMemoryCacheStore {
 #[async_trait]
 impl ChallengeStore for InMemoryChallengeStore {
     async fn init(&self) -> Result<(), PasskeyError> {
-        Ok(()) // Nothing to initialize for in-memory store
+        Ok(())
     }
 
     async fn store_challenge(
@@ -65,7 +62,7 @@ impl ChallengeStore for InMemoryChallengeStore {
 #[async_trait]
 impl CredentialStore for InMemoryCredentialStore {
     async fn init(&self) -> Result<(), PasskeyError> {
-        Ok(()) // Nothing to initialize for in-memory store
+        Ok(())
     }
 
     async fn store_credential(
@@ -91,7 +88,7 @@ impl CredentialStore for InMemoryCredentialStore {
         Ok(self
             .credentials
             .values()
-            .filter(|credential| credential.user.name == username)
+            .filter(|c| c.user.name == username)
             .cloned()
             .collect())
     }
@@ -105,7 +102,7 @@ impl CredentialStore for InMemoryCredentialStore {
             credential.counter = new_counter;
             Ok(())
         } else {
-            Err(PasskeyError::NotFound("Credential not found".to_string()))
+            Err(PasskeyError::Storage("Credential not found".into()))
         }
     }
 
@@ -117,29 +114,30 @@ impl CredentialStore for InMemoryCredentialStore {
 #[async_trait]
 impl CacheStore for InMemoryCacheStore {
     async fn init(&self) -> Result<(), PasskeyError> {
-        Ok(()) // Nothing to initialize for in-memory store
+        Ok(())
     }
 
     async fn put(&mut self, key: &str, value: CacheData) -> Result<(), PasskeyError> {
-        self.entry.insert(key.to_owned(), value);
+        self.cache.insert(key.to_string(), value);
         Ok(())
     }
 
     async fn get(&self, key: &str) -> Result<Option<CacheData>, PasskeyError> {
-        Ok(self.entry.get(key).cloned())
+        Ok(self.cache.get(key).cloned())
     }
 
     async fn gets(&self, key: &str) -> Result<Vec<CacheData>, PasskeyError> {
-        let matching_entries = self
-            .entry
-            .iter()
-            .filter_map(|(k, v)| if k == key { Some(v.clone()) } else { None })
-            .collect();
-        Ok(matching_entries)
+        let mut results = Vec::new();
+        for (k, v) in self.cache.iter() {
+            if k.starts_with(key) {
+                results.push(v.clone());
+            }
+        }
+        Ok(results)
     }
 
     async fn remove(&mut self, key: &str) -> Result<(), PasskeyError> {
-        self.entry.remove(key);
+        self.cache.remove(key);
         Ok(())
     }
 }

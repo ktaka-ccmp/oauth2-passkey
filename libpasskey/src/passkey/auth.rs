@@ -26,7 +26,7 @@ pub async fn start_authentication(
             let user_id = email_to_user_id(username).await?;
 
             let credential_id_strs: Vec<UserIdCredentialIdStr> = PASSKEY_CACHE_STORE
-                .lock()
+                .read()
                 .await
                 .get_store()
                 .gets(&user_id)
@@ -89,7 +89,7 @@ pub async fn start_authentication(
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    let mut challenge_store = PASSKEY_CHALLENGE_STORE.lock().await;
+    let mut challenge_store = PASSKEY_CHALLENGE_STORE.write().await;
     challenge_store
         .get_store_mut()
         .store_challenge(auth_id.clone(), stored_challenge)
@@ -119,8 +119,8 @@ pub async fn verify_authentication(
     );
 
     // Get stored challenge and verify auth
-    let mut challenge_store = PASSKEY_CHALLENGE_STORE.lock().await;
-    let credential_store = PASSKEY_CREDENTIAL_STORE.lock().await;
+    let mut challenge_store = PASSKEY_CHALLENGE_STORE.write().await;
+    let credential_store = PASSKEY_CREDENTIAL_STORE.read().await;
 
     // let mut store = state.store.lock().await;
     let stored_challenge = challenge_store
