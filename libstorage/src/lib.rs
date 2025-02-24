@@ -1,9 +1,8 @@
-mod config;
-mod error;
-mod store;
-mod types;
+pub mod config;
+pub mod store;
+pub mod types;
 
-pub use config::{StorageConfig, CACHE_STORE, PERMANENT_STORE};
-pub use error::StorageError;
-pub use store::{CacheStore, PermanentStore, Store};
-pub use types::{CacheDataKind, PermanentDataKind, QueryField, QueryRelation, StorageKind, StorageType};
+// Re-export necessary types
+pub use config::StorageConfig;
+pub use store::traits::{CacheStore, RawCacheStore, RawPermanentStore, Store};
+pub use types::CacheDataKind;

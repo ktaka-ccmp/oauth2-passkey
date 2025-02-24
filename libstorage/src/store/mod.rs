@@ -1,53 +1,41 @@
 mod memory;
 mod postgres;
-mod redis;
+pub mod redis;
 mod sqlite;
-mod traits;
+pub mod traits;
 
-pub use memory::{InMemoryCacheStore, InMemoryPermanentStore};
-pub use postgres::{PostgresCacheStore, PostgresPermanentStore};
-pub use redis::{RedisCacheStore, RedisPermanentStore};
-pub use sqlite::{SqliteCacheStore, SqlitePermanentStore};
-pub use traits::{CacheStore, PermanentStore, Store};
+use crate::types::{StorageError, StorageType};
+pub use memory::MemoryStore;
+pub use postgres::PostgresStore;
+pub use redis::RedisStore;
+pub use sqlite::SqliteStore;
+pub use traits::Store;
 
-use crate::{StorageError, StorageKind, StorageType};
+pub async fn init_store(
+    storage_type: StorageType,
+    url: &str,
+) -> Result<Box<dyn Store>, StorageError> {
+    let store: Box<dyn Store> = match storage_type {
+        StorageType::Memory => Box::new(MemoryStore::new()),
+        StorageType::Redis(_) => Box::new(RedisStore::new(url)?),
+        StorageType::Postgres(_) => Box::new(PostgresStore::connect(url).await?),
+        StorageType::Sqlite(_) => Box::new(SqliteStore::connect(url).await?),
+    };
 
-pub(crate) struct StorageFactory;
+    store.init().await?;
+    Ok(store)
+}
 
-impl StorageFactory {
-    pub async fn create_cache(storage_type: StorageType) -> Result<Box<dyn CacheStore>, StorageError> {
-        match storage_type {
-            StorageType::Memory => Ok(Box::new(InMemoryCacheStore::new())),
-            StorageType::Redis { url } => {
-                let store = RedisCacheStore::connect(&url).await?;
-                Ok(Box::new(store))
-            }
-            StorageType::Postgres { url } => {
-                let store = PostgresCacheStore::connect(&url).await?;
-                Ok(Box::new(store))
-            }
-            StorageType::Sqlite { path } => {
-                let store = SqliteCacheStore::connect(&path).await?;
-                Ok(Box::new(store))
-            }
-        }
-    }
+pub async fn init_storage<T>(storage_type: StorageType, url: &str) -> Result<T, StorageError>
+where
+    T: From<MemoryStore> + From<RedisStore> + From<PostgresStore> + From<SqliteStore>,
+{
+    let store = match storage_type {
+        StorageType::Memory => T::from(MemoryStore::new()),
+        StorageType::Redis(_) => T::from(RedisStore::new(url)?),
+        StorageType::Postgres(_) => T::from(PostgresStore::connect(url).await?),
+        StorageType::Sqlite(_) => T::from(SqliteStore::connect(url).await?),
+    };
 
-    pub async fn create_permanent(storage_type: StorageType) -> Result<Box<dyn PermanentStore>, StorageError> {
-        match storage_type {
-            StorageType::Memory => Ok(Box::new(InMemoryPermanentStore::new())),
-            StorageType::Redis { url } => {
-                let store = RedisPermanentStore::connect(&url).await?;
-                Ok(Box::new(store))
-            }
-            StorageType::Postgres { url } => {
-                let store = PostgresPermanentStore::connect(&url).await?;
-                Ok(Box::new(store))
-            }
-            StorageType::Sqlite { path } => {
-                let store = SqlitePermanentStore::connect(&path).await?;
-                Ok(Box::new(store))
-            }
-        }
-    }
+    Ok(store)
 }

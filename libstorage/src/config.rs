@@ -1,68 +1,53 @@
-use std::sync::Mutex;
-use once_cell::sync::Lazy;
+use std::env;
 
 use crate::{
-    store::StorageFactory,
-    types::{StorageKind, StorageType},
-    CacheStore, PermanentStore, StorageError,
+    store::{init_store, Store},
+    types::{StorageError, StorageType},
 };
 
 pub struct StorageConfig {
-    storage_type: StorageType,
-    url: String,
+    pub storage_type: StorageType,
 }
 
 impl StorageConfig {
     pub fn from_env() -> Result<Self, StorageError> {
-        dotenvy::dotenv().ok();
-
-        let storage_type = std::env::var("STORAGE_TYPE")
-            .unwrap_or_else(|_| "memory".to_string());
-        
-        let url = std::env::var("STORAGE_URL")
-            .unwrap_or_else(|_| "".to_string());
+        let storage_type = env::var("CACHE_STORAGE_TYPE").unwrap_or_else(|_| "memory".to_string());
+        let storage_url = env::var("CACHE_STORAGE_URL").ok();
 
         let storage_type = match storage_type.as_str() {
             "memory" => StorageType::Memory,
-            "redis" => StorageType::Redis { url: url.clone() },
-            "postgres" => StorageType::Postgres { url: url.clone() },
-            "sqlite" => StorageType::Sqlite { path: url.clone() },
-            _ => return Err(StorageError::Config("Invalid storage type".into())),
+            "redis" => {
+                let url = storage_url
+                    .ok_or_else(|| StorageError::ConfigError("Redis requires URL".into()))?;
+                StorageType::Redis(url)
+            }
+            "postgres" => {
+                let url = storage_url
+                    .ok_or_else(|| StorageError::ConfigError("Postgres requires URL".into()))?;
+                StorageType::Postgres(url)
+            }
+            "sqlite" => {
+                let url = storage_url
+                    .ok_or_else(|| StorageError::ConfigError("SQLite requires path".into()))?;
+                StorageType::Sqlite(url)
+            }
+            _ => {
+                return Err(StorageError::ConfigError(format!(
+                    "Unknown storage type: {}",
+                    storage_type
+                )))
+            }
         };
 
-        Ok(Self {
-            storage_type,
-            url,
-        })
+        Ok(Self { storage_type })
+    }
+
+    pub async fn init_store(&self) -> Result<Box<dyn Store>, StorageError> {
+        match &self.storage_type {
+            StorageType::Memory => init_store(StorageType::Memory, "").await,
+            StorageType::Redis(url) => init_store(StorageType::Redis(url.clone()), url).await,
+            StorageType::Postgres(url) => init_store(StorageType::Postgres(url.clone()), url).await,
+            StorageType::Sqlite(url) => init_store(StorageType::Sqlite(url.clone()), url).await,
+        }
     }
 }
-
-pub static CACHE_STORE: Lazy<Mutex<Box<dyn CacheStore>>> = Lazy::new(|| {
-    let config = StorageConfig::from_env()
-        .expect("Failed to load storage config");
-    
-    let store = tokio::runtime::Runtime::new()
-        .expect("Failed to create runtime")
-        .block_on(async {
-            StorageFactory::create_cache(config.storage_type)
-                .await
-                .expect("Failed to create cache store")
-        });
-
-    Mutex::new(store)
-});
-
-pub static PERMANENT_STORE: Lazy<Mutex<Box<dyn PermanentStore>>> = Lazy::new(|| {
-    let config = StorageConfig::from_env()
-        .expect("Failed to load storage config");
-    
-    let store = tokio::runtime::Runtime::new()
-        .expect("Failed to create runtime")
-        .block_on(async {
-            StorageFactory::create_permanent(config.storage_type)
-                .await
-                .expect("Failed to create permanent store")
-        });
-
-    Mutex::new(store)
-});

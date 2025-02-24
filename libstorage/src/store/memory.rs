@@ -1,27 +1,35 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::RwLock;
+
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    CacheDataKind, PermanentDataKind, QueryField, QueryRelation,
-    Store, CacheStore, PermanentStore, StorageError,
+    store::traits::{RawCacheStore, RawPermanentStore, Store},
+    types::{CacheDataKind, PermanentDataKind, QueryField, StorageError},
 };
 
-pub struct InMemoryCacheStore {
-    data: Mutex<HashMap<String, (String, Option<std::time::Instant>)>>,
+#[derive(Default)]
+pub struct MemoryStore {
+    cache: RwLock<HashMap<String, Vec<u8>>>,
+    permanent: RwLock<HashMap<String, Vec<u8>>>,
 }
 
-impl InMemoryCacheStore {
+impl MemoryStore {
     pub fn new() -> Self {
-        Self {
-            data: Mutex::new(HashMap::new()),
-        }
+        Self::default()
+    }
+
+    fn make_cache_key(kind: CacheDataKind, key: &str) -> String {
+        format!("{}:{}", kind, key)
+    }
+
+    fn make_permanent_key(kind: PermanentDataKind, key: &str) -> String {
+        format!("{}:{}", kind, key)
     }
 }
 
 #[async_trait]
-impl Store for InMemoryCacheStore {
+impl Store for MemoryStore {
     fn requires_schema(&self) -> bool {
         false
     }
@@ -29,163 +37,110 @@ impl Store for InMemoryCacheStore {
     async fn init(&self) -> Result<(), StorageError> {
         Ok(())
     }
-}
 
-#[async_trait]
-impl CacheStore for InMemoryCacheStore {
-    async fn put<T: Serialize + Send + Sync>(
-        &mut self,
-        kind: CacheDataKind,
-        key: &str,
-        value: &T,
-        ttl_secs: Option<u64>,
-    ) -> Result<(), StorageError> {
-        let prefixed_key = format!("{}{}", kind.prefix(), key);
-        let json = serde_json::to_string(value)?;
-        let expiry = ttl_secs.map(|secs| {
-            std::time::Instant::now() + std::time::Duration::from_secs(secs)
-        });
-        
-        let mut data = self.data.lock().unwrap();
-        data.insert(prefixed_key, (json, expiry));
-        Ok(())
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 
-    async fn get<T: DeserializeOwned>(
-        &self,
-        kind: CacheDataKind,
-        key: &str,
-    ) -> Result<Option<T>, StorageError> {
-        let prefixed_key = format!("{}{}", kind.prefix(), key);
-        let data = self.data.lock().unwrap();
-        
-        if let Some((json, expiry)) = data.get(&prefixed_key) {
-            // Check if expired
-            if let Some(expiry) = expiry {
-                if expiry < &std::time::Instant::now() {
-                    return Ok(None);
-                }
-            }
-            Ok(Some(serde_json::from_str(json)?))
-        } else {
-            Ok(None)
-        }
-    }
-
-    async fn delete(
-        &mut self,
-        kind: CacheDataKind,
-        key: &str,
-    ) -> Result<(), StorageError> {
-        let prefixed_key = format!("{}{}", kind.prefix(), key);
-        let mut data = self.data.lock().unwrap();
-        data.remove(&prefixed_key);
-        Ok(())
-    }
-}
-
-pub struct InMemoryPermanentStore {
-    data: Mutex<HashMap<String, String>>,
-    indexes: Mutex<HashMap<String, Vec<String>>>,
-}
-
-impl InMemoryPermanentStore {
-    pub fn new() -> Self {
-        Self {
-            data: Mutex::new(HashMap::new()),
-            indexes: Mutex::new(HashMap::new()),
-        }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 
 #[async_trait]
-impl Store for InMemoryPermanentStore {
-    fn requires_schema(&self) -> bool {
-        false
-    }
-
-    async fn init(&self) -> Result<(), StorageError> {
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl PermanentStore for InMemoryPermanentStore {
-    async fn store<T: Serialize + Send + Sync>(
+impl RawCacheStore for MemoryStore {
+    async fn put_raw(
         &mut self,
-        kind: PermanentDataKind,
+        kind: CacheDataKind,
         key: &str,
-        value: &T,
+        value: Vec<u8>,
+        _ttl: Option<u64>,
     ) -> Result<(), StorageError> {
-        let json = serde_json::to_string(value)?;
-        let mut data = self.data.lock().unwrap();
-        let mut indexes = self.indexes.lock().unwrap();
-
-        // Store main data
-        data.insert(format!("{:?}:{}", kind, key), json.clone());
-
-        // Update indexes based on the data type
-        let value_json: serde_json::Value = serde_json::from_str(&json)?;
-        match kind {
-            PermanentDataKind::User => {
-                if let Some(email) = value_json.get("email") {
-                    let index_key = format!("email:{}", email.as_str().unwrap());
-                    indexes.insert(index_key, vec![key.to_string()]);
-                }
-            }
-            PermanentDataKind::Credential => {
-                if let Some(user_handle) = value_json.get("user_handle") {
-                    let index_key = format!("user:{}:credentials", user_handle.as_str().unwrap());
-                    let entry = indexes.entry(index_key).or_insert_with(Vec::new);
-                    entry.push(key.to_string());
-                }
-            }
-        }
-
+        let key = Self::make_cache_key(kind, key);
+        self.cache.write().unwrap().insert(key, value);
         Ok(())
     }
 
-    async fn get<T: DeserializeOwned>(
+    async fn get_raw(
         &self,
-        kind: PermanentDataKind,
+        kind: CacheDataKind,
         key: &str,
-    ) -> Result<Option<T>, StorageError> {
-        let data = self.data.lock().unwrap();
-        if let Some(json) = data.get(&format!("{:?}:{}", kind, key)) {
-            Ok(Some(serde_json::from_str(json)?))
-        } else {
-            Ok(None)
-        }
+    ) -> Result<Option<Vec<u8>>, StorageError> {
+        let key = Self::make_cache_key(kind, key);
+        Ok(self.cache.read().unwrap().get(&key).cloned())
     }
 
-    async fn delete(
-        &mut self,
-        kind: PermanentDataKind,
-        key: &str,
-    ) -> Result<(), StorageError> {
-        let mut data = self.data.lock().unwrap();
-        data.remove(&format!("{:?}:{}", kind, key));
-        Ok(())
-    }
-
-    async fn query<T: DeserializeOwned>(
+    async fn query_raw(
         &self,
-        relation: QueryRelation,
-        field: QueryField,
-    ) -> Result<Vec<T>, StorageError> {
-        let indexes = self.indexes.lock().unwrap();
-        let data = self.data.lock().unwrap();
-        
-        let index_key = relation.redis_key_pattern(&field);
-        let keys = indexes.get(&index_key).cloned().unwrap_or_default();
-        
-        let mut results = Vec::new();
-        for key in keys {
-            if let Some(json) = data.get(&key) {
-                results.push(serde_json::from_str(json)?);
-            }
-        }
-        
+        kind: CacheDataKind,
+        key: &str,
+    ) -> Result<Vec<Vec<u8>>, StorageError> {
+        let prefix = Self::make_cache_key(kind, key);
+        let cache = self.cache.read().unwrap();
+        let results: Vec<Vec<u8>> = cache
+            .iter()
+            .filter(|(k, _)| k.starts_with(&prefix))
+            .map(|(_, v)| v.clone())
+            .collect();
         Ok(results)
+    }
+
+    async fn delete(&mut self, kind: CacheDataKind, key: &str) -> Result<(), StorageError> {
+        let key = Self::make_cache_key(kind, key);
+        self.cache.write().unwrap().remove(&key);
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl RawPermanentStore for MemoryStore {
+    async fn store_raw(
+        &mut self,
+        kind: PermanentDataKind,
+        key: &str,
+        value: Vec<u8>,
+    ) -> Result<(), StorageError> {
+        let key = Self::make_permanent_key(kind, key);
+        self.permanent.write().unwrap().insert(key, value);
+        Ok(())
+    }
+
+    async fn get_raw(
+        &self,
+        kind: PermanentDataKind,
+        key: &str,
+    ) -> Result<Option<Vec<u8>>, StorageError> {
+        let key = Self::make_permanent_key(kind, key);
+        Ok(self.permanent.read().unwrap().get(&key).cloned())
+    }
+
+    async fn query_raw(
+        &self,
+        kind: PermanentDataKind,
+        field: QueryField,
+    ) -> Result<Vec<Vec<u8>>, StorageError> {
+        let prefix = match (kind, field) {
+            (PermanentDataKind::User, QueryField::Email(email)) => {
+                format!("user:*:email:{}", email)
+            }
+            (PermanentDataKind::Credential, QueryField::UserHandle(handle)) => {
+                format!("credential:*:user_handle:{}", handle)
+            }
+            _ => return Ok(Vec::new()),
+        };
+
+        let permanent = self.permanent.read().unwrap();
+        let results: Vec<Vec<u8>> = permanent
+            .iter()
+            .filter(|(k, _)| k.starts_with(&prefix))
+            .map(|(_, v)| v.clone())
+            .collect();
+        Ok(results)
+    }
+
+    async fn delete(&mut self, kind: PermanentDataKind, key: &str) -> Result<(), StorageError> {
+        let key = Self::make_permanent_key(kind, key);
+        self.permanent.write().unwrap().remove(&key);
+        Ok(())
     }
 }

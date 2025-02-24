@@ -1,71 +1,136 @@
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
+use std::any::Any;
 
-use crate::{CacheDataKind, PermanentDataKind, QueryField, QueryRelation, StorageError};
+use crate::types::{CacheDataKind, PermanentDataKind, QueryField, StorageError};
 
 #[async_trait]
-pub trait Store: Send + Sync {
-    /// Returns true if this store requires schema initialization
+pub trait Store: Send + Sync + Any + 'static {
     fn requires_schema(&self) -> bool;
-
-    /// Initialize the store (create tables for SQL databases)
     async fn init(&self) -> Result<(), StorageError>;
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 #[async_trait]
-pub trait CacheStore: Store {
-    /// Store a value with its type
+pub trait RawCacheStore: Store {
+    async fn put_raw(
+        &mut self,
+        kind: CacheDataKind,
+        key: &str,
+        value: Vec<u8>,
+        ttl: Option<u64>,
+    ) -> Result<(), StorageError>;
+
+    async fn get_raw(
+        &self,
+        kind: CacheDataKind,
+        key: &str,
+    ) -> Result<Option<Vec<u8>>, StorageError>;
+
+    async fn query_raw(&self, kind: CacheDataKind, key: &str)
+        -> Result<Vec<Vec<u8>>, StorageError>;
+
+    async fn delete(&mut self, kind: CacheDataKind, key: &str) -> Result<(), StorageError>;
+}
+
+#[async_trait]
+pub trait RawPermanentStore: Store {
+    async fn store_raw(
+        &mut self,
+        kind: PermanentDataKind,
+        key: &str,
+        value: Vec<u8>,
+    ) -> Result<(), StorageError>;
+
+    async fn get_raw(
+        &self,
+        kind: PermanentDataKind,
+        key: &str,
+    ) -> Result<Option<Vec<u8>>, StorageError>;
+
+    async fn query_raw(
+        &self,
+        kind: PermanentDataKind,
+        field: QueryField,
+    ) -> Result<Vec<Vec<u8>>, StorageError>;
+
+    async fn delete(&mut self, kind: PermanentDataKind, key: &str) -> Result<(), StorageError>;
+}
+
+#[async_trait]
+pub trait CacheStore: RawCacheStore {
     async fn put<T: Serialize + Send + Sync>(
         &mut self,
         kind: CacheDataKind,
         key: &str,
         value: &T,
-        ttl_secs: Option<u64>,
-    ) -> Result<(), StorageError>;
+        ttl: Option<u64>,
+    ) -> Result<(), StorageError> {
+        let value = serde_json::to_vec(value)?;
+        self.put_raw(kind, key, value, ttl).await
+    }
 
-    /// Retrieve a value by its type and key
-    async fn get<T: DeserializeOwned>(
+    async fn get<T: DeserializeOwned + Send>(
         &self,
         kind: CacheDataKind,
         key: &str,
-    ) -> Result<Option<T>, StorageError>;
+    ) -> Result<Option<T>, StorageError> {
+        if let Some(value) = self.get_raw(kind, key).await? {
+            Ok(Some(serde_json::from_slice(&value)?))
+        } else {
+            Ok(None)
+        }
+    }
 
-    /// Delete a value by its type and key
-    async fn delete(
-        &mut self,
+    async fn query<T: DeserializeOwned + Send>(
+        &self,
         kind: CacheDataKind,
         key: &str,
-    ) -> Result<(), StorageError>;
+    ) -> Result<Vec<T>, StorageError> {
+        let values = self.query_raw(kind, key).await?;
+        let mut result = Vec::with_capacity(values.len());
+        for value in values {
+            result.push(serde_json::from_slice(&value)?);
+        }
+        Ok(result)
+    }
 }
 
 #[async_trait]
-pub trait PermanentStore: Store {
-    /// Store a value with its type
+pub trait PermanentStore: RawPermanentStore {
     async fn store<T: Serialize + Send + Sync>(
         &mut self,
         kind: PermanentDataKind,
         key: &str,
         value: &T,
-    ) -> Result<(), StorageError>;
+    ) -> Result<(), StorageError> {
+        let value = serde_json::to_vec(value)?;
+        self.store_raw(kind, key, value).await
+    }
 
-    /// Retrieve a value by its type and key
-    async fn get<T: DeserializeOwned>(
+    async fn get<T: DeserializeOwned + Send>(
         &self,
         kind: PermanentDataKind,
         key: &str,
-    ) -> Result<Option<T>, StorageError>;
+    ) -> Result<Option<T>, StorageError> {
+        if let Some(value) = self.get_raw(kind, key).await? {
+            Ok(Some(serde_json::from_slice(&value)?))
+        } else {
+            Ok(None)
+        }
+    }
 
-    /// Delete a value by its type and key
-    async fn delete(
-        &mut self,
-        kind: PermanentDataKind,
-        key: &str,
-    ) -> Result<(), StorageError>;
-
-    /// Query relationships between data
-    async fn query<T: DeserializeOwned>(
+    async fn query<T: DeserializeOwned + Send>(
         &self,
-        relation: QueryRelation,
+        kind: PermanentDataKind,
         field: QueryField,
-    ) -> Result<Vec<T>, StorageError>;
+    ) -> Result<Vec<T>, StorageError> {
+        let values = self.query_raw(kind, field).await?;
+        let mut result = Vec::with_capacity(values.len());
+        for value in values {
+            result.push(serde_json::from_slice(&value)?);
+        }
+        Ok(result)
+    }
 }

@@ -1,113 +1,47 @@
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Serialize};
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
-
-use crate::{
-    CacheDataKind, PermanentDataKind, QueryField, QueryRelation,
-    Store, PermanentStore, StorageError,
+use sqlx::{
+    sqlite::{SqlitePool, SqliteRow},
+    types::chrono::Utc,
+    Row,
 };
 
-pub struct SqlitePermanentStore {
+use crate::{
+    store::traits::{RawCacheStore, RawPermanentStore, Store},
+    types::{CacheDataKind, PermanentDataKind, QueryField, StorageError},
+};
+
+pub struct SqliteStore {
     pool: SqlitePool,
 }
 
-impl SqlitePermanentStore {
-    pub async fn connect(path: &str) -> Result<Self, StorageError> {
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1) // SQLite supports only one writer
-            .connect(&format!("sqlite:{}", path))
-            .await?;
+impl SqliteStore {
+    pub async fn connect(url: &str) -> Result<Self, StorageError> {
+        let pool = SqlitePool::connect(url).await?;
         Ok(Self { pool })
     }
 
-    async fn create_tables(&self) -> Result<(), StorageError> {
-        // Enable foreign key support
-        sqlx::query("PRAGMA foreign_keys = ON")
-            .execute(&self.pool)
-            .await?;
-
-        // Create users table
+    async fn init_schema(&self) -> Result<(), StorageError> {
         sqlx::query(
             r#"
+            CREATE TABLE IF NOT EXISTS cache_store (
+                kind TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value BLOB NOT NULL,
+                expiry INTEGER,
+                PRIMARY KEY (kind, key)
+            );
             CREATE TABLE IF NOT EXISTS users (
-                user_id TEXT PRIMARY KEY,
+                id TEXT PRIMARY KEY,
                 email TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        // Create credentials table
-        sqlx::query(
-            r#"
+                data BLOB NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS credentials (
-                credential_id TEXT PRIMARY KEY,
-                credential BLOB NOT NULL,
-                public_key BLOB NOT NULL,
-                counter INTEGER NOT NULL,
+                id TEXT PRIMARY KEY,
                 user_handle TEXT NOT NULL,
-                user_name TEXT NOT NULL,
-                user_display_name TEXT NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_handle) REFERENCES users(user_id)
-            )
+                data BLOB NOT NULL
+            );
             "#,
         )
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    async fn store_user<T: Serialize>(&self, key: &str, value: &T) -> Result<(), StorageError> {
-        let value_json: serde_json::Value = serde_json::to_value(value)?;
-        
-        sqlx::query(
-            r#"
-            INSERT INTO users (user_id, email, name)
-            VALUES (?1, ?2, ?3)
-            ON CONFLICT (user_id) DO UPDATE
-            SET email = ?2, name = ?3
-            "#,
-        )
-        .bind(key)
-        .bind(value_json.get("email").and_then(|v| v.as_str()).ok_or_else(|| StorageError::Config("Missing email".into()))?)
-        .bind(value_json.get("name").and_then(|v| v.as_str()).ok_or_else(|| StorageError::Config("Missing name".into()))?)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    async fn store_credential<T: Serialize>(&self, key: &str, value: &T) -> Result<(), StorageError> {
-        let value_json: serde_json::Value = serde_json::to_value(value)?;
-        
-        sqlx::query(
-            r#"
-            INSERT INTO credentials (
-                credential_id, credential, public_key, counter,
-                user_handle, user_name, user_display_name
-            )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            ON CONFLICT (credential_id) DO UPDATE
-            SET credential = ?2,
-                public_key = ?3,
-                counter = ?4,
-                user_handle = ?5,
-                user_name = ?6,
-                user_display_name = ?7
-            "#,
-        )
-        .bind(key)
-        .bind(value_json.get("credential").and_then(|v| v.as_array()).ok_or_else(|| StorageError::Config("Missing credential".into()))?)
-        .bind(value_json.get("public_key").and_then(|v| v.as_array()).ok_or_else(|| StorageError::Config("Missing public_key".into()))?)
-        .bind(value_json.get("counter").and_then(|v| v.as_i64()).ok_or_else(|| StorageError::Config("Missing counter".into()))?)
-        .bind(value_json.get("user_handle").and_then(|v| v.as_str()).ok_or_else(|| StorageError::Config("Missing user_handle".into()))?)
-        .bind(value_json.get("user_name").and_then(|v| v.as_str()).ok_or_else(|| StorageError::Config("Missing user_name".into()))?)
-        .bind(value_json.get("user_display_name").and_then(|v| v.as_str()).ok_or_else(|| StorageError::Config("Missing user_display_name".into()))?)
         .execute(&self.pool)
         .await?;
 
@@ -116,143 +50,216 @@ impl SqlitePermanentStore {
 }
 
 #[async_trait]
-impl Store for SqlitePermanentStore {
+impl Store for SqliteStore {
     fn requires_schema(&self) -> bool {
         true
     }
 
     async fn init(&self) -> Result<(), StorageError> {
-        self.create_tables().await
+        self.init_schema().await
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 
 #[async_trait]
-impl PermanentStore for SqlitePermanentStore {
-    async fn store<T: Serialize + Send + Sync>(
+impl RawCacheStore for SqliteStore {
+    async fn put_raw(
         &mut self,
-        kind: PermanentDataKind,
+        kind: CacheDataKind,
         key: &str,
-        value: &T,
+        value: Vec<u8>,
+        ttl: Option<u64>,
     ) -> Result<(), StorageError> {
-        match kind {
-            PermanentDataKind::User => self.store_user(key, value).await?,
-            PermanentDataKind::Credential => self.store_credential(key, value).await?,
-        }
+        sqlx::query(
+            r#"
+            INSERT INTO cache_store (kind, key, value, expiry)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(kind, key) DO UPDATE SET
+                value = excluded.value,
+                expiry = excluded.expiry
+            "#,
+        )
+        .bind(kind.to_string())
+        .bind(key)
+        .bind(value)
+        .bind(ttl.map(|t| (Utc::now().timestamp() as i64 + t as i64)))
+        .execute(&self.pool)
+        .await?;
+
         Ok(())
     }
 
-    async fn get<T: DeserializeOwned>(
+    async fn get_raw(
+        &self,
+        kind: CacheDataKind,
+        key: &str,
+    ) -> Result<Option<Vec<u8>>, StorageError> {
+        let row = sqlx::query(
+            r#"
+            SELECT value FROM cache_store
+            WHERE kind = ? AND key = ?
+                AND (expiry IS NULL OR expiry > ?)
+            "#,
+        )
+        .bind(kind.to_string())
+        .bind(key)
+        .bind(Utc::now().timestamp())
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|r: SqliteRow| r.get("value")))
+    }
+
+    async fn query_raw(
+        &self,
+        kind: CacheDataKind,
+        key: &str,
+    ) -> Result<Vec<Vec<u8>>, StorageError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT value FROM cache_store
+            WHERE kind = ? AND key LIKE ?
+                AND (expiry IS NULL OR expiry > ?)
+            "#,
+        )
+        .bind(kind.to_string())
+        .bind(format!("{}%", key))
+        .bind(Utc::now().timestamp())
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r: SqliteRow| r.get("value"))
+            .collect())
+    }
+
+    async fn delete(&mut self, kind: CacheDataKind, key: &str) -> Result<(), StorageError> {
+        sqlx::query(
+            r#"
+            DELETE FROM cache_store
+            WHERE kind = ? AND key = ?
+            "#,
+        )
+        .bind(kind.to_string())
+        .bind(key)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl RawPermanentStore for SqliteStore {
+    async fn store_raw(
+        &mut self,
+        kind: PermanentDataKind,
+        key: &str,
+        value: Vec<u8>,
+    ) -> Result<(), StorageError> {
+        match kind {
+            PermanentDataKind::User => {
+                sqlx::query(
+                    r#"
+                    INSERT OR REPLACE INTO users (id, email, data)
+                    VALUES (?, ?, ?)
+                    "#,
+                )
+                .bind(key)
+                .bind(key) // Using key as email for users
+                .bind(value)
+                .execute(&self.pool)
+                .await?;
+            }
+            PermanentDataKind::Credential => {
+                sqlx::query(
+                    r#"
+                    INSERT OR REPLACE INTO credentials (id, user_handle, data)
+                    VALUES (?, ?, ?)
+                    "#,
+                )
+                .bind(key)
+                .bind(key) // Using key as user_handle for credentials
+                .bind(value)
+                .execute(&self.pool)
+                .await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn get_raw(
         &self,
         kind: PermanentDataKind,
         key: &str,
-    ) -> Result<Option<T>, StorageError> {
+    ) -> Result<Option<Vec<u8>>, StorageError> {
         let row = match kind {
             PermanentDataKind::User => {
-                sqlx::query("SELECT * FROM users WHERE user_id = ?1")
+                sqlx::query("SELECT data FROM users WHERE id = ?")
                     .bind(key)
                     .fetch_optional(&self.pool)
                     .await?
             }
             PermanentDataKind::Credential => {
-                sqlx::query("SELECT * FROM credentials WHERE credential_id = ?1")
+                sqlx::query("SELECT data FROM credentials WHERE id = ?")
                     .bind(key)
                     .fetch_optional(&self.pool)
                     .await?
             }
         };
 
-        match row {
-            Some(row) => {
-                let json = match kind {
-                    PermanentDataKind::User => {
-                        serde_json::json!({
-                            "user_id": row.get::<String, _>("user_id"),
-                            "email": row.get::<String, _>("email"),
-                            "name": row.get::<String, _>("name"),
-                        })
-                    }
-                    PermanentDataKind::Credential => {
-                        serde_json::json!({
-                            "credential_id": row.get::<String, _>("credential_id"),
-                            "credential": row.get::<Vec<u8>, _>("credential"),
-                            "public_key": row.get::<Vec<u8>, _>("public_key"),
-                            "counter": row.get::<i32, _>("counter"),
-                            "user_handle": row.get::<String, _>("user_handle"),
-                            "user_name": row.get::<String, _>("user_name"),
-                            "user_display_name": row.get::<String, _>("user_display_name"),
-                        })
-                    }
-                };
-                Ok(Some(serde_json::from_value(json)?))
-            }
-            None => Ok(None),
-        }
+        Ok(row.map(|r: SqliteRow| r.get("data")))
     }
 
-    async fn delete(
-        &mut self,
+    async fn query_raw(
+        &self,
         kind: PermanentDataKind,
-        key: &str,
-    ) -> Result<(), StorageError> {
+        field: QueryField,
+    ) -> Result<Vec<Vec<u8>>, StorageError> {
+        let rows = match (kind, field) {
+            (PermanentDataKind::User, QueryField::Email(email)) => {
+                sqlx::query("SELECT data FROM users WHERE email = ?")
+                    .bind(email)
+                    .fetch_all(&self.pool)
+                    .await?
+            }
+            (PermanentDataKind::Credential, QueryField::UserHandle(handle)) => {
+                sqlx::query("SELECT data FROM credentials WHERE user_handle = ?")
+                    .bind(handle)
+                    .fetch_all(&self.pool)
+                    .await?
+            }
+            _ => return Ok(Vec::new()),
+        };
+
+        Ok(rows.into_iter().map(|r: SqliteRow| r.get("data")).collect())
+    }
+
+    async fn delete(&mut self, kind: PermanentDataKind, key: &str) -> Result<(), StorageError> {
         match kind {
             PermanentDataKind::User => {
-                sqlx::query("DELETE FROM users WHERE user_id = ?1")
+                sqlx::query("DELETE FROM users WHERE id = ?")
                     .bind(key)
                     .execute(&self.pool)
                     .await?;
             }
             PermanentDataKind::Credential => {
-                sqlx::query("DELETE FROM credentials WHERE credential_id = ?1")
+                sqlx::query("DELETE FROM credentials WHERE id = ?")
                     .bind(key)
                     .execute(&self.pool)
                     .await?;
             }
         }
+
         Ok(())
-    }
-
-    async fn query<T: DeserializeOwned>(
-        &self,
-        relation: QueryRelation,
-        field: QueryField,
-    ) -> Result<Vec<T>, StorageError> {
-        // Replace PostgreSQL's $1 with SQLite's ?1 in the SQL
-        let sql = relation.to_sql().replace("$1", "?1");
-        
-        let rows = sqlx::query(&sql)
-            .bind(match &field {
-                QueryField::UserId(id) => id,
-                QueryField::Email(email) => email,
-                _ => return Err(StorageError::InvalidQuery),
-            })
-            .fetch_all(&self.pool)
-            .await?;
-
-        let mut results = Vec::new();
-        for row in rows {
-            let json = match relation {
-                QueryRelation::CredentialsByUser | QueryRelation::CredentialsByEmail => {
-                    serde_json::json!({
-                        "credential_id": row.get::<String, _>("credential_id"),
-                        "credential": row.get::<Vec<u8>, _>("credential"),
-                        "public_key": row.get::<Vec<u8>, _>("public_key"),
-                        "counter": row.get::<i32, _>("counter"),
-                        "user_handle": row.get::<String, _>("user_handle"),
-                        "user_name": row.get::<String, _>("user_name"),
-                        "user_display_name": row.get::<String, _>("user_display_name"),
-                    })
-                }
-                QueryRelation::UserByEmail => {
-                    serde_json::json!({
-                        "user_id": row.get::<String, _>("user_id"),
-                        "email": row.get::<String, _>("email"),
-                        "name": row.get::<String, _>("name"),
-                    })
-                }
-            };
-            results.push(serde_json::from_value(json)?);
-        }
-
-        Ok(results)
     }
 }

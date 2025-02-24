@@ -1,87 +1,145 @@
-use serde::{de::DeserializeOwned, Serialize};
+use sqlx::{
+    encode::{Encode, IsNull},
+    postgres::{PgArgumentBuffer, PgTypeInfo, Postgres},
+    sqlite::{Sqlite, SqliteArgumentValue, SqliteTypeInfo},
+    Type,
+};
+use std::{error::Error as StdError, fmt, str::FromStr};
+use thiserror::Error;
 
 #[derive(Debug, Clone)]
 pub enum StorageType {
     Memory,
-    Redis { url: String },
-    Postgres { url: String },
-    Sqlite { path: String },
+    Redis(String),
+    Postgres(String),
+    Sqlite(String),
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum StorageKind {
-    Cache,    // For temporary data (sessions, challenges)
-    Permanent // For persistent data (credentials)
-}
+impl FromStr for StorageType {
+    type Err = StorageError;
 
-#[derive(Debug, Clone, Copy)]
-pub enum CacheDataKind {
-    Session,
-    Challenge,
-    EmailUserId,
-    CredentialMapping,
-}
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split("://").collect();
+        if parts.len() != 2 {
+            return Err(StorageError::ConfigError(format!(
+                "Invalid storage URL format: {}",
+                s
+            )));
+        }
 
-impl CacheDataKind {
-    pub fn prefix(&self) -> &'static str {
-        match self {
-            Self::Session => "session:",
-            Self::Challenge => "challenge:",
-            Self::EmailUserId => "email2uid:",
-            Self::CredentialMapping => "cred:",
+        let url = parts[1].to_string();
+        match parts[0] {
+            "memory" => Ok(StorageType::Memory),
+            "redis" => Ok(StorageType::Redis(url)),
+            "postgres" => Ok(StorageType::Postgres(url)),
+            "sqlite" => Ok(StorageType::Sqlite(url)),
+            _ => Err(StorageError::ConfigError(format!(
+                "Unknown storage type: {}",
+                s
+            ))),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type)]
+#[sqlx(type_name = "cache_data_kind", rename_all = "snake_case")]
+pub enum CacheDataKind {
+    Session,
+    State,
+    Challenge,
+}
+
+impl fmt::Display for CacheDataKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CacheDataKind::Session => write!(f, "aa_session"),
+            CacheDataKind::State => write!(f, "ab_state"),
+            CacheDataKind::Challenge => write!(f, "ac_challenge"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type)]
+#[sqlx(type_name = "permanent_data_kind", rename_all = "snake_case")]
 pub enum PermanentDataKind {
-    Credential,
     User,
+    Credential,
+}
+
+impl fmt::Display for PermanentDataKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PermanentDataKind::User => write!(f, "user"),
+            PermanentDataKind::Credential => write!(f, "credential"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum QueryField {
-    UserHandle(String),
     Email(String),
-    CredentialId(String),
-    UserId(String),
-    UserName(String),
+    UserHandle(String),
 }
 
-#[derive(Debug, Clone)]
-pub enum QueryRelation {
-    CredentialsByUser,
-    UserByEmail,
-    CredentialsByEmail,
-}
-
-impl QueryRelation {
-    pub fn to_sql(&self) -> &'static str {
+impl QueryField {
+    fn get_value(&self) -> String {
         match self {
-            Self::CredentialsByUser => r#"
-                SELECT c.* FROM credentials c
-                JOIN users u ON c.user_handle = u.user_id
-                WHERE u.user_id = $1
-            "#,
-            Self::UserByEmail => 
-                "SELECT * FROM users WHERE email = $1",
-            Self::CredentialsByEmail => r#"
-                SELECT c.* FROM credentials c
-                JOIN users u ON c.user_handle = u.user_id
-                WHERE u.email = $1
-            "#,
+            QueryField::Email(email) => email.clone(),
+            QueryField::UserHandle(handle) => handle.clone(),
         }
     }
+}
 
-    pub fn redis_key_pattern(&self, field: &QueryField) -> String {
-        match (self, field) {
-            (Self::CredentialsByUser, QueryField::UserId(id)) => 
-                format!("user:{}:credentials", id),
-            (Self::UserByEmail, QueryField::Email(email)) => 
-                format!("email:{}:user", email),
-            (Self::CredentialsByEmail, QueryField::Email(email)) => 
-                format!("email:{}:credentials", email),
-            _ => panic!("Invalid query combination"),
-        }
+#[derive(Debug, Error)]
+pub enum StorageError {
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] sqlx::Error),
+    #[error("Redis error: {0}")]
+    RedisError(#[from] redis::RedisError),
+    #[error("Serialization error: {0}")]
+    SerializationError(#[from] serde_json::Error),
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
+    #[error("Invalid storage type: {0}")]
+    InvalidStorageType(String),
+}
+
+impl Type<Postgres> for QueryField {
+    fn type_info() -> PgTypeInfo {
+        <String as Type<Postgres>>::type_info()
+    }
+
+    fn compatible(ty: &PgTypeInfo) -> bool {
+        <String as Type<Postgres>>::compatible(ty)
+    }
+}
+
+impl Type<Sqlite> for QueryField {
+    fn type_info() -> SqliteTypeInfo {
+        <String as Type<Sqlite>>::type_info()
+    }
+
+    fn compatible(ty: &SqliteTypeInfo) -> bool {
+        <String as Type<Sqlite>>::compatible(ty)
+    }
+}
+
+impl<'q> Encode<'q, Postgres> for QueryField {
+    fn encode_by_ref(
+        &self,
+        buf: &mut PgArgumentBuffer,
+    ) -> Result<IsNull, Box<dyn StdError + Send + Sync>> {
+        let value = self.get_value();
+        <String as Encode<Postgres>>::encode_by_ref(&value, buf)
+    }
+}
+
+impl<'q> Encode<'q, Sqlite> for QueryField {
+    fn encode_by_ref(
+        &self,
+        buf: &mut Vec<SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, Box<dyn StdError + Send + Sync>> {
+        let value = self.get_value();
+        <String as Encode<Sqlite>>::encode_by_ref(&value, buf)
     }
 }
