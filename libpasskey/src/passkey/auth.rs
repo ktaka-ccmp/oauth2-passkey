@@ -47,25 +47,6 @@ pub async fn start_authentication(
                     id: credential.credential_id,
                 });
             }
-
-            // let user = get_user_from_email(&username)
-            //     .await
-            //     .map_err(|_| PasskeyError::Storage("User not found".to_string()))?;
-            // #[cfg(debug_assertions)]
-            // println!("User: {:?}", user);
-
-            // let credential_store = PASSKEY_CREDENTIAL_STORE.lock().await;
-            // let credentials = credential_store
-            //     .get_store()
-            //     .get_credentials_by_username(&username)
-            //     .await?;
-
-            // for credential in credentials {
-            //     allow_credentials.push(AllowCredential {
-            //         type_: "public-key".to_string(),
-            //         id: credential.credential_id,
-            //     });
-            // }
         }
         None => {
             // allow_credentials = vec![];

@@ -1,9 +1,10 @@
 use base64::engine::{Engine, general_purpose::URL_SAFE};
 use ring::rand::SecureRandom;
 
-use crate::config::PASSKEY_CACHE_STORE;
+use libstorage::GENERIC_CACHE_STORE;
+
 use crate::errors::PasskeyError;
-use crate::types::CacheData;
+use crate::types::EmailUserId;
 
 pub(crate) fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
     let padding_len = (4 - input.len() % 4) % 4;
@@ -31,17 +32,33 @@ pub(crate) fn gen_random_string(len: usize) -> Result<String, PasskeyError> {
 }
 
 pub async fn email_to_user_id(username: String) -> Result<String, PasskeyError> {
-    let user_id = PASSKEY_CACHE_STORE
+    let email_user_id: EmailUserId = GENERIC_CACHE_STORE
         .lock()
         .await
         .get_store()
         .get(&username)
-        .await?
-        .ok_or(PasskeyError::Storage("User not found".into()))?;
-    let user_id = match user_id {
-        CacheData::EmailUserId(id) => Ok(id.user_id),
-        _ => Err(PasskeyError::Format("Invalid user type".to_string())),
-    };
-    let user_id = user_id?;
-    Ok(user_id)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?
+        .ok_or_else(|| PasskeyError::NotFound("User not found".to_string()))?
+        .try_into()?;
+
+    Ok(email_user_id.user_id)
+}
+
+// libpasskey/src/types.rs
+impl From<EmailUserId> for libstorage::CacheData {
+    fn from(data: EmailUserId) -> Self {
+        Self {
+            value: serde_json::to_vec(&data).expect("Failed to serialize EmailUserId"),
+            ttl: 3600, // Configure TTL as needed
+        }
+    }
+}
+
+impl TryFrom<libstorage::CacheData> for EmailUserId {
+    type Error = PasskeyError;
+
+    fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {
+        serde_json::from_slice(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
+    }
 }

@@ -3,6 +3,7 @@ use ciborium::value::{Integer, Value as CborValue};
 use std::time::SystemTime;
 
 use libsession::User as SessionUser;
+use libstorage::GENERIC_CACHE_STORE;
 
 use super::types::{
     AttestationObject, AuthenticatorSelection, PubKeyCredParam, RegisterCredential,
@@ -156,19 +157,19 @@ pub async fn finish_registration_with_auth_user(
 
     finish_registration(&reg_data).await?;
 
-    // Store email vs credential ID etc. in CacheStore
-    PASSKEY_CACHE_STORE
+    // Store email to user_id mapping in GENERIC_CACHE_STORE
+    let email_user_id = EmailUserId {
+        email: user.email.clone(),
+        user_id: user.id.clone(),
+    };
+
+    GENERIC_CACHE_STORE
         .lock()
         .await
         .get_store_mut()
-        .put(
-            &user.email.clone(),
-            CacheData::EmailUserId(EmailUserId {
-                email: user.email,
-                user_id: user.id.clone(),
-            }),
-        )
-        .await?;
+        .put(&user.email, email_user_id.into())
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     let credential_id = base64url_decode(&reg_data.raw_id)
         .map_err(|e| PasskeyError::Format(format!("Failed to decode credential ID: {}", e)))?;
