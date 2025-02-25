@@ -50,7 +50,6 @@ impl From<EmailUserId> for libstorage::CacheData {
     fn from(data: EmailUserId) -> Self {
         Self {
             value: serde_json::to_vec(&data).expect("Failed to serialize EmailUserId"),
-            ttl: 3600, // Configure TTL as needed
         }
     }
 }
