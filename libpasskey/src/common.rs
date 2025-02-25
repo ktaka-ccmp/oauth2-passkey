@@ -4,7 +4,7 @@ use ring::rand::SecureRandom;
 use libstorage::GENERIC_CACHE_STORE;
 
 use crate::errors::PasskeyError;
-use crate::types::{EmailUserId, SessionInfo, UserIdCredentialIdStr};
+use crate::types::{EmailUserId, SessionInfo, StoredChallenge, UserIdCredentialIdStr};
 
 pub(crate) fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
     let padding_len = (4 - input.len() % 4) % 4;
@@ -109,6 +109,22 @@ impl From<SessionInfo> for libstorage::CacheData {
 }
 
 impl TryFrom<libstorage::CacheData> for SessionInfo {
+    type Error = PasskeyError;
+
+    fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {
+        serde_json::from_slice(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
+    }
+}
+
+impl From<StoredChallenge> for libstorage::CacheData {
+    fn from(data: StoredChallenge) -> Self {
+        Self {
+            value: serde_json::to_vec(&data).expect("Failed to serialize StoredChallenge"),
+        }
+    }
+}
+
+impl TryFrom<libstorage::CacheData> for StoredChallenge {
     type Error = PasskeyError;
 
     fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {

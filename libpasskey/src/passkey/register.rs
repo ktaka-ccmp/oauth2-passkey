@@ -11,14 +11,14 @@ use super::types::{
 };
 use crate::common::{base64url_decode, generate_challenge};
 use crate::config::{
-    ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_STORE, PASSKEY_CHALLENGE_TIMEOUT,
+    ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
     PASSKEY_CREDENTIAL_STORE, PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID,
     PASSKEY_RP_NAME, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
 };
 use crate::errors::PasskeyError;
 use crate::types::{
-    EmailUserId, PublicKeyCredentialUserEntity, SessionInfo, StoredChallenge, StoredCredential,
-    UserIdCredentialIdStr,
+    EmailUserId, PublicKeyCredentialUserEntity, SessionInfo, StoredChallenge,
+    StoredCredential, UserIdCredentialIdStr,
 };
 
 pub async fn start_registration(username: String) -> Result<RegistrationOptions, PasskeyError> {
@@ -76,12 +76,13 @@ pub async fn create_registration_options(
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    PASSKEY_CHALLENGE_STORE
+    GENERIC_CACHE_STORE
         .lock()
         .await
         .get_store_mut()
-        .store_challenge(user_info.user_handle.clone(), stored_challenge)
-        .await?;
+        .put("regi_challenge", &user_info.user_handle, stored_challenge.into())
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     let authenticator_selection = AuthenticatorSelection {
         authenticator_attachment: PASSKEY_AUTHENTICATOR_ATTACHMENT.to_string(),
@@ -208,15 +209,15 @@ pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String
             "User handle is missing".to_string(),
         ))?;
 
-    let stored_challenge = PASSKEY_CHALLENGE_STORE
+    let stored_challenge: StoredChallenge = GENERIC_CACHE_STORE
         .lock()
         .await
         .get_store()
-        .get_challenge(user_handle)
-        .await?
-        .ok_or(PasskeyError::Storage(
-            "No challenge found for this user".to_string(),
-        ))?;
+        .get("regi_challenge", user_handle)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?
+        .ok_or_else(|| PasskeyError::NotFound("Challenge not found".to_string()))?
+        .try_into()?;
 
     let stored_user = stored_challenge.user.clone();
 
@@ -239,12 +240,13 @@ pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String
         .await?;
 
     // Remove used challenge
-    PASSKEY_CHALLENGE_STORE
+    GENERIC_CACHE_STORE
         .lock()
         .await
         .get_store_mut()
-        .remove_challenge(user_handle)
-        .await?;
+        .remove("regi_challenge", user_handle)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     Ok("Registration successful".to_string())
 }
@@ -473,15 +475,15 @@ async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), Passkey
             "User handle is missing".to_string(),
         ))?;
 
-    let challenge_store = PASSKEY_CHALLENGE_STORE.lock().await;
-
-    let stored_challenge = challenge_store
+    let stored_challenge: StoredChallenge = GENERIC_CACHE_STORE
+        .lock()
+        .await
         .get_store()
-        .get_challenge(user_handle)
-        .await?
-        .ok_or(PasskeyError::Storage(
-            "No challenge found for this user".to_string(),
-        ))?;
+        .get("regi_challenge", user_handle)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?
+        .ok_or_else(|| PasskeyError::NotFound("No challenge found for this user".to_string()))?
+        .try_into()?;
 
     // Validate challenge TTL
     let now = SystemTime::now()

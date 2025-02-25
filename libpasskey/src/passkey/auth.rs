@@ -2,6 +2,8 @@ use base64::engine::{Engine, general_purpose::URL_SAFE};
 use ring::{digest, signature::UnparsedPublicKey};
 use std::time::SystemTime;
 
+use libstorage::GENERIC_CACHE_STORE;
+
 use super::types::{
     AllowCredential, AuthenticationOptions, AuthenticatorData, AuthenticatorResponse,
     ParsedClientData,
@@ -9,7 +11,7 @@ use super::types::{
 
 use crate::common::{base64url_decode, email_to_user_id, generate_challenge, uid2cid_str_vec};
 use crate::config::{
-    ORIGIN, PASSKEY_CHALLENGE_STORE, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_CREDENTIAL_STORE,
+    ORIGIN, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_CREDENTIAL_STORE,
     PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
 };
 use crate::errors::PasskeyError;
@@ -54,11 +56,13 @@ pub async fn start_authentication(
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    let mut challenge_store = PASSKEY_CHALLENGE_STORE.lock().await;
-    challenge_store
+    GENERIC_CACHE_STORE
+        .lock()
+        .await
         .get_store_mut()
-        .store_challenge(auth_id.clone(), stored_challenge)
-        .await?;
+        .put("auth_challenge", &auth_id, stored_challenge.into())
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     let auth_option = AuthenticationOptions {
         challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
@@ -84,15 +88,18 @@ pub async fn verify_authentication(
     );
 
     // Get stored challenge and verify auth
-    let mut challenge_store = PASSKEY_CHALLENGE_STORE.lock().await;
     let credential_store = PASSKEY_CREDENTIAL_STORE.lock().await;
 
     // let mut store = state.store.lock().await;
-    let stored_challenge = challenge_store
+    let stored_challenge: StoredChallenge = GENERIC_CACHE_STORE
+        .lock()
+        .await
         .get_store()
-        .get_challenge(&auth_response.auth_id)
-        .await?
-        .ok_or(PasskeyError::Storage("Challenge not found".into()))?;
+        .get("auth_challenge", &auth_response.auth_id)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?
+        .ok_or_else(|| PasskeyError::NotFound("Challenge not found".to_string()))?
+        .try_into()?;
 
     // Validate challenge TTL
     let now = SystemTime::now()
@@ -205,10 +212,14 @@ pub async fn verify_authentication(
             println!("Signature verification successful");
 
             // Cleanup and return success
-            challenge_store
+            GENERIC_CACHE_STORE
+                .lock()
+                .await
                 .get_store_mut()
-                .remove_challenge(&auth_response.auth_id)
-                .await?;
+                .remove("auth_challenge", &auth_response.auth_id)
+                .await
+                .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
             Ok(name)
         }
         Err(e) => {
