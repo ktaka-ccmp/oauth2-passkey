@@ -4,7 +4,7 @@ use ring::rand::SecureRandom;
 use libstorage::GENERIC_CACHE_STORE;
 
 use crate::errors::PasskeyError;
-use crate::types::EmailUserId;
+use crate::types::{EmailUserId, SessionInfo, UserIdCredentialIdStr};
 
 pub(crate) fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
     let padding_len = (4 - input.len() % 4) % 4;
@@ -45,6 +45,28 @@ pub async fn email_to_user_id(username: String) -> Result<String, PasskeyError> 
     Ok(email_user_id.user_id)
 }
 
+pub(crate) async fn uid2cid_str_vec(
+    user_id: String,
+) -> Result<Vec<UserIdCredentialIdStr>, PasskeyError> {
+    let credential_id_strs: Vec<UserIdCredentialIdStr> = GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .get_store()
+        .gets("uid2cid_str", &user_id)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?
+        .into_iter()
+        .filter_map(|data| {
+            if let Ok(id_str) = UserIdCredentialIdStr::try_from(data) {
+                Some(id_str)
+            } else {
+                None
+            }
+        })
+        .collect();
+    Ok(credential_id_strs)
+}
+
 // libpasskey/src/types.rs
 impl From<EmailUserId> for libstorage::CacheData {
     fn from(data: EmailUserId) -> Self {
@@ -55,6 +77,38 @@ impl From<EmailUserId> for libstorage::CacheData {
 }
 
 impl TryFrom<libstorage::CacheData> for EmailUserId {
+    type Error = PasskeyError;
+
+    fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {
+        serde_json::from_slice(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
+    }
+}
+
+impl From<UserIdCredentialIdStr> for libstorage::CacheData {
+    fn from(data: UserIdCredentialIdStr) -> Self {
+        Self {
+            value: serde_json::to_vec(&data).expect("Failed to serialize UserIdCredentialIdStr"),
+        }
+    }
+}
+
+impl TryFrom<libstorage::CacheData> for UserIdCredentialIdStr {
+    type Error = PasskeyError;
+
+    fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {
+        serde_json::from_slice(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
+    }
+}
+
+impl From<SessionInfo> for libstorage::CacheData {
+    fn from(data: SessionInfo) -> Self {
+        Self {
+            value: serde_json::to_vec(&data).expect("Failed to serialize SessionInfo"),
+        }
+    }
+}
+
+impl TryFrom<libstorage::CacheData> for SessionInfo {
     type Error = PasskeyError;
 
     fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {

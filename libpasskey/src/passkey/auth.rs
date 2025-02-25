@@ -7,15 +7,13 @@ use super::types::{
     ParsedClientData,
 };
 
-use crate::common::{base64url_decode, email_to_user_id, generate_challenge};
+use crate::common::{base64url_decode, email_to_user_id, generate_challenge, uid2cid_str_vec};
 use crate::config::{
-    ORIGIN, PASSKEY_CACHE_STORE, PASSKEY_CHALLENGE_STORE, PASSKEY_CHALLENGE_TIMEOUT,
-    PASSKEY_CREDENTIAL_STORE, PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
+    ORIGIN, PASSKEY_CHALLENGE_STORE, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_CREDENTIAL_STORE,
+    PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
 };
 use crate::errors::PasskeyError;
-use crate::types::{
-    CacheData, PublicKeyCredentialUserEntity, StoredChallenge, UserIdCredentialIdStr,
-};
+use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge};
 
 pub async fn start_authentication(
     username: Option<String>,
@@ -25,21 +23,7 @@ pub async fn start_authentication(
         Some(username) => {
             let user_id = email_to_user_id(username).await?;
 
-            let credential_id_strs: Vec<UserIdCredentialIdStr> = PASSKEY_CACHE_STORE
-                .lock()
-                .await
-                .get_store()
-                .gets(&user_id)
-                .await?
-                .into_iter()
-                .filter_map(|data| {
-                    if let CacheData::UserIdCredentialIdStr(id_str) = data {
-                        Some(id_str)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+            let credential_id_strs = uid2cid_str_vec(user_id).await?;
 
             for credential in credential_id_strs {
                 allow_credentials.push(AllowCredential {

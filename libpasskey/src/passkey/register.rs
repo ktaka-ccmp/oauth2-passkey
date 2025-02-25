@@ -11,15 +11,14 @@ use super::types::{
 };
 use crate::common::{base64url_decode, generate_challenge};
 use crate::config::{
-    ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CACHE_STORE, PASSKEY_CHALLENGE_STORE,
-    PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_CREDENTIAL_STORE, PASSKEY_REQUIRE_RESIDENT_KEY,
-    PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID, PASSKEY_RP_NAME, PASSKEY_TIMEOUT,
-    PASSKEY_USER_VERIFICATION,
+    ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_STORE, PASSKEY_CHALLENGE_TIMEOUT,
+    PASSKEY_CREDENTIAL_STORE, PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID,
+    PASSKEY_RP_NAME, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
 };
 use crate::errors::PasskeyError;
 use crate::types::{
-    CacheData, EmailUserId, PublicKeyCredentialUserEntity, SessionInfo, StoredChallenge,
-    StoredCredential, UserIdCredentialIdStr,
+    EmailUserId, PublicKeyCredentialUserEntity, SessionInfo, StoredChallenge, StoredCredential,
+    UserIdCredentialIdStr,
 };
 
 pub async fn start_registration(username: String) -> Result<RegistrationOptions, PasskeyError> {
@@ -45,15 +44,15 @@ pub async fn start_registration_with_auth_user(
         display_name: user.name.clone(),
     };
 
-    // Wrap user info in session info to match the cache store data type
-    let session_info = CacheData::SessionInfo(SessionInfo { user });
+    let session_info = SessionInfo { user };
 
-    PASSKEY_CACHE_STORE
+    GENERIC_CACHE_STORE
         .lock()
         .await
         .get_store_mut()
-        .put(&user_info.user_handle, session_info)
-        .await?;
+        .put("session_info", &user_info.user_handle, session_info.into())
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     #[cfg(debug_assertions)]
     println!("User info: {:#?}", user_info);
@@ -131,24 +130,24 @@ pub async fn finish_registration_with_auth_user(
             "User handle is missing".to_string(),
         ))?;
 
-    let session_info = match PASSKEY_CACHE_STORE
+    let session_info: SessionInfo = GENERIC_CACHE_STORE
         .lock()
         .await
         .get_store()
-        .get(user_handle)
-        .await?
-    {
-        Some(CacheData::SessionInfo(info)) => Ok(info),
-        _ => Err(PasskeyError::Format("Invalid session type".to_string())),
-    }?;
+        .get("session_info", user_handle)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?
+        .ok_or(PasskeyError::NotFound("Session not found".to_string()))?
+        .try_into()?;
 
     // Delete the session info from the store
-    PASSKEY_CACHE_STORE
+    GENERIC_CACHE_STORE
         .lock()
         .await
         .get_store_mut()
-        .remove(user_handle)
-        .await?;
+        .remove("session_info", user_handle)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     // Verify the user is the same as the one in the cache store i.e. used to start the registration
     if user.id != session_info.user.id {
@@ -174,19 +173,19 @@ pub async fn finish_registration_with_auth_user(
     let credential_id = base64url_decode(&reg_data.raw_id)
         .map_err(|e| PasskeyError::Format(format!("Failed to decode credential ID: {}", e)))?;
 
-    PASSKEY_CACHE_STORE
+    let credential_id_str = UserIdCredentialIdStr {
+        user_id: user.id.clone(),
+        credential_id_str: reg_data.raw_id,
+        credential_id,
+    };
+
+    GENERIC_CACHE_STORE
         .lock()
         .await
         .get_store_mut()
-        .put(
-            &user.id.clone(),
-            CacheData::UserIdCredentialIdStr(UserIdCredentialIdStr {
-                user_id: user.id,
-                credential_id_str: reg_data.raw_id,
-                credential_id,
-            }),
-        )
-        .await?;
+        .put("uid2cid_str", &user.id, credential_id_str.into())
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     Ok("Registration successful".to_string())
 }
