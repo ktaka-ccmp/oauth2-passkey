@@ -7,13 +7,17 @@ use super::types::RedisCacheStore;
 use crate::errors::StorageError;
 use crate::types::CacheData;
 
-const CACHE_PREFIX: &str = "new_cache:";
+const CACHE_PREFIX: &str = "cache";
 
 impl RedisCacheStore {
     pub(crate) async fn connect(url: &str) -> Result<Self, StorageError> {
-        println!("Connecting to Redis at {} for tokens", url);
+        println!("Connecting to Redis at {} for generic cache", url);
         let client = redis::Client::open(url).map_err(|e| StorageError::Storage(e.to_string()))?;
         Ok(Self { client })
+    }
+
+    fn make_key(prefix: &str, key: &str) -> String {
+        format!("{}:{}:{}", CACHE_PREFIX, prefix, key)
     }
 }
 
@@ -25,10 +29,10 @@ impl CacheStore for RedisCacheStore {
         Ok(())
     }
 
-    async fn put(&mut self, key: &str, value: CacheData) -> Result<(), StorageError> {
+    async fn put(&mut self, prefix: &str, key: &str, value: CacheData) -> Result<(), StorageError> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
-        let key = format!("{}{}", CACHE_PREFIX, key);
+        let key = Self::make_key(prefix, key);
         let value = serde_json::to_string(&value)?;
         let _: () = conn.set(&key, value).await?;
         // let ttl = 600; // 10 minute for testing
@@ -40,13 +44,14 @@ impl CacheStore for RedisCacheStore {
 
     async fn put_with_ttl(
         &mut self,
+        prefix: &str,
         key: &str,
         value: CacheData,
         ttl: usize,
     ) -> Result<(), StorageError> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
-        let key = format!("{}{}", CACHE_PREFIX, key);
+        let key = Self::make_key(prefix, key);
         let value = serde_json::to_string(&value)?;
         let _: () = conn.set(&key, value).await?;
         let _: () = conn.expire(&key, ttl as i64).await?;
@@ -55,10 +60,10 @@ impl CacheStore for RedisCacheStore {
         Ok(())
     }
 
-    async fn get(&self, key: &str) -> Result<Option<CacheData>, StorageError> {
+    async fn get(&self, prefix: &str, key: &str) -> Result<Option<CacheData>, StorageError> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
-        let key = format!("{}{}", CACHE_PREFIX, key);
+        let key = Self::make_key(prefix, key);
         let value: Option<String> = conn.get(&key).await?;
 
         match value {
@@ -67,10 +72,10 @@ impl CacheStore for RedisCacheStore {
         }
     }
 
-    async fn gets(&self, key: &str) -> Result<Vec<CacheData>, StorageError> {
+    async fn gets(&self, prefix: &str, key: &str) -> Result<Vec<CacheData>, StorageError> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
-        let key = format!("{}{}", CACHE_PREFIX, key);
+        let key = Self::make_key(prefix, key);
         let keys: Vec<String> = conn.keys(&key).await?;
 
         let mut results = Vec::new();
@@ -85,10 +90,10 @@ impl CacheStore for RedisCacheStore {
         Ok(results)
     }
 
-    async fn remove(&mut self, key: &str) -> Result<(), StorageError> {
+    async fn remove(&mut self, prefix: &str, key: &str) -> Result<(), StorageError> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
-        let key = format!("{}{}", CACHE_PREFIX, key);
+        let key = Self::make_key(prefix, key);
         let _: () = conn.del(&key).await?;
         Ok(())
     }

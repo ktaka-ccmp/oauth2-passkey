@@ -167,7 +167,7 @@ pub async fn finish_registration_with_auth_user(
         .lock()
         .await
         .get_store_mut()
-        .put(&user.email, email_user_id.into())
+        .put("email", &user.email, email_user_id.into())
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 

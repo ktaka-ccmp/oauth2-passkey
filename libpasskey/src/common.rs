@@ -36,7 +36,7 @@ pub async fn email_to_user_id(username: String) -> Result<String, PasskeyError> 
         .lock()
         .await
         .get_store()
-        .get(&username)
+        .get("email", &username)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?
         .ok_or_else(|| PasskeyError::NotFound("User not found".to_string()))?

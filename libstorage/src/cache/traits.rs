@@ -43,22 +43,23 @@ pub trait CacheStore: Send + Sync + 'static {
     async fn init(&self) -> Result<(), StorageError>;
 
     /// Put a token into the store.
-    async fn put(&mut self, key: &str, value: CacheData) -> Result<(), StorageError>;
+    async fn put(&mut self, prefix: &str, key: &str, value: CacheData) -> Result<(), StorageError>;
 
     /// Put a token into the store with a TTL.
     async fn put_with_ttl(
         &mut self,
+        prefix: &str,
         key: &str,
         value: CacheData,
         ttl: usize,
     ) -> Result<(), StorageError>;
 
     /// Get a token from the store.
-    async fn get(&self, key: &str) -> Result<Option<CacheData>, StorageError>;
+    async fn get(&self, prefix: &str, key: &str) -> Result<Option<CacheData>, StorageError>;
 
-    /// Get a token from the store.
-    async fn gets(&self, key: &str) -> Result<Vec<CacheData>, StorageError>;
+    /// Gets multiple tokens from the store.
+    async fn gets(&self, prefix: &str, key: &str) -> Result<Vec<CacheData>, StorageError>;
 
     /// Remove a token from the store.
-    async fn remove(&mut self, key: &str) -> Result<(), StorageError>;
+    async fn remove(&mut self, prefix: &str, key: &str) -> Result<(), StorageError>;
 }
