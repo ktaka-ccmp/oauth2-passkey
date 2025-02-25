@@ -11,14 +11,14 @@ use super::types::{
 };
 use crate::common::{base64url_decode, generate_challenge};
 use crate::config::{
-    ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
-    PASSKEY_CREDENTIAL_STORE, PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID,
-    PASSKEY_RP_NAME, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
+    ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_CREDENTIAL_STORE,
+    PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID, PASSKEY_RP_NAME,
+    PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
 };
 use crate::errors::PasskeyError;
 use crate::types::{
-    EmailUserId, PublicKeyCredentialUserEntity, SessionInfo, StoredChallenge,
-    StoredCredential, UserIdCredentialIdStr,
+    EmailUserId, PublicKeyCredentialUserEntity, SessionInfo, StoredChallenge, StoredCredential,
+    UserIdCredentialIdStr,
 };
 
 pub async fn start_registration(username: String) -> Result<RegistrationOptions, PasskeyError> {
@@ -80,7 +80,11 @@ pub async fn create_registration_options(
         .lock()
         .await
         .get_store_mut()
-        .put("regi_challenge", &user_info.user_handle, stored_challenge.into())
+        .put(
+            "regi_challenge",
+            &user_info.user_handle,
+            stored_challenge.into(),
+        )
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 

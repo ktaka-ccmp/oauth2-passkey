@@ -11,8 +11,8 @@ use super::types::{
 
 use crate::common::{base64url_decode, email_to_user_id, generate_challenge, uid2cid_str_vec};
 use crate::config::{
-    ORIGIN, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_CREDENTIAL_STORE,
-    PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
+    ORIGIN, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_CREDENTIAL_STORE, PASSKEY_RP_ID, PASSKEY_TIMEOUT,
+    PASSKEY_USER_VERIFICATION,
 };
 use crate::errors::PasskeyError;
 use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge};
