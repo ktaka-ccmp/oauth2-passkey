@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use super::traits::CacheStore;
-use super::types::InMemoryCacheStore;
-
 use crate::errors::StorageError;
 use crate::types::CacheData;
+
+use super::traits::CacheStore;
+use super::types::InMemoryCacheStore;
 
 const CACHE_PREFIX: &str = "cache";
 

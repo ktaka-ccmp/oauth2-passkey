@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use redis::{self, AsyncCommands};
 
-use super::traits::CacheStore;
-use super::types::RedisCacheStore;
-
 use crate::errors::StorageError;
 use crate::types::CacheData;
+
+use super::traits::CacheStore;
+use super::types::RedisCacheStore;
 
 const CACHE_PREFIX: &str = "cache";
 

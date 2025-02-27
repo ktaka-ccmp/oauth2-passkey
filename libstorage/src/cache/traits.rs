@@ -3,10 +3,8 @@ use async_trait::async_trait;
 use crate::errors::StorageError;
 use crate::types::CacheData;
 
-use super::types::{InMemoryCacheStore, RedisCacheStore};
-
 use super::config::{GENERIC_CACHE_TYPE, GENERIC_CACHE_URL};
-use super::types::CacheStoreType;
+use super::types::{CacheStoreType, InMemoryCacheStore, RedisCacheStore};
 
 impl CacheStoreType {
     pub fn from_env() -> Result<Self, StorageError> {
@@ -32,6 +30,7 @@ impl CacheStoreType {
             CacheStoreType::Memory => Box::new(InMemoryCacheStore::new()),
             CacheStoreType::Redis { url } => Box::new(RedisCacheStore::connect(url).await?),
         };
+
         store.init().await?;
         Ok(store)
     }

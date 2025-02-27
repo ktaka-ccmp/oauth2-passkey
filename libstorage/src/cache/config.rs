@@ -1,7 +1,10 @@
 use std::{env, sync::LazyLock};
 use tokio::sync::Mutex;
 
-use crate::cache::{CacheStore, CacheStoreType, InMemoryCacheStore};
+use super::{
+    traits::CacheStore,
+    types::{CacheStoreType, InMemoryCacheStore},
+};
 use crate::errors::StorageError;
 
 pub(crate) static GENERIC_CACHE_TYPE: LazyLock<String> = LazyLock::new(|| {
@@ -19,7 +22,7 @@ pub static GENERIC_CACHE_STORE: LazyLock<Mutex<SingletonCacheStore>> = LazyLock:
 
 pub async fn init_cache_store() -> Result<(), StorageError> {
     let store_type = CacheStoreType::from_env().unwrap_or_else(|e| {
-        eprintln!("Failed to initialize token store from environment: {}", e);
+        eprintln!("Failed to initialize cache store from environment: {}", e);
         eprintln!("Falling back to in-memory store");
         CacheStoreType::Memory
     });
