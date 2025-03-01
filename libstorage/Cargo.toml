@@ -14,15 +14,15 @@ tokio = { workspace = true }
 tracing = "0.1.41"
 sqlx = { version = "0.8", features = [
     "any",
-    "chrono", 
-    "json", 
+    "chrono",
+    "json",
     "macros",
-    "mysql", 
-    "postgres", 
-    "regexp", 
-    "runtime-tokio", 
-    "runtime-tokio-native-tls", 
-    "runtime-tokio-rustls", 
+    "mysql",
+    "postgres",
+    "regexp",
+    "runtime-tokio",
+    "runtime-tokio-native-tls",
+    "runtime-tokio-rustls",
     "sqlite",
     "runtime-async-std-native-tls"
 ], default-features = false }

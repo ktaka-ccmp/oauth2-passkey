@@ -110,7 +110,9 @@ pub async fn verify_authentication(
             "Challenge expired after {} seconds (timeout: {})",
             age, timeout
         );
-        return Err(PasskeyError::Authentication("Challenge has expired".into()));
+        return Err(PasskeyError::Authentication(
+            "Challenge has expired. For more details, run with RUST_LOG=debug".into(),
+        ));
     }
 
     #[cfg(debug_assertions)]
@@ -190,12 +192,14 @@ pub async fn verify_authentication(
         is_discoverable,
     ) {
         (Some(handle), stored_handle, _) if handle != *stored_handle => {
-            return Err(PasskeyError::Authentication("User handle mismatch".into()));
+            return Err(PasskeyError::Authentication(
+                "User handle mismatch. For more details, run with RUST_LOG=debug".into(),
+            ));
         }
         (None, _, true) => {
             // Discoverable credentials MUST provide a user handle
             return Err(PasskeyError::Authentication(
-                "Missing required user handle for discoverable credential".into(),
+                "Missing required user handle for discoverable credential. For more details, run with RUST_LOG=debug".into(),
             ));
         }
         (None, _, false) => {
@@ -211,23 +215,32 @@ pub async fn verify_authentication(
 
     // Verify the authenticator data counter
     let auth_counter = auth_data.counter;
-    if auth_counter != 0 {
+    tracing::debug!(
+        "Counter verification - stored: {}, received: {}",
+        stored_credential.counter,
+        auth_counter
+    );
+
+    if auth_counter == 0 {
         // Counter value of 0 means the authenticator doesn't support counters
-        if auth_counter <= stored_credential.counter {
-            #[cfg(debug_assertions)]
-            println!(
-                "Counter value decreased - stored: {}, received: {}",
-                stored_credential.counter, auth_counter
-            );
-            #[cfg(debug_assertions)]
-            println!(
-                "TODO(auth.rs:verify_authentication): Implement counter verification to prevent credential cloning and update stored credential counter"
-            );
-            #[cfg(not(debug_assertions))]
-            return Err(PasskeyError::Authentication(
-                "Counter value decreased - possible credential cloning detected".into(),
-            ));
-        }
+        tracing::info!("Authenticator does not support counters (received counter=0)");
+    } else if auth_counter <= stored_credential.counter {
+        // Counter value decreased or didn't change - possible cloning attack
+        tracing::warn!(
+            "Counter verification failed - stored: {}, received: {}",
+            stored_credential.counter,
+            auth_counter
+        );
+        return Err(PasskeyError::Authentication(
+            "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
+        ));
+    } else {
+        // Counter increased as expected
+        tracing::debug!(
+            "Counter verification successful - stored: {}, received: {}",
+            stored_credential.counter,
+            auth_counter
+        );
     }
 
     let verification_algorithm = &ring::signature::ECDSA_P256_SHA256_ASN1;
@@ -279,7 +292,7 @@ pub async fn verify_authentication(
             println!("Signature verification failed: {:?}", e);
 
             Err(PasskeyError::Verification(
-                "Signature verification failed".into(),
+                "Signature verification failed. For more details, run with RUST_LOG=debug".into(),
             ))
         }
     }
@@ -325,7 +338,9 @@ impl ParsedClientData {
     fn verify(&self, stored_challenge: &[u8]) -> Result<(), PasskeyError> {
         // Verify challenge
         if self.challenge != stored_challenge {
-            return Err(PasskeyError::Challenge("Challenge mismatch".into()));
+            return Err(PasskeyError::Challenge(
+                "Challenge mismatch. For more details, run with RUST_LOG=debug".into(),
+            ));
         }
 
         // Verify origin
@@ -378,7 +393,7 @@ impl AuthenticatorData {
 
         if data.len() < 37 {
             return Err(PasskeyError::AuthenticatorData(
-                "Authenticator data too short".into(),
+                "Authenticator data too short. For more details, run with RUST_LOG=debug".into(),
             ));
         }
 
@@ -434,7 +449,9 @@ impl AuthenticatorData {
 
         // Verify user present flag
         if !self.is_user_present() {
-            return Err(PasskeyError::Authentication("User not present".into()));
+            return Err(PasskeyError::Authentication(
+                "User not present. For more details, run with RUST_LOG=debug".into(),
+            ));
         }
 
         // Verify user verification if required

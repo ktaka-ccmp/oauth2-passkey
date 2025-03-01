@@ -55,23 +55,33 @@ pub static GENERIC_DATA_STORE_URL: LazyLock<String> = LazyLock::new(|| {
 });
 
 pub static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = LazyLock::new(|| {
-    let store = match GENERIC_DATA_STORE_TYPE.as_str() {
+    let store_type = GENERIC_DATA_STORE_TYPE.as_str();
+    let store_url = GENERIC_DATA_STORE_URL.as_str();
+
+    tracing::info!(
+        "Initializing data store with type: {}, url: {}",
+        store_type,
+        store_url
+    );
+
+    let store = match store_type {
         "sqlite" => Box::new(SqliteDataStore {
-            pool: sqlx::SqlitePool::connect_lazy(&GENERIC_DATA_STORE_URL)
-                .expect("Failed to create SQLite pool"),
+            pool: sqlx::SqlitePool::connect_lazy(store_url).expect("Failed to create SQLite pool"),
         }) as Box<dyn DataStore>,
         "postgres" => Box::new(PostgresDataStore {
-            pool: sqlx::PgPool::connect_lazy(&GENERIC_DATA_STORE_URL)
-                .expect("Failed to create Postgres pool"),
+            pool: sqlx::PgPool::connect_lazy(store_url).expect("Failed to create Postgres pool"),
         }) as Box<dyn DataStore>,
         t => panic!(
             "Unsupported store type: {}. Supported types are 'sqlite' and 'postgres'",
             t
         ),
     };
-    tracing::info!(
-        "Initializing data store with type: {}",
-        GENERIC_DATA_STORE_TYPE.as_str()
+
+    #[cfg(debug_assertions)]
+    println!(
+        "Connected to database: type={}, url={}",
+        store_type, store_url
     );
+
     Mutex::new(store)
 });
