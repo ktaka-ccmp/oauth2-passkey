@@ -49,6 +49,13 @@ impl PasskeyStore {
         }
     }
 
+    /// Retrieves all credentials associated with a specific user
+    ///
+    /// This is useful for:
+    /// - Listing all passkeys registered to a user
+    /// - Supporting account management features where users can view/delete their registered passkeys
+    /// - Implementing multi-device scenarios where users might have multiple credentials
+    #[allow(dead_code)]
     pub async fn get_credentials_by_user(
         user_id: &str,
     ) -> Result<Vec<StoredCredential>, PasskeyError> {

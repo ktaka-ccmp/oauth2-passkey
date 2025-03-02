@@ -15,7 +15,7 @@ use crate::config::{
 };
 use crate::errors::PasskeyError;
 use crate::storage::PasskeyStore;
-use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
+use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge};
 
 pub async fn start_authentication(
     username: Option<String>,
@@ -146,6 +146,18 @@ pub async fn verify_authentication(
 
     auth_data.verify()?;
 
+    // Log detailed authenticator data information for debugging
+    tracing::debug!("Authenticator data verification passed");
+    tracing::debug!("User present: {}", auth_data.is_user_present());
+    tracing::debug!("User verified: {}", auth_data.is_user_verified());
+    tracing::debug!("Discoverable credential: {}", auth_data.is_discoverable());
+    tracing::debug!("Backed up: {}", auth_data.is_backed_up());
+    tracing::debug!(
+        "Has attested credential data: {}",
+        auth_data.has_attested_credential_data()
+    );
+    tracing::debug!("Has extension data: {}", auth_data.has_extension_data());
+
     // Get credential then public key
     let stored_credential = PasskeyStore::get_credential(&auth_response.id)
         .await?
@@ -159,12 +171,11 @@ pub async fn verify_authentication(
         .response
         .user_handle
         .as_ref()
-        .map(|handle| {
+        .and_then(|handle| {
             base64url_decode(handle)
                 .ok()
                 .and_then(|decoded| String::from_utf8(decoded).ok())
-        })
-        .flatten();
+        });
 
     // Check if credential is discoverable
     let is_discoverable = auth_data.is_discoverable();
@@ -296,11 +307,6 @@ pub async fn verify_authentication(
             ))
         }
     }
-}
-
-pub async fn get_credential(credential_id: &str) -> Result<Option<StoredCredential>, PasskeyError> {
-    let credential = PasskeyStore::get_credential(credential_id).await?;
-    Ok(credential)
 }
 
 impl ParsedClientData {
