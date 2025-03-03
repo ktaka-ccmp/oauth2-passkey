@@ -1,21 +1,22 @@
 use base64::engine::{Engine, general_purpose::URL_SAFE};
 use ring::{digest, signature::UnparsedPublicKey};
 
-use libstorage::GENERIC_CACHE_STORE;
-
 use super::challenge::{get_and_validate_challenge, remove_challenge};
 use super::types::{
     AllowCredential, AuthenticationOptions, AuthenticatorData, AuthenticatorResponse,
     ParsedClientData,
 };
 
-use crate::common::{base64url_decode, email_to_user_id, generate_challenge, uid2cid_str_vec};
+use crate::common::{
+    base64url_decode, email_to_user_id, gen_random_string, generate_challenge, store_in_cache,
+    uid2cid_str_vec,
+};
 use crate::config::{
     ORIGIN, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
 };
 use crate::errors::PasskeyError;
 use crate::storage::PasskeyStore;
-use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge};
+use crate::types::{PublicKeyCredentialUserEntity, StoredChallenge, StoredCredential};
 
 pub async fn start_authentication(
     username: Option<String>,
@@ -40,7 +41,7 @@ pub async fn start_authentication(
     }
 
     let challenge = generate_challenge();
-    let auth_id = crate::common::gen_random_string(16)?;
+    let auth_id = gen_random_string(16)?;
 
     let stored_challenge = StoredChallenge {
         challenge: challenge.clone().unwrap_or_default(),
@@ -56,12 +57,7 @@ pub async fn start_authentication(
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .put("auth_challenge", &auth_id, stored_challenge.into())
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    store_in_cache("auth_challenge", &auth_id, stored_challenge).await?;
 
     let auth_option = AuthenticationOptions {
         challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
@@ -336,7 +332,7 @@ impl AuthenticatorData {
 /// For non-discoverable credentials, a user handle is optional.
 fn verify_user_handle(
     auth_response: &AuthenticatorResponse,
-    stored_credential: &crate::types::StoredCredential,
+    stored_credential: &StoredCredential,
     is_discoverable: bool,
 ) -> Result<(), PasskeyError> {
     // Extract user handle from response
@@ -385,7 +381,7 @@ fn verify_user_handle(
 async fn verify_counter(
     credential_id: &str,
     auth_data: &AuthenticatorData,
-    stored_credential: &crate::types::StoredCredential,
+    stored_credential: &StoredCredential,
 ) -> Result<(), PasskeyError> {
     let auth_counter = auth_data.counter;
     tracing::debug!(
@@ -432,7 +428,7 @@ async fn verify_signature(
     auth_response: &AuthenticatorResponse,
     client_data: &ParsedClientData,
     auth_data: &AuthenticatorData,
-    stored_credential: &crate::types::StoredCredential,
+    stored_credential: &StoredCredential,
 ) -> Result<String, PasskeyError> {
     let verification_algorithm = &ring::signature::ECDSA_P256_SHA256_ASN1;
     let public_key = UnparsedPublicKey::new(verification_algorithm, &stored_credential.public_key);
