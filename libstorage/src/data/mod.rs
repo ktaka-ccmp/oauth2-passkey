@@ -77,10 +77,10 @@ pub static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = LazyLock::n
         ),
     };
 
-    #[cfg(debug_assertions)]
-    println!(
+    tracing::info!(
         "Connected to database: type={}, url={}",
-        store_type, store_url
+        store_type,
+        store_url
     );
 
     Mutex::new(store)

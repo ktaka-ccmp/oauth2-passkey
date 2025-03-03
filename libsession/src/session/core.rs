@@ -28,6 +28,7 @@ pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderM
 async fn create_new_session(session_info: SessionInfo) -> Result<HeaderMap, SessionError> {
     let mut headers = HeaderMap::new();
     let expires_at = session_info.expires_at;
+
     let session_id = create_and_store_session(session_info).await?;
     header_set_cookie(
         &mut headers,
@@ -36,8 +37,8 @@ async fn create_new_session(session_info: SessionInfo) -> Result<HeaderMap, Sess
         expires_at,
         *SESSION_COOKIE_MAX_AGE as i64,
     )?;
-    #[cfg(debug_assertions)]
-    println!("Headers: {:#?}", headers);
+
+    tracing::debug!("Headers: {:#?}", headers);
     Ok(headers)
 }
 
