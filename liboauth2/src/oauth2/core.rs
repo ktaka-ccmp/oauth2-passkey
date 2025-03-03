@@ -19,8 +19,9 @@ use crate::config::{
     OAUTH2_USERINFO_URL,
 };
 use crate::errors::OAuth2Error;
-use crate::oauth2::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
 use crate::types::{AuthResponse, GoogleUserInfo, OidcTokenResponse, StateParams, StoredToken};
+
+use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
 
 pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> String {
     let state_params = StateParams {
