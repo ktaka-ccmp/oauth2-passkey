@@ -62,11 +62,3 @@ pub(crate) struct StoredSession {
     pub(crate) info: SessionInfo,
     pub(crate) ttl: u64,
 }
-
-#[derive(Clone, Debug)]
-pub(crate) enum SessionStoreType {
-    Memory,
-    Sqlite { url: String },
-    Postgres { url: String },
-    Redis { url: String },
-}
