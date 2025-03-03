@@ -1,14 +1,15 @@
 use base64::engine::{Engine, general_purpose::URL_SAFE};
 use ciborium::value::{Integer, Value as CborValue};
-use std::time::SystemTime;
 
 use libsession::User as SessionUser;
 use libstorage::GENERIC_CACHE_STORE;
 
+use super::challenge::{get_and_validate_challenge, remove_challenge};
 use super::types::{
     AttestationObject, AuthenticatorSelection, PubKeyCredParam, RegisterCredential,
     RegistrationOptions, RelyingParty,
 };
+
 use crate::common::{base64url_decode, generate_challenge};
 use crate::config::{
     ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
@@ -214,16 +215,7 @@ pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String
             "User handle is missing".to_string(),
         ))?;
 
-    let stored_challenge: StoredChallenge = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store()
-        .get("regi_challenge", user_handle)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?
-        .ok_or_else(|| PasskeyError::NotFound("Challenge not found".to_string()))?
-        .try_into()?;
-
+    let stored_challenge = get_and_validate_challenge("regi_challenge", user_handle).await?;
     let stored_user = stored_challenge.user.clone();
 
     // Store using base64url encoded credential_id as the key
@@ -241,13 +233,7 @@ pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     // Remove used challenge
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store_mut()
-        .remove("regi_challenge", user_handle)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    remove_challenge("regi_challenge", user_handle).await?;
 
     Ok("Registration successful".to_string())
 }
@@ -269,7 +255,7 @@ fn extract_credential_public_key(reg_data: &RegisterCredential) -> Result<Vec<u8
     let attestation_obj = parse_attestation_object(&reg_data.response.attestation_object)?;
 
     // Verify attestation based on format
-    crate::passkey::attestation::verify_attestation(&attestation_obj, &decoded_client_data)?;
+    super::attestation::verify_attestation(&attestation_obj, &decoded_client_data)?;
 
     // Extract public key from authenticator data
     let public_key = extract_public_key_from_auth_data(&attestation_obj.auth_data)?;
@@ -476,30 +462,7 @@ async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), Passkey
             "User handle is missing".to_string(),
         ))?;
 
-    let stored_challenge: StoredChallenge = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store()
-        .get("regi_challenge", user_handle)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?
-        .ok_or_else(|| PasskeyError::NotFound("No challenge found for this user".to_string()))?
-        .try_into()?;
-
-    // Validate challenge TTL
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let age = now - stored_challenge.timestamp;
-    let timeout = stored_challenge.ttl.min(*PASSKEY_CHALLENGE_TIMEOUT as u64);
-    if age > timeout {
-        println!(
-            "Challenge expired after {} seconds (timeout: {})",
-            age, timeout
-        );
-        return Err(PasskeyError::Authentication("Challenge has expired".into()));
-    }
+    let stored_challenge = get_and_validate_challenge("regi_challenge", user_handle).await?;
 
     if decoded_challenge != stored_challenge.challenge {
         return Err(PasskeyError::Challenge(
