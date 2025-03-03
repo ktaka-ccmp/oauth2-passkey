@@ -2,17 +2,14 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use chrono::{DateTime, Utc};
 use http::header::HeaderMap;
 use ring::rand::SecureRandom;
-use url::Url;
 use std::time::Duration;
+use url::Url;
 
+use crate::config::OAUTH2_CSRF_COOKIE_MAX_AGE;
 use crate::errors::OAuth2Error;
 use crate::types::{StateParams, StoredToken};
-use crate::config::
-    OAUTH2_CSRF_COOKIE_MAX_AGE
-;
 
 use libstorage::GENERIC_CACHE_STORE;
-
 
 pub(super) fn gen_random_string(len: usize) -> Result<String, OAuth2Error> {
     let rng = ring::rand::SystemRandom::new();
@@ -60,11 +57,11 @@ pub async fn generate_store_token(
 }
 
 pub(crate) async fn get_token_from_store<T>(
-    token_type: &str, 
+    token_type: &str,
     token_id: &str,
-) -> Result<T, OAuth2Error> 
-where 
-    T: TryFrom<libstorage::CacheData, Error = OAuth2Error>
+) -> Result<T, OAuth2Error>
+where
+    T: TryFrom<libstorage::CacheData, Error = OAuth2Error>,
 {
     GENERIC_CACHE_STORE
         .lock()
@@ -73,7 +70,9 @@ where
         .get(token_type, token_id)
         .await
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?
-        .ok_or_else(|| OAuth2Error::SecurityTokenNotFound(format!("{}-session not found",token_type)))?
+        .ok_or_else(|| {
+            OAuth2Error::SecurityTokenNotFound(format!("{}-session not found", token_type))
+        })?
         .try_into()
 }
 

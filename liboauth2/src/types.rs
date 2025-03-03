@@ -4,8 +4,8 @@ use serde_json::json;
 
 use libsession::User as SessionUser;
 
-use super::oauth2::IdInfo as GoogleIdInfo;
 use super::errors::OAuth2Error;
+use super::oauth2::IdInfo as GoogleIdInfo;
 
 // The user data we'll get back from Google
 #[derive(Debug, Clone, Serialize, Deserialize)]

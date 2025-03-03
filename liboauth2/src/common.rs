@@ -21,4 +21,3 @@ pub fn header_set_cookie(
     );
     Ok(headers)
 }
-

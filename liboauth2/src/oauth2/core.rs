@@ -17,9 +17,11 @@ use crate::config::{
 use crate::errors::OAuth2Error;
 use crate::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken};
 
+use super::google::{exchange_code_for_token, fetch_user_data_from_google};
 use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
-use super::utils::{encode_state, get_token_from_store, remove_token_from_store, generate_store_token};
-use super::google::{fetch_user_data_from_google, exchange_code_for_token};
+use super::utils::{
+    encode_state, generate_store_token, get_token_from_store, remove_token_from_store,
+};
 
 pub async fn prepare_oauth2_auth_request(
     headers: HeaderMap,
@@ -103,9 +105,10 @@ async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, OAuth
     let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)
         .map_err(|e| OAuth2Error::Serde(e.to_string()))?;
 
-    let pkce_session: StoredToken = get_token_from_store("pkce", &state_in_response.pkce_id).await?;
+    let pkce_session: StoredToken =
+        get_token_from_store("pkce", &state_in_response.pkce_id).await?;
 
-    let _ = remove_token_from_store("pkce", &state_in_response.pkce_id).await?;
+    remove_token_from_store("pkce", &state_in_response.pkce_id).await?;
 
     Ok(pkce_session.token)
 }
@@ -119,7 +122,8 @@ async fn verify_nonce(
     let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)
         .map_err(|e| OAuth2Error::Serde(e.to_string()))?;
 
-    let nonce_session: StoredToken = get_token_from_store("nonce", &state_in_response.nonce_id).await?;
+    let nonce_session: StoredToken =
+        get_token_from_store("nonce", &state_in_response.nonce_id).await?;
 
     tracing::debug!("Nonce Data: {:#?}", nonce_session);
 
@@ -134,7 +138,7 @@ async fn verify_nonce(
         return Err(OAuth2Error::NonceMismatch);
     }
 
-    let _ = remove_token_from_store("nonce", &state_in_response.nonce_id).await?;
+    remove_token_from_store("nonce", &state_in_response.nonce_id).await?;
 
     Ok(())
 }
@@ -153,7 +157,7 @@ pub async fn csrf_checks(
     let csrf_session: StoredToken = get_token_from_store("csrf", csrf_id).await?;
     tracing::debug!("CSRF Session: {:#?}", csrf_session);
 
-    let _ = remove_token_from_store("csrf", csrf_id).await?;
+    remove_token_from_store("csrf", csrf_id).await?;
 
     let user_agent = headers
         .get(http::header::USER_AGENT)
@@ -197,4 +201,3 @@ pub async fn csrf_checks(
 
     Ok(())
 }
-

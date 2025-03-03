@@ -1,14 +1,15 @@
-use crate::errors::OAuth2Error;
-use crate::types::{GoogleUserInfo, OidcTokenResponse};
 use crate::config::{
-    OAUTH2_GOOGLE_CLIENT_ID,
-    OAUTH2_GOOGLE_CLIENT_SECRET, OAUTH2_REDIRECT_URI, OAUTH2_TOKEN_URL,
+    OAUTH2_GOOGLE_CLIENT_ID, OAUTH2_GOOGLE_CLIENT_SECRET, OAUTH2_REDIRECT_URI, OAUTH2_TOKEN_URL,
     OAUTH2_USERINFO_URL,
 };
+use crate::errors::OAuth2Error;
+use crate::types::{GoogleUserInfo, OidcTokenResponse};
 
 use super::utils::get_client;
 
-pub(super) async fn fetch_user_data_from_google(access_token: String) -> Result<GoogleUserInfo, OAuth2Error> {
+pub(super) async fn fetch_user_data_from_google(
+    access_token: String,
+) -> Result<GoogleUserInfo, OAuth2Error> {
     let client = get_client();
     let response = client
         .get(OAUTH2_USERINFO_URL)
