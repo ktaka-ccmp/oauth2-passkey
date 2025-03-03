@@ -1,4 +1,3 @@
-use anyhow::Context;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use chrono::{DateTime, Utc};
 use http::header::{HeaderMap, SET_COOKIE};
@@ -28,7 +27,6 @@ pub(crate) fn header_set_cookie(
         SET_COOKIE,
         cookie
             .parse()
-            .context("failed to parse cookie")
             .map_err(|_| SessionError::Cookie("Failed to parse cookie".to_string()))?,
     );
     Ok(headers)

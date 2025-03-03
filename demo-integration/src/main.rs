@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(debug_assertions)]
         {
             // Debug build default - show all log levels
-            "libpasskey=trace,libstorage=trace,demo_integration=trace".into()
+            "libpasskey=trace,liboauth2=trace,libstorage=trace,libuserdb=trace,demo_integration=trace".into()
         }
 
         #[cfg(not(debug_assertions))]
