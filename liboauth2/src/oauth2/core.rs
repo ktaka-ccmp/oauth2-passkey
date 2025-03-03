@@ -5,59 +5,23 @@ use base64::{
     Engine as _,
     engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD},
 };
-use url::Url;
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use sha2::{Digest, Sha256};
 
-use libstorage::GENERIC_CACHE_STORE;
-
-use crate::common::{gen_random_string, header_set_cookie};
+use crate::common::header_set_cookie;
 use crate::config::{
     OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_GOOGLE_CLIENT_ID,
-    OAUTH2_GOOGLE_CLIENT_SECRET, OAUTH2_QUERY_STRING, OAUTH2_REDIRECT_URI, OAUTH2_TOKEN_URL,
-    OAUTH2_USERINFO_URL,
+    OAUTH2_QUERY_STRING, OAUTH2_REDIRECT_URI,
 };
 use crate::errors::OAuth2Error;
-use crate::oauth2::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
-use crate::types::{AuthResponse, GoogleUserInfo, OidcTokenResponse, StateParams, StoredToken};
+use crate::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken};
 
-pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> String {
-    let state_params = StateParams {
-        csrf_token,
-        nonce_id,
-        pkce_id,
-    };
-
-    let state_json = serde_json::json!(state_params).to_string();
-    URL_SAFE.encode(state_json)
-}
-
-pub async fn generate_store_token(
-    token_type: &str,
-    expires_at: DateTime<Utc>,
-    user_agent: Option<String>,
-) -> Result<(String, String), OAuth2Error> {
-    let token = gen_random_string(32)?;
-    let token_id = gen_random_string(32)?;
-
-    let token_data = StoredToken {
-        token: token.clone(),
-        expires_at,
-        user_agent,
-        ttl: *OAUTH2_CSRF_COOKIE_MAX_AGE,
-    };
-
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store_mut()
-        .put(token_type, &token_id, token_data.into())
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-    Ok((token, token_id))
-}
+use super::google::{exchange_code_for_token, fetch_user_data_from_google};
+use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
+use super::utils::{
+    encode_state, generate_store_token, get_token_from_store, remove_token_from_store,
+};
 
 pub async fn prepare_oauth2_auth_request(
     headers: HeaderMap,
@@ -141,26 +105,12 @@ async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, OAuth
     let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)
         .map_err(|e| OAuth2Error::Serde(e.to_string()))?;
 
-    let pkce_session: StoredToken = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store()
-        .get("pkce", &state_in_response.pkce_id)
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?
-        .ok_or_else(|| OAuth2Error::SecurityTokenNotFound("PKCE Session not found".to_string()))?
-        .try_into()?;
+    let pkce_session: StoredToken =
+        get_token_from_store("pkce", &state_in_response.pkce_id).await?;
 
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store_mut()
-        .remove("pkce", &state_in_response.pkce_id)
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-    let pkce_verifier = pkce_session.token.clone();
-    tracing::debug!("PKCE Verifier: {:#?}", pkce_verifier);
-    Ok(pkce_verifier)
+    remove_token_from_store("pkce", &state_in_response.pkce_id).await?;
+
+    Ok(pkce_session.token)
 }
 
 async fn verify_nonce(
@@ -172,15 +122,8 @@ async fn verify_nonce(
     let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)
         .map_err(|e| OAuth2Error::Serde(e.to_string()))?;
 
-    let nonce_session: StoredToken = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store()
-        .get("nonce", &state_in_response.nonce_id)
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?
-        .ok_or_else(|| OAuth2Error::SecurityTokenNotFound("Nonce Session not found".to_string()))?
-        .try_into()?;
+    let nonce_session: StoredToken =
+        get_token_from_store("nonce", &state_in_response.nonce_id).await?;
 
     tracing::debug!("Nonce Data: {:#?}", nonce_session);
 
@@ -195,42 +138,9 @@ async fn verify_nonce(
         return Err(OAuth2Error::NonceMismatch);
     }
 
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store_mut()
-        .remove("nonce", &state_in_response.nonce_id)
-        .await
-        .expect("Failed to remove nonce session");
+    remove_token_from_store("nonce", &state_in_response.nonce_id).await?;
 
     Ok(())
-}
-
-pub async fn validate_origin(headers: &HeaderMap, auth_url: &str) -> Result<(), OAuth2Error> {
-    let parsed_url = Url::parse(auth_url).expect("Invalid URL");
-    let scheme = parsed_url.scheme();
-    let host = parsed_url.host_str().unwrap_or_default();
-    let port = parsed_url
-        .port()
-        .map_or("".to_string(), |p| format!(":{}", p));
-    let expected_origin = format!("{}://{}{}", scheme, host, port);
-
-    let origin = headers
-        .get("Origin")
-        .or_else(|| headers.get("Referer"))
-        .and_then(|h| h.to_str().ok());
-
-    match origin {
-        Some(origin) if origin.starts_with(&expected_origin) => Ok(()),
-        _ => {
-            tracing::error!("Expected Origin: {:#?}", expected_origin);
-            tracing::error!("Actual Origin: {:#?}", origin);
-            Err(OAuth2Error::InvalidOrigin(format!(
-                "Expected Origin: {:#?}, Actual Origin: {:#?}",
-                expected_origin, origin
-            )))
-        }
-    }
 }
 
 pub async fn csrf_checks(
@@ -244,28 +154,13 @@ pub async fn csrf_checks(
             OAuth2Error::SecurityTokenNotFound("No CSRF session cookie found".to_string())
         })?;
 
-    let csrf_session: StoredToken = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store()
-        .get("csrf", csrf_id)
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?
-        .ok_or_else(|| OAuth2Error::SecurityTokenNotFound("CSRF Session not found".to_string()))?
-        .try_into()?;
-
+    let csrf_session: StoredToken = get_token_from_store("csrf", csrf_id).await?;
     tracing::debug!("CSRF Session: {:#?}", csrf_session);
 
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store_mut()
-        .remove("csrf", csrf_id)
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+    remove_token_from_store("csrf", csrf_id).await?;
 
     let user_agent = headers
-        .get(axum::http::header::USER_AGENT)
+        .get(http::header::USER_AGENT)
         .and_then(|h| h.to_str().ok())
         .unwrap_or("Unknown")
         .to_string();
@@ -305,68 +200,4 @@ pub async fn csrf_checks(
     }
 
     Ok(())
-}
-
-async fn fetch_user_data_from_google(access_token: String) -> Result<GoogleUserInfo, OAuth2Error> {
-    let client = crate::client::get_client();
-    let response = client
-        .get(OAUTH2_USERINFO_URL)
-        .bearer_auth(access_token)
-        .send()
-        .await
-        .map_err(|e| OAuth2Error::FetchUserInfo(e.to_string()))?;
-
-    let response_body = response
-        .text()
-        .await
-        .map_err(|e| OAuth2Error::FetchUserInfo(e.to_string()))?;
-
-    tracing::debug!("Response Body: {:#?}", response_body);
-    let user_data: GoogleUserInfo = serde_json::from_str(&response_body)
-        .map_err(|e| OAuth2Error::Serde(format!("Failed to deserialize response body: {}", e)))?;
-
-    tracing::debug!("User data: {:#?}", user_data);
-    Ok(user_data)
-}
-
-async fn exchange_code_for_token(
-    code: String,
-    code_verifier: String,
-) -> Result<(String, String), OAuth2Error> {
-    let client = crate::client::get_client();
-    let response = client
-        .post(OAUTH2_TOKEN_URL.as_str())
-        .form(&[
-            ("code", code),
-            ("client_id", OAUTH2_GOOGLE_CLIENT_ID.to_string()),
-            ("client_secret", OAUTH2_GOOGLE_CLIENT_SECRET.to_string()),
-            ("redirect_uri", OAUTH2_REDIRECT_URI.to_string()),
-            ("grant_type", "authorization_code".to_string()),
-            ("code_verifier", code_verifier),
-        ])
-        .send()
-        .await
-        .map_err(|e| OAuth2Error::TokenExchange(e.to_string()))?;
-
-    match response.status() {
-        reqwest::StatusCode::OK => {
-            tracing::debug!("Token Exchange Response: {:#?}", response);
-        }
-        status => {
-            tracing::debug!("Token Exchange Response: {:#?}", response);
-            return Err(OAuth2Error::TokenExchange(status.to_string()));
-        }
-    };
-
-    let response_body = response
-        .text()
-        .await
-        .map_err(|e| OAuth2Error::TokenExchange(e.to_string()))?;
-    let response_json: OidcTokenResponse = serde_json::from_str(&response_body)
-        .map_err(|e| OAuth2Error::TokenExchange(e.to_string()))?;
-    let access_token = response_json.access_token.clone();
-    let id_token = response_json.id_token.clone().unwrap();
-
-    tracing::debug!("Response JSON: {:#?}", response_json);
-    Ok((access_token, id_token))
 }
