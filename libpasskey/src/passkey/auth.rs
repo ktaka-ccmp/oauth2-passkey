@@ -73,8 +73,8 @@ pub async fn start_authentication(
         auth_id,
     };
 
-    #[cfg(debug_assertions)]
-    println!("Auth options: {:?}", auth_option);
+    tracing::debug!("Auth options: {:?}", auth_option);
+
     Ok(auth_option)
 }
 

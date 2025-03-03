@@ -56,8 +56,7 @@ pub async fn start_registration_with_auth_user(
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    #[cfg(debug_assertions)]
-    println!("User info: {:#?}", user_info);
+    tracing::debug!("User info: {:#?}", user_info);
 
     let options = create_registration_options(user_info).await?;
 
@@ -120,8 +119,7 @@ pub async fn create_registration_options(
         attestation: "direct".to_string(),
     };
 
-    #[cfg(debug_assertions)]
-    println!("Registration options: {:?}", options);
+    tracing::debug!("Registration options: {:?}", options);
 
     Ok(options)
 }
@@ -298,10 +296,11 @@ fn parse_attestation_object(attestation_base64: &str) -> Result<AttestationObjec
             }
         }
 
-        #[cfg(debug_assertions)]
-        println!(
+        tracing::debug!(
             "Attestation format: {:?}, auth data: {:?}, attestation statement: {:?}",
-            fmt, auth_data, att_stmt
+            fmt,
+            auth_data,
+            att_stmt
         );
 
         match (fmt, auth_data, att_stmt) {
@@ -326,6 +325,7 @@ fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<Vec<u8>, Passke
     let flags = auth_data[32];
     let has_attested_cred_data = (flags & 0x40) != 0;
     if !has_attested_cred_data {
+        tracing::error!("No attested credential data present");
         return Err(PasskeyError::AuthenticatorData(
             "No attested credential data present".to_string(),
         ));
@@ -350,6 +350,7 @@ fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], PasskeyError> {
     let mut pos = 37; // Skip RP ID hash (32) + flags (1) + counter (4)
 
     if auth_data.len() < pos + 18 {
+        tracing::error!("Authenticator data too short");
         return Err(PasskeyError::Format(
             "Authenticator data too short".to_string(),
         ));
@@ -362,12 +363,14 @@ fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], PasskeyError> {
     pos += 2;
 
     if cred_id_len == 0 || cred_id_len > 1024 {
+        tracing::error!("Invalid credential ID length");
         return Err(PasskeyError::Format(
             "Invalid credential ID length".to_string(),
         ));
     }
 
     if auth_data.len() < pos + cred_id_len {
+        tracing::error!("Authenticator data too short for credential ID");
         return Err(PasskeyError::Format(
             "Authenticator data too short for credential ID".to_string(),
         ));
