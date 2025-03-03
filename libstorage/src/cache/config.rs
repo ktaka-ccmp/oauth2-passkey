@@ -3,66 +3,46 @@ use tokio::sync::Mutex;
 
 use super::{
     traits::CacheStore,
-    types::{CacheStoreType, InMemoryCacheStore},
+    types::{InMemoryCacheStore, RedisCacheStore},
 };
-use crate::errors::StorageError;
 
-pub(crate) static GENERIC_CACHE_TYPE: LazyLock<String> = LazyLock::new(|| {
-    env::var("GENERIC_CACHE_STORAGE_TYPE").unwrap_or_else(|_| "memory".to_string())
+pub static GENERIC_CACHE_STORE_TYPE: LazyLock<String> = LazyLock::new(|| {
+    env::var("GENERIC_CACHE_STORE_TYPE").expect("GENERIC_CACHE_STORE_TYPE must be set")
 });
 
-pub(crate) static GENERIC_CACHE_URL: LazyLock<String> =
-    LazyLock::new(|| env::var("GENERIC_CACHE_STORAGE_URL").expect("Failed to get CACHE_URL"));
-
-pub static GENERIC_CACHE_STORE: LazyLock<Mutex<SingletonCacheStore>> = LazyLock::new(|| {
-    Mutex::new(SingletonCacheStore::new(
-        Box::new(InMemoryCacheStore::new()),
-    ))
+pub static GENERIC_CACHE_STORE_URL: LazyLock<String> = LazyLock::new(|| {
+    env::var("GENERIC_CACHE_STORE_URL").expect("GENERIC_CACHE_STORE_URL must be set")
 });
 
-pub async fn init_cache_store() -> Result<(), StorageError> {
-    let store_type = CacheStoreType::from_env().unwrap_or_else(|e| {
-        eprintln!("Failed to initialize cache store from environment: {}", e);
-        eprintln!("Falling back to in-memory store");
-        CacheStoreType::Memory
-    });
+pub static GENERIC_CACHE_STORE: LazyLock<Mutex<Box<dyn CacheStore>>> = LazyLock::new(|| {
+    let store_type = GENERIC_CACHE_STORE_TYPE.as_str();
+    let store_url = GENERIC_CACHE_STORE_URL.as_str();
 
-    tracing::info!("Initializing cache store with type: {:?}", store_type);
-    let store = store_type.create_store().await?;
-    GENERIC_CACHE_STORE.lock().await.set_store(store)?;
-    tracing::info!("Cache store initialized successfully");
-    Ok(())
-}
+    tracing::info!(
+        "Initializing cache store with type: {}, url: {}",
+        store_type,
+        store_url
+    );
 
-pub struct SingletonCacheStore {
-    store: Box<dyn CacheStore>,
-    initialized: bool,
-}
-
-impl SingletonCacheStore {
-    fn new(store: Box<dyn CacheStore>) -> Self {
-        Self {
-            store,
-            initialized: false,
+    let store: Box<dyn CacheStore> = match store_type {
+        "memory" => Box::new(InMemoryCacheStore::new()),
+        "redis" => {
+            let client = redis::Client::open(store_url).expect("Failed to create Redis client");
+            // Create the store but don't try to verify the connection yet
+            // The connection will be established when the store is first used
+            Box::new(RedisCacheStore { client })
         }
-    }
+        t => panic!(
+            "Unsupported cache store type: {}. Supported types are 'memory' and 'redis'",
+            t
+        ),
+    };
 
-    fn set_store(&mut self, new_store: Box<dyn CacheStore>) -> Result<(), StorageError> {
-        if self.initialized {
-            return Err(StorageError::Storage(
-                "Cache store has already been initialized".to_string(),
-            ));
-        }
-        self.store = new_store;
-        self.initialized = true;
-        Ok(())
-    }
+    tracing::info!(
+        "Connected to cache store: type={}, url={}",
+        store_type,
+        store_url
+    );
 
-    pub fn get_store(&self) -> &dyn CacheStore {
-        &*self.store
-    }
-
-    pub fn get_store_mut(&mut self) -> &mut Box<dyn CacheStore> {
-        &mut self.store
-    }
-}
+    Mutex::new(store)
+});
