@@ -41,17 +41,12 @@ impl DataStore for PostgresDataStore {
 }
 
 // Configuration
-const DEFAULT_SQLITE_STORE_URL: &str = "sqlite:file:memdb1?mode=memory&cache=shared";
-const DEFAULT_POSTGRES_STORE_URL: &str = "postgres://postgres:postgres@localhost:5432/postgres";
-
-pub static GENERIC_DATA_STORE_TYPE: LazyLock<String> =
-    LazyLock::new(|| env::var("GENERIC_DATA_STORE_TYPE").unwrap_or_else(|_| "sqlite".to_string()));
+pub static GENERIC_DATA_STORE_TYPE: LazyLock<String> = LazyLock::new(|| {
+    env::var("GENERIC_DATA_STORE_TYPE").expect("GENERIC_DATA_STORE_TYPE must be set")
+});
 
 pub static GENERIC_DATA_STORE_URL: LazyLock<String> = LazyLock::new(|| {
-    env::var("GENERIC_DATA_STORE_URL").unwrap_or_else(|_| match GENERIC_DATA_STORE_TYPE.as_str() {
-        "postgres" => DEFAULT_POSTGRES_STORE_URL.to_string(),
-        _ => DEFAULT_SQLITE_STORE_URL.to_string(),
-    })
+    env::var("GENERIC_DATA_STORE_URL").expect("GENERIC_DATA_STORE_URL must be set")
 });
 
 pub static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = LazyLock::new(|| {
@@ -77,10 +72,10 @@ pub static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = LazyLock::n
         ),
     };
 
-    #[cfg(debug_assertions)]
-    println!(
+    tracing::info!(
         "Connected to database: type={}, url={}",
-        store_type, store_url
+        store_type,
+        store_url
     );
 
     Mutex::new(store)

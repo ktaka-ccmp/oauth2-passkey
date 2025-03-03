@@ -11,8 +11,7 @@ pub async fn init() -> Result<(), PasskeyError> {
     // Validate required environment variables early
     let _ = *super::config::PASSKEY_RP_ID;
 
-    // Initialize libstorage's cache store first
-    libstorage::init_cache_store()
+    libstorage::init()
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
@@ -50,7 +49,6 @@ pub async fn email_to_user_id(username: String) -> Result<String, PasskeyError> 
     let email_user_id: EmailUserId = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store()
         .get("email", &username)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?
@@ -66,7 +64,6 @@ pub(crate) async fn uid2cid_str_vec(
     let credential_id_strs: Vec<UserIdCredentialIdStr> = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store()
         .gets("uid2cid_str", &user_id)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?
@@ -82,7 +79,7 @@ pub(crate) async fn uid2cid_str_vec(
     Ok(credential_id_strs)
 }
 
-// libpasskey/src/types.rs
+/// Helper functions for cache store operations to improve code reuse and maintainability
 impl From<EmailUserId> for libstorage::CacheData {
     fn from(data: EmailUserId) -> Self {
         Self {
@@ -145,4 +142,49 @@ impl TryFrom<libstorage::CacheData> for StoredChallenge {
     fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {
         serde_json::from_slice(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
     }
+}
+
+/// Helper function to store data in the cache
+pub(crate) async fn store_in_cache<T>(
+    category: &str,
+    key: &str,
+    data: T,
+) -> Result<(), PasskeyError>
+where
+    T: Into<libstorage::CacheData>,
+{
+    GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .put(category, key, data.into())
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))
+}
+
+/// Helper function to retrieve data from the cache
+pub(crate) async fn get_from_cache<T>(category: &str, key: &str) -> Result<Option<T>, PasskeyError>
+where
+    T: TryFrom<libstorage::CacheData, Error = PasskeyError>,
+{
+    let data = GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .get(category, key)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    match data {
+        Some(value) => Ok(Some(value.try_into()?)),
+        None => Ok(None),
+    }
+}
+
+/// Helper function to remove data from the cache
+pub(crate) async fn remove_from_cache(category: &str, key: &str) -> Result<(), PasskeyError> {
+    GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .remove(category, key)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))
 }

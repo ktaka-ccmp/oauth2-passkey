@@ -28,6 +28,7 @@ pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderM
 async fn create_new_session(session_info: SessionInfo) -> Result<HeaderMap, SessionError> {
     let mut headers = HeaderMap::new();
     let expires_at = session_info.expires_at;
+
     let session_id = create_and_store_session(session_info).await?;
     header_set_cookie(
         &mut headers,
@@ -36,8 +37,8 @@ async fn create_new_session(session_info: SessionInfo) -> Result<HeaderMap, Sess
         expires_at,
         *SESSION_COOKIE_MAX_AGE as i64,
     )?;
-    #[cfg(debug_assertions)]
-    println!("Headers: {:#?}", headers);
+
+    tracing::debug!("Headers: {:#?}", headers);
     Ok(headers)
 }
 
@@ -51,7 +52,6 @@ async fn create_and_store_session(session_info: SessionInfo) -> Result<String, S
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
         .put("session", &session_id, stored_session.into())
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?;
@@ -66,7 +66,6 @@ pub async fn delete_session_from_store(
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .get_store_mut()
             .remove("session", cookie)
             .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
@@ -100,7 +99,6 @@ pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, 
     let cached_session = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store()
         .get("session", session_cookie)
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?

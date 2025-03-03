@@ -83,8 +83,7 @@ pub async fn post_authorized(
     headers: HeaderMap,
     Form(form): Form<AuthResponse>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    #[cfg(debug_assertions)]
-    println!(
+    tracing::debug!(
         "Cookies: {:#?}",
         cookies.get(OAUTH2_CSRF_COOKIE_NAME.as_str())
     );

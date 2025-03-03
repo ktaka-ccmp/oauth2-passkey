@@ -1,7 +1,6 @@
 use std::time::SystemTime;
 
-use libstorage::GENERIC_CACHE_STORE;
-
+use crate::common::{get_from_cache, remove_from_cache};
 use crate::config::PASSKEY_CHALLENGE_TIMEOUT;
 use crate::errors::PasskeyError;
 use crate::types::StoredChallenge;
@@ -16,15 +15,9 @@ pub async fn get_and_validate_challenge(
     challenge_type: &str,
     id: &str,
 ) -> Result<StoredChallenge, PasskeyError> {
-    let stored_challenge: StoredChallenge = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store()
-        .get(challenge_type, id)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?
-        .ok_or_else(|| PasskeyError::NotFound("Challenge not found".to_string()))?
-        .try_into()?;
+    let stored_challenge: StoredChallenge = get_from_cache(challenge_type, id)
+        .await?
+        .ok_or(PasskeyError::NotFound("Challenge not found".to_string()))?;
 
     // Validate challenge TTL
     let now = SystemTime::now()
@@ -54,14 +47,7 @@ pub async fn get_and_validate_challenge(
 /// This function is called after a successful registration or authentication
 /// to clean up the challenge data from the cache.
 pub async fn remove_challenge(challenge_type: &str, id: &str) -> Result<(), PasskeyError> {
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store_mut()
-        .remove(challenge_type, id)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
+    remove_from_cache(challenge_type, id).await?;
     tracing::debug!("Removed {} challenge for ID: {}", challenge_type, id);
 
     Ok(())

@@ -48,7 +48,6 @@ pub async fn generate_store_token(
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
         .put(token_type, &token_id, token_data.into())
         .await
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
@@ -66,7 +65,6 @@ where
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store()
         .get(token_type, token_id)
         .await
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?
@@ -83,7 +81,6 @@ pub(crate) async fn remove_token_from_store(
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
         .remove(token_type, token_id)
         .await
         .map_err(|e| OAuth2Error::Storage(e.to_string()))

@@ -17,6 +17,10 @@ pub use session::{
 pub use types::{SessionInfo, User}; // Required for session data
 
 pub async fn init() -> Result<(), errors::SessionError> {
+    libstorage::init()
+        .await
+        .map_err(|e| errors::SessionError::Storage(e.to_string()))?;
+
     libuserdb::init()
         .await
         .map_err(|e| errors::SessionError::Storage(e.to_string()))?;

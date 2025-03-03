@@ -19,5 +19,9 @@ pub async fn init() -> Result<(), errors::OAuth2Error> {
     let _ = *config::OAUTH2_GOOGLE_CLIENT_ID;
     let _ = *config::OAUTH2_GOOGLE_CLIENT_SECRET;
 
+    libstorage::init()
+        .await
+        .map_err(|e| errors::OAuth2Error::Storage(e.to_string()))?;
+
     Ok(())
 }

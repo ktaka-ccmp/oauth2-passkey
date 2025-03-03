@@ -3,39 +3,6 @@ use async_trait::async_trait;
 use crate::errors::StorageError;
 use crate::types::CacheData;
 
-use super::config::{GENERIC_CACHE_TYPE, GENERIC_CACHE_URL};
-use super::types::{CacheStoreType, InMemoryCacheStore, RedisCacheStore};
-
-impl CacheStoreType {
-    pub fn from_env() -> Result<Self, StorageError> {
-        dotenv::dotenv().ok();
-
-        let store_type = GENERIC_CACHE_TYPE.as_str();
-
-        match store_type {
-            "memory" => Ok(CacheStoreType::Memory),
-            "redis" => {
-                let url = GENERIC_CACHE_URL.to_string();
-                Ok(CacheStoreType::Redis { url })
-            }
-            _ => Err(StorageError::Storage(format!(
-                "Unknown cache store type: {}",
-                store_type
-            ))),
-        }
-    }
-
-    pub(crate) async fn create_store(&self) -> Result<Box<dyn CacheStore>, StorageError> {
-        let store: Box<dyn CacheStore> = match self {
-            CacheStoreType::Memory => Box::new(InMemoryCacheStore::new()),
-            CacheStoreType::Redis { url } => Box::new(RedisCacheStore::connect(url).await?),
-        };
-
-        store.init().await?;
-        Ok(store)
-    }
-}
-
 #[async_trait]
 pub trait CacheStore: Send + Sync + 'static {
     /// Initialize the store. This is called when the store is created.

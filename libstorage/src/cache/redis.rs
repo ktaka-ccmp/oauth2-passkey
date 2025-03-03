@@ -10,12 +10,6 @@ use super::types::RedisCacheStore;
 const CACHE_PREFIX: &str = "cache";
 
 impl RedisCacheStore {
-    pub(crate) async fn connect(url: &str) -> Result<Self, StorageError> {
-        println!("Connecting to Redis at {} for generic cache", url);
-        let client = redis::Client::open(url).map_err(|e| StorageError::Storage(e.to_string()))?;
-        Ok(Self { client })
-    }
-
     fn make_key(prefix: &str, key: &str) -> String {
         format!("{}:{}:{}", CACHE_PREFIX, prefix, key)
     }
@@ -35,10 +29,6 @@ impl CacheStore for RedisCacheStore {
         let key = Self::make_key(prefix, key);
         let value = serde_json::to_string(&value)?;
         let _: () = conn.set(&key, value).await?;
-        // let ttl = 600; // 10 minute for testing
-        // let _: () = conn.expire(&key, ttl).await?;
-        // let _: () = conn.set_ex(&key, value, ttl).await?;
-
         Ok(())
     }
 
@@ -55,7 +45,6 @@ impl CacheStore for RedisCacheStore {
         let value = serde_json::to_string(&value)?;
         let _: () = conn.set(&key, value).await?;
         let _: () = conn.expire(&key, ttl as i64).await?;
-        // let _: () = conn.set_ex(&key, value, ttl).await?;
 
         Ok(())
     }
