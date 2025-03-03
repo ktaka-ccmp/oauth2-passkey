@@ -4,7 +4,6 @@ mod common;
 mod config;
 mod errors;
 mod oauth2;
-mod storage;
 mod types;
 
 // Re-export only what's necessary for the public API
@@ -16,12 +15,11 @@ pub use config::{OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME};
 pub use oauth2::{csrf_checks, get_idinfo_userinfo, prepare_oauth2_auth_request, validate_origin};
 pub use types::AuthResponse;
 
-pub async fn init() -> Result<(), errors::AppError> {
+pub async fn init() -> Result<(), errors::OAuth2Error> {
     // Validate required environment variables early
     let _ = *config::OAUTH2_REDIRECT_URI; // This will validate ORIGIN
     let _ = *config::OAUTH2_GOOGLE_CLIENT_ID;
     let _ = *config::OAUTH2_GOOGLE_CLIENT_SECRET;
 
-    config::init_token_store().await?;
     Ok(())
 }

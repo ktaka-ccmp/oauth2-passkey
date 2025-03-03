@@ -27,9 +27,11 @@ sha2 = "0.10.8"
 base64 = "0.22.1"
 tracing = "0.1.41"
 
-libsession = { workspace = true }
 axum = { workspace = true }
 chrono = { workspace = true }
+
+libsession = { workspace = true }
+libstorage = { workspace = true }
 
 [package.metadata.askama]
 dir = "templates"
