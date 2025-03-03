@@ -16,3 +16,4 @@ rustls = { workspace = true }
 
 libaxum = { workspace = true }
 liboauth2 = { workspace = true }
+libsession = { workspace = true }

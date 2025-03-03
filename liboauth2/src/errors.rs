@@ -47,12 +47,6 @@ impl From<std::num::TryFromIntError> for AppError {
     }
 }
 
-impl From<libsession::AppError> for AppError {
-    fn from(err: libsession::AppError) -> Self {
-        Self(anyhow::anyhow!("Session error: {}", err))
-    }
-}
-
 impl From<crate::oauth2::TokenVerificationError> for AppError {
     fn from(err: crate::oauth2::TokenVerificationError) -> Self {
         Self(anyhow::anyhow!("Token verification error: {:?}", err))

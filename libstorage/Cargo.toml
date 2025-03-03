@@ -26,5 +26,3 @@ sqlx = { version = "0.8", features = [
     "sqlite",
     "runtime-async-std-native-tls"
 ], default-features = false }
-
-libsession = { workspace = true }
