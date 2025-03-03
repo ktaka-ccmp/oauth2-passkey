@@ -18,8 +18,8 @@ pub use config::PASSKEY_ROUTE_PREFIX; // Required for route configuration
 
 pub use passkey::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
-    finish_registration, finish_registration_with_auth_user, start_authentication,
-    start_registration, start_registration_with_auth_user, verify_authentication,
+    finish_authentication, finish_registration, finish_registration_with_auth_user,
+    start_authentication, start_registration, start_registration_with_auth_user,
 };
 
 pub use common::{email_to_user_id, init};

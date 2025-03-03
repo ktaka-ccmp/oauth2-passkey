@@ -78,116 +78,55 @@ pub async fn start_authentication(
     Ok(auth_option)
 }
 
-pub async fn verify_authentication(
+pub async fn finish_authentication(
     auth_response: AuthenticatorResponse,
 ) -> Result<String, PasskeyError> {
-    #[cfg(debug_assertions)]
-    println!(
+
+    tracing::debug!(
         "Starting authentication verification for response: {:?}",
         auth_response
     );
 
     // Get stored challenge and verify auth
-    let stored_challenge: StoredChallenge = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get_store()
-        .get("auth_challenge", &auth_response.auth_id)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?
-        .ok_or_else(|| PasskeyError::NotFound("Challenge not found".to_string()))?
-        .try_into()?;
+    let stored_challenge = get_and_validate_challenge(&auth_response.auth_id).await?;
 
-    // Validate challenge TTL
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let age = now - stored_challenge.timestamp;
-    let timeout = stored_challenge.ttl.min(*PASSKEY_CHALLENGE_TIMEOUT as u64);
-    if age > timeout {
-        println!(
-            "Challenge expired after {} seconds (timeout: {})",
-            age, timeout
-        );
-        return Err(PasskeyError::Authentication(
-            "Challenge has expired. For more details, run with RUST_LOG=debug".into(),
-        ));
-    }
-
-    #[cfg(debug_assertions)]
-    println!("Found stored challenge: {:?}", stored_challenge);
-
-    // Parse and verify client data
-    #[cfg(debug_assertions)]
-    println!(
+    tracing::debug!(
         "Parsing client data: {}",
         &auth_response.response.client_data_json
     );
 
     let client_data = ParsedClientData::from_base64(&auth_response.response.client_data_json)?;
 
-    #[cfg(debug_assertions)]
-    println!("Parsed client data: {:?}", client_data);
+    tracing::debug!("Parsed client data: {:?}", client_data);
 
+    // Verify client data i.e. challenge, origin and type(="webauthn.get")
     client_data.verify(&stored_challenge.challenge)?;
 
-    // Parse and verify authenticator data
-    #[cfg(debug_assertions)]
-    println!(
+    tracing::debug!(
         "Parsing authenticator data: {}",
         &auth_response.response.authenticator_data
     );
 
     let auth_data = AuthenticatorData::from_base64(&auth_response.response.authenticator_data)?;
 
-    #[cfg(debug_assertions)]
-    println!("Parsed authenticator data: {:?}", auth_data);
+    tracing::debug!("Parsed authenticator data: {:?}", auth_data);
 
+    // Verify authenticator data i.e. rpIdHash, flags and counter
     auth_data.verify()?;
-
-    // Log detailed authenticator data information for debugging
-    tracing::debug!("Authenticator data verification passed");
-    tracing::debug!("User present: {}", auth_data.is_user_present());
-    tracing::debug!("User verified: {}", auth_data.is_user_verified());
-    tracing::debug!("Discoverable credential: {}", auth_data.is_discoverable());
-    tracing::debug!("Backed up: {}", auth_data.is_backed_up());
-    tracing::debug!(
-        "Has attested credential data: {}",
-        auth_data.has_attested_credential_data()
-    );
-    tracing::debug!("Has extension data: {}", auth_data.has_extension_data());
 
     // Get credential then public key
     let stored_credential = PasskeyStore::get_credential(&auth_response.id)
         .await?
         .ok_or_else(|| PasskeyError::NotFound("Credential not found".into()))?;
 
-    #[cfg(debug_assertions)]
-    println!("Found credential: {:?}", stored_credential);
-
-    // Verify user handle based on credential type
-    let user_handle = auth_response
-        .response
-        .user_handle
-        .as_ref()
-        .and_then(|handle| {
-            base64url_decode(handle)
-                .ok()
-                .and_then(|decoded| String::from_utf8(decoded).ok())
-        });
-
-    // Check if credential is discoverable
-    let is_discoverable = auth_data.is_discoverable();
-
-    #[cfg(debug_assertions)]
-    println!(
+    tracing::debug!("Found credential: {:?}", stored_credential);
+    tracing::debug!(
         "Credential properties:\n\
          - Type: {}\n\
          - User present: {}\n\
          - User verified: {}\n\
          - Backed up: {}",
-        if is_discoverable {
+        if auth_data.is_discoverable() {
             "discoverable"
         } else {
             "server-side"
@@ -197,116 +136,18 @@ pub async fn verify_authentication(
         auth_data.is_backed_up(),
     );
 
-    match (
-        user_handle,
-        &stored_credential.user.user_handle,
-        is_discoverable,
-    ) {
-        (Some(handle), stored_handle, _) if handle != *stored_handle => {
-            return Err(PasskeyError::Authentication(
-                "User handle mismatch. For more details, run with RUST_LOG=debug".into(),
-            ));
-        }
-        (None, _, true) => {
-            // Discoverable credentials MUST provide a user handle
-            return Err(PasskeyError::Authentication(
-                "Missing required user handle for discoverable credential. For more details, run with RUST_LOG=debug".into(),
-            ));
-        }
-        (None, _, false) => {
-            // Non-discoverable credentials may omit the user handle
-            #[cfg(debug_assertions)]
-            println!("No user handle provided for non-discoverable credential");
-        }
-        _ => {
-            #[cfg(debug_assertions)]
-            println!("User handle verified successfully");
-        }
-    }
+    // Verify user handle and counter
+    verify_user_handle(&auth_response, &stored_credential, auth_data.is_discoverable())?;
+    verify_counter(&auth_response.id, &auth_data, &stored_credential).await?;
 
-    // Verify the authenticator data counter
-    let auth_counter = auth_data.counter;
-    tracing::debug!(
-        "Counter verification - stored: {}, received: {}",
-        stored_credential.counter,
-        auth_counter
-    );
-
-    if auth_counter == 0 {
-        // Counter value of 0 means the authenticator doesn't support counters
-        tracing::info!("Authenticator does not support counters (received counter=0)");
-    } else if auth_counter <= stored_credential.counter {
-        // Counter value decreased or didn't change - possible cloning attack
-        tracing::warn!(
-            "Counter verification failed - stored: {}, received: {}",
-            stored_credential.counter,
-            auth_counter
-        );
-        return Err(PasskeyError::Authentication(
-            "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
-        ));
-    } else {
-        // Counter increased as expected
-        tracing::debug!(
-            "Counter verification successful - stored: {}, received: {}",
-            stored_credential.counter,
-            auth_counter
-        );
-    }
-
-    let verification_algorithm = &ring::signature::ECDSA_P256_SHA256_ASN1;
-    let public_key = UnparsedPublicKey::new(verification_algorithm, &stored_credential.public_key);
-
-    // Signature
-    let signature = base64url_decode(&auth_response.response.signature)
-        .map_err(|e| PasskeyError::Format(format!("Invalid signature: {}", e)))?;
-
-    #[cfg(debug_assertions)]
-    println!("Decoded signature length: {}", signature.len());
-
-    // Prepare signed data
-    let client_data_hash = digest::digest(&digest::SHA256, &client_data.raw_data);
-    let mut signed_data = Vec::new();
-
-    signed_data.extend_from_slice(&auth_data.raw_data);
-    signed_data.extend_from_slice(client_data_hash.as_ref());
-
-    #[cfg(debug_assertions)]
-    println!("Signed data length: {}", signed_data.len());
-
-    // Verify signature using public key
-    match public_key.verify(&signed_data, &signature) {
-        Ok(_) => {
-            #[cfg(debug_assertions)]
-            println!("Signature verification successful");
-
-            // Update the counter
-            PasskeyStore::update_credential_counter(
-                &auth_response.id,
-                stored_credential.counter + 1,
-            )
-            .await?;
-
-            // Cleanup and return success
-            GENERIC_CACHE_STORE
-                .lock()
-                .await
-                .get_store_mut()
-                .remove("auth_challenge", &auth_response.auth_id)
-                .await
-                .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-            Ok(stored_credential.user.name)
-        }
-        Err(e) => {
-            #[cfg(debug_assertions)]
-            println!("Signature verification failed: {:?}", e);
-
-            Err(PasskeyError::Verification(
-                "Signature verification failed. For more details, run with RUST_LOG=debug".into(),
-            ))
-        }
-    }
+    // Verify signature and cleanup
+    verify_signature(
+        &auth_response,
+        &client_data,
+        &auth_data,
+        &stored_credential,
+    )
+    .await
 }
 
 impl ParsedClientData {
@@ -468,6 +309,198 @@ impl AuthenticatorData {
             )));
         }
 
+        tracing::debug!("Authenticator data verification passed");
+        tracing::debug!("User present: {}", self.is_user_present());
+        tracing::debug!("User verified: {}", self.is_user_verified());
+        tracing::debug!("Discoverable credential: {}", self.is_discoverable());
+        tracing::debug!("Backed up: {}", self.is_backed_up());
+        tracing::debug!(
+            "Attested credential data: {}",
+            self.has_attested_credential_data()
+        );
+        tracing::debug!("Extension data: {}", self.has_extension_data());
+
         Ok(())
+    }
+}
+
+async fn get_and_validate_challenge(auth_id: &str) -> Result<StoredChallenge, PasskeyError> {
+    let stored_challenge: StoredChallenge = GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .get_store()
+        .get("auth_challenge", auth_id)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?
+        .ok_or_else(|| PasskeyError::NotFound("Challenge not found".to_string()))?
+        .try_into()?;
+
+    // Validate challenge TTL
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let age = now - stored_challenge.timestamp;
+    let timeout = stored_challenge.ttl.min(*PASSKEY_CHALLENGE_TIMEOUT as u64);
+    if age > timeout {
+        println!(
+            "Challenge expired after {} seconds (timeout: {})",
+            age, timeout
+        );
+        return Err(PasskeyError::Authentication(
+            "Challenge has expired. For more details, run with RUST_LOG=debug".into(),
+        ));
+    }
+
+    tracing::debug!("Found stored challenge: {:?}", stored_challenge);
+
+    Ok(stored_challenge)
+}
+
+/// Verifies that the user handle in the authenticator response matches the stored credential
+///
+/// For discoverable credentials, a user handle is required.
+/// For non-discoverable credentials, a user handle is optional.
+fn verify_user_handle(
+    auth_response: &AuthenticatorResponse,
+    stored_credential: &crate::types::StoredCredential,
+    is_discoverable: bool,
+) -> Result<(), PasskeyError> {
+    // Extract user handle from response
+    let user_handle = auth_response
+        .response
+        .user_handle
+        .as_ref()
+        .and_then(|handle| {
+            base64url_decode(handle)
+                .ok()
+                .and_then(|decoded| String::from_utf8(decoded).ok())
+        });
+
+    match (
+        user_handle,
+        &stored_credential.user.user_handle,
+        is_discoverable,
+    ) {
+        (Some(handle), stored_handle, _) if handle != *stored_handle => {
+            return Err(PasskeyError::Authentication(
+                "User handle mismatch. For more details, run with RUST_LOG=debug".into(),
+            ));
+        }
+        (None, _, true) => {
+            // Discoverable credentials MUST provide a user handle
+            return Err(PasskeyError::Authentication(
+                "Missing required user handle for discoverable credential. For more details, run with RUST_LOG=debug".into(),
+            ));
+        }
+        (None, _, false) => {
+            // Non-discoverable credentials may omit the user handle
+            tracing::debug!("No user handle provided for non-discoverable credential");
+        }
+        _ => {
+            tracing::debug!("User handle verified successfully");
+        }
+    }
+
+    Ok(())
+}
+
+/// Verifies the authenticator counter to prevent replay attacks
+///
+/// The counter should always increase to prevent replay attacks.
+/// A counter value of 0 indicates the authenticator doesn't support counters.
+async fn verify_counter(
+    credential_id: &str,
+    auth_data: &AuthenticatorData,
+    stored_credential: &crate::types::StoredCredential,
+) -> Result<(), PasskeyError> {
+    let auth_counter = auth_data.counter;
+    tracing::debug!(
+        "Counter verification - stored: {}, received: {}",
+        stored_credential.counter,
+        auth_counter
+    );
+
+    if auth_counter == 0 {
+        // Counter value of 0 means the authenticator doesn't support counters
+        tracing::info!("Authenticator does not support counters (received counter=0)");
+    } else if auth_counter <= stored_credential.counter {
+        // Counter value decreased or didn't change - possible cloning attack
+        tracing::warn!(
+            "Counter verification failed - stored: {}, received: {}",
+            stored_credential.counter,
+            auth_counter
+        );
+        return Err(PasskeyError::Authentication(
+            "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
+        ));
+    } else {
+        // Counter increased as expected
+        tracing::debug!(
+            "Counter verification successful - stored: {}, received: {}",
+            stored_credential.counter,
+            auth_counter
+        );
+        
+        // Update the counter
+        PasskeyStore::update_credential_counter(credential_id, auth_counter).await?;
+    }
+
+    Ok(())
+}
+
+/// Verifies the signature using the public key and cleans up the challenge
+///
+/// This function:
+/// 1. Verifies the signature using the stored public key
+/// 2. Cleans up the challenge from the cache store on success
+/// 3. Returns the user's name on success
+async fn verify_signature(
+    auth_response: &AuthenticatorResponse,
+    client_data: &ParsedClientData,
+    auth_data: &AuthenticatorData,
+    stored_credential: &crate::types::StoredCredential,
+) -> Result<String, PasskeyError> {
+    let verification_algorithm = &ring::signature::ECDSA_P256_SHA256_ASN1;
+    let public_key = UnparsedPublicKey::new(verification_algorithm, &stored_credential.public_key);
+
+    // Signature
+    let signature = base64url_decode(&auth_response.response.signature)
+        .map_err(|e| PasskeyError::Format(format!("Invalid signature: {}", e)))?;
+
+    tracing::debug!("Decoded signature length: {}", signature.len());
+
+    // Prepare signed data
+    let client_data_hash = digest::digest(&digest::SHA256, &client_data.raw_data);
+    let mut signed_data = Vec::new();
+
+    signed_data.extend_from_slice(&auth_data.raw_data);
+    signed_data.extend_from_slice(client_data_hash.as_ref());
+
+    tracing::debug!("Signed data length: {}", signed_data.len());
+
+    // Verify signature using public key
+    match public_key.verify(&signed_data, &signature) {
+        Ok(_) => {
+            tracing::info!("Signature verification successful");
+
+            // Cleanup and return success
+            GENERIC_CACHE_STORE
+                .lock()
+                .await
+                .get_store_mut()
+                .remove("auth_challenge", &auth_response.auth_id)
+                .await
+                .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+            Ok(stored_credential.user.name.clone())
+        }
+        Err(e) => {
+            tracing::error!("Signature verification failed: {:?}", e);
+
+            Err(PasskeyError::Verification(
+                "Signature verification failed. For more details, run with RUST_LOG=debug".into(),
+            ))
+        }
     }
 }
