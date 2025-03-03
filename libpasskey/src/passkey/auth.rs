@@ -59,7 +59,6 @@ pub async fn start_authentication(
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
         .put("auth_challenge", &auth_id, stored_challenge.into())
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;

@@ -11,8 +11,7 @@ pub async fn init() -> Result<(), PasskeyError> {
     // Validate required environment variables early
     let _ = *super::config::PASSKEY_RP_ID;
 
-    // Initialize libstorage's cache store first
-    libstorage::init_cache_store()
+    libstorage::init()
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
@@ -50,7 +49,6 @@ pub async fn email_to_user_id(username: String) -> Result<String, PasskeyError> 
     let email_user_id: EmailUserId = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store()
         .get("email", &username)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?
@@ -66,7 +64,6 @@ pub(crate) async fn uid2cid_str_vec(
     let credential_id_strs: Vec<UserIdCredentialIdStr> = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store()
         .gets("uid2cid_str", &user_id)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?

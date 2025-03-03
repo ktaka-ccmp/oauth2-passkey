@@ -19,7 +19,6 @@ pub async fn get_and_validate_challenge(
     let stored_challenge: StoredChallenge = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store()
         .get(challenge_type, id)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?
@@ -57,7 +56,6 @@ pub async fn remove_challenge(challenge_type: &str, id: &str) -> Result<(), Pass
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
         .remove(challenge_type, id)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;

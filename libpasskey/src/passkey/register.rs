@@ -51,7 +51,6 @@ pub async fn start_registration_with_auth_user(
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
         .put("session_info", &user_info.user_handle, session_info.into())
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -80,7 +79,6 @@ pub async fn create_registration_options(
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
         .put(
             "regi_challenge",
             &user_info.user_handle,
@@ -138,7 +136,6 @@ pub async fn finish_registration_with_auth_user(
     let session_info: SessionInfo = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store()
         .get("session_info", user_handle)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?
@@ -149,7 +146,6 @@ pub async fn finish_registration_with_auth_user(
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
         .remove("session_info", user_handle)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -170,7 +166,6 @@ pub async fn finish_registration_with_auth_user(
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
         .put("email", &user.email, email_user_id.into())
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -187,7 +182,6 @@ pub async fn finish_registration_with_auth_user(
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
         .put("uid2cid_str", &user.id, credential_id_str.into())
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;

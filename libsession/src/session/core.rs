@@ -52,7 +52,6 @@ async fn create_and_store_session(session_info: SessionInfo) -> Result<String, S
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store_mut()
         .put("session", &session_id, stored_session.into())
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?;
@@ -67,7 +66,6 @@ pub async fn delete_session_from_store(
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .get_store_mut()
             .remove("session", cookie)
             .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
@@ -101,7 +99,6 @@ pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, 
     let cached_session = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_store()
         .get("session", session_cookie)
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?
