@@ -102,6 +102,8 @@ pub(crate) async fn handle_finish_authentication(
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
+    tracing::debug!("User ID: {:#?}", uid);
+
     let headers = create_session_with_uid(&uid)
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;

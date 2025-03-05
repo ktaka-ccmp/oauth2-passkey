@@ -33,3 +33,4 @@ tracing = { workspace = true }
 
 libsession = { workspace = true }
 libstorage = { workspace = true }
+libuserdb = { workspace = true }
