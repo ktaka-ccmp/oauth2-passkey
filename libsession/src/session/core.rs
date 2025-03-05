@@ -2,7 +2,7 @@ use chrono::{Duration, Utc};
 use headers::Cookie;
 use http::header::HeaderMap;
 
-use libuserdb::{User as DbUser, get_user, upsert_user};
+use libuserdb::{User as DbUser, UserStore};
 
 use crate::common::{gen_random_string, header_set_cookie};
 use crate::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
@@ -77,7 +77,7 @@ pub async fn create_session_with_user(user_data: SessionUser) -> Result<HeaderMa
     let db_user: DbUser = user_data.into_db_user();
 
     // Store the user in the database
-    let user: SessionUser = upsert_user(db_user)
+    let user: SessionUser = UserStore::upsert_user(db_user)
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?
         .into();
@@ -106,7 +106,7 @@ pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, 
 
     let stored_session: StoredSession = cached_session.try_into()?;
 
-    let user = get_user(&stored_session.info.user_id)
+    let user = UserStore::get_user(&stored_session.info.user_id)
         .await
         .map_err(|_| SessionError::SessionError)?
         .ok_or(SessionError::SessionError)?;

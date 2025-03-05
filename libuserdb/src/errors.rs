@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum AppError {
+pub enum UserError {
     #[error("User not found")]
     NotFound,
 
@@ -12,14 +12,14 @@ pub enum AppError {
     InvalidData(String),
 }
 
-impl From<serde_json::Error> for AppError {
+impl From<serde_json::Error> for UserError {
     fn from(err: serde_json::Error) -> Self {
-        AppError::InvalidData(err.to_string())
+        UserError::InvalidData(err.to_string())
     }
 }
 
-impl From<redis::RedisError> for AppError {
+impl From<redis::RedisError> for UserError {
     fn from(err: redis::RedisError) -> Self {
-        AppError::Storage(err.to_string())
+        UserError::Storage(err.to_string())
     }
 }
