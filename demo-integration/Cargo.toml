@@ -6,14 +6,15 @@ edition = { workspace = true }
 [dependencies]
 askama = { version = "0.12.1", features = ["serde-json"] }
 axum-server = { version = "0.7.1", features = ["tls-rustls"] }
-dotenv = "0.15.0"
-http = "1.2.0"
-tracing = "0.1.41"
+dotenv = { workspace = true }
+http = { workspace = true }
+tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 liboauth2 = { workspace = true }
 libpasskey = { workspace = true }
 libaxum = { workspace = true }
+libsession = { workspace = true }
 
 axum = { workspace = true }
 tokio = { workspace = true }

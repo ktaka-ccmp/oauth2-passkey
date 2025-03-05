@@ -303,12 +303,10 @@ pub async fn verify_idtoken(
             "kid".to_string(),
         ))?;
     let alg = header.alg;
-
-    println!("Algorithm from JWT header: {:?}", alg);
-
     let idinfo: IdInfo = decode_token(&token)?;
-    #[cfg(debug_assertions)]
-    println!("Decoded id_token payload: {:#?}", idinfo);
+
+    tracing::debug!("Algorithm from JWT header: {:?}", alg);
+    tracing::debug!("Decoded id_token payload: {:#?}", idinfo);
 
     let jwks_url = "https://www.googleapis.com/oauth2/v3/certs";
     let jwks = fetch_jwks(jwks_url).await?;

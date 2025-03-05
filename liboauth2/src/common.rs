@@ -1,17 +1,7 @@
-use anyhow::Context;
-use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use chrono::{DateTime, Utc};
 use http::header::{HeaderMap, SET_COOKIE};
-use ring::rand::SecureRandom;
 
-use crate::errors::AppError;
-
-pub(crate) fn gen_random_string(len: usize) -> Result<String, AppError> {
-    let rng = ring::rand::SystemRandom::new();
-    let mut session_id = vec![0u8; len];
-    rng.fill(&mut session_id)?;
-    Ok(URL_SAFE.encode(session_id))
-}
+use crate::errors::OAuth2Error;
 
 pub fn header_set_cookie(
     headers: &mut HeaderMap,
@@ -19,13 +9,15 @@ pub fn header_set_cookie(
     value: String,
     _expires_at: DateTime<Utc>,
     max_age: i64,
-) -> Result<&HeaderMap, AppError> {
+) -> Result<&HeaderMap, OAuth2Error> {
     let cookie =
         format!("{name}={value}; SameSite=Lax; Secure; HttpOnly; Path=/; Max-Age={max_age}");
     println!("Cookie: {:#?}", cookie);
     headers.append(
         SET_COOKIE,
-        cookie.parse().context("failed to parse cookie")?,
+        cookie
+            .parse()
+            .map_err(|_| OAuth2Error::Cookie("Failed to parse cookie".to_string()))?,
     );
     Ok(headers)
 }

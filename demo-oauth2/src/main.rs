@@ -32,6 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize the OAuth2 library
     liboauth2::init().await?;
+    libsession::init().await?;
 
     let app = Router::new()
         .route("/", get(index))

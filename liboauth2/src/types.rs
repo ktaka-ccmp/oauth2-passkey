@@ -2,8 +2,10 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::oauth2::IdInfo as GoogleIdInfo;
 use libsession::User as SessionUser;
+
+use super::errors::OAuth2Error;
+use super::oauth2::IdInfo as GoogleIdInfo;
 
 // The user data we'll get back from Google
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,10 +94,18 @@ pub(crate) struct OidcTokenResponse {
     pub(crate) id_token: Option<String>,
 }
 
-#[derive(Clone, Debug)]
-pub enum TokenStoreType {
-    Memory,
-    Sqlite { url: String },
-    Postgres { url: String },
-    Redis { url: String },
+impl From<StoredToken> for libstorage::CacheData {
+    fn from(data: StoredToken) -> Self {
+        Self {
+            value: serde_json::to_vec(&data).expect("Failed to serialize StoredToken"),
+        }
+    }
+}
+
+impl TryFrom<libstorage::CacheData> for StoredToken {
+    type Error = OAuth2Error;
+
+    fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {
+        serde_json::from_slice(&data.value).map_err(|e| OAuth2Error::Storage(e.to_string()))
+    }
 }

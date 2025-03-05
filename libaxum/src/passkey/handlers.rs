@@ -7,9 +7,9 @@ use axum::{
 
 use libpasskey::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
-    email_to_user_id, finish_registration, finish_registration_with_auth_user,
-    start_authentication, start_registration, start_registration_with_auth_user,
-    verify_authentication,
+    email_to_user_id, finish_authentication, finish_registration,
+    finish_registration_with_auth_user, start_authentication, start_registration,
+    start_registration_with_auth_user,
 };
 
 use libpasskey::PASSKEY_ROUTE_PREFIX;
@@ -24,8 +24,7 @@ pub(crate) async fn handle_start_registration_get(
     match user {
         None => Err((StatusCode::BAD_REQUEST, "Not logged in!".to_string())),
         Some(u) => {
-            #[cfg(debug_assertions)]
-            println!("User: {:#?}", u);
+            tracing::debug!("User: {:#?}", u);
 
             let session_user: SessionUser = (*u).clone();
             let options = start_registration_with_auth_user(session_user)
@@ -51,16 +50,14 @@ pub(crate) async fn handle_finish_registration(
     user: Option<AuthUser>,
     Json(reg_data): Json<RegisterCredential>,
 ) -> Result<String, (StatusCode, String)> {
-    #[cfg(debug_assertions)]
-    println!("Registration data: {:#?}", reg_data);
+    tracing::debug!("Registration data: {:#?}", reg_data);
 
     match user {
         None => finish_registration(&reg_data)
             .await
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string())),
         Some(u) => {
-            #[cfg(debug_assertions)]
-            println!("User: {:#?}", u);
+            tracing::debug!("User: {:#?}", u);
 
             finish_registration_with_auth_user((*u).clone(), reg_data)
                 .await
@@ -86,8 +83,7 @@ pub(crate) async fn handle_start_authentication(
     match start_authentication(username).await {
         Ok(auth_options) => Ok(Json(auth_options)),
         Err(e) => {
-            #[cfg(debug_assertions)]
-            println!("Error: {:#?}", e);
+            tracing::debug!("Error: {:#?}", e);
             Err((StatusCode::BAD_REQUEST, e.to_string()))
         }
     }
@@ -96,10 +92,9 @@ pub(crate) async fn handle_start_authentication(
 pub(crate) async fn handle_finish_authentication(
     Json(auth_response): Json<AuthenticatorResponse>,
 ) -> Result<(HeaderMap, String), (StatusCode, String)> {
-    #[cfg(debug_assertions)]
-    println!("Auth response: {:#?}", auth_response);
+    tracing::debug!("Auth response: {:#?}", auth_response);
 
-    let name = verify_authentication(auth_response)
+    let name = finish_authentication(auth_response)
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
 

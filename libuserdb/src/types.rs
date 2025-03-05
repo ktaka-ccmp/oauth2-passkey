@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sqlx::FromRow;
 
 /// Represents a user in the system
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: String,
     pub name: String,
@@ -15,15 +16,6 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     // pub credentials: Vec<Credential>,
-}
-
-/// Type of user store to use
-#[derive(Clone, Debug)]
-pub(crate) enum UserStoreType {
-    Memory,
-    Sqlite { url: String },
-    Postgres { url: String },
-    Redis { url: String },
 }
 
 impl Default for User {

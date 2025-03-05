@@ -11,7 +11,7 @@ const CACHE_PREFIX: &str = "cache";
 
 impl InMemoryCacheStore {
     pub(crate) fn new() -> Self {
-        println!("Creating new in-memory generic cache store");
+        tracing::info!("Creating new in-memory generic cache store");
         Self {
             entry: HashMap::new(),
         }
