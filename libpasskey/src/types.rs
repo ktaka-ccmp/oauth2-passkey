@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
@@ -22,6 +23,8 @@ pub(super) struct StoredCredential {
     pub(super) public_key: Vec<u8>,
     pub(super) counter: u32,
     pub(super) user: PublicKeyCredentialUserEntity,
+    pub(super) created_at: DateTime<Utc>,
+    pub(super) updated_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

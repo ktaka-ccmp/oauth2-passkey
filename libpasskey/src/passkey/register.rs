@@ -1,4 +1,5 @@
 use base64::engine::{Engine, general_purpose::URL_SAFE};
+use chrono::Utc;
 use ciborium::value::{Integer, Value as CborValue};
 
 use libsession::User as SessionUser;
@@ -186,6 +187,8 @@ pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String
         public_key,
         counter: 0,
         user: stored_user,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     };
 
     PasskeyStore::store_credential(credential_id_str, credential)

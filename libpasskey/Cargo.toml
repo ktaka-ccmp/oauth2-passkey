@@ -26,6 +26,7 @@ sqlx = { version = "0.8", features = [
 webpki = { version = "0.22.4", features = ["std"] }
 x509-parser = { version = "0.17.0", features = ["validate", "verify"] }
 
+chrono = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
