@@ -346,12 +346,21 @@ fn verify_user_handle(
                 .and_then(|decoded| String::from_utf8(decoded).ok())
         });
 
+    tracing::debug!(
+        "User handle: {:?}, Stored handle: {:?}, Is discoverable: {}\n User handle (raw)): {:?}",
+        user_handle,
+        &stored_credential.user.user_handle,
+        is_discoverable,
+        auth_response.response.user_handle,
+    );
+
     match (
         user_handle,
         &stored_credential.user.user_handle,
         is_discoverable,
     ) {
         (Some(handle), stored_handle, _) if handle != *stored_handle => {
+            tracing::error!("User handle mismatch: {} != {}", handle, stored_handle);
             return Err(PasskeyError::Authentication(
                 "User handle mismatch. For more details, run with RUST_LOG=debug".into(),
             ));
