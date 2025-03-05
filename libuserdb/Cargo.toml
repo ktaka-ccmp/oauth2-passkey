@@ -6,15 +6,12 @@ description = "User data management library for OAuth2 applications"
 license = "MIT"
 
 [dependencies]
-async-trait = { workspace = true }
-chrono = { version = "0.4", features = ["serde"] }
-dotenv = { workspace = true }
+chrono = { workspace = true }
 redis = { version = "0.29.1", features = ["tokio-comp", "connection-manager"] }
-serde = { version = "1.0", features = ["derive"] }
+serde = { workspace = true }
 serde_json = { workspace = true }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "chrono", "json", "uuid"] }
 thiserror = { workspace = true }
-tokio = { version = "1.43", features = ["sync"] }
 uuid = { version = "1.15", features = ["v4"] }
 
-[dev-dependencies]
-tokio = { version = "1.43", features = ["full"] }
+libstorage = { workspace = true }
