@@ -1,3 +1,3 @@
-mod generic_data_store;
+mod passkey_store;
 
-pub use generic_data_store::PasskeyStore;
+pub use passkey_store::PasskeyStore;
