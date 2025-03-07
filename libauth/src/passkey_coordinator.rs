@@ -14,9 +14,12 @@ impl PasskeyCoordinator {
         user_id: &str,
     ) -> Result<Vec<StoredCredential>, AuthError> {
         // Use the CredentialSearchField::UserId to find credentials
-        // This is a placeholder - we need to expose the proper types and methods from libpasskey
-        // to make this work correctly
-        Ok(vec![]) // Placeholder until we implement the proper integration
+        let search_field = libpasskey::CredentialSearchField::UserId(user_id.to_string());
+
+        // Retrieve credentials using the PasskeyStore
+        libpasskey::PasskeyStore::get_credentials_by(search_field)
+            .await
+            .map_err(AuthError::Passkey)
     }
 
     /// Register a new passkey credential for a user
@@ -48,9 +51,10 @@ impl PasskeyCoordinator {
             }
         };
 
-        // Store the credential
-        // This is a placeholder - we need to expose the proper types and methods from libpasskey
-        // to make this work correctly
+        // Store the credential using the PasskeyStore
+        libpasskey::PasskeyStore::store_credential(credential_id, credential)
+            .await
+            .map_err(AuthError::Passkey)?;
 
         Ok(user)
     }
@@ -59,16 +63,17 @@ impl PasskeyCoordinator {
     pub async fn find_user_by_credential_id(
         credential_id: &str,
     ) -> Result<Option<User>, AuthError> {
-        // First find the credential
-        // This is a placeholder - we need to expose the proper types and methods from libpasskey
-        // to make this work correctly
+        // First find the credential by its ID
+        let credential = match libpasskey::PasskeyStore::get_credential(credential_id)
+            .await
+            .map_err(AuthError::Passkey)?
+        {
+            Some(cred) => cred,
+            None => return Ok(None), // Credential not found
+        };
 
-        // For now, just return None as a placeholder
-        Ok(None)
+        // Get the user associated with the credential
+        let user_id = &credential.user_id;
+        UserStore::get_user(user_id).await.map_err(AuthError::User)
     }
 }
-
-// Note: This implementation is a placeholder. The actual implementation will require
-// exposing more types and methods from the libpasskey crate to make the coordination
-// work properly. Currently, the libpasskey crate has many types marked as pub(super)
-// or pub(crate) which limits their visibility outside the crate.

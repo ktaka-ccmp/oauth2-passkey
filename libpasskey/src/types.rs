@@ -18,14 +18,22 @@ pub(super) struct StoredOptions {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+/// Stored credential information for a passkey
 pub struct StoredCredential {
-    pub(super) credential_id: Vec<u8>,
-    pub(super) user_id: String,
-    pub(super) public_key: Vec<u8>,
-    pub(super) counter: u32,
-    pub(super) user: PublicKeyCredentialUserEntity,
-    pub(super) created_at: DateTime<Utc>,
-    pub(super) updated_at: DateTime<Utc>,
+    /// Raw credential ID bytes
+    pub credential_id: Vec<u8>,
+    /// User ID associated with this credential (database ID)
+    pub user_id: String,
+    /// Public key bytes for the credential
+    pub public_key: Vec<u8>,
+    /// Counter value for the credential (used to prevent replay attacks)
+    pub counter: u32,
+    /// User entity information
+    pub user: PublicKeyCredentialUserEntity,
+    /// When the credential was created
+    pub created_at: DateTime<Utc>,
+    /// When the credential was last updated
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -45,11 +53,16 @@ pub(super) struct SessionInfo {
     pub(super) user: libsession::User,
 }
 
+/// Search field options for credential lookup
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum CredentialSearchField {
+    /// Search by credential ID
     CredentialId(String),
+    /// Search by user ID (database ID)
     UserId(String),
+    /// Search by user handle (WebAuthn user handle)
     UserHandle(String),
+    /// Search by username
     UserName(String),
 }
