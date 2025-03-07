@@ -77,13 +77,7 @@ async fn get_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<Option<User>, 
 }
 
 async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Result<User, UserError> {
-    // Begin transaction
-    let mut tx = pool
-        .begin()
-        .await
-        .map_err(|e| UserError::Storage(e.to_string()))?;
-
-    // Upsert user
+    // Upsert user with a single query
     sqlx::query(
         r#"
         INSERT INTO users (id, created_at, updated_at)
@@ -96,14 +90,9 @@ async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Result<User, Use
     .bind(&user.id)
     .bind(user.created_at)
     .bind(user.updated_at)
-    .execute(&mut *tx)
+    .execute(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
-
-    // Commit transaction
-    tx.commit()
-        .await
-        .map_err(|e| UserError::Storage(e.to_string()))?;
 
     // Return updated user
     Ok(user)
@@ -141,13 +130,7 @@ async fn get_user_postgres(pool: &Pool<Postgres>, id: &str) -> Result<Option<Use
 }
 
 async fn upsert_user_postgres(pool: &Pool<Postgres>, user: User) -> Result<User, UserError> {
-    // Begin transaction
-    let mut tx = pool
-        .begin()
-        .await
-        .map_err(|e| UserError::Storage(e.to_string()))?;
-
-    // Upsert user
+    // Upsert user with a single query
     sqlx::query(
         r#"
         INSERT INTO users (id, created_at, updated_at)
@@ -161,14 +144,9 @@ async fn upsert_user_postgres(pool: &Pool<Postgres>, user: User) -> Result<User,
     .bind(&user.id)
     .bind(user.created_at)
     .bind(user.updated_at)
-    .fetch_one(&mut *tx)
+    .fetch_one(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
-
-    // Commit transaction
-    tx.commit()
-        .await
-        .map_err(|e| UserError::Storage(e.to_string()))?;
 
     // Return updated user
     Ok(user)
