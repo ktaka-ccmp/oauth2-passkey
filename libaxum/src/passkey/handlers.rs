@@ -4,17 +4,20 @@ use axum::{
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     response::{Html, IntoResponse, Response},
 };
+use chrono::Utc;
 use serde_json::Value;
+use uuid::Uuid;
 
-use libpasskey::{
-    AuthenticationOptions, AuthenticatorResponse, PublicKeyCredentialUserEntity,
-    RegisterCredential, RegistrationOptions, finish_authentication, finish_registration,
-    finish_registration_with_auth_user, gen_random_string, start_authentication,
-    start_registration, start_registration_with_auth_user,
+use libuserdb::{User, UserStore};
+
+use libauth::{
+    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
+    finish_authentication, finish_registration, finish_registration_with_auth_user,
+    start_authentication, start_registration,
 };
 
 use liboauth2::OAuth2Store;
-use libpasskey::PASSKEY_ROUTE_PREFIX;
+use libpasskey::{CredentialSearchField, PASSKEY_ROUTE_PREFIX, PasskeyStore, StoredCredential};
 use libsession::{User as SessionUser, create_session_with_uid};
 
 use crate::session::AuthUser;
@@ -29,7 +32,8 @@ pub(crate) async fn handle_start_registration_get(
 
             let session_user: SessionUser = (*u).clone();
 
-            let oauth2_accounts = OAuth2Store::get_oauth2_accounts(&session_user.id)
+            let oauth2_accounts = OAuth2Store::get_oauth2_accounts(&u.id)
+                // OAuth2Store::get_oauth2_accounts(&session_user.id)
                 .await
                 .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
                 .first()
@@ -41,26 +45,46 @@ pub(crate) async fn handle_start_registration_get(
                     )
                 })?;
 
-            let user_info = PublicKeyCredentialUserEntity {
-                user_handle: gen_random_string(16)
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
-                name: oauth2_accounts.email.clone(),
-                display_name: oauth2_accounts.name.clone(),
-            };
+            let username = oauth2_accounts.email.clone();
+            let displayname = oauth2_accounts.name.clone();
 
-            let options = start_registration_with_auth_user(session_user, user_info)
+            let options = start_registration(Some(session_user), username, displayname)
                 .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+                .expect("Failed to start registration");
             Ok(Json(options))
         }
     }
 }
 
 pub(crate) async fn handle_start_registration(
-    Json(username): Json<String>,
+    auth_user: Option<AuthUser>,
+    Json(body): Json<Value>,
 ) -> Json<RegistrationOptions> {
+    let session_user: Option<SessionUser> = match auth_user {
+        Some(u) => {
+            tracing::debug!("User: {:#?}", u);
+
+            let session_user: SessionUser = (*u).clone();
+            Some(session_user)
+        }
+        None => None,
+    };
+
+    let username = body
+        .get("username")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .expect("Missing username");
+
+    let displayname = body
+        .get("displayname")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or(username.clone());
+
     Json(
-        start_registration(username)
+        start_registration(session_user, username, displayname)
             .await
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
             .expect("Failed to start registration"),
@@ -68,35 +92,61 @@ pub(crate) async fn handle_start_registration(
 }
 
 pub(crate) async fn handle_finish_registration(
-    user: Option<AuthUser>,
+    auth_user: Option<AuthUser>,
     Json(reg_data): Json<RegisterCredential>,
-) -> Result<String, (StatusCode, String)> {
-    tracing::debug!("Registration data: {:#?}", reg_data);
-
-    match user {
-        None => finish_registration(&reg_data)
-            .await
-            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string())),
+) -> Result<(HeaderMap, String), (StatusCode, String)> {
+    match auth_user {
         Some(u) => {
             tracing::debug!("User: {:#?}", u);
 
-            finish_registration_with_auth_user((*u).clone(), reg_data)
+            let session_user: SessionUser = (*u).clone();
+            let message = finish_registration_with_auth_user(session_user, reg_data)
                 .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+            Ok((HeaderMap::new(), message))
+        }
+        None => {
+            let new_user = User {
+                id: Uuid::new_v4().to_string(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            };
+
+            // Store the user
+            let stored_user = UserStore::upsert_user(new_user)
+                .await
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+            // Finish registration
+            let result = finish_registration(&stored_user.id, &reg_data)
+                .await
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()));
+
+            match result {
+                Ok(message) => {
+                    // Create session with the user_id
+                    let headers = create_session_with_uid(&stored_user.id)
+                        .await
+                        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+                    Ok((headers, message))
+                }
+                Err(err) => Err(err),
+            }
         }
     }
 }
 
 pub(crate) async fn handle_start_authentication(
-    Json(username): Json<Value>,
+    Json(body): Json<Value>,
 ) -> Result<Json<AuthenticationOptions>, (StatusCode, String)> {
-    let username = if username.is_object() {
-        username
-            .get("username")
+    let username = if body.is_object() {
+        body.get("username")
             .and_then(|v| v.as_str())
             .map(String::from)
-    } else if username.is_string() {
-        Some(username.as_str().unwrap().to_string()) // Directly use the string
+    } else if body.is_string() {
+        Some(body.as_str().unwrap().to_string()) // Directly use the string
     } else {
         None
     };
@@ -157,4 +207,20 @@ pub(crate) async fn serve_conditional_ui_js() -> Response {
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.to_string().into())
         .unwrap()
+}
+
+pub(crate) async fn list_credentials(
+    auth_user: Option<AuthUser>,
+) -> Result<Json<Vec<StoredCredential>>, (StatusCode, String)> {
+    match auth_user {
+        Some(u) => {
+            tracing::debug!("User: {:#?}", u);
+            let credentials =
+                PasskeyStore::get_credentials_by(CredentialSearchField::UserId(u.id.to_owned()))
+                    .await
+                    .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+            Ok(Json(credentials))
+        }
+        None => Err((StatusCode::BAD_REQUEST, "Not logged in!".to_string())),
+    }
 }

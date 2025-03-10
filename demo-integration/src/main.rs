@@ -68,10 +68,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("Panic details: {}", panic_info);
     }));
 
-    // Initialize the OAuth2 library
-    liboauth2::init().await?;
-    libsession::init().await?;
-    libpasskey::init().await?;
+    // Initialize the authentication library
+    tracing::info!("Initializing authentication library");
+    libauth::init().await?;
 
     let app = Router::new()
         .route("/", get(index))

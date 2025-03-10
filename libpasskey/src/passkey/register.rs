@@ -26,29 +26,24 @@ use crate::errors::PasskeyError;
 use crate::storage::PasskeyStore;
 use crate::types::{PublicKeyCredentialUserEntity, SessionInfo, StoredCredential, StoredOptions};
 
-pub async fn start_registration(username: String) -> Result<RegistrationOptions, PasskeyError> {
-    println!("start_registration user: {}", username);
+pub async fn start_registration(
+    session_user: Option<SessionUser>,
+    username: String,
+    displayname: String,
+) -> Result<RegistrationOptions, PasskeyError> {
+    let user_handle = gen_random_string(16)?;
+
+    if let Some(u) = session_user {
+        tracing::debug!("User: {:#?}", u);
+        let session_info = SessionInfo { user: u };
+        store_in_cache("session_info", &user_handle, session_info).await?;
+    }
 
     let user_info = PublicKeyCredentialUserEntity {
-        user_handle: gen_random_string(16)?,
+        user_handle,
         name: username.clone(),
-        display_name: username.clone(),
+        display_name: displayname.clone(),
     };
-
-    let options = create_registration_options(user_info).await?;
-
-    Ok(options)
-}
-
-pub async fn start_registration_with_auth_user(
-    user: SessionUser,
-    user_info: PublicKeyCredentialUserEntity,
-) -> Result<RegistrationOptions, PasskeyError> {
-    let session_info = SessionInfo { user };
-
-    store_in_cache("session_info", &user_info.user_handle, session_info).await?;
-
-    tracing::debug!("User info: {:#?}", user_info);
 
     let options = create_registration_options(user_info).await?;
 
@@ -107,7 +102,7 @@ pub async fn create_registration_options(
 }
 
 pub async fn finish_registration_with_auth_user(
-    user: SessionUser,
+    session_user: SessionUser,
     reg_data: RegisterCredential,
 ) -> Result<String, PasskeyError> {
     let user_handle = reg_data
@@ -121,20 +116,24 @@ pub async fn finish_registration_with_auth_user(
         .await?
         .ok_or(PasskeyError::NotFound("Session not found".to_string()))?;
 
+    // Delete the session info from the store
+    remove_from_cache("session_info", user_handle).await?;
+
     // Verify the user is the same as the one in the cache store i.e. used to start the registration
-    if user.id != session_info.user.id {
+    if session_user.id != session_info.user.id {
         return Err(PasskeyError::Format("User ID mismatch".to_string()));
     }
 
-    finish_registration(&reg_data).await?;
-
-    // Delete the session info from the store
-    remove_from_cache("session_info", user_handle).await?;
+    finish_registration(&session_user.id, &reg_data).await?;
 
     Ok("Registration successful".to_string())
 }
 
-pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String, PasskeyError> {
+// pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String, PasskeyError> {
+pub async fn finish_registration(
+    user_id: &str,
+    reg_data: &RegisterCredential,
+) -> Result<String, PasskeyError> {
     println!("finish_registration user: {:?}", reg_data);
 
     verify_client_data(reg_data).await?;
@@ -155,26 +154,11 @@ pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String
     let stored_options = get_and_validate_options("regi_challenge", user_handle).await?;
     let stored_user = stored_options.user.clone();
 
-    let session_info: Option<SessionInfo> = get_from_cache("session_info", user_handle).await?;
-
-    let user_id = session_info
-        .map(|s| s.user.id)
-        .unwrap_or("undefined".to_string());
-
-    // let user_id = match session_info {
-    //     Some(SessionInfo { user, .. }) => user.id,
-    //     None => {
-    //         tracing::error!("Session not found for user handle: {}", user_handle);
-    //         return Err(PasskeyError::NotFound("Session not found".to_string()));
-    //     }
-    // };
-
-    // Store using base64url encoded credential_id as the key
     let credential_id_str = reg_data.raw_id.clone();
 
     let credential = StoredCredential {
         credential_id,
-        user_id,
+        user_id: user_id.to_string(),
         public_key,
         counter: 0,
         user: stored_user,

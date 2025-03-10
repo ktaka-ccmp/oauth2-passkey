@@ -12,9 +12,12 @@ pub use config::OAUTH2_ROUTE_PREFIX; // Required for route configuration
 pub use common::header_set_cookie;
 pub use config::{OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME};
 pub use errors::OAuth2Error;
-pub use oauth2::{csrf_checks, get_idinfo_userinfo, prepare_oauth2_auth_request, validate_origin};
+pub use oauth2::{
+    csrf_checks, decode_state, delete_session_and_misc_token_from_store, get_idinfo_userinfo,
+    get_uid_from_stored_session_by_state_param, prepare_oauth2_auth_request, validate_origin,
+};
 pub use storage::OAuth2Store;
-pub use types::{AuthResponse, OAuth2Account};
+pub use types::{AuthResponse, OAuth2Account, StateParams};
 
 pub async fn init() -> Result<(), errors::OAuth2Error> {
     // Validate required environment variables early

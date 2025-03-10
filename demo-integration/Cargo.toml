@@ -15,6 +15,7 @@ liboauth2 = { workspace = true }
 libpasskey = { workspace = true }
 libaxum = { workspace = true }
 libsession = { workspace = true }
+libauth = { workspace = true }
 
 axum = { workspace = true }
 tokio = { workspace = true }

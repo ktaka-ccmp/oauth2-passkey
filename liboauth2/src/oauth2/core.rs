@@ -1,10 +1,7 @@
 use headers::Cookie;
 use http::header::HeaderMap;
 
-use base64::{
-    Engine as _,
-    engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD},
-};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 
 use chrono::{Duration, Utc};
 use sha2::{Digest, Sha256};
@@ -20,7 +17,8 @@ use crate::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken};
 use super::google::{exchange_code_for_token, fetch_user_data_from_google};
 use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
 use super::utils::{
-    encode_state, generate_store_token, get_token_from_store, remove_token_from_store,
+    decode_state, encode_state, generate_store_token, get_session_id_from_headers,
+    get_token_from_store, remove_token_from_store, store_token_in_cache,
 };
 
 pub async fn prepare_oauth2_auth_request(
@@ -28,7 +26,7 @@ pub async fn prepare_oauth2_auth_request(
 ) -> Result<(String, HeaderMap), OAuth2Error> {
     let expires_at = Utc::now() + Duration::seconds((*OAUTH2_CSRF_COOKIE_MAX_AGE) as i64);
     let user_agent = headers
-        .get(axum::http::header::USER_AGENT)
+        .get(http::header::USER_AGENT)
         .and_then(|h| h.to_str().ok())
         .unwrap_or("Unknown")
         .to_string();
@@ -37,11 +35,26 @@ pub async fn prepare_oauth2_auth_request(
     let (nonce_token, nonce_id) = generate_store_token("nonce", expires_at, None).await?;
     let (pkce_token, pkce_id) = generate_store_token("pkce", expires_at, None).await?;
 
+    let misc_id = if let Some(session_id) = get_session_id_from_headers(&headers)? {
+        tracing::info!("Session ID found: {}", session_id);
+        Some(store_token_in_cache("misc_session", session_id, expires_at, None).await?)
+    } else {
+        tracing::debug!("No session ID found");
+        None
+    };
+
     tracing::debug!("PKCE ID: {:?}, PKCE verifier: {:?}", pkce_id, pkce_token);
     let pkce_challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(pkce_token.as_bytes()));
 
     tracing::debug!("PKCE Challenge: {:#?}", pkce_challenge);
-    let encoded_state = encode_state(csrf_token, nonce_id, pkce_id);
+    let state_params = StateParams {
+        csrf_token,
+        nonce_id,
+        pkce_id,
+        misc_id,
+    };
+
+    let encoded_state = encode_state(state_params)?;
 
     let auth_url = format!(
         "{}?{}&client_id={}&redirect_uri={}&state={}&nonce={}\
@@ -100,10 +113,7 @@ pub async fn get_idinfo_userinfo(
 }
 
 async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, OAuth2Error> {
-    let decoded_state_string =
-        String::from_utf8(URL_SAFE.decode(&auth_response.state).unwrap()).unwrap();
-    let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)
-        .map_err(|e| OAuth2Error::Serde(e.to_string()))?;
+    let state_in_response = decode_state(&auth_response.state)?;
 
     let pkce_session: StoredToken =
         get_token_from_store("pkce", &state_in_response.pkce_id).await?;
@@ -117,10 +127,7 @@ async fn verify_nonce(
     auth_response: &AuthResponse,
     idinfo: GoogleIdInfo,
 ) -> Result<(), OAuth2Error> {
-    let decoded_state_string =
-        String::from_utf8(URL_SAFE.decode(&auth_response.state).unwrap()).unwrap();
-    let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)
-        .map_err(|e| OAuth2Error::Serde(e.to_string()))?;
+    let state_in_response = decode_state(&auth_response.state)?;
 
     let nonce_session: StoredToken =
         get_token_from_store("nonce", &state_in_response.nonce_id).await?;
@@ -165,15 +172,7 @@ pub async fn csrf_checks(
         .unwrap_or("Unknown")
         .to_string();
 
-    let decoded_state_string = String::from_utf8(
-        URL_SAFE
-            .decode(&query.state)
-            .map_err(|e| OAuth2Error::DecodeState(e.to_string()))?,
-    )
-    .map_err(|e| OAuth2Error::DecodeState(e.to_string()))?;
-
-    let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)
-        .map_err(|e| OAuth2Error::Serde(e.to_string()))?;
+    let state_in_response = decode_state(&query.state)?;
 
     if state_in_response.csrf_token != csrf_session.token {
         tracing::error!(
