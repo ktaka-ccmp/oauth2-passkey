@@ -1,6 +1,6 @@
 use askama::Template;
 use axum::{
-    Router,
+    Json, Router,
     extract::{Form, Query},
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     response::{Html, Redirect, Response},
@@ -25,14 +25,14 @@ use libuserdb::{User, UserStore};
 
 use liboauth2::{
     AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ROUTE_PREFIX, OAuth2Account,
-    OAuth2Store, csrf_checks, get_idinfo_userinfo, header_set_cookie, prepare_oauth2_auth_request,
-    validate_origin,
+    OAuth2Store, csrf_checks, decode_state, delete_session_and_misc_token_from_store,
+    get_idinfo_userinfo, get_uid_from_stored_session_by_state_param, header_set_cookie,
+    prepare_oauth2_auth_request, validate_origin,
 };
 
-use libsession::{
-    SESSION_COOKIE_NAME, create_session_with_uid, delete_session_from_store,
-    prepare_logout_response,
-};
+use libsession::{create_session_with_uid, prepare_logout_response};
+
+use crate::AuthUser;
 
 pub fn router() -> Router {
     Router::new()
@@ -41,6 +41,7 @@ pub fn router() -> Router {
         .route("/authorized", get(get_authorized).post(post_authorized))
         .route("/popup_close", get(popup_close))
         .route("/logout", get(logout))
+        .route("/accounts", get(list_accounts))
 }
 
 #[derive(Template)]
@@ -117,10 +118,6 @@ pub async fn get_authorized(
         .await
         .into_response_error()?;
 
-    delete_session_from_store(cookies, SESSION_COOKIE_NAME.to_string())
-        .await
-        .into_response_error()?;
-
     authorized(&query).await
 }
 
@@ -141,17 +138,30 @@ async fn authorized(
     };
 
     // Upsert oauth2_account and user
-    // 1. Check if sub of idinfo/userinfo has a corresponding entry in oauth2_account table
-    // 2. If not, create a new entry in users table
-    // 3. Create a new entry in oauth2_account table
+    // 1. Decode the state from the auth response
+    // 2. Extract user_id from the stored session if available
+    // 3. Check if the OAuth2 account exists
+
+    // Handle user and account linking
+    // 4. If user is logged in and account exists, ensure they match
+    // 5. If user is logged in but account doesn't exist, link account to user
+    // 6. If user is not logged in but account exists, create session for account
+    // 7. If neither user is logged in nor account exists, create new user and account
 
     // Create session with user_id
-    // 4. Create a new entry in session store
-    // 5. Create a header for the session cookie
+    // 8. Create a new entry in session store
+    // 9. Create a header for the session cookie
 
-    // Upsert oauth2_account and user
-    // 1. Check if the OAuth2 account exists
+    // Decode the state from the auth response
+    let state_in_response =
+        decode_state(&auth_response.state).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
+    // Extract user_id from the stored session if available
+    let user_id = get_uid_from_stored_session_by_state_param(&state_in_response)
+        .await
+        .into_response_error()?;
+
+    // Check if the OAuth2 account exists
     let existing_account = OAuth2Store::get_oauth2_account_by_provider(
         &oauth2_account.provider,
         &oauth2_account.provider_user_id,
@@ -159,44 +169,47 @@ async fn authorized(
     .await
     .into_response_error()?;
 
-    // 2. Process the account
-    let user_id = match existing_account {
-        // If account exists, use its user_id
-        Some(account) => account.user_id,
-        // If not, create a new user and link it
-        None => {
-            // Create a new user
-            let new_user = User {
-                id: uuid::Uuid::new_v4().to_string(),
-                created_at: Utc::now(),
-                updated_at: Utc::now(),
-            };
-
-            // Store the user
-            let stored_user = UserStore::upsert_user(new_user)
+    // Match on the combination of auth_user and existing_account
+    let mut headers = match (user_id, existing_account) {
+        // Case 1: User is logged in and account exists
+        (Some(user_id), Some(account)) => {
+            if user_id == account.user_id {
+                tracing::debug!("OAuth2 account already linked to current user");
+                // Nothing to do, account is already properly linked
+            } else {
+                tracing::debug!("OAuth2 account already linked to different user");
+                // return Err((StatusCode::BAD_REQUEST, "This OAuth2 account is already linked to a different user".to_string()));
+            }
+            delete_session_and_misc_token_from_store(&state_in_response)
                 .await
                 .into_response_error()?;
-
-            // Set the user_id in the OAuth2 account
-            oauth2_account.user_id = stored_user.id.clone();
-
-            // Store the OAuth2 account
+            renew_session_header(user_id.to_string()).await?
+        }
+        // Case 2: User is logged in but account doesn't exist
+        (Some(user_id), None) => {
+            tracing::debug!("Linking OAuth2 account to user {}", user_id);
+            tracing::debug!("Linking OAuth2 account to user {}", user_id);
+            oauth2_account.user_id = user_id.clone();
             OAuth2Store::upsert_oauth2_account(oauth2_account)
                 .await
                 .into_response_error()?;
-
-            stored_user.id
+            delete_session_and_misc_token_from_store(&state_in_response)
+                .await
+                .into_response_error()?;
+            renew_session_header(user_id.to_string()).await?
+        }
+        // Case 3: User is not logged in but account exists
+        (None, Some(account)) => {
+            tracing::debug!("Using existing account's user");
+            renew_session_header(account.user_id).await?
+        }
+        // Case 4: User is not logged in and account doesn't exist
+        (None, None) => {
+            tracing::debug!("Creating new user and account");
+            let user_id = create_user_and_oauth2account(oauth2_account).await?;
+            renew_session_header(user_id).await?
         }
     };
-
-    // Create session with the user_id
-    let mut headers = create_session_with_uid(&user_id)
-        .await
-        .into_response_error()?;
-
-    // let mut headers = create_session_with_user(user_data)
-    //     .await
-    //     .into_response_error()?;
 
     let _ = header_set_cookie(
         &mut headers,
@@ -211,4 +224,44 @@ async fn authorized(
         headers,
         Redirect::to(&format!("{}/popup_close", OAUTH2_ROUTE_PREFIX.as_str())),
     ))
+}
+
+async fn renew_session_header(user_id: String) -> Result<HeaderMap, (StatusCode, String)> {
+    let headers = create_session_with_uid(&user_id)
+        .await
+        .into_response_error()?;
+    Ok(headers)
+}
+
+async fn create_user_and_oauth2account(
+    mut oauth2_account: OAuth2Account,
+) -> Result<String, (StatusCode, String)> {
+    let new_user = User {
+        id: uuid::Uuid::new_v4().to_string(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+    let stored_user = UserStore::upsert_user(new_user)
+        .await
+        .into_response_error()?;
+    oauth2_account.user_id = stored_user.id.clone();
+    OAuth2Store::upsert_oauth2_account(oauth2_account)
+        .await
+        .into_response_error()?;
+    Ok(stored_user.id)
+}
+
+pub async fn list_accounts(
+    auth_user: Option<AuthUser>,
+) -> Result<Json<Vec<OAuth2Account>>, (StatusCode, String)> {
+    match auth_user {
+        Some(u) => {
+            tracing::debug!("User: {:#?}", u);
+            let accounts = OAuth2Store::get_oauth2_accounts(&u.id)
+                .await
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+            Ok(Json(accounts))
+        }
+        None => Err((StatusCode::BAD_REQUEST, "Not logged in!".to_string())),
+    }
 }

@@ -3,7 +3,7 @@ use axum::routing::{Router, get, post};
 use super::handlers::{
     conditional_ui, handle_finish_authentication, handle_finish_registration,
     handle_start_authentication, handle_start_registration, handle_start_registration_get,
-    serve_conditional_ui_js, serve_passkey_js,
+    list_credentials, serve_conditional_ui_js, serve_passkey_js,
 };
 
 pub fn router() -> Router {
@@ -13,6 +13,7 @@ pub fn router() -> Router {
         .route("/conditional_ui.js", get(serve_conditional_ui_js))
         .nest("/auth", router_auth())
         .nest("/register", router_register())
+        .route("/credentials", get(list_credentials))
 }
 
 pub fn router_register() -> Router {

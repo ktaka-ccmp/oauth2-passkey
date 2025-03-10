@@ -37,11 +37,6 @@ pub struct StoredCredential {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub(super) enum CacheData {
-    SessionInfo(SessionInfo),
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
 pub(super) struct UserIdCredentialIdStr {
     pub(super) user_id: String,
     pub(super) credential_id_str: String,

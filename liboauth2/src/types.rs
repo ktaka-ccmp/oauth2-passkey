@@ -97,10 +97,11 @@ impl From<GoogleIdInfo> for OAuth2Account {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub(crate) struct StateParams {
+pub struct StateParams {
     pub(crate) csrf_token: String,
     pub(crate) nonce_id: String,
     pub(crate) pkce_id: String,
+    pub(crate) misc_id: Option<String>,
 }
 
 #[derive(Serialize, Clone, Deserialize, Debug)]

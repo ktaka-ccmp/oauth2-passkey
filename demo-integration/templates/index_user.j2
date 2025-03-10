@@ -41,11 +41,28 @@
             </dd>
         </dl>
     </div>
+    <div class="user-passkeys">
+        <dl>
+            <dt>Your Passkeys</dt>
+            <dd>
+                <p><a href="{{passkey_route_prefix}}/credentials">View your passkeys</a>.</p>
+            </dd>
+        </dl>
+    </div>
+    <div class="user-accounts">
+        <dl>
+            <dt>Your OAuth2 Accounts</dt>
+            <dd>
+                <p><a href="{{auth_route_prefix}}/accounts">View your OAuth2 accounts</a>.</p>
+            </dd>
+        </dl>
+    </div>
+    <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button onclick="showRegistrationModal()">Register New Passkey</button>
+    </div>
 
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="startRegistration(false)">
-            Register New Passkey
-        </button>
+        <button onclick="oauth2.openPopup()">Link New OAuth2 Account</button>
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 10px;">
@@ -57,11 +74,13 @@
         </script>
     </div>
 
+    <script src="{{auth_route_prefix}}/oauth2.js"></script>
+    <script src="{{passkey_route_prefix}}/passkey.js"></script>
     <script>
+        const oauth2 = initOAuth2Popup();
+        const AUTH_ROUTE_PREFIX = '{{auth_route_prefix}}';
         const PASSKEY_ROUTE_PREFIX = '{{passkey_route_prefix}}';
     </script>
-    <script src="{{passkey_route_prefix}}/passkey.js"></script>
 
 </body>
-
 </html>

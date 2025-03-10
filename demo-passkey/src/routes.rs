@@ -18,7 +18,7 @@ pub fn router_auth() -> Router {
 
 async fn handle_start_registration(Json(username): Json<String>) -> Json<RegistrationOptions> {
     Json(
-        start_registration(username)
+        start_registration(None, username.clone(), username)
             .await
             .expect("Failed to start registration"),
     )
@@ -27,7 +27,8 @@ async fn handle_start_registration(Json(username): Json<String>) -> Json<Registr
 async fn handle_finish_registration(
     Json(reg_data): Json<RegisterCredential>,
 ) -> Result<String, (StatusCode, String)> {
-    finish_registration(&reg_data)
+    let user_id = "undefined";
+    finish_registration(user_id, &reg_data)
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
