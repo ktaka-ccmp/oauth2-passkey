@@ -100,13 +100,14 @@ pub async fn handle_finish_registration_core(
         }
         None => {
             // Get user name from registration data with fallback mechanism
-            let name = reg_data.get_user_name().await;
+            let (name, display_name) = reg_data.get_user_name().await;
             tracing::debug!("User name: {}, registration data: {:#?}", name, reg_data);
 
             // Create a new user for unauthenticated registration
             let new_user = User {
                 id: Uuid::new_v4().to_string(),
                 name,
+                display_name,
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
             };
