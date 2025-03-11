@@ -140,6 +140,30 @@ function createRegistrationModal() {
 function showRegistrationModal() {
     const modal = createRegistrationModal();
     modal.style.display = 'block';
+
+    // Try to get current user info to pre-fill the form
+    fetch('/summary/user-info', {
+        method: 'GET',
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        }
+        // If not logged in or error, just leave the form empty
+        return null;
+    })
+    .then(userData => {
+        if (userData) {
+            // Pre-fill the form with user data
+            document.getElementById('reg-username').value = userData.name || '';
+            document.getElementById('reg-displayname').value = userData.display_name || '';
+        }
+    })
+    .catch(error => {
+        console.error('Error fetching user data:', error);
+        // Continue without pre-filling
+    });
 }
 
 function closeRegistrationModal() {

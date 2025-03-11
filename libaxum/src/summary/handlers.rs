@@ -1,5 +1,10 @@
 use askama::Template;
-use axum::{Router, http::StatusCode, response::Html, routing::get};
+use axum::{
+    Router,
+    http::StatusCode,
+    response::{Html, Json},
+    routing::get,
+};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 use libauth::{list_accounts_core, list_credentials_core};
@@ -9,10 +14,36 @@ use libsession::User as SessionUser;
 
 use super::templates::{TemplateAccount, TemplateCredential, UserSummaryTemplate};
 use crate::AuthUser;
+use serde_json::{Value, json};
 
 /// Create a router for the user summary endpoints
 pub fn router() -> Router<()> {
-    Router::new().route("/", get(user_summary))
+    Router::new()
+        .route("/", get(user_summary))
+        .route("/user-info", get(user_info))
+}
+
+/// Return basic user information as JSON for the client-side JavaScript
+///
+/// This endpoint provides the authenticated user's basic information (id, name, display_name)
+/// to be used by client-side JavaScript for pre-filling forms or displaying user information.
+pub async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCode, String)> {
+    match auth_user {
+        Some(user) => {
+            // Return user information as JSON
+            let user_data = json!({
+                "id": user.id,
+                "name": user.name,
+                "display_name": user.display_name
+            });
+
+            Ok(Json(user_data))
+        }
+        None => {
+            // Return a 401 Unauthorized if no user is authenticated
+            Err((StatusCode::UNAUTHORIZED, "Not authenticated".to_string()))
+        }
+    }
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
