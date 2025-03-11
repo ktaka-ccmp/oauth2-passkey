@@ -19,3 +19,4 @@ axum = { workspace = true }
 axum-extra = { workspace = true }
 chrono = { workspace = true }
 serde_json = { workspace = true }
+urlencoding = { workspace = true }

@@ -25,7 +25,7 @@ pub async fn get_authorized_core(
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
-) -> Result<HeaderMap, (StatusCode, String)> {
+) -> Result<(HeaderMap, String), (StatusCode, String)> {
     validate_origin(headers, OAUTH2_AUTH_URL.as_str())
         .await
         .into_response_error()?;
@@ -40,7 +40,7 @@ pub async fn get_authorized_core(
 pub async fn post_authorized_core(
     auth_response: &AuthResponse,
     headers: &HeaderMap,
-) -> Result<HeaderMap, (StatusCode, String)> {
+) -> Result<(HeaderMap, String), (StatusCode, String)> {
     validate_origin(headers, OAUTH2_AUTH_URL.as_str())
         .await
         .into_response_error()?;
@@ -52,9 +52,7 @@ pub async fn post_authorized_core(
         ));
     }
 
-    let headers = process_oauth2_authorization(auth_response).await?;
-
-    Ok(headers)
+    process_oauth2_authorization(auth_response).await
 }
 
 pub async fn list_accounts_core(
@@ -73,7 +71,7 @@ pub async fn list_accounts_core(
 
 pub async fn process_oauth2_authorization(
     auth_response: &AuthResponse,
-) -> Result<HeaderMap, (StatusCode, String)> {
+) -> Result<(HeaderMap, String), (StatusCode, String)> {
     let (idinfo, userinfo) = get_idinfo_userinfo(auth_response)
         .await
         .into_response_error()?;
@@ -120,24 +118,29 @@ pub async fn process_oauth2_authorization(
     .into_response_error()?;
 
     // Match on the combination of auth_user and existing_account
-    let user_id: String = match (state_user_id, stored_oauth2_account) {
+    let (user_id, message) = match (state_user_id, stored_oauth2_account) {
         // Case 1: User is logged in and account exists
         (Some(state_user_id), Some(stored_oauth2_account)) => {
-            if state_user_id == stored_oauth2_account.user_id {
-                tracing::debug!("OAuth2 account already linked to current user");
+            let message = if state_user_id == stored_oauth2_account.user_id {
+                let msg = format!("Already linked to current user {}", state_user_id);
+                tracing::debug!("{}", msg);
                 // Nothing to do, account is already properly linked
+                msg
             } else {
-                tracing::debug!("OAuth2 account already linked to different user");
+                let msg = "Already linked to a different user".to_string();
+                tracing::debug!("{}", msg);
                 // return Err((StatusCode::BAD_REQUEST, "This OAuth2 account is already linked to a different user".to_string()));
-            }
+                msg
+            };
             delete_session_and_misc_token_from_store(&state_in_response)
                 .await
                 .into_response_error()?;
-            state_user_id.to_string()
+            (state_user_id.to_string(), message)
         }
         // Case 2: User is logged in but account doesn't exist
         (Some(state_user_id), None) => {
-            tracing::debug!("Linking OAuth2 account to user {}", state_user_id);
+            let message = format!("Successfully linked to {}", state_user_id);
+            tracing::debug!("{}", message);
             oauth2_account.user_id = state_user_id.clone();
             OAuth2Store::upsert_oauth2_account(oauth2_account)
                 .await
@@ -145,21 +148,23 @@ pub async fn process_oauth2_authorization(
             delete_session_and_misc_token_from_store(&state_in_response)
                 .await
                 .into_response_error()?;
-            state_user_id.to_string()
+            (state_user_id.to_string(), message)
         }
         // Case 3: User is not logged in but account exists
         (None, Some(stored_oauth2_account)) => {
-            tracing::debug!("Using existing account's user");
-            stored_oauth2_account.user_id
+            let message = format!("Signing in as {}", stored_oauth2_account.user_id);
+            tracing::debug!("{}", message);
+            (stored_oauth2_account.user_id, message)
         }
         // Case 4: User is not logged in and account doesn't exist
         (None, None) => {
-            tracing::debug!("Creating new user and account");
             #[allow(clippy::let_and_return)]
             let user_id = create_user_and_oauth2account(oauth2_account)
                 .await
                 .into_response_error()?;
-            user_id
+            let message = format!("Created {}", user_id);
+            tracing::debug!("{}", message);
+            (user_id, message)
         }
     };
 
@@ -174,7 +179,7 @@ pub async fn process_oauth2_authorization(
     )
     .into_response_error()?;
 
-    Ok(headers)
+    Ok((headers, message))
 }
 
 async fn renew_session_header(user_id: String) -> Result<HeaderMap, (StatusCode, String)> {

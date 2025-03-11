@@ -6,7 +6,7 @@ function initOAuth2Popup() {
         popupWindow = window.open(
             `${AUTH_ROUTE_PREFIX}/google`,
             "PopupWindow",
-            "width=400,height=520,left=1000,top=200,resizable=yes,scrollbars=yes"
+            "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
         );
 
         // Listen for messages from the auth popup

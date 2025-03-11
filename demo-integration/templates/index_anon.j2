@@ -8,6 +8,7 @@
 
     <script src="{{auth_route_prefix}}/oauth2.js"></script>
     <script src="{{passkey_route_prefix}}/passkey.js"></script>
+    <script src="{{passkey_route_prefix}}/conditional_ui.js"></script>
     <script>
         const oauth2 = initOAuth2Popup();
         const AUTH_ROUTE_PREFIX = '{{auth_route_prefix}}';
@@ -21,20 +22,30 @@
         <h1>{{message}}</h1>
     </div>
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="oauth2.openPopup()">Google Oauth2</button>
+        Google OAuth2:
+    </div>
+    <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button onclick="oauth2.openPopup()">Create User or Sign in</button>
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="startAuthentication(false)">Have Passkey?</button>
+        Passkey:
     </div>
     <div style="display: flex; gap: 10px; margin-top: 10px;">
         <button onclick="showRegistrationModal()">
-            Create New Account with Passkey
+            Create User
         </button>
-    </div>
-
-    <div>
-        <p>Or, <a href="{{passkey_route_prefix}}/conditional_ui">try conditional UI</a>.</p>
+        <button onclick="startAuthentication(false)">Sign in</button>
+        {# Or, <a href="{{passkey_route_prefix}}/conditional_ui">try conditional UI</a> #}
+    {# </div>
+    <div style="display: flex; gap: 10px; margin-top: 10px;"> #} 
+        <form id="signin-form">
+            <div class="form-group">
+                <label for="username-input">or try conditional UI</label>
+                <input type="email" id="username-input" name="username" autocomplete="username webauthn"
+                    placeholder="Enter your email" required>
+            </div>
+        </form>
     </div>
 
 </body>

@@ -7,6 +7,7 @@ use axum::{
     routing::get,
 };
 use axum_extra::{TypedHeader, headers};
+use std::collections::HashMap;
 
 use libauth::{AuthResponse, OAUTH2_ROUTE_PREFIX, OAuth2Account, prepare_oauth2_auth_request};
 
@@ -41,10 +42,15 @@ pub fn router() -> Router {
 
 #[derive(Template)]
 #[template(path = "popup_close.j2")]
-struct PopupCloseTemplate;
+struct PopupCloseTemplate{
+    message: String,
+}
 
-pub(crate) async fn popup_close() -> Result<Html<String>, (StatusCode, String)> {
-    let template = PopupCloseTemplate;
+pub(crate) async fn popup_close(Query(params): Query<HashMap<String, String>>) -> Result<Html<String>, (StatusCode, String)> {
+    let message = params.get("message").cloned().unwrap_or_else(|| "Authentication completed".to_string());
+    let template = PopupCloseTemplate {
+        message,
+    };
     let html = Html(template.render().into_response_error()?);
     Ok(html)
 }
@@ -82,11 +88,11 @@ pub async fn get_authorized(
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let headers = get_authorized_core(&query, &cookies, &headers).await?;
+    let (headers, message) = get_authorized_core(&query, &cookies, &headers).await?;
 
     Ok((
         headers,
-        Redirect::to(&format!("{}/popup_close", OAUTH2_ROUTE_PREFIX.as_str())),
+        Redirect::to(&format!("{}/popup_close?message={}", OAUTH2_ROUTE_PREFIX.as_str(), urlencoding::encode(&message))),
     ))
 }
 
@@ -103,11 +109,11 @@ pub async fn post_authorized(
     headers: HeaderMap,
     Form(form): Form<AuthResponse>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let headers = post_authorized_core(&form, &headers).await?;
+    let (headers, message) = post_authorized_core(&form, &headers).await?;
 
     Ok((
         headers,
-        Redirect::to(&format!("{}/popup_close", OAUTH2_ROUTE_PREFIX.as_str())),
+        Redirect::to(&format!("{}/popup_close?message={}", OAUTH2_ROUTE_PREFIX.as_str(), urlencoding::encode(&message))),
     ))
 }
 
