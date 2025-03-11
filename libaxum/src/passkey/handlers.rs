@@ -109,11 +109,7 @@ pub(crate) async fn serve_conditional_ui_js() -> Response {
         .unwrap()
 }
 
-/// Axum handler that extracts AuthUser from the request and delegates to the core function
-///
-/// This function serves as a wrapper that handles the web framework specific parts
-/// (extracting the user from the request) and then calls the core function.
-pub(crate) async fn list_credentials(
+pub(crate) async fn list_passkey_credentials(
     auth_user: Option<AuthUser>,
 ) -> Result<Json<Vec<StoredCredential>>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser if present using deref coercion

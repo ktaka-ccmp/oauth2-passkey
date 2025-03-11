@@ -37,7 +37,7 @@ pub fn router() -> Router {
         .route("/authorized", get(get_authorized).post(post_authorized))
         .route("/popup_close", get(popup_close))
         .route("/logout", get(logout))
-        .route("/accounts", get(list_accounts))
+        .route("/accounts", get(list_oauth2_accounts))
 }
 
 #[derive(Template)]
@@ -128,7 +128,7 @@ pub async fn post_authorized(
     ))
 }
 
-pub async fn list_accounts(
+pub async fn list_oauth2_accounts(
     auth_user: Option<AuthUser>,
 ) -> Result<Json<Vec<OAuth2Account>>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser if present using deref coercion
