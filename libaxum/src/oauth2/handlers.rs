@@ -7,8 +7,16 @@ use axum::{
     routing::get,
 };
 use axum_extra::{TypedHeader, headers};
-use chrono::{Duration, Utc};
-// use axum_core::response::Response;
+
+use libauth::{AuthResponse, OAUTH2_ROUTE_PREFIX, OAuth2Account, prepare_oauth2_auth_request};
+
+use libauth::{
+    get_authorized_core, list_accounts_core, post_authorized_core, prepare_logout_response,
+};
+
+use libsession::User as SessionUser;
+
+use crate::AuthUser;
 
 // Helper trait for converting errors to a standard response error format
 trait IntoResponseError<T> {
@@ -20,19 +28,6 @@ impl<T, E: std::fmt::Display> IntoResponseError<T> for Result<T, E> {
         self.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
     }
 }
-
-use libuserdb::{User, UserStore};
-
-use liboauth2::{
-    AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ROUTE_PREFIX, OAuth2Account,
-    OAuth2Store, csrf_checks, decode_state, delete_session_and_misc_token_from_store,
-    get_idinfo_userinfo, get_uid_from_stored_session_by_state_param, header_set_cookie,
-    prepare_oauth2_auth_request, validate_origin,
-};
-
-use libsession::{create_session_with_uid, prepare_logout_response};
-
-use crate::AuthUser;
 
 pub fn router() -> Router {
     Router::new()
@@ -82,143 +77,12 @@ pub async fn logout(
     Ok((headers, Redirect::to("/")))
 }
 
-pub async fn post_authorized(
-    TypedHeader(cookies): TypedHeader<headers::Cookie>,
-    headers: HeaderMap,
-    Form(form): Form<AuthResponse>,
-) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    tracing::debug!(
-        "Cookies: {:#?}",
-        cookies.get(OAUTH2_CSRF_COOKIE_NAME.as_str())
-    );
-
-    validate_origin(&headers, OAUTH2_AUTH_URL.as_str())
-        .await
-        .into_response_error()?;
-
-    if form.state.is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Missing state parameter".to_string(),
-        ));
-    }
-
-    authorized(&form).await
-}
-
 pub async fn get_authorized(
     Query(query): Query<AuthResponse>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    validate_origin(&headers, OAUTH2_AUTH_URL.as_str())
-        .await
-        .into_response_error()?;
-    csrf_checks(cookies.clone(), &query, headers)
-        .await
-        .into_response_error()?;
-
-    authorized(&query).await
-}
-
-async fn authorized(
-    auth_response: &AuthResponse,
-) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (idinfo, userinfo) = get_idinfo_userinfo(auth_response)
-        .await
-        .into_response_error()?;
-
-    // Convert GoogleUserInfo to DbUser and store it
-    static OAUTH2_GOOGLE_USER: &str = "idinfo";
-
-    let mut oauth2_account = match OAUTH2_GOOGLE_USER {
-        "idinfo" => OAuth2Account::from(idinfo),
-        "userinfo" => OAuth2Account::from(userinfo),
-        _ => OAuth2Account::from(idinfo), // Default case
-    };
-
-    // Upsert oauth2_account and user
-    // 1. Decode the state from the auth response
-    // 2. Extract user_id from the stored session if available
-    // 3. Check if the OAuth2 account exists
-
-    // Handle user and account linking
-    // 4. If user is logged in and account exists, ensure they match
-    // 5. If user is logged in but account doesn't exist, link account to user
-    // 6. If user is not logged in but account exists, create session for account
-    // 7. If neither user is logged in nor account exists, create new user and account
-
-    // Create session with user_id
-    // 8. Create a new entry in session store
-    // 9. Create a header for the session cookie
-
-    // Decode the state from the auth response
-    let state_in_response =
-        decode_state(&auth_response.state).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-
-    // Extract user_id from the stored session if available
-    let user_id = get_uid_from_stored_session_by_state_param(&state_in_response)
-        .await
-        .into_response_error()?;
-
-    // Check if the OAuth2 account exists
-    let existing_account = OAuth2Store::get_oauth2_account_by_provider(
-        &oauth2_account.provider,
-        &oauth2_account.provider_user_id,
-    )
-    .await
-    .into_response_error()?;
-
-    // Match on the combination of auth_user and existing_account
-    let mut headers = match (user_id, existing_account) {
-        // Case 1: User is logged in and account exists
-        (Some(user_id), Some(account)) => {
-            if user_id == account.user_id {
-                tracing::debug!("OAuth2 account already linked to current user");
-                // Nothing to do, account is already properly linked
-            } else {
-                tracing::debug!("OAuth2 account already linked to different user");
-                // return Err((StatusCode::BAD_REQUEST, "This OAuth2 account is already linked to a different user".to_string()));
-            }
-            delete_session_and_misc_token_from_store(&state_in_response)
-                .await
-                .into_response_error()?;
-            renew_session_header(user_id.to_string()).await?
-        }
-        // Case 2: User is logged in but account doesn't exist
-        (Some(user_id), None) => {
-            tracing::debug!("Linking OAuth2 account to user {}", user_id);
-            tracing::debug!("Linking OAuth2 account to user {}", user_id);
-            oauth2_account.user_id = user_id.clone();
-            OAuth2Store::upsert_oauth2_account(oauth2_account)
-                .await
-                .into_response_error()?;
-            delete_session_and_misc_token_from_store(&state_in_response)
-                .await
-                .into_response_error()?;
-            renew_session_header(user_id.to_string()).await?
-        }
-        // Case 3: User is not logged in but account exists
-        (None, Some(account)) => {
-            tracing::debug!("Using existing account's user");
-            renew_session_header(account.user_id).await?
-        }
-        // Case 4: User is not logged in and account doesn't exist
-        (None, None) => {
-            tracing::debug!("Creating new user and account");
-            let user_id = create_user_and_oauth2account(oauth2_account).await?;
-            renew_session_header(user_id).await?
-        }
-    };
-
-    let _ = header_set_cookie(
-        &mut headers,
-        OAUTH2_CSRF_COOKIE_NAME.to_string(),
-        "value".to_string(),
-        Utc::now() - Duration::seconds(86400),
-        -86400,
-    )
-    .into_response_error()?;
+    let headers = get_authorized_core(&query, &cookies, &headers).await?;
 
     Ok((
         headers,
@@ -226,42 +90,34 @@ async fn authorized(
     ))
 }
 
-async fn renew_session_header(user_id: String) -> Result<HeaderMap, (StatusCode, String)> {
-    let headers = create_session_with_uid(&user_id)
-        .await
-        .into_response_error()?;
-    Ok(headers)
-}
+/// Handler for OAuth2 callbacks using form_post response mode.
+///
+/// Note: Unlike the GET handler, this POST handler doesn't receive session cookies because:
+/// 1. In form_post mode, the OAuth2 provider redirects the user via a POST request with form data
+/// 2. This POST request is a new HTTP request from the browser to our server
+/// 3. While browsers automatically include cookies in normal navigation, they don't include
+///    cookies from the original request in this cross-domain POST submission
+/// 4. Therefore, we can only access headers (which may contain some cookies) but not the
+///    typed Cookie header that would be available in a standard browser navigation
+pub async fn post_authorized(
+    headers: HeaderMap,
+    Form(form): Form<AuthResponse>,
+) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
+    let headers = post_authorized_core(&form, &headers).await?;
 
-async fn create_user_and_oauth2account(
-    mut oauth2_account: OAuth2Account,
-) -> Result<String, (StatusCode, String)> {
-    let new_user = User {
-        id: uuid::Uuid::new_v4().to_string(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-    };
-    let stored_user = UserStore::upsert_user(new_user)
-        .await
-        .into_response_error()?;
-    oauth2_account.user_id = stored_user.id.clone();
-    OAuth2Store::upsert_oauth2_account(oauth2_account)
-        .await
-        .into_response_error()?;
-    Ok(stored_user.id)
+    Ok((
+        headers,
+        Redirect::to(&format!("{}/popup_close", OAUTH2_ROUTE_PREFIX.as_str())),
+    ))
 }
 
 pub async fn list_accounts(
     auth_user: Option<AuthUser>,
 ) -> Result<Json<Vec<OAuth2Account>>, (StatusCode, String)> {
-    match auth_user {
-        Some(u) => {
-            tracing::debug!("User: {:#?}", u);
-            let accounts = OAuth2Store::get_oauth2_accounts(&u.id)
-                .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-            Ok(Json(accounts))
-        }
-        None => Err((StatusCode::BAD_REQUEST, "Not logged in!".to_string())),
-    }
+    // Convert AuthUser to SessionUser if present using deref coercion
+    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+
+    // Call the core function with the extracted data
+    let accounts = list_accounts_core(session_user).await?;
+    Ok(Json(accounts))
 }
