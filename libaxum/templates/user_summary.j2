@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Summary</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .section {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .section-title {
+            background-color: #f5f5f5;
+            padding: 10px;
+            margin: -15px -15px 15px -15px;
+            border-bottom: 1px solid #ddd;
+            border-radius: 5px 5px 0 0;
+        }
+        .item {
+            background-color: #f9f9f9;
+            border-left: 4px solid #4285f4;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 3px;
+        }
+        .item-detail {
+            margin: 5px 0;
+        }
+        .link-button {
+            display: inline-block;
+            background-color: #4285f4;
+            color: white;
+            padding: 10px 15px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .link-button:hover {
+            background-color: #3367d6;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #4285f4;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>User Summary</h1>
+
+    <!-- User Information Section -->
+    <div class="section">
+        <h2 class="section-title">User Information</h2>
+        <div class="item">
+            <div class="item-detail"><strong>User ID:</strong> {{ user.id }}</div>
+            <div class="item-detail"><strong>Name:</strong> {{ user.name }}</div>
+            <div class="item-detail"><strong>Created:</strong> {{ user.created_at }}</div>
+            <div class="item-detail"><strong>Updated:</strong> {{ user.updated_at }}</div>
+        </div>
+    </div>
+
+    <!-- Passkey Credentials Section -->
+    <div class="section">
+        <h2 class="section-title">Passkey Credentials</h2>
+        {% if passkey_credentials.is_empty() %}
+            <p>You don't have any passkey credentials yet.</p>
+        {% else %}
+            {% for credential in passkey_credentials %}
+                <div class="item">
+                    <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id_base64 }}</div>
+                    <div class="item-detail"><strong>User ID:</strong> {{ credential.user_id }}</div>
+                    <div class="item-detail"><strong>User Name:</strong> {{ credential.user_name }}</div>
+                    <div class="item-detail"><strong>Display Name:</strong> {{ credential.user_display_name }}</div>
+                    <div class="item-detail"><strong>User Handle:</strong> {{ credential.user_handle }}</div>
+                    <div class="item-detail"><strong>Counter:</strong> {{ credential.counter }}</div>
+                    <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
+                    <div class="item-detail"><strong>Updated:</strong> {{ credential.updated_at }}</div>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- OAuth2 Accounts Section -->
+    <div class="section">
+        <h2 class="section-title">OAuth2 Accounts</h2>
+        {% if oauth2_accounts.is_empty() %}
+            <p>You don't have any linked OAuth2 accounts yet.</p>
+        {% else %}
+            {% for account in oauth2_accounts %}
+                <div class="item">
+                    {% if account.picture != "" %}
+                    <div class="account-picture">
+                        <img src="{{ account.picture }}" alt="Profile Picture" style="max-width: 100px; max-height: 100px; border-radius: 50%;">
+                    </div>
+                    {% endif %}
+                    <div class="item-detail"><strong>ID:</strong> {{ account.id }}</div>
+                    <div class="item-detail"><strong>User ID:</strong> {{ account.user_id }}</div>
+                    <div class="item-detail"><strong>Provider:</strong> {{ account.provider }}</div>
+                    <div class="item-detail"><strong>Provider User ID:</strong> {{ account.provider_user_id }}</div>
+                    <div class="item-detail"><strong>Name:</strong> {{ account.name }}</div>
+                    {% if account.email != "" %}
+                        <div class="item-detail"><strong>Email:</strong> {{ account.email }}</div>
+                    {% endif %}
+                    {% if account.metadata_str != "" %}
+                        <div class="item-detail"><strong>Metadata:</strong> {{ account.metadata_str }}</div>
+                    {% endif %}
+                    <div class="item-detail"><strong>Created:</strong> {{ account.created_at }}</div>
+                    <div class="item-detail"><strong>Updated:</strong> {{ account.updated_at }}</div>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <a href="/" class="back-link">← Back to Home</a>
+</body>
+</html>

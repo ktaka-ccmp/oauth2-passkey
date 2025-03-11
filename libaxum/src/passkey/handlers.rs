@@ -4,6 +4,7 @@ use axum::{
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     response::{Html, IntoResponse, Response},
 };
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::Value;
 
 use libauth::{
@@ -113,7 +114,41 @@ pub(crate) async fn serve_conditional_ui_js() -> Response {
 ///
 /// This function serves as a wrapper that handles the web framework specific parts
 /// (extracting the user from the request) and then calls the core function.
-pub(crate) async fn list_credentials(
+// Template-friendly version of StoredCredential with binary data converted to strings
+#[derive(Debug, Clone)]
+struct TemplateCredential {
+    credential_id_base64: String,
+    user_id: String,
+    user_name: String,
+    user_display_name: String,
+    user_handle: String,
+    counter: String,
+    created_at: String,
+    updated_at: String,
+}
+
+impl From<StoredCredential> for TemplateCredential {
+    fn from(cred: StoredCredential) -> Self {
+        Self {
+            credential_id_base64: URL_SAFE_NO_PAD.encode(&cred.credential_id),
+            user_id: cred.user_id,
+            user_name: cred.user.name,
+            user_display_name: cred.user.display_name,
+            user_handle: cred.user.user_handle,
+            counter: cred.counter.to_string(),
+            created_at: cred.created_at.to_string(),
+            updated_at: cred.updated_at.to_string(),
+        }
+    }
+}
+
+#[derive(Template)]
+#[template(path = "passkey_credentials.j2")]
+struct PasskeyCredentialsTemplate {
+    credentials: Vec<TemplateCredential>,
+}
+
+pub(crate) async fn list_passkey_credentials(
     auth_user: Option<AuthUser>,
 ) -> Result<Json<Vec<StoredCredential>>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser if present using deref coercion
@@ -122,4 +157,37 @@ pub(crate) async fn list_credentials(
     // Call the core function with the extracted data
     let credentials = list_credentials_core(session_user).await?;
     Ok(Json(credentials))
+}
+
+/// Display passkey credentials in HTML format using a template
+///
+/// This handler retrieves the passkey credentials for the authenticated user
+/// and renders them using the passkey_credentials.j2 template.
+pub(crate) async fn list_passkey_credentials_html(
+    auth_user: Option<AuthUser>,
+) -> Result<Html<String>, (StatusCode, String)> {
+    // Convert AuthUser to SessionUser if present using deref coercion
+    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+
+    // Call the core function with the extracted data
+    let stored_credentials = list_credentials_core(session_user).await?;
+
+    // Convert StoredCredential to TemplateCredential
+    let credentials = stored_credentials
+        .into_iter()
+        .map(TemplateCredential::from)
+        .collect();
+
+    // Create template with credentials data
+    let template = PasskeyCredentialsTemplate { credentials };
+
+    // Render the template
+    let html = template.render().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Template error: {}", e),
+        )
+    })?;
+
+    Ok(Html(html))
 }

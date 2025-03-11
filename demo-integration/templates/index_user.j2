@@ -8,18 +8,16 @@
     <style>
         .user-info {
             background: #f5f5f5;
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 1rem 0;
         }
-
         .user-info dt {
             font-weight: bold;
             margin-top: 0.5rem;
         }
-
         .user-info dd {
-            margin-left: 1rem;
+            margin-top: 0.5rem;
+        }
+        .user-item {
+            margin-top: 0.5rem;
         }
     </style>
 </head>
@@ -27,17 +25,17 @@
 <body>
     <div>
         <h1>{{message}}</h1>
+        <p><a href="/summary" style="color: #4285f4; text-decoration: none; font-weight: bold;">View Your Complete Account Summary</a></p>
     </div>
 
     <div class="user-info">
         <dl>
-            <dt>Your Profile Picture</dt>
+            <dt>Your User Information</dt>
             <dd>
-                {# {% if user.picture.is_some() %}
-                <img src="{{ user.picture.as_ref().unwrap() }}" alt="Profile picture"
-                    style="max-width: 100px; border-radius: 50%;">
-                {% else %}
-                {% endif %} #}
+                <div class="user-item"><strong>User ID:</strong> {{ user.id }}</div>
+                <div class="user-item"><strong>Name:</strong> {{ user.name }}</div>
+                <div class="user-item"><strong>Created:</strong> {{ user.created_at }}</div>
+                <div class="user-item"><strong>Updated:</strong> {{ user.updated_at }}</div>
             </dd>
         </dl>
     </div>
@@ -45,7 +43,7 @@
         <dl>
             <dt>Your Passkeys</dt>
             <dd>
-                <p><a href="{{passkey_route_prefix}}/credentials">View your passkeys</a>.</p>
+                <p><a href="{{passkey_route_prefix}}/credentials/html">View your passkeys</a>.</p>
             </dd>
         </dl>
         <button onclick="showRegistrationModal()">Add New Passkey</button>
@@ -54,7 +52,7 @@
         <dl>
             <dt>Your OAuth2 Accounts</dt>
             <dd>
-                <p><a href="{{auth_route_prefix}}/accounts">View your OAuth2 accounts</a>.</p>
+                <p><a href="{{auth_route_prefix}}/accounts/html">View your OAuth2 accounts</a>.</p>
             </dd>
         </dl>
         <button onclick="oauth2.openPopup()">Add New OAuth2 Account</button>

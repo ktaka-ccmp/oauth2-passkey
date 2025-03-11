@@ -90,9 +90,7 @@ impl RegisterCredential {
     pub async fn get_user_name(&self) -> String {
         // Try to get the stored options if user_handle exists
         if let Some(handle) = &self.user_handle {
-            match super::challenge::get_and_validate_options("regi_challenge", handle)
-                .await
-            {
+            match super::challenge::get_and_validate_options("regi_challenge", handle).await {
                 Ok(stored_options) => stored_options.user.name,
                 Err(e) => {
                     tracing::warn!("Failed to get stored user: {}", e);
