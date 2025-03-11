@@ -198,12 +198,15 @@ async fn renew_session_header(user_id: String) -> Result<HeaderMap, (StatusCode,
     Ok(headers)
 }
 
+// When creating a new user, we assign email as name and name as display_name.
+// We also assign the user_id to the oauth2_account.
 async fn create_user_and_oauth2account(
     mut oauth2_account: OAuth2Account,
 ) -> Result<String, AuthError> {
     let new_user = DbUser {
         id: uuid::Uuid::new_v4().to_string(),
-        name: oauth2_account.name.clone(),
+        name: oauth2_account.email.clone(),
+        display_name: oauth2_account.name.clone(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };

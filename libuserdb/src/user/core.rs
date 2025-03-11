@@ -53,6 +53,7 @@ async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), UserError> {
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL,
+            display_name TEXT NOT NULL,
             created_at TIMESTAMP NOT NULL,
             updated_at TIMESTAMP NOT NULL
         )
@@ -81,16 +82,18 @@ async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Result<User, Use
     // Upsert user with a single query
     sqlx::query(
         r#"
-        INSERT INTO users (id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO users (id, name, display_name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET
             name = excluded.name,
+            display_name = excluded.display_name,
             created_at = excluded.created_at,
             updated_at = excluded.updated_at
         "#,
     )
     .bind(&user.id)
     .bind(&user.name)
+    .bind(&user.display_name)
     .bind(user.created_at)
     .bind(user.updated_at)
     .execute(pool)
@@ -109,6 +112,7 @@ async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), UserError> 
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL,
+            display_name TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL,
             updated_at TIMESTAMPTZ NOT NULL
         )
@@ -137,10 +141,11 @@ async fn upsert_user_postgres(pool: &Pool<Postgres>, user: User) -> Result<User,
     // Upsert user with a single query
     sqlx::query(
         r#"
-        INSERT INTO users (id, name, created_at, updated_at)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO users (id, name, display_name, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (id) DO UPDATE SET
             name = EXCLUDED.name,
+            display_name = EXCLUDED.display_name,
             created_at = EXCLUDED.created_at,
             updated_at = EXCLUDED.updated_at
         RETURNING *
@@ -148,6 +153,7 @@ async fn upsert_user_postgres(pool: &Pool<Postgres>, user: User) -> Result<User,
     )
     .bind(&user.id)
     .bind(&user.name)
+    .bind(&user.display_name)
     .bind(user.created_at)
     .bind(user.updated_at)
     .fetch_one(pool)

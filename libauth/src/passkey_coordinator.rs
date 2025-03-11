@@ -28,11 +28,12 @@ impl PasskeyCoordinator {
         reg_data: libpasskey::RegisterCredential,
     ) -> Result<String, AuthError> {
         // Get user name from registration data with fallback mechanism
-        let name = reg_data.get_user_name().await;
+        let (name, display_name) = reg_data.get_user_name().await;
 
         let new_user = User {
             id: Uuid::new_v4().to_string(),
             name,
+            display_name,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -66,6 +67,7 @@ impl PasskeyCoordinator {
                 let new_user = User {
                     id: user_id.to_string(),
                     name: "Passkey User".to_string(), // Default name since we don't have reg_data here
+                    display_name: "Passkey User".to_string(), // Default display name since we don't have reg_data here
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
                 };

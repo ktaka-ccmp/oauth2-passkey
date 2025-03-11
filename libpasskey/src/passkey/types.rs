@@ -87,19 +87,19 @@ pub struct RegisterCredential {
 impl RegisterCredential {
     /// Attempts to retrieve the stored user entity for this registration
     /// If the stored options are no longer available, falls back to a default value
-    pub async fn get_user_name(&self) -> String {
+    pub async fn get_user_name(&self) -> (String, String) {
         // Try to get the stored options if user_handle exists
         if let Some(handle) = &self.user_handle {
             match super::challenge::get_and_validate_options("regi_challenge", handle).await {
-                Ok(stored_options) => stored_options.user.name,
+                Ok(stored_options) => (stored_options.user.name, stored_options.user.display_name),
                 Err(e) => {
                     tracing::warn!("Failed to get stored user: {}", e);
-                    "Passkey User".to_string()
+                    ("Passkey User".to_string(), "Passkey User".to_string())
                 }
             }
         } else {
             // Fall back to default if user_handle is None
-            "Passkey User".to_string()
+            ("Passkey User".to_string(), "Passkey User".to_string())
         }
     }
 }
