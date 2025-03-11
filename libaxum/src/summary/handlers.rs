@@ -1,7 +1,10 @@
 use askama::Template;
 use axum::{Router, http::StatusCode, response::Html, routing::get};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+
 use libauth::{list_accounts_core, list_credentials_core};
+use liboauth2::OAUTH2_ROUTE_PREFIX;
+use libpasskey::PASSKEY_ROUTE_PREFIX;
 use libsession::User as SessionUser;
 
 use super::templates::{TemplateAccount, TemplateCredential, UserSummaryTemplate};
@@ -78,6 +81,8 @@ pub async fn user_summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCo
         user: auth_user,
         passkey_credentials,
         oauth2_accounts,
+        auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
+        passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
     };
 
     // Render the template
