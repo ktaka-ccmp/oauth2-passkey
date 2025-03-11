@@ -1,14 +1,23 @@
 use askama::Template;
 use axum::{
-    Router,
+    Json, Router,
     extract::{Form, Query},
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     response::{Html, Redirect, Response},
     routing::get,
 };
 use axum_extra::{TypedHeader, headers};
-use chrono::{Duration, Utc};
-// use axum_core::response::Response;
+use std::collections::HashMap;
+
+use libauth::{AuthResponse, OAUTH2_ROUTE_PREFIX, OAuth2Account, prepare_oauth2_auth_request};
+
+use libauth::{
+    get_authorized_core, list_accounts_core, post_authorized_core, prepare_logout_response,
+};
+
+use libsession::User as SessionUser;
+
+use crate::AuthUser;
 
 // Helper trait for converting errors to a standard response error format
 trait IntoResponseError<T> {
@@ -21,19 +30,6 @@ impl<T, E: std::fmt::Display> IntoResponseError<T> for Result<T, E> {
     }
 }
 
-use libuserdb::{User, UserStore};
-
-use liboauth2::{
-    AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ROUTE_PREFIX, OAuth2Account,
-    OAuth2Store, csrf_checks, get_idinfo_userinfo, header_set_cookie, prepare_oauth2_auth_request,
-    validate_origin,
-};
-
-use libsession::{
-    SESSION_COOKIE_NAME, create_session_with_uid, delete_session_from_store,
-    prepare_logout_response,
-};
-
 pub fn router() -> Router {
     Router::new()
         .route("/oauth2.js", get(serve_oauth2_js))
@@ -41,14 +37,23 @@ pub fn router() -> Router {
         .route("/authorized", get(get_authorized).post(post_authorized))
         .route("/popup_close", get(popup_close))
         .route("/logout", get(logout))
+        .route("/accounts", get(list_oauth2_accounts))
 }
 
 #[derive(Template)]
 #[template(path = "popup_close.j2")]
-struct PopupCloseTemplate;
+struct PopupCloseTemplate {
+    message: String,
+}
 
-pub(crate) async fn popup_close() -> Result<Html<String>, (StatusCode, String)> {
-    let template = PopupCloseTemplate;
+pub(crate) async fn popup_close(
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Html<String>, (StatusCode, String)> {
+    let message = params
+        .get("message")
+        .cloned()
+        .unwrap_or_else(|| "Authentication completed".to_string());
+    let template = PopupCloseTemplate { message };
     let html = Html(template.render().into_response_error()?);
     Ok(html)
 }
@@ -81,134 +86,55 @@ pub async fn logout(
     Ok((headers, Redirect::to("/")))
 }
 
-pub async fn post_authorized(
-    TypedHeader(cookies): TypedHeader<headers::Cookie>,
-    headers: HeaderMap,
-    Form(form): Form<AuthResponse>,
-) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    tracing::debug!(
-        "Cookies: {:#?}",
-        cookies.get(OAUTH2_CSRF_COOKIE_NAME.as_str())
-    );
-
-    validate_origin(&headers, OAUTH2_AUTH_URL.as_str())
-        .await
-        .into_response_error()?;
-
-    if form.state.is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Missing state parameter".to_string(),
-        ));
-    }
-
-    authorized(&form).await
-}
-
 pub async fn get_authorized(
     Query(query): Query<AuthResponse>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    validate_origin(&headers, OAUTH2_AUTH_URL.as_str())
-        .await
-        .into_response_error()?;
-    csrf_checks(cookies.clone(), &query, headers)
-        .await
-        .into_response_error()?;
-
-    delete_session_from_store(cookies, SESSION_COOKIE_NAME.to_string())
-        .await
-        .into_response_error()?;
-
-    authorized(&query).await
-}
-
-async fn authorized(
-    auth_response: &AuthResponse,
-) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (idinfo, userinfo) = get_idinfo_userinfo(auth_response)
-        .await
-        .into_response_error()?;
-
-    // Convert GoogleUserInfo to DbUser and store it
-    static OAUTH2_GOOGLE_USER: &str = "idinfo";
-
-    let mut oauth2_account = match OAUTH2_GOOGLE_USER {
-        "idinfo" => OAuth2Account::from(idinfo),
-        "userinfo" => OAuth2Account::from(userinfo),
-        _ => OAuth2Account::from(idinfo), // Default case
-    };
-
-    // Upsert oauth2_account and user
-    // 1. Check if sub of idinfo/userinfo has a corresponding entry in oauth2_account table
-    // 2. If not, create a new entry in users table
-    // 3. Create a new entry in oauth2_account table
-
-    // Create session with user_id
-    // 4. Create a new entry in session store
-    // 5. Create a header for the session cookie
-
-    // Upsert oauth2_account and user
-    // 1. Check if the OAuth2 account exists
-
-    let existing_account = OAuth2Store::get_oauth2_account_by_provider(
-        &oauth2_account.provider,
-        &oauth2_account.provider_user_id,
-    )
-    .await
-    .into_response_error()?;
-
-    // 2. Process the account
-    let user_id = match existing_account {
-        // If account exists, use its user_id
-        Some(account) => account.user_id,
-        // If not, create a new user and link it
-        None => {
-            // Create a new user
-            let new_user = User {
-                id: uuid::Uuid::new_v4().to_string(),
-                created_at: Utc::now(),
-                updated_at: Utc::now(),
-            };
-
-            // Store the user
-            let stored_user = UserStore::upsert_user(new_user)
-                .await
-                .into_response_error()?;
-
-            // Set the user_id in the OAuth2 account
-            oauth2_account.user_id = stored_user.id.clone();
-
-            // Store the OAuth2 account
-            OAuth2Store::upsert_oauth2_account(oauth2_account)
-                .await
-                .into_response_error()?;
-
-            stored_user.id
-        }
-    };
-
-    // Create session with the user_id
-    let mut headers = create_session_with_uid(&user_id)
-        .await
-        .into_response_error()?;
-
-    // let mut headers = create_session_with_user(user_data)
-    //     .await
-    //     .into_response_error()?;
-
-    let _ = header_set_cookie(
-        &mut headers,
-        OAUTH2_CSRF_COOKIE_NAME.to_string(),
-        "value".to_string(),
-        Utc::now() - Duration::seconds(86400),
-        -86400,
-    )
-    .into_response_error()?;
+    let (headers, message) = get_authorized_core(&query, &cookies, &headers).await?;
 
     Ok((
         headers,
-        Redirect::to(&format!("{}/popup_close", OAUTH2_ROUTE_PREFIX.as_str())),
+        Redirect::to(&format!(
+            "{}/popup_close?message={}",
+            OAUTH2_ROUTE_PREFIX.as_str(),
+            urlencoding::encode(&message)
+        )),
     ))
+}
+
+/// Handler for OAuth2 callbacks using form_post response mode.
+///
+/// Note: Unlike the GET handler, this POST handler doesn't receive session cookies because:
+/// 1. In form_post mode, the OAuth2 provider redirects the user via a POST request with form data
+/// 2. This POST request is a new HTTP request from the browser to our server
+/// 3. While browsers automatically include cookies in normal navigation, they don't include
+///    cookies from the original request in this cross-domain POST submission
+/// 4. Therefore, we can only access headers (which may contain some cookies) but not the
+///    typed Cookie header that would be available in a standard browser navigation
+pub async fn post_authorized(
+    headers: HeaderMap,
+    Form(form): Form<AuthResponse>,
+) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
+    let (headers, message) = post_authorized_core(&form, &headers).await?;
+
+    Ok((
+        headers,
+        Redirect::to(&format!(
+            "{}/popup_close?message={}",
+            OAUTH2_ROUTE_PREFIX.as_str(),
+            urlencoding::encode(&message)
+        )),
+    ))
+}
+
+pub async fn list_oauth2_accounts(
+    auth_user: Option<AuthUser>,
+) -> Result<Json<Vec<OAuth2Account>>, (StatusCode, String)> {
+    // Convert AuthUser to SessionUser if present using deref coercion
+    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+
+    // Call the core function with the extracted data
+    let accounts = list_accounts_core(session_user).await?;
+    Ok(Json(accounts))
 }

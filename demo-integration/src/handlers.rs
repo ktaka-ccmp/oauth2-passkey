@@ -33,9 +33,9 @@ struct ProtectedTemplate<'a> {
 pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCode, String)> {
     match user {
         Some(u) => {
-            let message = format!("Hey {}!", u.id);
+            let message = format!("Hey {}!", u.name);
             let template = IndexTemplateUser {
-                // user: u,
+                // user: u.clone(),
                 message: &message,
                 auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
                 passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),

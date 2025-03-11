@@ -12,6 +12,8 @@ pub struct SessionInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
+    pub name: String,
+    pub display_name: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -22,6 +24,8 @@ impl User {
     pub fn into_db_user(self) -> DbUser {
         DbUser {
             id: self.id,
+            name: self.name,
+            display_name: self.display_name,
             created_at: self.created_at,
             updated_at: self.updated_at,
         }
@@ -32,6 +36,8 @@ impl From<DbUser> for User {
     fn from(db_user: DbUser) -> Self {
         Self {
             id: db_user.id,
+            name: db_user.name,
+            display_name: db_user.display_name,
             created_at: db_user.created_at,
             updated_at: db_user.updated_at,
         }

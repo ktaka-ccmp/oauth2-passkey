@@ -2,7 +2,7 @@ use axum::{Router, routing::get};
 use dotenv::dotenv;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use libaxum::{oauth2_router, passkey_router};
+use libaxum::{oauth2_router, passkey_router, summary_router};
 use liboauth2::OAUTH2_ROUTE_PREFIX;
 use libpasskey::PASSKEY_ROUTE_PREFIX;
 
@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(debug_assertions)]
         {
             // Debug build default - show all log levels
-            "libaxum=trace,libsession=trace,libpasskey=trace,liboauth2=trace,libstorage=trace,libuserdb=trace,demo_integration=trace".into()
+            "libaxum=trace,libauth=trace,libsession=trace,libpasskey=trace,liboauth2=trace,libstorage=trace,libuserdb=trace,demo_integration=trace".into()
         }
 
         #[cfg(not(debug_assertions))]
@@ -68,14 +68,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("Panic details: {}", panic_info);
     }));
 
-    // Initialize the OAuth2 library
-    liboauth2::init().await?;
-    libsession::init().await?;
-    libpasskey::init().await?;
+    // Initialize the authentication library
+    tracing::info!("Initializing authentication library");
+    libauth::init().await?;
 
     let app = Router::new()
         .route("/", get(index))
         .route("/protected", get(protected))
+        .nest("/summary", summary_router())
         .nest(OAUTH2_ROUTE_PREFIX.as_str(), oauth2_router())
         .nest(PASSKEY_ROUTE_PREFIX.as_str(), passkey_router());
 

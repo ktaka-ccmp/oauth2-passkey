@@ -6,125 +6,75 @@ use axum::{
 };
 use serde_json::Value;
 
-use libpasskey::{
-    AuthenticationOptions, AuthenticatorResponse, PublicKeyCredentialUserEntity,
-    RegisterCredential, RegistrationOptions, finish_authentication, finish_registration,
-    finish_registration_with_auth_user, gen_random_string, start_authentication,
-    start_registration, start_registration_with_auth_user,
+use libauth::{
+    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
+    handle_finish_authentication_core, handle_finish_registration_core,
+    handle_start_authentication_core, handle_start_registration_get_core,
+    handle_start_registration_post_core, list_credentials_core,
 };
 
-use liboauth2::OAuth2Store;
-use libpasskey::PASSKEY_ROUTE_PREFIX;
-use libsession::{User as SessionUser, create_session_with_uid};
+use libpasskey::{PASSKEY_ROUTE_PREFIX, StoredCredential};
+use libsession::User as SessionUser;
 
 use crate::session::AuthUser;
 
+/// Axum handler that extracts AuthUser from the request and delegates to the core function
 pub(crate) async fn handle_start_registration_get(
     user: Option<AuthUser>,
 ) -> Result<Json<RegistrationOptions>, (StatusCode, String)> {
-    match user {
-        None => Err((StatusCode::BAD_REQUEST, "Not logged in!".to_string())),
-        Some(u) => {
-            tracing::debug!("User: {:#?}", u);
+    // Convert AuthUser to SessionUser if present using deref coercion
+    let session_user = user.as_ref().map(|u| u as &SessionUser);
 
-            let session_user: SessionUser = (*u).clone();
+    // Call the core function with the extracted data
+    let options = handle_start_registration_get_core(session_user)
+        .await
+        .expect("Failed to start registration");
 
-            let oauth2_accounts = OAuth2Store::get_oauth2_accounts(&session_user.id)
-                .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
-                .first()
-                .cloned()
-                .ok_or_else(|| {
-                    (
-                        StatusCode::BAD_REQUEST,
-                        "No OAuth2 accounts found".to_string(),
-                    )
-                })?;
-
-            let user_info = PublicKeyCredentialUserEntity {
-                user_handle: gen_random_string(16)
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
-                name: oauth2_accounts.email.clone(),
-                display_name: oauth2_accounts.name.clone(),
-            };
-
-            let options = start_registration_with_auth_user(session_user, user_info)
-                .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-            Ok(Json(options))
-        }
-    }
+    Ok(Json(options))
 }
 
-pub(crate) async fn handle_start_registration(
-    Json(username): Json<String>,
+pub(crate) async fn handle_start_registration_post(
+    auth_user: Option<AuthUser>,
+    Json(body): Json<Value>,
 ) -> Json<RegistrationOptions> {
-    Json(
-        start_registration(username)
-            .await
-            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
-            .expect("Failed to start registration"),
-    )
+    // Convert AuthUser to SessionUser if present using deref coercion
+    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+
+    // Call the core function with the extracted data
+    let registration_options = handle_start_registration_post_core(session_user, &body)
+        .await
+        .expect("Failed to start registration");
+
+    Json(registration_options)
 }
 
 pub(crate) async fn handle_finish_registration(
-    user: Option<AuthUser>,
+    auth_user: Option<AuthUser>,
     Json(reg_data): Json<RegisterCredential>,
-) -> Result<String, (StatusCode, String)> {
-    tracing::debug!("Registration data: {:#?}", reg_data);
+) -> Result<(HeaderMap, String), (StatusCode, String)> {
+    // Convert AuthUser to SessionUser if present
+    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
 
-    match user {
-        None => finish_registration(&reg_data)
-            .await
-            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string())),
-        Some(u) => {
-            tracing::debug!("User: {:#?}", u);
-
-            finish_registration_with_auth_user((*u).clone(), reg_data)
-                .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
-        }
-    }
+    handle_finish_registration_core(session_user, reg_data).await
 }
 
 pub(crate) async fn handle_start_authentication(
-    Json(username): Json<Value>,
+    Json(body): Json<Value>,
 ) -> Result<Json<AuthenticationOptions>, (StatusCode, String)> {
-    let username = if username.is_object() {
-        username
-            .get("username")
-            .and_then(|v| v.as_str())
-            .map(String::from)
-    } else if username.is_string() {
-        Some(username.as_str().unwrap().to_string()) // Directly use the string
-    } else {
-        None
-    };
+    // Call the core function with the extracted data
+    let auth_options = handle_start_authentication_core(&body).await?;
 
-    match start_authentication(username).await {
-        Ok(auth_options) => Ok(Json(auth_options)),
-        Err(e) => {
-            tracing::debug!("Error: {:#?}", e);
-            Err((StatusCode::BAD_REQUEST, e.to_string()))
-        }
-    }
+    // Return the authentication options as JSON
+    Ok(Json(auth_options))
 }
 
 pub(crate) async fn handle_finish_authentication(
     Json(auth_response): Json<AuthenticatorResponse>,
 ) -> Result<(HeaderMap, String), (StatusCode, String)> {
-    tracing::debug!("Auth response: {:#?}", auth_response);
+    // Call the core function with the extracted data
+    let (_, name, headers) = handle_finish_authentication_core(auth_response).await?;
 
-    let (uid, name) = finish_authentication(auth_response)
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-
-    tracing::debug!("User ID: {:#?}", uid);
-
-    let headers = create_session_with_uid(&uid)
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-
+    // Return the headers and name
     Ok((headers, name))
 }
 
@@ -157,4 +107,15 @@ pub(crate) async fn serve_conditional_ui_js() -> Response {
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.to_string().into())
         .unwrap()
+}
+
+pub(crate) async fn list_passkey_credentials(
+    auth_user: Option<AuthUser>,
+) -> Result<Json<Vec<StoredCredential>>, (StatusCode, String)> {
+    // Convert AuthUser to SessionUser if present using deref coercion
+    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+
+    // Call the core function with the extracted data
+    let credentials = list_credentials_core(session_user).await?;
+    Ok(Json(credentials))
 }

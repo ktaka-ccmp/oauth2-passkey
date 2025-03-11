@@ -6,6 +6,8 @@ use sqlx::FromRow;
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: String,
+    pub name: String,
+    pub display_name: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -14,6 +16,8 @@ impl Default for User {
     fn default() -> Self {
         Self {
             id: String::new(),
+            name: String::new(),
+            display_name: String::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

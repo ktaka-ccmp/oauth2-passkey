@@ -111,22 +111,96 @@ async function startAuthentication(withUsername = false) {
     }
 }
 
+function createRegistrationModal() {
+    // Create modal container if it doesn't exist
+    let modal = document.getElementById('registration-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'registration-modal';
+        modal.className = 'modal';
+        modal.style.cssText = 'display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);';
 
-async function startRegistration(withUsername = true) {
+        modal.innerHTML = `
+            <h3>Register New Passkey</h3>
+            <div style="margin: 10px 0;">
+                <input type="text" id="reg-username" placeholder="Username" style="width: 100%; margin-bottom: 10px; padding: 5px;">
+                <input type="text" id="reg-displayname" placeholder="Display Name" style="width: 100%; padding: 5px;">
+            </div>
+            <div style="text-align: right;">
+                <button onclick="closeRegistrationModal()">Cancel</button>
+                <button onclick="submitRegistration()">Register</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+    }
+    return modal;
+}
+
+function showRegistrationModal() {
+    const modal = createRegistrationModal();
+    modal.style.display = 'block';
+
+    // Try to get current user info to pre-fill the form
+    fetch('/summary/user-info', {
+        method: 'GET',
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        }
+        // If not logged in or error, just leave the form empty
+        return null;
+    })
+    .then(userData => {
+        if (userData) {
+            // Pre-fill the form with user data
+            document.getElementById('reg-username').value = userData.name || '';
+            document.getElementById('reg-displayname').value = userData.display_name || '';
+        }
+    })
+    .catch(error => {
+        console.error('Error fetching user data:', error);
+        // Continue without pre-filling
+    });
+}
+
+function closeRegistrationModal() {
+    const modal = document.getElementById('registration-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+async function submitRegistration() {
+    const username = document.getElementById('reg-username').value.trim();
+    const displayname = document.getElementById('reg-displayname').value.trim();
+
+    if (!username || !displayname) {
+        alert('Both username and display name are required');
+        return;
+    }
+
+    closeRegistrationModal();
+    await startRegistration(true, username, displayname);
+}
+
+async function startRegistration(withUsername = true, username = null, displayname = null) {
     try {
         let startResponse;
-        let username;
+        // let username;
 
         if (withUsername) {
-            username = prompt("Please enter your username:");
-            if (!username) return;
+            // username = prompt("Please enter your username:");
+            // if (!username) return;
 
             startResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/register/start', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(username)
+                body: JSON.stringify({ username, displayname })
             });
         } else {
             startResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/register/start', {

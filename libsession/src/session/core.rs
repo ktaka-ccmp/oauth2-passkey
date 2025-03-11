@@ -73,6 +73,16 @@ pub async fn delete_session_from_store(
     Ok(())
 }
 
+pub async fn delete_session_from_store_by_session_id(session_id: &str) -> Result<(), SessionError> {
+    GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .remove("session", session_id)
+        .await
+        .map_err(|e| SessionError::Storage(e.to_string()))?;
+    Ok(())
+}
+
 pub async fn create_session_with_user(user_data: SessionUser) -> Result<HeaderMap, SessionError> {
     let db_user: DbUser = user_data.into_db_user();
 

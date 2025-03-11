@@ -2,6 +2,8 @@
 
 use crate::errors::AuthError;
 use chrono::Utc;
+use uuid::Uuid;
+
 use libpasskey::StoredCredential;
 use libuserdb::{User, UserStore};
 
@@ -18,6 +20,29 @@ impl PasskeyCoordinator {
 
         // Retrieve credentials using the PasskeyStore
         libpasskey::PasskeyStore::get_credentials_by(search_field)
+            .await
+            .map_err(AuthError::Passkey)
+    }
+
+    pub async fn create_user_then_finish_registration(
+        reg_data: libpasskey::RegisterCredential,
+    ) -> Result<String, AuthError> {
+        // Get user name from registration data with fallback mechanism
+        let (name, display_name) = reg_data.get_user_name().await;
+
+        let new_user = User {
+            id: Uuid::new_v4().to_string(),
+            name,
+            display_name,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        UserStore::upsert_user(new_user.clone())
+            .await
+            .map_err(AuthError::User)?;
+
+        libpasskey::finish_registration(&new_user.id, &reg_data)
             .await
             .map_err(AuthError::Passkey)
     }
@@ -41,6 +66,8 @@ impl PasskeyCoordinator {
                 // User doesn't exist, so we should create one
                 let new_user = User {
                     id: user_id.to_string(),
+                    name: "Passkey User".to_string(), // Default name since we don't have reg_data here
+                    display_name: "Passkey User".to_string(), // Default display name since we don't have reg_data here
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
                 };

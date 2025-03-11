@@ -40,6 +40,8 @@ impl OAuth2Coordinator {
         let user = if account.user_id.is_empty() {
             let new_user = User {
                 id: Uuid::new_v4().to_string(),
+                name: account.email.clone(),
+                display_name: account.name.clone(),
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
             };

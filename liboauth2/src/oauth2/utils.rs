@@ -1,6 +1,6 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use chrono::{DateTime, Utc};
-use http::header::HeaderMap;
+use http::header::{COOKIE, HeaderMap};
 use ring::rand::SecureRandom;
 use std::time::Duration;
 use url::Url;
@@ -9,7 +9,41 @@ use crate::config::OAUTH2_CSRF_COOKIE_MAX_AGE;
 use crate::errors::OAuth2Error;
 use crate::types::{StateParams, StoredToken};
 
+use libsession::{
+    SESSION_COOKIE_NAME, User as SessionUser, delete_session_from_store_by_session_id,
+};
 use libstorage::GENERIC_CACHE_STORE;
+
+pub(super) fn get_session_id_from_headers(
+    headers: &HeaderMap,
+) -> Result<Option<&str>, OAuth2Error> {
+    let Some(cookie_header) = headers.get(COOKIE) else {
+        tracing::debug!("No cookie header found");
+        return Ok(None);
+    };
+
+    let cookie_str = cookie_header.to_str().map_err(|e| {
+        tracing::error!("Invalid cookie header: {}", e);
+        OAuth2Error::SecurityTokenNotFound("Invalid cookie header".to_string())
+    })?;
+
+    let cookie_name = SESSION_COOKIE_NAME.as_str();
+    tracing::debug!("Looking for cookie: {}", cookie_name);
+
+    let session_id = cookie_str.split(';').map(|s| s.trim()).find_map(|s| {
+        let mut parts = s.splitn(2, '=');
+        match (parts.next(), parts.next()) {
+            (Some(k), Some(v)) if k == cookie_name => Some(v),
+            _ => None,
+        }
+    });
+
+    if session_id.is_none() {
+        tracing::debug!("No session cookie '{}' found in cookies", cookie_name);
+    }
+
+    Ok(session_id)
+}
 
 pub(super) fn gen_random_string(len: usize) -> Result<String, OAuth2Error> {
     let rng = ring::rand::SystemRandom::new();
@@ -19,15 +53,46 @@ pub(super) fn gen_random_string(len: usize) -> Result<String, OAuth2Error> {
     Ok(URL_SAFE.encode(session_id))
 }
 
-pub fn encode_state(csrf_token: String, nonce_id: String, pkce_id: String) -> String {
-    let state_params = StateParams {
-        csrf_token,
-        nonce_id,
-        pkce_id,
+pub(super) fn encode_state(state_params: StateParams) -> Result<String, OAuth2Error> {
+    let state_json =
+        serde_json::to_string(&state_params).map_err(|e| OAuth2Error::Serde(e.to_string()))?;
+    Ok(URL_SAFE.encode(state_json))
+}
+
+pub fn decode_state(state: &str) -> Result<StateParams, OAuth2Error> {
+    let decoded_bytes = URL_SAFE
+        .decode(state)
+        .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode base64: {}", e)))?;
+    let decoded_state_string = String::from_utf8(decoded_bytes)
+        .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode UTF-8: {}", e)))?;
+    let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)
+        .map_err(|e| OAuth2Error::Serde(e.to_string()))?;
+    Ok(state_in_response)
+}
+
+pub(super) async fn store_token_in_cache(
+    token_type: &str,
+    token: &str,
+    expires_at: DateTime<Utc>,
+    user_agent: Option<String>,
+) -> Result<String, OAuth2Error> {
+    let token_id = gen_random_string(32)?;
+
+    let token_data = StoredToken {
+        token: token.to_string(),
+        expires_at,
+        user_agent,
+        ttl: *OAUTH2_CSRF_COOKIE_MAX_AGE,
     };
 
-    let state_json = serde_json::json!(state_params).to_string();
-    URL_SAFE.encode(state_json)
+    GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .put(token_type, &token_id, token_data.into())
+        .await
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+    Ok(token_id)
 }
 
 pub async fn generate_store_token(
@@ -131,4 +196,60 @@ pub(crate) fn get_client() -> reqwest::Client {
         .pool_max_idle_per_host(32)
         .build()
         .expect("Failed to create reqwest client")
+}
+
+/// Extract user ID from a stored session if it exists in the state parameters.
+/// Returns None if:
+/// - No misc_id in state parameters
+/// - Session not found in cache
+/// - Error getting user from session
+pub async fn get_uid_from_stored_session_by_state_param(
+    state_params: &StateParams,
+) -> Result<Option<SessionUser>, OAuth2Error> {
+    let Some(misc_id) = &state_params.misc_id else {
+        tracing::debug!("No misc_id in state");
+        return Ok(None);
+    };
+
+    tracing::debug!("misc_id: {:#?}", misc_id);
+
+    let Ok(token) = get_token_from_store::<StoredToken>("misc_session", misc_id).await else {
+        tracing::debug!("Failed to get session from cache");
+        return Ok(None);
+    };
+
+    tracing::debug!("Token: {:#?}", token);
+
+    // Clean up the misc session after use
+    // remove_token_from_store("misc_session", misc_id).await?;
+
+    match libsession::get_user_from_session(&token.token).await {
+        Ok(user) => {
+            tracing::debug!("Found user ID: {}", user.id);
+            Ok(Some(user))
+        }
+        Err(e) => {
+            tracing::debug!("Failed to get user from session: {}", e);
+            Ok(None)
+        }
+    }
+}
+
+pub async fn delete_session_and_misc_token_from_store(
+    state_params: &StateParams,
+) -> Result<(), OAuth2Error> {
+    if let Some(misc_id) = &state_params.misc_id {
+        let Ok(token) = get_token_from_store::<StoredToken>("misc_session", misc_id).await else {
+            tracing::debug!("Failed to get session from cache");
+            return Ok(());
+        };
+
+        delete_session_from_store_by_session_id(&token.token)
+            .await
+            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+        remove_token_from_store("misc_session", misc_id).await?;
+    }
+
+    Ok(())
 }
