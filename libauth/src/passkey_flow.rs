@@ -3,16 +3,15 @@ use http::{HeaderMap, StatusCode};
 use serde_json::Value;
 use uuid::Uuid;
 
-use libuserdb::{User, UserStore};
+use liboauth2::OAuth2Store;
 use libpasskey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyStore,
     RegisterCredential, RegistrationOptions, StoredCredential, finish_authentication,
-    finish_registration, finish_registration_with_auth_user, start_authentication, start_registration,
+    finish_registration, finish_registration_with_auth_user, start_authentication,
+    start_registration,
 };
 use libsession::{User as SessionUser, create_session_with_uid};
-use liboauth2::OAuth2Store;
-
-
+use libuserdb::{User, UserStore};
 
 /// Core function that handles the business logic of starting registration with OAuth2 account info
 ///

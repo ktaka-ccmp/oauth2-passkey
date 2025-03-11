@@ -13,11 +13,10 @@ use libauth::{
     handle_start_registration_post_core, list_credentials_core,
 };
 
-use libpasskey::{StoredCredential, PASSKEY_ROUTE_PREFIX};
+use libpasskey::{PASSKEY_ROUTE_PREFIX, StoredCredential};
 use libsession::User as SessionUser;
 
 use crate::session::AuthUser;
-
 
 /// Axum handler that extracts AuthUser from the request and delegates to the core function
 pub(crate) async fn handle_start_registration_get(
@@ -34,7 +33,6 @@ pub(crate) async fn handle_start_registration_get(
     Ok(Json(options))
 }
 
-
 pub(crate) async fn handle_start_registration_post(
     auth_user: Option<AuthUser>,
     Json(body): Json<Value>,
@@ -50,7 +48,6 @@ pub(crate) async fn handle_start_registration_post(
     Json(registration_options)
 }
 
-
 pub(crate) async fn handle_finish_registration(
     auth_user: Option<AuthUser>,
     Json(reg_data): Json<RegisterCredential>,
@@ -61,7 +58,6 @@ pub(crate) async fn handle_finish_registration(
     handle_finish_registration_core(session_user, reg_data).await
 }
 
-
 pub(crate) async fn handle_start_authentication(
     Json(body): Json<Value>,
 ) -> Result<Json<AuthenticationOptions>, (StatusCode, String)> {
@@ -71,7 +67,6 @@ pub(crate) async fn handle_start_authentication(
     // Return the authentication options as JSON
     Ok(Json(auth_options))
 }
-
 
 pub(crate) async fn handle_finish_authentication(
     Json(auth_response): Json<AuthenticatorResponse>,
@@ -113,7 +108,6 @@ pub(crate) async fn serve_conditional_ui_js() -> Response {
         .body(js_content.to_string().into())
         .unwrap()
 }
-
 
 /// Axum handler that extracts AuthUser from the request and delegates to the core function
 ///
