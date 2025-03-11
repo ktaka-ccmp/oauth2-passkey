@@ -38,51 +38,12 @@ pub fn router() -> Router {
         .route("/popup_close", get(popup_close))
         .route("/logout", get(logout))
         .route("/accounts", get(list_oauth2_accounts))
-        .route("/accounts/html", get(list_oauth2_accounts_html))
 }
 
 #[derive(Template)]
 #[template(path = "popup_close.j2")]
 struct PopupCloseTemplate {
     message: String,
-}
-
-// Template-friendly version of OAuth2Account with all Option<String> fields converted to String
-#[derive(Debug, Clone)]
-struct TemplateAccount {
-    id: String,
-    user_id: String,
-    provider: String,
-    provider_user_id: String,
-    name: String,
-    email: String,
-    picture: String,      // Converted from Option<String>
-    metadata_str: String, // Converted from Value
-    created_at: String,
-    updated_at: String,
-}
-
-impl From<OAuth2Account> for TemplateAccount {
-    fn from(account: OAuth2Account) -> Self {
-        Self {
-            id: account.id,
-            user_id: account.user_id,
-            provider: account.provider,
-            provider_user_id: account.provider_user_id,
-            name: account.name,
-            email: account.email,
-            picture: account.picture.unwrap_or_default(),
-            metadata_str: account.metadata.to_string(),
-            created_at: account.created_at.to_string(),
-            updated_at: account.updated_at.to_string(),
-        }
-    }
-}
-
-#[derive(Template)]
-#[template(path = "oauth2_accounts.j2")]
-struct OAuth2AccountsTemplate {
-    accounts: Vec<TemplateAccount>,
 }
 
 pub(crate) async fn popup_close(
@@ -176,37 +137,4 @@ pub async fn list_oauth2_accounts(
     // Call the core function with the extracted data
     let accounts = list_accounts_core(session_user).await?;
     Ok(Json(accounts))
-}
-
-/// Display OAuth2 accounts in HTML format using a template
-///
-/// This handler retrieves the OAuth2 accounts for the authenticated user
-/// and renders them using the oauth2_accounts.j2 template.
-pub async fn list_oauth2_accounts_html(
-    auth_user: Option<AuthUser>,
-) -> Result<Html<String>, (StatusCode, String)> {
-    // Convert AuthUser to SessionUser if present using deref coercion
-    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
-
-    // Call the core function with the extracted data
-    let oauth2_accounts = list_accounts_core(session_user).await?;
-
-    // Convert OAuth2Account to TemplateAccount
-    let accounts = oauth2_accounts
-        .into_iter()
-        .map(TemplateAccount::from)
-        .collect();
-
-    // Create template with accounts data
-    let template = OAuth2AccountsTemplate { accounts };
-
-    // Render the template
-    let html = template.render().map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Template error: {}", e),
-        )
-    })?;
-
-    Ok(Html(html))
 }
