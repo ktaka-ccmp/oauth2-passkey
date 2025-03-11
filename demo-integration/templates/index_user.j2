@@ -48,6 +48,7 @@
                 <p><a href="{{passkey_route_prefix}}/credentials">View your passkeys</a>.</p>
             </dd>
         </dl>
+        <button onclick="showRegistrationModal()">Add New Passkey</button>
     </div>
     <div class="user-accounts">
         <dl>
@@ -56,13 +57,7 @@
                 <p><a href="{{auth_route_prefix}}/accounts">View your OAuth2 accounts</a>.</p>
             </dd>
         </dl>
-    </div>
-    <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="showRegistrationModal()">Register New Passkey</button>
-    </div>
-
-    <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="oauth2.openPopup()">Link New OAuth2 Account</button>
+        <button onclick="oauth2.openPopup()">Add New OAuth2 Account</button>
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 10px;">

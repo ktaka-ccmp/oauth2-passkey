@@ -81,8 +81,29 @@ pub struct RegisterCredential {
     pub(super) response: AuthenticatorAttestationResponse,
     #[serde(rename = "type")]
     pub(super) type_: String,
-    pub(super) username: Option<String>,
     pub(super) user_handle: Option<String>,
+}
+
+impl RegisterCredential {
+    /// Attempts to retrieve the stored user entity for this registration
+    /// If the stored options are no longer available, falls back to a default value
+    pub async fn get_user_name(&self) -> String {
+        // Try to get the stored options if user_handle exists
+        if let Some(handle) = &self.user_handle {
+            match super::challenge::get_and_validate_options("regi_challenge", handle)
+                .await
+            {
+                Ok(stored_options) => stored_options.user.name,
+                Err(e) => {
+                    tracing::warn!("Failed to get stored user: {}", e);
+                    "Passkey User".to_string()
+                }
+            }
+        } else {
+            // Fall back to default if user_handle is None
+            "Passkey User".to_string()
+        }
+    }
 }
 
 #[derive(Deserialize, Debug)]
