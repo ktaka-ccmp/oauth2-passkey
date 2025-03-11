@@ -105,9 +105,14 @@ pub async fn process_oauth2_authorization(
         decode_state(&auth_response.state).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
     // Extract user_id from the stored session if available
-    let state_user_id = get_uid_from_stored_session_by_state_param(&state_in_response)
+    let state_user = get_uid_from_stored_session_by_state_param(&state_in_response)
         .await
         .into_response_error()?;
+
+    let (state_user_id, state_user_name) = match &state_user {
+        Some(user) => (Some(user.id.clone()), Some(user.name.clone())),
+        None => (None, None),
+    };
 
     // Check if the OAuth2 account exists
     let stored_oauth2_account = OAuth2Store::get_oauth2_account_by_provider(
@@ -122,7 +127,10 @@ pub async fn process_oauth2_authorization(
         // Case 1: User is logged in and account exists
         (Some(state_user_id), Some(stored_oauth2_account)) => {
             let message = if state_user_id == stored_oauth2_account.user_id {
-                let msg = format!("Already linked to current user {}", state_user_id);
+                let msg = format!(
+                    "Already linked to current user {}",
+                    state_user_name.unwrap()
+                );
                 tracing::debug!("{}", msg);
                 // Nothing to do, account is already properly linked
                 msg
@@ -139,7 +147,7 @@ pub async fn process_oauth2_authorization(
         }
         // Case 2: User is logged in but account doesn't exist
         (Some(state_user_id), None) => {
-            let message = format!("Successfully linked to {}", state_user_id);
+            let message = format!("Successfully linked to {}", state_user_name.unwrap());
             tracing::debug!("{}", message);
             oauth2_account.user_id = state_user_id.clone();
             OAuth2Store::upsert_oauth2_account(oauth2_account)
@@ -152,17 +160,18 @@ pub async fn process_oauth2_authorization(
         }
         // Case 3: User is not logged in but account exists
         (None, Some(stored_oauth2_account)) => {
-            let message = format!("Signing in as {}", stored_oauth2_account.user_id);
+            let message = format!("Signing in as {}", stored_oauth2_account.name);
             tracing::debug!("{}", message);
             (stored_oauth2_account.user_id, message)
         }
         // Case 4: User is not logged in and account doesn't exist
         (None, None) => {
+            let name = oauth2_account.name.clone();
             #[allow(clippy::let_and_return)]
             let user_id = create_user_and_oauth2account(oauth2_account)
                 .await
                 .into_response_error()?;
-            let message = format!("Created {}", user_id);
+            let message = format!("Created {}", name);
             tracing::debug!("{}", message);
             (user_id, message)
         }
@@ -194,6 +203,7 @@ async fn create_user_and_oauth2account(
 ) -> Result<String, AuthError> {
     let new_user = DbUser {
         id: uuid::Uuid::new_v4().to_string(),
+        name: oauth2_account.name.clone(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };

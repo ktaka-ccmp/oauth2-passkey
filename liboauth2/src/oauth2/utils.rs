@@ -9,7 +9,9 @@ use crate::config::OAUTH2_CSRF_COOKIE_MAX_AGE;
 use crate::errors::OAuth2Error;
 use crate::types::{StateParams, StoredToken};
 
-use libsession::{SESSION_COOKIE_NAME, delete_session_from_store_by_session_id};
+use libsession::{
+    SESSION_COOKIE_NAME, User as SessionUser, delete_session_from_store_by_session_id,
+};
 use libstorage::GENERIC_CACHE_STORE;
 
 pub(super) fn get_session_id_from_headers(
@@ -203,7 +205,7 @@ pub(crate) fn get_client() -> reqwest::Client {
 /// - Error getting user from session
 pub async fn get_uid_from_stored_session_by_state_param(
     state_params: &StateParams,
-) -> Result<Option<String>, OAuth2Error> {
+) -> Result<Option<SessionUser>, OAuth2Error> {
     let Some(misc_id) = &state_params.misc_id else {
         tracing::debug!("No misc_id in state");
         return Ok(None);
@@ -224,7 +226,7 @@ pub async fn get_uid_from_stored_session_by_state_param(
     match libsession::get_user_from_session(&token.token).await {
         Ok(user) => {
             tracing::debug!("Found user ID: {}", user.id);
-            Ok(Some(user.id))
+            Ok(Some(user))
         }
         Err(e) => {
             tracing::debug!("Failed to get user from session: {}", e);

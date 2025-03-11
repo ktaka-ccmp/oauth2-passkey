@@ -27,8 +27,12 @@ impl PasskeyCoordinator {
     pub async fn create_user_then_finish_registration(
         reg_data: libpasskey::RegisterCredential,
     ) -> Result<String, AuthError> {
+        // Get user name from registration data with fallback mechanism
+        let name = reg_data.get_user_name().await;
+
         let new_user = User {
             id: Uuid::new_v4().to_string(),
+            name,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -61,6 +65,7 @@ impl PasskeyCoordinator {
                 // User doesn't exist, so we should create one
                 let new_user = User {
                     id: user_id.to_string(),
+                    name: "Passkey User".to_string(), // Default name since we don't have reg_data here
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
                 };

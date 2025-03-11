@@ -42,15 +42,18 @@ pub fn router() -> Router {
 
 #[derive(Template)]
 #[template(path = "popup_close.j2")]
-struct PopupCloseTemplate{
+struct PopupCloseTemplate {
     message: String,
 }
 
-pub(crate) async fn popup_close(Query(params): Query<HashMap<String, String>>) -> Result<Html<String>, (StatusCode, String)> {
-    let message = params.get("message").cloned().unwrap_or_else(|| "Authentication completed".to_string());
-    let template = PopupCloseTemplate {
-        message,
-    };
+pub(crate) async fn popup_close(
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Html<String>, (StatusCode, String)> {
+    let message = params
+        .get("message")
+        .cloned()
+        .unwrap_or_else(|| "Authentication completed".to_string());
+    let template = PopupCloseTemplate { message };
     let html = Html(template.render().into_response_error()?);
     Ok(html)
 }
@@ -92,7 +95,11 @@ pub async fn get_authorized(
 
     Ok((
         headers,
-        Redirect::to(&format!("{}/popup_close?message={}", OAUTH2_ROUTE_PREFIX.as_str(), urlencoding::encode(&message))),
+        Redirect::to(&format!(
+            "{}/popup_close?message={}",
+            OAUTH2_ROUTE_PREFIX.as_str(),
+            urlencoding::encode(&message)
+        )),
     ))
 }
 
@@ -113,7 +120,11 @@ pub async fn post_authorized(
 
     Ok((
         headers,
-        Redirect::to(&format!("{}/popup_close?message={}", OAUTH2_ROUTE_PREFIX.as_str(), urlencoding::encode(&message))),
+        Redirect::to(&format!(
+            "{}/popup_close?message={}",
+            OAUTH2_ROUTE_PREFIX.as_str(),
+            urlencoding::encode(&message)
+        )),
     ))
 }
 
