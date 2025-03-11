@@ -9,7 +9,7 @@ SQLITE_HEADERS=".headers on"
 SQLITE_MODE=".mode column"
 
 # Define queries for each table
-QUERY_USERS="select id,created_at from users;"
+QUERY_USERS="select id,name,created_at from users;"
 QUERY_PASSKEY_CREDENTIALS="select user_id,credential_id,user_handle,user_name,user_display_name,created_at from passkey_credentials;"
 QUERY_OAUTH2_ACCOUNTS="select user_id,id,provider_user_id,email,created_at from oauth2_accounts;"
 
