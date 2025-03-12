@@ -175,7 +175,9 @@
             <div class="item-detail"><strong>Account:</strong> {{ user.account }}</div>
             <div class="item-detail"><strong>Label:</strong> {{ user.label }}</div>
             <div class="item-detail"><strong>Created:</strong> {{ user.created_at }}</div>
+            <!--
             <div class="item-detail"><strong>Updated:</strong> {{ user.updated_at }}</div>
+            -->
         </div>
     </div>
 
@@ -190,14 +192,16 @@
         {% else %}
             {% for credential in passkey_credentials %}
                 <div class="item">
-                    <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id_base64 }}</div>
-                    <div class="item-detail"><strong>User ID:</strong> {{ credential.user_id }}</div>
                     <div class="item-detail"><strong>User Name:</strong> {{ credential.user_name }}</div>
                     <div class="item-detail"><strong>Display Name:</strong> {{ credential.user_display_name }}</div>
+                    <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
+                    <!--
+                    <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
+                    <div class="item-detail"><strong>Updated:</strong> {{ credential.updated_at }}</div>
+                    <div class="item-detail"><strong>User ID:</strong> {{ credential.user_id }}</div>
                     <div class="item-detail"><strong>User Handle:</strong> {{ credential.user_handle }}</div>
                     <div class="item-detail"><strong>Counter:</strong> {{ credential.counter }}</div>
-                    <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
-                    <div class="item-detail"><strong>Updated:</strong> {{ credential.updated_at }}</div>
+                    -->
                 </div>
             {% endfor %}
         {% endif %}
@@ -219,19 +223,21 @@
                         <img src="{{ account.picture }}" alt="Profile Picture" style="max-width: 100px; max-height: 100px; border-radius: 50%;">
                     </div>
                     {% endif %}
+                    <!--
                     <div class="item-detail"><strong>ID:</strong> {{ account.id }}</div>
                     <div class="item-detail"><strong>User ID:</strong> {{ account.user_id }}</div>
                     <div class="item-detail"><strong>Provider:</strong> {{ account.provider }}</div>
                     <div class="item-detail"><strong>Provider User ID:</strong> {{ account.provider_user_id }}</div>
-                    <div class="item-detail"><strong>Name:</strong> {{ account.name }}</div>
-                    {% if account.email != "" %}
-                        <div class="item-detail"><strong>Email:</strong> {{ account.email }}</div>
-                    {% endif %}
                     {% if account.metadata_str != "" %}
                         <div class="item-detail"><strong>Metadata:</strong> {{ account.metadata_str }}</div>
                     {% endif %}
-                    <div class="item-detail"><strong>Created:</strong> {{ account.created_at }}</div>
                     <div class="item-detail"><strong>Updated:</strong> {{ account.updated_at }}</div>
+                    -->
+                    {% if account.email != "" %}
+                        <div class="item-detail"><strong>Email:</strong> {{ account.email }}</div>
+                    {% endif %}
+                    <div class="item-detail"><strong>Name:</strong> {{ account.name }}</div>
+                    <div class="item-detail"><strong>Created:</strong> {{ account.created_at }}</div>
                 </div>
             {% endfor %}
         {% endif %}

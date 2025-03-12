@@ -54,7 +54,13 @@ pub async fn start_authentication(
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    store_in_cache("auth_challenge", &auth_id, stored_options).await?;
+    store_in_cache(
+        "auth_challenge",
+        &auth_id,
+        stored_options,
+        *PASSKEY_CHALLENGE_TIMEOUT as usize,
+    )
+    .await?;
 
     let auth_option = AuthenticationOptions {
         challenge: URL_SAFE.encode(challenge.unwrap_or_default()),

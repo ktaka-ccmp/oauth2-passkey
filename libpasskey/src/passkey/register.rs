@@ -36,7 +36,13 @@ pub async fn start_registration(
     if let Some(u) = session_user {
         tracing::debug!("User: {:#?}", u);
         let session_info = SessionInfo { user: u };
-        store_in_cache("session_info", &user_handle, session_info).await?;
+        store_in_cache(
+            "session_info",
+            &user_handle,
+            session_info,
+            *PASSKEY_CHALLENGE_TIMEOUT as usize,
+        )
+        .await?;
     }
 
     let user_info = PublicKeyCredentialUserEntity {
@@ -64,7 +70,13 @@ pub async fn create_registration_options(
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    store_in_cache("regi_challenge", &user_info.user_handle, stored_challenge).await?;
+    store_in_cache(
+        "regi_challenge",
+        &user_info.user_handle,
+        stored_challenge,
+        *PASSKEY_CHALLENGE_TIMEOUT as usize,
+    )
+    .await?;
 
     let authenticator_selection = AuthenticatorSelection {
         authenticator_attachment: PASSKEY_AUTHENTICATOR_ATTACHMENT.to_string(),

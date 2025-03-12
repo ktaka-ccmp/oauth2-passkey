@@ -109,6 +109,7 @@ pub(crate) async fn store_in_cache<T>(
     category: &str,
     key: &str,
     data: T,
+    ttl: usize,
 ) -> Result<(), PasskeyError>
 where
     T: Into<libstorage::CacheData>,
@@ -116,7 +117,7 @@ where
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .put(category, key, data.into())
+        .put_with_ttl(category, key, data.into(), ttl)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))
 }
