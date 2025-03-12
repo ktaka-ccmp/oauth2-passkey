@@ -30,11 +30,22 @@ pub fn router() -> Router<()> {
 pub async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCode, String)> {
     match auth_user {
         Some(user) => {
+            // Get passkey credentials count for the user
+            let stored_credentials = list_credentials_core(Some(&user))
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Failed to fetch credentials: {:?}", e),
+                    )
+                })?;
+
             // Return user information as JSON
             let user_data = json!({
                 "id": user.id,
-                "name": user.name,
-                "display_name": user.display_name
+                "account": user.account,
+                "label": user.label,
+                "passkey_count": stored_credentials.len()
             });
 
             Ok(Json(user_data))

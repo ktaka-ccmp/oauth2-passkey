@@ -33,7 +33,7 @@ struct ProtectedTemplate<'a> {
 pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCode, String)> {
     match user {
         Some(u) => {
-            let message = format!("Hey {}!", u.name);
+            let message = format!("Hey {}!", u.account);
             let template = IndexTemplateUser {
                 // user: u.clone(),
                 message: &message,

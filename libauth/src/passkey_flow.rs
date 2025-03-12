@@ -106,8 +106,8 @@ pub async fn handle_finish_registration_core(
             // Create a new user for unauthenticated registration
             let new_user = User {
                 id: Uuid::new_v4().to_string(),
-                name,
-                display_name,
+                account: name,
+                label: display_name,
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
             };
