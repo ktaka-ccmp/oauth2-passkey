@@ -110,7 +110,7 @@ pub async fn process_oauth2_authorization(
         .into_response_error()?;
 
     let (state_user_id, state_user_name) = match &state_user {
-        Some(user) => (Some(user.id.clone()), Some(user.name.clone())),
+        Some(user) => (Some(user.id.clone()), Some(user.account.clone())),
         None => (None, None),
     };
 
@@ -205,8 +205,8 @@ async fn create_user_and_oauth2account(
 ) -> Result<String, AuthError> {
     let new_user = DbUser {
         id: uuid::Uuid::new_v4().to_string(),
-        name: oauth2_account.email.clone(),
-        display_name: oauth2_account.name.clone(),
+        account: oauth2_account.email.clone(),
+        label: oauth2_account.name.clone(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };

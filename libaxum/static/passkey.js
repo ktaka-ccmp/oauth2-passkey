@@ -156,8 +156,8 @@ function showRegistrationModal() {
     .then(userData => {
         if (userData) {
             // Pre-fill the form with user data
-            document.getElementById('reg-username').value = userData.name || '';
-            document.getElementById('reg-displayname').value = userData.display_name || '';
+            document.getElementById('reg-username').value = userData.account ? `${userData.account}#${userData.passkey_count + 1}` : 'username';
+            document.getElementById('reg-displayname').value = userData.label ? `${userData.label}#${userData.passkey_count + 1}` : 'displayname';
         }
     })
     .catch(error => {

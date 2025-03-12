@@ -32,8 +32,8 @@ impl PasskeyCoordinator {
 
         let new_user = User {
             id: Uuid::new_v4().to_string(),
-            name,
-            display_name,
+            account: name,
+            label: display_name,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -66,8 +66,8 @@ impl PasskeyCoordinator {
                 // User doesn't exist, so we should create one
                 let new_user = User {
                     id: user_id.to_string(),
-                    name: "Passkey User".to_string(), // Default name since we don't have reg_data here
-                    display_name: "Passkey User".to_string(), // Default display name since we don't have reg_data here
+                    account: "Passkey User".to_string(), // Default account since we don't have reg_data here
+                    label: "Passkey User".to_string(), // Default label since we don't have reg_data here
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
                 };
