@@ -140,6 +140,10 @@ function createRegistrationModal() {
 function showRegistrationModal() {
     const modal = createRegistrationModal();
     modal.style.display = 'block';
+    
+    // Set default values immediately
+    document.getElementById('reg-username').value = 'username';
+    document.getElementById('reg-displayname').value = 'displayname';
 
     // Try to get current user info to pre-fill the form
     fetch('/summary/user-info', {
@@ -150,7 +154,7 @@ function showRegistrationModal() {
         if (response.ok) {
             return response.json();
         }
-        // If not logged in or error, just leave the form empty
+        // If not logged in or error, keep the default values
         return null;
     })
     .then(userData => {
@@ -162,7 +166,7 @@ function showRegistrationModal() {
     })
     .catch(error => {
         console.error('Error fetching user data:', error);
-        // Continue without pre-filling
+        // Default values already set, so no action needed
     });
 }
 

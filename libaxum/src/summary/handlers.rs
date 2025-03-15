@@ -5,7 +5,6 @@ use axum::{
     response::{Html, Json},
     routing::get,
 };
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 use libauth::{list_accounts_core, list_credentials_core};
 use liboauth2::OAUTH2_ROUTE_PREFIX;
@@ -31,14 +30,12 @@ pub async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (Stat
     match auth_user {
         Some(user) => {
             // Get passkey credentials count for the user
-            let stored_credentials = list_credentials_core(Some(&user))
-                .await
-                .map_err(|e| {
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Failed to fetch credentials: {:?}", e),
-                    )
-                })?;
+            let stored_credentials = list_credentials_core(Some(&user)).await.map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to fetch credentials: {:?}", e),
+                )
+            })?;
 
             // Return user information as JSON
             let user_data = json!({
@@ -76,14 +73,22 @@ pub async fn user_summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCo
     let passkey_credentials = stored_credentials
         .into_iter()
         .map(|cred| {
-            let credential_id_base64 = BASE64.encode(&cred.credential_id);
+            // Convert Vec<u8> to hex string representation for consistency
+            let credential_id_hex = cred.credential_id.iter().fold(
+                String::with_capacity(cred.credential_id.len() * 2),
+                |mut acc, b| {
+                    use std::fmt::Write;
+                    let _ = write!(acc, "{:02x}", b);
+                    acc
+                },
+            );
 
             TemplateCredential {
-                credential_id_base64,
+                credential_id: credential_id_hex,
                 user_id: cred.user_id.clone(),
                 user_name: cred.user.name.clone(),
                 user_display_name: cred.user.display_name.clone(),
-                user_handle: BASE64.encode(cred.user.user_handle.as_bytes()),
+                user_handle: cred.user.user_handle.clone(),
                 counter: cred.counter.to_string(),
                 created_at: cred.created_at.to_string(),
                 updated_at: cred.updated_at.to_string(),

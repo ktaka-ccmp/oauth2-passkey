@@ -52,7 +52,12 @@ async fn create_and_store_session(session_info: SessionInfo) -> Result<String, S
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .put("session", &session_id, stored_session.into())
+        .put_with_ttl(
+            "session",
+            &session_id,
+            stored_session.into(),
+            *SESSION_COOKIE_MAX_AGE as usize,
+        )
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?;
     Ok(session_id)

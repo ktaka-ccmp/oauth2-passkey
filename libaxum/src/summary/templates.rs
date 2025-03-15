@@ -4,7 +4,7 @@ use askama::Template;
 // Template-friendly version of StoredCredential for display
 #[derive(Debug)]
 pub struct TemplateCredential {
-    pub credential_id_base64: String,
+    pub credential_id: String,
     pub user_id: String,
     pub user_name: String,
     pub user_display_name: String,
