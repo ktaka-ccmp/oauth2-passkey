@@ -38,10 +38,13 @@ impl OAuth2Coordinator {
     ) -> Result<(OAuth2Account, User), AuthError> {
         // If user_id is empty, create a new user
         let user = if account.user_id.is_empty() {
+            let (account, label) =
+                super::oauth2_flow::get_account_and_label_from_oauth2_account(&account);
+
             let new_user = User {
                 id: Uuid::new_v4().to_string(),
-                account: account.email.clone(),
-                label: account.name.clone(),
+                account,
+                label,
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
             };

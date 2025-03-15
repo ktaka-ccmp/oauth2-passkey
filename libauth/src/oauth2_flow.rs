@@ -1,5 +1,6 @@
 use chrono::{Duration, Utc};
 use http::{HeaderMap, StatusCode};
+use std::env;
 
 use liboauth2::{
     AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAuth2Account, OAuth2Store,
@@ -10,6 +11,19 @@ use libsession::{User as SessionUser, create_session_with_uid};
 use libuserdb::{User as DbUser, UserStore};
 
 use crate::errors::AuthError;
+
+// Default field mappings for OAuth2
+const DEFAULT_OAUTH2_ACCOUNT_FIELD: &str = "email";
+const DEFAULT_OAUTH2_LABEL_FIELD: &str = "name";
+
+/// Get the configured OAuth2 field mappings or defaults
+pub fn get_oauth2_field_mappings() -> (String, String) {
+    let account_field = env::var("OAUTH2_USER_ACCOUNT_FIELD")
+        .unwrap_or_else(|_| DEFAULT_OAUTH2_ACCOUNT_FIELD.to_string());
+    let label_field = env::var("OAUTH2_USER_LABEL_FIELD")
+        .unwrap_or_else(|_| DEFAULT_OAUTH2_LABEL_FIELD.to_string());
+    (account_field, label_field)
+}
 
 trait IntoResponseError<T> {
     fn into_response_error(self) -> Result<T, (StatusCode, String)>;
@@ -198,15 +212,17 @@ async fn renew_session_header(user_id: String) -> Result<HeaderMap, (StatusCode,
     Ok(headers)
 }
 
-// When creating a new user, we assign email as name and name as display_name.
+// When creating a new user, map fields according to configuration or defaults
 // We also assign the user_id to the oauth2_account.
 async fn create_user_and_oauth2account(
     mut oauth2_account: OAuth2Account,
 ) -> Result<String, AuthError> {
+    let (account, label) = get_account_and_label_from_oauth2_account(&oauth2_account);
+
     let new_user = DbUser {
         id: uuid::Uuid::new_v4().to_string(),
-        account: oauth2_account.email.clone(),
-        label: oauth2_account.name.clone(),
+        account,
+        label,
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
@@ -214,6 +230,27 @@ async fn create_user_and_oauth2account(
     oauth2_account.user_id = stored_user.id.clone();
     OAuth2Store::upsert_oauth2_account(oauth2_account).await?;
     Ok(stored_user.id)
+}
+
+pub(super) fn get_account_and_label_from_oauth2_account(
+    oauth2_account: &OAuth2Account,
+) -> (String, String) {
+    // Get field mappings from configuration
+    let (account_field, label_field) = get_oauth2_field_mappings();
+
+    // Map fields based on configuration
+    let account = match account_field.as_str() {
+        "email" => oauth2_account.email.clone(),
+        "name" => oauth2_account.name.clone(),
+        _ => oauth2_account.email.clone(), // Default to email if invalid mapping
+    };
+
+    let label = match label_field.as_str() {
+        "email" => oauth2_account.email.clone(),
+        "name" => oauth2_account.name.clone(),
+        _ => oauth2_account.name.clone(), // Default to name if invalid mapping
+    };
+    (account, label)
 }
 
 /// Get all OAuth2 accounts for a user

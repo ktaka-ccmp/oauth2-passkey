@@ -27,13 +27,13 @@ impl PasskeyCoordinator {
     pub async fn create_user_then_finish_registration(
         reg_data: libpasskey::RegisterCredential,
     ) -> Result<String, AuthError> {
-        // Get user name from registration data with fallback mechanism
-        let (name, display_name) = reg_data.get_user_name().await;
+        let (account, label) =
+            super::passkey_flow::get_account_and_label_from_passkey(&reg_data).await;
 
         let new_user = User {
             id: Uuid::new_v4().to_string(),
-            account: name,
-            label: display_name,
+            account,
+            label,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -63,11 +63,17 @@ impl PasskeyCoordinator {
         {
             Some(user) => user,
             None => {
-                // User doesn't exist, so we should create one
+                // Get field mappings from configuration (though we won't use them since we have no real data)
+                let (_account_field, _label_field) =
+                    super::passkey_flow::get_passkey_field_mappings();
+
+                // Since we don't have reg_data here, use a default value
+                let default_value = "Passkey User".to_string();
+
                 let new_user = User {
                     id: user_id.to_string(),
-                    account: "Passkey User".to_string(), // Default account since we don't have reg_data here
-                    label: "Passkey User".to_string(), // Default label since we don't have reg_data here
+                    account: default_value.clone(), // Use default since we don't have actual data
+                    label: default_value.clone(),   // Use default since we don't have actual data
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
                 };
