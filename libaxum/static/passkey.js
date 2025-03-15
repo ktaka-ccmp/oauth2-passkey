@@ -187,30 +187,19 @@ async function submitRegistration() {
     }
 
     closeRegistrationModal();
-    await startRegistration(true, username, displayname);
+    await startRegistration(username, displayname);
 }
 
-async function startRegistration(withUsername = true, username = null, displayname = null) {
+async function startRegistration(username = null, displayname = null) {
     try {
         let startResponse;
-        // let username;
-
-        if (withUsername) {
-            // username = prompt("Please enter your username:");
-            // if (!username) return;
-
-            startResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/register/start', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, displayname })
-            });
-        } else {
-            startResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/register/start', {
-                method: 'GET',
-            });
-        }
+        startResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/register/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, displayname })
+        });
 
         if (!startResponse.ok) {
             const errorText = await startResponse.text();
