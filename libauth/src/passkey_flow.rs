@@ -1,6 +1,7 @@
 use chrono::Utc;
 use http::{HeaderMap, StatusCode};
 use serde_json::Value;
+use std::env;
 use uuid::Uuid;
 
 use liboauth2::OAuth2Store;
@@ -12,6 +13,19 @@ use libpasskey::{
 };
 use libsession::{User as SessionUser, create_session_with_uid};
 use libuserdb::{User, UserStore};
+
+// Default field mappings for Passkey
+const DEFAULT_PASSKEY_ACCOUNT_FIELD: &str = "name";
+const DEFAULT_PASSKEY_LABEL_FIELD: &str = "display_name";
+
+/// Get the configured Passkey field mappings or defaults
+pub(super) fn get_passkey_field_mappings() -> (String, String) {
+    let account_field = env::var("PASSKEY_USER_ACCOUNT_FIELD")
+        .unwrap_or_else(|_| DEFAULT_PASSKEY_ACCOUNT_FIELD.to_string());
+    let label_field = env::var("PASSKEY_USER_LABEL_FIELD")
+        .unwrap_or_else(|_| DEFAULT_PASSKEY_LABEL_FIELD.to_string());
+    (account_field, label_field)
+}
 
 /// Core function that handles the business logic of starting registration with OAuth2 account info
 ///
@@ -99,15 +113,13 @@ pub async fn handle_finish_registration_core(
             Ok((HeaderMap::new(), message))
         }
         None => {
-            // Get user name from registration data with fallback mechanism
-            let (name, display_name) = reg_data.get_user_name().await;
-            tracing::debug!("User name: {}, registration data: {:#?}", name, reg_data);
+            let (account, label) = get_account_and_label_from_passkey(&reg_data).await;
 
             // Create a new user for unauthenticated registration
             let new_user = User {
                 id: Uuid::new_v4().to_string(),
-                account: name,
-                label: display_name,
+                account,
+                label,
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
             };
@@ -135,6 +147,30 @@ pub async fn handle_finish_registration_core(
             }
         }
     }
+}
+
+pub(super) async fn get_account_and_label_from_passkey(
+    reg_data: &libpasskey::RegisterCredential,
+) -> (String, String) {
+    // Get user name from registration data with fallback mechanism
+    let (name, display_name) = reg_data.get_registration_user_fields().await;
+
+    // Get field mappings from configuration
+    let (account_field, label_field) = get_passkey_field_mappings();
+
+    // Map fields based on configuration
+    let account = match account_field.as_str() {
+        "name" => name.clone(),
+        "display_name" => display_name.clone(),
+        _ => name.clone(), // Default to name if invalid mapping
+    };
+
+    let label = match label_field.as_str() {
+        "name" => name.clone(),
+        "display_name" => display_name.clone(),
+        _ => display_name.clone(), // Default to display_name if invalid mapping
+    };
+    (account, label)
 }
 
 /// Core function that handles the business logic of starting authentication

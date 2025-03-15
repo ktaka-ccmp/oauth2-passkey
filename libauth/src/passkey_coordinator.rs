@@ -27,27 +27,8 @@ impl PasskeyCoordinator {
     pub async fn create_user_then_finish_registration(
         reg_data: libpasskey::RegisterCredential,
     ) -> Result<String, AuthError> {
-        // Get user name from registration data with fallback mechanism
-        let (name, display_name) = reg_data.get_user_name().await;
-
-        // Get field mappings from environment or use defaults
-        let account_field =
-            std::env::var("PASSKEY_USER_ACCOUNT_FIELD").unwrap_or_else(|_| "name".to_string());
-        let label_field = std::env::var("PASSKEY_USER_LABEL_FIELD")
-            .unwrap_or_else(|_| "display_name".to_string());
-
-        // Map fields based on configuration
-        let account = match account_field.as_str() {
-            "name" => name.clone(),
-            "display_name" => display_name.clone(),
-            _ => name.clone(), // Default to name if invalid mapping
-        };
-
-        let label = match label_field.as_str() {
-            "name" => name.clone(),
-            "display_name" => display_name.clone(),
-            _ => display_name.clone(), // Default to display_name if invalid mapping
-        };
+        let (account, label) =
+            super::passkey_flow::get_account_and_label_from_passkey(&reg_data).await;
 
         let new_user = User {
             id: Uuid::new_v4().to_string(),
@@ -82,11 +63,17 @@ impl PasskeyCoordinator {
         {
             Some(user) => user,
             None => {
-                // User doesn't exist, so we should create one
+                // Get field mappings from configuration (though we won't use them since we have no real data)
+                let (_account_field, _label_field) =
+                    super::passkey_flow::get_passkey_field_mappings();
+
+                // Since we don't have reg_data here, use a default value
+                let default_value = "Passkey User".to_string();
+
                 let new_user = User {
                     id: user_id.to_string(),
-                    account: "Passkey User".to_string(), // Default account since we don't have reg_data here
-                    label: "Passkey User".to_string(), // Default label since we don't have reg_data here
+                    account: default_value.clone(), // Use default since we don't have actual data
+                    label: default_value.clone(),   // Use default since we don't have actual data
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
                 };

@@ -85,9 +85,9 @@ pub struct RegisterCredential {
 }
 
 impl RegisterCredential {
-    /// Attempts to retrieve the stored user entity for this registration
-    /// If the stored options are no longer available, falls back to a default value
-    pub async fn get_user_name(&self) -> (String, String) {
+    /// Attempts to retrieve the user fields (name, display_name) from stored registration data
+    /// If the stored options are no longer available, falls back to default values
+    pub async fn get_registration_user_fields(&self) -> (String, String) {
         // Try to get the stored options if user_handle exists
         if let Some(handle) = &self.user_handle {
             match super::challenge::get_and_validate_options("regi_challenge", handle).await {
