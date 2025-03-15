@@ -2,7 +2,7 @@ use axum::{Router, routing::get};
 use dotenv::dotenv;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use libaxum::{oauth2_router, passkey_router, summary_router};
+use libaxum::{oauth2_router, passkey_router, related_origin_router, summary_router};
 use liboauth2::OAUTH2_ROUTE_PREFIX;
 use libpasskey::PASSKEY_ROUTE_PREFIX;
 
@@ -77,7 +77,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/protected", get(protected))
         .nest("/summary", summary_router())
         .nest(OAUTH2_ROUTE_PREFIX.as_str(), oauth2_router())
-        .nest(PASSKEY_ROUTE_PREFIX.as_str(), passkey_router());
+        .nest(PASSKEY_ROUTE_PREFIX.as_str(), passkey_router())
+        .merge(related_origin_router()); // Mount the WebAuthn well-known endpoint at root level
 
     let ports = Ports {
         http: 3001,

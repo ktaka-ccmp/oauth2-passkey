@@ -12,7 +12,7 @@ use libauth::{
     handle_start_authentication_core, handle_start_registration_post_core, list_credentials_core,
 };
 
-use libpasskey::{PASSKEY_ROUTE_PREFIX, StoredCredential};
+use libpasskey::{PASSKEY_ROUTE_PREFIX, StoredCredential, get_related_origin_json};
 use libsession::User as SessionUser;
 
 use crate::session::AuthUser;
@@ -102,4 +102,20 @@ pub(crate) async fn list_passkey_credentials(
     // Call the core function with the extracted data
     let credentials = list_credentials_core(session_user).await?;
     Ok(Json(credentials))
+}
+
+/// Serve the WebAuthn configuration at /.well-known/webauthn
+pub(crate) async fn serve_related_origin() -> Response {
+    // Get the WebAuthn configuration JSON from libpasskey
+    match get_related_origin_json() {
+        Ok(json) => Response::builder()
+            .status(StatusCode::OK)
+            .header(CONTENT_TYPE, "application/json")
+            .body(json.into())
+            .unwrap_or_default(),
+        Err(e) => Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(format!("Failed to generate WebAuthn config: {}", e).into())
+            .unwrap_or_default(),
+    }
 }
