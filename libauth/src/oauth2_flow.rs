@@ -12,17 +12,12 @@ use libuserdb::{User as DbUser, UserStore};
 
 use crate::errors::AuthError;
 
-// Default field mappings for OAuth2
-const DEFAULT_OAUTH2_ACCOUNT_FIELD: &str = "email";
-const DEFAULT_OAUTH2_LABEL_FIELD: &str = "name";
-
 /// Get the configured OAuth2 field mappings or defaults
-pub fn get_oauth2_field_mappings() -> (String, String) {
-    let account_field = env::var("OAUTH2_USER_ACCOUNT_FIELD")
-        .unwrap_or_else(|_| DEFAULT_OAUTH2_ACCOUNT_FIELD.to_string());
-    let label_field = env::var("OAUTH2_USER_LABEL_FIELD")
-        .unwrap_or_else(|_| DEFAULT_OAUTH2_LABEL_FIELD.to_string());
-    (account_field, label_field)
+fn get_oauth2_field_mappings() -> (String, String) {
+    (
+        env::var("OAUTH2_USER_ACCOUNT_FIELD").unwrap_or_else(|_| "email".to_string()),
+        env::var("OAUTH2_USER_LABEL_FIELD").unwrap_or_else(|_| "name".to_string()),
+    )
 }
 
 trait IntoResponseError<T> {
@@ -74,7 +69,7 @@ pub async fn list_accounts_core(
 ) -> Result<Vec<OAuth2Account>, (StatusCode, String)> {
     match user {
         Some(user) => {
-            tracing::debug!("User: {:#?}", user);
+            tracing::debug!("list_accounts_core: User: {:#?}", user);
             OAuth2Store::get_oauth2_accounts(&user.id)
                 .await
                 .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
@@ -232,7 +227,7 @@ async fn create_user_and_oauth2account(
     Ok(stored_user.id)
 }
 
-pub(super) fn get_account_and_label_from_oauth2_account(
+pub fn get_account_and_label_from_oauth2_account(
     oauth2_account: &OAuth2Account,
 ) -> (String, String) {
     // Get field mappings from configuration

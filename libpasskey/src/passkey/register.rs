@@ -113,7 +113,7 @@ pub async fn create_registration_options(
     Ok(options)
 }
 
-pub async fn finish_registration_with_auth_user(
+pub async fn verify_session_then_finish_registration(
     session_user: SessionUser,
     reg_data: RegisterCredential,
 ) -> Result<String, PasskeyError> {

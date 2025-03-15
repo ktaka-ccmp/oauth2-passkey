@@ -7,23 +7,20 @@ use uuid::Uuid;
 use libpasskey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyStore,
     RegisterCredential, RegistrationOptions, StoredCredential, finish_authentication,
-    finish_registration, finish_registration_with_auth_user, start_authentication,
-    start_registration,
+    finish_registration, start_authentication, start_registration,
+    verify_session_then_finish_registration,
 };
 use libsession::{User as SessionUser, create_session_with_uid};
 use libuserdb::{User, UserStore};
 
-// Default field mappings for Passkey
-const DEFAULT_PASSKEY_ACCOUNT_FIELD: &str = "name";
-const DEFAULT_PASSKEY_LABEL_FIELD: &str = "display_name";
+use super::errors::AuthError;
 
 /// Get the configured Passkey field mappings or defaults
-pub(super) fn get_passkey_field_mappings() -> (String, String) {
-    let account_field = env::var("PASSKEY_USER_ACCOUNT_FIELD")
-        .unwrap_or_else(|_| DEFAULT_PASSKEY_ACCOUNT_FIELD.to_string());
-    let label_field = env::var("PASSKEY_USER_LABEL_FIELD")
-        .unwrap_or_else(|_| DEFAULT_PASSKEY_LABEL_FIELD.to_string());
-    (account_field, label_field)
+fn get_passkey_field_mappings() -> (String, String) {
+    (
+        env::var("PASSKEY_USER_ACCOUNT_FIELD").unwrap_or_else(|_| "name".to_string()),
+        env::var("PASSKEY_USER_LABEL_FIELD").unwrap_or_else(|_| "display_name".to_string()),
+    )
 }
 
 /// Core function that handles the business logic of starting registration with provided user info
@@ -65,55 +62,58 @@ pub async fn handle_finish_registration_core(
 ) -> Result<(HeaderMap, String), (StatusCode, String)> {
     match auth_user {
         Some(session_user) => {
-            tracing::debug!("User: {:#?}", session_user);
+            tracing::debug!("handle_finish_registration_core: User: {:#?}", session_user);
 
             // Handle authenticated user registration
-            let message = finish_registration_with_auth_user(session_user.clone(), reg_data)
+            let message = verify_session_then_finish_registration(session_user.clone(), reg_data)
                 .await
                 .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
             Ok((HeaderMap::new(), message))
         }
         None => {
-            let (account, label) = get_account_and_label_from_passkey(&reg_data).await;
-
-            // Create a new user for unauthenticated registration
-            let new_user = User {
-                id: Uuid::new_v4().to_string(),
-                account,
-                label,
-                created_at: Utc::now(),
-                updated_at: Utc::now(),
-            };
-
-            // Store the user
-            let stored_user = UserStore::upsert_user(new_user)
-                .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-
-            // Finish registration
-            let result = finish_registration(&stored_user.id, &reg_data)
-                .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()));
+            let result = create_user_then_finish_registration(reg_data).await;
 
             match result {
-                Ok(message) => {
+                Ok((message, stored_user_id)) => {
                     // Create session with the user_id
-                    let headers = create_session_with_uid(&stored_user.id)
+                    let headers = create_session_with_uid(&stored_user_id)
                         .await
                         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
                     Ok((headers, message))
                 }
-                Err(err) => Err(err),
+                Err(err) => Err((StatusCode::BAD_REQUEST, err.to_string())),
             }
         }
     }
 }
 
-pub(super) async fn get_account_and_label_from_passkey(
-    reg_data: &libpasskey::RegisterCredential,
-) -> (String, String) {
+async fn create_user_then_finish_registration(
+    reg_data: RegisterCredential,
+) -> Result<(String, String), AuthError> {
+    let (account, label) = get_account_and_label_from_passkey(&reg_data).await;
+
+    let new_user = User {
+        id: Uuid::new_v4().to_string(),
+        account,
+        label,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+
+    let stored_user = UserStore::upsert_user(new_user.clone())
+        .await
+        .map_err(AuthError::User)?;
+
+    let message = finish_registration(&stored_user.id, &reg_data)
+        .await
+        .map_err(AuthError::Passkey)?;
+
+    Ok((message, stored_user.id))
+}
+
+async fn get_account_and_label_from_passkey(reg_data: &RegisterCredential) -> (String, String) {
     // Get user name from registration data with fallback mechanism
     let (name, display_name) = reg_data.get_registration_user_fields().await;
 
@@ -193,7 +193,7 @@ pub async fn list_credentials_core(
 ) -> Result<Vec<StoredCredential>, (StatusCode, String)> {
     match user {
         Some(user) => {
-            tracing::debug!("User: {:#?}", user);
+            tracing::debug!("list_credentials_core: User: {:#?}", user);
             PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user.id.to_owned()))
                 .await
                 .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))

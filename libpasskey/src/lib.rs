@@ -11,8 +11,8 @@ pub use errors::PasskeyError;
 
 pub use passkey::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
-    finish_authentication, finish_registration, finish_registration_with_auth_user,
-    get_related_origin_json, start_authentication, start_registration,
+    finish_authentication, finish_registration, get_related_origin_json, start_authentication,
+    start_registration, verify_session_then_finish_registration,
 };
 
 pub use storage::PasskeyStore;
