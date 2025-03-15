@@ -2,8 +2,8 @@ use axum::routing::{Router, get, post};
 
 use super::handlers::{
     conditional_ui, handle_finish_authentication, handle_finish_registration,
-    handle_start_authentication, handle_start_registration_get, handle_start_registration_post,
-    list_passkey_credentials, serve_conditional_ui_js, serve_passkey_js,
+    handle_start_authentication, handle_start_registration_post, list_passkey_credentials,
+    serve_conditional_ui_js, serve_passkey_js,
 };
 
 pub fn router() -> Router {
@@ -18,10 +18,7 @@ pub fn router() -> Router {
 
 pub fn router_register() -> Router {
     Router::new()
-        .route(
-            "/start",
-            post(handle_start_registration_post).get(handle_start_registration_get),
-        )
+        .route("/start", post(handle_start_registration_post))
         .route("/finish", post(handle_finish_registration))
 }
 

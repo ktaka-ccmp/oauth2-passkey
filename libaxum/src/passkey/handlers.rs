@@ -9,29 +9,13 @@ use serde_json::Value;
 use libauth::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
     handle_finish_authentication_core, handle_finish_registration_core,
-    handle_start_authentication_core, handle_start_registration_get_core,
-    handle_start_registration_post_core, list_credentials_core,
+    handle_start_authentication_core, handle_start_registration_post_core, list_credentials_core,
 };
 
 use libpasskey::{PASSKEY_ROUTE_PREFIX, StoredCredential};
 use libsession::User as SessionUser;
 
 use crate::session::AuthUser;
-
-/// Axum handler that extracts AuthUser from the request and delegates to the core function
-pub(crate) async fn handle_start_registration_get(
-    user: Option<AuthUser>,
-) -> Result<Json<RegistrationOptions>, (StatusCode, String)> {
-    // Convert AuthUser to SessionUser if present using deref coercion
-    let session_user = user.as_ref().map(|u| u as &SessionUser);
-
-    // Call the core function with the extracted data
-    let options = handle_start_registration_get_core(session_user)
-        .await
-        .expect("Failed to start registration");
-
-    Ok(Json(options))
-}
 
 pub(crate) async fn handle_start_registration_post(
     auth_user: Option<AuthUser>,

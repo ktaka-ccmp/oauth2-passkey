@@ -4,7 +4,6 @@ use serde_json::Value;
 use std::env;
 use uuid::Uuid;
 
-use liboauth2::OAuth2Store;
 use libpasskey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyStore,
     RegisterCredential, RegistrationOptions, StoredCredential, finish_authentication,
@@ -25,43 +24,6 @@ pub(super) fn get_passkey_field_mappings() -> (String, String) {
     let label_field = env::var("PASSKEY_USER_LABEL_FIELD")
         .unwrap_or_else(|_| DEFAULT_PASSKEY_LABEL_FIELD.to_string());
     (account_field, label_field)
-}
-
-/// Core function that handles the business logic of starting registration with OAuth2 account info
-///
-/// This function takes an optional reference to a SessionUser and returns registration options
-/// based on the user's OAuth2 account information.
-pub async fn handle_start_registration_get_core(
-    user: Option<&SessionUser>,
-) -> Result<RegistrationOptions, (StatusCode, String)> {
-    match user {
-        None => Err((StatusCode::BAD_REQUEST, "Not logged in!".to_string())),
-        Some(user) => {
-            tracing::debug!("User: {:#?}", user);
-
-            // Get the user's OAuth2 accounts
-            let oauth2_accounts = OAuth2Store::get_oauth2_accounts(&user.id)
-                .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
-                .first()
-                .cloned()
-                .ok_or_else(|| {
-                    (
-                        StatusCode::BAD_REQUEST,
-                        "No OAuth2 accounts found".to_string(),
-                    )
-                })?;
-
-            // Extract username and displayname from the OAuth2 account
-            let username = oauth2_accounts.email.clone();
-            let displayname = oauth2_accounts.name.clone();
-
-            // Start registration with the extracted information
-            start_registration(Some(user.clone()), username, displayname)
-                .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
-        }
-    }
 }
 
 /// Core function that handles the business logic of starting registration with provided user info

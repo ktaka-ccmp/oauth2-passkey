@@ -19,8 +19,7 @@ pub use oauth2_flow::{
 pub use passkey_coordinator::PasskeyCoordinator;
 pub use passkey_flow::{
     handle_finish_authentication_core, handle_finish_registration_core,
-    handle_start_authentication_core, handle_start_registration_get_core,
-    handle_start_registration_post_core, list_credentials_core,
+    handle_start_authentication_core, handle_start_registration_post_core, list_credentials_core,
 };
 
 pub use liboauth2::{
