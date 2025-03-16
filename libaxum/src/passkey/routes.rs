@@ -1,9 +1,9 @@
-use axum::routing::{Router, get, post};
+use axum::routing::{Router, delete, get, post};
 
 use super::handlers::{
-    conditional_ui, handle_finish_authentication, handle_finish_registration,
-    handle_start_authentication, handle_start_registration_post, list_passkey_credentials,
-    serve_conditional_ui_js, serve_passkey_js, serve_related_origin,
+    conditional_ui, delete_passkey_credential, handle_finish_authentication,
+    handle_finish_registration, handle_start_authentication, handle_start_registration_post,
+    list_passkey_credentials, serve_conditional_ui_js, serve_passkey_js, serve_related_origin,
 };
 
 pub fn router() -> Router {
@@ -14,6 +14,10 @@ pub fn router() -> Router {
         .nest("/auth", router_auth())
         .nest("/register", router_register())
         .route("/credentials", get(list_passkey_credentials))
+        .route(
+            "/credentials/{credential_id}",
+            delete(delete_passkey_credential),
+        )
 }
 
 pub fn router_register() -> Router {
@@ -30,6 +34,6 @@ pub fn router_auth() -> Router {
 
 /// Creates a router for the WebAuthn well-known endpoint
 /// This should be mounted at the root level of the application
-pub fn related_origin_router() -> Router {
-    Router::new().route("/.well-known/webauthn", get(serve_related_origin))
+pub fn passkey_well_known_router() -> Router {
+    Router::new().route("/webauthn", get(serve_related_origin))
 }

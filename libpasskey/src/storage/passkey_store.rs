@@ -78,6 +78,18 @@ impl PasskeyStore {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }
     }
+
+    pub async fn delete_credential_by(field: CredentialSearchField) -> Result<(), PasskeyError> {
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        if let Some(pool) = store.as_sqlite() {
+            delete_credential_by_field_sqlite(pool, &field).await
+        } else if let Some(pool) = store.as_postgres() {
+            delete_credential_by_field_postgres(pool, &field).await
+        } else {
+            Err(PasskeyError::Storage("Unsupported database type".into()))
+        }
+    }
 }
 
 // SQLite implementations
@@ -213,6 +225,38 @@ async fn update_credential_counter_sqlite(
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    Ok(())
+}
+
+async fn delete_credential_by_field_sqlite(
+    pool: &Pool<Sqlite>,
+    field: &CredentialSearchField,
+) -> Result<(), PasskeyError> {
+    let (query, value) = match field {
+        CredentialSearchField::CredentialId(credential_id) => (
+            "DELETE FROM passkey_credentials WHERE credential_id = ?",
+            credential_id.as_str(),
+        ),
+        CredentialSearchField::UserId(id) => (
+            "DELETE FROM passkey_credentials WHERE user_id = ?",
+            id.as_str(),
+        ),
+        CredentialSearchField::UserHandle(handle) => (
+            "DELETE FROM passkey_credentials WHERE user_handle = ?",
+            handle.as_str(),
+        ),
+        CredentialSearchField::UserName(name) => (
+            "DELETE FROM passkey_credentials WHERE user_name = ?",
+            name.as_str(),
+        ),
+    };
+
+    sqlx::query(query)
+        .bind(value)
+        .execute(pool)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     Ok(())
 }
@@ -355,6 +399,38 @@ async fn update_credential_counter_postgres(
     .fetch_optional(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    Ok(())
+}
+
+async fn delete_credential_by_field_postgres(
+    pool: &Pool<Postgres>,
+    field: &CredentialSearchField,
+) -> Result<(), PasskeyError> {
+    let (query, value) = match field {
+        CredentialSearchField::CredentialId(credential_id) => (
+            "DELETE FROM passkey_credentials WHERE credential_id = ?",
+            credential_id.as_str(),
+        ),
+        CredentialSearchField::UserId(id) => (
+            "DELETE FROM passkey_credentials WHERE user_id = ?",
+            id.as_str(),
+        ),
+        CredentialSearchField::UserHandle(handle) => (
+            "DELETE FROM passkey_credentials WHERE user_handle = ?",
+            handle.as_str(),
+        ),
+        CredentialSearchField::UserName(name) => (
+            "DELETE FROM passkey_credentials WHERE user_name = ?",
+            name.as_str(),
+        ),
+    };
+
+    sqlx::query(query)
+        .bind(value)
+        .execute(pool)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     Ok(())
 }

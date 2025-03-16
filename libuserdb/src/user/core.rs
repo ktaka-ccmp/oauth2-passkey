@@ -43,6 +43,18 @@ impl UserStore {
             Err(UserError::Storage("Unsupported database type".to_string()))
         }
     }
+
+    pub async fn delete_user(id: &str) -> Result<(), UserError> {
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        if let Some(pool) = store.as_sqlite() {
+            delete_user_sqlite(pool, id).await
+        } else if let Some(pool) = store.as_postgres() {
+            delete_user_postgres(pool, id).await
+        } else {
+            Err(UserError::Storage("Unsupported database type".to_string()))
+        }
+    }
 }
 
 // SQLite implementations
@@ -104,6 +116,20 @@ async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Result<User, Use
     Ok(user)
 }
 
+async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<(), UserError> {
+    sqlx::query(
+        r#"
+        DELETE FROM users WHERE id = ?
+        "#,
+    )
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    Ok(())
+}
+
 // PostgreSQL implementations
 async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), UserError> {
     // Create users table
@@ -162,4 +188,18 @@ async fn upsert_user_postgres(pool: &Pool<Postgres>, user: User) -> Result<User,
 
     // Return updated user
     Ok(user)
+}
+
+async fn delete_user_postgres(pool: &Pool<Postgres>, id: &str) -> Result<(), UserError> {
+    sqlx::query(
+        r#"
+        DELETE FROM users WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    Ok(())
 }

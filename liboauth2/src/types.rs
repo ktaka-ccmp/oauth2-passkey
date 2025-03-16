@@ -144,3 +144,21 @@ impl TryFrom<libstorage::CacheData> for StoredToken {
         serde_json::from_slice(&data.value).map_err(|e| OAuth2Error::Storage(e.to_string()))
     }
 }
+
+/// Search field options for credential lookup
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum AccountSearchField {
+    /// Search by ID
+    Id(String),
+    /// Search by user ID (database ID)
+    UserId(String),
+    /// Search by provider
+    Provider(String),
+    /// Search by provider user ID
+    ProviderUserId(String),
+    /// Search by name
+    Name(String),
+    /// Search by email
+    Email(String),
+}

@@ -112,6 +112,30 @@
         .action-button:hover {
             background-color: #3367d6;
         }
+        
+        .delete-button {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        .delete-button:hover {
+            background-color: #d32f2f;
+        }
+        
+        .created-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
         /* Responsive adjustments */
         @media screen and (max-width: 600px) {
             html, body {
@@ -192,9 +216,13 @@
         {% else %}
             {% for credential in passkey_credentials %}
                 <div class="item">
+                    <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
                     <div class="item-detail"><strong>User Name:</strong> {{ credential.user_name }}</div>
                     <div class="item-detail"><strong>Display Name:</strong> {{ credential.user_display_name }}</div>
-                    <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
+                    <div class="item-detail created-row">
+                        <span><strong>Created:</strong> {{ credential.created_at }}</span>
+                        <button onclick="deletePasskeyCredential('{{ credential.credential_id }}')" class="delete-button">Unlink</button>
+                    </div>
                     <!--
                     <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
                     <div class="item-detail"><strong>Updated:</strong> {{ credential.updated_at }}</div>
@@ -237,7 +265,10 @@
                         <div class="item-detail"><strong>Email:</strong> {{ account.email }}</div>
                     {% endif %}
                     <div class="item-detail"><strong>Name:</strong> {{ account.name }}</div>
-                    <div class="item-detail"><strong>Created:</strong> {{ account.created_at }}</div>
+                    <div class="item-detail created-row">
+                        <span><strong>Created:</strong> {{ account.created_at }}</span>
+                        <button onclick="unlinkOAuth2Account('{{ account.provider }}', '{{ account.provider_user_id }}')" class="delete-button">Unlink</button>
+                    </div>
                 </div>
             {% endfor %}
         {% endif %}
@@ -248,6 +279,54 @@
     <script>
         function Logout() {
             window.location.href = "{{auth_route_prefix}}/logout";
+        }
+
+        function unlinkOAuth2Account(provider, providerUserId) {
+            if (confirm('Are you sure you want to unlink this OAuth2 account?')) {
+                fetch(`${AUTH_ROUTE_PREFIX}/accounts/${provider}/${providerUserId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Refresh the page to show updated account list
+                        window.location.reload();
+                    } else {
+                        response.text().then(text => {
+                            alert(`Failed to unlink account: ${text}`);
+                        });
+                    }
+                })
+                .catch(error => {
+                    alert(`Error: ${error.message}`);
+                });
+            }
+        }
+        
+        function deletePasskeyCredential(credentialId) {
+            if (confirm('Are you sure you want to unlink this passkey credential?')) {
+                fetch(`${PASSKEY_ROUTE_PREFIX}/credentials/${credentialId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Refresh the page to show updated credential list
+                        window.location.reload();
+                    } else {
+                        response.text().then(text => {
+                            alert(`Failed to unlink passkey credential: ${text}`);
+                        });
+                    }
+                })
+                .catch(error => {
+                    alert(`Error: ${error.message}`);
+                });
+            }
         }
     </script>
 

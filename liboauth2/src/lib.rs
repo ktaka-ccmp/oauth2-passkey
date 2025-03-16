@@ -17,7 +17,7 @@ pub use oauth2::{
     get_uid_from_stored_session_by_state_param, prepare_oauth2_auth_request, validate_origin,
 };
 pub use storage::OAuth2Store;
-pub use types::{AuthResponse, OAuth2Account, StateParams};
+pub use types::{AccountSearchField, AuthResponse, OAuth2Account, StateParams};
 
 pub async fn init() -> Result<(), errors::OAuth2Error> {
     // Validate required environment variables early

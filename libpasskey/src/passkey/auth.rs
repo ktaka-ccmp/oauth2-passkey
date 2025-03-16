@@ -119,6 +119,11 @@ pub async fn finish_authentication(
             PasskeyError::NotFound("Credential not found".into())
         })?;
 
+    tracing::debug!(
+        "finish_authentication: Credential &id: {:?}, id: {}",
+        &auth_response.id,
+        auth_response.id
+    );
     tracing::debug!("Found credential: {:?}", stored_credential);
     tracing::debug!(
         "Credential properties:\n\

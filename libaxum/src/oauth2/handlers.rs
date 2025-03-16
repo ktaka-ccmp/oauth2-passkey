@@ -1,9 +1,10 @@
 use askama::Template;
 use axum::{
     Json, Router,
-    extract::{Form, Query},
+    extract::{Form, Path, Query},
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     response::{Html, Redirect, Response},
+    routing::delete,
     routing::get,
 };
 use axum_extra::{TypedHeader, headers};
@@ -12,7 +13,8 @@ use std::collections::HashMap;
 use libauth::{AuthResponse, OAUTH2_ROUTE_PREFIX, OAuth2Account, prepare_oauth2_auth_request};
 
 use libauth::{
-    get_authorized_core, list_accounts_core, post_authorized_core, prepare_logout_response,
+    delete_oauth2_account_core, get_authorized_core, list_accounts_core, post_authorized_core,
+    prepare_logout_response,
 };
 
 use libsession::User as SessionUser;
@@ -38,6 +40,10 @@ pub fn router() -> Router {
         .route("/popup_close", get(popup_close))
         .route("/logout", get(logout))
         .route("/accounts", get(list_oauth2_accounts))
+        .route(
+            "/accounts/{provider}/{provider_user_id}",
+            delete(delete_oauth2_account),
+        )
 }
 
 #[derive(Template)]
@@ -137,4 +143,20 @@ pub async fn list_oauth2_accounts(
     // Call the core function with the extracted data
     let accounts = list_accounts_core(session_user).await?;
     Ok(Json(accounts))
+}
+
+/// Delete an OAuth2 account for the authenticated user
+///
+/// This endpoint requires authentication and verifies that the account
+/// belongs to the authenticated user before deleting it.
+pub async fn delete_oauth2_account(
+    auth_user: Option<AuthUser>,
+    Path((provider, provider_user_id)): Path<(String, String)>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+
+    delete_oauth2_account_core(session_user, &provider, &provider_user_id)
+        .await
+        .map_err(|e| (e.0, e.1))
+        .map(|()| StatusCode::NO_CONTENT)
 }
