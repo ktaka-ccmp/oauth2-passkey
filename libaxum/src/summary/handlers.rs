@@ -4,10 +4,10 @@ use axum::{
     extract::Json as ExtractJson,
     http::StatusCode,
     response::{Html, Json},
-    routing::{delete, get},
+    routing::{delete, get, put},
 };
 
-use libauth::{list_accounts_core, list_credentials_core};
+use libauth::{list_accounts_core, list_credentials_core, update_user_account};
 use liboauth2::OAUTH2_ROUTE_PREFIX;
 use libpasskey::PASSKEY_ROUTE_PREFIX;
 use libsession::User as SessionUser;
@@ -22,6 +22,7 @@ pub fn router() -> Router<()> {
         .route("/", get(user_summary))
         .route("/user-info", get(user_info))
         .route("/user/delete", delete(delete_user_account_handler))
+        .route("/user/update", put(update_user_account_handler))
 }
 
 /// Return basic user information as JSON for the client-side JavaScript
@@ -68,6 +69,63 @@ pub async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (Stat
 #[derive(serde::Deserialize)]
 pub struct DeleteUserRequest {
     user_id: String,
+}
+
+/// Request payload for updating user account information
+#[derive(serde::Deserialize)]
+pub struct UpdateUserRequest {
+    user_id: String,
+    account: Option<String>,
+    label: Option<String>,
+}
+
+/// Update the authenticated user's account information
+///
+/// This endpoint allows users to update their account and label fields.
+/// It requires authentication and verifies that the user is only updating their own account.
+pub async fn update_user_account_handler(
+    auth_user: AuthUser,
+    ExtractJson(payload): ExtractJson<UpdateUserRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    // Get the user ID from the authenticated user
+    let session_user_id = auth_user.id.clone();
+    let request_user_id = payload.user_id.clone();
+
+    // Verify that the user ID in the request matches the session user ID
+    if session_user_id != request_user_id {
+        tracing::warn!(
+            "User ID mismatch in update request: session={}, request={}",
+            session_user_id,
+            request_user_id
+        );
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Cannot update another user's account".to_string(),
+        ));
+    }
+
+    tracing::debug!("Updating user account: {}", session_user_id);
+    tracing::debug!(
+        "New account: {:?}, new label: {:?}",
+        payload.account,
+        payload.label
+    );
+
+    // Call the core function to update the user account
+    let updated_user = update_user_account(&session_user_id, payload.account, payload.label)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Return the updated user information
+    let user_data = json!({
+        "id": updated_user.id,
+        "account": updated_user.account,
+        "label": updated_user.label,
+        "success": true,
+        "message": "User account updated successfully"
+    });
+
+    Ok(Json(user_data))
 }
 
 pub async fn delete_user_account_handler(

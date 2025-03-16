@@ -136,6 +136,32 @@
             justify-content: space-between;
             align-items: center;
         }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .secondary-button {
+            background-color: #95a5a6;
+        }
+
+        .secondary-button:hover {
+            background-color: #7f8c8d;
+        }
         /* Responsive adjustments */
         @media screen and (max-width: 600px) {
             html, body {
@@ -196,15 +222,35 @@
 
     <!-- User Information Section -->
     <div class="section">
-        <h2 class="section-title">User Information</h2>
-        <div class="item">
+        <div class="section-header">
+            <h2 class="section-title">User Information</h2>
+            <button onclick="toggleEditUserForm()" class="action-button">Edit Profile</button>
+        </div>
+        <div class="item" id="user-info-display">
             <div class="item-detail"><strong>User ID:</strong> {{ user.id }}</div>
-            <div class="item-detail"><strong>Account:</strong> {{ user.account }}</div>
-            <div class="item-detail"><strong>Label:</strong> {{ user.label }}</div>
+            <div class="item-detail"><strong>Account:</strong> <span id="display-account">{{ user.account }}</span></div>
+            <div class="item-detail"><strong>Label:</strong> <span id="display-label">{{ user.label }}</span></div>
             <div class="item-detail"><strong>Created:</strong> {{ user.created_at }}</div>
             <!--
             <div class="item-detail"><strong>Updated:</strong> {{ user.updated_at }}</div>
             -->
+        </div>
+        <div class="item" id="user-edit-form" style="display: none;">
+            <form id="update-user-form">
+                <input type="hidden" id="edit-user-id" value="{{ user.id }}">
+                <div class="form-group">
+                    <label for="edit-account">Account:</label>
+                    <input type="text" id="edit-account" value="{{ user.account }}" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="edit-label">Label:</label>
+                    <input type="text" id="edit-label" value="{{ user.label }}" class="form-input">
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="updateUserAccount()" class="action-button">Save</button>
+                    <button type="button" onclick="toggleEditUserForm()" class="action-button secondary-button">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -280,6 +326,59 @@
     <script>
         function Logout() {
             window.location.href = "{{auth_route_prefix}}/logout";
+        }
+
+        function toggleEditUserForm() {
+            const displayDiv = document.getElementById('user-info-display');
+            const editForm = document.getElementById('user-edit-form');
+
+            if (editForm.style.display === 'none') {
+                displayDiv.style.display = 'none';
+                editForm.style.display = 'block';
+            } else {
+                displayDiv.style.display = 'block';
+                editForm.style.display = 'none';
+            }
+        }
+
+        function updateUserAccount() {
+            const userId = document.getElementById('edit-user-id').value;
+            const account = document.getElementById('edit-account').value;
+            const label = document.getElementById('edit-label').value;
+
+            fetch(`/summary/user/update`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    account: account,
+                    label: label
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(text);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Update the display with the new values
+                document.getElementById('display-account').textContent = data.account;
+                document.getElementById('display-label').textContent = data.label;
+
+                // Show a success message
+                alert('Profile updated successfully');
+
+                // Toggle back to display view
+                toggleEditUserForm();
+            })
+            .catch(error => {
+                alert(`Error updating profile: ${error.message}`);
+            });
         }
 
         function DeleteAccount() {
