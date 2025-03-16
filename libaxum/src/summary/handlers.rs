@@ -1,9 +1,10 @@
 use askama::Template;
 use axum::{
     Router,
+    extract::Json as ExtractJson,
     http::StatusCode,
     response::{Html, Json},
-    routing::get,
+    routing::{delete, get},
 };
 
 use libauth::{list_accounts_core, list_credentials_core};
@@ -20,6 +21,7 @@ pub fn router() -> Router<()> {
     Router::new()
         .route("/", get(user_summary))
         .route("/user-info", get(user_info))
+        .route("/user/delete", delete(delete_user_account_handler))
 }
 
 /// Return basic user information as JSON for the client-side JavaScript
@@ -52,6 +54,53 @@ pub async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (Stat
             Err((StatusCode::UNAUTHORIZED, "Not authenticated".to_string()))
         }
     }
+}
+
+/// Delete the authenticated user's account and all associated data
+///
+/// This endpoint requires authentication and will delete:
+/// 1. All OAuth2 accounts linked to the user
+/// 2. All Passkey credentials registered by the user
+/// 3. The user account itself
+///
+/// After successful deletion, the client should redirect to the logout endpoint
+/// to clear the session.
+#[derive(serde::Deserialize)]
+pub struct DeleteUserRequest {
+    user_id: String,
+}
+
+pub async fn delete_user_account_handler(
+    auth_user: AuthUser,
+    ExtractJson(payload): ExtractJson<DeleteUserRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    // Get the user ID from the authenticated user
+    let session_user_id = auth_user.id.clone();
+    let request_user_id = payload.user_id;
+
+    // Verify that the user ID in the request matches the session user ID
+    if session_user_id != request_user_id {
+        tracing::warn!(
+            "User ID mismatch in delete request: session={}, request={}",
+            session_user_id,
+            request_user_id
+        );
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Cannot delete another user's account".to_string(),
+        ));
+    }
+
+    tracing::debug!("Deleting user account: {}", session_user_id);
+
+    // Call the core function to delete the user account and all associated data
+    // Using the imported function from libauth
+    libauth::delete_user_account(&session_user_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Return a success status code
+    Ok(StatusCode::OK)
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts

@@ -44,10 +44,12 @@ pub async fn update_user_account(
 /// Delete a user account and all associated OAuth2 accounts and Passkey credentials
 pub async fn delete_user_account(user_id: &str) -> Result<(), UserFlowError> {
     // Check if the user exists
-    let _user = UserStore::get_user(user_id)
+    let user = UserStore::get_user(user_id)
         .await
         .map_err(|e| UserFlowError::Database(e.to_string()))?
         .ok_or_else(|| UserFlowError::UserNotFound(user_id.to_string()))?;
+
+    tracing::debug!("Deleting user account: {:#?}", user);
 
     // Delete all OAuth2 accounts for this user
     OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.to_string()))

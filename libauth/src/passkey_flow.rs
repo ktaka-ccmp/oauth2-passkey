@@ -224,16 +224,15 @@ pub async fn delete_passkey_credential_core(
     // The credential_id from the UI is in hex format, but in the database it's stored directly as a string
     // So we need to use it directly without conversion
     tracing::debug!("Attempting to delete credential with ID: {}", credential_id);
-    
+
     // Get all credentials for this user to find the matching one
-    let user_credentials = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
-        user.id.to_owned(),
-    ))
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
+    let user_credentials =
+        PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user.id.to_owned()))
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     tracing::debug!("Found {} credentials for user", user_credentials.len());
-    
+
     // Find the credential with the matching ID
     let credential = user_credentials
         .into_iter()
@@ -259,14 +258,22 @@ pub async fn delete_passkey_credential_core(
 
     // The credential ID in the database is stored directly as a string
     // We need to use the exact credential ID as it appears in the database
-    
+
     // Get the raw credential ID string from the database record
     let raw_credential_id = std::str::from_utf8(&credential.credential_id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Invalid credential ID encoding".to_string()))?
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Invalid credential ID encoding".to_string(),
+            )
+        })?
         .to_string();
-    
-    tracing::debug!("Deleting credential with raw database ID: {}", raw_credential_id);
-    
+
+    tracing::debug!(
+        "Deleting credential with raw database ID: {}",
+        raw_credential_id
+    );
+
     // Delete the credential using the raw credential ID format from the database
     PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(raw_credential_id))
         .await
@@ -274,7 +281,7 @@ pub async fn delete_passkey_credential_core(
             tracing::error!("Failed to delete credential: {}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
         })?;
-        
+
     tracing::debug!("Successfully deleted credential");
 
     Ok(())
