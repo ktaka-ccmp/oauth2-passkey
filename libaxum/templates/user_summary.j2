@@ -265,13 +265,17 @@
         {% else %}
             {% for credential in passkey_credentials %}
                 <div class="item">
+                    <div class="item-detail"><strong>User Handle:</strong> {{ credential.user_handle }}</div>
                     <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
                     <div class="item-detail"><strong>User Name:</strong> {{ credential.user_name }}</div>
                     <div class="item-detail"><strong>Display Name:</strong> {{ credential.user_display_name }}</div>
                     <div class="item-detail created-row">
                         <span><strong>Created:</strong> {{ credential.created_at }}</span>
-                        <button onclick="deletePasskeyCredential('{{ credential.credential_id }}')" class="delete-button">Unlink</button>
+                        <button onclick="deletePasskeyCredential('{{ credential.credential_id }}', '{{ credential.user_handle }}')" class="delete-button">Unlink</button>
                     </div>
+                    <!--
+                    <div><button onclick="synchronizeCredentialsWithSignalUnknown('{{ credential.credential_id }}')">Synchronize Credentials with Signal Unknown</button></div>
+                    -->
                     <!--
                     <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
                     <div class="item-detail"><strong>Updated:</strong> {{ credential.updated_at }}</div>
@@ -434,8 +438,142 @@
             }
         }
         
-        function deletePasskeyCredential(credentialId) {
-            if (confirm('Are you sure you want to unlink this passkey credential?')) {
+        // Function to synchronize credentials with the authenticator using signalAllAcceptedCredentials
+        // This helps keep the authenticator's credential store in sync with the server
+        // Takes the user handle of the deleted credential as a parameter
+        function synchronizeCredentials(userHandle) {
+            try {
+                // Check if the WebAuthn API is available
+                if (!window.PublicKeyCredential) {
+                    console.log('WebAuthn credential management API not available');
+                    return;
+                }
+
+                console.log('PublicKeyCredential is available');
+
+                // Check if signalAllAcceptedCredentials is available
+                if (typeof window.PublicKeyCredential.signalAllAcceptedCredentials !== 'function') {
+                    console.log('WebAuthn credential management API not supported in this browser');
+                    return;
+                }
+
+                console.log('signalAllAcceptedCredentials API is available');
+                console.log('Using signalAllAcceptedCredentials with empty array for credential deletion');
+
+                // Use the user handle provided from the deleted credential
+                // This is more accurate than fetching it from another credential
+                if (!userHandle) {
+                    // If no user handle was provided, use a fallback
+                    userHandle = 'user';
+                    console.log('No user handle provided, using fallback:', userHandle);
+                } else {
+                    console.log('Using user handle from deleted credential:', userHandle);
+                }
+
+                // Encode the user handle in base64url format
+                const userIdBytes = new TextEncoder().encode(userHandle);
+                const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
+
+                console.log('Using base64url encoded userId:', userIdBase64Url);
+                console.log('Using empty array for credentials to signal deletion');
+
+                // Signal all accepted credentials with an empty array
+                // This tells the authenticator that no credentials are valid for this user and RP
+                return window.PublicKeyCredential.signalAllAcceptedCredentials({
+                    rpId: window.location.hostname,
+                    userId: userIdBase64Url,
+                    allAcceptedCredentialIds: [] // Empty array = no valid credentials
+                })
+                .then(() => {
+                    console.log('Successfully signaled credential deletion to authenticator');
+                })
+                .catch(err => {
+                    console.warn('Error during credential synchronization:', err);
+
+                    // Fallback to a generic user handle if we can't fetch credentials
+                    const fallbackUserHandle = 'user';
+                    const fallbackUserIdBytes = new TextEncoder().encode(fallbackUserHandle);
+                    const fallbackUserIdBase64Url = arrayBufferToBase64URL(fallbackUserIdBytes.buffer);
+
+                    console.log('Using fallback user handle due to error');
+
+                    // Try with the fallback user handle
+                    return window.PublicKeyCredential.signalAllAcceptedCredentials({
+                        rpId: window.location.hostname,
+                        userId: fallbackUserIdBase64Url,
+                        allAcceptedCredentialIds: [] // Empty array = no valid credentials
+                    })
+                    .then(() => {
+                        console.log('Successfully signaled credential deletion with fallback user handle');
+                    })
+                    .catch(err => {
+                        console.warn('Error signaling credential deletion with fallback:', err);
+                    });
+                });
+            } catch (err) {
+                console.warn('Unexpected error during credential synchronization:', err);
+                return Promise.resolve(); // Return a resolved promise to allow chaining
+            }
+        }
+
+        // Function to synchronize credentials with the authenticator using signalUnknownCredential
+        // This is an alternative approach for testing purposes
+        // Takes the credential ID of the deleted credential as a parameter
+        function synchronizeCredentialsWithSignalUnknown(credentialId) {
+            try {
+                // Check if the WebAuthn API is available
+                if (!window.PublicKeyCredential) {
+                    console.log('WebAuthn credential management API not available');
+                    return Promise.resolve();
+                }
+
+                console.log('PublicKeyCredential is available');
+
+                // Check if signalUnknownCredential is available
+                if (typeof window.PublicKeyCredential.signalUnknownCredential !== 'function') {
+                    console.log('signalUnknownCredential API not supported in this browser');
+                    return Promise.resolve();
+                }
+
+                console.log('signalUnknownCredential API is available');
+
+                // Convert the credential ID to the format expected by the WebAuthn API
+                // The credential ID is in hex format, we need to convert it to base64url
+                const hexToBytes = (hex) => {
+                    const bytes = new Uint8Array(hex.length / 2);
+                    for (let i = 0; i < hex.length; i += 2) {
+                        bytes[i/2] = parseInt(hex.substring(i, i+2), 16);
+                    }
+                    return bytes;
+                };
+
+                // Convert the credential ID to bytes and then to base64url
+                const credBytes = hexToBytes(credentialId);
+                const credBase64Url = arrayBufferToBase64URL(credBytes.buffer);
+
+                console.log('Signaling unknown credential ID to authenticator:', credentialId);
+                console.log('Credential ID in base64url format:', credBase64Url);
+
+                // Signal the unknown credential to the authenticator
+                return window.PublicKeyCredential.signalUnknownCredential({
+                    rpId: window.location.hostname,
+                    credentialId: credBase64Url
+                })
+                .then(() => {
+                    console.log('Successfully signaled unknown credential to authenticator. rpId:', window.location.hostname, "credentialId:", credBase64Url);
+                })
+                .catch(err => {
+                    console.warn('Error signaling unknown credential:', err);
+                    return Promise.resolve(); // Return a resolved promise to allow chaining
+                });
+            } catch (err) {
+                console.warn('Unexpected error during credential synchronization with signalUnknown:', err);
+                return Promise.resolve(); // Return a resolved promise to allow chaining
+            }
+        }
+
+        function deletePasskeyCredential(credentialId, userHandle) {
+            if (confirm('Are you sure you want to unlink this passkey credential?\n\nNote: While we will notify your browser about this deletion, you may need to manually remove the credential from your password manager if it doesn\'t disappear automatically.')) {
                 fetch(`${PASSKEY_ROUTE_PREFIX}/credentials/${credentialId}`, {
                     method: 'DELETE',
                     headers: {
@@ -444,13 +582,19 @@
                 })
                 .then(response => {
                     if (response.ok) {
-                        // Refresh the page to show updated credential list
-                        window.location.reload();
+                        // After successful deletion, synchronize credentials with the authenticator
+                        // Pass the user handle of the deleted credential for accurate synchronization
+                        return synchronizeCredentials(userHandle);
+                        // return synchronizeCredentialsWithSignalUnknown(credentialId);
                     } else {
-                        response.text().then(text => {
-                            alert(`Failed to unlink passkey credential: ${text}`);
+                        return response.text().then(text => {
+                            throw new Error(`Failed to unlink passkey credential: ${text}`);
                         });
                     }
+                })
+                .then(() => {
+                    // Refresh the page to show updated credential list
+                    window.location.reload();
                 })
                 .catch(error => {
                     alert(`Error: ${error.message}`);
