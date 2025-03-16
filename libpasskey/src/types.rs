@@ -53,6 +53,7 @@ pub(super) struct SessionInfo {
 #[derive(Debug)]
 pub enum CredentialSearchField {
     /// Search by credential ID
+    // CredentialId(Vec<u8>),
     CredentialId(String),
     /// Search by user ID (database ID)
     UserId(String),

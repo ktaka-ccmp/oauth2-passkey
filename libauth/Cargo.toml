@@ -13,8 +13,10 @@ libuserdb = { path = "../libuserdb" }
 libstorage = { path = "../libstorage" }
 libsession = { path = "../libsession" }
 
+base64 = "0.21"
 chrono.workspace = true
 headers.workspace = true
+hex = "0.4.3"
 http.workspace = true
 serde.workspace = true
 serde_json.workspace = true

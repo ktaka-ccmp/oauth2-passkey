@@ -8,8 +8,9 @@ use serde_json::Value;
 
 use libauth::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
-    handle_finish_authentication_core, handle_finish_registration_core,
-    handle_start_authentication_core, handle_start_registration_post_core, list_credentials_core,
+    delete_passkey_credential_core, handle_finish_authentication_core,
+    handle_finish_registration_core, handle_start_authentication_core,
+    handle_start_registration_post_core, list_credentials_core,
 };
 
 use libpasskey::{PASSKEY_ROUTE_PREFIX, StoredCredential, get_related_origin_json};
@@ -102,6 +103,24 @@ pub(crate) async fn list_passkey_credentials(
     // Call the core function with the extracted data
     let credentials = list_credentials_core(session_user).await?;
     Ok(Json(credentials))
+}
+
+/// Delete a passkey credential for the authenticated user
+///
+/// This endpoint requires authentication and verifies that the credential
+/// belongs to the authenticated user before deleting it.
+pub(crate) async fn delete_passkey_credential(
+    auth_user: Option<AuthUser>,
+    axum::extract::Path(credential_id): axum::extract::Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    // Convert AuthUser to SessionUser if present using deref coercion
+    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+
+    // Call the core function with the extracted data
+    delete_passkey_credential_core(session_user, &credential_id)
+        .await
+        .map_err(|e| (e.0, e.1))
+        .map(|()| StatusCode::NO_CONTENT)
 }
 
 /// Serve the WebAuthn configuration at /.well-known/webauthn

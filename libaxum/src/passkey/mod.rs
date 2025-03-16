@@ -1,4 +1,4 @@
 mod handlers;
 mod routes;
 
-pub use routes::{related_origin_router, router};
+pub use routes::{passkey_well_known_router, router};

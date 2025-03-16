@@ -3,7 +3,7 @@ use libstorage::GENERIC_DATA_STORE;
 use sqlx::{Pool, Postgres, Sqlite};
 
 use crate::errors::OAuth2Error;
-use crate::types::OAuth2Account;
+use crate::types::{AccountSearchField, OAuth2Account};
 
 pub struct OAuth2Store;
 
@@ -28,9 +28,34 @@ impl OAuth2Store {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {
-            get_oauth2_accounts_sqlite(pool, user_id).await
+            get_oauth2_accounts_by_field_sqlite(
+                pool,
+                &AccountSearchField::UserId(user_id.to_string()),
+            )
+            .await
+            // get_oauth2_accounts_sqlite(pool, user_id).await
         } else if let Some(pool) = store.as_postgres() {
-            get_oauth2_accounts_postgres(pool, user_id).await
+            get_oauth2_accounts_by_field_postgres(
+                pool,
+                &AccountSearchField::UserId(user_id.to_string()),
+            )
+            .await
+            // get_oauth2_accounts_postgres(pool, user_id).await
+        } else {
+            Err(OAuth2Error::Storage(
+                "Unsupported database type".to_string(),
+            ))
+        }
+    }
+
+    pub async fn get_oauth2_accounts_by(
+        field: AccountSearchField,
+    ) -> Result<Vec<OAuth2Account>, OAuth2Error> {
+        let store = GENERIC_DATA_STORE.lock().await;
+        if let Some(pool) = store.as_sqlite() {
+            get_oauth2_accounts_by_field_sqlite(pool, &field).await
+        } else if let Some(pool) = store.as_postgres() {
+            get_oauth2_accounts_by_field_postgres(pool, &field).await
         } else {
             Err(OAuth2Error::Storage(
                 "Unsupported database type".to_string(),
@@ -79,6 +104,20 @@ impl OAuth2Store {
             ))
         }
     }
+
+    pub async fn delete_oauth2_accounts_by(field: AccountSearchField) -> Result<(), OAuth2Error> {
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        if let Some(pool) = store.as_sqlite() {
+            delete_oauth2_accounts_by_field_sqlite(pool, &field).await
+        } else if let Some(pool) = store.as_postgres() {
+            delete_oauth2_accounts_by_field_postgres(pool, &field).await
+        } else {
+            Err(OAuth2Error::Storage(
+                "Unsupported database type".to_string(),
+            ))
+        }
+    }
 }
 
 // SQLite implementations
@@ -118,19 +157,39 @@ async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), OAuth2Error> {
     Ok(())
 }
 
-async fn get_oauth2_accounts_sqlite(
+async fn get_oauth2_accounts_by_field_sqlite(
     pool: &Pool<Sqlite>,
-    user_id: &str,
+    field: &AccountSearchField,
 ) -> Result<Vec<OAuth2Account>, OAuth2Error> {
-    sqlx::query_as::<_, OAuth2Account>(
-        r#"
-        SELECT * FROM oauth2_accounts WHERE user_id = ?
-        "#,
-    )
-    .bind(user_id)
-    .fetch_all(pool)
-    .await
-    .map_err(|e| OAuth2Error::Storage(e.to_string()))
+    let (query, value) = match field {
+        AccountSearchField::Id(id) => ("SELECT * FROM oauth2_accounts WHERE id = ?", id.as_str()),
+        AccountSearchField::UserId(user_id) => (
+            "SELECT * FROM oauth2_accounts WHERE user_id = ?",
+            user_id.as_str(),
+        ),
+        AccountSearchField::Provider(provider) => (
+            "SELECT * FROM oauth2_accounts WHERE provider = ?",
+            provider.as_str(),
+        ),
+        AccountSearchField::ProviderUserId(provider_user_id) => (
+            "SELECT * FROM oauth2_accounts WHERE provider_user_id = ?",
+            provider_user_id.as_str(),
+        ),
+        AccountSearchField::Name(name) => (
+            "SELECT * FROM oauth2_accounts WHERE name = ?",
+            name.as_str(),
+        ),
+        AccountSearchField::Email(email) => (
+            "SELECT * FROM oauth2_accounts WHERE email = ?",
+            email.as_str(),
+        ),
+    };
+
+    sqlx::query_as::<_, OAuth2Account>(query)
+        .bind(value)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))
 }
 
 async fn get_oauth2_account_by_provider_sqlite(
@@ -247,6 +306,42 @@ async fn upsert_oauth2_account_sqlite(
     Ok(updated_account)
 }
 
+async fn delete_oauth2_accounts_by_field_sqlite(
+    pool: &Pool<Sqlite>,
+    field: &AccountSearchField,
+) -> Result<(), OAuth2Error> {
+    let (query, value) = match field {
+        AccountSearchField::Id(id) => ("DELETE FROM oauth2_accounts WHERE id = ?", id.as_str()),
+        AccountSearchField::UserId(user_id) => (
+            "DELETE FROM oauth2_accounts WHERE user_id = ?",
+            user_id.as_str(),
+        ),
+        AccountSearchField::Provider(provider) => (
+            "DELETE FROM oauth2_accounts WHERE provider = ?",
+            provider.as_str(),
+        ),
+        AccountSearchField::ProviderUserId(provider_user_id) => (
+            "DELETE FROM oauth2_accounts WHERE provider_user_id = ?",
+            provider_user_id.as_str(),
+        ),
+        AccountSearchField::Name(name) => {
+            ("DELETE FROM oauth2_accounts WHERE name = ?", name.as_str())
+        }
+        AccountSearchField::Email(email) => (
+            "DELETE FROM oauth2_accounts WHERE email = ?",
+            email.as_str(),
+        ),
+    };
+
+    sqlx::query(query)
+        .bind(value)
+        .execute(pool)
+        .await
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+    Ok(())
+}
+
 // PostgreSQL implementations
 async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), OAuth2Error> {
     // Create oauth2_accounts table
@@ -284,19 +379,39 @@ async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), OAuth2Error
     Ok(())
 }
 
-async fn get_oauth2_accounts_postgres(
+async fn get_oauth2_accounts_by_field_postgres(
     pool: &Pool<Postgres>,
-    user_id: &str,
+    field: &AccountSearchField,
 ) -> Result<Vec<OAuth2Account>, OAuth2Error> {
-    sqlx::query_as::<_, OAuth2Account>(
-        r#"
-        SELECT * FROM oauth2_accounts WHERE user_id = $1
-        "#,
-    )
-    .bind(user_id)
-    .fetch_all(pool)
-    .await
-    .map_err(|e| OAuth2Error::Storage(e.to_string()))
+    let (query, value) = match field {
+        AccountSearchField::Id(id) => ("SELECT * FROM oauth2_accounts WHERE id = ?", id.as_str()),
+        AccountSearchField::UserId(user_id) => (
+            "SELECT * FROM oauth2_accounts WHERE user_id = ?",
+            user_id.as_str(),
+        ),
+        AccountSearchField::Provider(provider) => (
+            "SELECT * FROM oauth2_accounts WHERE provider = ?",
+            provider.as_str(),
+        ),
+        AccountSearchField::ProviderUserId(provider_user_id) => (
+            "SELECT * FROM oauth2_accounts WHERE provider_user_id = ?",
+            provider_user_id.as_str(),
+        ),
+        AccountSearchField::Name(name) => (
+            "SELECT * FROM oauth2_accounts WHERE name = ?",
+            name.as_str(),
+        ),
+        AccountSearchField::Email(email) => (
+            "SELECT * FROM oauth2_accounts WHERE email = ?",
+            email.as_str(),
+        ),
+    };
+
+    sqlx::query_as::<_, OAuth2Account>(query)
+        .bind(value)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))
 }
 
 async fn get_oauth2_account_by_provider_postgres(
@@ -408,4 +523,40 @@ async fn upsert_oauth2_account_postgres(
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     Ok(updated_account)
+}
+
+async fn delete_oauth2_accounts_by_field_postgres(
+    pool: &Pool<Postgres>,
+    field: &AccountSearchField,
+) -> Result<(), OAuth2Error> {
+    let (query, value) = match field {
+        AccountSearchField::Id(id) => ("DELETE FROM oauth2_accounts WHERE id = ?", id.as_str()),
+        AccountSearchField::UserId(user_id) => (
+            "DELETE FROM oauth2_accounts WHERE user_id = ?",
+            user_id.as_str(),
+        ),
+        AccountSearchField::Provider(provider) => (
+            "DELETE FROM oauth2_accounts WHERE provider = ?",
+            provider.as_str(),
+        ),
+        AccountSearchField::ProviderUserId(provider_user_id) => (
+            "DELETE FROM oauth2_accounts WHERE provider_user_id = ?",
+            provider_user_id.as_str(),
+        ),
+        AccountSearchField::Name(name) => {
+            ("DELETE FROM oauth2_accounts WHERE name = ?", name.as_str())
+        }
+        AccountSearchField::Email(email) => (
+            "DELETE FROM oauth2_accounts WHERE email = ?",
+            email.as_str(),
+        ),
+    };
+
+    sqlx::query(query)
+        .bind(value)
+        .execute(pool)
+        .await
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+    Ok(())
 }

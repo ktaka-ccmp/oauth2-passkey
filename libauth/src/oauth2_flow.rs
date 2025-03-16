@@ -3,9 +3,10 @@ use http::{HeaderMap, StatusCode};
 use std::env;
 
 use liboauth2::{
-    AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAuth2Account, OAuth2Store,
-    csrf_checks, decode_state, delete_session_and_misc_token_from_store, get_idinfo_userinfo,
-    get_uid_from_stored_session_by_state_param, header_set_cookie, validate_origin,
+    AccountSearchField, AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAuth2Account,
+    OAuth2Store, csrf_checks, decode_state, delete_session_and_misc_token_from_store,
+    get_idinfo_userinfo, get_uid_from_stored_session_by_state_param, header_set_cookie,
+    validate_origin,
 };
 use libsession::{User as SessionUser, create_session_with_uid};
 use libuserdb::{User as DbUser, UserStore};
@@ -253,4 +254,55 @@ pub async fn get_oauth2_accounts(user_id: &str) -> Result<Vec<OAuth2Account>, Au
     OAuth2Store::get_oauth2_accounts(user_id)
         .await
         .map_err(AuthError::OAuth2)
+}
+
+/// Delete an OAuth2 account for a user
+///
+/// This function checks that the OAuth2 account belongs to the authenticated user
+/// before deleting it to prevent unauthorized deletions.
+pub async fn delete_oauth2_account_core(
+    user: Option<&SessionUser>,
+    provider: &str,
+    provider_user_id: &str,
+) -> Result<(), (StatusCode, String)> {
+    // Ensure user is authenticated
+    let user = user.ok_or((
+        StatusCode::UNAUTHORIZED,
+        "User not authenticated".to_string(),
+    ))?;
+
+    // Get the OAuth2 account to verify it belongs to the user
+    let accounts = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::ProviderUserId(
+        provider_user_id.to_string(),
+    ))
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Verify the account exists
+    let account = accounts
+        .into_iter()
+        .find(|account| {
+            account.provider == provider && account.provider_user_id == provider_user_id
+        })
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            "OAuth2 account not found".to_string(),
+        ))?;
+
+    // Verify the account belongs to the authenticated user
+    if account.user_id != user.id {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Not authorized to delete this account".to_string(),
+        ));
+    }
+
+    // Delete the OAuth2 account
+    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::ProviderUserId(
+        provider_user_id.to_string(),
+    ))
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(())
 }

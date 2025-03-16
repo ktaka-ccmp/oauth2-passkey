@@ -112,6 +112,56 @@
         .action-button:hover {
             background-color: #3367d6;
         }
+        
+        .delete-button {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        .delete-button:hover {
+            background-color: #d32f2f;
+        }
+        
+        .created-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .secondary-button {
+            background-color: #95a5a6;
+        }
+
+        .secondary-button:hover {
+            background-color: #7f8c8d;
+        }
         /* Responsive adjustments */
         @media screen and (max-width: 600px) {
             html, body {
@@ -164,20 +214,43 @@
 <body>
     <div class="page-header">
         <h1>User Summary</h1>
-        <button onclick="Logout()" class="action-button">Logout</button>
+        <div class="header-buttons">
+            <button onclick="Logout()" class="action-button">Logout</button>
+            <button onclick="DeleteAccount()" class="action-button delete-button">Delete Account</button>
+        </div>
     </div>
 
     <!-- User Information Section -->
     <div class="section">
-        <h2 class="section-title">User Information</h2>
-        <div class="item">
+        <div class="section-header">
+            <h2 class="section-title">User Information</h2>
+            <button onclick="toggleEditUserForm()" class="action-button">Edit Profile</button>
+        </div>
+        <div class="item" id="user-info-display">
             <div class="item-detail"><strong>User ID:</strong> {{ user.id }}</div>
-            <div class="item-detail"><strong>Account:</strong> {{ user.account }}</div>
-            <div class="item-detail"><strong>Label:</strong> {{ user.label }}</div>
+            <div class="item-detail"><strong>Account:</strong> <span id="display-account">{{ user.account }}</span></div>
+            <div class="item-detail"><strong>Label:</strong> <span id="display-label">{{ user.label }}</span></div>
             <div class="item-detail"><strong>Created:</strong> {{ user.created_at }}</div>
             <!--
             <div class="item-detail"><strong>Updated:</strong> {{ user.updated_at }}</div>
             -->
+        </div>
+        <div class="item" id="user-edit-form" style="display: none;">
+            <form id="update-user-form">
+                <input type="hidden" id="edit-user-id" value="{{ user.id }}">
+                <div class="form-group">
+                    <label for="edit-account">Account:</label>
+                    <input type="text" id="edit-account" value="{{ user.account }}" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="edit-label">Label:</label>
+                    <input type="text" id="edit-label" value="{{ user.label }}" class="form-input">
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="updateUserAccount()" class="action-button">Save</button>
+                    <button type="button" onclick="toggleEditUserForm()" class="action-button secondary-button">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -192,9 +265,13 @@
         {% else %}
             {% for credential in passkey_credentials %}
                 <div class="item">
+                    <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
                     <div class="item-detail"><strong>User Name:</strong> {{ credential.user_name }}</div>
                     <div class="item-detail"><strong>Display Name:</strong> {{ credential.user_display_name }}</div>
-                    <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
+                    <div class="item-detail created-row">
+                        <span><strong>Created:</strong> {{ credential.created_at }}</span>
+                        <button onclick="deletePasskeyCredential('{{ credential.credential_id }}')" class="delete-button">Unlink</button>
+                    </div>
                     <!--
                     <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
                     <div class="item-detail"><strong>Updated:</strong> {{ credential.updated_at }}</div>
@@ -237,17 +314,148 @@
                         <div class="item-detail"><strong>Email:</strong> {{ account.email }}</div>
                     {% endif %}
                     <div class="item-detail"><strong>Name:</strong> {{ account.name }}</div>
-                    <div class="item-detail"><strong>Created:</strong> {{ account.created_at }}</div>
+                    <div class="item-detail created-row">
+                        <span><strong>Created:</strong> {{ account.created_at }}</span>
+                        <button onclick="unlinkOAuth2Account('{{ account.provider }}', '{{ account.provider_user_id }}')" class="delete-button">Unlink</button>
+                    </div>
                 </div>
             {% endfor %}
         {% endif %}
     </div>
 
-    <!-- Removed duplicate buttons as they're now in the section headers -->
-
     <script>
         function Logout() {
             window.location.href = "{{auth_route_prefix}}/logout";
+        }
+
+        function toggleEditUserForm() {
+            const displayDiv = document.getElementById('user-info-display');
+            const editForm = document.getElementById('user-edit-form');
+
+            if (editForm.style.display === 'none') {
+                displayDiv.style.display = 'none';
+                editForm.style.display = 'block';
+            } else {
+                displayDiv.style.display = 'block';
+                editForm.style.display = 'none';
+            }
+        }
+
+        function updateUserAccount() {
+            const userId = document.getElementById('edit-user-id').value;
+            const account = document.getElementById('edit-account').value;
+            const label = document.getElementById('edit-label').value;
+
+            fetch(`/summary/user/update`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    account: account,
+                    label: label
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(text);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Update the display with the new values
+                document.getElementById('display-account').textContent = data.account;
+                document.getElementById('display-label').textContent = data.label;
+
+                // Show a success message
+                alert('Profile updated successfully');
+
+                // Toggle back to display view
+                toggleEditUserForm();
+            })
+            .catch(error => {
+                alert(`Error updating profile: ${error.message}`);
+            });
+        }
+
+        function DeleteAccount() {
+            // Include account name in confirmation for better verification
+            const accountName = "{{user.account}}";
+            const userId = "{{user.id}}";
+            if (confirm(`Are you sure you want to delete your account "${accountName}"? This action cannot be undone and will delete all your data including OAuth2 accounts and passkey credentials.`)) {
+                fetch(`/summary/user/delete`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ user_id: userId })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Your account has been deleted. You will now be logged out.');
+                        // Redirect to logout to clear the session
+                        window.location.reload();
+                    } else {
+                        response.text().then(text => {
+                            alert(`Failed to delete account: ${text}`);
+                        });
+                    }
+                })
+                .catch(error => {
+                    alert(`Error: ${error.message}`);
+                });
+            }
+        }
+
+        function unlinkOAuth2Account(provider, providerUserId) {
+            if (confirm('Are you sure you want to unlink this OAuth2 account?')) {
+                fetch(`${AUTH_ROUTE_PREFIX}/accounts/${provider}/${providerUserId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Refresh the page to show updated account list
+                        window.location.reload();
+                    } else {
+                        response.text().then(text => {
+                            alert(`Failed to unlink account: ${text}`);
+                        });
+                    }
+                })
+                .catch(error => {
+                    alert(`Error: ${error.message}`);
+                });
+            }
+        }
+        
+        function deletePasskeyCredential(credentialId) {
+            if (confirm('Are you sure you want to unlink this passkey credential?')) {
+                fetch(`${PASSKEY_ROUTE_PREFIX}/credentials/${credentialId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Refresh the page to show updated credential list
+                        window.location.reload();
+                    } else {
+                        response.text().then(text => {
+                            alert(`Failed to unlink passkey credential: ${text}`);
+                        });
+                    }
+                })
+                .catch(error => {
+                    alert(`Error: ${error.message}`);
+                });
+            }
         }
     </script>
 
