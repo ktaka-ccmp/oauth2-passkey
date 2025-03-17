@@ -99,7 +99,7 @@ async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), PasskeyError> {
         CREATE TABLE IF NOT EXISTS passkey_credentials (
             credential_id TEXT PRIMARY KEY NOT NULL,
             user_id TEXT NOT NULL REFERENCES users(id),
-            public_key BLOB NOT NULL,
+            public_key TEXT NOT NULL,
             counter INTEGER NOT NULL DEFAULT 0,
             user_handle TEXT NOT NULL,
             user_name TEXT NOT NULL,
@@ -268,7 +268,7 @@ async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), PasskeyErro
         CREATE TABLE IF NOT EXISTS passkey_credentials (
             credential_id TEXT PRIMARY KEY NOT NULL,
             user_id TEXT NOT NULL REFERENCES users(id),
-            public_key BYTEA NOT NULL,
+            public_key TEXT NOT NULL,
             counter INTEGER NOT NULL DEFAULT 0,
             user_handle TEXT NOT NULL,
             user_name TEXT NOT NULL,
@@ -442,7 +442,7 @@ impl<'r> FromRow<'r, SqliteRow> for StoredCredential {
     fn from_row(row: &'r SqliteRow) -> Result<Self, sqlx::Error> {
         let credential_id: String = row.try_get("credential_id")?;
         let user_id: String = row.try_get("user_id")?;
-        let public_key: Vec<u8> = row.try_get("public_key")?;
+        let public_key: String = row.try_get("public_key")?;
         let counter: i64 = row.try_get("counter")?;
         let user_handle: String = row.try_get("user_handle")?;
         let user_name: String = row.try_get("user_name")?;
@@ -471,7 +471,7 @@ impl<'r> FromRow<'r, PgRow> for StoredCredential {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
         let credential_id: String = row.try_get("credential_id")?;
         let user_id: String = row.try_get("user_id")?;
-        let public_key: Vec<u8> = row.try_get("public_key")?;
+        let public_key: String = row.try_get("public_key")?;
         let counter: i32 = row.try_get("counter")?;
         let user_handle: String = row.try_get("user_handle")?;
         let user_name: String = row.try_get("user_name")?;

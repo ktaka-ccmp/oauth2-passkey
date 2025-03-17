@@ -10,7 +10,8 @@ use super::types::{
 };
 
 use crate::common::{
-    base64url_decode, gen_random_string, get_from_cache, remove_from_cache, store_in_cache,
+    base64url_decode, base64url_encode, gen_random_string, get_from_cache, remove_from_cache,
+    store_in_cache,
 };
 use crate::config::{
     ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
@@ -235,7 +236,7 @@ pub async fn finish_registration(
     Ok("Registration successful".to_string())
 }
 
-fn extract_credential_public_key(reg_data: &RegisterCredential) -> Result<Vec<u8>, PasskeyError> {
+fn extract_credential_public_key(reg_data: &RegisterCredential) -> Result<String, PasskeyError> {
     let decoded_client_data = base64url_decode(&reg_data.response.client_data_json)
         .map_err(|e| PasskeyError::Format(format!("Failed to decode client data: {}", e)))?;
 
@@ -319,7 +320,7 @@ fn parse_attestation_object(attestation_base64: &str) -> Result<AttestationObjec
     }
 }
 
-fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<Vec<u8>, PasskeyError> {
+fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<String, PasskeyError> {
     // Check attested credential data flag
     let flags = auth_data[32];
     let has_attested_cred_data = (flags & 0x40) != 0;
@@ -342,7 +343,9 @@ fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<Vec<u8>, Passke
     public_key.extend_from_slice(&x_coord);
     public_key.extend_from_slice(&y_coord);
 
-    Ok(public_key)
+    let encoded = base64url_encode(public_key)
+        .map_err(|_| PasskeyError::Format("Failed to encode public key".to_string()))?;
+    Ok(encoded)
 }
 
 fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], PasskeyError> {
