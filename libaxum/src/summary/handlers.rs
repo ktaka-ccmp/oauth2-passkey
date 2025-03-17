@@ -179,27 +179,15 @@ pub async fn user_summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCo
     // Convert StoredCredential to TemplateCredential
     let passkey_credentials = stored_credentials
         .into_iter()
-        .map(|cred| {
-            // Convert Vec<u8> to hex string representation for consistency
-            let credential_id_hex = cred.credential_id.iter().fold(
-                String::with_capacity(cred.credential_id.len() * 2),
-                |mut acc, b| {
-                    use std::fmt::Write;
-                    let _ = write!(acc, "{:02x}", b);
-                    acc
-                },
-            );
-
-            TemplateCredential {
-                credential_id: credential_id_hex,
-                user_id: cred.user_id.clone(),
-                user_name: cred.user.name.clone(),
-                user_display_name: cred.user.display_name.clone(),
-                user_handle: cred.user.user_handle.clone(),
-                counter: cred.counter.to_string(),
-                created_at: cred.created_at.to_string(),
-                updated_at: cred.updated_at.to_string(),
-            }
+        .map(|cred| TemplateCredential {
+            credential_id: cred.credential_id,
+            user_id: cred.user_id.clone(),
+            user_name: cred.user.name.clone(),
+            user_display_name: cred.user.display_name.clone(),
+            user_handle: cred.user.user_handle.clone(),
+            counter: cred.counter.to_string(),
+            created_at: cred.created_at.to_string(),
+            updated_at: cred.updated_at.to_string(),
         })
         .collect();
 

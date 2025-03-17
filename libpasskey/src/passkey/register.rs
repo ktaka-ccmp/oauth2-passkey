@@ -203,10 +203,6 @@ pub async fn finish_registration(
 
     let public_key = extract_credential_public_key(reg_data)?;
 
-    // Decode and store credential
-    let credential_id = base64url_decode(&reg_data.raw_id)
-        .map_err(|e| PasskeyError::Format(format!("Failed to decode credential ID: {}", e)))?;
-
     let user_handle = reg_data
         .user_handle
         .as_deref()
@@ -220,7 +216,7 @@ pub async fn finish_registration(
     let credential_id_str = reg_data.raw_id.clone();
 
     let credential = StoredCredential {
-        credential_id,
+        credential_id: credential_id_str.clone(),
         user_id: user_id.to_string(),
         public_key,
         counter: 0,

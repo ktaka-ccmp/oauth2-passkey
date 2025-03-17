@@ -21,7 +21,7 @@ pub(super) struct StoredOptions {
 /// Stored credential information for a passkey
 pub struct StoredCredential {
     /// Raw credential ID bytes
-    pub credential_id: Vec<u8>,
+    pub credential_id: String,
     /// User ID associated with this credential (database ID)
     pub user_id: String,
     /// Public key bytes for the credential
@@ -39,8 +39,7 @@ pub struct StoredCredential {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(super) struct UserIdCredentialIdStr {
     pub(super) user_id: String,
-    pub(super) credential_id_str: String,
-    pub(super) credential_id: Vec<u8>,
+    pub(super) credential_id: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

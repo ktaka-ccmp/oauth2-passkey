@@ -451,7 +451,7 @@ impl<'r> FromRow<'r, SqliteRow> for StoredCredential {
         let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
 
         Ok(StoredCredential {
-            credential_id: credential_id.as_bytes().to_vec(),
+            credential_id,
             user_id,
             public_key,
             counter: counter as u32,
@@ -480,7 +480,7 @@ impl<'r> FromRow<'r, PgRow> for StoredCredential {
         let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
 
         Ok(StoredCredential {
-            credential_id: credential_id.as_bytes().to_vec(),
+            credential_id,
             user_id,
             public_key,
             counter: counter as u32,

@@ -50,7 +50,6 @@ pub(crate) async fn get_credential_id_strs_by(
         .into_iter()
         .map(|cred| UserIdCredentialIdStr {
             user_id: cred.user_id,
-            credential_id_str: URL_SAFE_NO_PAD.encode(&cred.credential_id),
             credential_id: cred.credential_id,
         })
         .collect();

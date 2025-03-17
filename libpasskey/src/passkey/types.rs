@@ -17,7 +17,7 @@ pub struct AuthenticationOptions {
 #[derive(Serialize, Debug)]
 pub(super) struct AllowCredential {
     pub(super) type_: String,
-    pub(super) id: Vec<u8>,
+    pub(super) id: String,
 }
 
 #[derive(Serialize, Debug, Clone, Deserialize)]
