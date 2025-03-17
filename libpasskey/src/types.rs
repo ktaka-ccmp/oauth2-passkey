@@ -25,7 +25,7 @@ pub struct StoredCredential {
     /// User ID associated with this credential (database ID)
     pub user_id: String,
     /// Public key bytes for the credential
-    pub public_key: Vec<u8>,
+    pub public_key: String,
     /// Counter value for the credential (used to prevent replay attacks)
     pub counter: u32,
     /// User entity information

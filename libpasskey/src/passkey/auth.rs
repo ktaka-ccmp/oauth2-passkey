@@ -442,7 +442,11 @@ async fn verify_signature(
     stored_credential: &StoredCredential,
 ) -> Result<(), PasskeyError> {
     let verification_algorithm = &ring::signature::ECDSA_P256_SHA256_ASN1;
-    let public_key = UnparsedPublicKey::new(verification_algorithm, &stored_credential.public_key);
+
+    let public_key = base64url_decode(&stored_credential.public_key)
+        .map_err(|e| PasskeyError::Format(format!("Invalid public key: {}", e)))?;
+
+    let unparsed_public_key = UnparsedPublicKey::new(verification_algorithm, &public_key);
 
     // Signature
     let signature = base64url_decode(&auth_response.response.signature)
@@ -460,7 +464,7 @@ async fn verify_signature(
     tracing::debug!("Signed data length: {}", signed_data.len());
 
     // Verify signature using public key
-    match public_key.verify(&signed_data, &signature) {
+    match unparsed_public_key.verify(&signed_data, &signature) {
         Ok(_) => {
             tracing::info!("Signature verification successful");
             Ok(())
