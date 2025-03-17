@@ -11,7 +11,7 @@ pub struct PublicKeyCredentialUserEntity {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(super) struct StoredOptions {
-    pub(super) challenge: Vec<u8>,
+    pub(super) challenge: String,
     pub(super) user: PublicKeyCredentialUserEntity,
     pub(super) timestamp: u64,
     pub(super) ttl: u64,

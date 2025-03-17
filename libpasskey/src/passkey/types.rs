@@ -119,7 +119,7 @@ pub(super) struct AttestationObject {
 
 #[derive(Debug)]
 pub(super) struct ParsedClientData {
-    pub(super) challenge: Vec<u8>,
+    pub(super) challenge: String,
     pub(super) origin: String,
     pub(super) type_: String,
     pub(super) raw_data: Vec<u8>,

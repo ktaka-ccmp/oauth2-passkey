@@ -1,7 +1,4 @@
-use base64::engine::{
-    Engine,
-    general_purpose::{URL_SAFE, URL_SAFE_NO_PAD},
-};
+use base64::engine::{Engine, general_purpose::URL_SAFE_NO_PAD};
 use ring::rand::SecureRandom;
 
 use libstorage::GENERIC_CACHE_STORE;
@@ -24,20 +21,14 @@ pub async fn init() -> Result<(), PasskeyError> {
 }
 
 pub(crate) fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
-    let padding_len = (4 - input.len() % 4) % 4;
-    let padded = format!("{}{}", input, "=".repeat(padding_len));
-    let decoded = URL_SAFE
-        .decode(padded)
+    let decoded = URL_SAFE_NO_PAD
+        .decode(input)
         .map_err(|_| PasskeyError::Format("Failed to decode base64url".to_string()))?;
     Ok(decoded)
 }
 
-pub(crate) fn generate_challenge() -> Result<Vec<u8>, PasskeyError> {
-    let rng = ring::rand::SystemRandom::new();
-    let mut challenge = vec![0u8; 32];
-    rng.fill(&mut challenge)
-        .map_err(|_| PasskeyError::Crypto("Failed to generate random challenge".to_string()))?;
-    Ok(challenge)
+pub(crate) fn base64url_encode(input: Vec<u8>) -> Result<String, PasskeyError> {
+    Ok(URL_SAFE_NO_PAD.encode(input))
 }
 
 pub fn gen_random_string(len: usize) -> Result<String, PasskeyError> {
@@ -45,7 +36,9 @@ pub fn gen_random_string(len: usize) -> Result<String, PasskeyError> {
     let mut session_id = vec![0u8; len];
     rng.fill(&mut session_id)
         .map_err(|_| PasskeyError::Crypto("Failed to generate random string".to_string()))?;
-    Ok(URL_SAFE_NO_PAD.encode(session_id))
+    let encoded = base64url_encode(session_id)
+        .map_err(|_| PasskeyError::Crypto("Failed to encode random string".to_string()))?;
+    Ok(encoded)
 }
 
 pub(crate) async fn get_credential_id_strs_by(
