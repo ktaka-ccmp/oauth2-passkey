@@ -11,7 +11,8 @@ use liboauth2::{
 use libsession::{User as SessionUser, create_session_with_uid};
 use libuserdb::{User as DbUser, UserStore};
 
-use crate::errors::AuthError;
+use super::errors::AuthError;
+use super::user_flow::gen_new_user_id;
 
 /// Get the configured OAuth2 field mappings or defaults
 fn get_oauth2_field_mappings() -> (String, String) {
@@ -216,7 +217,7 @@ async fn create_user_and_oauth2account(
     let (account, label) = get_account_and_label_from_oauth2_account(&oauth2_account);
 
     let new_user = DbUser {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: gen_new_user_id().await?,
         account,
         label,
         created_at: Utc::now(),

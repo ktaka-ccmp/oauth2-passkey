@@ -2,7 +2,6 @@ use chrono::Utc;
 use http::{HeaderMap, StatusCode};
 use serde_json::Value;
 use std::env;
-use uuid::Uuid;
 
 use libpasskey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyStore,
@@ -14,6 +13,7 @@ use libsession::{User as SessionUser, create_session_with_uid};
 use libuserdb::{User, UserStore};
 
 use super::errors::AuthError;
+use super::user_flow::gen_new_user_id;
 
 /// Get the configured Passkey field mappings or defaults
 fn get_passkey_field_mappings() -> (String, String) {
@@ -95,7 +95,7 @@ async fn create_user_then_finish_registration(
     let (account, label) = get_account_and_label_from_passkey(&reg_data).await;
 
     let new_user = User {
-        id: Uuid::new_v4().to_string(),
+        id: gen_new_user_id().await?,
         account,
         label,
         created_at: Utc::now(),
