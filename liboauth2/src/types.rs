@@ -55,7 +55,7 @@ pub struct GoogleUserInfo {
 impl From<GoogleUserInfo> for OAuth2Account {
     fn from(google_user: GoogleUserInfo) -> Self {
         Self {
-            id: uuid::Uuid::new_v4().to_string(),
+            id: String::new(),      // Will be set during storage
             user_id: String::new(), // Will be set during upsert process
             name: google_user.name,
             email: google_user.email,
@@ -77,7 +77,7 @@ impl From<GoogleUserInfo> for OAuth2Account {
 impl From<GoogleIdInfo> for OAuth2Account {
     fn from(idinfo: GoogleIdInfo) -> Self {
         Self {
-            id: uuid::Uuid::new_v4().to_string(),
+            id: String::new(),      // Will be set during storage
             user_id: String::new(), // Will be set during upsert process
             name: idinfo.name,
             email: idinfo.email,

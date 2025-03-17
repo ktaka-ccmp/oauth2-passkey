@@ -8,6 +8,34 @@ use crate::types::{AccountSearchField, OAuth2Account};
 pub struct OAuth2Store;
 
 impl OAuth2Store {
+    /// Generate a unique ID for an OAuth2 account
+    /// This function checks if the generated ID already exists in the database
+    /// and retries up to 3 times if there's a collision
+    pub async fn gen_unique_account_id() -> Result<String, OAuth2Error> {
+        // Try up to 3 times to generate a unique ID
+        for _ in 0..3 {
+            let id = uuid::Uuid::new_v4().to_string();
+
+            // Check if an account with this ID already exists
+            match Self::get_oauth2_accounts_by(AccountSearchField::Id(id.clone())).await {
+                Ok(accounts) if accounts.is_empty() => return Ok(id), // ID is unique, return it
+                Ok(_) => continue,                                    // ID exists, try again
+                Err(e) => {
+                    return Err(OAuth2Error::Database(format!(
+                        "Failed to check account ID: {}",
+                        e
+                    )));
+                }
+            }
+        }
+
+        // If we get here, we failed to generate a unique ID after multiple attempts
+        // This is extremely unlikely with UUID v4, but we handle it anyway
+        Err(OAuth2Error::Internal(
+            "Failed to generate a unique OAuth2 account ID after multiple attempts".to_string(),
+        ))
+    }
+
     /// Initialize the OAuth2 database tables
     pub async fn init() -> Result<(), OAuth2Error> {
         let store = GENERIC_DATA_STORE.lock().await;
@@ -84,12 +112,17 @@ impl OAuth2Store {
     /// Create or update an OAuth2 account
     /// Note: This does not create a user. The user_id must be set before calling this method.
     pub async fn upsert_oauth2_account(
-        account: OAuth2Account,
+        mut account: OAuth2Account,
     ) -> Result<OAuth2Account, OAuth2Error> {
         if account.user_id.is_empty() {
             return Err(OAuth2Error::Storage(
                 "user_id must be set before upserting OAuth2 account".to_string(),
             ));
+        }
+
+        // Generate a unique ID if one isn't provided
+        if account.id.is_empty() {
+            account.id = Self::gen_unique_account_id().await?;
         }
 
         let store = GENERIC_DATA_STORE.lock().await;
