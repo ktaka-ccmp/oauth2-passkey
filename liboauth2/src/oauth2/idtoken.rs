@@ -1,4 +1,4 @@
-use base64::Engine as _;
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use jsonwebtoken::{Algorithm, DecodingKey};
 use pkcs1::{EncodeRsaPublicKey, LineEnding};
 use rsa::RsaPublicKey;
@@ -206,9 +206,7 @@ fn find_jwk<'a>(jwks: &'a Jwks, kid: &str) -> Option<&'a Jwk> {
 }
 
 fn decode_base64_url_safe(input: &str) -> Result<Vec<u8>, TokenVerificationError> {
-    base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(input)
-        .map_err(TokenVerificationError::from)
+    URL_SAFE_NO_PAD.decode(input).map_err(TokenVerificationError::from)
 }
 
 fn convert_jwk_to_decoding_key(jwk: &Jwk) -> Result<DecodingKey, TokenVerificationError> {
@@ -283,7 +281,7 @@ fn verify_signature(
 
     let message = format!("{}.{}", parts[0], parts[1]);
     let signature = decode_base64_url_safe(parts[2])?;
-    let signature_str = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(signature);
+    let signature_str = URL_SAFE_NO_PAD.encode(signature);
 
     match jsonwebtoken::crypto::verify(&signature_str, message.as_bytes(), decoding_key, alg) {
         Ok(valid) => Ok(valid),

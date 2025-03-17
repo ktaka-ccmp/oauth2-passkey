@@ -1,4 +1,4 @@
-use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use http::header::{COOKIE, HeaderMap};
 use ring::rand::SecureRandom;
@@ -45,22 +45,28 @@ pub(super) fn get_session_id_from_headers(
     Ok(session_id)
 }
 
+pub(super) fn base64url_encode(input: Vec<u8>) -> Result<String, OAuth2Error> {
+    Ok(URL_SAFE_NO_PAD.encode(input))
+}
+
 pub(super) fn gen_random_string(len: usize) -> Result<String, OAuth2Error> {
     let rng = ring::rand::SystemRandom::new();
     let mut session_id = vec![0u8; len];
     rng.fill(&mut session_id)
         .map_err(|_| OAuth2Error::Crypto("Failed to generate random string".to_string()))?;
-    Ok(URL_SAFE.encode(session_id))
+    let encoded = base64url_encode(session_id)
+        .map_err(|_| OAuth2Error::Crypto("Failed to encode random string".to_string()))?;
+    Ok(encoded)
 }
 
 pub(super) fn encode_state(state_params: StateParams) -> Result<String, OAuth2Error> {
     let state_json =
         serde_json::to_string(&state_params).map_err(|e| OAuth2Error::Serde(e.to_string()))?;
-    Ok(URL_SAFE.encode(state_json))
+    Ok(URL_SAFE_NO_PAD.encode(state_json))
 }
 
 pub fn decode_state(state: &str) -> Result<StateParams, OAuth2Error> {
-    let decoded_bytes = URL_SAFE
+    let decoded_bytes = URL_SAFE_NO_PAD
         .decode(state)
         .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode base64: {}", e)))?;
     let decoded_state_string = String::from_utf8(decoded_bytes)
