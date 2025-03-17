@@ -15,8 +15,9 @@ use crate::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken};
 use super::google::{exchange_code_for_token, fetch_user_data_from_google};
 use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
 use super::utils::{
-    decode_state, encode_state, generate_store_token, get_session_id_from_headers,
-    get_token_from_store, remove_token_from_store, store_token_in_cache, base64url_encode,
+    base64url_encode, decode_state, encode_state, generate_store_token,
+    get_session_id_from_headers, get_token_from_store, remove_token_from_store,
+    store_token_in_cache,
 };
 
 pub async fn prepare_oauth2_auth_request(
