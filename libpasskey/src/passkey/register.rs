@@ -20,18 +20,74 @@ use crate::common::{
 use crate::config::{
     ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
     PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID, PASSKEY_RP_NAME,
-    PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
+    PASSKEY_TIMEOUT, PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL, PASSKEY_USER_VERIFICATION,
 };
 use crate::errors::PasskeyError;
 use crate::storage::PasskeyStore;
 use crate::types::{PublicKeyCredentialUserEntity, SessionInfo, StoredCredential, StoredOptions};
+
+/// Resolves a user handle for passkey registration
+///
+/// If the user is logged in and has existing credentials, reuse the user handle
+/// from the first credential. Otherwise, generate a new user handle.
+///
+/// This ensures that all credentials for the same user share the same user handle,
+/// which is important for proper credential syncing across devices.
+async fn get_or_create_user_handle(
+    session_user: &Option<SessionUser>,
+) -> Result<String, PasskeyError> {
+    // If configured to always use unique user handles, generate a new one regardless of user state
+    if *PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL {
+        let new_handle = gen_random_string(16)?;
+        tracing::debug!(
+            "Using unique user handle for every credential: {}",
+            new_handle
+        );
+        return Ok(new_handle);
+    }
+
+    // Otherwise, follow the normal logic of reusing handles for logged-in users
+    if let Some(user) = session_user {
+        tracing::debug!("User is logged in: {:#?}", user);
+
+        // Try to find existing credentials for this user
+        let existing_credentials = PasskeyStore::get_credentials_by(
+            crate::types::CredentialSearchField::UserId(user.id.clone()),
+        )
+        .await?;
+
+        if !existing_credentials.is_empty() {
+            // Reuse the existing user_handle from the first credential
+            let existing_handle = existing_credentials[0].user.user_handle.clone();
+            tracing::debug!("Reusing existing user handle: {}", existing_handle);
+            Ok(existing_handle)
+        } else {
+            // No existing credentials, generate a new user_handle
+            let new_handle = gen_random_string(16)?;
+            tracing::debug!(
+                "No existing credentials found, generating new user handle: {}",
+                new_handle
+            );
+            Ok(new_handle)
+        }
+    } else {
+        // User is not logged in, generate a new user_handle
+        let new_handle = gen_random_string(16)?;
+        tracing::debug!(
+            "User not logged in, generating new user handle: {}",
+            new_handle
+        );
+        Ok(new_handle)
+    }
+}
 
 pub async fn start_registration(
     session_user: Option<SessionUser>,
     username: String,
     displayname: String,
 ) -> Result<RegistrationOptions, PasskeyError> {
-    let user_handle = gen_random_string(16)?;
+    // Get or create a user handle
+    let user_handle = get_or_create_user_handle(&session_user).await?;
 
     if let Some(u) = session_user {
         tracing::debug!("User: {:#?}", u);

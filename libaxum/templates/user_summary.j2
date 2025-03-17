@@ -442,78 +442,36 @@
         // This helps keep the authenticator's credential store in sync with the server
         // Takes the user handle of the deleted credential as a parameter
         function synchronizeCredentials(userHandle) {
-            try {
-                // Check if the WebAuthn API is available
-                if (!window.PublicKeyCredential) {
-                    console.log('WebAuthn credential management API not available');
-                    return;
-                }
-
-                console.log('PublicKeyCredential is available');
-
-                // Check if signalAllAcceptedCredentials is available
-                if (typeof window.PublicKeyCredential.signalAllAcceptedCredentials !== 'function') {
-                    console.log('WebAuthn credential management API not supported in this browser');
-                    return;
-                }
-
-                console.log('signalAllAcceptedCredentials API is available');
-                console.log('Using signalAllAcceptedCredentials with empty array for credential deletion');
-
-                // Use the user handle provided from the deleted credential
-                // This is more accurate than fetching it from another credential
-                if (!userHandle) {
-                    // If no user handle was provided, use a fallback
-                    userHandle = 'user';
-                    console.log('No user handle provided, using fallback:', userHandle);
-                } else {
-                    console.log('Using user handle from deleted credential:', userHandle);
-                }
-
-                // Encode the user handle in base64url format
-                const userIdBytes = new TextEncoder().encode(userHandle);
-                const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
-
-                console.log('Using base64url encoded userId:', userIdBase64Url);
-                console.log('Using empty array for credentials to signal deletion');
-
-                // Signal all accepted credentials with an empty array
-                // This tells the authenticator that no credentials are valid for this user and RP
-                return window.PublicKeyCredential.signalAllAcceptedCredentials({
-                    rpId: window.location.hostname,
-                    userId: userIdBase64Url,
-                    allAcceptedCredentialIds: [] // Empty array = no valid credentials
-                })
-                .then(() => {
-                    console.log('Successfully signaled credential deletion to authenticator');
-                })
-                .catch(err => {
-                    console.warn('Error during credential synchronization:', err);
-
-                    // Fallback to a generic user handle if we can't fetch credentials
-                    const fallbackUserHandle = 'user';
-                    const fallbackUserIdBytes = new TextEncoder().encode(fallbackUserHandle);
-                    const fallbackUserIdBase64Url = arrayBufferToBase64URL(fallbackUserIdBytes.buffer);
-
-                    console.log('Using fallback user handle due to error');
-
-                    // Try with the fallback user handle
-                    return window.PublicKeyCredential.signalAllAcceptedCredentials({
-                        rpId: window.location.hostname,
-                        userId: fallbackUserIdBase64Url,
-                        allAcceptedCredentialIds: [] // Empty array = no valid credentials
-                    })
-                    .then(() => {
-                        console.log('Successfully signaled credential deletion with fallback user handle');
-                    })
-                    .catch(err => {
-                        console.warn('Error signaling credential deletion with fallback:', err);
-                    });
-                });
-            } catch (err) {
-                console.warn('Unexpected error during credential synchronization:', err);
-                return Promise.resolve(); // Return a resolved promise to allow chaining
+            // Check if the WebAuthn API and signalAllAcceptedCredentials are available
+            if (!window.PublicKeyCredential ||
+                typeof window.PublicKeyCredential.signalAllAcceptedCredentials !== 'function') {
+                console.log('WebAuthn credential management API not available or not supported');
+                return Promise.resolve(); // Return resolved promise for chaining
             }
+
+            // Exit early if no user handle is provided
+            if (!userHandle) {
+                console.log('No user handle provided, skipping credential synchronization');
+                return Promise.resolve();
+            }
+
+            // Encode the user handle in base64url format
+            const userIdBytes = new TextEncoder().encode(userHandle);
+            const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
+
+            // Signal all accepted credentials with an empty array
+            // This tells the authenticator that no credentials are valid for this user and RP
+            return window.PublicKeyCredential.signalAllAcceptedCredentials({
+                rpId: window.location.hostname,
+                userId: userIdBase64Url,
+                allAcceptedCredentialIds: [] // Empty array = no valid credentials
+            })
+            .then(() => {
+                console.log('Successfully signaled credential deletion to authenticator');
+            })
+            .catch(err => {
+                console.warn('Error during credential synchronization:', err);
+            });
         }
 
         // Function to synchronize credentials with the authenticator using signalUnknownCredential
