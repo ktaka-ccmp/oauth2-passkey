@@ -1,4 +1,3 @@
-use base64::engine::{Engine, general_purpose::URL_SAFE};
 use ring::{digest, signature::UnparsedPublicKey};
 
 use super::challenge::{get_and_validate_options, remove_options};
@@ -7,9 +6,7 @@ use super::types::{
     ParsedClientData,
 };
 
-use crate::common::{
-    base64url_decode, gen_random_string, generate_challenge, name2cid_str_vec, store_in_cache,
-};
+use crate::common::{base64url_decode, gen_random_string, name2cid_str_vec, store_in_cache};
 use crate::config::{
     ORIGIN, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
 };
@@ -37,11 +34,11 @@ pub async fn start_authentication(
         }
     }
 
-    let challenge = generate_challenge();
+    let challenge_str = gen_random_string(32)?;
     let auth_id = gen_random_string(16)?;
 
     let stored_options = StoredOptions {
-        challenge: challenge.clone().unwrap_or_default(),
+        challenge: challenge_str.clone(),
         user: PublicKeyCredentialUserEntity {
             user_handle: "temp".to_string(),
             name: "temp".to_string(),
@@ -63,7 +60,7 @@ pub async fn start_authentication(
     .await?;
 
     let auth_option = AuthenticationOptions {
-        challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
+        challenge: challenge_str,
         timeout: (*PASSKEY_TIMEOUT) * 1000, // Convert seconds to milliseconds
         rp_id: PASSKEY_RP_ID.to_string(),
         allow_credentials,
@@ -171,15 +168,12 @@ impl ParsedClientData {
         let data: serde_json::Value = serde_json::from_str(&data_str)
             .map_err(|e| PasskeyError::Format(format!("Invalid JSON: {}", e)))?;
 
-        let challenge = base64url_decode(
-            data["challenge"]
-                .as_str()
-                .ok_or_else(|| PasskeyError::ClientData("Missing challenge".into()))?,
-        )
-        .map_err(|e| PasskeyError::Format(format!("Invalid challenge: {}", e)))?;
+        let challenge_str = data["challenge"]
+            .as_str()
+            .ok_or_else(|| PasskeyError::ClientData("Missing challenge".into()))?;
 
         Ok(Self {
-            challenge,
+            challenge: challenge_str.to_string(),
             origin: data["origin"]
                 .as_str()
                 .ok_or_else(|| PasskeyError::ClientData("Missing origin".into()))?
@@ -192,7 +186,7 @@ impl ParsedClientData {
         })
     }
 
-    fn verify(&self, stored_challenge: &[u8]) -> Result<(), PasskeyError> {
+    fn verify(&self, stored_challenge: &str) -> Result<(), PasskeyError> {
         // Verify challenge
         if self.challenge != stored_challenge {
             return Err(PasskeyError::Challenge(

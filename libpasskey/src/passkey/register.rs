@@ -1,7 +1,3 @@
-use base64::engine::{
-    Engine,
-    general_purpose::{URL_SAFE, URL_SAFE_NO_PAD},
-};
 use chrono::Utc;
 use ciborium::value::{Integer, Value as CborValue};
 
@@ -14,8 +10,7 @@ use super::types::{
 };
 
 use crate::common::{
-    base64url_decode, gen_random_string, generate_challenge, get_from_cache, remove_from_cache,
-    store_in_cache,
+    base64url_decode, gen_random_string, get_from_cache, remove_from_cache, store_in_cache,
 };
 use crate::config::{
     ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
@@ -115,9 +110,9 @@ pub async fn start_registration(
 pub async fn create_registration_options(
     user_info: PublicKeyCredentialUserEntity,
 ) -> Result<RegistrationOptions, PasskeyError> {
-    let challenge = generate_challenge();
+    let challenge_str = gen_random_string(32)?;
     let stored_challenge = StoredOptions {
-        challenge: challenge.clone().unwrap_or_default(),
+        challenge: challenge_str.clone(),
         user: user_info.clone(),
         timestamp: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -142,7 +137,7 @@ pub async fn create_registration_options(
     };
 
     let options = RegistrationOptions {
-        challenge: URL_SAFE.encode(challenge.unwrap_or_default()),
+        challenge: challenge_str,
         rp_id: PASSKEY_RP_ID.to_string(),
         rp: RelyingParty {
             name: PASSKEY_RP_NAME.to_string(),
@@ -202,15 +197,11 @@ pub async fn finish_registration(
     user_id: &str,
     reg_data: &RegisterCredential,
 ) -> Result<String, PasskeyError> {
-    println!("finish_registration user: {:?}", reg_data);
+    tracing::debug!("finish_registration user: {:?}", reg_data);
 
     verify_client_data(reg_data).await?;
 
     let public_key = extract_credential_public_key(reg_data)?;
-
-    // Decode and store credential
-    let credential_id = base64url_decode(&reg_data.raw_id)
-        .map_err(|e| PasskeyError::Format(format!("Failed to decode credential ID: {}", e)))?;
 
     let user_handle = reg_data
         .user_handle
@@ -225,7 +216,7 @@ pub async fn finish_registration(
     let credential_id_str = reg_data.raw_id.clone();
 
     let credential = StoredCredential {
-        credential_id,
+        credential_id: credential_id_str.clone(),
         user_id: user_id.to_string(),
         public_key,
         counter: 0,
@@ -461,12 +452,11 @@ async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), Passkey
     let stored_options = get_and_validate_options("regi_challenge", user_handle).await?;
 
     // Step 8: Verify challenge using base64url encoding comparison
-    let stored_challenge = URL_SAFE_NO_PAD.encode(&stored_options.challenge);
-    if client_data.challenge != stored_challenge {
+    if client_data.challenge != stored_options.challenge {
         tracing::error!(
             "Challenge verification failed: client_data.challenge: {}, stored_options.challenge: {}",
             client_data.challenge,
-            stored_challenge
+            stored_options.challenge
         );
         return Err(PasskeyError::Challenge(
             "Challenge verification failed".to_string(),

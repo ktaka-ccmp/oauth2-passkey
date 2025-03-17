@@ -49,7 +49,7 @@ async function startAuthentication(withUsername = false) {
             console.log('Raw credentials:', options.allowCredentials);
             options.allowCredentials = options.allowCredentials.map(credential => ({
                 type: 'public-key',  // Required by WebAuthn
-                id: new Uint8Array(credential.id),
+                id: base64URLToUint8Array(credential.id),
                 transports: credential.transports  // Optional
             }));
             console.log('Processed credentials:', options.allowCredentials);
