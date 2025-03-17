@@ -1,4 +1,4 @@
-use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use http::header::{HeaderMap, SET_COOKIE};
 use ring::rand::SecureRandom;
@@ -10,7 +10,7 @@ pub(crate) fn gen_random_string(len: usize) -> Result<String, SessionError> {
     let mut session_id = vec![0u8; len];
     rng.fill(&mut session_id)
         .map_err(|_| SessionError::Crypto("Failed to generate random string".to_string()))?;
-    Ok(URL_SAFE.encode(session_id))
+    Ok(URL_SAFE_NO_PAD.encode(session_id))
 }
 
 pub(crate) fn header_set_cookie(

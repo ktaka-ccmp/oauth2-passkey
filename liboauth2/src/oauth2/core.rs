@@ -1,8 +1,6 @@
 use headers::Cookie;
 use http::header::HeaderMap;
 
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-
 use chrono::{Duration, Utc};
 use sha2::{Digest, Sha256};
 
@@ -18,7 +16,7 @@ use super::google::{exchange_code_for_token, fetch_user_data_from_google};
 use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
 use super::utils::{
     decode_state, encode_state, generate_store_token, get_session_id_from_headers,
-    get_token_from_store, remove_token_from_store, store_token_in_cache,
+    get_token_from_store, remove_token_from_store, store_token_in_cache, base64url_encode,
 };
 
 pub async fn prepare_oauth2_auth_request(
@@ -44,7 +42,7 @@ pub async fn prepare_oauth2_auth_request(
     };
 
     tracing::debug!("PKCE ID: {:?}, PKCE verifier: {:?}", pkce_id, pkce_token);
-    let pkce_challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(pkce_token.as_bytes()));
+    let pkce_challenge = base64url_encode(Sha256::digest(pkce_token.as_bytes()).to_vec())?;
 
     tracing::debug!("PKCE Challenge: {:#?}", pkce_challenge);
     let state_params = StateParams {
