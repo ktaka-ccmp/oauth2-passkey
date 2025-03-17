@@ -45,7 +45,7 @@ pub fn gen_random_string(len: usize) -> Result<String, PasskeyError> {
     let mut session_id = vec![0u8; len];
     rng.fill(&mut session_id)
         .map_err(|_| PasskeyError::Crypto("Failed to generate random string".to_string()))?;
-    Ok(URL_SAFE.encode(session_id))
+    Ok(URL_SAFE_NO_PAD.encode(session_id))
 }
 
 pub(crate) async fn get_credential_id_strs_by(

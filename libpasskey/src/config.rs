@@ -101,3 +101,10 @@ pub(crate) static PASSKEY_USER_VERIFICATION: LazyLock<String> = LazyLock::new(||
         },
     )
 });
+
+pub(crate) static PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL: LazyLock<bool> =
+    LazyLock::new(|| {
+        env::var("PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL")
+            .map(|v| v.parse::<bool>().unwrap_or(true))
+            .unwrap_or(true)
+    });
