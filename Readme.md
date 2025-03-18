@@ -5,8 +5,8 @@
 - Middleware based page protection i.e. create a likes of is_authorized middleware.
 - Consolidate liboauth2, libpasskey, libsession and libstorage into libauth.
 - We'll do this after the tests are implemented
+- Schema check when initializing database connection.
 
-- [Need to investigate] Passkey sync between RP and Authenticator using signalCurrentUserDetails not working.
 
 ## Half Done
 
@@ -34,6 +34,7 @@
   - Update database schema and existing records if necessary
 
 - Make user id and OAuth2 account id collision-less.
+- ~~[Need to investigate]~~(It's working now) Passkey sync between RP and Authenticator using signalCurrentUserDetails not working.
 
 ## Memo
 
