@@ -35,7 +35,7 @@ pub(crate) fn header_set_cookie(
 impl From<StoredSession> for libstorage::CacheData {
     fn from(data: StoredSession) -> Self {
         Self {
-            value: serde_json::to_vec(&data).expect("Failed to serialize StoredSession"),
+            value: serde_json::to_string(&data).expect("Failed to serialize StoredSession"),
         }
     }
 }
@@ -44,6 +44,6 @@ impl TryFrom<libstorage::CacheData> for StoredSession {
     type Error = SessionError;
 
     fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {
-        serde_json::from_slice(&data.value).map_err(|e| SessionError::Storage(e.to_string()))
+        serde_json::from_str(&data.value).map_err(|e| SessionError::Storage(e.to_string()))
     }
 }

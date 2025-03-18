@@ -132,7 +132,7 @@ pub(crate) struct OidcTokenResponse {
 impl From<StoredToken> for libstorage::CacheData {
     fn from(data: StoredToken) -> Self {
         Self {
-            value: serde_json::to_vec(&data).expect("Failed to serialize StoredToken"),
+            value: serde_json::to_string(&data).expect("Failed to serialize StoredToken"),
         }
     }
 }
@@ -141,7 +141,7 @@ impl TryFrom<libstorage::CacheData> for StoredToken {
     type Error = OAuth2Error;
 
     fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {
-        serde_json::from_slice(&data.value).map_err(|e| OAuth2Error::Storage(e.to_string()))
+        serde_json::from_str(&data.value).map_err(|e| OAuth2Error::Storage(e.to_string()))
     }
 }
 

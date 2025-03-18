@@ -67,7 +67,7 @@ pub(crate) async fn name2cid_str_vec(
 impl From<SessionInfo> for libstorage::CacheData {
     fn from(data: SessionInfo) -> Self {
         Self {
-            value: serde_json::to_vec(&data).expect("Failed to serialize SessionInfo"),
+            value: serde_json::to_string(&data).expect("Failed to serialize SessionInfo"),
         }
     }
 }
@@ -76,14 +76,14 @@ impl TryFrom<libstorage::CacheData> for SessionInfo {
     type Error = PasskeyError;
 
     fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {
-        serde_json::from_slice(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
+        serde_json::from_str(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
     }
 }
 
 impl From<StoredOptions> for libstorage::CacheData {
     fn from(data: StoredOptions) -> Self {
         Self {
-            value: serde_json::to_vec(&data).expect("Failed to serialize StoredOptions"),
+            value: serde_json::to_string(&data).expect("Failed to serialize StoredOptions"),
         }
     }
 }
@@ -92,7 +92,7 @@ impl TryFrom<libstorage::CacheData> for StoredOptions {
     type Error = PasskeyError;
 
     fn try_from(data: libstorage::CacheData) -> Result<Self, Self::Error> {
-        serde_json::from_slice(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
+        serde_json::from_str(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
     }
 }
 
