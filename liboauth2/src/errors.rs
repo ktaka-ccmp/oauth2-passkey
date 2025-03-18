@@ -49,4 +49,10 @@ pub enum OAuth2Error {
 
     #[error("Token exchange error: {0}")]
     TokenExchange(String),
+
+    #[error("Database error: {0}")]
+    Database(String),
+
+    #[error("Internal error: {0}")]
+    Internal(String),
 }

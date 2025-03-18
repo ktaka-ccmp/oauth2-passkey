@@ -1,20 +1,10 @@
+use uuid::Uuid;
+
 use liboauth2::{AccountSearchField, OAuth2Store};
 use libpasskey::{CredentialSearchField, PasskeyStore};
 use libuserdb::{User, UserStore};
-use thiserror::Error;
 
-/// Errors that can occur during user account operations
-#[derive(Error, Debug)]
-pub enum UserFlowError {
-    #[error("User not found: {0}")]
-    UserNotFound(String),
-    #[error("Database error: {0}")]
-    Database(String),
-    #[error("Credential not found: {0}")]
-    CredentialNotFound(String),
-    #[error("OAuth2 account not found: {0}")]
-    OAuth2AccountNotFound(String),
-}
+use super::errors::{AuthError, UserFlowError};
 
 /// Update a user's account and label
 pub async fn update_user_account(
@@ -67,4 +57,30 @@ pub async fn delete_user_account(user_id: &str) -> Result<(), UserFlowError> {
         .map_err(|e| UserFlowError::Database(e.to_string()))?;
 
     Ok(())
+}
+
+// generate a unique user ID, with built-in collision detection
+pub(super) async fn gen_new_user_id() -> Result<String, AuthError> {
+    // Try up to 3 times to generate a unique ID
+    for _ in 0..3 {
+        let id = Uuid::new_v4().to_string();
+
+        // Check if a user with this ID already exists
+        match UserStore::get_user(&id).await {
+            Ok(None) => return Ok(id), // ID is unique, return it
+            Ok(Some(_)) => continue,   // ID exists, try again
+            Err(e) => {
+                return Err(AuthError::Database(format!(
+                    "Failed to check user ID: {}",
+                    e
+                )));
+            }
+        }
+    }
+
+    // If we get here, we failed to generate a unique ID after multiple attempts
+    // This is extremely unlikely with UUID v4, but we handle it anyway
+    Err(AuthError::Coordination(
+        "Failed to generate a unique user ID after multiple attempts".to_string(),
+    ))
 }

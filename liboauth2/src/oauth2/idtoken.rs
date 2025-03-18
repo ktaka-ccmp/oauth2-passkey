@@ -206,7 +206,9 @@ fn find_jwk<'a>(jwks: &'a Jwks, kid: &str) -> Option<&'a Jwk> {
 }
 
 fn decode_base64_url_safe(input: &str) -> Result<Vec<u8>, TokenVerificationError> {
-    URL_SAFE_NO_PAD.decode(input).map_err(TokenVerificationError::from)
+    URL_SAFE_NO_PAD
+        .decode(input)
+        .map_err(TokenVerificationError::from)
 }
 
 fn convert_jwk_to_decoding_key(jwk: &Jwk) -> Result<DecodingKey, TokenVerificationError> {

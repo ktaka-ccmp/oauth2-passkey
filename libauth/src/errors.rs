@@ -25,3 +25,16 @@ pub enum AuthError {
     #[error("Database error: {0}")]
     Database(String),
 }
+
+/// Errors that can occur during user account operations
+#[derive(Error, Debug)]
+pub enum UserFlowError {
+    #[error("User not found: {0}")]
+    UserNotFound(String),
+    #[error("Database error: {0}")]
+    Database(String),
+    #[error("Credential not found: {0}")]
+    CredentialNotFound(String),
+    #[error("OAuth2 account not found: {0}")]
+    OAuth2AccountNotFound(String),
+}
