@@ -11,7 +11,7 @@ use libaxum::AuthUser as User;
 struct IndexTemplateUser<'a> {
     // user: User,
     message: &'a str,
-    auth_route_prefix: &'a str,
+    oauth_route_prefix: &'a str,
     passkey_route_prefix: &'a str,
 }
 
@@ -19,7 +19,7 @@ struct IndexTemplateUser<'a> {
 #[template(path = "index_anon.j2")]
 struct IndexTemplateAnon<'a> {
     message: &'a str,
-    auth_route_prefix: &'a str,
+    oauth_route_prefix: &'a str,
     passkey_route_prefix: &'a str,
 }
 
@@ -27,7 +27,7 @@ struct IndexTemplateAnon<'a> {
 #[template(path = "protected.j2")]
 struct ProtectedTemplate<'a> {
     user: User,
-    auth_route_prefix: &'a str,
+    oauth_route_prefix: &'a str,
 }
 
 pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCode, String)> {
@@ -37,7 +37,7 @@ pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCod
             let template = IndexTemplateUser {
                 // user: u.clone(),
                 message: &message,
-                auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
+                oauth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
                 passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
             };
             let html = Html(
@@ -51,7 +51,7 @@ pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCod
             let message = "Click the Login button below.".to_string();
             let template = IndexTemplateAnon {
                 message: &message,
-                auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
+                oauth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
                 passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
             };
             let html = Html(
@@ -67,7 +67,7 @@ pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCod
 pub(crate) async fn protected(user: User) -> Result<Html<String>, (StatusCode, String)> {
     let template = ProtectedTemplate {
         user,
-        auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
+        oauth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
     };
     let html = Html(
         template
