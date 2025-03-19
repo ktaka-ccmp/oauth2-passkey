@@ -35,6 +35,6 @@ pub struct UserSummaryTemplate {
     pub user: AuthUser,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
-    pub auth_route_prefix: &'static str,
+    pub oauth_route_prefix: &'static str,
     pub passkey_route_prefix: &'static str,
 }

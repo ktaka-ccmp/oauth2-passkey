@@ -10,7 +10,10 @@ use axum::{
 use axum_extra::{TypedHeader, headers};
 use std::collections::HashMap;
 
-use libauth::{AuthResponse, OAUTH2_ROUTE_PREFIX, OAuth2Account, prepare_oauth2_auth_request};
+use libauth::{
+    AuthResponse, OAUTH2_ROUTE_PREFIX, OAuth2Account, prepare_oauth2_auth_request,
+    verify_context_token_and_page,
+};
 
 use libauth::{
     delete_oauth2_account_core, get_authorized_core, list_accounts_core, post_authorized_core,
@@ -74,8 +77,26 @@ pub(crate) async fn serve_oauth2_js() -> Result<Response, (StatusCode, String)> 
 }
 
 pub(crate) async fn google_auth(
+    auth_user: Option<AuthUser>,
     headers: HeaderMap,
+    Query(params): Query<HashMap<String, String>>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
+    let mode = params.get("mode").cloned();
+    let context = params.get("context").cloned();
+
+    if mode.is_some() && mode.as_ref().unwrap() == "add_to_existing_user" {
+        if context.is_none() {
+            return Err((StatusCode::BAD_REQUEST, "Missing context".to_string()));
+        }
+
+        let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+        let user_id: String = session_user.map(|u| u.id.clone()).unwrap_or_default();
+
+        // Verify the user context token
+        verify_context_token_and_page(&headers, Some(&context.unwrap()), &user_id)
+            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    }
+
     let (auth_url, headers) = prepare_oauth2_auth_request(headers)
         .await
         .into_response_error()?;

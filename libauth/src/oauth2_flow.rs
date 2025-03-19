@@ -11,6 +11,7 @@ use liboauth2::{
 use libsession::{User as SessionUser, create_session_with_uid};
 use libuserdb::{User as DbUser, UserStore};
 
+use super::context_token::add_context_token_to_header;
 use super::errors::AuthError;
 use super::user_flow::gen_new_user_id;
 
@@ -203,9 +204,15 @@ pub async fn process_oauth2_authorization(
 }
 
 async fn renew_session_header(user_id: String) -> Result<HeaderMap, (StatusCode, String)> {
-    let headers = create_session_with_uid(&user_id)
+    // Create session cookie for authentication
+    let mut headers = create_session_with_uid(&user_id)
         .await
         .into_response_error()?;
+
+    add_context_token_to_header(&user_id, &mut headers);
+
+    tracing::debug!("Created session and context token cookies: {headers:?}");
+
     Ok(headers)
 }
 

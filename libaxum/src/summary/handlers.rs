@@ -223,7 +223,7 @@ pub async fn user_summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCo
         user: auth_user,
         passkey_credentials,
         oauth2_accounts,
-        auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
+        oauth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
         passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
     };
 

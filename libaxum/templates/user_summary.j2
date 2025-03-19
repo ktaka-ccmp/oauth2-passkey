@@ -3,6 +3,11 @@
 <head>
     <title>User Summary</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Embed user context for session boundary verification -->
+    <script>
+        // Page context for session boundary protection
+        const PAGE_USER_CONTEXT = "{{ user.id }}";
+    </script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -258,7 +263,7 @@
     <div class="section">
         <div class="section-header">
             <h2 class="section-title">Passkey Credentials</h2>
-            <button onclick="showRegistrationModal()" class="action-button">Add New Passkey</button>
+            <button onclick="showRegistrationModal('add_to_existing_user')" class="action-button">Add New Passkey</button>
         </div>
         {% if passkey_credentials.is_empty() %}
             <p>You don't have any passkey credentials yet.</p>
@@ -294,7 +299,7 @@
     <div class="section">
         <div class="section-header">
             <h2 class="section-title">OAuth2 Accounts</h2>
-            <button onclick="oauth2.openPopup()" class="action-button">Add New OAuth2 Account</button>
+            <button onclick="oauth2.openPopup('add_to_existing_user', PAGE_USER_CONTEXT)" class="action-button">Add New OAuth2 Account</button>
         </div>
         {% if oauth2_accounts.is_empty() %}
             <p>You don't have any linked OAuth2 accounts yet.</p>
@@ -331,7 +336,7 @@
 
     <script>
         function Logout() {
-            window.location.href = "{{auth_route_prefix}}/logout";
+            window.location.href = "{{oauth_route_prefix}}/logout";
         }
 
         function toggleEditUserForm() {
@@ -418,7 +423,7 @@
 
         function unlinkOAuth2Account(provider, providerUserId) {
             if (confirm('Are you sure you want to unlink this OAuth2 account?')) {
-                fetch(`${AUTH_ROUTE_PREFIX}/accounts/${provider}/${providerUserId}`, {
+                fetch(`${OAUTH_ROUTE_PREFIX}/accounts/${provider}/${providerUserId}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json'
@@ -546,11 +551,11 @@
         }
     </script>
 
-    <script src="{{auth_route_prefix}}/oauth2.js"></script>
+    <script src="{{oauth_route_prefix}}/oauth2.js"></script>
     <script src="{{passkey_route_prefix}}/passkey.js"></script>
     <script>
         const oauth2 = initOAuth2Popup();
-        const AUTH_ROUTE_PREFIX = '{{auth_route_prefix}}';
+        const OAUTH_ROUTE_PREFIX = '{{oauth_route_prefix}}';
         const PASSKEY_ROUTE_PREFIX = '{{passkey_route_prefix}}';
     </script>
 
