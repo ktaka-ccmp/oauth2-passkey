@@ -34,7 +34,7 @@ async fn get_or_create_user_handle(
 ) -> Result<String, PasskeyError> {
     // If configured to always use unique user handles, generate a new one regardless of user state
     if *PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL {
-        let new_handle = gen_random_string(16)?;
+        let new_handle = gen_random_string(32)?;
         tracing::debug!(
             "Using unique user handle for every credential: {}",
             new_handle
@@ -59,7 +59,7 @@ async fn get_or_create_user_handle(
             Ok(existing_handle)
         } else {
             // No existing credentials, generate a new user_handle
-            let new_handle = gen_random_string(16)?;
+            let new_handle = gen_random_string(32)?;
             tracing::debug!(
                 "No existing credentials found, generating new user handle: {}",
                 new_handle
@@ -68,7 +68,7 @@ async fn get_or_create_user_handle(
         }
     } else {
         // User is not logged in, generate a new user_handle
-        let new_handle = gen_random_string(16)?;
+        let new_handle = gen_random_string(32)?;
         tracing::debug!(
             "User not logged in, generating new user handle: {}",
             new_handle

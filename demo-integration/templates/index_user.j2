@@ -56,16 +56,16 @@
         <button onclick="Logout()">Logout</button>
         <script>
             function Logout() {
-                window.location.href = "{{auth_route_prefix}}/logout";
+                window.location.href = "{{oauth_route_prefix}}/logout";
             }
         </script>
     </div>
 
-    <script src="{{auth_route_prefix}}/oauth2.js"></script>
+    <script src="{{oauth_route_prefix}}/oauth2.js"></script>
     <script src="{{passkey_route_prefix}}/passkey.js"></script>
     <script>
         const oauth2 = initOAuth2Popup();
-        const AUTH_ROUTE_PREFIX = '{{auth_route_prefix}}';
+        const OAUTH_ROUTE_PREFIX = '{{oauth_route_prefix}}';
         const PASSKEY_ROUTE_PREFIX = '{{passkey_route_prefix}}';
     </script>
 
