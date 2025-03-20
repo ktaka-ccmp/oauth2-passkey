@@ -1,5 +1,8 @@
 use askama::Template;
-use axum::{http::StatusCode, response::Html};
+use axum::{
+    http::StatusCode,
+    response::{Html, IntoResponse, Redirect, Response},
+};
 use liboauth2::OAUTH2_ROUTE_PREFIX;
 use libpasskey::PASSKEY_ROUTE_PREFIX;
 
@@ -30,7 +33,7 @@ struct ProtectedTemplate<'a> {
     oauth_route_prefix: &'a str,
 }
 
-pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCode, String)> {
+pub(crate) async fn index(user: Option<User>) -> Result<Response, (StatusCode, String)> {
     match user {
         Some(u) => {
             let message = format!("Hey {}!", u.account);
@@ -40,12 +43,13 @@ pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCod
                 oauth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
                 passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
             };
-            let html = Html(
+            let _html = Html(
                 template
                     .render()
                     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
             );
-            Ok(html)
+            // Ok(html.into_response())
+            Ok(Redirect::to("/summary").into_response())
         }
         None => {
             let message = "Click the Login button below.".to_string();
@@ -59,7 +63,7 @@ pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCod
                     .render()
                     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
             );
-            Ok(html)
+            Ok(html.into_response())
         }
     }
 }
