@@ -2,12 +2,20 @@ function initOAuth2Popup() {
     let popupWindow;
     let isReloading = false;
 
-    function openPopup() {
-        popupWindow = window.open(
-            `${AUTH_ROUTE_PREFIX}/google`,
-            "PopupWindow",
-            "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
-        );
+    function openPopup(mode=null, page_context=null) {
+        if (mode === 'add_to_existing_user') {
+            popupWindow = window.open(
+                `${OAUTH_ROUTE_PREFIX}/google?mode=${mode}&context=${page_context}`,
+                "PopupWindow",
+                "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
+            );
+        } else {
+            popupWindow = window.open(
+                `${OAUTH_ROUTE_PREFIX}/google`,
+                "PopupWindow",
+                "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
+            );
+        }
 
         // Listen for messages from the auth popup
         window.addEventListener('message', function(event) {

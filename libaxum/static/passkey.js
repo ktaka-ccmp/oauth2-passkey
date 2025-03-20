@@ -128,7 +128,7 @@ function createRegistrationModal() {
             </div>
             <div style="text-align: right;">
                 <button onclick="closeRegistrationModal()">Cancel</button>
-                <button onclick="submitRegistration()">Register</button>
+                <button onclick="submitRegistration(document.getElementById('registration-modal').dataset.mode)">Register</button>
             </div>
         `;
 
@@ -137,10 +137,13 @@ function createRegistrationModal() {
     return modal;
 }
 
-function showRegistrationModal() {
+function showRegistrationModal(mode) {
     const modal = createRegistrationModal();
     modal.style.display = 'block';
     
+    // Store the mode in the modal for later use
+    modal.dataset.mode = mode;
+
     // Set default values immediately
     document.getElementById('reg-username').value = 'username';
     document.getElementById('reg-displayname').value = 'displayname';
@@ -177,7 +180,7 @@ function closeRegistrationModal() {
     }
 }
 
-async function submitRegistration() {
+async function submitRegistration(mode) {
     const username = document.getElementById('reg-username').value.trim();
     const displayname = document.getElementById('reg-displayname').value.trim();
 
@@ -187,22 +190,49 @@ async function submitRegistration() {
     }
 
     closeRegistrationModal();
-    await startRegistration(username, displayname);
+    await startRegistration(mode, username, displayname);
 }
 
-async function startRegistration(username = null, displayname = null) {
+async function startRegistration(mode, username = null, displayname = null) {
     try {
+        // Log the explicitly provided mode
+        console.log('Registration mode:', mode);
+
+        // Include mode and page context for session boundary verification
+        const request = {
+            username,
+            displayname,
+            mode: mode,
+            page_context: typeof PAGE_USER_CONTEXT !== 'undefined' ? PAGE_USER_CONTEXT : '',
+        };
+
         let startResponse;
         startResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/register/start', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ username, displayname })
+            credentials: 'same-origin', // Important for cookie-based context token
+            body: JSON.stringify(request)
         });
 
         if (!startResponse.ok) {
             const errorText = await startResponse.text();
+
+            console.error('Failed to start registration:', errorText);
+
+            // Handle session boundary errors with user-friendly messages
+            if (errorText.includes('Session mismatch')) {
+                alert('Your session appears to be out of sync. Please refresh the page and try again.');
+                return;
+            } else if (errorText.includes('Context token')) {
+                alert('Missing security context. Please refresh the page and try again.');
+                return;
+            } else if (errorText.includes('Unauthorized')) {
+                alert('You need to be logged in to add a passkey to your account.');
+                return;
+            }
+
             alert('Registration failed: ' + errorText);
             return;
         }
@@ -222,9 +252,6 @@ async function startRegistration(username = null, displayname = null) {
             publicKey: options
         });
 
-        // console.log('Registration credential:', credential);
-        // console.log('Registration credential response clientDataJSON:', credential.response.clientDataJSON);
-
         const credentialResponse = {
             id: credential.id,
             raw_id: arrayBufferToBase64URL(credential.rawId),
@@ -234,21 +261,28 @@ async function startRegistration(username = null, displayname = null) {
                 client_data_json: arrayBufferToBase64URL(credential.response.clientDataJSON)
             },
             user_handle: userHandle,
-            // username: username
+            mode: mode,
+            page_context: typeof PAGE_USER_CONTEXT !== 'undefined' ? PAGE_USER_CONTEXT : '',
         };
 
         console.log('Registration response:', credentialResponse);
 
+        // Use the single registration finish endpoint
+        // The mode has already been verified at the start stage, and the page_context
+        // is included in the credential for additional verification
         const finishResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/register/finish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            // Include credentials to ensure cookies are sent with the request
+            credentials: 'same-origin',
             body: JSON.stringify(credentialResponse)
         });
 
         if (finishResponse.ok) {
             location.reload(); // Refresh to show authenticated state
         } else {
-            throw new Error('Registration verification failed');
+            const errorText = await finishResponse.text();
+            throw new Error('Registration verification failed: ' + errorText);
         }
     } catch (error) {
         console.error('Error during registration:', error);

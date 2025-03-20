@@ -1,5 +1,6 @@
 use chrono::Utc;
 use http::{HeaderMap, StatusCode};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::env;
 
@@ -12,6 +13,7 @@ use libpasskey::{
 use libsession::{User as SessionUser, create_session_with_uid};
 use libuserdb::{User, UserStore};
 
+use super::context_token::{add_context_token_to_header, verify_context_token_and_page};
 use super::errors::AuthError;
 use super::user_flow::gen_new_user_id;
 
@@ -23,32 +25,61 @@ fn get_passkey_field_mappings() -> (String, String) {
     )
 }
 
+/// Mode of registration operation to explicitly indicate user intent
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RegistrationMode {
+    /// Adding a passkey to an existing user (requires authentication)
+    AddToExistingUser,
+    /// Creating a new user with a passkey (no authentication required)
+    NewUser,
+}
+
+/// Request for starting passkey registration with explicit mode
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistrationStartRequest {
+    pub username: String,
+    pub displayname: String,
+    pub mode: RegistrationMode,
+    /// Optional page context for session boundary verification
+    #[serde(default)]
+    pub page_context: Option<String>,
+}
+
 /// Core function that handles the business logic of starting registration with provided user info
 ///
 /// This function takes an optional reference to a SessionUser, extracts username and displayname
 /// from the request body, and returns registration options.
-pub async fn handle_start_registration_post_core(
+pub async fn handle_start_registration_core(
     auth_user: Option<&SessionUser>,
-    body: &Value,
+    request_headers: &HeaderMap,
+    body: RegistrationStartRequest,
 ) -> Result<RegistrationOptions, (StatusCode, String)> {
-    // Extract username from the request body
-    let username = body
-        .get("username")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .ok_or((StatusCode::BAD_REQUEST, "Missing username".to_string()))?;
+    match body.mode {
+        RegistrationMode::AddToExistingUser => {
+            // let auth_user_id = auth_user.map(|u| u.id).unwrap();
+            let Some(auth_user) = auth_user else {
+                return Err((
+                    StatusCode::UNAUTHORIZED,
+                    "Missing authentication user".to_string(),
+                ));
+            };
 
-    // Extract displayname from the request body, defaulting to username if not provided
-    let displayname = body
-        .get("displayname")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or(username.clone());
+            verify_context_token_and_page(
+                request_headers,
+                body.page_context.as_ref(),
+                &auth_user.id,
+            )
+            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
-    // Call the start_registration function with the extracted data
-    start_registration(auth_user.cloned(), username, displayname)
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+            start_registration(Some(auth_user.clone()), body.username, body.displayname)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        }
+        RegistrationMode::NewUser => start_registration(None, body.username, body.displayname)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    }
 }
 
 /// Core function that handles the business logic of finishing registration
@@ -58,11 +89,19 @@ pub async fn handle_start_registration_post_core(
 /// with the credential.
 pub async fn handle_finish_registration_core(
     auth_user: Option<&SessionUser>,
+    request_headers: &HeaderMap,
     reg_data: RegisterCredential,
 ) -> Result<(HeaderMap, String), (StatusCode, String)> {
     match auth_user {
         Some(session_user) => {
             tracing::debug!("handle_finish_registration_core: User: {:#?}", session_user);
+
+            verify_context_token_and_page(
+                request_headers,
+                reg_data.page_context.as_ref(),
+                &session_user.id,
+            )
+            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
             // Handle authenticated user registration
             let message = verify_session_then_finish_registration(session_user.clone(), reg_data)
@@ -77,9 +116,12 @@ pub async fn handle_finish_registration_core(
             match result {
                 Ok((message, stored_user_id)) => {
                     // Create session with the user_id
-                    let headers = create_session_with_uid(&stored_user_id)
+                    let mut headers = create_session_with_uid(&stored_user_id)
                         .await
                         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+                    // Add context token cookie for session boundary protection
+                    add_context_token_to_header(&stored_user_id, &mut headers);
 
                     Ok((headers, message))
                 }
@@ -177,9 +219,12 @@ pub async fn handle_finish_authentication_core(
     tracing::debug!("User ID: {:#?}", uid);
 
     // Create a session for the authenticated user
-    let headers = create_session_with_uid(&uid)
+    let mut headers = create_session_with_uid(&uid)
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+    // Add context token headers for session boundary protection
+    add_context_token_to_header(&uid, &mut headers);
 
     Ok((uid, name, headers))
 }

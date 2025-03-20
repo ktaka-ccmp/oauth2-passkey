@@ -1,6 +1,6 @@
 use askama::Template;
 use axum::{
-    extract::Json,
+    extract::{Json, Path},
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     response::{Html, IntoResponse, Response},
 };
@@ -8,39 +8,36 @@ use serde_json::Value;
 
 use libauth::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
-    delete_passkey_credential_core, handle_finish_authentication_core,
+    RegistrationStartRequest, delete_passkey_credential_core, handle_finish_authentication_core,
     handle_finish_registration_core, handle_start_authentication_core,
-    handle_start_registration_post_core, list_credentials_core,
+    handle_start_registration_core, list_credentials_core,
 };
-
 use libpasskey::{PASSKEY_ROUTE_PREFIX, StoredCredential, get_related_origin_json};
 use libsession::User as SessionUser;
 
 use crate::session::AuthUser;
 
-pub(crate) async fn handle_start_registration_post(
+pub(crate) async fn handle_start_registration(
     auth_user: Option<AuthUser>,
-    Json(body): Json<Value>,
-) -> Json<RegistrationOptions> {
-    // Convert AuthUser to SessionUser if present using deref coercion
+    request_headers: HeaderMap,
+    Json(request): Json<RegistrationStartRequest>,
+) -> Result<Json<RegistrationOptions>, (StatusCode, String)> {
     let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
 
-    // Call the core function with the extracted data
-    let registration_options = handle_start_registration_post_core(session_user, &body)
-        .await
-        .expect("Failed to start registration");
+    // Use the new wrapper function that handles headers directly
+    let registration_options =
+        handle_start_registration_core(session_user, &request_headers, request).await?;
 
-    Json(registration_options)
+    Ok(Json(registration_options))
 }
 
 pub(crate) async fn handle_finish_registration(
     auth_user: Option<AuthUser>,
+    request_headers: HeaderMap,
     Json(reg_data): Json<RegisterCredential>,
 ) -> Result<(HeaderMap, String), (StatusCode, String)> {
-    // Convert AuthUser to SessionUser if present
     let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
-
-    handle_finish_registration_core(session_user, reg_data).await
+    handle_finish_registration_core(session_user, &request_headers, reg_data).await
 }
 
 pub(crate) async fn handle_start_authentication(
@@ -82,7 +79,7 @@ pub(crate) async fn conditional_ui() -> impl IntoResponse {
     let template = ConditionalUiTemplate {
         passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
     };
-    (StatusCode::OK, Html(template.render().unwrap())).into_response()
+    (StatusCode::OK, Html(template.render().unwrap_or_default())).into_response()
 }
 
 pub(crate) async fn serve_conditional_ui_js() -> Response {
@@ -97,33 +94,22 @@ pub(crate) async fn serve_conditional_ui_js() -> Response {
 pub(crate) async fn list_passkey_credentials(
     auth_user: Option<AuthUser>,
 ) -> Result<Json<Vec<StoredCredential>>, (StatusCode, String)> {
-    // Convert AuthUser to SessionUser if present using deref coercion
     let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
-
-    // Call the core function with the extracted data
     let credentials = list_credentials_core(session_user).await?;
     Ok(Json(credentials))
 }
 
-/// Delete a passkey credential for the authenticated user
-///
-/// This endpoint requires authentication and verifies that the credential
-/// belongs to the authenticated user before deleting it.
 pub(crate) async fn delete_passkey_credential(
     auth_user: Option<AuthUser>,
-    axum::extract::Path(credential_id): axum::extract::Path<String>,
+    Path(credential_id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // Convert AuthUser to SessionUser if present using deref coercion
     let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
-
-    // Call the core function with the extracted data
     delete_passkey_credential_core(session_user, &credential_id)
         .await
         .map_err(|e| (e.0, e.1))
         .map(|()| StatusCode::NO_CONTENT)
 }
 
-/// Serve the WebAuthn configuration at /.well-known/webauthn
 pub(crate) async fn serve_related_origin() -> Response {
     // Get the WebAuthn configuration JSON from libpasskey
     match get_related_origin_json() {

@@ -24,6 +24,22 @@ pub enum AuthError {
     /// Database error
     #[error("Database error: {0}")]
     Database(String),
+
+    /// Authentication error
+    #[error("Authentication error: {0}")]
+    Authentication(String),
+
+    /// Session mismatch error - when user in session differs from user in context
+    #[error("Session mismatch: {0}")]
+    SessionMismatch(String),
+
+    /// Missing context token error
+    #[error("Context token is missing")]
+    MissingContextToken,
+
+    /// Unauthorized access error
+    #[error("Unauthorized access")]
+    Unauthorized,
 }
 
 /// Errors that can occur during user account operations

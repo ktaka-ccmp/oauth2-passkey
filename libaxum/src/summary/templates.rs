@@ -1,6 +1,7 @@
 use crate::AuthUser;
 use askama::Template;
 
+use libauth::obfuscate_user_id;
 // Template-friendly version of StoredCredential for display
 #[derive(Debug)]
 pub struct TemplateCredential {
@@ -35,6 +36,28 @@ pub struct UserSummaryTemplate {
     pub user: AuthUser,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
-    pub auth_route_prefix: &'static str,
+    pub oauth_route_prefix: &'static str,
     pub passkey_route_prefix: &'static str,
+    pub obfuscated_user_id: String,
+}
+
+impl UserSummaryTemplate {
+    pub fn new(
+        user: AuthUser,
+        passkey_credentials: Vec<TemplateCredential>,
+        oauth2_accounts: Vec<TemplateAccount>,
+        oauth_route_prefix: &'static str,
+        passkey_route_prefix: &'static str,
+    ) -> Self {
+        let obfuscated_user_id = obfuscate_user_id(&user.id);
+
+        Self {
+            user,
+            passkey_credentials,
+            oauth2_accounts,
+            oauth_route_prefix,
+            passkey_route_prefix,
+            obfuscated_user_id,
+        }
+    }
 }

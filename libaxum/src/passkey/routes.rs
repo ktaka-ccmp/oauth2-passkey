@@ -2,7 +2,7 @@ use axum::routing::{Router, delete, get, post};
 
 use super::handlers::{
     conditional_ui, delete_passkey_credential, handle_finish_authentication,
-    handle_finish_registration, handle_start_authentication, handle_start_registration_post,
+    handle_finish_registration, handle_start_authentication, handle_start_registration,
     list_passkey_credentials, serve_conditional_ui_js, serve_passkey_js, serve_related_origin,
 };
 
@@ -22,7 +22,7 @@ pub fn router() -> Router {
 
 pub fn router_register() -> Router {
     Router::new()
-        .route("/start", post(handle_start_registration_post))
+        .route("/start", post(handle_start_registration))
         .route("/finish", post(handle_finish_registration))
 }
 

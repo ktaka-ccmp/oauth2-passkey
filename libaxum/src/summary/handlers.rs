@@ -219,13 +219,13 @@ pub async fn user_summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCo
         .collect();
 
     // Create template with all data
-    let template = UserSummaryTemplate {
-        user: auth_user,
+    let template = UserSummaryTemplate::new(
+        auth_user,
         passkey_credentials,
         oauth2_accounts,
-        auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
-        passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
-    };
+        OAUTH2_ROUTE_PREFIX.as_str(),
+        PASSKEY_ROUTE_PREFIX.as_str(),
+    );
 
     // Render the template
     let html = template.render().map_err(|e| {

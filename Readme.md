@@ -7,7 +7,6 @@
 - We'll do this after the tests are implemented
 - Schema check when initializing database connection.
 
-
 ## Half Done
 
 - [Need to investigate] I'm wondering if we should stop creating new user_handle everytime we create a new passkey credential.Instead we might have to use the existing user_handle for a logged in user. This will align well with syncing of credentials using the signalAllAcceptedCredentials.
@@ -36,9 +35,20 @@
 - Make user id and OAuth2 account id collision-less.
 - ~~[Need to investigate]~~(It's working now) Passkey sync between RP and Authenticator using signalCurrentUserDetails not working.
 
+- ✔️ Session boundary protection for authentication flows. When a user adds a new passkey credential or links a new OAuth2 account, we ensure session consistency:
+  - Implemented dedicated functions with clear intent separation through explicit modes:
+    - `add_to_existing_user` mode - For adding credentials to existing users
+    - Default mode - For creating new users with credentials when no user is logged in
+  - For OAuth2 account linking:
+    - Context token verification before redirecting to OAuth2 provider
+    - State parameter used to maintain user context across the redirect
+    - Session renewal after successful authentication
+    - See detailed analysis in [docs/oauth2-user-verification.md](docs/oauth2-user-verification.md)
+  - For Passkey credential addition:
+    - Context token verification before initiating registration
+    - Session verification during the registration process
+
 ## Memo
 
 ```text
 Can you take a look the following diff and if we aren't introducing any bugs and every change is OK suggest a commit message plz.
-
-```
