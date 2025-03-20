@@ -12,7 +12,7 @@ mod user_flow;
 // Re-export the main coordination components
 pub use context_token::{
     USER_CONTEXT_TOKEN_COOKIE, extract_context_token_from_cookies, generate_user_context_token,
-    verify_context_token_and_page, verify_user_context_token,
+    obfuscate_user_id, verify_context_token_and_page, verify_user_context_token,
 };
 pub use errors::AuthError;
 pub use oauth2_flow::{

@@ -3,10 +3,10 @@
 <head>
     <title>User Summary</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Embed user context for session boundary verification -->
+    <!-- Embed obfuscated user context for session boundary verification -->
     <script>
         // Page context for session boundary protection
-        const PAGE_USER_CONTEXT = "{{ user.id }}";
+        const PAGE_USER_CONTEXT = "{{ obfuscated_user_id }}";
     </script>
     <style>
         body {

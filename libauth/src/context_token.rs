@@ -33,19 +33,31 @@ static AUTH_SERVER_SECRET: LazyLock<Vec<u8>> = LazyLock::new(|| {
 static USE_CONTEXT_TOKEN_COOKIE: LazyLock<bool> =
     LazyLock::new(|| env::var("USE_CONTEXT_TOKEN_COOKIE").is_ok());
 
+/// Obfuscate user ID to prevent direct exposure
+pub fn obfuscate_user_id(user_id: &str) -> String {
+    let mut mac =
+        HmacSha256::new_from_slice(&AUTH_SERVER_SECRET).expect("HMAC can take key of any size");
+    mac.update(user_id.as_bytes());
+    let result = mac.finalize().into_bytes();
+    URL_SAFE_NO_PAD.encode(result)
+}
+
 /// Generate a signed context token for a user
 ///
-/// This token contains the user ID and an expiration timestamp, signed with HMAC-SHA256
+/// This token contains an obfuscated user ID and an expiration timestamp, signed with HMAC-SHA256
 /// to prevent tampering. The token can be used to verify that the user viewing a page
 /// is the same as the user in the session.
 pub fn generate_user_context_token(user_id: &str) -> String {
     let expires_at = Utc::now() + Duration::days(1);
     let expiry_str = expires_at.timestamp().to_string();
 
-    // Create the data string
-    let data = format!("{}:{}", user_id, expiry_str);
+    // Obfuscate user ID
+    let obfuscated_user_id = obfuscate_user_id(user_id);
 
-    // Sign the data
+    // Create the data string
+    let data = format!("{}:{}", obfuscated_user_id, expiry_str);
+
+    // Sign the data with HMAC-SHA256
     let mut mac =
         HmacSha256::new_from_slice(&AUTH_SERVER_SECRET).expect("HMAC can take key of any size");
     mac.update(data.as_bytes());
@@ -56,13 +68,10 @@ pub fn generate_user_context_token(user_id: &str) -> String {
     format!("{}:{}", data, signature_base64)
 }
 
-/// Verify a user context token against the session user ID
+/// Verify a user context token
 ///
-/// This function validates that:
-/// 1. The token format is valid
-/// 2. The signature is correct (no tampering)
-/// 3. The token has not expired
-/// 4. The user ID in the token matches the session user ID
+/// This function verifies the token's signature, checks expiration,
+/// and compares the obfuscated user ID
 pub fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(), AuthError> {
     // Parse token parts
     let parts: Vec<&str> = token.split(':').collect();
@@ -72,9 +81,20 @@ pub fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(
         ));
     }
 
-    let token_user_id = parts[0];
+    let token_obfuscated_user_id = parts[0];
     let expiry_str = parts[1];
     let signature_base64 = parts[2];
+
+    // Verify obfuscated user ID
+    let session_obfuscated_user_id = obfuscate_user_id(session_user_id);
+    if token_obfuscated_user_id != session_obfuscated_user_id {
+        tracing::debug!(
+            "Session desynchronization detected: token user does not match session user"
+        );
+        return Err(AuthError::SessionMismatch(
+            "Your session has changed since this page was loaded".to_string(),
+        ));
+    }
 
     // Check expiration
     let expiry = expiry_str
@@ -87,7 +107,7 @@ pub fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(
     }
 
     // Verify signature
-    let data = format!("{}:{}", token_user_id, expiry_str);
+    let data = format!("{}:{}", token_obfuscated_user_id, expiry_str);
     let mut mac = HmacSha256::new_from_slice(&AUTH_SERVER_SECRET)
         .map_err(|_| AuthError::Authentication("Failed to create HMAC".to_string()))?;
     mac.update(data.as_bytes());
@@ -98,18 +118,6 @@ pub fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(
 
     mac.verify_slice(&signature)
         .map_err(|_| AuthError::Authentication("Invalid token signature".to_string()))?;
-
-    // Check user ID matches session
-    if token_user_id != session_user_id {
-        tracing::debug!(
-            "Session desynchronization detected: token user_id '{}' does not match session user_id '{}'",
-            token_user_id,
-            session_user_id
-        );
-        return Err(AuthError::SessionMismatch(
-            "Your session has changed since this page was loaded".to_string(),
-        ));
-    }
 
     Ok(())
 }
@@ -179,7 +187,7 @@ pub fn verify_context_token_and_page(
 
     // Verify page context matches user (if provided)
     if let Some(context) = page_context {
-        if !context.is_empty() && context != user_id {
+        if !context.is_empty() && context != &obfuscate_user_id(user_id) {
             return Err(AuthError::SessionMismatch(
                 "Page context does not match session user".to_string(),
             ));
