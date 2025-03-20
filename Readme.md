@@ -7,13 +7,6 @@
 - We'll do this after the tests are implemented
 - Schema check when initializing database connection.
 
-- [Need to investigate] Deal with session boundary problems. When a user decides to add a new passkey credential or link a new oauth2 account, we have to make sure that the session is still valid. Current implementation creates a new user if there is no session, even if the user is intending to add a new passkey credential or link a new oauth2 account to existing user.
-  - Maybe we should create new dedicated functions, add_new_passkey_to_user and add_new_oauth2_account_to_user, which should never create a new user.
-    - OAuth2: Verify {user.id(embedded in the page), session.user_id} match before redirecting to OAuth2 provider and upon receiving the callback, conveying the "user.id" in the state parameter. Maybe we should avoid form_post mode to have a valid session in the callback. Use the same session before and after linking.
-    - Passkey: Verify {user.id(embedded in the page), session.user_id} match before start_register and finish_register.
-  - We should also create a new dedicated function, add_new_user_with_passkey and add_new_user_with_oauth2_account.
-    - We should make sure there isn't a session beginning and ending of the process.
-
 ## Half Done
 
 - [Need to investigate] I'm wondering if we should stop creating new user_handle everytime we create a new passkey credential.Instead we might have to use the existing user_handle for a logged in user. This will align well with syncing of credentials using the signalAllAcceptedCredentials.
@@ -42,9 +35,20 @@
 - Make user id and OAuth2 account id collision-less.
 - ~~[Need to investigate]~~(It's working now) Passkey sync between RP and Authenticator using signalCurrentUserDetails not working.
 
+- ✔️ Session boundary protection for authentication flows. When a user adds a new passkey credential or links a new OAuth2 account, we ensure session consistency:
+  - Implemented dedicated functions with clear intent separation through explicit modes:
+    - `add_to_existing_user` mode - For adding credentials to existing users
+    - Default mode - For creating new users with credentials when no user is logged in
+  - For OAuth2 account linking:
+    - Context token verification before redirecting to OAuth2 provider
+    - State parameter used to maintain user context across the redirect
+    - Session renewal after successful authentication
+    - See detailed analysis in [docs/oauth2-user-verification.md](docs/oauth2-user-verification.md)
+  - For Passkey credential addition:
+    - Context token verification before initiating registration
+    - Session verification during the registration process
+
 ## Memo
 
 ```text
 Can you take a look the following diff and if we aren't introducing any bugs and every change is OK suggest a commit message plz.
-
-```
