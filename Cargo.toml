@@ -1,15 +1,10 @@
 [workspace]
 members = [
     "demo-integration",
-    "demo-oauth2",
-    "demo-passkey",
-    "liboauth2",
-    "libsession",
-    "libpasskey",
-    "libuserdb",
+    # "demo-oauth2",
+    # "demo-passkey",
     "libaxum",
-    "libstorage",
-    "libauth",
+    "oauth2_passkey",
 ]
 
 resolver = "2"
@@ -19,13 +14,8 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
-liboauth2 = { path = "./liboauth2" }
-libpasskey = { path = "./libpasskey" }
-libsession = { path = "./libsession" }
-libuserdb = { path = "./libuserdb" }
 libaxum = { path = "./libaxum" }
-libstorage = { path = "./libstorage" }
-libauth = { path = "./libauth" }
+oauth2_passkey = { path = "./oauth2_passkey" }
 
 async-trait = "0.1.88"
 axum = { version = "0.8", features = ["http2", "macros", "multipart"] }
@@ -49,17 +39,3 @@ uuid = { version = "1.16", features = ["v4"] }
 urlencoding = "2.1.3"
 
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "chrono", "json", "uuid"] }
-
-# sqlx = { version = "0.8", features = [
-#     "any",
-#     "chrono", 
-#     "json", 
-#     "macros",
-#     "mysql", 
-#     "postgres", 
-#     "regexp", 
-#     "runtime-tokio-native-tls", 
-#     "runtime-tokio-rustls", 
-#     "sqlite",
-#     "runtime-async-std-native-tls"
-# ], default-features = false }

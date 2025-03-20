@@ -1,7 +1,7 @@
 use crate::AuthUser;
 use askama::Template;
 
-use libauth::obfuscate_user_id;
+use oauth2_passkey::obfuscate_user_id;
 // Template-friendly version of StoredCredential for display
 #[derive(Debug)]
 pub struct TemplateCredential {

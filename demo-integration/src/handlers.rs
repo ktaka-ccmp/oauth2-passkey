@@ -3,8 +3,7 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Redirect, Response},
 };
-use liboauth2::OAUTH2_ROUTE_PREFIX;
-use libpasskey::PASSKEY_ROUTE_PREFIX;
+use oauth2_passkey::{OAUTH2_ROUTE_PREFIX, PASSKEY_ROUTE_PREFIX};
 
 // use libsession::User;
 use libaxum::AuthUser as User;

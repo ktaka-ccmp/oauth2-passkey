@@ -8,10 +8,7 @@ askama = { version = "0.12.1", features = ["serde-json"] }
 http = { workspace = true }
 tracing = { workspace = true }
 
-libauth = { workspace = true }
-liboauth2 = { workspace = true }
-libsession = { workspace = true }
-libpasskey = { workspace = true }
+oauth2_passkey = { workspace = true }
 
 axum = { workspace = true }
 axum-extra = { workspace = true }

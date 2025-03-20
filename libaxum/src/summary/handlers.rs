@@ -7,10 +7,11 @@ use axum::{
     routing::{delete, get, put},
 };
 
-use libauth::{list_accounts_core, list_credentials_core, update_user_account};
-use liboauth2::OAUTH2_ROUTE_PREFIX;
-use libpasskey::PASSKEY_ROUTE_PREFIX;
-use libsession::User as SessionUser;
+use oauth2_passkey::SessionUser;
+use oauth2_passkey::{
+    OAUTH2_ROUTE_PREFIX, PASSKEY_ROUTE_PREFIX, delete_user_account, list_accounts_core,
+    list_credentials_core, update_user_account,
+};
 
 use super::templates::{TemplateAccount, TemplateCredential, UserSummaryTemplate};
 use crate::AuthUser;
@@ -153,7 +154,7 @@ pub async fn delete_user_account_handler(
 
     // Call the core function to delete the user account and all associated data
     // Using the imported function from libauth
-    libauth::delete_user_account(&session_user_id)
+    delete_user_account(&session_user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

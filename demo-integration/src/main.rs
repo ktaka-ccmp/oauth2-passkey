@@ -3,8 +3,7 @@ use dotenv::dotenv;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use libaxum::{oauth2_router, passkey_router, passkey_well_known_router, summary_router};
-use liboauth2::OAUTH2_ROUTE_PREFIX;
-use libpasskey::PASSKEY_ROUTE_PREFIX;
+use oauth2_passkey::{OAUTH2_ROUTE_PREFIX, PASSKEY_ROUTE_PREFIX};
 
 mod handlers;
 mod server;
@@ -30,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(debug_assertions)]
         {
             // Debug build default - show all log levels
-            "libaxum=trace,libauth=trace,libsession=trace,libpasskey=trace,liboauth2=trace,libstorage=trace,libuserdb=trace,demo_integration=trace".into()
+            "libaxum=trace,oauth2_passkey=trace,demo_integration=trace".into()
         }
 
         #[cfg(not(debug_assertions))]
@@ -70,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize the authentication library
     tracing::info!("Initializing authentication library");
-    libauth::init().await?;
+    oauth2_passkey::init().await?;
 
     let app = Router::new()
         .route("/", get(index))

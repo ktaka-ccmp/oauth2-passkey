@@ -6,14 +6,13 @@ use axum::{
 };
 use serde_json::Value;
 
-use libauth::{
+use oauth2_passkey::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
-    RegistrationStartRequest, delete_passkey_credential_core, handle_finish_authentication_core,
-    handle_finish_registration_core, handle_start_authentication_core,
-    handle_start_registration_core, list_credentials_core,
+    RegistrationStartRequest, SessionUser, delete_passkey_credential_core,
+    handle_finish_authentication_core, handle_finish_registration_core,
+    handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
 };
-use libpasskey::{PASSKEY_ROUTE_PREFIX, StoredCredential, get_related_origin_json};
-use libsession::User as SessionUser;
+use oauth2_passkey::{PASSKEY_ROUTE_PREFIX, StoredCredential, get_related_origin_json};
 
 use crate::session::AuthUser;
 

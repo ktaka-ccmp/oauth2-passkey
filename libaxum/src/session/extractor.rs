@@ -6,8 +6,7 @@ use axum::{
 use axum_extra::{TypedHeader, headers};
 use http::request::Parts;
 
-use libsession::User;
-use libsession::{SESSION_COOKIE_NAME, SessionError, get_user_from_session};
+use oauth2_passkey::{SESSION_COOKIE_NAME, SessionError, SessionUser, get_user_from_session};
 
 pub struct AuthRedirect;
 
@@ -26,18 +25,18 @@ impl From<SessionError> for AuthRedirect {
 
 /// A local wrapper around libsession::User to allow implementing foreign traits
 #[derive(Clone, Debug)]
-pub struct AuthUser(User);
+pub struct AuthUser(SessionUser);
 
 impl std::ops::Deref for AuthUser {
-    type Target = User;
+    type Target = SessionUser;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl From<User> for AuthUser {
-    fn from(user: User) -> Self {
+impl From<SessionUser> for AuthUser {
+    fn from(user: SessionUser) -> Self {
         Self(user)
     }
 }
@@ -59,7 +58,7 @@ where
             .to_string();
 
         // Convert libuserdb::User to libsession::User to AuthUser
-        let user: User = get_user_from_session(&session_cookie)
+        let user: SessionUser = get_user_from_session(&session_cookie)
             .await
             .map_err(AuthRedirect::from)?;
         Ok(AuthUser::from(user))
