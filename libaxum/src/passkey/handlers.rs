@@ -73,13 +73,11 @@ pub(crate) async fn serve_passkey_js() -> Response {
 #[template(path = "conditional_ui.j2")]
 struct ConditionalUiTemplate {
     passkey_route_prefix: &'static str,
-    user_id: String,
 }
 
-pub(crate) async fn conditional_ui(auth_user: Option<AuthUser>) -> impl IntoResponse {
+pub(crate) async fn conditional_ui() -> impl IntoResponse {
     let template = ConditionalUiTemplate {
         passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
-        user_id: auth_user.map(|u| u.id.clone()).unwrap_or_default(),
     };
     (StatusCode::OK, Html(template.render().unwrap_or_default())).into_response()
 }

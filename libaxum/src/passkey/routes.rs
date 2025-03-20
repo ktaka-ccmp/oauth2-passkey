@@ -1,4 +1,3 @@
-use crate::session::AuthUser;
 use axum::routing::{Router, delete, get, post};
 
 use super::handlers::{
@@ -10,10 +9,7 @@ use super::handlers::{
 pub fn router() -> Router {
     Router::new()
         .route("/passkey.js", get(serve_passkey_js))
-        .route(
-            "/conditional_ui",
-            get(|auth_user: Option<AuthUser>| conditional_ui(auth_user)),
-        )
+        .route("/conditional_ui", get(conditional_ui))
         .route("/conditional_ui.js", get(serve_conditional_ui_js))
         .nest("/auth", router_auth())
         .nest("/register", router_register())
