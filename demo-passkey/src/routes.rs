@@ -1,5 +1,5 @@
 use axum::{Router, extract::Json, http::StatusCode, routing::post};
-use libpasskey::{
+use oauth2_passkey::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
     finish_authentication, finish_registration, start_authentication, start_registration,
 };

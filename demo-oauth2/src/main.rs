@@ -3,7 +3,7 @@ use dotenv::dotenv;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use libaxum::oauth2_router;
-use liboauth2::OAUTH2_ROUTE_PREFIX;
+use oauth2_passkey::{OAUTH2_ROUTE_PREFIX, oauth2_init, storage_init, userdb_init};
 
 mod handlers;
 mod server;
@@ -31,8 +31,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     // Initialize the OAuth2 library
-    liboauth2::init().await?;
-    libsession::init().await?;
+    oauth2_init().await?;
+    storage_init().await?;
+    userdb_init().await?;
 
     let app = Router::new()
         .route("/", get(index))

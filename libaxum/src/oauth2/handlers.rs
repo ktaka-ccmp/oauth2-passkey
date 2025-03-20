@@ -10,17 +10,11 @@ use axum::{
 use axum_extra::{TypedHeader, headers};
 use std::collections::HashMap;
 
-use libauth::{
-    AuthResponse, OAUTH2_ROUTE_PREFIX, OAuth2Account, prepare_oauth2_auth_request,
-    verify_context_token_and_page,
+use oauth2_passkey::{
+    AuthResponse, OAUTH2_ROUTE_PREFIX, OAuth2Account, SessionUser, delete_oauth2_account_core,
+    get_authorized_core, list_accounts_core, post_authorized_core, prepare_logout_response,
+    prepare_oauth2_auth_request, verify_context_token_and_page,
 };
-
-use libauth::{
-    delete_oauth2_account_core, get_authorized_core, list_accounts_core, post_authorized_core,
-    prepare_logout_response,
-};
-
-use libsession::User as SessionUser;
 
 use crate::AuthUser;
 

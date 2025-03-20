@@ -7,7 +7,7 @@ use axum::{
 use axum_core::response::IntoResponse;
 
 use libaxum::passkey_router;
-use libpasskey::PASSKEY_ROUTE_PREFIX;
+use oauth2_passkey::{PASSKEY_ROUTE_PREFIX, passkey_init};
 
 mod routes;
 
@@ -27,7 +27,7 @@ async fn index() -> impl IntoResponse {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv::dotenv().ok();
-    libpasskey::init().await?;
+    passkey_init().await?;
 
     let app = Router::new()
         .route("/", get(index))

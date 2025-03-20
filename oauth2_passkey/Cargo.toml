@@ -1,0 +1,42 @@
+[package]
+name = "oauth2_passkey"
+version = { workspace = true }
+edition = { workspace = true }
+description = "OAuth2 and Passkey authentication for axum-oauth2-passkey"
+license = "MIT"
+authors = ["Kimitoshi Takahashi <ktaka@ccmp.jp>"]
+
+[dependencies]
+async-trait = { workspace = true }
+chrono.workspace = true
+headers.workspace = true
+http.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+hmac = "0.12.1"
+sha2 = "0.10.8"
+base64 = "0.22.1"
+
+ciborium = "0.2.2"
+oid-registry = "0.8.1"
+redis = { version = "0.29.1", features = ["tokio-comp"] }
+ring = { version = "0.17.14", features = ["std"] }
+webpki = { version = "0.22.4", features = ["std"] }
+x509-parser = { version = "0.17.0", features = ["validate", "verify"] }
+
+
+dashmap = "6.1.0"
+jsonwebtoken = "9.3.1"
+moka = { version = "0.12.10", features = ["future"] }
+once_cell = "1.21.1"
+pkcs1 = "0.7.5"
+reqwest = { version = "0.12.15", features = ["json"] }
+rsa = "0.9.8"
+url = "2.5.4"
+
