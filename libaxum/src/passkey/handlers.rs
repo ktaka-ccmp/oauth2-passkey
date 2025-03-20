@@ -1,6 +1,6 @@
 use askama::Template;
 use axum::{
-    extract::Json,
+    extract::{Json, Path},
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     response::{Html, IntoResponse, Response},
 };
@@ -101,7 +101,7 @@ pub(crate) async fn list_passkey_credentials(
 
 pub(crate) async fn delete_passkey_credential(
     auth_user: Option<AuthUser>,
-    axum::extract::Path(credential_id): axum::extract::Path<String>,
+    Path(credential_id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
     delete_passkey_credential_core(session_user, &credential_id)
