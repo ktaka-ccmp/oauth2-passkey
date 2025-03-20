@@ -1,7 +1,7 @@
 use askama::Template;
 use axum::{http::StatusCode, response::Html};
 use libaxum::AuthUser as User;
-use liboauth2::OAUTH2_ROUTE_PREFIX;
+use oauth2_passkey::OAUTH2_ROUTE_PREFIX;
 
 #[derive(Template)]
 #[template(path = "index_user.j2")]

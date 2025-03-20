@@ -29,14 +29,15 @@ pub use coordinate::{delete_user_account, update_user_account};
 
 pub use oauth2::{
     AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ROUTE_PREFIX, OAuth2Account,
-    OAuth2Store, csrf_checks, prepare_oauth2_auth_request, validate_origin,
+    OAuth2Store, csrf_checks, init as oauth2_init, prepare_oauth2_auth_request, validate_origin,
 };
 
 pub use passkey::{
     AuthenticationOptions, AuthenticatorResponse, PASSKEY_ROUTE_PREFIX, PasskeyStore,
     PublicKeyCredentialUserEntity, RegisterCredential, RegistrationOptions, StoredCredential,
     finish_authentication, finish_registration, gen_random_string, get_related_origin_json,
-    start_authentication, start_registration, verify_session_then_finish_registration,
+    init as passkey_init, start_authentication, start_registration,
+    verify_session_then_finish_registration,
 };
 
 pub use session::{
@@ -44,14 +45,15 @@ pub use session::{
     get_user_from_session, prepare_logout_response,
 };
 
-pub use storage::GENERIC_DATA_STORE;
+pub use storage::{GENERIC_DATA_STORE, init as storage_init};
+pub use userdb::init as userdb_init;
 
 /// Initialize the authentication coordination layer
 pub async fn init() -> Result<(), AuthError> {
     // Initialize the underlying stores
     userdb::init().await.map_err(AuthError::User)?;
-    oauth2::init().await.map_err(AuthError::OAuth2)?;
-    passkey::init().await.map_err(AuthError::Passkey)?;
+    oauth2_init().await.map_err(AuthError::OAuth2)?;
+    passkey_init().await.map_err(AuthError::Passkey)?;
 
     Ok(())
 }
