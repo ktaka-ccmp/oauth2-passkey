@@ -5,7 +5,9 @@
 - Middleware based page protection i.e. create a likes of is_authorized middleware.
 - Consolidate liboauth2, libpasskey, libsession and libstorage into libauth.
 - We'll do this after the tests are implemented
-- Schema check when initializing database connection.
+- Schema check when initializing database connection. Make sure the schema the program is expecting is the same as the one in the database.
+- When using Delete User button, deletion of passkey credentials aren't notified to Passkey Authenticator.
+- Adjust visibility of functions, structs, enums, etc. What needs to be public?
 
 ## Half Done
 
@@ -18,7 +20,6 @@
 - Passkey sync between RP and Authenticator using signalAllAcceptedCredentials.
 - Enable modification of User.account and User.label for logged in user.
 - Enable deletion of logged in user then logout.
-
 - Enable deletion of Passkey credential for logged in user.
 - Enable unlinking of OAuth2 account for logged in user.
 - Examine if we should use OAuth2Coordinator and PasskeyCoordinator.
@@ -47,6 +48,7 @@
   - For Passkey credential addition:
     - Context token verification before initiating registration
     - Session verification during the registration process
+- Prefix of tables in database can be configured in .env file.
 
 ## Memo
 
