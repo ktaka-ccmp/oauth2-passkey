@@ -22,7 +22,7 @@ pub(super) struct StoredOptions {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 /// Stored credential information for a passkey
-pub struct StoredCredential {
+pub struct PasskeyCredential {
     /// Raw credential ID bytes
     pub credential_id: String,
     /// User ID associated with this credential (database ID)

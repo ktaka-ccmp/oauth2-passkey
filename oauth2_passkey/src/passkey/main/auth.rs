@@ -12,7 +12,7 @@ use crate::passkey::config::{
 };
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::storage::PasskeyStore;
-use crate::passkey::types::{PublicKeyCredentialUserEntity, StoredCredential, StoredOptions};
+use crate::passkey::types::{PasskeyCredential, PublicKeyCredentialUserEntity, StoredOptions};
 
 use crate::utils::{base64url_decode, gen_random_string};
 
@@ -336,7 +336,7 @@ impl AuthenticatorData {
 /// For non-discoverable credentials, a user handle is optional.
 fn verify_user_handle(
     auth_response: &AuthenticatorResponse,
-    stored_credential: &StoredCredential,
+    stored_credential: &PasskeyCredential,
     is_discoverable: bool,
 ) -> Result<(), PasskeyError> {
     // Extract user handle from response
@@ -394,7 +394,7 @@ fn verify_user_handle(
 async fn verify_counter(
     credential_id: &str,
     auth_data: &AuthenticatorData,
-    stored_credential: &StoredCredential,
+    stored_credential: &PasskeyCredential,
 ) -> Result<(), PasskeyError> {
     let auth_counter = auth_data.counter;
     tracing::debug!(
@@ -441,7 +441,7 @@ async fn verify_signature(
     auth_response: &AuthenticatorResponse,
     client_data: &ParsedClientData,
     auth_data: &AuthenticatorData,
-    stored_credential: &StoredCredential,
+    stored_credential: &PasskeyCredential,
 ) -> Result<(), PasskeyError> {
     let verification_algorithm = &ring::signature::ECDSA_P256_SHA256_ASN1;
 

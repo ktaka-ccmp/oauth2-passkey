@@ -18,7 +18,7 @@ use crate::passkey::config::{
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::storage::PasskeyStore;
 use crate::passkey::types::{
-    CredentialSearchField, PublicKeyCredentialUserEntity, SessionInfo, StoredCredential,
+    CredentialSearchField, PasskeyCredential, PublicKeyCredentialUserEntity, SessionInfo,
     StoredOptions,
 };
 
@@ -217,7 +217,7 @@ pub async fn finish_registration(
 
     let credential_id_str = reg_data.raw_id.clone();
 
-    let credential = StoredCredential {
+    let credential = PasskeyCredential {
         credential_id: credential_id_str.clone(),
         user_id: user_id.to_string(),
         public_key,

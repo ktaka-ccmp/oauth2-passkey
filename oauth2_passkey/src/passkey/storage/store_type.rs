@@ -1,7 +1,8 @@
+use crate::passkey::PasskeyCredential;
 use crate::storage::GENERIC_DATA_STORE;
 
 use crate::passkey::errors::PasskeyError;
-use crate::passkey::types::{CredentialSearchField, StoredCredential};
+use crate::passkey::types::CredentialSearchField;
 
 use super::postgres::*;
 use super::sqlite::*;
@@ -24,7 +25,7 @@ impl PasskeyStore {
 
     pub async fn store_credential(
         credential_id: String,
-        credential: StoredCredential,
+        credential: PasskeyCredential,
     ) -> Result<(), PasskeyError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
@@ -39,7 +40,7 @@ impl PasskeyStore {
 
     pub async fn get_credential(
         credential_id: &str,
-    ) -> Result<Option<StoredCredential>, PasskeyError> {
+    ) -> Result<Option<PasskeyCredential>, PasskeyError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {
@@ -53,7 +54,7 @@ impl PasskeyStore {
 
     pub async fn get_credentials_by(
         field: CredentialSearchField,
-    ) -> Result<Vec<StoredCredential>, PasskeyError> {
+    ) -> Result<Vec<PasskeyCredential>, PasskeyError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {

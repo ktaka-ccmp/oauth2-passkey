@@ -33,8 +33,8 @@ pub use oauth2::{
 };
 
 pub use passkey::{
-    AuthenticationOptions, AuthenticatorResponse, PASSKEY_ROUTE_PREFIX, RegisterCredential,
-    RegistrationOptions, StoredCredential, get_related_origin_json,
+    AuthenticationOptions, AuthenticatorResponse, PASSKEY_ROUTE_PREFIX, PasskeyCredential,
+    RegisterCredential, RegistrationOptions, get_related_origin_json,
 };
 
 pub use session::{

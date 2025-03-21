@@ -2,7 +2,7 @@ use crate::storage::{DB_TABLE_PASSKEY_CREDENTIALS, DB_TABLE_USERS};
 use sqlx::{Pool, Sqlite};
 
 use crate::passkey::errors::PasskeyError;
-use crate::passkey::types::{CredentialSearchField, StoredCredential};
+use crate::passkey::types::{CredentialSearchField, PasskeyCredential};
 
 // SQLite implementations
 pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), PasskeyError> {
@@ -50,7 +50,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
 pub(super) async fn store_credential_sqlite(
     pool: &Pool<Sqlite>,
     credential_id: &str,
-    credential: &StoredCredential,
+    credential: &PasskeyCredential,
 ) -> Result<(), PasskeyError> {
     let counter_i64 = credential.counter as i64;
     let public_key = &credential.public_key;
@@ -89,10 +89,10 @@ pub(super) async fn store_credential_sqlite(
 pub(super) async fn get_credential_sqlite(
     pool: &Pool<Sqlite>,
     credential_id: &str,
-) -> Result<Option<StoredCredential>, PasskeyError> {
+) -> Result<Option<PasskeyCredential>, PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query_as::<_, StoredCredential>(&format!(
+    sqlx::query_as::<_, PasskeyCredential>(&format!(
         r#"SELECT * FROM {} WHERE credential_id = ?"#,
         passkey_table
     ))
@@ -105,7 +105,7 @@ pub(super) async fn get_credential_sqlite(
 pub(super) async fn get_credentials_by_field_sqlite(
     pool: &Pool<Sqlite>,
     field: &CredentialSearchField,
-) -> Result<Vec<StoredCredential>, PasskeyError> {
+) -> Result<Vec<PasskeyCredential>, PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
     let (query, value) = match field {
         CredentialSearchField::CredentialId(credential_id) => (
@@ -126,7 +126,7 @@ pub(super) async fn get_credentials_by_field_sqlite(
         ),
     };
 
-    sqlx::query_as::<_, StoredCredential>(query)
+    sqlx::query_as::<_, PasskeyCredential>(query)
         .bind(value)
         .fetch_all(pool)
         .await

@@ -7,8 +7,8 @@ use axum::{
 use serde_json::Value;
 
 use oauth2_passkey::{
-    AuthenticationOptions, AuthenticatorResponse, PASSKEY_ROUTE_PREFIX, RegisterCredential,
-    RegistrationOptions, RegistrationStartRequest, SessionUser, StoredCredential,
+    AuthenticationOptions, AuthenticatorResponse, PASSKEY_ROUTE_PREFIX, PasskeyCredential,
+    RegisterCredential, RegistrationOptions, RegistrationStartRequest, SessionUser,
     delete_passkey_credential_core, get_related_origin_json, handle_finish_authentication_core,
     handle_finish_registration_core, handle_start_authentication_core,
     handle_start_registration_core, list_credentials_core,
@@ -135,7 +135,7 @@ pub(crate) async fn serve_conditional_ui_js() -> Response {
 
 pub(crate) async fn list_passkey_credentials(
     auth_user: Option<AuthUser>,
-) -> Result<Json<Vec<StoredCredential>>, (StatusCode, String)> {
+) -> Result<Json<Vec<PasskeyCredential>>, (StatusCode, String)> {
     let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
     let credentials = list_credentials_core(session_user)
         .await

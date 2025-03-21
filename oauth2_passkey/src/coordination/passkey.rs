@@ -5,8 +5,8 @@ use serde_json::Value;
 use std::env;
 
 use crate::passkey::{
-    AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyStore,
-    RegisterCredential, RegistrationOptions, StoredCredential, finish_authentication,
+    AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyCredential,
+    PasskeyStore, RegisterCredential, RegistrationOptions, finish_authentication,
     finish_registration, start_authentication, start_registration,
     verify_session_then_finish_registration,
 };
@@ -209,7 +209,7 @@ pub async fn handle_finish_authentication_core(
 /// associated with that user, or an error if the user is not logged in.
 pub async fn list_credentials_core(
     user: Option<&SessionUser>,
-) -> Result<Vec<StoredCredential>, CoordinationError> {
+) -> Result<Vec<PasskeyCredential>, CoordinationError> {
     // Ensure user is authenticated
     let user = user.ok_or(CoordinationError::Unauthorized.log())?;
 

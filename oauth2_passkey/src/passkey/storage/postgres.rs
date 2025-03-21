@@ -4,7 +4,7 @@ use sqlx::{Pool, Postgres};
 
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::{
-    CredentialSearchField, PublicKeyCredentialUserEntity, StoredCredential,
+    CredentialSearchField, PasskeyCredential, PublicKeyCredentialUserEntity,
 };
 
 // PostgreSQL implementations
@@ -53,7 +53,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
 pub(super) async fn store_credential_postgres(
     pool: &Pool<Postgres>,
     credential_id: &str,
-    credential: &StoredCredential,
+    credential: &PasskeyCredential,
 ) -> Result<(), PasskeyError> {
     let counter_i32 = credential.counter as i32;
     let public_key = &credential.public_key;
@@ -95,10 +95,10 @@ pub(super) async fn store_credential_postgres(
 pub(super) async fn get_credential_postgres(
     pool: &Pool<Postgres>,
     credential_id: &str,
-) -> Result<Option<StoredCredential>, PasskeyError> {
+) -> Result<Option<PasskeyCredential>, PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query_as::<_, StoredCredential>(&format!(
+    sqlx::query_as::<_, PasskeyCredential>(&format!(
         r#"SELECT * FROM {} WHERE credential_id = $1"#,
         passkey_table
     ))
@@ -111,7 +111,7 @@ pub(super) async fn get_credential_postgres(
 pub(super) async fn get_credentials_by_field_postgres(
     pool: &Pool<Postgres>,
     field: &CredentialSearchField,
-) -> Result<Vec<StoredCredential>, PasskeyError> {
+) -> Result<Vec<PasskeyCredential>, PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
     let (query, value) = match field {
         CredentialSearchField::CredentialId(credential_id) => (
@@ -135,7 +135,7 @@ pub(super) async fn get_credentials_by_field_postgres(
         ),
     };
 
-    sqlx::query_as::<_, StoredCredential>(query)
+    sqlx::query_as::<_, PasskeyCredential>(query)
         .bind(value)
         .fetch_all(pool)
         .await
@@ -203,8 +203,8 @@ pub(super) async fn delete_credential_by_field_postgres(
 
 use sqlx::{FromRow, Row, postgres::PgRow, sqlite::SqliteRow};
 
-// Implement FromRow for StoredCredential to handle the flattened database structure for SQLite
-impl<'r> FromRow<'r, SqliteRow> for StoredCredential {
+// Implement FromRow for PasskeyCredential to handle the flattened database structure for SQLite
+impl<'r> FromRow<'r, SqliteRow> for PasskeyCredential {
     fn from_row(row: &'r SqliteRow) -> Result<Self, sqlx::Error> {
         let credential_id: String = row.try_get("credential_id")?;
         let user_id: String = row.try_get("user_id")?;
@@ -216,7 +216,7 @@ impl<'r> FromRow<'r, SqliteRow> for StoredCredential {
         let created_at: DateTime<Utc> = row.try_get("created_at")?;
         let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
 
-        Ok(StoredCredential {
+        Ok(PasskeyCredential {
             credential_id,
             user_id,
             public_key,
@@ -232,8 +232,8 @@ impl<'r> FromRow<'r, SqliteRow> for StoredCredential {
     }
 }
 
-// Implement FromRow for StoredCredential to handle the flattened database structure for PostgreSQL
-impl<'r> FromRow<'r, PgRow> for StoredCredential {
+// Implement FromRow for PasskeyCredential to handle the flattened database structure for PostgreSQL
+impl<'r> FromRow<'r, PgRow> for PasskeyCredential {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
         let credential_id: String = row.try_get("credential_id")?;
         let user_id: String = row.try_get("user_id")?;
@@ -245,7 +245,7 @@ impl<'r> FromRow<'r, PgRow> for StoredCredential {
         let created_at: DateTime<Utc> = row.try_get("created_at")?;
         let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
 
-        Ok(StoredCredential {
+        Ok(PasskeyCredential {
             credential_id,
             user_id,
             public_key,

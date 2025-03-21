@@ -14,7 +14,7 @@ pub use main::{
 };
 
 pub use storage::PasskeyStore;
-pub use types::{CredentialSearchField, StoredCredential};
+pub use types::{CredentialSearchField, PasskeyCredential};
 
 pub async fn init() -> Result<(), PasskeyError> {
     // Validate required environment variables early
