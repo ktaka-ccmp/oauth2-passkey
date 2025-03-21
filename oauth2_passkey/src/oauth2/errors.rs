@@ -1,3 +1,5 @@
+use crate::session::SessionError;
+use crate::utils::UtilError;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]
@@ -7,6 +9,9 @@ pub enum OAuth2Error {
 
     #[error("Crypto error: {0}")]
     Crypto(String),
+
+    #[error("Encoding error: {0}")]
+    Encoding(String),
 
     #[error("Cookie error: {0}")]
     Cookie(String),
@@ -55,4 +60,12 @@ pub enum OAuth2Error {
 
     #[error("Internal error: {0}")]
     Internal(String),
+
+    /// Error from utils operations
+    #[error("Utils error: {0}")]
+    Utils(#[from] UtilError),
+
+    /// Error from session operations
+    #[error("Session error: {0}")]
+    Session(#[from] SessionError),
 }

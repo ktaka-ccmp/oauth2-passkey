@@ -3,11 +3,11 @@
 ## Todo
 
 - Middleware based page protection i.e. create a likes of is_authorized middleware.
-- Consolidate liboauth2, libpasskey, libsession and libstorage into libauth.
 - We'll do this after the tests are implemented
 - Schema check when initializing database connection. Make sure the schema the program is expecting is the same as the one in the database.
 - When using Delete User button, deletion of passkey credentials aren't notified to Passkey Authenticator.
 - Adjust visibility of functions, structs, enums, etc. What needs to be public?
+- signalCurrentUserDetails seems not working on Android device.
 
 ## Half Done
 
@@ -50,7 +50,10 @@
     - Session verification during the registration process
 - Prefix of tables in database can be configured in .env file.
 
+- Consolidate liboauth2, libpasskey, libsession and libstorage into libauth.
+
 ## Memo
 
 ```text
 Can you take a look the following diff and if we aren't introducing any bugs and every change is OK suggest a commit message plz.
+```

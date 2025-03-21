@@ -1,11 +1,9 @@
-mod common;
 mod config;
 mod errors;
 mod main;
 mod storage;
 mod types;
 
-pub use common::{gen_random_string, init};
 pub use config::PASSKEY_ROUTE_PREFIX; // Required for route configuration
 pub use errors::PasskeyError;
 
@@ -16,4 +14,17 @@ pub use main::{
 };
 
 pub use storage::PasskeyStore;
-pub use types::{CredentialSearchField, PublicKeyCredentialUserEntity, StoredCredential};
+pub use types::{CredentialSearchField, PasskeyCredential};
+
+pub async fn init() -> Result<(), PasskeyError> {
+    // Validate required environment variables early
+    let _ = *config::PASSKEY_RP_ID;
+
+    crate::storage::init()
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    PasskeyStore::init().await?;
+
+    Ok(())
+}

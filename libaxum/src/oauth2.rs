@@ -17,17 +17,7 @@ use oauth2_passkey::{
 };
 
 use crate::AuthUser;
-
-// Helper trait for converting errors to a standard response error format
-trait IntoResponseError<T> {
-    fn into_response_error(self) -> Result<T, (StatusCode, String)>;
-}
-
-impl<T, E: std::fmt::Display> IntoResponseError<T> for Result<T, E> {
-    fn into_response_error(self) -> Result<T, (StatusCode, String)> {
-        self.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-    }
-}
+use crate::IntoResponseError;
 
 pub fn router() -> Router {
     Router::new()
@@ -57,12 +47,16 @@ pub(crate) async fn popup_close(
         .cloned()
         .unwrap_or_else(|| "Authentication completed".to_string());
     let template = PopupCloseTemplate { message };
-    let html = Html(template.render().into_response_error()?);
+    let html = Html(
+        template
+            .render()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+    );
     Ok(html)
 }
 
 pub(crate) async fn serve_oauth2_js() -> Result<Response, (StatusCode, String)> {
-    let js_content = include_str!("../../static/oauth2.js");
+    let js_content = include_str!("../static/oauth2.js");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
@@ -93,7 +87,7 @@ pub(crate) async fn google_auth(
 
     let (auth_url, headers) = prepare_oauth2_auth_request(headers)
         .await
-        .into_response_error()?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok((headers, Redirect::to(&auth_url)))
 }
@@ -103,7 +97,7 @@ pub async fn logout(
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
     let headers = prepare_logout_response(cookies)
         .await
-        .into_response_error()?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok((headers, Redirect::to("/")))
 }
 
@@ -112,7 +106,9 @@ pub async fn get_authorized(
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (headers, message) = get_authorized_core(&query, &cookies, &headers).await?;
+    let (headers, message) = get_authorized_core(&query, &cookies, &headers)
+        .await
+        .into_response_error()?;
 
     Ok((
         headers,
@@ -137,7 +133,9 @@ pub async fn post_authorized(
     headers: HeaderMap,
     Form(form): Form<AuthResponse>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (headers, message) = post_authorized_core(&form, &headers).await?;
+    let (headers, message) = post_authorized_core(&form, &headers)
+        .await
+        .into_response_error()?;
 
     Ok((
         headers,
@@ -156,7 +154,9 @@ pub async fn list_oauth2_accounts(
     let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
 
     // Call the core function with the extracted data
-    let accounts = list_accounts_core(session_user).await?;
+    let accounts = list_accounts_core(session_user)
+        .await
+        .into_response_error()?;
     Ok(Json(accounts))
 }
 
@@ -172,6 +172,6 @@ pub async fn delete_oauth2_account(
 
     delete_oauth2_account_core(session_user, &provider, &provider_user_id)
         .await
-        .map_err(|e| (e.0, e.1))
         .map(|()| StatusCode::NO_CONTENT)
+        .into_response_error()
 }

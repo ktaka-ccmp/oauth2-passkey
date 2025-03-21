@@ -1,6 +1,8 @@
 use thiserror::Error;
 
-#[derive(Debug, Error, Clone)]
+use crate::utils::UtilError;
+
+#[derive(Debug, Error)]
 pub enum PasskeyError {
     #[error("Configuration error: {0}")]
     Config(String),
@@ -40,16 +42,16 @@ pub enum PasskeyError {
 
     #[error("{0}")]
     Other(String),
-}
 
-impl From<redis::RedisError> for PasskeyError {
-    fn from(err: redis::RedisError) -> Self {
-        Self::Storage(err.to_string()) // Adjust this based on how you want to represent the error
-    }
-}
+    /// Error from utils operations
+    #[error("Utils error: {0}")]
+    Utils(#[from] UtilError),
 
-impl From<serde_json::Error> for PasskeyError {
-    fn from(err: serde_json::Error) -> Self {
-        Self::Serde(err.to_string())
-    }
+    /// Error from redis operations
+    #[error("Redis error: {0}")]
+    Redis(#[from] redis::RedisError),
+
+    /// Error from serde operations
+    #[error("Serde error: {0}")]
+    SerdeJson(#[from] serde_json::Error),
 }

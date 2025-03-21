@@ -1,3 +1,5 @@
-mod oauth2_store;
+mod postgres;
+mod sqlite;
+mod store_type;
 
-pub use oauth2_store::OAuth2Store;
+pub use store_type::OAuth2Store;

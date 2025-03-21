@@ -16,7 +16,7 @@ use headers::{Cookie, HeaderMapExt};
 /// Name of the cookie where the user context token will be stored
 pub const USER_CONTEXT_TOKEN_COOKIE: &str = "auth_context_token";
 
-use super::errors::AuthError;
+use crate::session::errors::SessionError;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -72,11 +72,11 @@ pub fn generate_user_context_token(user_id: &str) -> String {
 ///
 /// This function verifies the token's signature, checks expiration,
 /// and compares the obfuscated user ID
-pub fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(), AuthError> {
+pub fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(), SessionError> {
     // Parse token parts
     let parts: Vec<&str> = token.split(':').collect();
     if parts.len() != 3 {
-        return Err(AuthError::Authentication(
+        return Err(SessionError::ContextToken(
             "Invalid token format".to_string(),
         ));
     }
@@ -91,44 +91,48 @@ pub fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(
         tracing::debug!(
             "Session desynchronization detected: token user does not match session user"
         );
-        return Err(AuthError::SessionMismatch(
+        return Err(SessionError::ContextToken(
             "Your session has changed since this page was loaded".to_string(),
         ));
     }
 
     // Check expiration
-    let expiry = expiry_str
-        .parse::<i64>()
-        .map_err(|_| AuthError::Authentication("Invalid expiration format in token".to_string()))?;
+    let expiry = expiry_str.parse::<i64>().map_err(|_| {
+        SessionError::ContextToken("Invalid expiration format in token".to_string())
+    })?;
 
     let now = Utc::now().timestamp();
     if now > expiry {
-        return Err(AuthError::Authentication("Token has expired".to_string()));
+        return Err(SessionError::ContextToken("Token has expired".to_string()));
     }
 
     // Verify signature
     let data = format!("{}:{}", token_obfuscated_user_id, expiry_str);
     let mut mac = HmacSha256::new_from_slice(&AUTH_SERVER_SECRET)
-        .map_err(|_| AuthError::Authentication("Failed to create HMAC".to_string()))?;
+        .map_err(|_| SessionError::ContextToken("Failed to create HMAC".to_string()))?;
     mac.update(data.as_bytes());
 
     let signature = URL_SAFE_NO_PAD
         .decode(signature_base64)
-        .map_err(|_| AuthError::Authentication("Invalid signature encoding".to_string()))?;
+        .map_err(|_| SessionError::ContextToken("Invalid signature encoding".to_string()))?;
 
     mac.verify_slice(&signature)
-        .map_err(|_| AuthError::Authentication("Invalid token signature".to_string()))?;
+        .map_err(|_| SessionError::ContextToken("Invalid token signature".to_string()))?;
 
     Ok(())
 }
 
-pub(super) fn add_context_token_to_header(user_id: &str, headers: &mut HeaderMap) {
+pub(crate) fn add_context_token_to_header(
+    user_id: &str,
+    headers: &mut HeaderMap,
+) -> Result<(), SessionError> {
     if *USE_CONTEXT_TOKEN_COOKIE {
         let context_headers = create_context_token_cookie(user_id);
         for (key, value) in context_headers.iter() {
             headers.append(key, value.clone());
         }
     }
+    Ok(())
 }
 
 fn create_context_token_cookie(user_id: &str) -> HeaderMap {
@@ -168,18 +172,16 @@ pub fn extract_context_token_from_cookies(headers: &HeaderMap) -> Option<String>
 /// 1. Extracts and verifies the context token from cookies
 /// 2. Verifies that any page context (if provided) matches the user ID
 ///
-/// Returns AuthError if verification fails.
+/// Returns SessionError if verification fails.
 pub fn verify_context_token_and_page(
     headers: &HeaderMap,
     page_context: Option<&String>,
     user_id: &str,
-) -> Result<(), super::errors::AuthError> {
-    use super::errors::AuthError;
-
+) -> Result<(), SessionError> {
     if *USE_CONTEXT_TOKEN_COOKIE {
         // Extract token
         let context_token = extract_context_token_from_cookies(headers)
-            .ok_or_else(|| AuthError::Authentication("Context token missing".to_string()))?;
+            .ok_or_else(|| SessionError::ContextToken("Context token missing".to_string()))?;
 
         // Verify token belongs to user
         verify_user_context_token(&context_token, user_id)?;
@@ -188,7 +190,7 @@ pub fn verify_context_token_and_page(
     // Verify page context matches user (if provided)
     if let Some(context) = page_context {
         if !context.is_empty() && context != &obfuscate_user_id(user_id) {
-            return Err(AuthError::SessionMismatch(
+            return Err(SessionError::ContextToken(
                 "Page context does not match session user".to_string(),
             ));
         }

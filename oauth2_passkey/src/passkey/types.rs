@@ -1,6 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use super::errors::PasskeyError;
+use crate::storage::CacheData;
+
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct PublicKeyCredentialUserEntity {
     pub user_handle: String,
@@ -19,7 +22,7 @@ pub(super) struct StoredOptions {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 /// Stored credential information for a passkey
-pub struct StoredCredential {
+pub struct PasskeyCredential {
     /// Raw credential ID bytes
     pub credential_id: String,
     /// User ID associated with this credential (database ID)
@@ -60,4 +63,37 @@ pub enum CredentialSearchField {
     UserHandle(String),
     /// Search by username
     UserName(String),
+}
+
+/// Helper functions for cache store operations to improve code reuse and maintainability
+impl From<SessionInfo> for CacheData {
+    fn from(data: SessionInfo) -> Self {
+        Self {
+            value: serde_json::to_string(&data).expect("Failed to serialize SessionInfo"),
+        }
+    }
+}
+
+impl TryFrom<CacheData> for SessionInfo {
+    type Error = PasskeyError;
+
+    fn try_from(data: CacheData) -> Result<Self, Self::Error> {
+        serde_json::from_str(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
+    }
+}
+
+impl From<StoredOptions> for CacheData {
+    fn from(data: StoredOptions) -> Self {
+        Self {
+            value: serde_json::to_string(&data).expect("Failed to serialize StoredOptions"),
+        }
+    }
+}
+
+impl TryFrom<CacheData> for StoredOptions {
+    type Error = PasskeyError;
+
+    fn try_from(data: CacheData) -> Result<Self, Self::Error> {
+        serde_json::from_str(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
+    }
 }

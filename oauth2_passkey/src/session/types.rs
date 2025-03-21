@@ -1,5 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+
+use crate::session::errors::SessionError;
+use crate::storage::CacheData;
+
 // Minimal session information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionInfo {
@@ -48,4 +52,20 @@ impl From<DbUser> for User {
 pub(crate) struct StoredSession {
     pub(crate) info: SessionInfo,
     pub(crate) ttl: u64,
+}
+
+impl From<StoredSession> for CacheData {
+    fn from(data: StoredSession) -> Self {
+        Self {
+            value: serde_json::to_string(&data).expect("Failed to serialize StoredSession"),
+        }
+    }
+}
+
+impl TryFrom<CacheData> for StoredSession {
+    type Error = SessionError;
+
+    fn try_from(data: CacheData) -> Result<Self, Self::Error> {
+        serde_json::from_str(&data.value).map_err(|e| SessionError::Storage(e.to_string()))
+    }
 }

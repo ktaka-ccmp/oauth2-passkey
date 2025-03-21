@@ -1,64 +1,17 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
-use http::header::{COOKIE, HeaderMap};
-use ring::rand::SecureRandom;
+use http::header::HeaderMap;
 use std::time::Duration;
 use url::Url;
 
-use crate::oauth2::config::OAUTH2_CSRF_COOKIE_MAX_AGE;
-use crate::oauth2::errors::OAuth2Error;
-use crate::oauth2::types::{StateParams, StoredToken};
+use crate::oauth2::OAuth2Error;
+use crate::oauth2::{StateParams, StoredToken};
 
 use crate::session::{
-    SESSION_COOKIE_NAME, User as SessionUser, delete_session_from_store_by_session_id,
-    get_user_from_session,
+    User as SessionUser, delete_session_from_store_by_session_id, get_user_from_session,
 };
 use crate::storage::{CacheData, GENERIC_CACHE_STORE};
-
-pub(super) fn get_session_id_from_headers(
-    headers: &HeaderMap,
-) -> Result<Option<&str>, OAuth2Error> {
-    let Some(cookie_header) = headers.get(COOKIE) else {
-        tracing::debug!("No cookie header found");
-        return Ok(None);
-    };
-
-    let cookie_str = cookie_header.to_str().map_err(|e| {
-        tracing::error!("Invalid cookie header: {}", e);
-        OAuth2Error::SecurityTokenNotFound("Invalid cookie header".to_string())
-    })?;
-
-    let cookie_name = SESSION_COOKIE_NAME.as_str();
-    tracing::debug!("Looking for cookie: {}", cookie_name);
-
-    let session_id = cookie_str.split(';').map(|s| s.trim()).find_map(|s| {
-        let mut parts = s.splitn(2, '=');
-        match (parts.next(), parts.next()) {
-            (Some(k), Some(v)) if k == cookie_name => Some(v),
-            _ => None,
-        }
-    });
-
-    if session_id.is_none() {
-        tracing::debug!("No session cookie '{}' found in cookies", cookie_name);
-    }
-
-    Ok(session_id)
-}
-
-pub(super) fn base64url_encode(input: Vec<u8>) -> Result<String, OAuth2Error> {
-    Ok(URL_SAFE_NO_PAD.encode(input))
-}
-
-pub(super) fn gen_random_string(len: usize) -> Result<String, OAuth2Error> {
-    let rng = ring::rand::SystemRandom::new();
-    let mut session_id = vec![0u8; len];
-    rng.fill(&mut session_id)
-        .map_err(|_| OAuth2Error::Crypto("Failed to generate random string".to_string()))?;
-    let encoded = base64url_encode(session_id)
-        .map_err(|_| OAuth2Error::Crypto("Failed to encode random string".to_string()))?;
-    Ok(encoded)
-}
+use crate::utils::gen_random_string;
 
 pub(super) fn encode_state(state_params: StateParams) -> Result<String, OAuth2Error> {
     let state_json =
@@ -77,9 +30,29 @@ pub fn decode_state(state: &str) -> Result<StateParams, OAuth2Error> {
     Ok(state_in_response)
 }
 
+/// Store OAuth2-related tokens in the cache store
+///
+/// This function:
+/// 1. Generates a unique token ID
+/// 2. Creates a StoredToken struct with the token data and TTL
+/// 3. Stores the token in the cache using the provided token type and token ID
+///
+/// The token is stored with a TTL based on OAUTH2_CSRF_COOKIE_MAX_AGE
+/// and can be retrieved later using the token_type and token_id
+///
+/// # Arguments
+/// * `token_type` - Type identifier for the token (e.g., "access_token", "refresh_token")
+/// * `token` - The actual token string to store
+/// * `expires_at` - The expiration time of the token
+/// * `user_agent` - Optional user agent string for tracking
+///
+/// # Returns
+/// * `Ok(token_id)` - The generated token ID that can be used to retrieve the token
+/// * `Err(OAuth2Error)` - If token generation or storage fails
 pub(super) async fn store_token_in_cache(
     token_type: &str,
     token: &str,
+    ttl: u64,
     expires_at: DateTime<Utc>,
     user_agent: Option<String>,
 ) -> Result<String, OAuth2Error> {
@@ -89,7 +62,7 @@ pub(super) async fn store_token_in_cache(
         token: token.to_string(),
         expires_at,
         user_agent,
-        ttl: *OAUTH2_CSRF_COOKIE_MAX_AGE,
+        ttl,
     };
 
     GENERIC_CACHE_STORE
@@ -104,25 +77,12 @@ pub(super) async fn store_token_in_cache(
 
 pub async fn generate_store_token(
     token_type: &str,
+    ttl: u64,
     expires_at: DateTime<Utc>,
     user_agent: Option<String>,
 ) -> Result<(String, String), OAuth2Error> {
     let token = gen_random_string(32)?;
-    let token_id = gen_random_string(32)?;
-
-    let token_data = StoredToken {
-        token: token.clone(),
-        expires_at,
-        user_agent,
-        ttl: *OAUTH2_CSRF_COOKIE_MAX_AGE,
-    };
-
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .put(token_type, &token_id, token_data.into())
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+    let token_id = store_token_in_cache(token_type, &token, ttl, expires_at, user_agent).await?;
 
     Ok((token, token_id))
 }

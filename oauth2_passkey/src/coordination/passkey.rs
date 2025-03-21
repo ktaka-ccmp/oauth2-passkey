@@ -1,21 +1,21 @@
 use chrono::Utc;
-use http::{HeaderMap, StatusCode};
+use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::env;
 
 use crate::passkey::{
-    AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyStore,
-    RegisterCredential, RegistrationOptions, StoredCredential, finish_authentication,
+    AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyCredential,
+    PasskeyStore, RegisterCredential, RegistrationOptions, finish_authentication,
     finish_registration, start_authentication, start_registration,
     verify_session_then_finish_registration,
 };
-use crate::session::{User as SessionUser, create_session_with_uid};
+use crate::session::User as SessionUser;
+use crate::session::{renew_session_header, verify_context_token_and_page};
 use crate::userdb::{User, UserStore};
 
-use super::context_token::{add_context_token_to_header, verify_context_token_and_page};
-use super::errors::AuthError;
-use super::user_flow::gen_new_user_id;
+use super::errors::CoordinationError;
+use super::user::gen_new_user_id;
 
 /// Get the configured Passkey field mappings or defaults
 fn get_passkey_field_mappings() -> (String, String) {
@@ -54,31 +54,26 @@ pub async fn handle_start_registration_core(
     auth_user: Option<&SessionUser>,
     request_headers: &HeaderMap,
     body: RegistrationStartRequest,
-) -> Result<RegistrationOptions, (StatusCode, String)> {
+) -> Result<RegistrationOptions, CoordinationError> {
     match body.mode {
         RegistrationMode::AddToExistingUser => {
-            // let auth_user_id = auth_user.map(|u| u.id).unwrap();
-            let Some(auth_user) = auth_user else {
-                return Err((
-                    StatusCode::UNAUTHORIZED,
-                    "Missing authentication user".to_string(),
-                ));
-            };
+            let auth_user = auth_user.ok_or(CoordinationError::Unauthorized.log())?;
 
             verify_context_token_and_page(
                 request_headers,
                 body.page_context.as_ref(),
                 &auth_user.id,
-            )
-            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+            )?;
 
-            start_registration(Some(auth_user.clone()), body.username, body.displayname)
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+            let result =
+                start_registration(Some(auth_user.clone()), body.username, body.displayname)
+                    .await?;
+            Ok(result)
         }
-        RegistrationMode::NewUser => start_registration(None, body.username, body.displayname)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+        RegistrationMode::NewUser => {
+            let result = start_registration(None, body.username, body.displayname).await?;
+            Ok(result)
+        }
     }
 }
 
@@ -91,7 +86,7 @@ pub async fn handle_finish_registration_core(
     auth_user: Option<&SessionUser>,
     request_headers: &HeaderMap,
     reg_data: RegisterCredential,
-) -> Result<(HeaderMap, String), (StatusCode, String)> {
+) -> Result<(HeaderMap, String), CoordinationError> {
     match auth_user {
         Some(session_user) => {
             tracing::debug!("handle_finish_registration_core: User: {:#?}", session_user);
@@ -100,13 +95,11 @@ pub async fn handle_finish_registration_core(
                 request_headers,
                 reg_data.page_context.as_ref(),
                 &session_user.id,
-            )
-            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+            )?;
 
             // Handle authenticated user registration
-            let message = verify_session_then_finish_registration(session_user.clone(), reg_data)
-                .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+            let message =
+                verify_session_then_finish_registration(session_user.clone(), reg_data).await?;
 
             Ok((HeaderMap::new(), message))
         }
@@ -116,16 +109,11 @@ pub async fn handle_finish_registration_core(
             match result {
                 Ok((message, stored_user_id)) => {
                     // Create session with the user_id
-                    let mut headers = create_session_with_uid(&stored_user_id)
-                        .await
-                        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-
-                    // Add context token cookie for session boundary protection
-                    add_context_token_to_header(&stored_user_id, &mut headers);
+                    let headers = renew_session_header(stored_user_id).await?;
 
                     Ok((headers, message))
                 }
-                Err(err) => Err((StatusCode::BAD_REQUEST, err.to_string())),
+                Err(err) => Err(err),
             }
         }
     }
@@ -133,7 +121,7 @@ pub async fn handle_finish_registration_core(
 
 async fn create_user_then_finish_registration(
     reg_data: RegisterCredential,
-) -> Result<(String, String), AuthError> {
+) -> Result<(String, String), CoordinationError> {
     let (account, label) = get_account_and_label_from_passkey(&reg_data).await;
 
     let new_user = User {
@@ -144,13 +132,9 @@ async fn create_user_then_finish_registration(
         updated_at: Utc::now(),
     };
 
-    let stored_user = UserStore::upsert_user(new_user.clone())
-        .await
-        .map_err(AuthError::User)?;
+    let stored_user = UserStore::upsert_user(new_user.clone()).await?;
 
-    let message = finish_registration(&stored_user.id, &reg_data)
-        .await
-        .map_err(AuthError::Passkey)?;
+    let message = finish_registration(&stored_user.id, &reg_data).await?;
 
     Ok((message, stored_user.id))
 }
@@ -183,7 +167,7 @@ async fn get_account_and_label_from_passkey(reg_data: &RegisterCredential) -> (S
 /// authentication process.
 pub async fn handle_start_authentication_core(
     body: &Value,
-) -> Result<AuthenticationOptions, (StatusCode, String)> {
+) -> Result<AuthenticationOptions, CoordinationError> {
     // Extract username from the request body
     let username = if body.is_object() {
         body.get("username")
@@ -196,10 +180,7 @@ pub async fn handle_start_authentication_core(
     };
 
     // Start the authentication process
-    start_authentication(username).await.map_err(|e| {
-        tracing::debug!("Error: {:#?}", e);
-        (StatusCode::BAD_REQUEST, e.to_string())
-    })
+    Ok(start_authentication(username).await?)
 }
 
 /// Core function that handles the business logic of finishing authentication
@@ -208,23 +189,16 @@ pub async fn handle_start_authentication_core(
 /// authenticated user, and returns the user ID, name, and session headers.
 pub async fn handle_finish_authentication_core(
     auth_response: AuthenticatorResponse,
-) -> Result<(String, String, HeaderMap), (StatusCode, String)> {
+) -> Result<(String, String, HeaderMap), CoordinationError> {
     tracing::debug!("Auth response: {:#?}", auth_response);
 
     // Verify the authentication and get the user ID and name
-    let (uid, name) = finish_authentication(auth_response)
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    let (uid, name) = finish_authentication(auth_response).await?;
 
     tracing::debug!("User ID: {:#?}", uid);
 
     // Create a session for the authenticated user
-    let mut headers = create_session_with_uid(&uid)
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-
-    // Add context token headers for session boundary protection
-    add_context_token_to_header(&uid, &mut headers);
+    let headers = renew_session_header(uid.clone()).await?;
 
     Ok((uid, name, headers))
 }
@@ -235,16 +209,14 @@ pub async fn handle_finish_authentication_core(
 /// associated with that user, or an error if the user is not logged in.
 pub async fn list_credentials_core(
     user: Option<&SessionUser>,
-) -> Result<Vec<StoredCredential>, (StatusCode, String)> {
-    match user {
-        Some(user) => {
-            tracing::debug!("list_credentials_core: User: {:#?}", user);
-            PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user.id.to_owned()))
-                .await
-                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
-        }
-        None => Err((StatusCode::BAD_REQUEST, "Not logged in!".to_string())),
-    }
+) -> Result<Vec<PasskeyCredential>, CoordinationError> {
+    // Ensure user is authenticated
+    let user = user.ok_or(CoordinationError::Unauthorized.log())?;
+
+    tracing::debug!("list_credentials_core: User: {:#?}", user);
+    let credentials =
+        PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user.id.to_owned())).await?;
+    Ok(credentials)
 }
 
 /// Delete a passkey credential for a user
@@ -254,49 +226,37 @@ pub async fn list_credentials_core(
 pub async fn delete_passkey_credential_core(
     user: Option<&SessionUser>,
     credential_id: &str,
-) -> Result<(), (StatusCode, String)> {
+) -> Result<(), CoordinationError> {
     // Ensure user is authenticated
-    let user = match user {
-        Some(user) => user,
-        None => {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                "User not authenticated".to_string(),
-            ));
-        }
-    };
+    let user = user.ok_or(CoordinationError::Unauthorized.log())?;
 
+    tracing::debug!("delete_passkey_credential_core: User: {:#?}", user);
     tracing::debug!("Attempting to delete credential with ID: {}", credential_id);
 
     let credential = PasskeyStore::get_credentials_by(CredentialSearchField::CredentialId(
         credential_id.to_owned(),
     ))
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .await?
     .into_iter()
     .next()
-    .ok_or((
-        StatusCode::NOT_FOUND,
-        format!("Credential not found with ID: {}", credential_id),
-    ))?;
+    .ok_or(
+        CoordinationError::ResourceNotFound {
+            resource_type: "Passkey".to_string(),
+            resource_id: credential_id.to_string(),
+        }
+        .log(),
+    )?;
 
     // Verify the credential belongs to the authenticated user
     if credential.user_id != user.id {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Not authorized to delete this credential".to_string(),
-        ));
+        return Err(CoordinationError::Unauthorized.log());
     }
 
     // Delete the credential using the raw credential ID format from the database
     PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
         credential.credential_id.clone(),
     ))
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to delete credential: {}", e);
-        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-    })?;
+    .await?;
 
     tracing::debug!("Successfully deleted credential");
 

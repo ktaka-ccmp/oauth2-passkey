@@ -1,14 +1,16 @@
 use chrono::{Duration, Utc};
 use headers::Cookie;
-use http::header::HeaderMap;
+use http::header::{COOKIE, HeaderMap};
 
-use crate::session::common::{gen_random_string, header_set_cookie};
+use super::context_token::add_context_token_to_header;
+
 use crate::session::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
 use crate::session::errors::SessionError;
 use crate::session::types::{SessionInfo, StoredSession, User as SessionUser};
+use crate::utils::{gen_random_string, header_set_cookie};
 
 use crate::storage::GENERIC_CACHE_STORE;
-use crate::userdb::{User as DbUser, UserStore};
+use crate::userdb::UserStore;
 
 /// Get user information from libuserdb for a given session
 pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderMap, SessionError> {
@@ -87,18 +89,6 @@ pub async fn delete_session_from_store_by_session_id(session_id: &str) -> Result
     Ok(())
 }
 
-pub async fn create_session_with_user(user_data: SessionUser) -> Result<HeaderMap, SessionError> {
-    let db_user: DbUser = user_data.into_db_user();
-
-    // Store the user in the database
-    let user: SessionUser = UserStore::upsert_user(db_user)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
-        .into();
-
-    create_session_with_uid(&user.id).await
-}
-
 pub async fn create_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {
     // Create minimal session info
     let session_info = SessionInfo {
@@ -126,4 +116,45 @@ pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, 
         .ok_or(SessionError::SessionError)?;
 
     Ok(SessionUser::from(user))
+}
+
+pub fn get_session_id_from_headers(headers: &HeaderMap) -> Result<Option<&str>, SessionError> {
+    let Some(cookie_header) = headers.get(COOKIE) else {
+        tracing::debug!("No cookie header found");
+        return Ok(None);
+    };
+
+    let cookie_str = cookie_header.to_str().map_err(|e| {
+        tracing::error!("Invalid cookie header: {}", e);
+        SessionError::HeaderError("Invalid cookie header".to_string())
+    })?;
+
+    let cookie_name = SESSION_COOKIE_NAME.as_str();
+    tracing::debug!("Looking for cookie: {}", cookie_name);
+
+    let session_id = cookie_str.split(';').map(|s| s.trim()).find_map(|s| {
+        let mut parts = s.splitn(2, '=');
+        match (parts.next(), parts.next()) {
+            (Some(k), Some(v)) if k == cookie_name => Some(v),
+            _ => None,
+        }
+    });
+
+    if session_id.is_none() {
+        tracing::debug!("No session cookie '{}' found in cookies", cookie_name);
+    }
+
+    Ok(session_id)
+}
+
+#[tracing::instrument]
+pub(crate) async fn renew_session_header(user_id: String) -> Result<HeaderMap, SessionError> {
+    // Create session cookie for authentication
+    let mut headers = create_session_with_uid(&user_id).await?;
+
+    add_context_token_to_header(&user_id, &mut headers)?;
+
+    tracing::debug!("Created session and context token cookies: {headers:?}");
+
+    Ok(headers)
 }

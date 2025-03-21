@@ -2,115 +2,91 @@
 
 ## Overview
 
-The following is a blueprint of the architecture of this application. It reflects the current state of the application with proposed consolidation of components.
+The following is a blueprint of the architecture of this application. It reflects the current state of the application as of March 2025.
 
 ## Current Components
 
-- demo-integrated: example of axum application that uses oauth2 and passkey authentication
-- libaxum: provides oauth2 and passkey authentication handlers for axum application
-- libauth: public interface to provide oauth2 and passkey authentication. Also acts as authentication coordination layer.
-  - liboauth2: oauth2 operations, stores oauth2 accounts. refers user_id from libuserdb
-  - libpasskey: passkey operations, stores passkey credentials. refers user_id from libuserdb
-  - libsession: manages session using cache store, provides session cookie. refers user_id from libuserdb
-  - libstorage: cache & operation provider, SQL store provider
-- libuserdb(replaceable): user_id provider
+- **demo-integrated**: Example Axum application that uses OAuth2 and passkey authentication
+- **libaxum**: Provides OAuth2 and passkey authentication handlers for Axum applications
+  - Includes routers for OAuth2, passkey, and user summary endpoints
+  - Handles HTTP-specific concerns like request/response handling
+- **oauth2_passkey**: Core authentication coordination library
+  - **coordination**: Central coordination layer that orchestrates authentication flows
+  - **oauth2**: OAuth2 authentication operations, stores OAuth2 accounts
+  - **passkey**: Passkey/WebAuthn operations, stores passkey credentials
+  - **session**: Session management using cache store, provides session cookies
+  - **storage**: Cache and SQL store providers (PostgreSQL and SQLite support)
+  - **userdb**: User database operations, provides user_id management
+  - **utils**: Common utility functions
 
-## Proposed Consolidation
+## Component Responsibilities
 
-To simplify the architecture and reduce dependencies, we propose the following consolidation:
+### oauth2_passkey (Core Library)
 
-- demo-integrated: remains as is
-- libaxum: remains as is
-- libauth: becomes the main public interface with internal modules
-  - auth::oauth2: (formerly liboauth2) internal module for oauth2 operations
-  - auth::passkey: (formerly libpasskey) internal module for passkey operations
-  - auth::session: (formerly libsession) internal module for session management
-  - auth::storage: (formerly libstorage) internal module for storage operations
-- libuserdb: remains separate as it's designed to be replaceable
+- **coordination**: Provides a unified API for authentication operations
+  - Orchestrates the authentication flows between different modules
+  - Handles error mapping and coordination between components
+  - Exposes high-level functions for authentication operations
 
-## Benefits of Consolidation
+- **oauth2**: Handles OAuth2 authentication
+  - Manages OAuth2 provider integration
+  - Stores and retrieves OAuth2 accounts
+  - Handles OAuth2 authentication flow (authorization, token exchange)
 
-- Simplified dependency management
-- Easier maintenance with related code in one place
-- Reduced boilerplate for inter-module communication
-- Better encapsulation of internal implementation details
-- Smaller dependency footprint for users of the library
+- **passkey**: Handles WebAuthn/Passkey authentication
+  - Manages passkey registration and authentication
+  - Stores and retrieves passkey credentials
+  - Implements WebAuthn protocol for credential verification
 
-## Notes
+- **session**: Manages user sessions
+  - Creates and validates session tokens
+  - Handles session cookies and context tokens
+  - Provides user information from sessions
 
-- libuserdb remains replaceable, allowing for alternative user_id providers or external REST APIs
-- The consolidated approach maintains logical separation of concerns while reducing crate boundaries
+- **storage**: Provides data persistence
+  - Implements cache storage for temporary data
+  - Provides SQL database access for persistent data
+  - Supports both PostgreSQL and SQLite
 
-## Analysis of the codebase as of 202503171800
+- **userdb**: Manages user accounts
+  - Creates and updates user records
+  - Provides user lookup functionality
+  - Links authentication methods to user accounts
 
-### Component Structure Verification
+### libaxum (Axum Integration)
 
-The codebase correctly follows the architecture outlined in the "Current Components" section:
+- Provides Axum-specific HTTP handlers and routers
+- Translates between HTTP requests/responses and core library functions
+- Manages authentication middleware for Axum applications
 
-1. **libauth**: Acts as the coordination layer between different authentication mechanisms
-   - Provides public interfaces through `OAuth2Coordinator` and `PasskeyCoordinator`
-   - Initializes all required stores and handles errors appropriately
+## Data Flow
 
-2. **liboauth2**: Handles OAuth2 operations
-   - Manages OAuth2 accounts in its own database tables
-   - References user_id from libuserdb as specified
-   - Properly exports necessary types and functions
+1. HTTP requests are received by the Axum application
+2. libaxum handlers process the requests and call oauth2_passkey functions
+3. The coordination layer orchestrates the authentication flow
+4. Specific modules (oauth2, passkey, session) handle their respective operations
+5. User data is stored and retrieved through the storage layer
+6. Responses are returned through libaxum to the client
 
-3. **libpasskey**: Manages passkey credentials
-   - Stores passkey credentials with references to user_id
-   - Provides authentication and registration functionality
-   - Correctly exports necessary types
+## Security Considerations
 
-4. **libsession**: Manages session using cache store
-   - Provides session cookie functionality
-   - References user_id from libuserdb
+- Session tokens are securely managed with proper expiration
+- Context tokens provide protection against session desynchronization
+- Passkey credentials follow WebAuthn security standards
+- OAuth2 implementation follows best practices for authorization flow
 
-5. **libstorage**: Provides storage solutions
-   - Offers SQL store provider functionality
-   - Used by other components for database operations
+## Dependency Structure
 
-6. **libuserdb**: Acts as the user_id provider
-   - Manages user data independently
-   - No longer contains OAuth2 account functionality (correctly moved)
+The dependencies between components are implemented as follows:
 
-7. **libaxum**: Provides handlers for axum applications
-   - Correctly implements OAuth2 and passkey authentication routes
-   - Uses the coordination layer (libauth) appropriately
+- libaxum depends on oauth2_passkey
+- oauth2_passkey depends on its internal modules (oauth2, passkey, session, storage, userdb)
+- oauth2 and passkey depend on storage but not on each other
+- userdb depends on storage but not on oauth2 or passkey
 
-### Dependency Structure
+## Future Directions
 
-The dependencies between components are correctly implemented:
-
-- libauth depends on liboauth2, libpasskey, libuserdb, and libstorage
-- liboauth2 and libpasskey depend on libstorage but not on each other
-- libuserdb depends on libstorage but not on liboauth2 or libpasskey
-- libaxum depends on all the libraries to provide its handlers
-
-### Identified Issues
-
-1. **Incomplete Passkey Coordinator Implementation**:
-   - The `PasskeyCoordinator::get_credentials_by_user_id` method returns an empty vector with a comment indicating it's a placeholder
-   - This could lead to issues if any code relies on this method returning actual credentials
-
-2. **Counter Verification in Passkey Authentication**:
-   - The counter verification in `libpasskey/src/passkey/auth.rs` is fully implemented and working correctly
-   - The implementation properly checks if the counter is supported, verifies it has increased, and updates the stored counter value after successful verification
-   - The code correctly handles potential cloning attacks by detecting decreased counter values
-
-3. **WebAuthn Terminology**:
-   - The codebase maintains backward compatibility by using both older terminology ("resident key", "require_resident_key") and newer terminology ("discoverable credential")
-   - Comments and documentation acknowledge the updated terminology from WebAuthn Level 2 specification
-   - This approach is appropriate for maintaining compatibility with existing authenticators and client libraries
-
-4. **Error Handling Consistency** (to be addressed during consolidation):
-   - Some components use `thiserror` for error handling while others use custom error types
-   - This would be best addressed during the consolidation of libraries into `libauth`
-   - Standardizing on `thiserror` across all components would improve consistency
-
-5. **Potential Circular Dependency Risk** (to be addressed during consolidation):
-   - While the current implementation avoids circular dependencies, the coordination layer (libauth) depends on all other components
-   - The proposed consolidation would naturally resolve this by placing all components under a single crate with proper module boundaries
-
-### Conclusion
-
-The recent refactoring to move OAuth2Account-related functionality from libuserdb to liboauth2 has been successfully implemented, and the separation of concerns is maintained. The proposed consolidation approach would further simplify the codebase by reducing the number of separate crates while maintaining logical separation through modules.
+- Further consolidation of related functionality
+- Enhanced error handling and logging with standardization on thiserror
+- Additional authentication methods
+- Improved documentation and examples

@@ -4,6 +4,7 @@ mod challenge;
 mod register;
 mod related_origin;
 mod types;
+mod utils;
 
 pub use types::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,

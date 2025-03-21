@@ -1,8 +1,8 @@
 [workspace]
 members = [
     "demo-integration",
-    "demo-oauth2",
-    "demo-passkey",
+    # "demo-oauth2",
+    # "demo-passkey",
     "libaxum",
     "oauth2_passkey",
 ]

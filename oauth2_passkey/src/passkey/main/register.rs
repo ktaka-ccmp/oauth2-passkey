@@ -8,11 +8,8 @@ use super::types::{
     AttestationObject, AuthenticatorSelection, PubKeyCredParam, RegisterCredential,
     RegistrationOptions, RelyingParty, WebAuthnClientData,
 };
+use super::utils::{get_from_cache, remove_from_cache, store_in_cache};
 
-use crate::passkey::common::{
-    base64url_decode, base64url_encode, gen_random_string, get_from_cache, remove_from_cache,
-    store_in_cache,
-};
 use crate::passkey::config::{
     ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
     PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID, PASSKEY_RP_NAME,
@@ -21,9 +18,11 @@ use crate::passkey::config::{
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::storage::PasskeyStore;
 use crate::passkey::types::{
-    CredentialSearchField, PublicKeyCredentialUserEntity, SessionInfo, StoredCredential,
+    CredentialSearchField, PasskeyCredential, PublicKeyCredentialUserEntity, SessionInfo,
     StoredOptions,
 };
+
+use crate::utils::{base64url_decode, base64url_encode, gen_random_string};
 
 /// Resolves a user handle for passkey registration
 ///
@@ -218,7 +217,7 @@ pub async fn finish_registration(
 
     let credential_id_str = reg_data.raw_id.clone();
 
-    let credential = StoredCredential {
+    let credential = PasskeyCredential {
         credential_id: credential_id_str.clone(),
         user_id: user_id.to_string(),
         public_key,

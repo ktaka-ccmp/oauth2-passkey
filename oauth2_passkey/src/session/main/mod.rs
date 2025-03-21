@@ -1,6 +1,10 @@
-mod core;
+mod context_token;
+// mod cookie;
+mod session;
 
-pub use core::{
-    create_session_with_uid, delete_session_from_store_by_session_id, get_user_from_session,
-    prepare_logout_response,
+pub(crate) use session::{
+    delete_session_from_store_by_session_id, get_session_id_from_headers, renew_session_header,
 };
+
+pub use context_token::{obfuscate_user_id, verify_context_token_and_page};
+pub use session::{get_user_from_session, prepare_logout_response};
