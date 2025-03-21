@@ -56,7 +56,7 @@ pub(crate) async fn popup_close(
 }
 
 pub(crate) async fn serve_oauth2_js() -> Result<Response, (StatusCode, String)> {
-    let js_content = include_str!("../../static/oauth2.js");
+    let js_content = include_str!("../static/oauth2.js");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")

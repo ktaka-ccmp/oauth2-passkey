@@ -7,15 +7,49 @@ use axum::{
 use serde_json::Value;
 
 use oauth2_passkey::{
-    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
-    RegistrationStartRequest, SessionUser, delete_passkey_credential_core,
-    handle_finish_authentication_core, handle_finish_registration_core,
-    handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
+    AuthenticationOptions, AuthenticatorResponse, PASSKEY_ROUTE_PREFIX, RegisterCredential,
+    RegistrationOptions, RegistrationStartRequest, SessionUser, StoredCredential,
+    delete_passkey_credential_core, get_related_origin_json, handle_finish_authentication_core,
+    handle_finish_registration_core, handle_start_authentication_core,
+    handle_start_registration_core, list_credentials_core,
 };
-use oauth2_passkey::{PASSKEY_ROUTE_PREFIX, StoredCredential, get_related_origin_json};
 
 use crate::IntoResponseError;
 use crate::session::AuthUser;
+
+use axum::routing::{Router, delete, get, post};
+
+pub fn router() -> Router {
+    Router::new()
+        .route("/passkey.js", get(serve_passkey_js))
+        .route("/conditional_ui", get(conditional_ui))
+        .route("/conditional_ui.js", get(serve_conditional_ui_js))
+        .nest("/auth", router_auth())
+        .nest("/register", router_register())
+        .route("/credentials", get(list_passkey_credentials))
+        .route(
+            "/credentials/{credential_id}",
+            delete(delete_passkey_credential),
+        )
+}
+
+pub fn router_register() -> Router {
+    Router::new()
+        .route("/start", post(handle_start_registration))
+        .route("/finish", post(handle_finish_registration))
+}
+
+pub fn router_auth() -> Router {
+    Router::new()
+        .route("/start", post(handle_start_authentication))
+        .route("/finish", post(handle_finish_authentication))
+}
+
+/// Creates a router for the WebAuthn well-known endpoint
+/// This should be mounted at the root level of the application
+pub fn passkey_well_known_router() -> Router {
+    Router::new().route("/webauthn", get(serve_related_origin))
+}
 
 pub(crate) async fn handle_start_registration(
     auth_user: Option<AuthUser>,
@@ -69,7 +103,7 @@ pub(crate) async fn handle_finish_authentication(
 }
 
 pub(crate) async fn serve_passkey_js() -> Response {
-    let js_content = include_str!("../../static/passkey.js");
+    let js_content = include_str!("../static/passkey.js");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
@@ -91,7 +125,7 @@ pub(crate) async fn conditional_ui() -> impl IntoResponse {
 }
 
 pub(crate) async fn serve_conditional_ui_js() -> Response {
-    let js_content = include_str!("../../static/conditional_ui.js");
+    let js_content = include_str!("../static/conditional_ui.js");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")

@@ -8,8 +8,8 @@ use super::types::{
     AttestationObject, AuthenticatorSelection, PubKeyCredParam, RegisterCredential,
     RegistrationOptions, RelyingParty, WebAuthnClientData,
 };
+use super::utils::{get_from_cache, remove_from_cache, store_in_cache};
 
-use crate::passkey::common::{get_from_cache, remove_from_cache, store_in_cache};
 use crate::passkey::config::{
     ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
     PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID, PASSKEY_RP_NAME,

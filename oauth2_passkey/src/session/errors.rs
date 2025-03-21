@@ -22,4 +22,7 @@ pub enum SessionError {
     /// Error from utils operations
     #[error("Utils error: {0}")]
     Utils(#[from] UtilError),
+
+    #[error("Header error: {0}")]
+    HeaderError(String),
 }

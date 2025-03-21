@@ -5,8 +5,8 @@ use super::types::{
     AllowCredential, AuthenticationOptions, AuthenticatorData, AuthenticatorResponse,
     ParsedClientData,
 };
+use super::utils::{name2cid_str_vec, store_in_cache};
 
-use crate::passkey::common::{name2cid_str_vec, store_in_cache};
 use crate::passkey::config::{
     ORIGIN, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
 };

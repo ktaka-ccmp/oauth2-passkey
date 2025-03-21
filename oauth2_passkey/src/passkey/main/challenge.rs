@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use crate::passkey::common::{get_from_cache, remove_from_cache};
+use super::utils::{get_from_cache, remove_from_cache};
 use crate::passkey::config::PASSKEY_CHALLENGE_TIMEOUT;
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::StoredOptions;

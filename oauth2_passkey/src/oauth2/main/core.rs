@@ -10,33 +10,35 @@ use crate::oauth2::config::{
 };
 use crate::oauth2::errors::OAuth2Error;
 use crate::oauth2::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken};
-use crate::utils::header_set_cookie;
+use crate::session::get_session_id_from_headers;
+use crate::utils::{base64url_encode, header_set_cookie};
 
 use super::google::{exchange_code_for_token, fetch_user_data_from_google};
 use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
 use super::utils::{
-    base64url_encode, decode_state, encode_state, generate_store_token,
-    get_session_id_from_headers, get_token_from_store, remove_token_from_store,
-    store_token_in_cache,
+    decode_state, encode_state, generate_store_token, get_token_from_store,
+    remove_token_from_store, store_token_in_cache,
 };
 
 pub async fn prepare_oauth2_auth_request(
     headers: HeaderMap,
 ) -> Result<(String, HeaderMap), OAuth2Error> {
     let expires_at = Utc::now() + Duration::seconds((*OAUTH2_CSRF_COOKIE_MAX_AGE) as i64);
+    let ttl = *OAUTH2_CSRF_COOKIE_MAX_AGE;
     let user_agent = headers
         .get(http::header::USER_AGENT)
         .and_then(|h| h.to_str().ok())
         .unwrap_or("Unknown")
         .to_string();
 
-    let (csrf_token, csrf_id) = generate_store_token("csrf", expires_at, Some(user_agent)).await?;
-    let (nonce_token, nonce_id) = generate_store_token("nonce", expires_at, None).await?;
-    let (pkce_token, pkce_id) = generate_store_token("pkce", expires_at, None).await?;
+    let (csrf_token, csrf_id) =
+        generate_store_token("csrf", ttl, expires_at, Some(user_agent)).await?;
+    let (nonce_token, nonce_id) = generate_store_token("nonce", ttl, expires_at, None).await?;
+    let (pkce_token, pkce_id) = generate_store_token("pkce", ttl, expires_at, None).await?;
 
     let misc_id = if let Some(session_id) = get_session_id_from_headers(&headers)? {
         tracing::info!("Session ID found: {}", session_id);
-        Some(store_token_in_cache("misc_session", session_id, expires_at, None).await?)
+        Some(store_token_in_cache("misc_session", session_id, ttl, expires_at, None).await?)
     } else {
         tracing::debug!("No session ID found");
         None

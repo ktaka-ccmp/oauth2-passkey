@@ -4,11 +4,10 @@ mod main;
 mod storage;
 mod types;
 
-// Re-export only what's necessary for the public API
-// pub use axum::router; // The main router function for nesting
-pub use config::OAUTH2_ROUTE_PREFIX; // Required for route configuration
+pub(super) use types::{StateParams, StoredToken};
 
-pub use config::{OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME};
+pub use config::{OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ROUTE_PREFIX};
+
 pub use errors::OAuth2Error;
 pub use main::{
     csrf_checks, decode_state, delete_session_and_misc_token_from_store, get_idinfo_userinfo,

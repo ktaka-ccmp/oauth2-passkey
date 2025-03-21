@@ -1,21 +1,8 @@
 use crate::storage::{CacheData, GENERIC_CACHE_STORE};
 
-use super::errors::PasskeyError;
-use super::storage::PasskeyStore;
-use super::types::{CredentialSearchField, SessionInfo, StoredOptions, UserIdCredentialIdStr};
-
-pub async fn init() -> Result<(), PasskeyError> {
-    // Validate required environment variables early
-    let _ = *super::config::PASSKEY_RP_ID;
-
-    crate::storage::init()
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-    PasskeyStore::init().await?;
-
-    Ok(())
-}
+use crate::passkey::PasskeyError;
+use crate::passkey::PasskeyStore;
+use crate::passkey::{CredentialSearchField, types::UserIdCredentialIdStr};
 
 pub(crate) async fn get_credential_id_strs_by(
     field: CredentialSearchField,
@@ -37,39 +24,6 @@ pub(crate) async fn name2cid_str_vec(
     name: &str,
 ) -> Result<Vec<UserIdCredentialIdStr>, PasskeyError> {
     get_credential_id_strs_by(CredentialSearchField::UserName(name.to_string())).await
-}
-
-/// Helper functions for cache store operations to improve code reuse and maintainability
-impl From<SessionInfo> for CacheData {
-    fn from(data: SessionInfo) -> Self {
-        Self {
-            value: serde_json::to_string(&data).expect("Failed to serialize SessionInfo"),
-        }
-    }
-}
-
-impl TryFrom<CacheData> for SessionInfo {
-    type Error = PasskeyError;
-
-    fn try_from(data: CacheData) -> Result<Self, Self::Error> {
-        serde_json::from_str(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
-    }
-}
-
-impl From<StoredOptions> for CacheData {
-    fn from(data: StoredOptions) -> Self {
-        Self {
-            value: serde_json::to_string(&data).expect("Failed to serialize StoredOptions"),
-        }
-    }
-}
-
-impl TryFrom<CacheData> for StoredOptions {
-    type Error = PasskeyError;
-
-    fn try_from(data: CacheData) -> Result<Self, Self::Error> {
-        serde_json::from_str(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
-    }
 }
 
 /// Helper function to store data in the cache
