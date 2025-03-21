@@ -211,9 +211,9 @@ pub async fn list_credentials_core(
     user: Option<&SessionUser>,
 ) -> Result<Vec<PasskeyCredential>, CoordinationError> {
     // Ensure user is authenticated
-    let user = user.ok_or(CoordinationError::Unauthorized.log())?;
+    let user = user.ok_or_else(|| CoordinationError::Unauthorized.log())?;
 
-    tracing::debug!("list_credentials_core: User: {:#?}", user);
+    tracing::trace!("list_credentials_core: User: {:#?}", user);
     let credentials =
         PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user.id.to_owned())).await?;
     Ok(credentials)
@@ -228,7 +228,7 @@ pub async fn delete_passkey_credential_core(
     credential_id: &str,
 ) -> Result<(), CoordinationError> {
     // Ensure user is authenticated
-    let user = user.ok_or(CoordinationError::Unauthorized.log())?;
+    let user = user.ok_or_else(|| CoordinationError::Unauthorized.log())?;
 
     tracing::debug!("delete_passkey_credential_core: User: {:#?}", user);
     tracing::debug!("Attempting to delete credential with ID: {}", credential_id);

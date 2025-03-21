@@ -6,8 +6,10 @@
 - We'll do this after the tests are implemented
 - Schema check when initializing database connection. Make sure the schema the program is expecting is the same as the one in the database.
 - When using Delete User button, deletion of passkey credentials aren't notified to Passkey Authenticator.
+- Decide on Public API
 - Adjust visibility of functions, structs, enums, etc. What needs to be public?
 - signalCurrentUserDetails seems not working on Android device.
+- Use tracing-error crate https://crates.io/crates/tracing-error
 
 ## Half Done
 
@@ -51,6 +53,12 @@
 - Prefix of tables in database can be configured in .env file.
 
 - Consolidate liboauth2, libpasskey, libsession and libstorage into libauth.
+
+- Want to change the directory structure of the endpoints for Passkey and OAuth2
+  - Currently Passkey endpoints should be mounted at OAUTH2_ROUTE_PREFIX(default: /passkey)
+  - OAuth2 endpoints should be mounted at OAUTH2_ROUTE_PREFIX(default: /oauth2)
+  - OAUTH2_ROUTE_PREFIX and PASSKEY_ROUTE_PREFIX are referenced by handlers and the endpoints are reflected in the templates and javascript files.
+  - I want to change it to O2P_ROUTE_PREFIX/passkey and O2P_ROUTE_PREFIX/oauth2 respectively. By doing so we only need to nest single tree in the application. The summary endpoint can be also nested in the same tree freeing from necessity of explicitly mounting it in the application.
 
 ## Memo
 

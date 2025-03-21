@@ -1,3 +1,4 @@
+use crate::config::{O2P_ROUTE_PREFIX, OAUTH2_SUB_ROUTE};
 use std::{env, sync::LazyLock};
 
 pub(crate) static OAUTH2_USERINFO_URL: &str = "https://www.googleapis.com/userinfo/v2/me";
@@ -54,17 +55,12 @@ pub(crate) static OAUTH2_CSRF_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
         .unwrap_or(60) // Default to 60 seconds if not set or invalid
 });
 
-pub static OAUTH2_ROUTE_PREFIX: LazyLock<String> = LazyLock::new(|| {
-    std::env::var("OAUTH2_ROUTE_PREFIX")
-        .ok()
-        .unwrap_or("/oauth2".to_string())
-});
-
 pub(crate) static OAUTH2_REDIRECT_URI: LazyLock<String> = LazyLock::new(|| {
     format!(
-        "{}{}/authorized",
+        "{}{}{}/authorized",
         env::var("ORIGIN").expect("Missing ORIGIN!"),
-        OAUTH2_ROUTE_PREFIX.as_str()
+        O2P_ROUTE_PREFIX.as_str(),
+        OAUTH2_SUB_ROUTE
     )
 });
 
