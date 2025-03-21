@@ -4,7 +4,6 @@ mod main;
 mod storage;
 mod types;
 
-pub use config::PASSKEY_ROUTE_PREFIX; // Required for route configuration
 pub use errors::PasskeyError;
 
 pub use main::{

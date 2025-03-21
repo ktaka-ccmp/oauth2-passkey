@@ -6,7 +6,7 @@ mod types;
 
 pub(super) use types::{StateParams, StoredToken};
 
-pub use config::{OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ROUTE_PREFIX};
+pub use config::{OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME};
 
 pub use errors::OAuth2Error;
 pub use main::{

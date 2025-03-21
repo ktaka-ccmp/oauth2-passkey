@@ -7,11 +7,11 @@ use axum::{
 use serde_json::Value;
 
 use oauth2_passkey::{
-    AuthenticationOptions, AuthenticatorResponse, PASSKEY_ROUTE_PREFIX, PasskeyCredential,
-    RegisterCredential, RegistrationOptions, RegistrationStartRequest, SessionUser,
-    delete_passkey_credential_core, get_related_origin_json, handle_finish_authentication_core,
-    handle_finish_registration_core, handle_start_authentication_core,
-    handle_start_registration_core, list_credentials_core,
+    AuthenticationOptions, AuthenticatorResponse, O2P_ROUTE_PREFIX, PASSKEY_SUB_ROUTE,
+    PasskeyCredential, RegisterCredential, RegistrationOptions, RegistrationStartRequest,
+    SessionUser, delete_passkey_credential_core, get_related_origin_json,
+    handle_finish_authentication_core, handle_finish_registration_core,
+    handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
 };
 
 use crate::IntoResponseError;
@@ -113,13 +113,13 @@ pub(crate) async fn serve_passkey_js() -> Response {
 
 #[derive(Template)]
 #[template(path = "conditional_ui.j2")]
-struct ConditionalUiTemplate {
-    passkey_route_prefix: &'static str,
+struct ConditionalUiTemplate<'a> {
+    passkey_route_prefix: &'a str,
 }
 
 pub(crate) async fn conditional_ui() -> impl IntoResponse {
     let template = ConditionalUiTemplate {
-        passkey_route_prefix: PASSKEY_ROUTE_PREFIX.as_str(),
+        passkey_route_prefix: &format!("{}{}", O2P_ROUTE_PREFIX.as_str(), PASSKEY_SUB_ROUTE),
     };
     (StatusCode::OK, Html(template.render().unwrap_or_default())).into_response()
 }

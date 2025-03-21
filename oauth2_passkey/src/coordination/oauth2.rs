@@ -206,7 +206,7 @@ pub async fn delete_oauth2_account_core(
     provider_user_id: &str,
 ) -> Result<(), CoordinationError> {
     // Ensure user is authenticated
-    let user = user.ok_or(CoordinationError::Unauthorized.log())?;
+    let user = user.ok_or_else(|| CoordinationError::Unauthorized.log())?;
 
     // Get the OAuth2 account to verify it belongs to the user
     let accounts = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::ProviderUserId(
@@ -258,7 +258,8 @@ pub async fn list_accounts_core(
     user: Option<&SessionUser>,
 ) -> Result<Vec<OAuth2Account>, CoordinationError> {
     // Ensure user is authenticated
-    let user = user.ok_or(CoordinationError::Unauthorized.log())?;
+    let user = user.ok_or_else(|| CoordinationError::Unauthorized.log())?;
+    tracing::trace!("list_accounts_core: User: {:#?}", user);
 
     get_oauth2_accounts(&user.id).await
 }

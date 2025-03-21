@@ -1,17 +1,15 @@
+mod handlers;
+mod server;
+
 use axum::{Router, routing::get};
 use dotenv::dotenv;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use libaxum::{oauth2_router, passkey_router, passkey_well_known_router, summary_router};
-use oauth2_passkey::{OAUTH2_ROUTE_PREFIX, PASSKEY_ROUTE_PREFIX};
+use libaxum::{auth_router, passkey_well_known_router};
+use oauth2_passkey::O2P_ROUTE_PREFIX;
 
-mod handlers;
-mod server;
-
-use crate::{
-    handlers::{index, protected},
-    server::{Ports, spawn_http_server, spawn_https_server},
-};
+use handlers::{index, protected};
+use server::{Ports, spawn_http_server, spawn_https_server};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -51,6 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("You can increase verbosity by setting the RUST_LOG environment variable.");
     tracing::info!("Log levels from least to most verbose: error < warn < info < debug < trace");
     tracing::info!("Example: RUST_LOG=debug ./demo-integration");
+    tracing::info!("O2P_ROUTE_PREFIX: {}", O2P_ROUTE_PREFIX.as_str());
 
     // Print the current log level
     #[cfg(debug_assertions)]
@@ -74,9 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/", get(index))
         .route("/protected", get(protected))
-        .nest("/summary", summary_router())
-        .nest(OAUTH2_ROUTE_PREFIX.as_str(), oauth2_router())
-        .nest(PASSKEY_ROUTE_PREFIX.as_str(), passkey_router())
+        .nest(O2P_ROUTE_PREFIX.as_str(), auth_router())
         .nest("/.well-known", passkey_well_known_router()); // Mount the WebAuthn well-known endpoint at root level
 
     let ports = Ports {

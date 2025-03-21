@@ -3,6 +3,7 @@
 //! This crate provides coordination between different authentication mechanisms
 //! including OAuth2, Passkey, and user database operations.
 
+mod config;
 mod coordination;
 mod oauth2;
 mod passkey;
@@ -28,20 +29,22 @@ pub use coordination::{
     post_authorized_core, update_user_account,
 };
 
-pub use oauth2::{
-    AuthResponse, OAUTH2_ROUTE_PREFIX, OAuth2Account, OAuth2Error, prepare_oauth2_auth_request,
-};
+// Re-export the route prefixes
+pub use config::{O2P_ROUTE_PREFIX, OAUTH2_SUB_ROUTE, PASSKEY_SUB_ROUTE, SUMMARY_SUB_ROUTE};
+
+pub use oauth2::{AuthResponse, OAuth2Account, OAuth2Error, prepare_oauth2_auth_request};
 
 pub use passkey::{
-    AuthenticationOptions, AuthenticatorResponse, PASSKEY_ROUTE_PREFIX, PasskeyCredential,
-    RegisterCredential, RegistrationOptions, get_related_origin_json,
+    AuthenticationOptions, AuthenticatorResponse, PasskeyCredential, RegisterCredential,
+    RegistrationOptions, get_related_origin_json,
 };
 
 pub use session::{
     SESSION_COOKIE_NAME, SessionError, User as SessionUser, get_user_from_session,
-    prepare_logout_response,
+    // is_authenticated_basic, is_authenticated_strict,
+    obfuscate_user_id, prepare_logout_response,
+    verify_context_token_and_page,
 };
-pub use session::{obfuscate_user_id, verify_context_token_and_page};
 
 /// Initialize the authentication coordination layer
 pub async fn init() -> Result<(), Box<dyn std::error::Error>> {

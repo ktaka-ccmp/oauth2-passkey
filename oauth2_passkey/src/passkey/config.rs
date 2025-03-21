@@ -1,11 +1,5 @@
 use std::{env, sync::LazyLock};
 
-pub static PASSKEY_ROUTE_PREFIX: LazyLock<String> = LazyLock::new(|| {
-    std::env::var("PASSKEY_ROUTE_PREFIX")
-        .ok()
-        .unwrap_or("/passkey".to_string())
-});
-
 pub(crate) static ORIGIN: LazyLock<String> =
     LazyLock::new(|| std::env::var("ORIGIN").expect("ORIGIN must be set"));
 
