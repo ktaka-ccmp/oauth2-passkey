@@ -1,6 +1,3 @@
-use base64::engine::{Engine, general_purpose::URL_SAFE_NO_PAD};
-use ring::rand::SecureRandom;
-
 use crate::storage::{CacheData, GENERIC_CACHE_STORE};
 
 use super::errors::PasskeyError;
@@ -18,27 +15,6 @@ pub async fn init() -> Result<(), PasskeyError> {
     PasskeyStore::init().await?;
 
     Ok(())
-}
-
-pub(crate) fn base64url_decode(input: &str) -> Result<Vec<u8>, PasskeyError> {
-    let decoded = URL_SAFE_NO_PAD
-        .decode(input)
-        .map_err(|_| PasskeyError::Format("Failed to decode base64url".to_string()))?;
-    Ok(decoded)
-}
-
-pub(crate) fn base64url_encode(input: Vec<u8>) -> Result<String, PasskeyError> {
-    Ok(URL_SAFE_NO_PAD.encode(input))
-}
-
-pub fn gen_random_string(len: usize) -> Result<String, PasskeyError> {
-    let rng = ring::rand::SystemRandom::new();
-    let mut session_id = vec![0u8; len];
-    rng.fill(&mut session_id)
-        .map_err(|_| PasskeyError::Crypto("Failed to generate random string".to_string()))?;
-    let encoded = base64url_encode(session_id)
-        .map_err(|_| PasskeyError::Crypto("Failed to encode random string".to_string()))?;
-    Ok(encoded)
 }
 
 pub(crate) async fn get_credential_id_strs_by(

@@ -2,13 +2,13 @@ use chrono::{Duration, Utc};
 use headers::Cookie;
 use http::header::HeaderMap;
 
-use crate::session::common::{gen_random_string, header_set_cookie};
 use crate::session::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
 use crate::session::errors::SessionError;
 use crate::session::types::{SessionInfo, StoredSession, User as SessionUser};
+use crate::utils::{gen_random_string, header_set_cookie};
 
 use crate::storage::GENERIC_CACHE_STORE;
-use crate::userdb::{User as DbUser, UserStore};
+use crate::userdb::UserStore;
 
 /// Get user information from libuserdb for a given session
 pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderMap, SessionError> {
@@ -85,18 +85,6 @@ pub async fn delete_session_from_store_by_session_id(session_id: &str) -> Result
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?;
     Ok(())
-}
-
-pub async fn create_session_with_user(user_data: SessionUser) -> Result<HeaderMap, SessionError> {
-    let db_user: DbUser = user_data.into_db_user();
-
-    // Store the user in the database
-    let user: SessionUser = UserStore::upsert_user(db_user)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
-        .into();
-
-    create_session_with_uid(&user.id).await
 }
 
 pub async fn create_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {

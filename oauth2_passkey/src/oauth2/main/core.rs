@@ -4,13 +4,13 @@ use http::header::HeaderMap;
 use chrono::{Duration, Utc};
 use sha2::{Digest, Sha256};
 
-use crate::oauth2::common::header_set_cookie;
 use crate::oauth2::config::{
     OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_GOOGLE_CLIENT_ID,
     OAUTH2_QUERY_STRING, OAUTH2_REDIRECT_URI,
 };
 use crate::oauth2::errors::OAuth2Error;
 use crate::oauth2::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken};
+use crate::utils::header_set_cookie;
 
 use super::google::{exchange_code_for_token, fetch_user_data_from_google};
 use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};

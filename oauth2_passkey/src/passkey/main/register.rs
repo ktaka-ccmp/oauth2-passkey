@@ -9,10 +9,7 @@ use super::types::{
     RegistrationOptions, RelyingParty, WebAuthnClientData,
 };
 
-use crate::passkey::common::{
-    base64url_decode, base64url_encode, gen_random_string, get_from_cache, remove_from_cache,
-    store_in_cache,
-};
+use crate::passkey::common::{get_from_cache, remove_from_cache, store_in_cache};
 use crate::passkey::config::{
     ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
     PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID, PASSKEY_RP_NAME,
@@ -24,6 +21,8 @@ use crate::passkey::types::{
     CredentialSearchField, PublicKeyCredentialUserEntity, SessionInfo, StoredCredential,
     StoredOptions,
 };
+
+use crate::utils::{base64url_decode, base64url_encode, gen_random_string};
 
 /// Resolves a user handle for passkey registration
 ///

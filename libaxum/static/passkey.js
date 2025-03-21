@@ -220,19 +220,6 @@ async function startRegistration(mode, username = null, displayname = null) {
             const errorText = await startResponse.text();
 
             console.error('Failed to start registration:', errorText);
-
-            // Handle session boundary errors with user-friendly messages
-            if (errorText.includes('Session mismatch')) {
-                alert('Your session appears to be out of sync. Please refresh the page and try again.');
-                return;
-            } else if (errorText.includes('Context token')) {
-                alert('Missing security context. Please refresh the page and try again.');
-                return;
-            } else if (errorText.includes('Unauthorized')) {
-                alert('You need to be logged in to add a passkey to your account.');
-                return;
-            }
-
             alert('Registration failed: ' + errorText);
             return;
         }

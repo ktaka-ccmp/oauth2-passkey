@@ -6,15 +6,15 @@ use super::types::{
     ParsedClientData,
 };
 
-use crate::passkey::common::{
-    base64url_decode, gen_random_string, name2cid_str_vec, store_in_cache,
-};
+use crate::passkey::common::{name2cid_str_vec, store_in_cache};
 use crate::passkey::config::{
     ORIGIN, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_RP_ID, PASSKEY_TIMEOUT, PASSKEY_USER_VERIFICATION,
 };
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::storage::PasskeyStore;
 use crate::passkey::types::{PublicKeyCredentialUserEntity, StoredCredential, StoredOptions};
+
+use crate::utils::{base64url_decode, gen_random_string};
 
 pub async fn start_authentication(
     username: Option<String>,
