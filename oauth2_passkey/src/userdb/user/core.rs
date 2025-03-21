@@ -1,3 +1,4 @@
+use crate::storage::DB_TABLE_USERS;
 use crate::storage::GENERIC_DATA_STORE;
 use crate::userdb::{errors::UserError, types::User};
 use sqlx::{Pool, Postgres, Sqlite};
@@ -59,10 +60,12 @@ impl UserStore {
 
 // SQLite implementations
 async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), UserError> {
+    let table_name = DB_TABLE_USERS.as_str();
+
     // Create users table
-    sqlx::query(
+    sqlx::query(&format!(
         r#"
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE IF NOT EXISTS {} (
             id TEXT PRIMARY KEY NOT NULL,
             account TEXT NOT NULL,
             label TEXT NOT NULL,
@@ -70,7 +73,8 @@ async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), UserError> {
             updated_at TIMESTAMP NOT NULL
         )
         "#,
-    )
+        table_name
+    ))
     .execute(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
@@ -79,11 +83,14 @@ async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), UserError> {
 }
 
 async fn get_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<Option<User>, UserError> {
-    sqlx::query_as::<_, User>(
+    let table_name = DB_TABLE_USERS.as_str();
+
+    sqlx::query_as::<_, User>(&format!(
         r#"
-        SELECT * FROM users WHERE id = ?
+        SELECT * FROM {} WHERE id = ?
         "#,
-    )
+        table_name
+    ))
     .bind(id)
     .fetch_optional(pool)
     .await
@@ -91,10 +98,12 @@ async fn get_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<Option<User>, 
 }
 
 async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Result<User, UserError> {
+    let table_name = DB_TABLE_USERS.as_str();
+
     // Upsert user with a single query
-    sqlx::query(
+    sqlx::query(&format!(
         r#"
-        INSERT INTO users (id, account, label, created_at, updated_at)
+        INSERT INTO {} (id, account, label, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET
             account = excluded.account,
@@ -102,7 +111,8 @@ async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Result<User, Use
             created_at = excluded.created_at,
             updated_at = excluded.updated_at
         "#,
-    )
+        table_name
+    ))
     .bind(&user.id)
     .bind(&user.account)
     .bind(&user.label)
@@ -117,11 +127,14 @@ async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Result<User, Use
 }
 
 async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<(), UserError> {
-    sqlx::query(
+    let table_name = DB_TABLE_USERS.as_str();
+
+    sqlx::query(&format!(
         r#"
-        DELETE FROM users WHERE id = ?
+        DELETE FROM {} WHERE id = ?
         "#,
-    )
+        table_name
+    ))
     .bind(id)
     .execute(pool)
     .await
@@ -132,10 +145,12 @@ async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<(), UserErr
 
 // PostgreSQL implementations
 async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), UserError> {
+    let table_name = DB_TABLE_USERS.as_str();
+
     // Create users table
-    sqlx::query(
+    sqlx::query(&format!(
         r#"
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE IF NOT EXISTS {} (
             id TEXT PRIMARY KEY NOT NULL,
             account TEXT NOT NULL,
             label TEXT NOT NULL,
@@ -143,7 +158,8 @@ async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), UserError> 
             updated_at TIMESTAMPTZ NOT NULL
         )
         "#,
-    )
+        table_name
+    ))
     .execute(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
@@ -152,11 +168,14 @@ async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), UserError> 
 }
 
 async fn get_user_postgres(pool: &Pool<Postgres>, id: &str) -> Result<Option<User>, UserError> {
-    sqlx::query_as::<_, User>(
+    let table_name = DB_TABLE_USERS.as_str();
+
+    sqlx::query_as::<_, User>(&format!(
         r#"
-        SELECT * FROM users WHERE id = $1
+        SELECT * FROM {} WHERE id = $1
         "#,
-    )
+        table_name
+    ))
     .bind(id)
     .fetch_optional(pool)
     .await
@@ -164,10 +183,12 @@ async fn get_user_postgres(pool: &Pool<Postgres>, id: &str) -> Result<Option<Use
 }
 
 async fn upsert_user_postgres(pool: &Pool<Postgres>, user: User) -> Result<User, UserError> {
+    let table_name = DB_TABLE_USERS.as_str();
+
     // Upsert user with a single query
-    sqlx::query(
+    sqlx::query(&format!(
         r#"
-        INSERT INTO users (id, account, label, created_at, updated_at)
+        INSERT INTO {} (id, account, label, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (id) DO UPDATE SET
             account = EXCLUDED.account,
@@ -176,7 +197,8 @@ async fn upsert_user_postgres(pool: &Pool<Postgres>, user: User) -> Result<User,
             updated_at = EXCLUDED.updated_at
         RETURNING *
         "#,
-    )
+        table_name
+    ))
     .bind(&user.id)
     .bind(&user.account)
     .bind(&user.label)
@@ -191,11 +213,14 @@ async fn upsert_user_postgres(pool: &Pool<Postgres>, user: User) -> Result<User,
 }
 
 async fn delete_user_postgres(pool: &Pool<Postgres>, id: &str) -> Result<(), UserError> {
-    sqlx::query(
+    let table_name = DB_TABLE_USERS.as_str();
+
+    sqlx::query(&format!(
         r#"
-        DELETE FROM users WHERE id = $1
+        DELETE FROM {} WHERE id = $1
         "#,
-    )
+        table_name
+    ))
     .bind(id)
     .execute(pool)
     .await

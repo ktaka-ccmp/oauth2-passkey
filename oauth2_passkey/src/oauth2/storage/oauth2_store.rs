@@ -1,4 +1,5 @@
 use crate::storage::GENERIC_DATA_STORE;
+use crate::storage::{DB_TABLE_OAUTH2_ACCOUNTS, DB_TABLE_USERS};
 use chrono::Utc;
 use sqlx::{Pool, Postgres, Sqlite};
 
@@ -155,12 +156,15 @@ impl OAuth2Store {
 
 // SQLite implementations
 async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), OAuth2Error> {
+    let oauth2_table = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
+    let users_table = DB_TABLE_USERS.as_str();
+
     // Create oauth2_accounts table
-    sqlx::query(
+    sqlx::query(&format!(
         r#"
-        CREATE TABLE IF NOT EXISTS oauth2_accounts (
+        CREATE TABLE IF NOT EXISTS {} (
             id TEXT PRIMARY KEY NOT NULL,
-            user_id TEXT NOT NULL REFERENCES users(id),
+            user_id TEXT NOT NULL REFERENCES {}(id),
             provider TEXT NOT NULL,
             provider_user_id TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -172,17 +176,20 @@ async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), OAuth2Error> {
             UNIQUE(provider, provider_user_id)
         )
         "#,
-    )
+        oauth2_table, users_table
+    ))
     .execute(pool)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     // Create index on user_id for faster lookups
-    sqlx::query(
+    sqlx::query(&format!(
         r#"
-        CREATE INDEX IF NOT EXISTS idx_oauth2_accounts_user_id ON oauth2_accounts(user_id)
+        CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id)
         "#,
-    )
+        oauth2_table.replace(".", "_"),
+        oauth2_table
+    ))
     .execute(pool)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
@@ -194,26 +201,30 @@ async fn get_oauth2_accounts_by_field_sqlite(
     pool: &Pool<Sqlite>,
     field: &AccountSearchField,
 ) -> Result<Vec<OAuth2Account>, OAuth2Error> {
+    let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
     let (query, value) = match field {
-        AccountSearchField::Id(id) => ("SELECT * FROM oauth2_accounts WHERE id = ?", id.as_str()),
+        AccountSearchField::Id(id) => (
+            &format!("SELECT * FROM {} WHERE id = ?", table_name),
+            id.as_str(),
+        ),
         AccountSearchField::UserId(user_id) => (
-            "SELECT * FROM oauth2_accounts WHERE user_id = ?",
+            &format!("SELECT * FROM {} WHERE user_id = ?", table_name),
             user_id.as_str(),
         ),
         AccountSearchField::Provider(provider) => (
-            "SELECT * FROM oauth2_accounts WHERE provider = ?",
+            &format!("SELECT * FROM {} WHERE provider = ?", table_name),
             provider.as_str(),
         ),
         AccountSearchField::ProviderUserId(provider_user_id) => (
-            "SELECT * FROM oauth2_accounts WHERE provider_user_id = ?",
+            &format!("SELECT * FROM {} WHERE provider_user_id = ?", table_name),
             provider_user_id.as_str(),
         ),
         AccountSearchField::Name(name) => (
-            "SELECT * FROM oauth2_accounts WHERE name = ?",
+            &format!("SELECT * FROM {} WHERE name = ?", table_name),
             name.as_str(),
         ),
         AccountSearchField::Email(email) => (
-            "SELECT * FROM oauth2_accounts WHERE email = ?",
+            &format!("SELECT * FROM {} WHERE email = ?", table_name),
             email.as_str(),
         ),
     };
@@ -230,12 +241,15 @@ async fn get_oauth2_account_by_provider_sqlite(
     provider: &str,
     provider_user_id: &str,
 ) -> Result<Option<OAuth2Account>, OAuth2Error> {
-    sqlx::query_as::<_, OAuth2Account>(
+    let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
+
+    sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
-        SELECT * FROM oauth2_accounts 
+        SELECT * FROM {}
         WHERE provider = ? AND provider_user_id = ?
         "#,
-    )
+        table_name
+    ))
     .bind(provider)
     .bind(provider_user_id)
     .fetch_optional(pool)
@@ -247,6 +261,8 @@ async fn upsert_oauth2_account_sqlite(
     pool: &Pool<Sqlite>,
     account: OAuth2Account,
 ) -> Result<OAuth2Account, OAuth2Error> {
+    let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
+
     // Begin transaction
     let mut tx = pool
         .begin()
@@ -254,12 +270,13 @@ async fn upsert_oauth2_account_sqlite(
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     // Check if the account already exists
-    let existing = sqlx::query_as::<_, OAuth2Account>(
+    let existing = sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
-        SELECT * FROM oauth2_accounts 
+        SELECT * FROM {}
         WHERE provider = ? AND provider_user_id = ?
         "#,
-    )
+        table_name
+    ))
     .bind(&account.provider)
     .bind(&account.provider_user_id)
     .fetch_optional(&mut *tx)
@@ -268,9 +285,9 @@ async fn upsert_oauth2_account_sqlite(
 
     let account_id = if let Some(existing) = existing {
         // Update existing account
-        sqlx::query(
+        sqlx::query(&format!(
             r#"
-            UPDATE oauth2_accounts SET
+            UPDATE {} SET
                 name = ?,
                 email = ?,
                 picture = ?,
@@ -278,7 +295,8 @@ async fn upsert_oauth2_account_sqlite(
                 updated_at = ?
             WHERE id = ?
             "#,
-        )
+            table_name
+        ))
         .bind(&account.name)
         .bind(&account.email)
         .bind(&account.picture)
@@ -297,11 +315,14 @@ async fn upsert_oauth2_account_sqlite(
         // Insert new account
         let id = account.id.clone();
         sqlx::query(
+            &format!(
             r#"
-            INSERT INTO oauth2_accounts 
+            INSERT INTO {}
             (id, user_id, provider, provider_user_id, name, email, picture, metadata, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
+            table_name
+            )
         )
         .bind(&id)
         .bind(&account.user_id)
@@ -326,11 +347,12 @@ async fn upsert_oauth2_account_sqlite(
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     // Return the updated account
-    let updated_account = sqlx::query_as::<_, OAuth2Account>(
+    let updated_account = sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
-        SELECT * FROM oauth2_accounts WHERE id = ?
+        SELECT * FROM {} WHERE id = ?
         "#,
-    )
+        table_name
+    ))
     .bind(account_id)
     .fetch_one(pool)
     .await
@@ -343,25 +365,30 @@ async fn delete_oauth2_accounts_by_field_sqlite(
     pool: &Pool<Sqlite>,
     field: &AccountSearchField,
 ) -> Result<(), OAuth2Error> {
+    let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
     let (query, value) = match field {
-        AccountSearchField::Id(id) => ("DELETE FROM oauth2_accounts WHERE id = ?", id.as_str()),
+        AccountSearchField::Id(id) => (
+            &format!("DELETE FROM {} WHERE id = ?", table_name),
+            id.as_str(),
+        ),
         AccountSearchField::UserId(user_id) => (
-            "DELETE FROM oauth2_accounts WHERE user_id = ?",
+            &format!("DELETE FROM {} WHERE user_id = ?", table_name),
             user_id.as_str(),
         ),
         AccountSearchField::Provider(provider) => (
-            "DELETE FROM oauth2_accounts WHERE provider = ?",
+            &format!("DELETE FROM {} WHERE provider = ?", table_name),
             provider.as_str(),
         ),
         AccountSearchField::ProviderUserId(provider_user_id) => (
-            "DELETE FROM oauth2_accounts WHERE provider_user_id = ?",
+            &format!("DELETE FROM {} WHERE provider_user_id = ?", table_name),
             provider_user_id.as_str(),
         ),
-        AccountSearchField::Name(name) => {
-            ("DELETE FROM oauth2_accounts WHERE name = ?", name.as_str())
-        }
+        AccountSearchField::Name(name) => (
+            &format!("DELETE FROM {} WHERE name = ?", table_name),
+            name.as_str(),
+        ),
         AccountSearchField::Email(email) => (
-            "DELETE FROM oauth2_accounts WHERE email = ?",
+            &format!("DELETE FROM {} WHERE email = ?", table_name),
             email.as_str(),
         ),
     };
@@ -377,34 +404,40 @@ async fn delete_oauth2_accounts_by_field_sqlite(
 
 // PostgreSQL implementations
 async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), OAuth2Error> {
+    let oauth2_table = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
+    let users_table = DB_TABLE_USERS.as_str();
+
     // Create oauth2_accounts table
-    sqlx::query(
+    sqlx::query(&format!(
         r#"
-        CREATE TABLE IF NOT EXISTS oauth2_accounts (
+        CREATE TABLE IF NOT EXISTS {} (
             id TEXT PRIMARY KEY NOT NULL,
-            user_id TEXT NOT NULL REFERENCES users(id),
+            user_id TEXT NOT NULL REFERENCES {}(id),
             provider TEXT NOT NULL,
             provider_user_id TEXT NOT NULL,
             name TEXT NOT NULL,
             email TEXT NOT NULL,
             picture TEXT,
             metadata JSONB NOT NULL,
-            created_at TIMESTAMP NOT NULL,
-            updated_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL,
             UNIQUE(provider, provider_user_id)
         )
         "#,
-    )
+        oauth2_table, users_table
+    ))
     .execute(pool)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     // Create index on user_id for faster lookups
-    sqlx::query(
+    sqlx::query(&format!(
         r#"
-        CREATE INDEX IF NOT EXISTS idx_oauth2_accounts_user_id ON oauth2_accounts(user_id)
+        CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id)
         "#,
-    )
+        oauth2_table.replace(".", "_"),
+        oauth2_table
+    ))
     .execute(pool)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
@@ -416,26 +449,30 @@ async fn get_oauth2_accounts_by_field_postgres(
     pool: &Pool<Postgres>,
     field: &AccountSearchField,
 ) -> Result<Vec<OAuth2Account>, OAuth2Error> {
+    let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
     let (query, value) = match field {
-        AccountSearchField::Id(id) => ("SELECT * FROM oauth2_accounts WHERE id = ?", id.as_str()),
+        AccountSearchField::Id(id) => (
+            &format!("SELECT * FROM {} WHERE id = $1", table_name),
+            id.as_str(),
+        ),
         AccountSearchField::UserId(user_id) => (
-            "SELECT * FROM oauth2_accounts WHERE user_id = ?",
+            &format!("SELECT * FROM {} WHERE user_id = $1", table_name),
             user_id.as_str(),
         ),
         AccountSearchField::Provider(provider) => (
-            "SELECT * FROM oauth2_accounts WHERE provider = ?",
+            &format!("SELECT * FROM {} WHERE provider = $1", table_name),
             provider.as_str(),
         ),
         AccountSearchField::ProviderUserId(provider_user_id) => (
-            "SELECT * FROM oauth2_accounts WHERE provider_user_id = ?",
+            &format!("SELECT * FROM {} WHERE provider_user_id = $1", table_name),
             provider_user_id.as_str(),
         ),
         AccountSearchField::Name(name) => (
-            "SELECT * FROM oauth2_accounts WHERE name = ?",
+            &format!("SELECT * FROM {} WHERE name = $1", table_name),
             name.as_str(),
         ),
         AccountSearchField::Email(email) => (
-            "SELECT * FROM oauth2_accounts WHERE email = ?",
+            &format!("SELECT * FROM {} WHERE email = $1", table_name),
             email.as_str(),
         ),
     };
@@ -452,12 +489,15 @@ async fn get_oauth2_account_by_provider_postgres(
     provider: &str,
     provider_user_id: &str,
 ) -> Result<Option<OAuth2Account>, OAuth2Error> {
-    sqlx::query_as::<_, OAuth2Account>(
+    let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
+
+    sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
-        SELECT * FROM oauth2_accounts 
+        SELECT * FROM {}
         WHERE provider = $1 AND provider_user_id = $2
         "#,
-    )
+        table_name
+    ))
     .bind(provider)
     .bind(provider_user_id)
     .fetch_optional(pool)
@@ -469,6 +509,8 @@ async fn upsert_oauth2_account_postgres(
     pool: &Pool<Postgres>,
     account: OAuth2Account,
 ) -> Result<OAuth2Account, OAuth2Error> {
+    let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
+
     // Begin transaction
     let mut tx = pool
         .begin()
@@ -476,12 +518,13 @@ async fn upsert_oauth2_account_postgres(
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     // Check if the account already exists
-    let existing = sqlx::query_as::<_, OAuth2Account>(
+    let existing = sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
-        SELECT * FROM oauth2_accounts 
+        SELECT * FROM {}
         WHERE provider = $1 AND provider_user_id = $2
         "#,
-    )
+        table_name
+    ))
     .bind(&account.provider)
     .bind(&account.provider_user_id)
     .fetch_optional(&mut *tx)
@@ -490,9 +533,9 @@ async fn upsert_oauth2_account_postgres(
 
     let account_id = if let Some(existing) = existing {
         // Update existing account
-        sqlx::query(
+        sqlx::query(&format!(
             r#"
-            UPDATE oauth2_accounts SET
+            UPDATE {} SET
                 name = $1,
                 email = $2,
                 picture = $3,
@@ -500,11 +543,15 @@ async fn upsert_oauth2_account_postgres(
                 updated_at = $5
             WHERE id = $6
             "#,
-        )
+            table_name
+        ))
         .bind(&account.name)
         .bind(&account.email)
         .bind(&account.picture)
-        .bind(&account.metadata)
+        .bind(
+            serde_json::to_value(&account.metadata)
+                .map_err(|e| OAuth2Error::Storage(e.to_string()))?,
+        )
         .bind(Utc::now())
         .bind(&existing.id)
         .execute(&mut *tx)
@@ -516,11 +563,14 @@ async fn upsert_oauth2_account_postgres(
         // Insert new account
         let id = account.id.clone();
         sqlx::query(
+            &format!(
             r#"
-            INSERT INTO oauth2_accounts 
+            INSERT INTO {}
             (id, user_id, provider, provider_user_id, name, email, picture, metadata, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             "#,
+            table_name
+            )
         )
         .bind(&id)
         .bind(&account.user_id)
@@ -529,7 +579,7 @@ async fn upsert_oauth2_account_postgres(
         .bind(&account.name)
         .bind(&account.email)
         .bind(&account.picture)
-        .bind(&account.metadata)
+        .bind(serde_json::to_value(&account.metadata).map_err(|e| OAuth2Error::Storage(e.to_string()))?)
         .bind(Utc::now())
         .bind(Utc::now())
         .execute(&mut *tx)
@@ -545,11 +595,12 @@ async fn upsert_oauth2_account_postgres(
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     // Return the updated account
-    let updated_account = sqlx::query_as::<_, OAuth2Account>(
+    let updated_account = sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
-        SELECT * FROM oauth2_accounts WHERE id = $1
+        SELECT * FROM {} WHERE id = $1
         "#,
-    )
+        table_name
+    ))
     .bind(account_id)
     .fetch_one(pool)
     .await
@@ -562,25 +613,30 @@ async fn delete_oauth2_accounts_by_field_postgres(
     pool: &Pool<Postgres>,
     field: &AccountSearchField,
 ) -> Result<(), OAuth2Error> {
+    let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
     let (query, value) = match field {
-        AccountSearchField::Id(id) => ("DELETE FROM oauth2_accounts WHERE id = ?", id.as_str()),
+        AccountSearchField::Id(id) => (
+            &format!("DELETE FROM {} WHERE id = $1", table_name),
+            id.as_str(),
+        ),
         AccountSearchField::UserId(user_id) => (
-            "DELETE FROM oauth2_accounts WHERE user_id = ?",
+            &format!("DELETE FROM {} WHERE user_id = $1", table_name),
             user_id.as_str(),
         ),
         AccountSearchField::Provider(provider) => (
-            "DELETE FROM oauth2_accounts WHERE provider = ?",
+            &format!("DELETE FROM {} WHERE provider = $1", table_name),
             provider.as_str(),
         ),
         AccountSearchField::ProviderUserId(provider_user_id) => (
-            "DELETE FROM oauth2_accounts WHERE provider_user_id = ?",
+            &format!("DELETE FROM {} WHERE provider_user_id = $1", table_name),
             provider_user_id.as_str(),
         ),
-        AccountSearchField::Name(name) => {
-            ("DELETE FROM oauth2_accounts WHERE name = ?", name.as_str())
-        }
+        AccountSearchField::Name(name) => (
+            &format!("DELETE FROM {} WHERE name = $1", table_name),
+            name.as_str(),
+        ),
         AccountSearchField::Email(email) => (
-            "DELETE FROM oauth2_accounts WHERE email = ?",
+            &format!("DELETE FROM {} WHERE email = $1", table_name),
             email.as_str(),
         ),
     };
