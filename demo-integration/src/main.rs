@@ -1,14 +1,17 @@
 mod handlers;
 mod server;
 
-use axum::{Router, routing::get};
+use axum::{Router, middleware::from_fn, routing::get};
 use dotenv::dotenv;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use libaxum::{auth_router, passkey_well_known_router};
+use libaxum::{
+    is_authenticated_or_redirect, is_authenticated_with_user, oauth2_passkey_router,
+    passkey_well_known_router,
+};
 use oauth2_passkey::O2P_ROUTE_PREFIX;
 
-use handlers::{index, protected};
+use handlers::{index, p1, p2, protected};
 use server::{Ports, spawn_http_server, spawn_https_server};
 
 #[tokio::main]
@@ -70,10 +73,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Initializing authentication library");
     oauth2_passkey::init().await?;
 
+    // Define custom redirect URL for authentication
+    // If None, will return 401 Unauthorized instead of redirecting
+    // let redirect = Some("/");
+    let redirect = None;
+
     let app = Router::new()
         .route("/", get(index))
         .route("/protected", get(protected))
-        .nest(O2P_ROUTE_PREFIX.as_str(), auth_router())
+        .route(
+            "/p1",
+            get(p1).route_layer(from_fn(move |req, next| {
+                is_authenticated_or_redirect(redirect, req, next)
+            })),
+        )
+        .route(
+            "/p2",
+            get(p2).route_layer(from_fn(is_authenticated_with_user)),
+        )
+        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
         .nest("/.well-known", passkey_well_known_router()); // Mount the WebAuthn well-known endpoint at root level
 
     let ports = Ports {

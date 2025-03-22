@@ -9,7 +9,11 @@
 - Decide on Public API
 - Adjust visibility of functions, structs, enums, etc. What needs to be public?
 - signalCurrentUserDetails seems not working on Android device.
-- Use tracing-error crate https://crates.io/crates/tracing-error
+- Tracing
+  - Use tracing-error crate https://crates.io/crates/tracing-error
+  - Use https://docs.rs/tower-http/latest/tower_http/trace/index.html
+  - https://docs.rs/tracing/latest/tracing/
+- Change name: libaxum to oauth2_passkey_axum
 
 ## Half Done
 

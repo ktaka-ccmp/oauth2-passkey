@@ -16,7 +16,7 @@ use oauth2_passkey::{
     prepare_logout_response, prepare_oauth2_auth_request, verify_context_token_and_page,
 };
 
-use crate::AuthUser;
+use super::session::AuthUser;
 use crate::IntoResponseError;
 
 pub fn router() -> Router {

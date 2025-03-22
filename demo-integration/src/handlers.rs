@@ -1,11 +1,12 @@
 use askama::Template;
 use axum::{
+    extract::Extension,
     http::StatusCode,
     response::{Html, IntoResponse, Redirect, Response},
 };
 use oauth2_passkey::{O2P_ROUTE_PREFIX, OAUTH2_SUB_ROUTE, PASSKEY_SUB_ROUTE, SUMMARY_SUB_ROUTE};
 
-// use libsession::User;
+// User extracted from session by libaxum crate
 use libaxum::AuthUser as User;
 
 #[derive(Template)]
@@ -28,6 +29,19 @@ struct IndexTemplateAnon<'a> {
 #[derive(Template)]
 #[template(path = "protected.j2")]
 struct ProtectedTemplate<'a> {
+    user: User,
+    oauth_route_prefix: &'a str,
+}
+
+#[derive(Template)]
+#[template(path = "p1.j2")]
+struct P1Template<'a> {
+    oauth_route_prefix: &'a str,
+}
+
+#[derive(Template)]
+#[template(path = "p2.j2")]
+struct P2Template<'a> {
     user: User,
     oauth_route_prefix: &'a str,
 }
@@ -80,6 +94,39 @@ pub(crate) async fn protected(user: User) -> Result<Html<String>, (StatusCode, S
     let oauth_route = format!("{}{}", O2P_ROUTE_PREFIX.as_str(), OAUTH2_SUB_ROUTE);
 
     let template = ProtectedTemplate {
+        user,
+        oauth_route_prefix: &oauth_route,
+    };
+    let html = Html(
+        template
+            .render()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+    );
+    Ok(html)
+}
+
+pub(crate) async fn p1() -> Result<Html<String>, (StatusCode, String)> {
+    let oauth_route = format!("{}{}", O2P_ROUTE_PREFIX.as_str(), OAUTH2_SUB_ROUTE);
+
+    let template = P1Template {
+        oauth_route_prefix: &oauth_route,
+    };
+    let html = Html(
+        template
+            .render()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+    );
+    Ok(html)
+}
+
+pub(crate) async fn p2(
+    // Extract user from extension inserted by is_authenticated_with_user middleware
+    Extension(user): Extension<User>,
+) -> Result<Html<String>, (StatusCode, String)> {
+    let oauth_route = format!("{}{}", O2P_ROUTE_PREFIX.as_str(), OAUTH2_SUB_ROUTE);
+
+    tracing::debug!("User: {:?}", user);
+    let template = P2Template {
         user,
         oauth_route_prefix: &oauth_route,
     };

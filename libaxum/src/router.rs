@@ -3,8 +3,6 @@
 use axum::Router;
 use oauth2_passkey::{OAUTH2_SUB_ROUTE, PASSKEY_SUB_ROUTE, SUMMARY_SUB_ROUTE};
 
-use crate::{oauth2_router, passkey_router, summary_router};
-
 /// Create a combined router for all authentication endpoints
 ///
 /// This router combines the OAuth2, Passkey, and Summary endpoints under a single mount point.
@@ -14,9 +12,9 @@ use crate::{oauth2_router, passkey_router, summary_router};
 /// - {O2P_ROUTE_PREFIX}/summary/...
 ///
 /// This simplifies integration by requiring only a single router to be mounted in the application.
-pub fn auth_router() -> Router {
+pub fn oauth2_passkey_router() -> Router {
     Router::new()
-        .nest(OAUTH2_SUB_ROUTE, oauth2_router())
-        .nest(PASSKEY_SUB_ROUTE, passkey_router())
-        .nest(SUMMARY_SUB_ROUTE, summary_router())
+        .nest(OAUTH2_SUB_ROUTE, super::oauth2::router())
+        .nest(PASSKEY_SUB_ROUTE, super::passkey::router())
+        .nest(SUMMARY_SUB_ROUTE, super::summary::router())
 }

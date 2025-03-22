@@ -1,4 +1,4 @@
-use crate::AuthUser;
+use crate::session::AuthUser;
 use askama::Template;
 
 use oauth2_passkey::obfuscate_user_id;
