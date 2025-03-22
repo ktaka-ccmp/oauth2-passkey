@@ -14,7 +14,7 @@ use oauth2_passkey::{
 };
 
 use super::templates::{TemplateAccount, TemplateCredential, UserSummaryTemplate};
-use crate::AuthUser;
+use crate::session::AuthUser;
 use serde_json::{Value, json};
 
 /// Create a router for the user summary endpoints
