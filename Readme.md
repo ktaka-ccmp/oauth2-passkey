@@ -2,8 +2,8 @@
 
 ## Todo
 
-- Middleware based page protection i.e. create a likes of is_authorized middleware.
-- We'll do this after the tests are implemented
+- Tests
+- GitHub Actions
 - Schema check when initializing database connection. Make sure the schema the program is expecting is the same as the one in the database.
 - When using Delete User button, deletion of passkey credentials aren't notified to Passkey Authenticator.
 - Decide on Public API
@@ -63,6 +63,9 @@
   - OAuth2 endpoints should be mounted at OAUTH2_ROUTE_PREFIX(default: /oauth2)
   - OAUTH2_ROUTE_PREFIX and PASSKEY_ROUTE_PREFIX are referenced by handlers and the endpoints are reflected in the templates and javascript files.
   - I want to change it to O2P_ROUTE_PREFIX/passkey and O2P_ROUTE_PREFIX/oauth2 respectively. By doing so we only need to nest single tree in the application. The summary endpoint can be also nested in the same tree freeing from necessity of explicitly mounting it in the application.
+
+- Middleware based page protection i.e. create a likes of is_authorized middleware.
+
 
 ## Memo
 
