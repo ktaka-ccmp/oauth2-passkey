@@ -75,7 +75,7 @@ pub(crate) async fn index(user: Option<User>) -> Result<Response, (StatusCode, S
             let passkey_route = format!("{}{}", O2P_ROUTE_PREFIX.as_str(), PASSKEY_SUB_ROUTE);
 
             let template = IndexTemplateAnon {
-                message: "Welcome to the demo integration app!",
+                message: "Passkey/OAuth2 integration demo!",
                 oauth_route_prefix: &oauth_route,
                 passkey_route_prefix: &passkey_route,
             };

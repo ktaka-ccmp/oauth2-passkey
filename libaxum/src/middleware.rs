@@ -38,7 +38,6 @@ pub async fn is_authenticated_with_user(
     next: Next,
 ) -> impl IntoResponse {
     if let Some(user) = user {
-        let user = super::session::AuthUser::from(user);
         tracing::debug!("User: {:?}", user);
         req.extensions_mut().insert(user);
         next.run(req).await
