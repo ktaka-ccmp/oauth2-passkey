@@ -11,7 +11,7 @@ http = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
-libaxum = { workspace = true }
+oauth2_passkey_axum = { workspace = true }
 oauth2_passkey = { workspace = true }
 
 axum = { workspace = true }

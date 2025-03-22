@@ -5,11 +5,10 @@ use axum::{Router, middleware::from_fn, routing::get};
 use dotenv::dotenv;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use libaxum::{
-    is_authenticated_or_redirect, is_authenticated_with_user, oauth2_passkey_router,
-    passkey_well_known_router,
+use oauth2_passkey_axum::{
+    O2P_ROUTE_PREFIX, is_authenticated_or_redirect, is_authenticated_with_user,
+    oauth2_passkey_router, passkey_well_known_router,
 };
-use oauth2_passkey::O2P_ROUTE_PREFIX;
 
 use handlers::{index, p1, p2, protected};
 use server::{Ports, spawn_http_server, spawn_https_server};
