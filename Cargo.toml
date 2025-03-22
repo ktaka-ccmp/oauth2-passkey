@@ -3,7 +3,7 @@ members = [
     "demo-integration",
     # "demo-oauth2",
     # "demo-passkey",
-    "libaxum",
+    "oauth2_passkey_axum",
     "oauth2_passkey",
 ]
 
@@ -14,7 +14,7 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
-libaxum = { path = "./libaxum" }
+oauth2_passkey_axum = { path = "./oauth2_passkey_axum" }
 oauth2_passkey = { path = "./oauth2_passkey" }
 
 async-trait = "0.1.88"

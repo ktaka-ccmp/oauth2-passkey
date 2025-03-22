@@ -7,7 +7,7 @@ use axum::{
 use oauth2_passkey::{O2P_ROUTE_PREFIX, OAUTH2_SUB_ROUTE, PASSKEY_SUB_ROUTE, SUMMARY_SUB_ROUTE};
 
 // User extracted from session by libaxum crate
-use libaxum::AuthUser as User;
+use oauth2_passkey_axum::AuthUser as User;
 
 #[derive(Template)]
 #[template(path = "index_user.j2")]
