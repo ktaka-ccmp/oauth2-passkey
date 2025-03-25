@@ -15,8 +15,7 @@
   - https://docs.rs/tracing/latest/tracing/
 - Change name: libaxum to oauth2_passkey_axum
 - Completely separate create_account function from add_to_existing_user function to avoid the case where new user is created even though user is already logged in.
-
-
+- Replace "if let", "unwrap_or_else", "ok_or_else" etc. with "match", where appropriate.
 
 ## Half Done
 
@@ -69,6 +68,14 @@
 
 - Middleware based page protection i.e. create a likes of is_authorized middleware.
 - Fix: add O2P_ROUTE_PREFIX to "fetch('/summary/user-info', {"
+- Currently if a user is showing two pages, the one for index page for unauthenticated user and the one for summary page for authenticated user, then tries to create a new user with a new passkey in the first page, the passkey will be registered for the authenticated user in the second page.
+  - Fixed by checking if the user isn't authenticated
+```rust
+            match auth_user {
+                Some(_) => return Err(CoordinationError::UnexpectedlyAuthorized.log()),
+                None => {}
+            };
+```
 
 ## Memo
 

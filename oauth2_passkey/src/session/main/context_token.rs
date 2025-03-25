@@ -144,8 +144,15 @@ fn create_context_token_cookie(user_id: &str) -> HeaderMap {
         "{USER_CONTEXT_TOKEN_COOKIE}={}; Path=/; Max-Age=86400; HttpOnly; SameSite=Strict",
         token
     );
-    if let Ok(cookie_value) = cookie.parse() {
-        headers.insert(SET_COOKIE, cookie_value);
+
+    // Parse cookie. The parse function is used to convert the cookie string into a HeaderMap.
+    match cookie.parse() {
+        Ok(cookie_value) => {
+            headers.insert(SET_COOKIE, cookie_value);
+        }
+        Err(e) => {
+            tracing::error!("Failed to parse cookie: {}", e);
+        }
     }
 
     headers
@@ -188,12 +195,15 @@ pub fn verify_context_token_and_page(
     }
 
     // Verify page context matches user (if provided)
-    if let Some(context) = page_context {
-        if !context.is_empty() && context != &obfuscate_user_id(user_id) {
-            return Err(SessionError::ContextToken(
+    match page_context {
+        // If page context is provided, it must match the obfuscated user ID
+        Some(context) if context != &obfuscate_user_id(user_id) => {
+            // Some(context) if !context.is_empty() && context != &obfuscate_user_id(user_id) => {
+                return Err(SessionError::ContextToken(
                 "Page context does not match session user".to_string(),
             ));
-        }
+        },
+        _ => {} // Do nothing for None or matching context
     }
 
     Ok(())
