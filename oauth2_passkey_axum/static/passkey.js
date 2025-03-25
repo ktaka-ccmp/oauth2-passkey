@@ -149,7 +149,7 @@ function showRegistrationModal(mode) {
     document.getElementById('reg-displayname').value = 'displayname';
 
     // Try to get current user info to pre-fill the form
-    fetch(O2P_ROUTE_PREFIX + '/summary/user-info', {
+    fetch(O2P_ROUTE_PREFIX + '/user/info', {
         method: 'GET',
         credentials: 'same-origin'
     })

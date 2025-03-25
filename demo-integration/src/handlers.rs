@@ -6,23 +6,8 @@ use axum::{
 };
 use oauth2_passkey::O2P_ROUTE_PREFIX;
 
-// User extracted from session by libaxum crate
+use oauth2_passkey_axum::{O2P_REDIRECT_ANON, O2P_REDIRECT_USER};
 use oauth2_passkey_axum::AuthUser as User;
-
-#[derive(Template)]
-#[template(path = "index_user.j2")]
-struct IndexTemplateUser<'a> {
-    // user: User,
-    message: &'a str,
-    o2p_route_prefix: &'a str,
-}
-
-#[derive(Template)]
-#[template(path = "index_anon.j2")]
-struct IndexTemplateAnon<'a> {
-    message: &'a str,
-    o2p_route_prefix: &'a str,
-}
 
 #[derive(Template)]
 #[template(path = "protected.j2")]
@@ -46,37 +31,11 @@ struct P2Template<'a> {
 
 pub(crate) async fn index(user: Option<User>) -> Result<Response, (StatusCode, String)> {
     match user {
-        Some(u) => {
-            let message = format!("Hey {}!", u.account);
-            // Create the route strings first so they live long enough
-
-            let template = IndexTemplateUser {
-                // user: u.clone(),
-                message: &message,
-                o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
-            };
-            let _html = Html(
-                template
-                    .render()
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
-            );
-            // Ok(html.into_response())
-            let summary_route = format!("{}/summary", O2P_ROUTE_PREFIX.as_str());
-            Ok(Redirect::to(&summary_route).into_response())
+        Some(_) => {
+            Ok(Redirect::to(O2P_REDIRECT_USER.as_str()).into_response())
         }
         None => {
-            // Create the route strings first so they live long enough
-
-            let template = IndexTemplateAnon {
-                message: "Passkey/OAuth2 integration demo!",
-                o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
-            };
-            let html = Html(
-                template
-                    .render()
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
-            );
-            Ok(html.into_response())
+            Ok(Redirect::to(O2P_REDIRECT_ANON.as_str()).into_response())
         }
     }
 }

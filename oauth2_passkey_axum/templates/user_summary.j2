@@ -232,7 +232,9 @@
             <button onclick="toggleEditUserForm()" class="action-button">Edit Profile</button>
         </div>
         <div class="item" id="user-info-display">
+            <!--
             <div class="item-detail"><strong>User ID:</strong> {{ user.id }}</div>
+            -->
             <div class="item-detail"><strong>Account:</strong> <span id="display-account">{{ user.account }}</span></div>
             <div class="item-detail"><strong>Label:</strong> <span id="display-label">{{ user.label }}</span></div>
             <div class="item-detail"><strong>Created:</strong> {{ user.created_at }}</div>
@@ -357,7 +359,7 @@
             const account = document.getElementById('edit-account').value;
             const label = document.getElementById('edit-label').value;
 
-            fetch(`${O2P_ROUTE_PREFIX}/summary/user/update`, {
+            fetch(`${O2P_ROUTE_PREFIX}/user/update`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -397,7 +399,7 @@
             const accountName = "{{user.account}}";
             const userId = "{{user.id}}";
             if (confirm(`Are you sure you want to delete your account "${accountName}"? This action cannot be undone and will delete all your data including OAuth2 accounts and passkey credentials.`)) {
-                fetch(`${O2P_ROUTE_PREFIX}/summary/user/delete`, {
+                fetch(`${O2P_ROUTE_PREFIX}/user/delete`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json'

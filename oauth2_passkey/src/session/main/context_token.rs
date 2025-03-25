@@ -199,10 +199,10 @@ pub fn verify_context_token_and_page(
         // If page context is provided, it must match the obfuscated user ID
         Some(context) if context != &obfuscate_user_id(user_id) => {
             // Some(context) if !context.is_empty() && context != &obfuscate_user_id(user_id) => {
-                return Err(SessionError::ContextToken(
+            return Err(SessionError::ContextToken(
                 "Page context does not match session user".to_string(),
             ));
-        },
+        }
         _ => {} // Do nothing for None or matching context
     }
 
