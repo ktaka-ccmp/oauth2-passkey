@@ -1,10 +1,11 @@
+mod config;
 mod error;
 mod middleware;
 mod oauth2;
+mod pages;
 mod passkey;
 mod router;
 mod session;
-mod summary;
 
 pub use error::IntoResponseError;
 pub use middleware::{
@@ -13,5 +14,7 @@ pub use middleware::{
 pub use passkey::passkey_well_known_router;
 pub use router::oauth2_passkey_router;
 pub use session::AuthUser;
+pub use config::{O2P_REDIRECT_ANON, O2P_REDIRECT_USER};
 
 pub use oauth2_passkey::O2P_ROUTE_PREFIX;
+

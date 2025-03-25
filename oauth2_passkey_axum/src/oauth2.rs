@@ -16,8 +16,9 @@ use oauth2_passkey::{
     prepare_oauth2_auth_request, verify_context_token_and_page,
 };
 
+use super::config::O2P_REDIRECT_ANON;
+use super::error::IntoResponseError;
 use super::session::AuthUser;
-use crate::IntoResponseError;
 
 pub fn router() -> Router {
     Router::new()
@@ -98,7 +99,7 @@ pub async fn logout(
     let headers = prepare_logout_response(cookies)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    Ok((headers, Redirect::to("/")))
+    Ok((headers, Redirect::to(O2P_REDIRECT_ANON.as_str())))
 }
 
 pub async fn get_authorized(

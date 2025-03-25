@@ -1,29 +1,73 @@
 use askama::Template;
 use axum::{
-    Router,
     extract::Json as ExtractJson,
     http::StatusCode,
     response::{Html, Json},
-    routing::{delete, get, put},
 };
 
-use oauth2_passkey::SessionUser;
 use oauth2_passkey::{
-    O2P_ROUTE_PREFIX, delete_user_account, list_accounts_core, list_credentials_core,
-    update_user_account,
+    O2P_ROUTE_PREFIX, SessionUser, delete_user_account, list_accounts_core, list_credentials_core,
+    obfuscate_user_id, update_user_account,
 };
 
-use super::templates::{TemplateAccount, TemplateCredential, UserSummaryTemplate};
 use crate::session::AuthUser;
 use serde_json::{Value, json};
 
-/// Create a router for the user summary endpoints
-pub fn router() -> Router<()> {
-    Router::new()
-        .route("/", get(user_summary))
-        .route("/user-info", get(user_info))
-        .route("/user/delete", delete(delete_user_account_handler))
-        .route("/user/update", put(update_user_account_handler))
+// Template-friendly version of StoredCredential for display
+#[derive(Debug)]
+pub struct TemplateCredential {
+    pub credential_id: String,
+    pub user_id: String,
+    pub user_name: String,
+    pub user_display_name: String,
+    pub user_handle: String,
+    pub counter: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// Template-friendly version of OAuth2Account for display
+#[derive(Debug)]
+pub struct TemplateAccount {
+    pub id: String,
+    pub user_id: String,
+    pub provider: String,
+    pub provider_user_id: String,
+    pub name: String,
+    pub email: String,
+    pub picture: String,
+    pub metadata_str: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Template)]
+#[template(path = "user_summary.j2")]
+pub struct UserSummaryTemplate {
+    pub user: AuthUser,
+    pub passkey_credentials: Vec<TemplateCredential>,
+    pub oauth2_accounts: Vec<TemplateAccount>,
+    pub o2p_route_prefix: String,
+    pub obfuscated_user_id: String,
+}
+
+impl UserSummaryTemplate {
+    pub fn new(
+        user: AuthUser,
+        passkey_credentials: Vec<TemplateCredential>,
+        oauth2_accounts: Vec<TemplateAccount>,
+        o2p_route_prefix: String,
+    ) -> Self {
+        let obfuscated_user_id = obfuscate_user_id(&user.id);
+
+        Self {
+            user,
+            passkey_credentials,
+            oauth2_accounts,
+            o2p_route_prefix,
+            obfuscated_user_id,
+        }
+    }
 }
 
 /// Return basic user information as JSON for the client-side JavaScript

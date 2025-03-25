@@ -6,6 +6,7 @@ use axum::{
 use axum_extra::{TypedHeader, headers};
 use http::request::Parts;
 
+use super::config::O2P_REDIRECT_ANON;
 use oauth2_passkey::{SESSION_COOKIE_NAME, SessionError, SessionUser, get_user_from_session};
 
 pub struct AuthRedirect;
@@ -13,7 +14,7 @@ pub struct AuthRedirect;
 impl IntoResponse for AuthRedirect {
     fn into_response(self) -> Response {
         println!("AuthRedirect called.");
-        Redirect::temporary("/").into_response()
+        Redirect::temporary(O2P_REDIRECT_ANON.as_str()).into_response()
     }
 }
 
