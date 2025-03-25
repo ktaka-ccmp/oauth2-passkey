@@ -57,7 +57,10 @@ pub async fn handle_start_registration_core(
 ) -> Result<RegistrationOptions, CoordinationError> {
     match body.mode {
         RegistrationMode::AddToExistingUser => {
-            let auth_user = auth_user.ok_or(CoordinationError::Unauthorized.log())?;
+            let auth_user = match auth_user {
+                Some(user) => user,
+                None => return Err(CoordinationError::Unauthorized.log())
+            };
 
             verify_context_token_and_page(
                 request_headers,
@@ -71,6 +74,11 @@ pub async fn handle_start_registration_core(
             Ok(result)
         }
         RegistrationMode::NewUser => {
+            match auth_user {
+                Some(_) => return Err(CoordinationError::UnexpectedlyAuthorized.log()),
+                None => {}
+            };
+
             let result = start_registration(None, body.username, body.displayname).await?;
             Ok(result)
         }

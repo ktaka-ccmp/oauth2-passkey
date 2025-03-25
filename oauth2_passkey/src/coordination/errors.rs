@@ -35,6 +35,10 @@ pub enum CoordinationError {
     #[error("Unauthorized access")]
     Unauthorized,
 
+    /// Unexpectedly authorized access error
+    #[error("You are already authenticated")]
+    UnexpectedlyAuthorized,
+
     /// No content error
     #[error("No content")]
     NoContent,
@@ -111,6 +115,7 @@ impl CoordinationError {
             Self::SessionMismatch(msg) => tracing::error!("Session mismatch: {}", msg),
             Self::MissingContextToken => tracing::error!("Context token is missing"),
             Self::Unauthorized => tracing::error!("Unauthorized access"),
+            Self::UnexpectedlyAuthorized => tracing::error!("Unexpectedly authorized access"),
             Self::NoContent => tracing::error!("No content"),
             Self::ResourceNotFound {
                 resource_type,
