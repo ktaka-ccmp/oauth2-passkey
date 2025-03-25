@@ -7,10 +7,9 @@ use axum::{
 
 // Simple authentication checker
 pub async fn is_authenticated_or_error(req: Request, next: Next) -> impl IntoResponse {
-    if let Ok(true) = oauth2_passkey::is_authenticated_basic(req.headers()).await {
-        next.run(req).await
-    } else {
-        (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
+    match oauth2_passkey::is_authenticated_basic(req.headers()).await {
+        Ok(true) => next.run(req).await,
+        Ok(false) | Err(_) => (StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     }
 }
 
@@ -20,13 +19,12 @@ pub async fn is_authenticated_or_redirect(
     req: Request,
     next: Next,
 ) -> impl IntoResponse {
-    if let Ok(true) = oauth2_passkey::is_authenticated_basic(req.headers()).await {
-        next.run(req).await
-    } else {
-        match redirect_url {
+    match oauth2_passkey::is_authenticated_basic(req.headers()).await {
+        Ok(true) => next.run(req).await,
+        Ok(false) | Err(_) => match redirect_url {
             Some(url) => Redirect::temporary(url).into_response(),
             None => (StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
-        }
+        },
     }
 }
 
@@ -37,11 +35,12 @@ pub async fn is_authenticated_with_user(
     mut req: Request,
     next: Next,
 ) -> impl IntoResponse {
-    if let Some(user) = user {
-        tracing::debug!("User: {:?}", user);
-        req.extensions_mut().insert(user);
-        next.run(req).await
-    } else {
-        (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
+    match user {
+        Some(user) => {
+            tracing::debug!("User: {:?}", user);
+            req.extensions_mut().insert(user);
+            next.run(req).await
+        }
+        None => (StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     }
 }
