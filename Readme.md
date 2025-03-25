@@ -14,6 +14,10 @@
   - Use https://docs.rs/tower-http/latest/tower_http/trace/index.html
   - https://docs.rs/tracing/latest/tracing/
 - Change name: libaxum to oauth2_passkey_axum
+- Fix: add O2P_ROUTE_PREFIX to fetch('/summary/user-info', {
+- Completely separate create_account function from add_to_existing_user function to avoid the case where new user is created even though user is already logged in.
+
+
 
 ## Half Done
 

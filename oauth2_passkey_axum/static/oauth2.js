@@ -5,13 +5,13 @@ function initOAuth2Popup() {
     function openPopup(mode=null, page_context=null) {
         if (mode === 'add_to_existing_user') {
             popupWindow = window.open(
-                `${OAUTH_ROUTE_PREFIX}/google?mode=${mode}&context=${page_context}`,
+                `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}&context=${page_context}`,
                 "PopupWindow",
                 "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
             );
         } else {
             popupWindow = window.open(
-                `${OAUTH_ROUTE_PREFIX}/google`,
+                `${O2P_ROUTE_PREFIX}/oauth2/google`,
                 "PopupWindow",
                 "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
             );

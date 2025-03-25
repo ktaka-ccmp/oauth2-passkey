@@ -27,7 +27,7 @@ async function startAuthentication(withUsername = false) {
     const authActions = document.getElementById("auth-actions");
 
     try {
-        const startResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/auth/start', {
+        const startResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/auth/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: "{}"
@@ -82,7 +82,7 @@ async function startAuthentication(withUsername = false) {
 
         console.log('Authentication response:', authResponse);
 
-        const verifyResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/auth/finish', {
+        const verifyResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/auth/finish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(authResponse)
@@ -149,7 +149,7 @@ function showRegistrationModal(mode) {
     document.getElementById('reg-displayname').value = 'displayname';
 
     // Try to get current user info to pre-fill the form
-    fetch('/summary/user-info', {
+    fetch(O2P_ROUTE_PREFIX + '/summary/user-info', {
         method: 'GET',
         credentials: 'same-origin'
     })
@@ -207,7 +207,7 @@ async function startRegistration(mode, username = null, displayname = null) {
         };
 
         let startResponse;
-        startResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/register/start', {
+        startResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/start', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -257,7 +257,7 @@ async function startRegistration(mode, username = null, displayname = null) {
         // Use the single registration finish endpoint
         // The mode has already been verified at the start stage, and the page_context
         // is included in the credential for additional verification
-        const finishResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/register/finish', {
+        const finishResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/finish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             // Include credentials to ensure cookies are sent with the request

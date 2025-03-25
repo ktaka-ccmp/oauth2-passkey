@@ -40,7 +40,7 @@ function base64URLToUint8Array(base64URL) {
 
     // Function to get fresh challenge from server
     async function getFreshChallenge() {
-        const response = await fetch(PASSKEY_ROUTE_PREFIX + '/auth/start', {
+        const response = await fetch(O2P_ROUTE_PREFIX + '/passkey/auth/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(null) // null for username-less auth
@@ -84,7 +84,7 @@ function base64URLToUint8Array(base64URL) {
 
             // If we get a credential, verify it
             if (credential) {
-                const authResponse = await fetch(PASSKEY_ROUTE_PREFIX + '/auth/finish', {
+                const authResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/auth/finish', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

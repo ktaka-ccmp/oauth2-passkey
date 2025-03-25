@@ -11,9 +11,9 @@ use axum_extra::{TypedHeader, headers};
 use std::collections::HashMap;
 
 use oauth2_passkey::{
-    AuthResponse, O2P_ROUTE_PREFIX, OAUTH2_SUB_ROUTE, OAuth2Account, SessionUser,
-    delete_oauth2_account_core, get_authorized_core, list_accounts_core, post_authorized_core,
-    prepare_logout_response, prepare_oauth2_auth_request, verify_context_token_and_page,
+    AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, SessionUser, delete_oauth2_account_core,
+    get_authorized_core, list_accounts_core, post_authorized_core, prepare_logout_response,
+    prepare_oauth2_auth_request, verify_context_token_and_page,
 };
 
 use super::session::AuthUser;
@@ -113,9 +113,8 @@ pub async fn get_authorized(
     Ok((
         headers,
         Redirect::to(&format!(
-            "{}{}/popup_close?message={}",
+            "{}/oauth2/popup_close?message={}",
             O2P_ROUTE_PREFIX.as_str(),
-            OAUTH2_SUB_ROUTE,
             urlencoding::encode(&message)
         )),
     ))
@@ -141,9 +140,8 @@ pub async fn post_authorized(
     Ok((
         headers,
         Redirect::to(&format!(
-            "{}{}/popup_close?message={}",
+            "{}/oauth2/popup_close?message={}",
             O2P_ROUTE_PREFIX.as_str(),
-            OAUTH2_SUB_ROUTE,
             urlencoding::encode(&message)
         )),
     ))
