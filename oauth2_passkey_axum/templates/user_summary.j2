@@ -521,7 +521,7 @@
         }
 
         function deletePasskeyCredential(credentialId, userHandle) {
-            if (confirm('Are you sure you want to unlink this passkey credential?\n\nNote: While we will notify your browser about this deletion, you may need to manually remove the credential from your password manager if it doesn\'t disappear automatically.')) {
+            if (confirm('Are you sure you want to unlink this passkey credential?')) {
                 fetch(`${O2P_ROUTE_PREFIX}/passkey/credentials/${credentialId}`, {
                     method: 'DELETE',
                     headers: {
