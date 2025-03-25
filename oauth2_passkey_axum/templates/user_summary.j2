@@ -336,7 +336,7 @@
 
     <script>
         function Logout() {
-            window.location.href = "{{oauth_route_prefix}}/logout";
+            window.location.href = "{{o2p_route_prefix}}/oauth2/logout";
         }
 
         function toggleEditUserForm() {
@@ -357,7 +357,7 @@
             const account = document.getElementById('edit-account').value;
             const label = document.getElementById('edit-label').value;
 
-            fetch(`/summary/user/update`, {
+            fetch(`${O2P_ROUTE_PREFIX}/summary/user/update`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -397,7 +397,7 @@
             const accountName = "{{user.account}}";
             const userId = "{{user.id}}";
             if (confirm(`Are you sure you want to delete your account "${accountName}"? This action cannot be undone and will delete all your data including OAuth2 accounts and passkey credentials.`)) {
-                fetch(`/summary/user/delete`, {
+                fetch(`${O2P_ROUTE_PREFIX}/summary/user/delete`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json'
@@ -423,7 +423,7 @@
 
         function unlinkOAuth2Account(provider, providerUserId) {
             if (confirm('Are you sure you want to unlink this OAuth2 account?')) {
-                fetch(`${OAUTH_ROUTE_PREFIX}/accounts/${provider}/${providerUserId}`, {
+                fetch(`${O2P_ROUTE_PREFIX}/oauth2/accounts/${provider}/${providerUserId}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json'
@@ -522,7 +522,7 @@
 
         function deletePasskeyCredential(credentialId, userHandle) {
             if (confirm('Are you sure you want to unlink this passkey credential?\n\nNote: While we will notify your browser about this deletion, you may need to manually remove the credential from your password manager if it doesn\'t disappear automatically.')) {
-                fetch(`${PASSKEY_ROUTE_PREFIX}/credentials/${credentialId}`, {
+                fetch(`${O2P_ROUTE_PREFIX}/passkey/credentials/${credentialId}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json'
@@ -551,12 +551,11 @@
         }
     </script>
 
-    <script src="{{oauth_route_prefix}}/oauth2.js"></script>
-    <script src="{{passkey_route_prefix}}/passkey.js"></script>
+    <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
+    <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
     <script>
         const oauth2 = initOAuth2Popup();
-        const OAUTH_ROUTE_PREFIX = '{{oauth_route_prefix}}';
-        const PASSKEY_ROUTE_PREFIX = '{{passkey_route_prefix}}';
+        const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
     </script>
 
     <a href="/" class="back-link">← Back to Home</a>

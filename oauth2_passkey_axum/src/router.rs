@@ -1,7 +1,6 @@
 //! Combined router for all authentication endpoints
 
 use axum::Router;
-use oauth2_passkey::{OAUTH2_SUB_ROUTE, PASSKEY_SUB_ROUTE, SUMMARY_SUB_ROUTE};
 
 /// Create a combined router for all authentication endpoints
 ///
@@ -14,7 +13,7 @@ use oauth2_passkey::{OAUTH2_SUB_ROUTE, PASSKEY_SUB_ROUTE, SUMMARY_SUB_ROUTE};
 /// This simplifies integration by requiring only a single router to be mounted in the application.
 pub fn oauth2_passkey_router() -> Router {
     Router::new()
-        .nest(OAUTH2_SUB_ROUTE, super::oauth2::router())
-        .nest(PASSKEY_SUB_ROUTE, super::passkey::router())
-        .nest(SUMMARY_SUB_ROUTE, super::summary::router())
+        .nest("/oauth2", super::oauth2::router())
+        .nest("/passkey", super::passkey::router())
+        .nest("/summary", super::summary::router())
 }

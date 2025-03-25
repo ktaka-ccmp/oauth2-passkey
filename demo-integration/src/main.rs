@@ -10,7 +10,7 @@ use oauth2_passkey_axum::{
     oauth2_passkey_router, passkey_well_known_router,
 };
 
-use handlers::{index, p1, p2, protected};
+use handlers::{index, p1, p2, p3, p4, protected};
 use server::{Ports, spawn_http_server, spawn_https_server};
 
 #[tokio::main]
@@ -90,6 +90,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/p2",
             get(p2).route_layer(from_fn(is_authenticated_with_user)),
         )
+        .route("/p3", get(p3))
+        .route("/p4", get(p4))
         .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
         .nest("/.well-known", passkey_well_known_router()); // Mount the WebAuthn well-known endpoint at root level
 

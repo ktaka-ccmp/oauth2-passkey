@@ -30,7 +30,7 @@ pub use coordination::{
 };
 
 // Re-export the route prefixes
-pub use config::{O2P_ROUTE_PREFIX, OAUTH2_SUB_ROUTE, PASSKEY_SUB_ROUTE, SUMMARY_SUB_ROUTE};
+pub use config::O2P_ROUTE_PREFIX;
 
 pub use oauth2::{AuthResponse, OAuth2Account, OAuth2Error, prepare_oauth2_auth_request};
 

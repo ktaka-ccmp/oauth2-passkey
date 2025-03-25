@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Index Page</title>
 
-    <script src="{{oauth_route_prefix}}/oauth2.js"></script>
-    <script src="{{passkey_route_prefix}}/passkey.js"></script>
+    <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
+    <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
     {# <!--Conditional UI does not work as we expect it to-->
     <!--<script src="{{passkey_route_prefix}}/conditional_ui.js"></script>-->
     <!--
@@ -31,8 +31,7 @@
     --> #}
     <script>
         const oauth2 = initOAuth2Popup();
-        const OAUTH_ROUTE_PREFIX = '{{oauth_route_prefix}}';
-        const PASSKEY_ROUTE_PREFIX = '{{passkey_route_prefix}}';
+        const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
     </script>
 
 </head>
@@ -56,7 +55,7 @@
             Create User
         </button>
         <button onclick="startAuthentication(false)">Sign in</button>
-        or <a href="{{passkey_route_prefix}}/conditional_ui">try conditional UI</a>
+        or <a href="{{o2p_route_prefix}}/passkey/conditional_ui">try conditional UI</a>
     </div>
 
     {# <!--Conditional UI does not work as we expect it to-->

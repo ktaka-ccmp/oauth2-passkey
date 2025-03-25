@@ -36,8 +36,7 @@ pub struct UserSummaryTemplate {
     pub user: AuthUser,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
-    pub oauth_route_prefix: String,
-    pub passkey_route_prefix: String,
+    pub o2p_route_prefix: String,
     pub obfuscated_user_id: String,
 }
 
@@ -46,8 +45,7 @@ impl UserSummaryTemplate {
         user: AuthUser,
         passkey_credentials: Vec<TemplateCredential>,
         oauth2_accounts: Vec<TemplateAccount>,
-        oauth_route_prefix: String,
-        passkey_route_prefix: String,
+        o2p_route_prefix: String,
     ) -> Self {
         let obfuscated_user_id = obfuscate_user_id(&user.id);
 
@@ -55,8 +53,7 @@ impl UserSummaryTemplate {
             user,
             passkey_credentials,
             oauth2_accounts,
-            oauth_route_prefix,
-            passkey_route_prefix,
+            o2p_route_prefix,
             obfuscated_user_id,
         }
     }

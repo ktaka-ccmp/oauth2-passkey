@@ -9,8 +9,8 @@ use axum::{
 
 use oauth2_passkey::SessionUser;
 use oauth2_passkey::{
-    O2P_ROUTE_PREFIX, OAUTH2_SUB_ROUTE, PASSKEY_SUB_ROUTE, delete_user_account, list_accounts_core,
-    list_credentials_core, update_user_account,
+    O2P_ROUTE_PREFIX, delete_user_account, list_accounts_core, list_credentials_core,
+    update_user_account,
 };
 
 use super::templates::{TemplateAccount, TemplateCredential, UserSummaryTemplate};
@@ -221,16 +221,13 @@ pub async fn user_summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCo
 
     // Create template with all data
     // Create the route strings first
-    let oauth_route = format!("{}{}", O2P_ROUTE_PREFIX.as_str(), OAUTH2_SUB_ROUTE);
-    let passkey_route = format!("{}{}", O2P_ROUTE_PREFIX.as_str(), PASSKEY_SUB_ROUTE);
 
     let template = UserSummaryTemplate::new(
         auth_user,
         passkey_credentials,
         oauth2_accounts,
         // Pass owned String values to the template
-        oauth_route,
-        passkey_route,
+        O2P_ROUTE_PREFIX.to_string(),
     );
 
     // Render the template
