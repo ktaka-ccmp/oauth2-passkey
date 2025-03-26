@@ -1,44 +1,9 @@
-use sqlx::{Pool, Postgres, Sqlite};
+//! Database table configuration
+
 use std::{env, sync::LazyLock};
 use tokio::sync::Mutex;
 
-// Types
-#[derive(Clone, Debug)]
-pub(crate) struct SqliteDataStore {
-    pub(super) pool: sqlx::SqlitePool,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct PostgresDataStore {
-    pub(super) pool: sqlx::PgPool,
-}
-
-// Trait
-pub trait DataStore: Send + Sync {
-    fn as_sqlite(&self) -> Option<&Pool<Sqlite>>;
-    fn as_postgres(&self) -> Option<&Pool<Postgres>>;
-}
-
-// Store implementations
-impl DataStore for SqliteDataStore {
-    fn as_sqlite(&self) -> Option<&Pool<Sqlite>> {
-        Some(&self.pool)
-    }
-
-    fn as_postgres(&self) -> Option<&Pool<Postgres>> {
-        None
-    }
-}
-
-impl DataStore for PostgresDataStore {
-    fn as_sqlite(&self) -> Option<&Pool<Sqlite>> {
-        None
-    }
-
-    fn as_postgres(&self) -> Option<&Pool<Postgres>> {
-        Some(&self.pool)
-    }
-}
+use super::types::{DataStore, PostgresDataStore, SqliteDataStore};
 
 // Configuration
 pub static GENERIC_DATA_STORE_TYPE: LazyLock<String> = LazyLock::new(|| {
@@ -79,4 +44,25 @@ pub static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = LazyLock::n
     );
 
     Mutex::new(store)
+});
+
+/// Table prefix from environment variable
+pub static TABLE_PREFIX: LazyLock<String> =
+    LazyLock::new(|| env::var("DB_TABLE_PREFIX").unwrap_or_else(|_| "o2p_".to_string()));
+
+/// Users table name
+pub static DB_TABLE_USERS: LazyLock<String> = LazyLock::new(|| {
+    env::var("DB_TABLE_USERS").unwrap_or_else(|_| format!("{}{}", *TABLE_PREFIX, "users"))
+});
+
+/// Passkey credentials table name
+pub static DB_TABLE_PASSKEY_CREDENTIALS: LazyLock<String> = LazyLock::new(|| {
+    env::var("DB_TABLE_PASSKEY_CREDENTIALS")
+        .unwrap_or_else(|_| format!("{}{}", *TABLE_PREFIX, "passkey_credentials"))
+});
+
+/// OAuth2 accounts table name
+pub static DB_TABLE_OAUTH2_ACCOUNTS: LazyLock<String> = LazyLock::new(|| {
+    env::var("DB_TABLE_OAUTH2_ACCOUNTS")
+        .unwrap_or_else(|_| format!("{}{}", *TABLE_PREFIX, "oauth2_accounts"))
 });

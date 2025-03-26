@@ -1,0 +1,6 @@
+mod config;
+mod types;
+
+pub use config::{
+    DB_TABLE_OAUTH2_ACCOUNTS, DB_TABLE_PASSKEY_CREDENTIALS, DB_TABLE_USERS, GENERIC_DATA_STORE,
+};
