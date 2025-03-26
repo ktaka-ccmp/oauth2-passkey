@@ -36,10 +36,18 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     sqlx::query(&format!(
         r#"
         CREATE INDEX IF NOT EXISTS idx_{}_user_name ON {}(user_name);
-        CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id);
         "#,
         passkey_table.replace(".", "_"),
-        passkey_table,
+        passkey_table
+    ))
+    .execute(pool)
+    .await
+    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    sqlx::query(&format!(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id);
+        "#,
         passkey_table.replace(".", "_"),
         passkey_table
     ))
