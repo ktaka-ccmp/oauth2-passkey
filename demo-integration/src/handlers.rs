@@ -6,8 +6,8 @@ use axum::{
 };
 use oauth2_passkey::O2P_ROUTE_PREFIX;
 
-use oauth2_passkey_axum::{O2P_REDIRECT_ANON, O2P_REDIRECT_USER};
 use oauth2_passkey_axum::AuthUser as User;
+use oauth2_passkey_axum::{O2P_REDIRECT_ANON, O2P_REDIRECT_USER};
 
 #[derive(Template)]
 #[template(path = "protected.j2")]
@@ -31,12 +31,8 @@ struct P2Template<'a> {
 
 pub(crate) async fn index(user: Option<User>) -> Result<Response, (StatusCode, String)> {
     match user {
-        Some(_) => {
-            Ok(Redirect::to(O2P_REDIRECT_USER.as_str()).into_response())
-        }
-        None => {
-            Ok(Redirect::to(O2P_REDIRECT_ANON.as_str()).into_response())
-        }
+        Some(_) => Ok(Redirect::to(O2P_REDIRECT_USER.as_str()).into_response()),
+        None => Ok(Redirect::to(O2P_REDIRECT_ANON.as_str()).into_response()),
     }
 }
 

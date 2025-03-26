@@ -26,7 +26,10 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), User
     Ok(())
 }
 
-pub(super) async fn get_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<Option<User>, UserError> {
+pub(super) async fn get_user_sqlite(
+    pool: &Pool<Sqlite>,
+    id: &str,
+) -> Result<Option<User>, UserError> {
     let table_name = DB_TABLE_USERS.as_str();
 
     sqlx::query_as::<_, User>(&format!(

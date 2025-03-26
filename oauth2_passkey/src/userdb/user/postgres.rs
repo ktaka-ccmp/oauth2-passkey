@@ -26,7 +26,10 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     Ok(())
 }
 
-pub(super) async fn get_user_postgres(pool: &Pool<Postgres>, id: &str) -> Result<Option<User>, UserError> {
+pub(super) async fn get_user_postgres(
+    pool: &Pool<Postgres>,
+    id: &str,
+) -> Result<Option<User>, UserError> {
     let table_name = DB_TABLE_USERS.as_str();
 
     sqlx::query_as::<_, User>(&format!(
@@ -41,7 +44,10 @@ pub(super) async fn get_user_postgres(pool: &Pool<Postgres>, id: &str) -> Result
     .map_err(|e| UserError::Storage(e.to_string()))
 }
 
-pub(super) async fn upsert_user_postgres(pool: &Pool<Postgres>, user: User) -> Result<User, UserError> {
+pub(super) async fn upsert_user_postgres(
+    pool: &Pool<Postgres>,
+    user: User,
+) -> Result<User, UserError> {
     let table_name = DB_TABLE_USERS.as_str();
 
     // Upsert user with a single query

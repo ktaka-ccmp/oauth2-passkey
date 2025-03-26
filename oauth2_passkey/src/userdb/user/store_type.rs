@@ -1,8 +1,8 @@
 use crate::storage::GENERIC_DATA_STORE;
 use crate::userdb::{errors::UserError, types::User};
 
-use super::sqlite::*;
 use super::postgres::*;
+use super::sqlite::*;
 
 pub struct UserStore;
 
