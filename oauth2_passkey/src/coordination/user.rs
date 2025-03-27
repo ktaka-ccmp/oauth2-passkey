@@ -34,7 +34,9 @@ pub async fn update_user_account(
 }
 
 /// Delete a user account and all associated OAuth2 accounts and Passkey credentials
-pub async fn delete_user_account(user_id: &str) -> Result<(), CoordinationError> {
+///
+/// Returns a list of deleted passkey credential IDs for client-side notification
+pub async fn delete_user_account(user_id: &str) -> Result<Vec<String>, CoordinationError> {
     // Check if the user exists
     let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
         CoordinationError::ResourceNotFound {
@@ -46,6 +48,15 @@ pub async fn delete_user_account(user_id: &str) -> Result<(), CoordinationError>
 
     tracing::debug!("Deleting user account: {:#?}", user);
 
+    // Get all Passkey credentials for this user before deleting them
+    let credentials =
+        PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_string()))
+            .await?;
+    let credential_ids: Vec<String> = credentials
+        .iter()
+        .map(|c| c.credential_id.clone())
+        .collect();
+
     // Delete all OAuth2 accounts for this user
     OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.to_string())).await?;
 
@@ -55,7 +66,7 @@ pub async fn delete_user_account(user_id: &str) -> Result<(), CoordinationError>
     // Finally, delete the user account
     UserStore::delete_user(user_id).await?;
 
-    Ok(())
+    Ok(credential_ids)
 }
 
 // generate a unique user ID, with built-in collision detection

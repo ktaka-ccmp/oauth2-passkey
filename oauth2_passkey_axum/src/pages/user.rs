@@ -176,7 +176,7 @@ pub async fn update_user_account_handler(
 pub async fn delete_user_account_handler(
     auth_user: AuthUser,
     ExtractJson(payload): ExtractJson<DeleteUserRequest>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     // Get the user ID from the authenticated user
     let session_user_id = auth_user.id.clone();
     let request_user_id = payload.user_id;
@@ -198,12 +198,16 @@ pub async fn delete_user_account_handler(
 
     // Call the core function to delete the user account and all associated data
     // Using the imported function from libauth
-    delete_user_account(&session_user_id)
+    let credential_ids = delete_user_account(&session_user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // Return a success status code
-    Ok(StatusCode::OK)
+    // Return the credential IDs in the response for client-side notification
+    Ok(Json(json!({
+        "status": "success",
+        "message": "User account deleted successfully",
+        "credential_ids": credential_ids
+    })))
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
