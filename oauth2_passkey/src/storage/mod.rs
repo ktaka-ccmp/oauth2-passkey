@@ -1,6 +1,7 @@
 mod cache_store;
 mod data_store;
 mod errors;
+mod schema_validation;
 mod types;
 
 pub async fn init() -> Result<(), errors::StorageError> {
@@ -16,3 +17,6 @@ pub use types::CacheData;
 pub use data_store::{
     DB_TABLE_OAUTH2_ACCOUNTS, DB_TABLE_PASSKEY_CREDENTIALS, DB_TABLE_USERS, GENERIC_DATA_STORE,
 };
+
+// Re-export schema validation function for internal use
+pub use schema_validation::validate_postgres_table_schema;

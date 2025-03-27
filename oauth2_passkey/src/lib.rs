@@ -53,3 +53,37 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
     passkey::init().await?;
     Ok(())
 }
+
+/// Schema validation errors that can occur during database validation
+#[derive(Debug, thiserror::Error)]
+pub enum SchemaValidationError {
+    /// OAuth2 schema validation error
+    #[error("OAuth2 schema validation error: {0}")]
+    OAuth2(#[from] crate::oauth2::OAuth2Error),
+
+    /// Passkey schema validation error
+    #[error("Passkey schema validation error: {0}")]
+    Passkey(#[from] crate::passkey::PasskeyError),
+
+    /// User schema validation error
+    #[error("User schema validation error: {0}")]
+    User(#[from] crate::userdb::UserError),
+}
+
+/// Validate all database schemas to ensure they match the expected structure
+///
+/// This function should be called during application startup to ensure that
+/// the database schema matches what the code expects. This helps catch
+/// discrepancies early and prevents runtime errors due to schema mismatches.
+pub async fn validate_schemas() -> Result<(), SchemaValidationError> {
+    // Validate OAuth2 schema
+    crate::oauth2::OAuth2Store::validate_schema().await?;
+
+    // Validate Passkey schema
+    crate::passkey::PasskeyStore::validate_schema().await?;
+
+    // Validate User schema
+    crate::userdb::UserStore::validate_schema().await?;
+
+    Ok(())
+}

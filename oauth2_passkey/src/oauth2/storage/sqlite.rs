@@ -1,9 +1,9 @@
-use crate::storage::{DB_TABLE_OAUTH2_ACCOUNTS, DB_TABLE_USERS};
-use chrono::Utc;
-use sqlx::{Pool, Sqlite};
-
 use crate::oauth2::errors::OAuth2Error;
 use crate::oauth2::types::{AccountSearchField, OAuth2Account};
+use crate::storage::{DB_TABLE_OAUTH2_ACCOUNTS, DB_TABLE_USERS};
+use chrono::{DateTime, Utc};
+use sqlx::{Pool, Row, Sqlite};
+use tracing;
 
 // SQLite implementations
 pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), OAuth2Error> {
@@ -249,6 +249,105 @@ pub(super) async fn delete_oauth2_accounts_by_field_sqlite(
         .execute(pool)
         .await
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+    Ok(())
+}
+
+/// Validates that the OAuth2 account table schema matches what we expect
+pub(super) async fn validate_oauth2_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), OAuth2Error> {
+    let oauth2_table = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
+
+    // Define expected schema (column name, data type)
+    let expected_columns = [
+        ("id", "TEXT"),
+        ("user_id", "TEXT"),
+        ("provider", "TEXT"),
+        ("provider_user_id", "TEXT"),
+        ("access_token", "TEXT"),
+        ("refresh_token", "TEXT"),
+        ("expires_at", "TIMESTAMP"),
+        ("scope", "TEXT"),
+        ("token_type", "TEXT"),
+        ("id_token", "TEXT"),
+        ("name", "TEXT"),
+        ("email", "TEXT"),
+        ("created_at", "TIMESTAMP"),
+        ("updated_at", "TIMESTAMP"),
+    ];
+
+    // Check if table exists
+    let table_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT name FROM sqlite_master WHERE type='table' AND name=?)",
+    )
+    .bind(oauth2_table)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+    if !table_exists {
+        return Err(OAuth2Error::Storage(format!(
+            "Schema validation failed: Table '{}' does not exist",
+            oauth2_table
+        )));
+    }
+
+    // Query actual schema from database
+    let rows = sqlx::query("PRAGMA table_info(?)")
+        .bind(oauth2_table)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+    let actual_columns: Vec<(String, String)> = rows
+        .iter()
+        .map(|row| {
+            let name: String = row.get("name");
+            let type_: String = row.get("type");
+            (name, type_)
+        })
+        .collect();
+
+    // Compare schemas
+    for (expected_name, expected_type) in &expected_columns {
+        let found = actual_columns
+            .iter()
+            .find(|(name, _)| name == expected_name);
+
+        match found {
+            Some((_, actual_type)) if actual_type == expected_type => {
+                // Column exists with correct type, all good
+            }
+            Some((_, actual_type)) => {
+                // Column exists but with wrong type
+                return Err(OAuth2Error::Storage(format!(
+                    "Schema validation failed: Column '{}' has type '{}' but expected '{}'",
+                    expected_name, actual_type, expected_type
+                )));
+            }
+            None => {
+                // Column doesn't exist
+                return Err(OAuth2Error::Storage(format!(
+                    "Schema validation failed: Missing column '{}'",
+                    expected_name
+                )));
+            }
+        }
+    }
+
+    // Check for extra columns (just log a warning)
+    for (actual_name, _) in &actual_columns {
+        if !expected_columns
+            .iter()
+            .any(|(name, _)| *name == actual_name)
+        {
+            // Log a warning about extra column
+            tracing::warn!(
+                "Extra column '{}' found in table '{}'",
+                actual_name,
+                oauth2_table
+            );
+        }
+    }
 
     Ok(())
 }

@@ -209,6 +209,34 @@ pub(super) async fn delete_credential_by_field_postgres(
     Ok(())
 }
 
+/// Validates that the Passkey credential table schema matches what we expect
+pub(super) async fn validate_passkey_tables_postgres(
+    pool: &Pool<Postgres>,
+) -> Result<(), PasskeyError> {
+    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
+
+    // Define expected schema (column name, data type)
+    let expected_columns = [
+        ("credential_id", "text"),
+        ("user_id", "text"),
+        ("public_key", "text"),
+        ("counter", "integer"),
+        ("user_handle", "text"),
+        ("user_name", "text"),
+        ("user_display_name", "text"),
+        ("created_at", "timestamp with time zone"),
+        ("updated_at", "timestamp with time zone"),
+    ];
+
+    crate::storage::validate_postgres_table_schema(
+        pool,
+        passkey_table,
+        &expected_columns,
+        PasskeyError::Storage,
+    )
+    .await
+}
+
 use sqlx::{FromRow, Row, postgres::PgRow, sqlite::SqliteRow};
 
 // Implement FromRow for PasskeyCredential to handle the flattened database structure for SQLite

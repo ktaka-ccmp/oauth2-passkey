@@ -57,4 +57,19 @@ impl UserStore {
             Err(UserError::Storage("Unsupported database type".to_string()))
         }
     }
+
+    /// Validate that the database schema matches what we expect
+    /// This should be called during application startup to ensure the database
+    /// schema is compatible with the code
+    pub async fn validate_schema() -> Result<(), UserError> {
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        if let Some(pool) = store.as_sqlite() {
+            super::sqlite::validate_user_tables_sqlite(pool).await
+        } else if let Some(pool) = store.as_postgres() {
+            super::postgres::validate_user_tables_postgres(pool).await
+        } else {
+            Err(UserError::Storage("Unsupported database type".to_string()))
+        }
+    }
 }

@@ -92,4 +92,17 @@ impl PasskeyStore {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }
     }
+
+    /// Validates the database schema for the passkey tables
+    pub async fn validate_schema() -> Result<(), PasskeyError> {
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        if let Some(pool) = store.as_sqlite() {
+            validate_passkey_tables_sqlite(pool).await
+        } else if let Some(pool) = store.as_postgres() {
+            validate_passkey_tables_postgres(pool).await
+        } else {
+            Err(PasskeyError::Storage("Unsupported database type".into()))
+        }
+    }
 }
