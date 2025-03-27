@@ -40,14 +40,20 @@ impl OAuth2Store {
     pub async fn init() -> Result<(), OAuth2Error> {
         let store = GENERIC_DATA_STORE.lock().await;
 
-        if let Some(pool) = store.as_sqlite() {
-            create_tables_sqlite(pool).await
-        } else if let Some(pool) = store.as_postgres() {
-            create_tables_postgres(pool).await
-        } else {
-            Err(OAuth2Error::Storage(
+        match (store.as_sqlite(), store.as_postgres()) {
+            (Some(pool), _) => {
+                create_tables_sqlite(pool).await?;
+                validate_oauth2_tables_sqlite(pool).await?;
+                Ok(())
+            }
+            (_, Some(pool)) => {
+                create_tables_postgres(pool).await?;
+                validate_oauth2_tables_postgres(pool).await?;
+                Ok(())
+            }
+            _ => Err(OAuth2Error::Storage(
                 "Unsupported database type".to_string(),
-            ))
+            )),
         }
     }
 

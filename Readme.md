@@ -7,14 +7,14 @@
 - Schema check when initializing database connection. Make sure the schema the program is expecting is the same as the one in the database.
 - Decide on Public API
 - Adjust visibility of functions, structs, enums, etc. What needs to be public?
-- signalCurrentUserDetails seems not working on Android device.
+- signalUnknownCredential seems not working on Android device.
 - Tracing
   - Use tracing-error crate https://crates.io/crates/tracing-error
   - Use https://docs.rs/tower-http/latest/tower_http/trace/index.html
   - https://docs.rs/tracing/latest/tracing/
-- Change name: libaxum to oauth2_passkey_axum
 - Completely separate create_account function from add_to_existing_user function to avoid the case where new user is created even though user is already logged in.
 - Replace "if let", "unwrap_or_else", "ok_or_else" etc. with "match", where appropriate.
+- Enable update of name and displayname feild for passkey credentials. Also notify the update to autheticator using signalCurrentUserDetails.
 
 ## Half Done
 
@@ -41,7 +41,7 @@
   - Update database schema and existing records if necessary
 
 - Make user id and OAuth2 account id collision-less.
-- ~~[Need to investigate]~~(It's working now) Passkey sync between RP and Authenticator using signalCurrentUserDetails not working.
+- ~~[Need to investigate]~~(It's working now) Passkey sync between RP and Authenticator using signalUnknownCredential not working.
 
 - ✔️ Session boundary protection for authentication flows. When a user adds a new passkey credential or links a new OAuth2 account, we ensure session consistency:
   - Implemented dedicated functions with clear intent separation through explicit modes:
@@ -76,6 +76,7 @@
             };
 ```
 - When using Delete User button, deletion of passkey credentials aren't notified to Passkey Authenticator.
+- Change name: libaxum to oauth2_passkey_axum
 
 
 ## Memo

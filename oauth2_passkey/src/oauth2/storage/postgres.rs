@@ -1,9 +1,10 @@
-use crate::storage::{DB_TABLE_OAUTH2_ACCOUNTS, DB_TABLE_USERS};
+use crate::oauth2::{
+    errors::OAuth2Error,
+    types::{AccountSearchField, OAuth2Account},
+};
+use crate::storage::{DB_TABLE_OAUTH2_ACCOUNTS, DB_TABLE_USERS, validate_postgres_table_schema};
 use chrono::Utc;
 use sqlx::{Pool, Postgres};
-
-use crate::oauth2::errors::OAuth2Error;
-use crate::oauth2::types::{AccountSearchField, OAuth2Account};
 
 // PostgreSQL implementations
 pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), OAuth2Error> {
@@ -46,6 +47,30 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     Ok(())
+}
+
+/// Validates that the OAuth2 account table schema matches what we expect
+pub(super) async fn validate_oauth2_tables_postgres(
+    pool: &Pool<Postgres>,
+) -> Result<(), OAuth2Error> {
+    let oauth2_table = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
+
+    // Define expected schema (column name, data type)
+    let expected_columns = [
+        ("id", "text"),
+        ("user_id", "text"),
+        ("provider", "text"),
+        ("provider_user_id", "text"),
+        ("name", "text"),
+        ("email", "text"),
+        ("picture", "text"),
+        ("metadata", "jsonb"),
+        ("created_at", "timestamp with time zone"),
+        ("updated_at", "timestamp with time zone"),
+    ];
+
+    validate_postgres_table_schema(pool, oauth2_table, &expected_columns, OAuth2Error::Storage)
+        .await
 }
 
 pub(super) async fn get_oauth2_accounts_by_field_postgres(

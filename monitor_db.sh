@@ -23,7 +23,10 @@ case "$GENERIC_DATA_STORE_TYPE" in
     FORMAT_COMMAND=""
     ;;
   sqlite)
-    DB_STRING="sqlite3 ${GENERIC_DATA_STORE_URL#sqlite://}"
+    DB_PATH="${GENERIC_DATA_STORE_URL#sqlite:}"
+    DB_PATH="${DB_PATH#//}"
+    DB_STRING="sqlite3 ${DB_PATH}"
+    echo $DB_STRING
     # SQLite formatting options
     SQLITE_HEADERS=".headers on"
     SQLITE_MODE=".mode column"

@@ -1,6 +1,6 @@
 //! Database table configuration
 
-use std::{env, sync::LazyLock};
+use std::{env, str::FromStr, sync::LazyLock};
 use tokio::sync::Mutex;
 
 use super::types::{DataStore, PostgresDataStore, SqliteDataStore};
@@ -25,9 +25,15 @@ pub static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = LazyLock::n
     );
 
     let store = match store_type {
-        "sqlite" => Box::new(SqliteDataStore {
-            pool: sqlx::SqlitePool::connect_lazy(store_url).expect("Failed to create SQLite pool"),
-        }) as Box<dyn DataStore>,
+        "sqlite" => {
+            let opts = sqlx::sqlite::SqliteConnectOptions::from_str(store_url)
+                .expect("Failed to parse SQLite connection string")
+                .create_if_missing(true);
+
+            Box::new(SqliteDataStore {
+                pool: sqlx::sqlite::SqlitePool::connect_lazy_with(opts),
+            }) as Box<dyn DataStore>
+        }
         "postgres" => Box::new(PostgresDataStore {
             pool: sqlx::PgPool::connect_lazy(store_url).expect("Failed to create Postgres pool"),
         }) as Box<dyn DataStore>,

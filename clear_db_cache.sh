@@ -22,7 +22,10 @@ case "$GENERIC_DATA_STORE_TYPE" in
     DB_STRING="psql $GENERIC_DATA_STORE_URL"
     ;;
   sqlite)
-    DB_STRING="sqlite3 ${GENERIC_DATA_STORE_URL#sqlite://}"
+    DB_PATH="${GENERIC_DATA_STORE_URL#sqlite:}"
+    DB_PATH="${DB_PATH#//}"
+    DB_STRING="sqlite3 ${DB_PATH}"
+    echo $DB_STRING
     ;;
   *)
     echo "ERROR: Unsupported data store type: $GENERIC_DATA_STORE_TYPE"
