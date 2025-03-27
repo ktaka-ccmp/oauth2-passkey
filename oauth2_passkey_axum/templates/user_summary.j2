@@ -269,7 +269,7 @@
             <p>You don't have any passkey credentials yet.</p>
         {% else %}
             {% for credential in passkey_credentials %}
-                <div class="item">
+                <div class="item" data-credential-id="{{ credential.credential_id }}">
                     <!--
                     <div class="item-detail"><strong>User Handle:</strong> {{ credential.user_handle }}</div>
                     <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
@@ -397,6 +397,7 @@
             const accountName = "{{user.account}}";
             const userId = "{{user.id}}";
             if (confirm(`Are you sure you want to delete your account "${accountName}"? This action cannot be undone and will delete all your data including OAuth2 accounts and passkey credentials.`)) {
+                // Delete the account on the server first
                 fetch(`${O2P_ROUTE_PREFIX}/user/delete`, {
                     method: 'DELETE',
                     headers: {
@@ -405,15 +406,42 @@
                     body: JSON.stringify({ user_id: userId })
                 })
                 .then(response => {
-                    if (response.ok) {
-                        alert('Your account has been deleted. You will now be logged out.');
-                        // Redirect to logout to clear the session
-                        window.location.reload();
-                    } else {
-                        response.text().then(text => {
-                            alert(`Failed to delete account: ${text}`);
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`Failed to delete account: ${text}`);
                         });
                     }
+                    return response.json();
+                })
+                .then(data => {
+                    // After successful server-side deletion, notify the authenticator about each credential
+                    console.log('Account deleted successfully on server side');
+
+                    // Check if we have credential IDs to notify about
+                    const credentialIds = data.credential_ids || [];
+                    if (credentialIds.length > 0) {
+                        console.log(`Notifying authenticator about ${credentialIds.length} deleted credentials`);
+
+                        // Create a chain of promises to notify the authenticator about each credential
+                        let notificationChain = Promise.resolve();
+
+                        // Process each credential sequentially
+                        credentialIds.forEach(credentialId => {
+                            notificationChain = notificationChain.then(() => {
+                                return synchronizeCredentialsWithSignalUnknown(credentialId);
+                            });
+                        });
+
+                        return notificationChain;
+                    } else {
+                        console.log('No passkey credentials to notify about');
+                        return Promise.resolve();
+                    }
+                })
+                .then(() => {
+                    alert('Your account has been deleted. You will now be logged out.');
+                    // Redirect to logout to clear the session
+                    window.location.reload();
                 })
                 .catch(error => {
                     alert(`Error: ${error.message}`);

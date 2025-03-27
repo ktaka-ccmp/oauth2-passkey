@@ -5,7 +5,6 @@
 - Tests
 - GitHub Actions
 - Schema check when initializing database connection. Make sure the schema the program is expecting is the same as the one in the database.
-- When using Delete User button, deletion of passkey credentials aren't notified to Passkey Authenticator.
 - Decide on Public API
 - Adjust visibility of functions, structs, enums, etc. What needs to be public?
 - signalCurrentUserDetails seems not working on Android device.
@@ -76,6 +75,8 @@
                 None => {}
             };
 ```
+- When using Delete User button, deletion of passkey credentials aren't notified to Passkey Authenticator.
+
 
 ## Memo
 
