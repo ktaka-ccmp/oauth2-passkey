@@ -1,8 +1,11 @@
-use crate::storage::{DB_TABLE_PASSKEY_CREDENTIALS, DB_TABLE_USERS};
+use crate::storage::validate_sqlite_table_schema;
+use crate::userdb::DB_TABLE_USERS;
 use sqlx::{Pool, Sqlite};
 
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::{CredentialSearchField, PasskeyCredential};
+
+use super::config::DB_TABLE_PASSKEY_CREDENTIALS;
 
 // SQLite implementations
 pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), PasskeyError> {
@@ -45,6 +48,34 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     Ok(())
+}
+
+/// Validates that the Passkey credential table schema matches what we expect
+pub(super) async fn validate_passkey_tables_sqlite(
+    pool: &Pool<Sqlite>,
+) -> Result<(), PasskeyError> {
+    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
+
+    // Define expected schema (column name, data type)
+    let expected_columns = vec![
+        ("credential_id", "TEXT"),
+        ("user_id", "TEXT"),
+        ("public_key", "TEXT"),
+        ("counter", "INTEGER"),
+        ("user_handle", "TEXT"),
+        ("user_name", "TEXT"),
+        ("user_display_name", "TEXT"),
+        ("created_at", "TIMESTAMP"),
+        ("updated_at", "TIMESTAMP"),
+    ];
+
+    validate_sqlite_table_schema(
+        pool,
+        passkey_table,
+        &expected_columns,
+        PasskeyError::Storage,
+    )
+    .await
 }
 
 pub(super) async fn store_credential_sqlite(

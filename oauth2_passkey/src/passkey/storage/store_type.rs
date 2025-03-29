@@ -13,13 +13,20 @@ impl PasskeyStore {
     pub async fn init() -> Result<(), PasskeyError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
-        // Create table based on database type
-        if let Some(pool) = store.as_sqlite() {
-            create_tables_sqlite(pool).await
-        } else if let Some(pool) = store.as_postgres() {
-            create_tables_postgres(pool).await
-        } else {
-            Err(PasskeyError::Storage("Unsupported database type".into()))
+        match (store.as_sqlite(), store.as_postgres()) {
+            (Some(pool), _) => {
+                create_tables_sqlite(pool).await?;
+                validate_passkey_tables_sqlite(pool).await?;
+                Ok(())
+            }
+            (_, Some(pool)) => {
+                create_tables_postgres(pool).await?;
+                validate_passkey_tables_postgres(pool).await?;
+                Ok(())
+            }
+            _ => Err(PasskeyError::Storage(
+                "Unsupported database type".to_string(),
+            )),
         }
     }
 

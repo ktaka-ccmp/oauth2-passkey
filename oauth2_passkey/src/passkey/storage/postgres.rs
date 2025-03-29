@@ -1,4 +1,5 @@
-use crate::storage::{DB_TABLE_PASSKEY_CREDENTIALS, DB_TABLE_USERS};
+use crate::storage::validate_postgres_table_schema;
+use crate::userdb::DB_TABLE_USERS;
 use chrono::{DateTime, Utc};
 use sqlx::{Pool, Postgres};
 
@@ -6,6 +7,8 @@ use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::{
     CredentialSearchField, PasskeyCredential, PublicKeyCredentialUserEntity,
 };
+
+use super::config::DB_TABLE_PASSKEY_CREDENTIALS;
 
 // PostgreSQL implementations
 pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), PasskeyError> {
@@ -56,6 +59,34 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     Ok(())
+}
+
+/// Validates that the Passkey credential table schema matches what we expect
+pub(super) async fn validate_passkey_tables_postgres(
+    pool: &Pool<Postgres>,
+) -> Result<(), PasskeyError> {
+    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
+
+    // Define expected schema (column name, data type)
+    let expected_columns = [
+        ("credential_id", "text"),
+        ("user_id", "text"),
+        ("public_key", "text"),
+        ("counter", "integer"),
+        ("user_handle", "text"),
+        ("user_name", "text"),
+        ("user_display_name", "text"),
+        ("created_at", "timestamp with time zone"),
+        ("updated_at", "timestamp with time zone"),
+    ];
+
+    validate_postgres_table_schema(
+        pool,
+        passkey_table,
+        &expected_columns,
+        PasskeyError::Storage,
+    )
+    .await
 }
 
 pub(super) async fn store_credential_postgres(

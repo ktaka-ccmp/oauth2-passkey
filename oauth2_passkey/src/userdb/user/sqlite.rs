@@ -1,6 +1,8 @@
-use crate::storage::DB_TABLE_USERS;
-use crate::userdb::{errors::UserError, types::User};
 use sqlx::{Pool, Sqlite};
+
+use super::config::DB_TABLE_USERS;
+use crate::storage::validate_sqlite_table_schema;
+use crate::userdb::{errors::UserError, types::User};
 
 // SQLite implementations
 pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), UserError> {
@@ -24,6 +26,22 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), User
     .map_err(|e| UserError::Storage(e.to_string()))?;
 
     Ok(())
+}
+
+/// Validates that the User table schema matches what we expect
+pub(super) async fn validate_user_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), UserError> {
+    let users_table = DB_TABLE_USERS.as_str();
+
+    // Define expected schema (column name, data type)
+    let expected_columns = vec![
+        ("id", "TEXT"),
+        ("account", "TEXT"),
+        ("label", "TEXT"),
+        ("created_at", "TIMESTAMP"),
+        ("updated_at", "TIMESTAMP"),
+    ];
+
+    validate_sqlite_table_schema(pool, users_table, &expected_columns, UserError::Storage).await
 }
 
 pub(super) async fn get_user_sqlite(
