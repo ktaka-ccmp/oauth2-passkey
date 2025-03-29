@@ -26,13 +26,13 @@ pub use coordination::{
 
 pub use coordination::{
     delete_oauth2_account_core, delete_user_account, get_authorized_core, list_accounts_core,
-    post_authorized_core, update_user_account,
+    post_authorized_core, update_passkey_credential_core, update_user_account,
 };
 
 // Re-export the route prefixes
 pub use config::O2P_ROUTE_PREFIX;
 
-pub use oauth2::{AuthResponse, OAuth2Account, OAuth2Error, prepare_oauth2_auth_request};
+pub use oauth2::{AuthResponse, OAuth2Account, prepare_oauth2_auth_request};
 
 pub use passkey::{
     AuthenticationOptions, AuthenticatorResponse, PasskeyCredential, RegisterCredential,

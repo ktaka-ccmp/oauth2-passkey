@@ -99,4 +99,20 @@ impl PasskeyStore {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }
     }
+
+    pub async fn update_credential(
+        credential_id: &str,
+        name: &str,
+        display_name: &str,
+    ) -> Result<(), PasskeyError> {
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        if let Some(pool) = store.as_sqlite() {
+            update_credential_user_details_sqlite(pool, credential_id, name, display_name).await
+        } else if let Some(pool) = store.as_postgres() {
+            update_credential_user_details_postgres(pool, credential_id, name, display_name).await
+        } else {
+            Err(PasskeyError::Storage("Unsupported database type".into()))
+        }
+    }
 }

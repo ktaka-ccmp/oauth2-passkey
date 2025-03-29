@@ -135,6 +135,24 @@
         .delete-button:hover {
             background-color: #d32f2f;
         }
+
+        .edit-button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .edit-button:hover {
+            background-color: #3367d6;
+        }
         
         .created-row {
             display: flex;
@@ -167,6 +185,50 @@
         .secondary-button:hover {
             background-color: #7f8c8d;
         }
+
+        /* Modal styles */
+        .credential-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .credential-modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 5px;
+        }
+
+        .credential-close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .credential-close:hover,
+        .credential-close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* Keep the original modal styles for backward compatibility but make them less specific */
+        .modal {
+            display: none;
+        }
+
         /* Responsive adjustments */
         @media screen and (max-width: 600px) {
             html, body {
@@ -274,11 +336,14 @@
                     <div class="item-detail"><strong>User Handle:</strong> {{ credential.user_handle }}</div>
                     <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
                     -->
-                    <div class="item-detail"><strong>User Name:</strong> {{ credential.user_name }}</div>
-                    <div class="item-detail"><strong>Display Name:</strong> {{ credential.user_display_name }}</div>
+                    <div class="item-detail"><strong>User Name:</strong> <span id="credential-name-{{ credential.credential_id }}">{{ credential.user_name }}</span></div>
+                    <div class="item-detail"><strong>Display Name:</strong> <span id="credential-display-name-{{ credential.credential_id }}">{{ credential.user_display_name }}</span></div>
                     <div class="item-detail created-row">
                         <span><strong>Created:</strong> {{ credential.created_at }}</span>
-                        <button onclick="deletePasskeyCredential('{{ credential.credential_id }}', '{{ credential.user_handle }}')" class="delete-button">Delete</button>
+                        <div>
+                            <button onclick="openUpdateCredentialModal('{{ credential.credential_id }}', '{{ credential.user_name }}', '{{ credential.user_display_name }}', '{{ credential.user_handle }}')" class="edit-button">Edit</button>
+                            <button onclick="deletePasskeyCredential('{{ credential.credential_id }}', '{{ credential.user_handle }}')" class="delete-button">Delete</button>
+                        </div>
                     </div>
                     <!--
                     <div><button onclick="synchronizeCredentialsWithSignalUnknown('{{ credential.credential_id }}')">Synchronize Credentials with Signal Unknown</button></div>
@@ -334,7 +399,36 @@
         {% endif %}
     </div>
 
+    <!-- Update Credential Modal -->
+    <div id="update-credential-modal" class="credential-modal" style="display: none;">
+        <div class="credential-modal-content">
+            <span class="credential-close" onclick="closeUpdateCredentialModal()">&times;</span>
+            <h2>Update Credential Details</h2>
+            <form id="update-credential-form">
+                <input type="hidden" id="update-credential-id" name="credential-id">
+                <input type="hidden" id="update-credential-user-handle" name="credential-user-handle">
+                <div class="form-group">
+                    <label for="update-credential-name">Name:</label>
+                    <input type="text" id="update-credential-name" name="name" required class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="update-credential-display-name">Display Name:</label>
+                    <input type="text" id="update-credential-display-name" name="display-name" required class="form-input">
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="updateCredentialDetails()" class="action-button">Update</button>
+                    <button type="button" onclick="closeUpdateCredentialModal()" class="action-button secondary-button">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
+        // Global error handler to catch and log any uncaught errors
+        window.addEventListener('error', function(event) {
+            console.error('Uncaught error:', event.error);
+        });
+
         function Logout() {
             window.location.href = "{{o2p_route_prefix}}/oauth2/logout";
         }
@@ -357,7 +451,7 @@
             const account = document.getElementById('edit-account').value;
             const label = document.getElementById('edit-label').value;
 
-            fetch(`${O2P_ROUTE_PREFIX}/user/update`, {
+            fetch(`{{o2p_route_prefix}}/user/update`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -575,6 +669,120 @@
                 .catch(error => {
                     alert(`Error: ${error.message}`);
                 });
+            }
+        }
+
+        // Function to open the update credential modal
+        function openUpdateCredentialModal(credentialId, name, displayName, userHandle) {
+            document.getElementById('update-credential-id').value = credentialId;
+            document.getElementById('update-credential-name').value = name || '';
+            document.getElementById('update-credential-display-name').value = displayName || '';
+            document.getElementById('update-credential-user-handle').value = userHandle || '';
+            document.getElementById('update-credential-modal').style.display = 'block';
+        }
+
+        // Function to close the update credential modal
+        function closeUpdateCredentialModal() {
+            document.getElementById('update-credential-modal').style.display = 'none';
+        }
+
+        // Close the modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('update-credential-modal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+
+        function updateCredentialDetails() {
+            const credentialId = document.getElementById('update-credential-id').value;
+            const name = document.getElementById('update-credential-name').value;
+            const displayName = document.getElementById('update-credential-display-name').value;
+            const userHandle = document.getElementById('update-credential-user-handle').value;
+
+            console.log('Updating credential:', credentialId);
+            console.log('New name:', name);
+            console.log('New display name:', displayName);
+            console.log('User handle:', userHandle);
+
+            fetch('{{o2p_route_prefix}}/passkey/credential/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    credential_id: credentialId,
+                    name: name,
+                    display_name: displayName,
+                    user_handle: userHandle
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to update credential');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Update successful:', data);
+
+                // Update the UI
+                document.getElementById(`credential-name-${credentialId}`).textContent = name;
+                document.getElementById(`credential-display-name-${credentialId}`).textContent = displayName;
+
+                // Signal the update to the authenticator
+                signalCurrentUserDetails({
+                    credentialId: credentialId,
+                    userHandle: userHandle,
+                    name: name,
+                    displayName: displayName
+                });
+
+                closeUpdateCredentialModal();
+            })
+            .catch(error => {
+                console.error('Error updating credential:', error);
+                alert('Failed to update credential: ' + error.message);
+            });
+        }
+
+        /**
+         * Update the user details for a credential in the authenticator
+         * @param {Object} options - The options for updating user details
+         * @param {string} options.credentialId - The credential ID
+         * @param {string} options.userHandle - The user handle
+         * @param {string} options.name - The updated name
+         * @param {string} options.displayName - The updated display name
+         */
+        async function signalCurrentUserDetails(options) {
+            try {
+                console.log('signalCurrentUserDetails called with options:', options);
+
+                if (!window.PublicKeyCredential || 
+                    typeof window.PublicKeyCredential.signalCurrentUserDetails !== 'function') {
+                    console.warn('signalCurrentUserDetails is not supported in this browser');
+                    return;
+                }
+
+                // Get the current domain
+                const rpId = window.location.hostname;
+                console.log('Using rpId:', rpId);
+
+                const signalOptions = {
+                    rpId: rpId,
+                    userId: options.userHandle,
+                    name: options.name,
+                    displayName: options.displayName
+                };
+
+                console.log('Calling PublicKeyCredential.signalCurrentUserDetails with:', signalOptions);
+
+                await PublicKeyCredential.signalCurrentUserDetails(signalOptions);
+
+                console.log('Successfully updated user details in authenticator');
+                return true;
+            } catch (error) {
+                console.error('Error updating user details in authenticator:', error);
+                // Don't throw the error - this is a non-critical operation
+                return false;
             }
         }
     </script>
