@@ -339,23 +339,17 @@ fn verify_user_handle(
     stored_credential: &PasskeyCredential,
     is_discoverable: bool,
 ) -> Result<(), PasskeyError> {
-    // Extract user handle from response
-    let user_handle = auth_response
-        .response
-        .user_handle
-        .as_ref()
-        .and_then(|handle| {
-            base64url_decode(handle)
-                .ok()
-                .and_then(|decoded| String::from_utf8(decoded).ok())
-        });
+
+    let user_handle = auth_response.response.user_handle
+    .as_ref()
+    .map(|handle| handle.clone());
 
     tracing::debug!(
-        "User handle: {:?}, Stored handle: {:?}, Is discoverable: {}\n User handle (raw)): {:?}",
+        "User handle: {:?}, Stored handle: {:?}, User handle raw: {:?}, Is discoverable: {}",
         user_handle,
         &stored_credential.user.user_handle,
-        is_discoverable,
         auth_response.response.user_handle,
+        is_discoverable,
     );
 
     match (
