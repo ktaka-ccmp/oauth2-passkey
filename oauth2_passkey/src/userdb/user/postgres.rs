@@ -1,6 +1,8 @@
-use crate::storage::{DB_TABLE_USERS, validate_postgres_table_schema};
-use crate::userdb::{errors::UserError, types::User};
 use sqlx::{Pool, Postgres};
+
+use super::config::DB_TABLE_USERS;
+use crate::storage::validate_postgres_table_schema;
+use crate::userdb::{errors::UserError, types::User};
 
 // PostgreSQL implementations
 pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), UserError> {
