@@ -1,5 +1,5 @@
-use crate::storage::{DB_TABLE_PASSKEY_CREDENTIALS, DB_TABLE_USERS};
-use sqlx::{Pool, Row, Sqlite};
+use crate::storage::{DB_TABLE_PASSKEY_CREDENTIALS, DB_TABLE_USERS, validate_sqlite_table_schema};
+use sqlx::{Pool, Sqlite};
 
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::{CredentialSearchField, PasskeyCredential};
@@ -45,6 +45,34 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     Ok(())
+}
+
+/// Validates that the Passkey credential table schema matches what we expect
+pub(super) async fn validate_passkey_tables_sqlite(
+    pool: &Pool<Sqlite>,
+) -> Result<(), PasskeyError> {
+    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
+
+    // Define expected schema (column name, data type)
+    let expected_columns = vec![
+        ("credential_id", "TEXT"),
+        ("user_id", "TEXT"),
+        ("public_key", "TEXT"),
+        ("counter", "INTEGER"),
+        ("user_handle", "TEXT"),
+        ("user_name", "TEXT"),
+        ("user_display_name", "TEXT"),
+        ("created_at", "TIMESTAMP"),
+        ("updated_at", "TIMESTAMP"),
+    ];
+
+    validate_sqlite_table_schema(
+        pool,
+        passkey_table,
+        &expected_columns,
+        PasskeyError::Storage,
+    )
+    .await
 }
 
 pub(super) async fn store_credential_sqlite(
@@ -187,99 +215,6 @@ pub(super) async fn delete_credential_by_field_sqlite(
         .execute(pool)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-    Ok(())
-}
-
-/// Validates that the Passkey credential table schema matches what we expect
-pub(super) async fn validate_passkey_tables_sqlite(
-    pool: &Pool<Sqlite>,
-) -> Result<(), PasskeyError> {
-    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
-
-    // Define expected schema (column name, data type)
-    let expected_columns = vec![
-        ("credential_id", "TEXT"),
-        ("user_id", "TEXT"),
-        ("public_key", "TEXT"),
-        ("counter", "INTEGER"),
-        ("user_handle", "TEXT"),
-        ("user_name", "TEXT"),
-        ("user_display_name", "TEXT"),
-        ("created_at", "TIMESTAMP"),
-        ("updated_at", "TIMESTAMP"),
-    ];
-
-    // Check if table exists
-    let table_exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT name FROM sqlite_master WHERE type='table' AND name=?)",
-    )
-    .bind(passkey_table)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-    if !table_exists {
-        return Err(PasskeyError::Storage(format!(
-            "Schema validation failed: Table '{}' does not exist",
-            passkey_table
-        )));
-    }
-
-    // Query actual schema from database
-    let rows = sqlx::query("PRAGMA table_info(?)")
-        .bind(passkey_table)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-    let actual_columns: Vec<(String, String)> = rows
-        .iter()
-        .map(|row| {
-            let name: String = row.get("name");
-            let type_: String = row.get("type");
-            (name, type_)
-        })
-        .collect();
-
-    // Compare schemas
-    for (expected_name, expected_type) in &expected_columns {
-        let found = actual_columns
-            .iter()
-            .find(|(name, _)| name == expected_name);
-
-        match found {
-            Some((_, actual_type)) if actual_type == expected_type => {
-                // Column exists with correct type, all good
-            }
-            Some((_, actual_type)) => {
-                // Column exists but with wrong type
-                return Err(PasskeyError::Storage(format!(
-                    "Schema validation failed: Column '{}' has type '{}' but expected '{}'",
-                    expected_name, actual_type, expected_type
-                )));
-            }
-            None => {
-                // Column doesn't exist
-                return Err(PasskeyError::Storage(format!(
-                    "Schema validation failed: Missing column '{}'",
-                    expected_name
-                )));
-            }
-        }
-    }
-
-    // Check for extra columns (just log a warning)
-    for (actual_name, _) in &actual_columns {
-        if !expected_columns.iter().any(|(name, _)| name == actual_name) {
-            // Log a warning about extra column
-            tracing::warn!(
-                "Extra column '{}' found in table '{}'.",
-                actual_name,
-                passkey_table
-            );
-        }
-    }
 
     Ok(())
 }

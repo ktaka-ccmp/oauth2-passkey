@@ -1,6 +1,6 @@
 //! Database table configuration
 
-use std::{env, sync::LazyLock};
+use std::{env, str::FromStr, sync::LazyLock};
 use tokio::sync::Mutex;
 
 use super::types::{DataStore, PostgresDataStore, SqliteDataStore};
@@ -25,9 +25,35 @@ pub static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = LazyLock::n
     );
 
     let store = match store_type {
-        "sqlite" => Box::new(SqliteDataStore {
-            pool: sqlx::SqlitePool::connect_lazy(store_url).expect("Failed to create SQLite pool"),
-        }) as Box<dyn DataStore>,
+        "sqlite-test" => {
+            let file_path = match (
+                store_url.strip_prefix("sqlite:///"),
+                store_url.strip_prefix("sqlite:"),
+            ) {
+                (Some(path), _) => format!("/{}", path),
+                (None, Some(path)) => path.to_string(),
+                (None, None) => store_url.to_string(),
+            };
+
+            tracing::info!("Using SQLite file: {}", file_path);
+
+            let opts = sqlx::sqlite::SqliteConnectOptions::new()
+                .filename(file_path)
+                .create_if_missing(true);
+
+            Box::new(SqliteDataStore {
+                pool: sqlx::SqlitePool::connect_lazy_with(opts), // .expect("Failed to create SQLite pool"),
+            }) as Box<dyn DataStore>
+        }
+        "sqlite" => {
+            let opts = sqlx::sqlite::SqliteConnectOptions::from_str(store_url)
+                .expect("Failed to parse SQLite connection string")
+                .create_if_missing(true);
+
+            let pool = sqlx::sqlite::SqlitePool::connect_lazy_with(opts);
+
+            Box::new(SqliteDataStore { pool }) as Box<dyn DataStore>
+        }
         "postgres" => Box::new(PostgresDataStore {
             pool: sqlx::PgPool::connect_lazy(store_url).expect("Failed to create Postgres pool"),
         }) as Box<dyn DataStore>,

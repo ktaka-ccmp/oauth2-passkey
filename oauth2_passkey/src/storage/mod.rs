@@ -19,4 +19,4 @@ pub use data_store::{
 };
 
 // Re-export schema validation function for internal use
-pub use schema_validation::validate_postgres_table_schema;
+pub(crate) use schema_validation::{validate_postgres_table_schema, validate_sqlite_table_schema};

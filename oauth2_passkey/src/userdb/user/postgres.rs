@@ -1,6 +1,6 @@
-use crate::storage::DB_TABLE_USERS;
+use crate::storage::{DB_TABLE_USERS, validate_postgres_table_schema};
 use crate::userdb::{errors::UserError, types::User};
-use sqlx::{Pool, Postgres, Row};
+use sqlx::{Pool, Postgres};
 
 // PostgreSQL implementations
 pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), UserError> {
@@ -24,6 +24,22 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     .map_err(|e| UserError::Storage(e.to_string()))?;
 
     Ok(())
+}
+
+/// Validates that the User table schema matches what we expect
+pub(super) async fn validate_user_tables_postgres(pool: &Pool<Postgres>) -> Result<(), UserError> {
+    let users_table = DB_TABLE_USERS.as_str();
+
+    // Define expected schema (column name, data type)
+    let expected_columns = vec![
+        ("id", "text"),
+        ("account", "text"),
+        ("label", "text"),
+        ("created_at", "timestamp with time zone"),
+        ("updated_at", "timestamp with time zone"),
+    ];
+
+    validate_postgres_table_schema(pool, users_table, &expected_columns, UserError::Storage).await
 }
 
 pub(super) async fn get_user_postgres(
@@ -90,96 +106,6 @@ pub(super) async fn delete_user_postgres(pool: &Pool<Postgres>, id: &str) -> Res
     .execute(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
-
-    Ok(())
-}
-
-/// Validates that the User table schema matches what we expect
-pub(super) async fn validate_user_tables_postgres(pool: &Pool<Postgres>) -> Result<(), UserError> {
-    let users_table = DB_TABLE_USERS.as_str();
-
-    // Define expected schema (column name, data type)
-    let expected_columns = vec![
-        ("id", "text"),
-        ("account", "text"),
-        ("label", "text"),
-        ("created_at", "timestamp with time zone"),
-        ("updated_at", "timestamp with time zone"),
-    ];
-
-    // Check if table exists
-    let table_exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = $1)",
-    )
-    .bind(users_table)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| UserError::Storage(e.to_string()))?;
-
-    if !table_exists {
-        return Err(UserError::Storage(format!(
-            "Schema validation failed: Table '{}' does not exist",
-            users_table
-        )));
-    }
-
-    // Query actual schema from database
-    let rows = sqlx::query(
-        "SELECT column_name, data_type FROM information_schema.columns 
-         WHERE table_name = $1 ORDER BY column_name",
-    )
-    .bind(users_table)
-    .fetch_all(pool)
-    .await
-    .map_err(|e| UserError::Storage(e.to_string()))?;
-
-    let actual_columns: Vec<(String, String)> = rows
-        .iter()
-        .map(|row| {
-            let name: String = row.get("column_name");
-            let type_: String = row.get("data_type");
-            (name, type_)
-        })
-        .collect();
-
-    // Compare schemas
-    for (expected_name, expected_type) in &expected_columns {
-        let found = actual_columns
-            .iter()
-            .find(|(name, _)| name == expected_name);
-
-        match found {
-            Some((_, actual_type)) if actual_type == expected_type => {
-                // Column exists with correct type, all good
-            }
-            Some((_, actual_type)) => {
-                // Column exists but with wrong type
-                return Err(UserError::Storage(format!(
-                    "Schema validation failed: Column '{}' has type '{}' but expected '{}'",
-                    expected_name, actual_type, expected_type
-                )));
-            }
-            None => {
-                // Column doesn't exist
-                return Err(UserError::Storage(format!(
-                    "Schema validation failed: Missing column '{}'",
-                    expected_name
-                )));
-            }
-        }
-    }
-
-    // Check for extra columns (just log a warning)
-    for (actual_name, _) in &actual_columns {
-        if !expected_columns.iter().any(|(name, _)| name == actual_name) {
-            // Log a warning about extra column
-            tracing::warn!(
-                "Extra column '{}' found in table '{}'.",
-                actual_name,
-                users_table
-            );
-        }
-    }
 
     Ok(())
 }
