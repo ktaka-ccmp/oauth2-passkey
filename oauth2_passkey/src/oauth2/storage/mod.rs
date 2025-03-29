@@ -1,3 +1,4 @@
+mod config;
 mod postgres;
 mod sqlite;
 mod store_type;

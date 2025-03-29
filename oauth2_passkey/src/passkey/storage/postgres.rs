@@ -1,6 +1,5 @@
-use crate::storage::{
-    DB_TABLE_PASSKEY_CREDENTIALS, DB_TABLE_USERS, validate_postgres_table_schema,
-};
+use crate::storage::validate_postgres_table_schema;
+use crate::userdb::DB_TABLE_USERS;
 use chrono::{DateTime, Utc};
 use sqlx::{Pool, Postgres};
 
@@ -8,6 +7,8 @@ use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::{
     CredentialSearchField, PasskeyCredential, PublicKeyCredentialUserEntity,
 };
+
+use super::config::DB_TABLE_PASSKEY_CREDENTIALS;
 
 // PostgreSQL implementations
 pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), PasskeyError> {

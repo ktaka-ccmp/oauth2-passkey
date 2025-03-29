@@ -1,8 +1,11 @@
-use crate::storage::{DB_TABLE_PASSKEY_CREDENTIALS, DB_TABLE_USERS, validate_sqlite_table_schema};
+use crate::storage::validate_sqlite_table_schema;
+use crate::userdb::DB_TABLE_USERS;
 use sqlx::{Pool, Sqlite};
 
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::{CredentialSearchField, PasskeyCredential};
+
+use super::config::DB_TABLE_PASSKEY_CREDENTIALS;
 
 // SQLite implementations
 pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), PasskeyError> {

@@ -14,9 +14,7 @@ pub async fn init() -> Result<(), errors::StorageError> {
 pub use cache_store::GENERIC_CACHE_STORE;
 pub use types::CacheData;
 
-pub use data_store::{
-    DB_TABLE_OAUTH2_ACCOUNTS, DB_TABLE_PASSKEY_CREDENTIALS, DB_TABLE_USERS, GENERIC_DATA_STORE,
-};
+pub(crate) use data_store::{DB_TABLE_PREFIX, GENERIC_DATA_STORE};
 
 // Re-export schema validation function for internal use
 pub(crate) use schema_validation::{validate_postgres_table_schema, validate_sqlite_table_schema};

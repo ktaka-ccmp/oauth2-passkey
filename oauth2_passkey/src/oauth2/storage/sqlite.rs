@@ -1,8 +1,13 @@
-use crate::oauth2::errors::OAuth2Error;
-use crate::oauth2::types::{AccountSearchField, OAuth2Account};
-use crate::storage::{DB_TABLE_OAUTH2_ACCOUNTS, DB_TABLE_USERS, validate_sqlite_table_schema};
+use crate::oauth2::{
+    errors::OAuth2Error,
+    types::{AccountSearchField, OAuth2Account},
+};
+use crate::storage::validate_sqlite_table_schema;
+use crate::userdb::DB_TABLE_USERS;
 use chrono::Utc;
 use sqlx::{Pool, Sqlite};
+
+use super::config::DB_TABLE_OAUTH2_ACCOUNTS;
 
 // SQLite implementations
 pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), OAuth2Error> {
