@@ -272,3 +272,71 @@ pub async fn delete_passkey_credential_core(
 
     Ok(())
 }
+
+/// Update the name and display name of a passkey credential
+///
+/// This function updates the name and display name fields of a passkey credential
+/// and returns the updated credential information.
+///
+/// # Arguments
+/// * `credential_id` - The ID of the credential to update
+/// * `name` - The new name for the credential
+/// * `display_name` - The new display name for the credential
+/// * `session_user` - The authenticated user session
+///
+/// # Returns
+/// * The updated credential information in a Result
+pub async fn update_passkey_credential_core(
+    credential_id: &str,
+    name: &str,
+    display_name: &str,
+    session_user: Option<SessionUser>,
+) -> Result<serde_json::Value, CoordinationError> {
+    // Ensure the user is authenticated
+    let user_id = match session_user {
+        Some(user) => user.id,
+        None => {
+            return Err(CoordinationError::Unauthorized.log());
+        }
+    };
+
+    // Get the credential to verify ownership
+    let credential = match PasskeyStore::get_credential(credential_id).await? {
+        Some(cred) => cred,
+        None => {
+            return Err(CoordinationError::ResourceNotFound {
+                resource_type: "Passkey".to_string(),
+                resource_id: credential_id.to_string(),
+            });
+        }
+    };
+
+    // Verify that the credential belongs to the authenticated user
+    if credential.user_id != user_id {
+        return Err(CoordinationError::Unauthorized.log());
+    }
+
+    // Update the credential in the database
+    PasskeyStore::update_credential(credential_id, name, display_name).await?;
+
+    // Get the updated credential
+    let updated_credential = match PasskeyStore::get_credential(credential_id).await? {
+        Some(cred) => cred,
+        None => {
+            return Err(CoordinationError::ResourceNotFound {
+                resource_type: "Passkey".to_string(),
+                resource_id: credential_id.to_string(),
+            });
+        }
+    };
+
+    tracing::debug!("Successfully updated credential");
+
+    // Return the credential information in JSON format
+    Ok(serde_json::json!({
+        "credentialId": credential_id,
+        "name": updated_credential.user.name,
+        "displayName": updated_credential.user.display_name,
+        "userHandle": updated_credential.user.user_handle,
+    }))
+}

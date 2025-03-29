@@ -40,6 +40,9 @@ pub enum PasskeyError {
     #[error("Invalid format: {0}")]
     Format(String),
 
+    #[error("Unauthorized error: {0}")]
+    Unauthorized(String),
+
     #[error("{0}")]
     Other(String),
 

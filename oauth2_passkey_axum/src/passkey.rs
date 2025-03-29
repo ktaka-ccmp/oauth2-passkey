@@ -4,6 +4,7 @@ use axum::{
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     response::{Html, IntoResponse, Response},
 };
+use serde::Deserialize;
 use serde_json::Value;
 
 use oauth2_passkey::{
@@ -11,7 +12,7 @@ use oauth2_passkey::{
     RegisterCredential, RegistrationOptions, RegistrationStartRequest, SessionUser,
     delete_passkey_credential_core, get_related_origin_json, handle_finish_authentication_core,
     handle_finish_registration_core, handle_start_authentication_core,
-    handle_start_registration_core, list_credentials_core,
+    handle_start_registration_core, list_credentials_core, update_passkey_credential_core,
 };
 
 use crate::IntoResponseError;
@@ -31,6 +32,7 @@ pub fn router() -> Router {
             "/credentials/{credential_id}",
             delete(delete_passkey_credential),
         )
+        .route("/credential/update", post(update_passkey_credential))
 }
 
 pub fn router_register() -> Router {
@@ -167,4 +169,36 @@ pub(crate) async fn serve_related_origin() -> Response {
             .body(format!("Failed to generate WebAuthn config: {}", e).into())
             .unwrap_or_default(),
     }
+}
+
+#[derive(Deserialize)]
+pub struct UpdateCredentialUserDetailsRequest {
+    pub credential_id: String,
+    pub name: String,
+    pub display_name: String,
+}
+
+/// Update the name and display name of a passkey credential
+///
+/// This endpoint allows users to update the name and display name of their passkey credentials.
+/// It also provides the necessary information for the client to call the WebAuthn
+/// signalCurrentUserDetails API to update the credential in the authenticator.
+pub async fn update_passkey_credential(
+    auth_user: Option<AuthUser>,
+    Json(payload): Json<UpdateCredentialUserDetailsRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    // Convert AuthUser to SessionUser if present using deref coercion
+    let session_user = auth_user.as_ref().map(|u| u as &SessionUser).cloned();
+
+    // Call the update function
+    let response = update_passkey_credential_core(
+        &payload.credential_id,
+        &payload.name,
+        &payload.display_name,
+        session_user,
+    )
+    .await
+    .into_response_error()?;
+
+    Ok(Json(response))
 }

@@ -339,10 +339,7 @@ fn verify_user_handle(
     stored_credential: &PasskeyCredential,
     is_discoverable: bool,
 ) -> Result<(), PasskeyError> {
-
-    let user_handle = auth_response.response.user_handle
-    .as_ref()
-    .map(|handle| handle.clone());
+    let user_handle = auth_response.response.user_handle.clone();
 
     tracing::debug!(
         "User handle: {:?}, Stored handle: {:?}, User handle raw: {:?}, Is discoverable: {}",

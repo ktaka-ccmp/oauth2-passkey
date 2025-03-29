@@ -240,6 +240,28 @@ pub(super) async fn delete_credential_by_field_postgres(
     Ok(())
 }
 
+pub(super) async fn update_credential_user_details_postgres(
+    pool: &Pool<Postgres>,
+    credential_id: &str,
+    name: &str,
+    display_name: &str,
+) -> Result<(), PasskeyError> {
+    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
+
+    sqlx::query(&format!(
+        r#"UPDATE {} SET user_name = $1, user_display_name = $2 WHERE credential_id = $3"#,
+        passkey_table
+    ))
+    .bind(name)
+    .bind(display_name)
+    .bind(credential_id)
+    .execute(pool)
+    .await
+    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    Ok(())
+}
+
 use sqlx::{FromRow, Row, postgres::PgRow, sqlite::SqliteRow};
 
 // Implement FromRow for PasskeyCredential to handle the flattened database structure for SQLite
