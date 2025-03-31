@@ -220,11 +220,15 @@ function synchronizeCredentialsWithSignalUnknown(credentialId) {
 
         console.log("signalUnknownCredential API is available");
 
-        // Signal the unknown credential to the authenticator
-        return window.PublicKeyCredential.signalUnknownCredential({
+        let options = {
             rpId: window.location.hostname,
             credentialId: credentialId,
-        })
+        };
+
+        console.log("Signal unknown credential options:", options);
+
+        // Signal the unknown credential to the authenticator
+        return window.PublicKeyCredential.signalUnknownCredential(options)
             .then(() => {
                 console.log(
                     "Successfully signaled unknown credential to authenticator. rpId:",
@@ -234,7 +238,7 @@ function synchronizeCredentialsWithSignalUnknown(credentialId) {
                 );
             })
             .catch((err) => {
-                console.warn("Error signaling unknown credential:", err);
+                console.warn("Error signalUnknownCredential API:", err);
                 return Promise.resolve(); // Return a resolved promise to allow chaining
             });
     } catch (err) {
