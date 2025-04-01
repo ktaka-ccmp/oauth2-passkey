@@ -1,4 +1,4 @@
-# axum-oauth2-passkey
+# oauth2-passkey
 
 ## Todo
 
@@ -6,7 +6,6 @@
 - GitHub Actions
 - Decide on Public API
 - Adjust visibility of functions, structs, enums, etc. What needs to be public?
-- signalUnknownCredential seems not working on Android device.
 - Tracing
   - Use tracing-error crate https://crates.io/crates/tracing-error
   - Use https://docs.rs/tower-http/latest/tower_http/trace/index.html
@@ -14,12 +13,19 @@
 - Completely separate create_account function from add_to_existing_user function to avoid the case where new user is created even though user is already logged in.
 - Replace "if let", "unwrap_or_else", "ok_or_else" etc. with "match", where appropriate.
 - Cleanup frontend
+- Implement Admin Account
+  - Password login for the first time, disable it for next time.
+  - Mandate passkey registration during first session.
+  - Can list and manage all users.
 
 ## Half Done
 
 - [Need to investigate] I'm wondering if we should stop creating new user_handle everytime we create a new passkey credential.Instead we might have to use the existing user_handle for a logged in user. This will align well with syncing of credentials using the signalAllAcceptedCredentials.
   - We can now control this by setting PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL environment variable.
   - By having user_handle unique for user i.e. not for every credential, we seem to be able to only register one passkey credential per user in Google Password Manager.
+
+- signalUnknownCredential seems not working on Android device.
+  - Seems like it hasn't been supported yet.
 
 ## Done
 
