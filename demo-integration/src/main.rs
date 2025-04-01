@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(debug_assertions)]
         {
             // Debug build default - show all log levels
-            "libaxum=trace,oauth2_passkey=trace,demo_integration=trace".into()
+            "oauth2_passkey_axum=trace,oauth2_passkey=trace,demo_integration=trace".into()
         }
 
         #[cfg(not(debug_assertions))]
@@ -70,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize the authentication library
     tracing::info!("Initializing authentication library");
-    oauth2_passkey::init().await?;
+    oauth2_passkey_axum::init().await?;
 
     // Define custom redirect URL for authentication
     // If None, will return 401 Unauthorized instead of redirecting

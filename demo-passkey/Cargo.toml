@@ -10,7 +10,7 @@ axum-core = { workspace = true }
 tokio = { workspace = true }
 
 oauth2_passkey.workspace = true
-libaxum.workspace = true
+oauth2_passkey_axum.workspace = true
 
 dotenv = { workspace = true }
 http = { workspace = true }

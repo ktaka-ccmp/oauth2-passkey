@@ -1,8 +1,8 @@
 [workspace]
 members = [
     "demo-integration",
-    # "demo-oauth2",
-    # "demo-passkey",
+    "demo-oauth2",
+    "demo-passkey",
     "oauth2_passkey_axum",
     "oauth2_passkey",
 ]
@@ -28,8 +28,8 @@ base64 = "0.22.1"
 
 tokio = { version = "1.44", features = ["bytes", "fs", "io-std", "macros", "parking_lot", "rt-multi-thread", "signal-hook-registry", "socket2", "sync", "time", "tracing"] }
 rustls = { version = "0.23.25", features = ["ring"] }
-axum-core = "0.5.0"
-axum-extra = { version = "0.10.0", features = ["typed-header"] }
+axum-core = "0.5.2"
+axum-extra = { version = "0.10.1", features = ["typed-header"] }
 chrono = { version = "0.4.40", features = ["serde"] }
 tracing = "0.1.41"
 thiserror = "2.0.12"

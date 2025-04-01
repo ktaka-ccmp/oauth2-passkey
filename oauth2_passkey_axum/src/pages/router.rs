@@ -4,9 +4,10 @@ use axum::{
 };
 
 /// Create a router for the user summary endpoints
-pub fn router() -> Router<()> {
+pub(crate) fn router() -> Router<()> {
     Router::new()
         .route("/login", get(super::login::login))
+        .route("/logout", get(super::logout::logout))
         .route("/summary", get(super::user::user_summary))
         .route("/info", get(super::user::user_info))
         .route("/delete", delete(super::user::delete_user_account_handler))

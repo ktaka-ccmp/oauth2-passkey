@@ -1,4 +1,4 @@
-//! oauth2_passkey - Authentication coordination library for axum-oauth2-passkey
+//! oauth2_passkey - Authentication coordination library
 //!
 //! This crate provides coordination between different authentication mechanisms
 //! including OAuth2, Passkey, and user database operations.

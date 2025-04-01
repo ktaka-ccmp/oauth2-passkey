@@ -4,7 +4,7 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-askama = { version = "0.12.1", features = ["serde-json"] }
+askama = { version = "0.13.0" }
 http = { workspace = true }
 tracing = { workspace = true }
 

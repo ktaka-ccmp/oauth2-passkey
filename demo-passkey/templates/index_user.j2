@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passkey Demo</title>
+    <script>
+        const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
+    </script>
+    <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
+</head>
+
+<body>
+    <div id="main-content">
+        <h1>{{message}}</h1>
+        <p>Welcome to our site.</p>
+    </div>
+
+    <div id="passkey-sign-out" style="display: block">
+        <button onclick="signOutAndRedirect();" class="auth-button">
+            Sign out
+        </button>
+    </div>
+</body>
+
+</html>
