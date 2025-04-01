@@ -4,10 +4,10 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Redirect, Response},
 };
-use oauth2_passkey::O2P_ROUTE_PREFIX;
 
-use oauth2_passkey_axum::AuthUser as User;
-use oauth2_passkey_axum::{O2P_REDIRECT_ANON, O2P_REDIRECT_USER};
+use oauth2_passkey_axum::{
+    AuthUser as User, O2P_REDIRECT_ANON, O2P_REDIRECT_USER, O2P_ROUTE_PREFIX,
+};
 
 #[derive(Template)]
 #[template(path = "protected.j2")]

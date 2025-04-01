@@ -1,7 +1,6 @@
 use askama::Template;
 use axum::{http::StatusCode, response::Html};
-use libaxum::AuthUser as User;
-use oauth2_passkey::OAUTH2_ROUTE_PREFIX;
+use oauth2_passkey_axum::{AuthUser as User, O2P_ROUTE_PREFIX};
 
 #[derive(Template)]
 #[template(path = "index_user.j2")]
@@ -27,10 +26,10 @@ struct ProtectedTemplate<'a> {
 pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCode, String)> {
     match user {
         Some(u) => {
-            let message = format!("Hey {}!", u.id);
+            let message = format!("Hey {}!", u.account);
             let template = IndexTemplateUser {
                 message: &message,
-                auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
+                auth_route_prefix: O2P_ROUTE_PREFIX.as_str(),
             };
             let html = Html(
                 template
@@ -43,7 +42,7 @@ pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCod
             let message = "Click the Login button below.".to_string();
             let template = IndexTemplateAnon {
                 message: &message,
-                auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
+                auth_route_prefix: O2P_ROUTE_PREFIX.as_str(),
             };
             let html = Html(
                 template
@@ -58,7 +57,7 @@ pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCod
 pub(crate) async fn protected(user: User) -> Result<Html<String>, (StatusCode, String)> {
     let template = ProtectedTemplate {
         user,
-        auth_route_prefix: OAUTH2_ROUTE_PREFIX.as_str(),
+        auth_route_prefix: O2P_ROUTE_PREFIX.as_str(),
     };
     let html = Html(
         template

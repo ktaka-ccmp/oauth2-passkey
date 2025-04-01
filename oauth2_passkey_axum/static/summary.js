@@ -2,10 +2,6 @@ window.addEventListener("error", function (event) {
     console.error("Uncaught error:", event.error);
 });
 
-function Logout() {
-    window.location.href = `${O2P_ROUTE_PREFIX}/oauth2/logout`;
-}
-
 function toggleEditUserForm() {
     const displayDiv = document.getElementById("user-info-display");
     const editForm = document.getElementById("user-edit-form");

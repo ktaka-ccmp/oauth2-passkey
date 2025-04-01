@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 
 // Template-friendly version of StoredCredential for display
 #[derive(Debug)]
-pub struct TemplateCredential {
+pub(super) struct TemplateCredential {
     pub credential_id: String,
     pub user_id: String,
     pub user_name: String,
@@ -28,7 +28,7 @@ pub struct TemplateCredential {
 
 // Template-friendly version of OAuth2Account for display
 #[derive(Debug)]
-pub struct TemplateAccount {
+pub(super) struct TemplateAccount {
     pub id: String,
     pub user_id: String,
     pub provider: String,
@@ -43,7 +43,7 @@ pub struct TemplateAccount {
 
 #[derive(Template)]
 #[template(path = "summary.j2")]
-pub struct UserSummaryTemplate {
+pub(super) struct UserSummaryTemplate {
     pub user: AuthUser,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
@@ -52,7 +52,7 @@ pub struct UserSummaryTemplate {
 }
 
 impl UserSummaryTemplate {
-    pub fn new(
+    pub(super) fn new(
         user: AuthUser,
         passkey_credentials: Vec<TemplateCredential>,
         oauth2_accounts: Vec<TemplateAccount>,
@@ -74,7 +74,9 @@ impl UserSummaryTemplate {
 ///
 /// This endpoint provides the authenticated user's basic information (id, name, display_name)
 /// to be used by client-side JavaScript for pre-filling forms or displaying user information.
-pub async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCode, String)> {
+pub(super) async fn user_info(
+    auth_user: Option<AuthUser>,
+) -> Result<Json<Value>, (StatusCode, String)> {
     match auth_user {
         Some(user) => {
             // Get passkey credentials count for the user
@@ -112,13 +114,13 @@ pub async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (Stat
 /// After successful deletion, the client should redirect to the logout endpoint
 /// to clear the session.
 #[derive(serde::Deserialize)]
-pub struct DeleteUserRequest {
+pub(super) struct DeleteUserRequest {
     user_id: String,
 }
 
 /// Request payload for updating user account information
 #[derive(serde::Deserialize)]
-pub struct UpdateUserRequest {
+pub(super) struct UpdateUserRequest {
     user_id: String,
     account: Option<String>,
     label: Option<String>,
@@ -128,7 +130,7 @@ pub struct UpdateUserRequest {
 ///
 /// This endpoint allows users to update their account and label fields.
 /// It requires authentication and verifies that the user is only updating their own account.
-pub async fn update_user_account_handler(
+pub(super) async fn update_user_account_handler(
     auth_user: AuthUser,
     ExtractJson(payload): ExtractJson<UpdateUserRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
@@ -173,7 +175,7 @@ pub async fn update_user_account_handler(
     Ok(Json(user_data))
 }
 
-pub async fn delete_user_account_handler(
+pub(super) async fn delete_user_account_handler(
     auth_user: AuthUser,
     ExtractJson(payload): ExtractJson<DeleteUserRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
@@ -211,7 +213,9 @@ pub async fn delete_user_account_handler(
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
-pub async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
+pub(super) async fn user_summary(
+    auth_user: AuthUser,
+) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
     let session_user: &SessionUser = &auth_user;
 
@@ -289,7 +293,7 @@ pub async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, S
     Ok(Html(html))
 }
 
-pub(super) async fn serve_summary_js() -> Response {
+pub(super) async fn serve_user_summary_js() -> Response {
     let js_content = include_str!("../../static/summary.js");
     Response::builder()
         .status(StatusCode::OK)
@@ -298,7 +302,7 @@ pub(super) async fn serve_summary_js() -> Response {
         .unwrap()
 }
 
-pub(super) async fn serve_summary_css() -> Response {
+pub(super) async fn serve_user_summary_css() -> Response {
     let css_content = include_str!("../../static/summary.css");
     Response::builder()
         .status(StatusCode::OK)

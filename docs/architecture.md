@@ -7,7 +7,7 @@ The following is a blueprint of the architecture of this application. It reflect
 ## Current Components
 
 - **demo-integrated**: Example Axum application that uses OAuth2 and passkey authentication
-- **libaxum**: Provides OAuth2 and passkey authentication handlers for Axum applications
+- **oauth2_passkey_axum**: Provides OAuth2 and passkey authentication handlers for Axum applications
   - Includes routers for OAuth2, passkey, and user summary endpoints
   - Handles HTTP-specific concerns like request/response handling
 - **oauth2_passkey**: Core authentication coordination library
@@ -53,7 +53,7 @@ The following is a blueprint of the architecture of this application. It reflect
   - Provides user lookup functionality
   - Links authentication methods to user accounts
 
-### libaxum (Axum Integration)
+### oauth2_passkey_axum (Axum Integration)
 
 - Provides Axum-specific HTTP handlers and routers
 - Translates between HTTP requests/responses and core library functions
@@ -62,11 +62,11 @@ The following is a blueprint of the architecture of this application. It reflect
 ## Data Flow
 
 1. HTTP requests are received by the Axum application
-2. libaxum handlers process the requests and call oauth2_passkey functions
+2. oauth2_passkey_axum handlers process the requests and call oauth2_passkey functions
 3. The coordination layer orchestrates the authentication flow
 4. Specific modules (oauth2, passkey, session) handle their respective operations
 5. User data is stored and retrieved through the storage layer
-6. Responses are returned through libaxum to the client
+6. Responses are returned through oauth2_passkey_axum to the client
 
 ## Security Considerations
 
@@ -79,7 +79,7 @@ The following is a blueprint of the architecture of this application. It reflect
 
 The dependencies between components are implemented as follows:
 
-- libaxum depends on oauth2_passkey
+- oauth2_passkey_axum depends on oauth2_passkey
 - oauth2_passkey depends on its internal modules (oauth2, passkey, session, storage, userdb)
 - oauth2 and passkey depend on storage but not on each other
 - userdb depends on storage but not on oauth2 or passkey

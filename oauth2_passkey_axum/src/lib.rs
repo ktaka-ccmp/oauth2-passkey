@@ -16,4 +16,5 @@ pub use passkey::passkey_well_known_router;
 pub use router::oauth2_passkey_router;
 pub use session::AuthUser;
 
-pub use oauth2_passkey::O2P_ROUTE_PREFIX;
+// Re-export the route prefix and initialization function from oauth2_passkey crate
+pub use oauth2_passkey::{O2P_ROUTE_PREFIX, init};
