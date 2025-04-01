@@ -48,6 +48,11 @@
         </table>
     </div>
 
-    <p><a href="{{ auth_route_prefix }}/oauth2/logout">Logout</a></p>
+    <button onclick="Logout()">Logout</button>
+    <script>
+        function Logout() {
+            window.location.href = "{{auth_route_prefix}}/user/logout?redirect=/";
+        }
+    </script>
 </body>
 </html>
