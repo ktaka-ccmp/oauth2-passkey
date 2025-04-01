@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Summary</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Embed obfuscated user context for session boundary verification -->
+    <!-- External CSS file -->
+    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/summary.css">
+</head>
+<body>
+    <div class="page-header">
+        <h1>User Summary</h1>
+        <div class="header-buttons">
+            <button onclick="DeleteAccount()" class="action-button delete-button">Delete Account</button>
+            <button onclick="Logout()" class="action-button">Logout</button>
+        </div>
+    </div>
+
+    <!-- User Information Section -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">User Information</h2>
+            <button onclick="toggleEditUserForm()" class="action-button">Edit Profile</button>
+        </div>
+        <div class="item" id="user-info-display">
+            <div class="item-detail"><strong>User ID:</strong> {{ user.id }}</div>
+            <div class="item-detail"><strong>Account:</strong> <span id="display-account">{{ user.account }}</span></div>
+            <div class="item-detail"><strong>Label:</strong> <span id="display-label">{{ user.label }}</span></div>
+            <div class="item-detail"><strong>Created:</strong> {{ user.created_at }}</div>
+            <!--
+            <div class="item-detail"><strong>Updated:</strong> {{ user.updated_at }}</div>
+            -->
+        </div>
+        <div class="item" id="user-edit-form" style="display: none;">
+            <form id="update-user-form">
+                <input type="hidden" id="edit-user-id" value="{{ user.id }}">
+                <div class="form-group">
+                    <label for="edit-account">Account:</label>
+                    <input type="text" id="edit-account" value="{{ user.account }}" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="edit-label">Label:</label>
+                    <input type="text" id="edit-label" value="{{ user.label }}" class="form-input">
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="updateUserAccount()" class="action-button">Save</button>
+                    <button type="button" onclick="toggleEditUserForm()" class="action-button secondary-button">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Passkey Credentials Section -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">Passkey Credentials</h2>
+            <button onclick="showRegistrationModal('add_to_existing_user')" class="action-button">Add New Passkey</button>
+        </div>
+        {% if passkey_credentials.is_empty() %}
+            <p>You don't have any passkey credentials yet.</p>
+        {% else %}
+            {% for credential in passkey_credentials %}
+                <div class="item" data-credential-id="{{ credential.credential_id }}">
+                    <!--
+                    <div class="item-detail"><strong>User Handle:</strong> {{ credential.user_handle }}</div>
+                    <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
+                    -->
+                    <div class="item-detail"><strong>User Name:</strong> <span id="credential-name-{{ credential.credential_id }}">{{ credential.user_name }}</span></div>
+                    <div class="item-detail"><strong>Display Name:</strong> <span id="credential-display-name-{{ credential.credential_id }}">{{ credential.user_display_name }}</span></div>
+                    <div class="item-detail created-row">
+                        <span><strong>Created:</strong> {{ credential.created_at }}</span>
+                        <div>
+                            <button onclick="openUpdateCredentialModal('{{ credential.credential_id }}', '{{ credential.user_name }}', '{{ credential.user_display_name }}', '{{ credential.user_handle }}')" class="edit-button">Edit</button>
+                            <button onclick="deletePasskeyCredential('{{ credential.credential_id }}', '{{ credential.user_handle }}')" class="delete-button">Delete</button>
+                        </div>
+                    </div>
+                    <!--
+                    <div><button onclick="synchronizeCredentialsWithSignalUnknown('{{ credential.credential_id }}')">Synchronize Credentials with Signal Unknown</button></div>
+                    -->
+                    <!--
+                    <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
+                    <div class="item-detail"><strong>Updated:</strong> {{ credential.updated_at }}</div>
+                    <div class="item-detail"><strong>User ID:</strong> {{ credential.user_id }}</div>
+                    <div class="item-detail"><strong>User Handle:</strong> {{ credential.user_handle }}</div>
+                    <div class="item-detail"><strong>Counter:</strong> {{ credential.counter }}</div>
+                    -->
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- OAuth2 Accounts Section -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">OAuth2 Accounts</h2>
+            <button onclick="oauth2.openPopup('add_to_existing_user', PAGE_USER_CONTEXT)" class="action-button">Add New OAuth2 Account</button>
+        </div>
+        {% if oauth2_accounts.is_empty() %}
+            <p>You don't have any linked OAuth2 accounts yet.</p>
+        {% else %}
+            {% for account in oauth2_accounts %}
+                <div class="item">
+                    {% if account.picture != "" %}
+                    <div class="account-picture">
+                        <img src="{{ account.picture }}" alt="Profile Picture" style="max-width: 100px; max-height: 100px; border-radius: 50%;">
+                    </div>
+                    {% endif %}
+                    <!--
+                    <div class="item-detail"><strong>ID:</strong> {{ account.id }}</div>
+                    <div class="item-detail"><strong>User ID:</strong> {{ account.user_id }}</div>
+                    <div class="item-detail"><strong>Provider:</strong> {{ account.provider }}</div>
+                    <div class="item-detail"><strong>Provider User ID:</strong> {{ account.provider_user_id }}</div>
+                    {% if account.metadata_str != "" %}
+                        <div class="item-detail"><strong>Metadata:</strong> {{ account.metadata_str }}</div>
+                    {% endif %}
+                    <div class="item-detail"><strong>Updated:</strong> {{ account.updated_at }}</div>
+                    -->
+                    {% if account.email != "" %}
+                        <div class="item-detail"><strong>Email:</strong> {{ account.email }}</div>
+                    {% endif %}
+                    <div class="item-detail"><strong>Name:</strong> {{ account.name }}</div>
+                    <div class="item-detail created-row">
+                        <span><strong>Created:</strong> {{ account.created_at }}</span>
+                        <button onclick="unlinkOAuth2Account('{{ account.provider }}', '{{ account.provider_user_id }}')" class="delete-button">Unlink</button>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- Update Credential Modal -->
+    <div id="update-credential-modal" class="credential-modal" style="display: none;">
+        <div class="credential-modal-content">
+            <span class="credential-close" onclick="closeUpdateCredentialModal()">&times;</span>
+            <h2>Update Credential Details</h2>
+            <form id="update-credential-form">
+                <input type="hidden" id="update-credential-id" name="credential-id">
+                <input type="hidden" id="update-credential-user-handle" name="credential-user-handle">
+                <div class="form-group">
+                    <label for="update-credential-name">Name:</label>
+                    <input type="text" id="update-credential-name" name="name" required class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="update-credential-display-name">Display Name:</label>
+                    <input type="text" id="update-credential-display-name" name="display-name" required class="form-input">
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="updateCredentialDetails()" class="action-button">Update</button>
+                    <button type="button" onclick="closeUpdateCredentialModal()" class="action-button secondary-button">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- External JavaScript files -->
+    <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
+    <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
+    <script src="{{o2p_route_prefix}}/user/summary.js"></script>
+    <script>
+        // Page context for session boundary protection
+        const PAGE_USER_CONTEXT = "{{ obfuscated_user_id }}";
+        // Global route prefix for API calls
+        const O2P_ROUTE_PREFIX = "{{o2p_route_prefix}}";
+        const accountName = "{{user.account}}";
+        const userId = "{{user.id}}";
+        const oauth2 = initOAuth2Popup();
+    </script>
+
+    <a href="/" class="back-link">← Back to Home</a>
+</body>
+</html>

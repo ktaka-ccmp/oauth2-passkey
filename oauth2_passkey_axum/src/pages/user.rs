@@ -1,8 +1,8 @@
 use askama::Template;
 use axum::{
     extract::Json as ExtractJson,
-    http::StatusCode,
-    response::{Html, Json},
+    http::{StatusCode, header::CONTENT_TYPE},
+    response::{Html, Json, Response},
 };
 
 use oauth2_passkey::{
@@ -42,7 +42,7 @@ pub struct TemplateAccount {
 }
 
 #[derive(Template)]
-#[template(path = "user_summary.j2")]
+#[template(path = "summary.j2")]
 pub struct UserSummaryTemplate {
     pub user: AuthUser,
     pub passkey_credentials: Vec<TemplateCredential>,
@@ -211,7 +211,7 @@ pub async fn delete_user_account_handler(
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
-pub async fn user_summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
+pub async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
     let session_user: &SessionUser = &auth_user;
 
@@ -287,4 +287,22 @@ pub async fn user_summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCo
     })?;
 
     Ok(Html(html))
+}
+
+pub(super) async fn serve_summary_js() -> Response {
+    let js_content = include_str!("../../static/summary.js");
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, "application/javascript")
+        .body(js_content.to_string().into())
+        .unwrap()
+}
+
+pub(super) async fn serve_summary_css() -> Response {
+    let css_content = include_str!("../../static/summary.css");
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, "text/css")
+        .body(css_content.to_string().into())
+        .unwrap()
 }
