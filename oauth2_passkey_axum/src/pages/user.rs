@@ -211,7 +211,7 @@ pub async fn delete_user_account_handler(
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
-pub async fn user_summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
+pub async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
     let session_user: &SessionUser = &auth_user;
 
@@ -289,7 +289,7 @@ pub async fn user_summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCo
     Ok(Html(html))
 }
 
-pub(crate) async fn serve_user_summary_js() -> Response {
+pub(super) async fn serve_summary_js() -> Response {
     let js_content = include_str!("../../static/summary.js");
     Response::builder()
         .status(StatusCode::OK)
@@ -298,7 +298,7 @@ pub(crate) async fn serve_user_summary_js() -> Response {
         .unwrap()
 }
 
-pub(crate) async fn serve_user_summary_css() -> Response {
+pub(super) async fn serve_summary_css() -> Response {
     let css_content = include_str!("../../static/summary.css");
     Response::builder()
         .status(StatusCode::OK)
