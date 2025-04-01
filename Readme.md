@@ -17,6 +17,7 @@
   - Password login for the first time, disable it for next time.
   - Mandate passkey registration during first session.
   - Can list and manage all users.
+- Debug: there are cases signalCurrentUserDetails doesn't work properly.
 
 ## Half Done
 
