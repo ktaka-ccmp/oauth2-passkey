@@ -274,20 +274,6 @@ async function startRegistration(mode, username = null, displayname = null) {
     }
 }
 
-// Only define signOutAndReload if it doesn't already exist
-if (typeof signOutAndReload === 'undefined') {
-    async function signOutAndReload(redirect) {
-        await fetch(`${O2P_ROUTE_PREFIX}/user/logout`);
-        if (redirect) {
-            location.href = redirect;
-        } else {
-            location.reload();
-        }
-    }
-    // Make it globally available
-    window.signOutAndReload = signOutAndReload;
-}
-
 if (typeof signOutAndRedirect === 'undefined') {
     async function signOutAndRedirect(redirect) {
         if (redirect) {
