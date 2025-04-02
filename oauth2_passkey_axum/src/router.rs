@@ -12,8 +12,14 @@ use axum::Router;
 ///
 /// This simplifies integration by requiring only a single router to be mounted in the application.
 pub fn oauth2_passkey_router() -> Router {
+    let mut user_router = super::user::router();
+    #[cfg(feature = "default-pages")]
+    {
+        user_router = user_router.merge(super::default_pages::router());
+    }
+
     Router::new()
         .nest("/oauth2", super::oauth2::router())
         .nest("/passkey", super::passkey::router())
-        .nest("/user", super::pages::user_router())
+        .nest("/user", user_router)
 }

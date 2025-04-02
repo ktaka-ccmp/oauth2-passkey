@@ -1,17 +1,52 @@
 use askama::Template;
 use axum::{
-    extract::Json as ExtractJson,
+    Router,
     http::{StatusCode, header::CONTENT_TYPE},
-    response::{Html, Json, Response},
+    response::{Html, IntoResponse, Json, Redirect, Response},
+    routing::get,
 };
+use serde_json::{Value, json};
 
 use oauth2_passkey::{
-    O2P_ROUTE_PREFIX, SessionUser, delete_user_account, list_accounts_core, list_credentials_core,
-    obfuscate_user_id, update_user_account,
+    O2P_ROUTE_PREFIX, SessionUser, list_accounts_core, list_credentials_core, obfuscate_user_id,
 };
 
+use crate::config::O2P_REDIRECT_USER;
 use crate::session::AuthUser;
-use serde_json::{Value, json};
+
+pub(super) fn router() -> Router<()> {
+    Router::new()
+        .route("/info", get(user_info))
+        .route("/login", get(login))
+        .route("/summary", get(summary))
+        .route("/summary.js", get(serve_summary_js))
+        .route("/summary.css", get(serve_summary_css))
+}
+
+#[derive(Template)]
+#[template(path = "login.j2")]
+struct LoginTemplate<'a> {
+    message: &'a str,
+    o2p_route_prefix: &'a str,
+}
+
+pub(super) async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
+    match user {
+        Some(_) => Ok(Redirect::to(O2P_REDIRECT_USER.as_str()).into_response()),
+        None => {
+            let template = LoginTemplate {
+                message: "Passkey/OAuth2 Login Page!",
+                o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
+            };
+            let html = Html(
+                template
+                    .render()
+                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+            );
+            Ok(html.into_response())
+        }
+    }
+}
 
 // Template-friendly version of StoredCredential for display
 #[derive(Debug)]
@@ -104,114 +139,6 @@ pub(super) async fn user_info(
     }
 }
 
-/// Delete the authenticated user's account and all associated data
-///
-/// This endpoint requires authentication and will delete:
-/// 1. All OAuth2 accounts linked to the user
-/// 2. All Passkey credentials registered by the user
-/// 3. The user account itself
-///
-/// After successful deletion, the client should redirect to the logout endpoint
-/// to clear the session.
-#[derive(serde::Deserialize)]
-pub(super) struct DeleteUserRequest {
-    user_id: String,
-}
-
-/// Request payload for updating user account information
-#[derive(serde::Deserialize)]
-pub(super) struct UpdateUserRequest {
-    user_id: String,
-    account: Option<String>,
-    label: Option<String>,
-}
-
-/// Update the authenticated user's account information
-///
-/// This endpoint allows users to update their account and label fields.
-/// It requires authentication and verifies that the user is only updating their own account.
-pub(super) async fn update_user_account_handler(
-    auth_user: AuthUser,
-    ExtractJson(payload): ExtractJson<UpdateUserRequest>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    // Get the user ID from the authenticated user
-    let session_user_id = auth_user.id.clone();
-    let request_user_id = payload.user_id.clone();
-
-    // Verify that the user ID in the request matches the session user ID
-    if session_user_id != request_user_id {
-        tracing::warn!(
-            "User ID mismatch in update request: session={}, request={}",
-            session_user_id,
-            request_user_id
-        );
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Cannot update another user's account".to_string(),
-        ));
-    }
-
-    tracing::debug!("Updating user account: {}", session_user_id);
-    tracing::debug!(
-        "New account: {:?}, new label: {:?}",
-        payload.account,
-        payload.label
-    );
-
-    // Call the core function to update the user account
-    let updated_user = update_user_account(&session_user_id, payload.account, payload.label)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    // Return the updated user information
-    let user_data = json!({
-        "id": updated_user.id,
-        "account": updated_user.account,
-        "label": updated_user.label,
-        "success": true,
-        "message": "User account updated successfully"
-    });
-
-    Ok(Json(user_data))
-}
-
-pub(super) async fn delete_user_account_handler(
-    auth_user: AuthUser,
-    ExtractJson(payload): ExtractJson<DeleteUserRequest>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    // Get the user ID from the authenticated user
-    let session_user_id = auth_user.id.clone();
-    let request_user_id = payload.user_id;
-
-    // Verify that the user ID in the request matches the session user ID
-    if session_user_id != request_user_id {
-        tracing::warn!(
-            "User ID mismatch in delete request: session={}, request={}",
-            session_user_id,
-            request_user_id
-        );
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Cannot delete another user's account".to_string(),
-        ));
-    }
-
-    tracing::debug!("Deleting user account: {}", session_user_id);
-
-    // Call the core function to delete the user account and all associated data
-    // Using the imported function from libauth
-    let credential_ids = delete_user_account(&session_user_id)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    // Return the credential IDs in the response for client-side notification
-    Ok(Json(json!({
-        "status": "success",
-        "message": "User account deleted successfully",
-        "credential_ids": credential_ids
-    })))
-}
-
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
 pub(super) async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
@@ -292,7 +219,7 @@ pub(super) async fn summary(auth_user: AuthUser) -> Result<Html<String>, (Status
 }
 
 pub(super) async fn serve_summary_js() -> Response {
-    let js_content = include_str!("../../static/summary.js");
+    let js_content = include_str!("../static/summary.js");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
@@ -301,7 +228,7 @@ pub(super) async fn serve_summary_js() -> Response {
 }
 
 pub(super) async fn serve_summary_css() -> Response {
-    let css_content = include_str!("../../static/summary.css");
+    let css_content = include_str!("../static/summary.css");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "text/css")

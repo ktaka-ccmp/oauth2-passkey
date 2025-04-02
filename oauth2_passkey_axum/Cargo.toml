@@ -3,6 +3,10 @@ name = "oauth2_passkey_axum"
 version = { workspace = true }
 edition = { workspace = true }
 
+[features]
+default = ["default-pages"]
+default-pages = []
+
 [dependencies]
 askama = { version = "0.13.0" }
 http = { workspace = true }
