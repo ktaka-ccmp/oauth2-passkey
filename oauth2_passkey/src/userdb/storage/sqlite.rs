@@ -1,8 +1,9 @@
 use sqlx::{Pool, Sqlite};
 
-use super::config::DB_TABLE_USERS;
 use crate::storage::validate_sqlite_table_schema;
 use crate::userdb::{errors::UserError, types::User};
+
+use super::config::DB_TABLE_USERS;
 
 // SQLite implementations
 pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), UserError> {

@@ -1,10 +1,7 @@
 use std::{env, sync::LazyLock};
 use tokio::sync::Mutex;
 
-use super::{
-    traits::CacheStore,
-    types::{InMemoryCacheStore, RedisCacheStore},
-};
+use super::types::{CacheStore, InMemoryCacheStore, RedisCacheStore};
 
 pub static GENERIC_CACHE_STORE_TYPE: LazyLock<String> = LazyLock::new(|| {
     env::var("GENERIC_CACHE_STORE_TYPE").expect("GENERIC_CACHE_STORE_TYPE must be set")

@@ -14,7 +14,7 @@ use std::{env, sync::LazyLock};
 use headers::{Cookie, HeaderMapExt};
 
 /// Name of the cookie where the user context token will be stored
-pub const USER_CONTEXT_TOKEN_COOKIE: &str = "auth_context_token";
+const USER_CONTEXT_TOKEN_COOKIE: &str = "auth_context_token";
 
 use crate::session::errors::SessionError;
 
@@ -46,6 +46,11 @@ static USE_CONTEXT_TOKEN_COOKIE: LazyLock<bool> = LazyLock::new(|| {
 });
 
 /// Obfuscate user ID to prevent direct exposure
+/// # Arguments
+/// * `user_id` - The user ID to obfuscate
+///
+/// # Returns
+/// * `String` - The obfuscated user ID
 pub fn obfuscate_user_id(user_id: &str) -> String {
     let mut mac =
         HmacSha256::new_from_slice(&AUTH_SERVER_SECRET).expect("HMAC can take key of any size");
@@ -54,12 +59,7 @@ pub fn obfuscate_user_id(user_id: &str) -> String {
     URL_SAFE_NO_PAD.encode(result)
 }
 
-/// Generate a signed context token for a user
-///
-/// This token contains an obfuscated user ID and an expiration timestamp, signed with HMAC-SHA256
-/// to prevent tampering. The token can be used to verify that the user viewing a page
-/// is the same as the user in the session.
-pub fn generate_user_context_token(user_id: &str) -> String {
+fn generate_user_context_token(user_id: &str) -> String {
     let expires_at = Utc::now() + Duration::days(1);
     let expiry_str = expires_at.timestamp().to_string();
 
@@ -80,11 +80,7 @@ pub fn generate_user_context_token(user_id: &str) -> String {
     format!("{}:{}", data, signature_base64)
 }
 
-/// Verify a user context token
-///
-/// This function verifies the token's signature, checks expiration,
-/// and compares the obfuscated user ID
-pub fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(), SessionError> {
+fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(), SessionError> {
     // Parse token parts
     let parts: Vec<&str> = token.split(':').collect();
     if parts.len() != 3 {
@@ -134,7 +130,7 @@ pub fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(
     Ok(())
 }
 
-pub(crate) fn add_context_token_to_header(
+pub(super) fn add_context_token_to_header(
     user_id: &str,
     headers: &mut HeaderMap,
 ) -> Result<(), SessionError> {
@@ -170,11 +166,7 @@ fn create_context_token_cookie(user_id: &str) -> HeaderMap {
     headers
 }
 
-/// Extract context token from request headers
-///
-/// This function extracts the context token from the Cookie header
-/// of an incoming request.
-pub fn extract_context_token_from_cookies(headers: &HeaderMap) -> Option<String> {
+fn extract_context_token_from_cookies(headers: &HeaderMap) -> Option<String> {
     // Try to extract Cookie header
 
     let token = headers.typed_get::<Cookie>().and_then(|cookie| {
@@ -192,6 +184,14 @@ pub fn extract_context_token_from_cookies(headers: &HeaderMap) -> Option<String>
 /// 2. Verifies that any page context (if provided) matches the user ID
 ///
 /// Returns SessionError if verification fails.
+///
+/// # Arguments
+/// * `headers` - The headers to extract the context token from
+/// * `page_context` - The page context to verify
+/// * `user_id` - The user ID to verify against
+///
+/// # Returns
+/// * `Result<(), SessionError>` - The result of the verification, or an error
 pub fn verify_context_token_and_page(
     headers: &HeaderMap,
     page_context: Option<&String>,

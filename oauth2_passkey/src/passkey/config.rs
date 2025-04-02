@@ -1,9 +1,9 @@
 use std::{env, sync::LazyLock};
 
-pub(crate) static ORIGIN: LazyLock<String> =
+pub(super) static ORIGIN: LazyLock<String> =
     LazyLock::new(|| std::env::var("ORIGIN").expect("ORIGIN must be set"));
 
-pub(crate) static PASSKEY_RP_ID: LazyLock<String> = LazyLock::new(|| {
+pub(super) static PASSKEY_RP_ID: LazyLock<String> = LazyLock::new(|| {
     ORIGIN
         .trim_start_matches("https://")
         .trim_start_matches("http://")
@@ -13,22 +13,22 @@ pub(crate) static PASSKEY_RP_ID: LazyLock<String> = LazyLock::new(|| {
         .expect("Could not extract RP ID from ORIGIN")
 });
 
-pub(crate) static PASSKEY_RP_NAME: LazyLock<String> =
+pub(super) static PASSKEY_RP_NAME: LazyLock<String> =
     LazyLock::new(|| env::var("PASSKEY_RP_NAME").ok().unwrap_or(ORIGIN.clone()));
 
-pub(crate) static PASSKEY_TIMEOUT: LazyLock<u32> = LazyLock::new(|| {
+pub(super) static PASSKEY_TIMEOUT: LazyLock<u32> = LazyLock::new(|| {
     env::var("PASSKEY_TIMEOUT")
         .map(|v| v.parse::<u32>().unwrap_or(60))
         .unwrap_or(60)
 });
 
-pub(crate) static PASSKEY_CHALLENGE_TIMEOUT: LazyLock<u32> = LazyLock::new(|| {
+pub(super) static PASSKEY_CHALLENGE_TIMEOUT: LazyLock<u32> = LazyLock::new(|| {
     env::var("PASSKEY_CHALLENGE_TIMEOUT")
         .map(|v| v.parse::<u32>().unwrap_or(60))
         .unwrap_or(60)
 });
 
-pub(crate) static PASSKEY_AUTHENTICATOR_ATTACHMENT: LazyLock<String> = LazyLock::new(|| {
+pub(super) static PASSKEY_AUTHENTICATOR_ATTACHMENT: LazyLock<String> = LazyLock::new(|| {
     match env::var("PASSKEY_AUTHENTICATOR_ATTACHMENT").ok() {
         None => "platform".to_string(),
         Some(v) => match v.to_lowercase().as_str() {
@@ -46,7 +46,7 @@ pub(crate) static PASSKEY_AUTHENTICATOR_ATTACHMENT: LazyLock<String> = LazyLock:
     }
 });
 
-pub(crate) static PASSKEY_RESIDENT_KEY: LazyLock<String> = LazyLock::new(|| {
+pub(super) static PASSKEY_RESIDENT_KEY: LazyLock<String> = LazyLock::new(|| {
     env::var("PASSKEY_RESIDENT_KEY").map_or(
         "required".to_string(), // Default to required
         |v| match v.to_lowercase().as_str() {
@@ -61,7 +61,7 @@ pub(crate) static PASSKEY_RESIDENT_KEY: LazyLock<String> = LazyLock::new(|| {
     )
 });
 
-pub(crate) static PASSKEY_REQUIRE_RESIDENT_KEY: LazyLock<bool> = LazyLock::new(|| {
+pub(super) static PASSKEY_REQUIRE_RESIDENT_KEY: LazyLock<bool> = LazyLock::new(|| {
     env::var("PASSKEY_REQUIRE_RESIDENT_KEY").map_or(
         true, // Default to true
         |v| match v.to_lowercase().as_str() {
@@ -78,7 +78,7 @@ pub(crate) static PASSKEY_REQUIRE_RESIDENT_KEY: LazyLock<bool> = LazyLock::new(|
     )
 });
 
-pub(crate) static PASSKEY_USER_VERIFICATION: LazyLock<String> = LazyLock::new(|| {
+pub(super) static PASSKEY_USER_VERIFICATION: LazyLock<String> = LazyLock::new(|| {
     env::var("PASSKEY_USER_VERIFICATION").map_or(
         "discouraged".to_string(), // Default to discouraged
         |v| match v.to_lowercase().as_str() {
@@ -96,7 +96,7 @@ pub(crate) static PASSKEY_USER_VERIFICATION: LazyLock<String> = LazyLock::new(||
     )
 });
 
-pub(crate) static PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL: LazyLock<bool> =
+pub(super) static PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL: LazyLock<bool> =
     LazyLock::new(|| {
         env::var("PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL")
             .map(|v| v.parse::<bool>().unwrap_or(true))

@@ -5,13 +5,13 @@ use crate::storage::GENERIC_DATA_STORE;
 use super::postgres::*;
 use super::sqlite::*;
 
-pub struct OAuth2Store;
+pub(crate) struct OAuth2Store;
 
 impl OAuth2Store {
     /// Generate a unique ID for an OAuth2 account
     /// This function checks if the generated ID already exists in the database
     /// and retries up to 3 times if there's a collision
-    pub async fn gen_unique_account_id() -> Result<String, OAuth2Error> {
+    pub(crate) async fn gen_unique_account_id() -> Result<String, OAuth2Error> {
         // Try up to 3 times to generate a unique ID
         for _ in 0..3 {
             let id = uuid::Uuid::new_v4().to_string();
@@ -37,7 +37,7 @@ impl OAuth2Store {
     }
 
     /// Initialize the OAuth2 database tables
-    pub async fn init() -> Result<(), OAuth2Error> {
+    pub(crate) async fn init() -> Result<(), OAuth2Error> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         match (store.as_sqlite(), store.as_postgres()) {
@@ -58,7 +58,9 @@ impl OAuth2Store {
     }
 
     /// Get all OAuth2 accounts for a user
-    pub async fn get_oauth2_accounts(user_id: &str) -> Result<Vec<OAuth2Account>, OAuth2Error> {
+    pub(crate) async fn get_oauth2_accounts(
+        user_id: &str,
+    ) -> Result<Vec<OAuth2Account>, OAuth2Error> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {
@@ -82,7 +84,7 @@ impl OAuth2Store {
         }
     }
 
-    pub async fn get_oauth2_accounts_by(
+    pub(crate) async fn get_oauth2_accounts_by(
         field: AccountSearchField,
     ) -> Result<Vec<OAuth2Account>, OAuth2Error> {
         let store = GENERIC_DATA_STORE.lock().await;
@@ -98,7 +100,7 @@ impl OAuth2Store {
     }
 
     /// Get OAuth2 account by provider and provider_user_id
-    pub async fn get_oauth2_account_by_provider(
+    pub(crate) async fn get_oauth2_account_by_provider(
         provider: &str,
         provider_user_id: &str,
     ) -> Result<Option<OAuth2Account>, OAuth2Error> {
@@ -117,7 +119,7 @@ impl OAuth2Store {
 
     /// Create or update an OAuth2 account
     /// Note: This does not create a user. The user_id must be set before calling this method.
-    pub async fn upsert_oauth2_account(
+    pub(crate) async fn upsert_oauth2_account(
         mut account: OAuth2Account,
     ) -> Result<OAuth2Account, OAuth2Error> {
         if account.user_id.is_empty() {
@@ -144,7 +146,9 @@ impl OAuth2Store {
         }
     }
 
-    pub async fn delete_oauth2_accounts_by(field: AccountSearchField) -> Result<(), OAuth2Error> {
+    pub(crate) async fn delete_oauth2_accounts_by(
+        field: AccountSearchField,
+    ) -> Result<(), OAuth2Error> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {

@@ -10,7 +10,7 @@ use super::sqlite::*;
 pub struct PasskeyStore;
 
 impl PasskeyStore {
-    pub async fn init() -> Result<(), PasskeyError> {
+    pub(crate) async fn init() -> Result<(), PasskeyError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         match (store.as_sqlite(), store.as_postgres()) {
@@ -30,7 +30,7 @@ impl PasskeyStore {
         }
     }
 
-    pub async fn store_credential(
+    pub(crate) async fn store_credential(
         credential_id: String,
         credential: PasskeyCredential,
     ) -> Result<(), PasskeyError> {
@@ -45,7 +45,7 @@ impl PasskeyStore {
         }
     }
 
-    pub async fn get_credential(
+    pub(crate) async fn get_credential(
         credential_id: &str,
     ) -> Result<Option<PasskeyCredential>, PasskeyError> {
         let store = GENERIC_DATA_STORE.lock().await;
@@ -59,7 +59,7 @@ impl PasskeyStore {
         }
     }
 
-    pub async fn get_credentials_by(
+    pub(crate) async fn get_credentials_by(
         field: CredentialSearchField,
     ) -> Result<Vec<PasskeyCredential>, PasskeyError> {
         let store = GENERIC_DATA_STORE.lock().await;
@@ -73,7 +73,7 @@ impl PasskeyStore {
         }
     }
 
-    pub async fn update_credential_counter(
+    pub(crate) async fn update_credential_counter(
         credential_id: &str,
         counter: u32,
     ) -> Result<(), PasskeyError> {
@@ -88,7 +88,9 @@ impl PasskeyStore {
         }
     }
 
-    pub async fn delete_credential_by(field: CredentialSearchField) -> Result<(), PasskeyError> {
+    pub(crate) async fn delete_credential_by(
+        field: CredentialSearchField,
+    ) -> Result<(), PasskeyError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {
@@ -100,7 +102,7 @@ impl PasskeyStore {
         }
     }
 
-    pub async fn update_credential(
+    pub(crate) async fn update_credential(
         credential_id: &str,
         name: &str,
         display_name: &str,

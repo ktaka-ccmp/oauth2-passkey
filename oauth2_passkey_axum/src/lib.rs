@@ -8,7 +8,6 @@ mod router;
 mod session;
 
 pub use config::{O2P_REDIRECT_ANON, O2P_REDIRECT_USER};
-pub use error::IntoResponseError;
 pub use middleware::{
     is_authenticated_or_error, is_authenticated_or_redirect, is_authenticated_with_user,
 };

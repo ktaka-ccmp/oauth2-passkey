@@ -42,7 +42,7 @@ impl Default for OAuth2Account {
 
 // The user data we'll get back from Google
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GoogleUserInfo {
+pub(crate) struct GoogleUserInfo {
     pub(crate) id: String,
     pub(crate) family_name: String,
     pub name: String,
@@ -99,7 +99,7 @@ impl From<GoogleIdInfo> for OAuth2Account {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct StateParams {
+pub(crate) struct StateParams {
     pub(crate) csrf_token: String,
     pub(crate) nonce_id: String,
     pub(crate) pkce_id: String,
@@ -122,13 +122,13 @@ pub struct AuthResponse {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct OidcTokenResponse {
-    pub(crate) access_token: String,
+pub(super) struct OidcTokenResponse {
+    pub(super) access_token: String,
     token_type: String,
     expires_in: u64,
     refresh_token: Option<String>,
     scope: String,
-    pub(crate) id_token: Option<String>,
+    pub(super) id_token: Option<String>,
 }
 
 impl From<StoredToken> for CacheData {
@@ -150,7 +150,7 @@ impl TryFrom<CacheData> for StoredToken {
 /// Search field options for credential lookup
 #[allow(dead_code)]
 #[derive(Debug)]
-pub enum AccountSearchField {
+pub(crate) enum AccountSearchField {
     /// Search by ID
     Id(String),
     /// Search by user ID (database ID)

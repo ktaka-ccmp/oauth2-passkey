@@ -4,8 +4,7 @@ use std::collections::HashMap;
 use crate::storage::errors::StorageError;
 use crate::storage::types::CacheData;
 
-use super::traits::CacheStore;
-use super::types::InMemoryCacheStore;
+use super::types::{CacheStore, InMemoryCacheStore};
 
 const CACHE_PREFIX: &str = "cache";
 

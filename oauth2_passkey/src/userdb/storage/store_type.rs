@@ -4,11 +4,11 @@ use crate::userdb::{errors::UserError, types::User};
 use super::postgres::*;
 use super::sqlite::*;
 
-pub struct UserStore;
+pub(crate) struct UserStore;
 
 impl UserStore {
     /// Initialize the user database tables
-    pub async fn init() -> Result<(), UserError> {
+    pub(crate) async fn init() -> Result<(), UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         match (store.as_sqlite(), store.as_postgres()) {
@@ -27,7 +27,7 @@ impl UserStore {
     }
 
     /// Get a user by their ID
-    pub async fn get_user(id: &str) -> Result<Option<User>, UserError> {
+    pub(crate) async fn get_user(id: &str) -> Result<Option<User>, UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {
@@ -40,7 +40,7 @@ impl UserStore {
     }
 
     /// Create or update a user
-    pub async fn upsert_user(user: User) -> Result<User, UserError> {
+    pub(crate) async fn upsert_user(user: User) -> Result<User, UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {
@@ -52,7 +52,7 @@ impl UserStore {
         }
     }
 
-    pub async fn delete_user(id: &str) -> Result<(), UserError> {
+    pub(crate) async fn delete_user(id: &str) -> Result<(), UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {

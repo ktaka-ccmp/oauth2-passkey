@@ -12,7 +12,13 @@ use crate::utils::{gen_random_string, header_set_cookie};
 use crate::storage::GENERIC_CACHE_STORE;
 use crate::userdb::UserStore;
 
-/// Get user information from libuserdb for a given session
+/// Prepare a logout response by removing the session cookie and deleting the session from storage
+///
+/// # Arguments
+/// * `cookies` - The cookies from the request
+///
+/// # Returns
+/// * `Result<HeaderMap, SessionError>` - The headers with the logout response, or an error
 pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderMap, SessionError> {
     let mut headers = HeaderMap::new();
     header_set_cookie(
@@ -64,7 +70,7 @@ async fn create_and_store_session(session_info: SessionInfo) -> Result<String, S
     Ok(session_id)
 }
 
-pub async fn delete_session_from_store(
+async fn delete_session_from_store(
     cookies: Cookie,
     cookie_name: String,
 ) -> Result<(), SessionError> {
@@ -79,7 +85,9 @@ pub async fn delete_session_from_store(
     Ok(())
 }
 
-pub async fn delete_session_from_store_by_session_id(session_id: &str) -> Result<(), SessionError> {
+pub(crate) async fn delete_session_from_store_by_session_id(
+    session_id: &str,
+) -> Result<(), SessionError> {
     GENERIC_CACHE_STORE
         .lock()
         .await
@@ -89,7 +97,7 @@ pub async fn delete_session_from_store_by_session_id(session_id: &str) -> Result
     Ok(())
 }
 
-pub async fn create_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {
+async fn create_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {
     // Create minimal session info
     let session_info = SessionInfo {
         user_id: user_id.to_string(),
@@ -99,6 +107,13 @@ pub async fn create_session_with_uid(user_id: &str) -> Result<HeaderMap, Session
     create_new_session(session_info).await
 }
 
+/// Retrieves the user information from the session
+///
+/// # Arguments
+/// * `session_cookie` - The session cookie from the request
+///
+/// # Returns
+/// * `Result<SessionUser, SessionError>` - The user information from the session, or an error
 pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, SessionError> {
     let cached_session = GENERIC_CACHE_STORE
         .lock()
@@ -118,7 +133,9 @@ pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, 
     Ok(SessionUser::from(user))
 }
 
-pub fn get_session_id_from_headers(headers: &HeaderMap) -> Result<Option<&str>, SessionError> {
+pub(crate) fn get_session_id_from_headers(
+    headers: &HeaderMap,
+) -> Result<Option<&str>, SessionError> {
     let Some(cookie_header) = headers.get(COOKIE) else {
         tracing::debug!("No cookie header found");
         return Ok(None);
@@ -158,7 +175,7 @@ pub fn get_session_id_from_headers(headers: &HeaderMap) -> Result<Option<&str>, 
 ///
 /// # Returns
 /// * `Result<bool, SessionError>` - True if authenticated, false if not authenticated, or an error
-pub async fn is_authenticated(
+async fn is_authenticated(
     headers: &HeaderMap,
     verify_user_exists: bool,
 ) -> Result<bool, SessionError> {
@@ -216,10 +233,29 @@ pub async fn is_authenticated(
     }
 }
 
+/// Check if the request is authenticated by examining the session headers
+///
+/// This function checks if valid session credentials exist in the request headers.
+///
+/// # Arguments
+/// * `headers` - The HTTP headers from the request
+///
+/// # Returns
+/// * `Result<bool, SessionError>` - True if authenticated, false if not authenticated, or an error
 pub async fn is_authenticated_basic(headers: &HeaderMap) -> Result<bool, SessionError> {
     is_authenticated(headers, false).await
 }
 
+/// Check if the request is authenticated by examining the session headers and verifying user existence
+///
+/// This function checks if valid session credentials exist in the request headers and verifies that
+/// the user exists in the database.
+///
+/// # Arguments
+/// * `headers` - The HTTP headers from the request
+///
+/// # Returns
+/// * `Result<bool, SessionError>` - True if authenticated, false if not authenticated, or an error
 pub async fn is_authenticated_strict(headers: &HeaderMap) -> Result<bool, SessionError> {
     is_authenticated(headers, true).await
 }

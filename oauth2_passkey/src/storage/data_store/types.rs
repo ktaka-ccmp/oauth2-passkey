@@ -2,17 +2,17 @@ use sqlx::{Pool, Postgres, Sqlite};
 
 // Types
 #[derive(Clone, Debug)]
-pub(crate) struct SqliteDataStore {
+pub(super) struct SqliteDataStore {
     pub(super) pool: sqlx::SqlitePool,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct PostgresDataStore {
+pub(super) struct PostgresDataStore {
     pub(super) pool: sqlx::PgPool,
 }
 
 // Trait
-pub trait DataStore: Send + Sync {
+pub(crate) trait DataStore: Send + Sync {
     fn as_sqlite(&self) -> Option<&Pool<Sqlite>>;
     fn as_postgres(&self) -> Option<&Pool<Postgres>>;
 }

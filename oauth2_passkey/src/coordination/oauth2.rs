@@ -42,7 +42,7 @@ pub async fn post_authorized_core(
     process_oauth2_authorization(auth_response).await
 }
 
-pub async fn process_oauth2_authorization(
+async fn process_oauth2_authorization(
     auth_response: &AuthResponse,
 ) -> Result<(HeaderMap, String), CoordinationError> {
     let (idinfo, userinfo) = get_idinfo_userinfo(auth_response).await?;
