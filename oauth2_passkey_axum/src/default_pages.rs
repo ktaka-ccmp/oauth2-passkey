@@ -30,7 +30,7 @@ struct LoginTemplate<'a> {
     o2p_route_prefix: &'a str,
 }
 
-pub(super) async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
+async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
     match user {
         Some(_) => Ok(Redirect::to(O2P_REDIRECT_USER.as_str()).into_response()),
         None => {
@@ -50,7 +50,7 @@ pub(super) async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCod
 
 // Template-friendly version of StoredCredential for display
 #[derive(Debug)]
-pub(super) struct TemplateCredential {
+struct TemplateCredential {
     pub credential_id: String,
     pub user_id: String,
     pub user_name: String,
@@ -63,7 +63,7 @@ pub(super) struct TemplateCredential {
 
 // Template-friendly version of OAuth2Account for display
 #[derive(Debug)]
-pub(super) struct TemplateAccount {
+struct TemplateAccount {
     pub id: String,
     pub user_id: String,
     pub provider: String,
@@ -78,7 +78,7 @@ pub(super) struct TemplateAccount {
 
 #[derive(Template)]
 #[template(path = "summary.j2")]
-pub(super) struct UserSummaryTemplate {
+struct UserSummaryTemplate {
     pub user: AuthUser,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
@@ -87,7 +87,7 @@ pub(super) struct UserSummaryTemplate {
 }
 
 impl UserSummaryTemplate {
-    pub(super) fn new(
+    fn new(
         user: AuthUser,
         passkey_credentials: Vec<TemplateCredential>,
         oauth2_accounts: Vec<TemplateAccount>,
@@ -109,9 +109,7 @@ impl UserSummaryTemplate {
 ///
 /// This endpoint provides the authenticated user's basic information (id, name, display_name)
 /// to be used by client-side JavaScript for pre-filling forms or displaying user information.
-pub(super) async fn user_info(
-    auth_user: Option<AuthUser>,
-) -> Result<Json<Value>, (StatusCode, String)> {
+async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCode, String)> {
     match auth_user {
         Some(user) => {
             // Get passkey credentials count for the user
@@ -140,7 +138,7 @@ pub(super) async fn user_info(
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
-pub(super) async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
+async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
     let session_user: &SessionUser = &auth_user;
 
@@ -218,7 +216,7 @@ pub(super) async fn summary(auth_user: AuthUser) -> Result<Html<String>, (Status
     Ok(Html(html))
 }
 
-pub(super) async fn serve_summary_js() -> Response {
+async fn serve_summary_js() -> Response {
     let js_content = include_str!("../static/summary.js");
     Response::builder()
         .status(StatusCode::OK)
@@ -227,7 +225,7 @@ pub(super) async fn serve_summary_js() -> Response {
         .unwrap()
 }
 
-pub(super) async fn serve_summary_css() -> Response {
+async fn serve_summary_css() -> Response {
     let css_content = include_str!("../static/summary.css");
     Response::builder()
         .status(StatusCode::OK)
