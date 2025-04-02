@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]
-pub enum StorageError {
+pub(crate) enum StorageError {
     #[error("Storage error: {0}")]
     Storage(String),
 

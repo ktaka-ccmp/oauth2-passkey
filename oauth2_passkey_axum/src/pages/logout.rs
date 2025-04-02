@@ -4,10 +4,9 @@ use axum::{
     response::{IntoResponse, Redirect},
 };
 use axum_extra::{TypedHeader, headers};
+use serde::Deserialize;
 
 use oauth2_passkey::prepare_logout_response;
-
-use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub(super) struct RedirectQuery {

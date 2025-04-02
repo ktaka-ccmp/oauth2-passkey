@@ -2,7 +2,7 @@ use http::{Result as HttpResponse, StatusCode};
 use oauth2_passkey::CoordinationError;
 
 /// Helper trait for converting errors to a standard response error format
-pub trait IntoResponseError<T> {
+pub(super) trait IntoResponseError<T> {
     fn into_response_error(self) -> Result<T, (StatusCode, String)>;
 }
 

@@ -87,7 +87,7 @@ pub async fn prepare_oauth2_auth_request(
     Ok((auth_url, headers))
 }
 
-pub async fn get_idinfo_userinfo(
+pub(crate) async fn get_idinfo_userinfo(
     auth_response: &AuthResponse,
 ) -> Result<(GoogleIdInfo, GoogleUserInfo), OAuth2Error> {
     let pkce_verifier = get_pkce_verifier(auth_response).await?;
@@ -151,7 +151,7 @@ async fn verify_nonce(
     Ok(())
 }
 
-pub async fn csrf_checks(
+pub(crate) async fn csrf_checks(
     cookies: Cookie,
     query: &AuthResponse,
     headers: HeaderMap,

@@ -4,15 +4,15 @@ mod errors;
 mod schema_validation;
 mod types;
 
-pub async fn init() -> Result<(), errors::StorageError> {
+pub(crate) async fn init() -> Result<(), errors::StorageError> {
     let _ = *cache_store::GENERIC_CACHE_STORE;
     let _ = *data_store::GENERIC_DATA_STORE;
 
     Ok(())
 }
 
-pub use cache_store::GENERIC_CACHE_STORE;
-pub use types::CacheData;
+pub(crate) use cache_store::GENERIC_CACHE_STORE;
+pub(crate) use types::CacheData;
 
 pub(crate) use data_store::{DB_TABLE_PREFIX, GENERIC_DATA_STORE};
 

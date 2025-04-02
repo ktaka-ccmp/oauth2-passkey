@@ -19,7 +19,7 @@ pub(super) fn encode_state(state_params: StateParams) -> Result<String, OAuth2Er
     Ok(URL_SAFE_NO_PAD.encode(state_json))
 }
 
-pub fn decode_state(state: &str) -> Result<StateParams, OAuth2Error> {
+pub(crate) fn decode_state(state: &str) -> Result<StateParams, OAuth2Error> {
     let decoded_bytes = URL_SAFE_NO_PAD
         .decode(state)
         .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode base64: {}", e)))?;
@@ -75,7 +75,7 @@ pub(super) async fn store_token_in_cache(
     Ok(token_id)
 }
 
-pub async fn generate_store_token(
+pub(super) async fn generate_store_token(
     token_type: &str,
     ttl: u64,
     expires_at: DateTime<Utc>,
@@ -87,7 +87,7 @@ pub async fn generate_store_token(
     Ok((token, token_id))
 }
 
-pub(crate) async fn get_token_from_store<T>(
+pub(super) async fn get_token_from_store<T>(
     token_type: &str,
     token_id: &str,
 ) -> Result<T, OAuth2Error>
@@ -106,7 +106,7 @@ where
         .try_into()
 }
 
-pub(crate) async fn remove_token_from_store(
+pub(super) async fn remove_token_from_store(
     token_type: &str,
     token_id: &str,
 ) -> Result<(), OAuth2Error> {
@@ -118,7 +118,10 @@ pub(crate) async fn remove_token_from_store(
         .map_err(|e| OAuth2Error::Storage(e.to_string()))
 }
 
-pub async fn validate_origin(headers: &HeaderMap, auth_url: &str) -> Result<(), OAuth2Error> {
+pub(crate) async fn validate_origin(
+    headers: &HeaderMap,
+    auth_url: &str,
+) -> Result<(), OAuth2Error> {
     let parsed_url = Url::parse(auth_url).expect("Invalid URL");
     let scheme = parsed_url.scheme();
     let host = parsed_url.host_str().unwrap_or_default();
@@ -156,7 +159,7 @@ pub async fn validate_origin(headers: &HeaderMap, auth_url: &str) -> Result<(), 
 /// - `pool_max_idle_per_host`: Set to 32 (default). This controls the maximum number of idle
 ///   connections that can be maintained per host in the connection pool. The default value
 ///   provides good balance for parallel OAuth2 operations while being memory efficient.
-pub(crate) fn get_client() -> reqwest::Client {
+pub(super) fn get_client() -> reqwest::Client {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .pool_idle_timeout(Duration::from_secs(90))
@@ -170,7 +173,7 @@ pub(crate) fn get_client() -> reqwest::Client {
 /// - No misc_id in state parameters
 /// - Session not found in cache
 /// - Error getting user from session
-pub async fn get_uid_from_stored_session_by_state_param(
+pub(crate) async fn get_uid_from_stored_session_by_state_param(
     state_params: &StateParams,
 ) -> Result<Option<SessionUser>, OAuth2Error> {
     let Some(misc_id) = &state_params.misc_id else {
@@ -202,7 +205,7 @@ pub async fn get_uid_from_stored_session_by_state_param(
     }
 }
 
-pub async fn delete_session_and_misc_token_from_store(
+pub(crate) async fn delete_session_and_misc_token_from_store(
     state_params: &StateParams,
 ) -> Result<(), OAuth2Error> {
     if let Some(misc_id) = &state_params.misc_id {

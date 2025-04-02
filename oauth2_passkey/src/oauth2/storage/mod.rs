@@ -3,4 +3,4 @@ mod postgres;
 mod sqlite;
 mod store_type;
 
-pub use store_type::OAuth2Store;
+pub(crate) use store_type::OAuth2Store;

@@ -42,20 +42,20 @@ pub(crate) static OAUTH2_QUERY_STRING: LazyLock<String> = LazyLock::new(|| {
 
 // "__Host-" prefix are added to make cookies "host-only".
 
-pub static OAUTH2_CSRF_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
+pub(crate) static OAUTH2_CSRF_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
     std::env::var("OAUTH2_CSRF_COOKIE_NAME")
         .ok()
         .unwrap_or("__Host-CsrfId".to_string())
 });
 
-pub(crate) static OAUTH2_CSRF_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
+pub(super) static OAUTH2_CSRF_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
     std::env::var("OAUTH2_CSRF_COOKIE_MAX_AGE")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(60) // Default to 60 seconds if not set or invalid
 });
 
-pub(crate) static OAUTH2_REDIRECT_URI: LazyLock<String> = LazyLock::new(|| {
+pub(super) static OAUTH2_REDIRECT_URI: LazyLock<String> = LazyLock::new(|| {
     format!(
         "{}{}/oauth2/authorized",
         env::var("ORIGIN").expect("Missing ORIGIN!"),
@@ -63,10 +63,10 @@ pub(crate) static OAUTH2_REDIRECT_URI: LazyLock<String> = LazyLock::new(|| {
     )
 });
 
-pub(crate) static OAUTH2_GOOGLE_CLIENT_ID: LazyLock<String> = LazyLock::new(|| {
+pub(super) static OAUTH2_GOOGLE_CLIENT_ID: LazyLock<String> = LazyLock::new(|| {
     std::env::var("OAUTH2_GOOGLE_CLIENT_ID").expect("OAUTH2_GOOGLE_CLIENT_ID must be set")
 });
 
-pub(crate) static OAUTH2_GOOGLE_CLIENT_SECRET: LazyLock<String> = LazyLock::new(|| {
+pub(super) static OAUTH2_GOOGLE_CLIENT_SECRET: LazyLock<String> = LazyLock::new(|| {
     std::env::var("OAUTH2_GOOGLE_CLIENT_SECRET").expect("OAUTH2_GOOGLE_CLIENT_SECRET must be set")
 });

@@ -6,7 +6,7 @@ use crate::passkey::config::{ORIGIN, PASSKEY_RP_ID};
 use crate::passkey::errors::PasskeyError;
 
 #[derive(Serialize)]
-pub struct WebAuthnConfig {
+struct WebAuthnConfig {
     /// The WebAuthn relying party ID
     #[serde(rename = "rp_id")]
     rp_id: String,

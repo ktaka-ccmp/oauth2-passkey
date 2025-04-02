@@ -291,7 +291,7 @@ fn verify_signature(
     }
 }
 
-pub async fn verify_idtoken(
+pub(super) async fn verify_idtoken(
     token: String,
     audience: String,
 ) -> Result<IdInfo, TokenVerificationError> {

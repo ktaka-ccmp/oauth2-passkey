@@ -2,6 +2,7 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use http::header::{HeaderMap, SET_COOKIE};
 use ring::rand::SecureRandom;
+use thiserror::Error;
 
 // use crate::session::SessionError;
 // use crate::passkey::PasskeyError;
@@ -25,7 +26,7 @@ pub(crate) fn base64url_encode(input: Vec<u8>) -> Result<String, UtilError> {
     Ok(URL_SAFE_NO_PAD.encode(input))
 }
 
-pub fn gen_random_string(len: usize) -> Result<String, UtilError> {
+pub(crate) fn gen_random_string(len: usize) -> Result<String, UtilError> {
     let rng = ring::rand::SystemRandom::new();
     let mut session_id = vec![0u8; len];
     rng.fill(&mut session_id)
@@ -53,8 +54,6 @@ pub(crate) fn header_set_cookie(
     );
     Ok(headers)
 }
-
-use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]
 pub enum UtilError {

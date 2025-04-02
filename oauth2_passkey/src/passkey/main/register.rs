@@ -78,7 +78,7 @@ async fn get_or_create_user_handle(
     }
 }
 
-pub async fn start_registration(
+pub(crate) async fn start_registration(
     session_user: Option<SessionUser>,
     username: String,
     displayname: String,
@@ -109,7 +109,7 @@ pub async fn start_registration(
     Ok(options)
 }
 
-pub async fn create_registration_options(
+async fn create_registration_options(
     user_info: PublicKeyCredentialUserEntity,
 ) -> Result<RegistrationOptions, PasskeyError> {
     let challenge_str = gen_random_string(32)?;
@@ -166,7 +166,7 @@ pub async fn create_registration_options(
     Ok(options)
 }
 
-pub async fn verify_session_then_finish_registration(
+pub(crate) async fn verify_session_then_finish_registration(
     session_user: SessionUser,
     reg_data: RegisterCredential,
 ) -> Result<String, PasskeyError> {
@@ -195,7 +195,7 @@ pub async fn verify_session_then_finish_registration(
 }
 
 // pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String, PasskeyError> {
-pub async fn finish_registration(
+pub(crate) async fn finish_registration(
     user_id: &str,
     reg_data: &RegisterCredential,
 ) -> Result<String, PasskeyError> {

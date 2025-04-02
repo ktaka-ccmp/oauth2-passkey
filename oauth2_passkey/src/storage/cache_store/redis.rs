@@ -4,8 +4,7 @@ use redis::{self, AsyncCommands};
 use crate::storage::errors::StorageError;
 use crate::storage::types::CacheData;
 
-use super::traits::CacheStore;
-use super::types::RedisCacheStore;
+use super::types::{CacheStore, RedisCacheStore};
 
 const CACHE_PREFIX: &str = "cache";
 

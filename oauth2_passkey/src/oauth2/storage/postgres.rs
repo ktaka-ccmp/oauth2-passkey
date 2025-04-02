@@ -1,11 +1,12 @@
+use chrono::Utc;
+use sqlx::{Pool, Postgres};
+
 use crate::oauth2::{
     errors::OAuth2Error,
     types::{AccountSearchField, OAuth2Account},
 };
 use crate::storage::validate_postgres_table_schema;
 use crate::userdb::DB_TABLE_USERS;
-use chrono::Utc;
-use sqlx::{Pool, Postgres};
 
 use super::config::DB_TABLE_OAUTH2_ACCOUNTS;
 

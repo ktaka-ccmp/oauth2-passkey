@@ -91,7 +91,7 @@ pub(crate) async fn google_auth(
     Ok((headers, Redirect::to(&auth_url)))
 }
 
-pub async fn get_authorized(
+pub(crate) async fn get_authorized(
     Query(query): Query<AuthResponse>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
@@ -119,7 +119,7 @@ pub async fn get_authorized(
 ///    cookies from the original request in this cross-domain POST submission
 /// 4. Therefore, we can only access headers (which may contain some cookies) but not the
 ///    typed Cookie header that would be available in a standard browser navigation
-pub async fn post_authorized(
+pub(crate) async fn post_authorized(
     headers: HeaderMap,
     Form(form): Form<AuthResponse>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
@@ -137,7 +137,7 @@ pub async fn post_authorized(
     ))
 }
 
-pub async fn list_oauth2_accounts(
+pub(crate) async fn list_oauth2_accounts(
     auth_user: Option<AuthUser>,
 ) -> Result<Json<Vec<OAuth2Account>>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser if present using deref coercion
@@ -154,7 +154,7 @@ pub async fn list_oauth2_accounts(
 ///
 /// This endpoint requires authentication and verifies that the account
 /// belongs to the authenticated user before deleting it.
-pub async fn delete_oauth2_account(
+pub(crate) async fn delete_oauth2_account(
     auth_user: Option<AuthUser>,
     Path((provider, provider_user_id)): Path<(String, String)>,
 ) -> Result<StatusCode, (StatusCode, String)> {
