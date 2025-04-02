@@ -15,7 +15,7 @@ struct LoginTemplate<'a> {
     o2p_route_prefix: &'a str,
 }
 
-pub(crate) async fn login(user: Option<User>) -> Result<Response, (StatusCode, String)> {
+pub(super) async fn login(user: Option<User>) -> Result<Response, (StatusCode, String)> {
     match user {
         Some(_) => Ok(Redirect::to(O2P_REDIRECT_USER.as_str()).into_response()),
         None => {

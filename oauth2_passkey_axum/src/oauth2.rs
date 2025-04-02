@@ -12,11 +12,10 @@ use std::collections::HashMap;
 
 use oauth2_passkey::{
     AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, SessionUser, delete_oauth2_account_core,
-    get_authorized_core, list_accounts_core, post_authorized_core, prepare_logout_response,
-    prepare_oauth2_auth_request, verify_context_token_and_page,
+    get_authorized_core, list_accounts_core, post_authorized_core, prepare_oauth2_auth_request,
+    verify_context_token_and_page,
 };
 
-use super::config::O2P_REDIRECT_ANON;
 use super::error::IntoResponseError;
 use super::session::AuthUser;
 
@@ -26,7 +25,6 @@ pub fn router() -> Router {
         .route("/google", get(google_auth))
         .route("/authorized", get(get_authorized).post(post_authorized))
         .route("/popup_close", get(popup_close))
-        .route("/logout", get(logout))
         .route("/accounts", get(list_oauth2_accounts))
         .route(
             "/accounts/{provider}/{provider_user_id}",
@@ -91,15 +89,6 @@ pub(crate) async fn google_auth(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok((headers, Redirect::to(&auth_url)))
-}
-
-pub async fn logout(
-    TypedHeader(cookies): TypedHeader<headers::Cookie>,
-) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let headers = prepare_logout_response(cookies)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    Ok((headers, Redirect::to(O2P_REDIRECT_ANON.as_str())))
 }
 
 pub async fn get_authorized(

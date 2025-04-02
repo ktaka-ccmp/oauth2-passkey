@@ -22,7 +22,7 @@ function base64URLToUint8Array(base64URL) {
 }
 
 // Authentication functions
-async function startAuthentication(withUsername = false) {
+async function startAuthentication() {
     const authStatus = document.getElementById("auth-status");
     const authActions = document.getElementById("auth-actions");
 
@@ -31,7 +31,6 @@ async function startAuthentication(withUsername = false) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: "{}"
-            // body: username ? JSON.stringify(username) : "{}"
         });
 
         if (!startResponse.ok) {
@@ -57,8 +56,6 @@ async function startAuthentication(withUsername = false) {
             options.allowCredentials = [];
         }
         console.log('Processed Authentication options:', options);
-
-        // options.rpId = "amazon.co.jp"
 
         const credential = await navigator.credentials.get({
             publicKey: options
@@ -275,4 +272,17 @@ async function startRegistration(mode, username = null, displayname = null) {
         console.error('Error during registration:', error);
         alert('Registration failed: ' + error.message);
     }
+}
+
+if (typeof signOutAndRedirect === 'undefined') {
+    async function signOutAndRedirect(redirect) {
+        if (redirect) {
+            await fetch(`${O2P_ROUTE_PREFIX}/user/logout?redirect=${encodeURIComponent(redirect)}`);
+        } else {
+            await fetch(`${O2P_ROUTE_PREFIX}/user/logout`);
+            location.reload();
+        }
+    }
+    // Make it globally available
+    window.signOutAndRedirect = signOutAndRedirect;
 }

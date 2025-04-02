@@ -58,3 +58,17 @@ function initOAuth2Popup() {
         openPopup: openPopup
     };
 }
+
+// Only define signOutAndRedirect if it doesn't already exist
+if (typeof signOutAndRedirect === 'undefined') {
+    async function signOutAndRedirect(redirect) {
+        if (redirect) {
+            await fetch(`${O2P_ROUTE_PREFIX}/user/logout?redirect=${encodeURIComponent(redirect)}`);
+        } else {
+            await fetch(`${O2P_ROUTE_PREFIX}/user/logout`);
+            location.reload();
+        }
+    }
+    // Make it globally available
+    window.signOutAndRedirect = signOutAndRedirect;
+}

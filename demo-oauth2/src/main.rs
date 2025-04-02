@@ -2,8 +2,7 @@ use axum::{Router, routing::get};
 use dotenv::dotenv;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use libaxum::oauth2_router;
-use oauth2_passkey::{OAUTH2_ROUTE_PREFIX, oauth2_init, storage_init, userdb_init};
+use oauth2_passkey_axum::{O2P_ROUTE_PREFIX, oauth2_passkey_router};
 
 mod handlers;
 mod server;
@@ -21,24 +20,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .install_default()
         .expect("Failed to install default CryptoProvider");
 
-    dotenv().ok();
+
+
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        #[cfg(debug_assertions)]
+        {
+            "oauth2_passkey_axum=trace,oauth2_passkey=trace,demo_oauth2=trace".into()
+        }
+
+        #[cfg(not(debug_assertions))]
+        {
+            "info".into()
+        }
+    });
+
     tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
-        )
+        .with(env_filter)
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    dotenv().ok();
     // Initialize the OAuth2 library
-    oauth2_init().await?;
-    storage_init().await?;
-    userdb_init().await?;
+    oauth2_passkey_axum::init().await?;
 
     let app = Router::new()
         .route("/", get(index))
         .route("/protected", get(protected))
-        .nest(OAUTH2_ROUTE_PREFIX.as_str(), oauth2_router());
+        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
 
     let ports = Ports {
         http: 3001,

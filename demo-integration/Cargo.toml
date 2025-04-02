@@ -4,16 +4,14 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-askama = { version = "0.12.1", features = ["serde-json"] }
+askama = { version = "0.13.0" }
 axum-server = { version = "0.7.2", features = ["tls-rustls"] }
 dotenv = { workspace = true }
 http = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-
-oauth2_passkey_axum = { workspace = true }
-oauth2_passkey = { workspace = true }
-
 axum = { workspace = true }
 tokio = { workspace = true }
 rustls = { workspace = true }
+
+oauth2_passkey_axum = { workspace = true }

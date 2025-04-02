@@ -11,33 +11,48 @@
             padding: 1rem;
             margin: 1rem 0;
         }
-        .user-info dt {
-            font-weight: bold;
-            margin-top: 0.5rem;
+        .user-info td {
+            padding: 0.5rem;
+            border-bottom: 1px solid #ddd;
         }
-        .user-info dd {
-            margin-left: 1rem;
+        .user-info td:first-child {
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <h1>Welcome to the Protected Area</h1>
-    <p>Hello, {{ user.id }}! You've successfully authenticated.</p>
-    
     <div class="user-info">
-        <h2>Your Profile Information:</h2>
-        <dl>
-            
-            <dt>Picture URL</dt>
-            <dd>
-            {# {% if user.picture.is_some() %}
-                <img src="{{ user.picture.as_ref().unwrap() }}" alt="Profile picture" style="max-width: 100px; border-radius: 50%;">
-            {% else %}
-            {% endif %} #}
-            </dd>
-        </dl>
+        <h2>Your Account Information:</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <td>User ID</td>
+                <td>{{ user.id }}</td>
+            </tr>
+            <tr>
+                <td>Account</td>
+                <td>{{ user.account }}</td>
+            </tr>
+            <tr>
+                <td>Label</td>
+                <td>{{ user.label }}</td>
+            </tr>
+            <tr>
+                <td>Created At</td>
+                <td>{{ user.created_at }}</td>
+            </tr>
+            <tr>
+                <td>Updated At</td>
+                <td>{{ user.updated_at }}</td>
+            </tr>
+        </table>
     </div>
 
-    <p><a href="{{ auth_route_prefix }}/logout">Logout</a></p>
+    <button onclick="Logout()">Logout</button>
+    <script>
+        function Logout() {
+            window.location.href = "{{auth_route_prefix}}/user/logout?redirect=/";
+        }
+    </script>
 </body>
 </html>
