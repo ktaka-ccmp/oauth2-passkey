@@ -68,7 +68,13 @@ pub(super) async fn store_token_in_cache(
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .put(token_type, &token_id, token_data.into())
+        // .put(token_type, &token_id, token_data.into())
+        .put_with_ttl(
+            token_type,
+            &token_id,
+            token_data.into(),
+            ttl.try_into().unwrap(),
+        )
         .await
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 

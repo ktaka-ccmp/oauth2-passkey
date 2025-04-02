@@ -1,19 +1,13 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use chrono::{DateTime, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey};
 use pkcs1::{EncodeRsaPublicKey, LineEnding};
 use rsa::RsaPublicKey;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
-};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
-use dashmap::DashMap;
-use moka::future::Cache;
-use once_cell::sync::Lazy;
-use tokio::sync::RwLock;
+use crate::storage::{CacheData, GENERIC_CACHE_STORE};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Jwks {
@@ -94,110 +88,106 @@ pub enum TokenVerificationError {
     SystemTimeError(#[from] std::time::SystemTimeError),
     #[error("PKCS1 error: {0}")]
     Pkcs1Error(#[from] pkcs1::Error),
+    #[error("JWKS parsing error: {0}")]
+    JwksParsing(String),
+    #[error("JWKS fetch error: {0}")]
+    JwksFetch(String),
 }
 
-// Define a struct to hold the JWKS and its expiration time
-struct CachedJwks {
-    jwks: Jwks,
-    expiration: Instant,
-}
-
-const CACHE_MODE: &str = "moka";
+const CACHE_MODE: &str = "cached";
 const CACHE_EXPIRATION: Duration = Duration::from_secs(600);
 
 async fn fetch_jwks(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
     match CACHE_MODE {
-        "nocache" => fetch_jwks_nocache(jwks_url).await,
-        "dashmap" => fetch_jwks_dashmap(jwks_url).await,
-        "arc_rwlock_hashmap" => fetch_jwks_arh(jwks_url).await,
-        "moka" => fetch_jwks_moka(jwks_url).await,
-        _ => fetch_jwks_moka(jwks_url).await,
+        "nocache" => fetch_jwks_no_cache(jwks_url).await,
+        "cached" => fetch_jwks_cache(jwks_url).await,
+        _ => fetch_jwks_no_cache(jwks_url).await,
     }
 }
 
 // 0. Without caching:
-async fn fetch_jwks_nocache(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
+async fn fetch_jwks_no_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
     let resp = reqwest::get(jwks_url).await?;
     let jwks: Jwks = resp.json().await?;
     Ok(jwks)
 }
 
-// 1. DashMap + Lazy + RwLock:
-static JWKS_CACHE_DASHMAP: Lazy<DashMap<String, RwLock<CachedJwks>>> = Lazy::new(DashMap::new);
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct JwksCache {
+    jwks: Jwks,
+    expires_at: DateTime<Utc>,
+}
 
-async fn fetch_jwks_dashmap(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
-    // Check if the JWKS is in the cache and not expired
-    if let Some(cached) = JWKS_CACHE_DASHMAP.get(jwks_url) {
-        let cached_jwks = cached.value().read().await;
-        if cached_jwks.expiration > Instant::now() {
-            return Ok(cached_jwks.jwks.clone());
+impl From<JwksCache> for CacheData {
+    fn from(cache: JwksCache) -> Self {
+        Self {
+            value: serde_json::to_string(&cache).unwrap_or_default(),
         }
     }
-
-    // If not in cache or expired, fetch from the URL
-    let resp = reqwest::get(jwks_url).await?;
-    let jwks: Jwks = resp.json().await?;
-
-    // Update the cache
-    let cached_jwks = CachedJwks {
-        jwks: jwks.clone(),
-        expiration: Instant::now() + CACHE_EXPIRATION,
-    };
-    JWKS_CACHE_DASHMAP.insert(jwks_url.to_string(), RwLock::new(cached_jwks));
-
-    Ok(jwks)
 }
 
-// 2. Arc<RwLock<HashMap>> + tokio::time::Instant:
-static JWKS_CACHE_ARC_RWLOCK_HASHMAP: Lazy<Arc<RwLock<HashMap<String, CachedJwks>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
+impl TryFrom<CacheData> for JwksCache {
+    type Error = TokenVerificationError;
 
-async fn fetch_jwks_arh(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
+    fn try_from(cache_data: CacheData) -> Result<Self, Self::Error> {
+        serde_json::from_str(&cache_data.value)
+            .map_err(|e| TokenVerificationError::JwksParsing(format!("{}", e)))
+    }
+}
+
+async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
     // Try to get from cache first
+    let prefix = "jwks";
+    let cache_key = jwks_url;
+
+    if let Some(cached) = GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .get(prefix, cache_key)
+        .await
+        .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?
     {
-        let cache = JWKS_CACHE_ARC_RWLOCK_HASHMAP.read().await;
-        if let Some(cached) = cache.get(jwks_url) {
-            if cached.expiration > Instant::now() {
-                return Ok(cached.jwks.clone());
-            }
+        let jwks_cache: JwksCache = cached.try_into()?;
+        tracing::debug!("JWKs found in cache: {:#?}", jwks_cache);
+
+        if jwks_cache.expires_at > Utc::now() {
+            tracing::debug!("Returning valid cached JWKs");
+            return Ok(jwks_cache.jwks);
         }
-    } // The RwLock read guard is dropped here
 
-    // If not in cache or expired, fetch from the URL
-    let resp = reqwest::get(jwks_url).await?;
-    let jwks: Jwks = resp.json().await?;
-
-    // Update the cache
-    let mut cache = JWKS_CACHE_ARC_RWLOCK_HASHMAP.write().await;
-    cache.insert(
-        jwks_url.to_string(),
-        CachedJwks {
-            jwks: jwks.clone(),
-            expiration: Instant::now() + CACHE_EXPIRATION,
-        },
-    );
-
-    Ok(jwks)
-}
-
-// 3. moka::future::Cache:
-static JWKS_CACHE_MOKA: Lazy<Cache<String, Jwks>> = Lazy::new(|| {
-    Cache::builder()
-        .time_to_live(Duration::from_secs(3600))
-        .build()
-});
-
-async fn fetch_jwks_moka(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
-    if let Some(jwks) = JWKS_CACHE_MOKA.get(jwks_url).await {
-        return Ok(jwks);
+        tracing::debug!("Removing expired JWKs from cache");
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .remove(prefix, cache_key)
+            .await
+            .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?;
     }
 
+    // If not in cache, fetch from the URL
     let resp = reqwest::get(jwks_url).await?;
     let jwks: Jwks = resp.json().await?;
+    tracing::debug!("JWKs fetched from URL: {:#?}", jwks);
 
-    JWKS_CACHE_MOKA
-        .insert(jwks_url.to_string(), jwks.clone())
-        .await;
+    // Store in cache
+    let jwks_cache = JwksCache {
+        jwks: jwks.clone(),
+        expires_at: Utc::now() + CACHE_EXPIRATION,
+    };
+
+    GENERIC_CACHE_STORE
+        .lock()
+        .await
+        // .put(prefix, cache_key, jwks_cache.into())
+        .put_with_ttl(
+            prefix,
+            cache_key,
+            jwks_cache.into(),
+            CACHE_EXPIRATION.as_secs() as usize,
+        )
+        .await
+        .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {}", e)))?;
+
     Ok(jwks)
 }
 
