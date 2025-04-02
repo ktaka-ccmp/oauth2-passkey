@@ -1,4 +1,5 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use chrono::{DateTime, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey};
 use pkcs1::{EncodeRsaPublicKey, LineEnding};
 use rsa::RsaPublicKey;
@@ -14,6 +15,8 @@ use dashmap::DashMap;
 use moka::future::Cache;
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
+
+use crate::storage::{CacheData, GENERIC_CACHE_STORE};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Jwks {
@@ -94,6 +97,10 @@ pub enum TokenVerificationError {
     SystemTimeError(#[from] std::time::SystemTimeError),
     #[error("PKCS1 error: {0}")]
     Pkcs1Error(#[from] pkcs1::Error),
+    #[error("JWKS parsing error: {0}")]
+    JwksParsing(String),
+    #[error("JWKS fetch error: {0}")]
+    JwksFetch(String),
 }
 
 // Define a struct to hold the JWKS and its expiration time
@@ -102,8 +109,8 @@ struct CachedJwks {
     expiration: Instant,
 }
 
-const CACHE_MODE: &str = "moka";
-const CACHE_EXPIRATION: Duration = Duration::from_secs(600);
+const CACHE_MODE: &str = "generic_cache_store";
+const CACHE_EXPIRATION: Duration = Duration::from_secs(60);
 
 async fn fetch_jwks(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
     match CACHE_MODE {
@@ -111,6 +118,7 @@ async fn fetch_jwks(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
         "dashmap" => fetch_jwks_dashmap(jwks_url).await,
         "arc_rwlock_hashmap" => fetch_jwks_arh(jwks_url).await,
         "moka" => fetch_jwks_moka(jwks_url).await,
+        "generic_cache_store" => fetch_jwks_generic_cache_store(jwks_url).await,
         _ => fetch_jwks_moka(jwks_url).await,
     }
 }
@@ -198,6 +206,86 @@ async fn fetch_jwks_moka(jwks_url: &str) -> Result<Jwks, TokenVerificationError>
     JWKS_CACHE_MOKA
         .insert(jwks_url.to_string(), jwks.clone())
         .await;
+    Ok(jwks)
+}
+
+// 4. GENERIC_CACHE_STORE:
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct JwksCache {
+    jwks: Jwks,
+    expires_at: DateTime<Utc>,
+}
+
+impl From<JwksCache> for CacheData {
+    fn from(cache: JwksCache) -> Self {
+        Self {
+            value: serde_json::to_string(&cache).unwrap_or_default(),
+        }
+    }
+}
+
+impl TryFrom<CacheData> for JwksCache {
+    type Error = TokenVerificationError;
+
+    fn try_from(cache_data: CacheData) -> Result<Self, Self::Error> {
+        serde_json::from_str(&cache_data.value)
+            .map_err(|e| TokenVerificationError::JwksParsing(format!("{}", e)))
+    }
+}
+
+async fn fetch_jwks_generic_cache_store(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
+    // Try to get from cache first
+    let prefix = "jwks";
+    let cache_key = jwks_url;
+
+    if let Some(cached) = GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .get(prefix, cache_key)
+        .await
+        .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?
+    {
+        let jwks_cache: JwksCache = cached.try_into()?;
+        tracing::debug!("JWKs found in cache: {:#?}", jwks_cache);
+
+        if jwks_cache.expires_at > Utc::now() {
+            tracing::debug!("Returning valid cached JWKs");
+            return Ok(jwks_cache.jwks);
+        }
+
+        tracing::debug!("Removing expired JWKs from cache");
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .remove(prefix, cache_key)
+            .await
+            .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?;
+    }
+
+    // If not in cache, fetch from the URL
+    let resp = reqwest::get(jwks_url).await?;
+    let jwks: Jwks = resp.json().await?;
+    tracing::debug!("JWKs fetched from URL: {:#?}", jwks);
+
+    // Store in cache
+    let jwks_cache = JwksCache {
+        jwks: jwks.clone(),
+        expires_at: Utc::now() + CACHE_EXPIRATION,
+    };
+
+    GENERIC_CACHE_STORE
+        .lock()
+        .await
+        // .put(prefix, cache_key, jwks_cache.into())
+        .put_with_ttl(
+            prefix,
+            cache_key,
+            jwks_cache.into(),
+            CACHE_EXPIRATION.as_secs() as usize,
+        )
+        .await
+        .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {}", e)))?;
+
     Ok(jwks)
 }
 
