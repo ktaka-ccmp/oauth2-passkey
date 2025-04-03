@@ -54,20 +54,6 @@ async fn logout(
     }
 }
 
-/// Delete the authenticated user's account and all associated data
-///
-/// This endpoint requires authentication and will delete:
-/// 1. All OAuth2 accounts linked to the user
-/// 2. All Passkey credentials registered by the user
-/// 3. The user account itself
-///
-/// After successful deletion, the client should redirect to the logout endpoint
-/// to clear the session.
-#[derive(serde::Deserialize)]
-pub(super) struct DeleteUserRequest {
-    user_id: String,
-}
-
 /// Request payload for updating user account information
 #[derive(serde::Deserialize)]
 pub(super) struct UpdateUserRequest {
@@ -123,6 +109,21 @@ pub(super) async fn update_user_account_handler(
     });
 
     Ok(Json(user_data))
+}
+
+/// Delete the authenticated user's account and all associated data
+///
+/// This endpoint requires authentication and will delete:
+/// 1. All OAuth2 accounts linked to the user
+/// 2. All Passkey credentials registered by the user
+/// 3. The user account itself
+///
+/// After successful deletion, the client should redirect to the logout endpoint
+/// to clear the session.
+/// Returns a list of credential IDs that were deleted.
+#[derive(serde::Deserialize)]
+pub(super) struct DeleteUserRequest {
+    user_id: String,
 }
 
 pub(super) async fn delete_user_account_handler(
