@@ -19,7 +19,7 @@ use oauth2_passkey::{
 use super::error::IntoResponseError;
 use super::session::AuthUser;
 
-pub fn router() -> Router {
+pub(super) fn router() -> Router {
     Router::new()
         .route("/oauth2.js", get(serve_oauth2_js))
         .route("/google", get(google_auth))
@@ -38,7 +38,7 @@ struct PopupCloseTemplate {
     message: String,
 }
 
-pub(crate) async fn popup_close(
+async fn popup_close(
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Html<String>, (StatusCode, String)> {
     let message = params
@@ -54,7 +54,7 @@ pub(crate) async fn popup_close(
     Ok(html)
 }
 
-pub(crate) async fn serve_oauth2_js() -> Result<Response, (StatusCode, String)> {
+async fn serve_oauth2_js() -> Result<Response, (StatusCode, String)> {
     let js_content = include_str!("../static/oauth2.js");
     Response::builder()
         .status(StatusCode::OK)
@@ -63,7 +63,7 @@ pub(crate) async fn serve_oauth2_js() -> Result<Response, (StatusCode, String)> 
         .into_response_error()
 }
 
-pub(crate) async fn google_auth(
+async fn google_auth(
     auth_user: Option<AuthUser>,
     headers: HeaderMap,
     Query(params): Query<HashMap<String, String>>,
@@ -91,7 +91,7 @@ pub(crate) async fn google_auth(
     Ok((headers, Redirect::to(&auth_url)))
 }
 
-pub(crate) async fn get_authorized(
+async fn get_authorized(
     Query(query): Query<AuthResponse>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
@@ -119,7 +119,7 @@ pub(crate) async fn get_authorized(
 ///    cookies from the original request in this cross-domain POST submission
 /// 4. Therefore, we can only access headers (which may contain some cookies) but not the
 ///    typed Cookie header that would be available in a standard browser navigation
-pub(crate) async fn post_authorized(
+async fn post_authorized(
     headers: HeaderMap,
     Form(form): Form<AuthResponse>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
@@ -137,7 +137,7 @@ pub(crate) async fn post_authorized(
     ))
 }
 
-pub(crate) async fn list_oauth2_accounts(
+async fn list_oauth2_accounts(
     auth_user: Option<AuthUser>,
 ) -> Result<Json<Vec<OAuth2Account>>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser if present using deref coercion
@@ -154,7 +154,7 @@ pub(crate) async fn list_oauth2_accounts(
 ///
 /// This endpoint requires authentication and verifies that the account
 /// belongs to the authenticated user before deleting it.
-pub(crate) async fn delete_oauth2_account(
+async fn delete_oauth2_account(
     auth_user: Option<AuthUser>,
     Path((provider, provider_user_id)): Path<(String, String)>,
 ) -> Result<StatusCode, (StatusCode, String)> {

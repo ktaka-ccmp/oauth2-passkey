@@ -16,7 +16,6 @@
 	- Mandate passkey registration during first session.
 	- Can list and manage all users.
 - Debug: there are cases signalCurrentUserDetails doesn't work properly.
-- idtoken.rs: make it use CacheStore instead of current mechanisms.
 
 ## Half Done
 
@@ -87,9 +86,11 @@
 
 - Cleanup frontend
 - Adjust visibility of functions, structs, enums, etc. What needs to be public?
+- idtoken.rs: make it use CacheStore instead of current mechanisms.
+- Utilize feature gate to enable/disable supplementary frontend templates and JavaScript.
 
 ## Memo
 
 ```text
-Can you take a look the following diff and if we aren't introducing any bugs and every change is OK suggest a commit message plz.
+Can you take a look the following diff carefully and if we aren't introducing any bugs and every change is OK suggest a commit message plz.
 ```
