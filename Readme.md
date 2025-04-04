@@ -9,13 +9,14 @@
 	- Use tracing-error crate https://crates.io/crates/tracing-error
 	- Use https://docs.rs/tower-http/latest/tower_http/trace/index.html
 	- https://docs.rs/tracing/latest/tracing/
-- Completely separate create_account function from add_to_existing_user function to avoid the case where new user is created even though user is already logged in.
 - Replace "if let", "unwrap_or_else", "ok_or_else" etc. with "match", where appropriate.
-- Implement Admin Account
-	- Password login for the first time, disable it for next time.
-	- Mandate passkey registration during first session.
+- Implement Admin Account idea
+	- ~~Modify the User table to add admin flag and sequence number.~~
+	- ~~The first user i.e. sequence number 1 will be the admin.~~
+	- He has the power to modify all attributes of all users.
 	- Can list and manage all users.
-- Debug: there are cases signalCurrentUserDetails doesn't work properly.
+- Does page context token verification work as csrf protection?
+	- Suppose the situation where a malicious user tries to let the admin give him admin privileges, or modify arbitrary user's account details.
 
 ## Half Done
 
@@ -88,6 +89,8 @@
 - Adjust visibility of functions, structs, enums, etc. What needs to be public?
 - idtoken.rs: make it use CacheStore instead of current mechanisms.
 - Utilize feature gate to enable/disable supplementary frontend templates and JavaScript.
+- Completely separate create_account function from add_to_user function to avoid the case where new user is created even though user is already logged in.
+- Debug: there are cases signalCurrentUserDetails doesn't work properly.
 
 ## Memo
 

@@ -138,6 +138,8 @@ async fn create_user_then_finish_registration(
         id: gen_new_user_id().await?,
         account,
         label,
+        is_admin: false,
+        sequence_number: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
