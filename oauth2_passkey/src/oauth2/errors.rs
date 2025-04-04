@@ -68,4 +68,7 @@ pub enum OAuth2Error {
     /// Error from session operations
     #[error("Session error: {0}")]
     Session(#[from] SessionError),
+
+    #[error("Invalid mode: {0}")]
+    InvalidMode(String),
 }

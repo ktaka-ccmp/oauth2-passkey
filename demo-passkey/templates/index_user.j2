@@ -17,10 +17,13 @@
         <p>Welcome to our site.</p>
     </div>
 
-    <div id="passkey-sign-out" style="display: block">
-        <button onclick="signOutAndRedirect();" class="auth-button">
-            Sign out
-        </button>
+    <div>
+        <button onclick="Logout()">Logout</button>
+        <script>
+            function Logout() {
+                window.location.href = "{{o2p_route_prefix}}/user/logout?redirect=/";
+            }
+        </script>
     </div>
 </body>
 

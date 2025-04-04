@@ -30,9 +30,9 @@ fn get_passkey_field_mappings() -> (String, String) {
 #[serde(rename_all = "snake_case")]
 pub enum RegistrationMode {
     /// Adding a passkey to an existing user (requires authentication)
-    AddToExistingUser,
+    AddToUser,
     /// Creating a new user with a passkey (no authentication required)
-    NewUser,
+    CreateUser,
 }
 
 /// Request for starting passkey registration with explicit mode
@@ -56,7 +56,7 @@ pub async fn handle_start_registration_core(
     body: RegistrationStartRequest,
 ) -> Result<RegistrationOptions, CoordinationError> {
     match body.mode {
-        RegistrationMode::AddToExistingUser => {
+        RegistrationMode::AddToUser => {
             let auth_user = match auth_user {
                 Some(user) => user,
                 None => return Err(CoordinationError::Unauthorized.log()),
@@ -73,11 +73,11 @@ pub async fn handle_start_registration_core(
                     .await?;
             Ok(result)
         }
-        RegistrationMode::NewUser => {
+        RegistrationMode::CreateUser => {
             match auth_user {
                 Some(_) => return Err(CoordinationError::UnexpectedlyAuthorized.log()),
                 None => {
-                    tracing::trace!("handle_start_registration_core: New User");
+                    tracing::trace!("handle_start_registration_core: Create User");
                 }
             };
 

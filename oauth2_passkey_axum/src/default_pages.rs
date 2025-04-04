@@ -11,7 +11,7 @@ use oauth2_passkey::{
     O2P_ROUTE_PREFIX, SessionUser, list_accounts_core, list_credentials_core, obfuscate_user_id,
 };
 
-use crate::config::O2P_REDIRECT_USER;
+use crate::config::O2P_REDIRECT_ANON;
 use crate::session::AuthUser;
 
 pub(super) fn router() -> Router<()> {
@@ -32,7 +32,7 @@ struct LoginTemplate<'a> {
 
 async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
     match user {
-        Some(_) => Ok(Redirect::to(O2P_REDIRECT_USER.as_str()).into_response()),
+        Some(_) => Ok(Redirect::to(O2P_REDIRECT_ANON.as_str()).into_response()),
         None => {
             let template = LoginTemplate {
                 message: "Passkey/OAuth2 Login Page!",
@@ -83,6 +83,7 @@ struct UserSummaryTemplate {
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
+    pub o2p_redirect_anon: String,
     pub obfuscated_user_id: String,
 }
 
@@ -92,6 +93,7 @@ impl UserSummaryTemplate {
         passkey_credentials: Vec<TemplateCredential>,
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
+        o2p_redirect_anon: String,
     ) -> Self {
         let obfuscated_user_id = obfuscate_user_id(&user.id);
 
@@ -100,6 +102,7 @@ impl UserSummaryTemplate {
             passkey_credentials,
             oauth2_accounts,
             o2p_route_prefix,
+            o2p_redirect_anon,
             obfuscated_user_id,
         }
     }
@@ -203,6 +206,7 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
         oauth2_accounts,
         // Pass owned String values to the template
         O2P_ROUTE_PREFIX.to_string(),
+        O2P_REDIRECT_ANON.to_string(),
     );
 
     // Render the template

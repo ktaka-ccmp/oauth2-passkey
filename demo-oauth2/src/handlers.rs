@@ -1,6 +1,6 @@
 use askama::Template;
 use axum::{http::StatusCode, response::Html};
-use oauth2_passkey_axum::{AuthUser as User, O2P_ROUTE_PREFIX};
+use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX};
 
 #[derive(Template)]
 #[template(path = "index_user.j2")]
@@ -19,11 +19,11 @@ struct IndexTemplateAnon<'a> {
 #[derive(Template)]
 #[template(path = "protected.j2")]
 struct ProtectedTemplate<'a> {
-    user: User,
+    user: AuthUser,
     auth_route_prefix: &'a str,
 }
 
-pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCode, String)> {
+pub(crate) async fn index(user: Option<AuthUser>) -> Result<Html<String>, (StatusCode, String)> {
     match user {
         Some(u) => {
             let message = format!("Hey {}!", u.account);
@@ -54,7 +54,7 @@ pub(crate) async fn index(user: Option<User>) -> Result<Html<String>, (StatusCod
     }
 }
 
-pub(crate) async fn protected(user: User) -> Result<Html<String>, (StatusCode, String)> {
+pub(crate) async fn protected(user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     let template = ProtectedTemplate {
         user,
         auth_route_prefix: O2P_ROUTE_PREFIX.as_str(),

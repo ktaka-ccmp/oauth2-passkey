@@ -43,16 +43,24 @@ pub enum CoordinationError {
     #[error("No content")]
     NoContent,
 
+    /// Invalid mode
+    #[error("Invalid mode")]
+    InvalidMode,
+
+    /// Conflict error
+    #[error("Conflict: {0}")]
+    Conflict(String),
+
+    /// Invalid state error
+    #[error("Invalid state: {0}")]
+    InvalidState(String),
+
     /// Resource not found with context
     #[error("Resource not found: {resource_type} {resource_id}")]
     ResourceNotFound {
         resource_type: String,
         resource_id: String,
     },
-
-    /// Invalid state parameter
-    #[error("Invalid state parameter")]
-    InvalidState,
 
     /// Error from the user database operations
     #[error("User error: {0}")]
@@ -117,11 +125,13 @@ impl CoordinationError {
             Self::Unauthorized => tracing::error!("Unauthorized access"),
             Self::UnexpectedlyAuthorized => tracing::error!("Unexpectedly authorized access"),
             Self::NoContent => tracing::error!("No content"),
+            Self::InvalidMode => tracing::error!("Invalid mode"),
+            Self::Conflict(message) => tracing::error!("Conflict: {}", message),
+            Self::InvalidState(message) => tracing::error!("Invalid state: {}", message),
             Self::ResourceNotFound {
                 resource_type,
                 resource_id,
             } => tracing::error!("Resource not found: {} {}", resource_type, resource_id),
-            Self::InvalidState => tracing::error!("Invalid state parameter"),
             Self::UserError(err) => tracing::error!("User error: {}", err),
             Self::OAuth2Error(err) => tracing::error!("OAuth2 error: {}", err),
             Self::PasskeyError(err) => tracing::error!("Passkey error: {}", err),

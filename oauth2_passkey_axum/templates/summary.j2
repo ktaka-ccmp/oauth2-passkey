@@ -12,7 +12,7 @@
         <h1>User Summary</h1>
         <div class="header-buttons">
             <button onclick="DeleteAccount()" class="action-button delete-button">Delete Account</button>
-            <button onclick="signOutAndRedirect('')" class="action-button">Logout</button>
+            <button onclick="Logout()" class="action-button">Logout</button>
         </div>
     </div>
 
@@ -54,7 +54,7 @@
     <div class="section">
         <div class="section-header">
             <h2 class="section-title">Passkey Credentials</h2>
-            <button onclick="showRegistrationModal('add_to_existing_user')" class="action-button">Add New Passkey</button>
+            <button onclick="showRegistrationModal('add_to_user')" class="action-button">Add New Passkey</button>
         </div>
         {% if passkey_credentials.is_empty() %}
             <p>You don't have any passkey credentials yet.</p>
@@ -93,7 +93,7 @@
     <div class="section">
         <div class="section-header">
             <h2 class="section-title">OAuth2 Accounts</h2>
-            <button onclick="oauth2.openPopup('add_to_existing_user', PAGE_USER_CONTEXT)" class="action-button">Add New OAuth2 Account</button>
+            <button onclick="oauth2.openPopup('add_to_user', PAGE_USER_CONTEXT)" class="action-button">Add New OAuth2 Account</button>
         </div>
         {% if oauth2_accounts.is_empty() %}
             <p>You don't have any linked OAuth2 accounts yet.</p>
@@ -163,7 +163,9 @@
         const O2P_ROUTE_PREFIX = "{{o2p_route_prefix}}";
         const accountName = "{{user.account}}";
         const userId = "{{user.id}}";
-        const oauth2 = initOAuth2Popup();
+        function Logout() {
+            window.location.href = "{{o2p_route_prefix}}/user/logout?redirect={{o2p_redirect_anon}}";
+        }
     </script>
 
 </body>

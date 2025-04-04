@@ -5,8 +5,12 @@ use axum::{
     routing::{Router, get},
 };
 use axum_core::response::IntoResponse;
+use dotenv::dotenv;
 
-use oauth2_passkey_axum::{AuthUser as User, O2P_ROUTE_PREFIX, oauth2_passkey_router};
+use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_router};
+
+mod server;
+use crate::server::{init_tracing, spawn_http_server, spawn_https_server};
 
 #[derive(Template)]
 #[template(path = "index_anon.j2")]
@@ -22,7 +26,7 @@ struct IndexUserTemplate<'a> {
     o2p_route_prefix: &'static str,
 }
 
-async fn index(user: Option<User>) -> impl IntoResponse {
+async fn index(user: Option<AuthUser>) -> impl IntoResponse {
     match user {
         Some(u) => {
             let template = IndexUserTemplate {
@@ -43,15 +47,26 @@ async fn index(user: Option<User>) -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv::dotenv().ok();
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install default CryptoProvider");
+
+    init_tracing("demo_passkey");
+
+    dotenv().ok();
     oauth2_passkey_axum::init().await?;
 
     let app = Router::new()
         .route("/", get(index))
         .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
 
-    println!("Starting server on http://localhost:3001");
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await?;
-    axum::serve(listener, app).await?;
+    // spawn_http_server doesn't need await because it's synchronous - it immediately returns a JoinHandle
+    let http_server = spawn_http_server(3001, app.clone());
+
+    // spawn_https_server requires await because it loads TLS certificates asynchronously before returning a JoinHandle
+    let https_server = spawn_https_server(3443, app).await;
+
+    // Wait for both servers to complete (which they never will in this case)
+    tokio::try_join!(http_server, https_server).unwrap();
     Ok(())
 }

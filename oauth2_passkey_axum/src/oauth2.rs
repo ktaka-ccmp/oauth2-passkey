@@ -71,7 +71,7 @@ async fn google_auth(
     let mode = params.get("mode").cloned();
     let context = params.get("context").cloned();
 
-    if mode.is_some() && mode.as_ref().unwrap() == "add_to_existing_user" {
+    if mode.is_some() && mode.as_ref().unwrap() == "add_to_user" {
         if context.is_none() {
             return Err((StatusCode::BAD_REQUEST, "Missing context".to_string()));
         }
@@ -79,12 +79,15 @@ async fn google_auth(
         let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
         let user_id: String = session_user.map(|u| u.id.clone()).unwrap_or_default();
 
-        // Verify the user context token
+        // Verify the user context token:
+        // 1. Verifies that the context user matches the session user ID
+        // 2. Verifies that the context token has not expired
+        // 3. Verifies that the context signature is valid
         verify_context_token_and_page(&headers, Some(&context.unwrap()), &user_id)
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     }
 
-    let (auth_url, headers) = prepare_oauth2_auth_request(headers)
+    let (auth_url, headers) = prepare_oauth2_auth_request(headers, mode.as_deref())
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

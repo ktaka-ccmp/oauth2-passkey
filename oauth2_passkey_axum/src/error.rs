@@ -16,7 +16,7 @@ impl<T> IntoResponseError<T> for Result<T, CoordinationError> {
                 CoordinationError::PasskeyError(_) => StatusCode::BAD_REQUEST,
                 CoordinationError::UserError(_) => StatusCode::BAD_REQUEST,
                 CoordinationError::SessionError(_) => StatusCode::BAD_REQUEST,
-                CoordinationError::InvalidState => StatusCode::BAD_REQUEST,
+                CoordinationError::InvalidState(_) => StatusCode::BAD_REQUEST,
                 CoordinationError::NoContent => StatusCode::NO_CONTENT,
                 CoordinationError::ResourceNotFound { .. } => StatusCode::NOT_FOUND,
                 _ => StatusCode::INTERNAL_SERVER_ERROR,

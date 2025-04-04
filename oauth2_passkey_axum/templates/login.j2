@@ -8,29 +8,8 @@
 
     <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
     <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
-    {# <!--Conditional UI does not work as we expect it to-->
-    <!--<script src="{{passkey_route_prefix}}/conditional_ui.js"></script>-->
-    <!--
-    The Problem
-    When you include both passkey.js and conditional_ui.js, they're competing for the same WebAuthn resources:
 
-    conditional_ui.js automatically starts a WebAuthn credential request with mediation: 'conditional' on page load
-    When you try to use the regular passkey operations (registration or authentication), they fail with "A request is already pending" because the conditional UI has already initiated a WebAuthn request
-    Solution Options
-    Here are a few ways to solve this issue:
-
-    Option 1: Modify conditional_ui.js to abort its request when manual operations are triggered
-    Option 2: Create a unified passkey manager
-    A better long-term solution would be to refactor both scripts into a single passkey manager that coordinates all WebAuthn operations. This would prevent conflicts and provide a cleaner API.
-
-    Option 3: Use feature flags to enable only one at a time
-    If you don't need both features simultaneously, you could use a feature flag to enable either the conditional UI or the manual operations, but not both at the same time.
-
-    Recommended Solution
-    I recommend implementing Option 1 as a quick fix. Let me know if you'd like me to implement any of these solutions for you.
-    --> #}
     <script>
-        const oauth2 = initOAuth2Popup();
         const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
     </script>
 
@@ -44,30 +23,22 @@
         Google OAuth2:
     </div>
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="oauth2.openPopup()">Create User or Sign in</button>
+        <button onclick="oauth2.openPopup('create_user')">Create User</button>
+        <button onclick="oauth2.openPopup('login')">Sign in</button>
+        <button onclick="oauth2.openPopup('create_user_or_login')">Either is fine</button>
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 10px;">
         Passkey:
     </div>
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="showRegistrationModal('new_user')">
+        <button onclick="showRegistrationModal('create_user')">
             Create User
         </button>
         <button onclick="startAuthentication(false)">Sign in</button>
         or <a href="{{o2p_route_prefix}}/passkey/conditional_ui">try conditional UI</a>
     </div>
 
-    {# <!--Conditional UI does not work as we expect it to-->
-    <!--<div style="display: flex; gap: 10px; margin-top: 10px;">
-        <form id="signin-form">
-            <div class="form-group">
-                <label for="username-input">or try conditional UI</label>
-                <input type="email" id="username-input" name="username" autocomplete="username webauthn"
-                    placeholder="Enter your email" required>
-            </div>
-        </form>
-    </div>--> #}
 </body>
 
 </html>

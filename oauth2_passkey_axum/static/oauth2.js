@@ -1,9 +1,16 @@
-function initOAuth2Popup() {
+const oauth2 = (function() {
     let popupWindow;
     let isReloading = false;
 
+    // mode: add_to_user, create_user, login
     function openPopup(mode=null, page_context=null) {
-        if (mode === 'add_to_existing_user') {
+        // Only proceed if mode is one of the valid options
+        if (mode !== 'add_to_user' && mode !== 'create_user' && mode !== 'login' && mode !== 'create_user_or_login') {
+            console.log('Invalid or missing mode parameter');
+            return; // Exit the function early
+        }
+
+        if (mode === 'add_to_user') {
             popupWindow = window.open(
                 `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}&context=${page_context}`,
                 "PopupWindow",
@@ -11,7 +18,7 @@ function initOAuth2Popup() {
             );
         } else {
             popupWindow = window.open(
-                `${O2P_ROUTE_PREFIX}/oauth2/google`,
+                `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}`,
                 "PopupWindow",
                 "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
             );
@@ -38,7 +45,7 @@ function initOAuth2Popup() {
         // Reload the parent window
         setTimeout(() => {
             window.location.reload();
-        }, 100);  // Wait for 0.1 second before reloading
+        }, 10);  // Wait for 0.1 second before reloading
     }
 
     // Clean up on page unload
@@ -57,18 +64,4 @@ function initOAuth2Popup() {
     return {
         openPopup: openPopup
     };
-}
-
-// Only define signOutAndRedirect if it doesn't already exist
-if (typeof signOutAndRedirect === 'undefined') {
-    async function signOutAndRedirect(redirect) {
-        if (redirect) {
-            await fetch(`${O2P_ROUTE_PREFIX}/user/logout?redirect=${encodeURIComponent(redirect)}`);
-        } else {
-            await fetch(`${O2P_ROUTE_PREFIX}/user/logout`);
-            location.reload();
-        }
-    }
-    // Make it globally available
-    window.signOutAndRedirect = signOutAndRedirect;
-}
+})();

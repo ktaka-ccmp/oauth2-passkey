@@ -148,7 +148,7 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
         .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?
     {
         let jwks_cache: JwksCache = cached.try_into()?;
-        tracing::debug!("JWKs found in cache: {:#?}", jwks_cache);
+        // tracing::debug!("JWKs found in cache: {:#?}", jwks_cache);
 
         if jwks_cache.expires_at > Utc::now() {
             tracing::debug!("Returning valid cached JWKs");
@@ -167,7 +167,8 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
     // If not in cache, fetch from the URL
     let resp = reqwest::get(jwks_url).await?;
     let jwks: Jwks = resp.json().await?;
-    tracing::debug!("JWKs fetched from URL: {:#?}", jwks);
+    // tracing::debug!("JWKs fetched from URL: {:#?}", jwks);
+    tracing::debug!("JWKs fetched from URL");
 
     // Store in cache
     let jwks_cache = JwksCache {
@@ -328,22 +329,21 @@ pub(super) async fn verify_idtoken(
     let skew: u64 = 2; // allow 2 seconds of skew
 
     if let Some(nbf) = idinfo.nbf {
-        if now + skew < nbf.try_into().unwrap() {
+        if now + skew < (nbf as u64) {
             // tolerate the system clock to be the skew seconds behind
             return Err(TokenVerificationError::TokenNotYetValidNotBeFore(
-                now,
-                nbf.try_into().unwrap(),
+                now, nbf as u64,
             ));
         }
     }
 
-    if now + skew < idinfo.iat.try_into().unwrap() {
+    if now + skew < (idinfo.iat as u64) {
         // tolerate the system clock to be the skew seconds behind
         return Err(TokenVerificationError::TokenNotYetValidIssuedAt(
             now,
-            idinfo.iat.try_into().unwrap(),
+            idinfo.iat as u64,
         ));
-    } else if now > idinfo.exp.try_into().unwrap() {
+    } else if now > (idinfo.exp as u64) {
         return Err(TokenVerificationError::TokenExpired);
     }
 

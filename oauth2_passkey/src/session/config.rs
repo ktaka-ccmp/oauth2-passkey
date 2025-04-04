@@ -11,3 +11,9 @@ pub static SESSION_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
         .and_then(|s| s.parse().ok())
         .unwrap_or(600) // Default to 10 minutes if not set or invalid
 });
+
+pub static USER_CONTEXT_TOKEN_COOKIE: LazyLock<String> = LazyLock::new(|| {
+    std::env::var("USER_CONTEXT_TOKEN_COOKIE")
+        .ok()
+        .unwrap_or("__Host-ContextToken".to_string())
+});
