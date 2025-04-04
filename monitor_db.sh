@@ -39,7 +39,7 @@ case "$GENERIC_DATA_STORE_TYPE" in
 esac
 
 # Define queries for each table
-QUERY_USERS="select id,account,label,created_at from o2p_users;"
+QUERY_USERS="select sequence_number,is_admin,id,account,label,created_at from o2p_users;"
 QUERY_PASSKEY_CREDENTIALS="select user_id,user_name,credential_id,public_key,created_at from o2p_passkey_credentials;"
 QUERY_OAUTH2_ACCOUNTS="select user_id,email,id,created_at from o2p_oauth2_accounts;"
 

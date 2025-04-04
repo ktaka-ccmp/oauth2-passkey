@@ -43,12 +43,31 @@ impl UserStore {
     pub(crate) async fn upsert_user(user: User) -> Result<User, UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
-        if let Some(pool) = store.as_sqlite() {
+        // Perform the upsert operation
+        let result = if let Some(pool) = store.as_sqlite() {
             upsert_user_sqlite(pool, user).await
         } else if let Some(pool) = store.as_postgres() {
             upsert_user_postgres(pool, user).await
         } else {
-            Err(UserError::Storage("Unsupported database type".to_string()))
+            return Err(UserError::Storage("Unsupported database type".to_string()));
+        }?;
+
+        // Check if this is the first user (sequence_number = 1)
+        // If so, make them an admin if they aren't already
+        if result.sequence_number == Some(1) && !result.is_admin {
+            let mut admin_user = result.clone();
+            admin_user.is_admin = true;
+
+            // Update the user to make them an admin
+            if let Some(pool) = store.as_sqlite() {
+                upsert_user_sqlite(pool, admin_user).await
+            } else if let Some(pool) = store.as_postgres() {
+                upsert_user_postgres(pool, admin_user).await
+            } else {
+                return Err(UserError::Storage("Unsupported database type".to_string()));
+            }
+        } else {
+            Ok(result)
         }
     }
 

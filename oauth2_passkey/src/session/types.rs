@@ -19,6 +19,8 @@ pub struct User {
     pub id: String,
     pub account: String,
     pub label: String,
+    pub is_admin: bool,
+    pub sequence_number: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -29,6 +31,8 @@ impl From<DbUser> for User {
             id: db_user.id,
             account: db_user.account,
             label: db_user.label,
+            is_admin: db_user.is_admin,
+            sequence_number: db_user.sequence_number.unwrap_or(0),
             created_at: db_user.created_at,
             updated_at: db_user.updated_at,
         }
