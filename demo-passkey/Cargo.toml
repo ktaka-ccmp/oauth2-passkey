@@ -4,7 +4,7 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-askama = "0.12.1"
+askama = "0.13.0"
 axum = { workspace = true }
 axum-core = { workspace = true }
 axum-server = { version = "0.7.2", features = ["tls-rustls"] }
@@ -12,8 +12,6 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 rustls = { workspace = true }
-
-oauth2_passkey.workspace = true
 oauth2_passkey_axum = { path = "../oauth2_passkey_axum", default-features = false, features = [] }
 
 dotenv = { workspace = true }
