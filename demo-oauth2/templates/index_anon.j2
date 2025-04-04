@@ -10,12 +10,12 @@
         <h1>{{message}}</h1>
     </div>
     <div>
-        <button onclick="oauth2.openPopup()">Login</button>
-        <div id="status"></div>
+        <button onclick="oauth2.openPopup('create_user')">Create User</button>
+        <button onclick="oauth2.openPopup('login')">Login</button>
+        <button onclick="oauth2.openPopup('create_user_or_login')">Either way</button>
 
         <script src="{{auth_route_prefix}}/oauth2/oauth2.js"></script>
         <script>
-            const oauth2 = initOAuth2Popup();
             const O2P_ROUTE_PREFIX = '{{auth_route_prefix}}';
         </script>
     </div>

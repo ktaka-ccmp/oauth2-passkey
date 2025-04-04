@@ -4,8 +4,9 @@ use std::env;
 
 use crate::oauth2::{
     AccountSearchField, AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAuth2Account,
-    OAuth2Store, csrf_checks, decode_state, delete_session_and_misc_token_from_store,
-    get_idinfo_userinfo, get_uid_from_stored_session_by_state_param, validate_origin,
+    OAuth2Mode, OAuth2Store, csrf_checks, decode_state, delete_session_and_misc_token_from_store,
+    get_idinfo_userinfo, get_mode_from_stored_session, get_uid_from_stored_session_by_state_param,
+    validate_origin,
 };
 
 use crate::session::User as SessionUser;
@@ -36,7 +37,9 @@ pub async fn post_authorized_core(
     validate_origin(headers, OAUTH2_AUTH_URL.as_str()).await?;
 
     if auth_response.state.is_empty() {
-        return Err(CoordinationError::InvalidState);
+        return Err(CoordinationError::InvalidState(
+            "State is empty".to_string(),
+        ));
     }
 
     process_oauth2_authorization(auth_response).await
@@ -77,62 +80,111 @@ async fn process_oauth2_authorization(
     // Extract user_id from the stored session if available
     let state_user = get_uid_from_stored_session_by_state_param(&state_in_response).await?;
 
-    let (state_user_id, state_user_name) = match &state_user {
-        Some(user) => (Some(user.id.clone()), Some(user.account.clone())),
+    let (uid_in_state, account_in_state) = match &state_user {
+        Some(user) => (Some(&user.id), Some(&user.account)),
         None => (None, None),
     };
 
     // Check if the OAuth2 account exists
-    let stored_oauth2_account = OAuth2Store::get_oauth2_account_by_provider(
+    let existing_account = OAuth2Store::get_oauth2_account_by_provider(
         &oauth2_account.provider,
         &oauth2_account.provider_user_id,
     )
     .await?;
 
-    // Match on the combination of auth_user and existing_account
-    let (user_id, message) = match (state_user_id, stored_oauth2_account) {
-        // Case 1: User is logged in and account exists
-        (Some(state_user_id), Some(stored_oauth2_account)) => {
-            let message = if state_user_id == stored_oauth2_account.user_id {
-                let msg = format!(
-                    "Already linked to current user {}",
-                    state_user_name.unwrap()
-                );
-                tracing::debug!("{}", msg);
-                // Nothing to do, account is already properly linked
-                msg
-            } else {
-                let msg = "Already linked to a different user".to_string();
-                tracing::debug!("{}", msg);
-                // return Err((StatusCode::BAD_REQUEST, "This OAuth2 account is already linked to a different user".to_string()));
-                msg
-            };
-            delete_session_and_misc_token_from_store(&state_in_response).await?;
-            (state_user_id.to_string(), message)
+    // Extract mode_id from the stored session if available
+    let mode = match &state_in_response.mode_id {
+        Some(mode_id) => get_mode_from_stored_session(mode_id).await?,
+        None => {
+            tracing::debug!("No mode ID found");
+            None
         }
-        // Case 2: User is logged in but account doesn't exist
-        (Some(state_user_id), None) => {
-            let message = format!("Successfully linked to {}", state_user_name.unwrap());
+    };
+
+    tracing::debug!("Mode: {:?}", mode);
+    tracing::debug!("User ID in state: {:?}", uid_in_state);
+    tracing::debug!("Existing account: {:?}", existing_account);
+    tracing::debug!("Account in state: {:?}", account_in_state);
+    // Match on the combination of mode, auth_user and existing_account
+    let (user_id, message) = match (mode.clone(), uid_in_state, &existing_account) {
+        // Case 1: AddToUser mode - User is logged in and account doesn't exist (success case)
+        (Some(OAuth2Mode::AddToUser), Some(uid), None) => {
+            let message = format!("Successfully linked to {}", account_in_state.unwrap());
             tracing::debug!("{}", message);
-            oauth2_account.user_id = state_user_id.clone();
+            oauth2_account.user_id = uid.clone();
             OAuth2Store::upsert_oauth2_account(oauth2_account).await?;
             delete_session_and_misc_token_from_store(&state_in_response).await?;
-            (state_user_id.to_string(), message)
+            (uid.to_string(), message)
         }
-        // Case 3: User is not logged in but account exists
-        (None, Some(stored_oauth2_account)) => {
-            let message = format!("Signing in as {}", stored_oauth2_account.name);
+
+        // Case 2: AddToUser mode - User is logged in and account exists (already linked or error)
+        (Some(OAuth2Mode::AddToUser), Some(uid), Some(existing)) => {
+            if uid == &existing.user_id {
+                let msg = format!(
+                    "Already linked to current user {}",
+                    account_in_state.unwrap()
+                );
+                tracing::debug!("{}", msg);
+                delete_session_and_misc_token_from_store(&state_in_response).await?;
+                (uid.to_string(), msg)
+            } else {
+                return Err(CoordinationError::Conflict(
+                    "This OAuth2 account is already linked to a different user".to_string(),
+                ));
+            }
+        }
+
+        // Case 3: Login mode - User is not logged in and account exists (success case)
+        (Some(OAuth2Mode::Login), None, Some(existing)) => {
+            let message = format!("Signing in as {}", existing.name);
             tracing::debug!("{}", message);
-            (stored_oauth2_account.user_id, message)
+            (existing.user_id.clone(), message)
         }
-        // Case 4: User is not logged in and account doesn't exist
-        (None, None) => {
+
+        // Case 4: CreateUser mode - User is not logged in and account doesn't exist (success case)
+        (Some(OAuth2Mode::CreateUser), None, None) => {
             let name = oauth2_account.name.clone();
-            #[allow(clippy::let_and_return)]
             let user_id = create_user_and_oauth2account(oauth2_account).await?;
-            let message = format!("Created {}", name);
+            let message = format!("Created new user {}", name);
             tracing::debug!("{}", message);
-            (user_id, message)
+            (user_id.clone(), message)
+        }
+
+        (Some(OAuth2Mode::CreateUserOrLogin), None, Some(existing)) => {
+            let message = format!("Signing in as {}", existing.name);
+            tracing::debug!("{}", message);
+            (existing.user_id.clone(), message)
+        }
+
+        (Some(OAuth2Mode::CreateUserOrLogin), None, None) => {
+            let name = oauth2_account.name.clone();
+            let user_id = create_user_and_oauth2account(oauth2_account).await?;
+            let message = format!("Created new user {}", name);
+            tracing::debug!("{}", message);
+            (user_id.clone(), message)
+        }
+
+        (Some(OAuth2Mode::CreateUser), None, Some(_)) => {
+            tracing::debug!("This OAuth2 account is already registered");
+            return Err(CoordinationError::Conflict(
+                "This OAuth2 account is already registered".to_string(),
+            ));
+        }
+
+        (Some(OAuth2Mode::Login), None, None) => {
+            tracing::debug!("This OAuth2 account is not registered");
+            return Err(CoordinationError::Conflict(
+                "This OAuth2 account is not registered".to_string(),
+            ));
+        }
+
+        // Catch-all for any other invalid combinations
+        _ => {
+            tracing::error!("Invalid combination of mode {:?} and user state", mode);
+            return Err(CoordinationError::InvalidState(format!(
+                "Invalid combination of mode {:?} and user state",
+                mode
+            )));
         }
     };
 

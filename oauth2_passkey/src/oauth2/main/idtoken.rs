@@ -148,7 +148,7 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
         .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?
     {
         let jwks_cache: JwksCache = cached.try_into()?;
-        tracing::debug!("JWKs found in cache: {:#?}", jwks_cache);
+        // tracing::debug!("JWKs found in cache: {:#?}", jwks_cache);
 
         if jwks_cache.expires_at > Utc::now() {
             tracing::debug!("Returning valid cached JWKs");
@@ -167,7 +167,8 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
     // If not in cache, fetch from the URL
     let resp = reqwest::get(jwks_url).await?;
     let jwks: Jwks = resp.json().await?;
-    tracing::debug!("JWKs fetched from URL: {:#?}", jwks);
+    // tracing::debug!("JWKs fetched from URL: {:#?}", jwks);
+    tracing::debug!("JWKs fetched from URL");
 
     // Store in cache
     let jwks_cache = JwksCache {

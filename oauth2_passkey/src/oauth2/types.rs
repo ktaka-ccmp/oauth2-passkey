@@ -104,6 +104,7 @@ pub(crate) struct StateParams {
     pub(crate) nonce_id: String,
     pub(crate) pkce_id: String,
     pub(crate) misc_id: Option<String>,
+    pub(crate) mode_id: Option<String>,
 }
 
 #[derive(Serialize, Clone, Deserialize, Debug)]
@@ -163,4 +164,39 @@ pub(crate) enum AccountSearchField {
     Name(String),
     /// Search by email
     Email(String),
+}
+
+/// Mode of OAuth2 operation to explicitly indicate user intent
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuth2Mode {
+    AddToUser,
+    CreateUser,
+    Login,
+    CreateUserOrLogin,
+}
+
+impl OAuth2Mode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::AddToUser => "add_to_user",
+            Self::CreateUser => "create_user",
+            Self::Login => "login",
+            Self::CreateUserOrLogin => "create_user_or_login",
+        }
+    }
+}
+
+impl std::str::FromStr for OAuth2Mode {
+    type Err = OAuth2Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "add_to_user" => Ok(Self::AddToUser),
+            "create_user" => Ok(Self::CreateUser),
+            "login" => Ok(Self::Login),
+            "create_user_or_login" => Ok(Self::CreateUserOrLogin),
+            _ => Err(OAuth2Error::InvalidMode(s.to_string())),
+        }
+    }
 }

@@ -1,11 +1,11 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use http::header::HeaderMap;
+use std::str::FromStr;
 use std::time::Duration;
 use url::Url;
 
-use crate::oauth2::OAuth2Error;
-use crate::oauth2::{StateParams, StoredToken};
+use crate::oauth2::{OAuth2Error, OAuth2Mode, StateParams, StoredToken};
 
 use crate::session::{
     User as SessionUser, delete_session_from_store_by_session_id, get_user_from_session,
@@ -228,4 +228,22 @@ pub(crate) async fn delete_session_and_misc_token_from_store(
     }
 
     Ok(())
+}
+
+pub(crate) async fn get_mode_from_stored_session(
+    mode_id: &str,
+) -> Result<Option<OAuth2Mode>, OAuth2Error> {
+    let Ok(token) = get_token_from_store::<StoredToken>("mode", mode_id).await else {
+        tracing::debug!("Failed to get mode from cache");
+        return Ok(None);
+    };
+
+    // Convert the string to OAuth2Mode enum
+    match OAuth2Mode::from_str(&token.token) {
+        Ok(mode) => Ok(Some(mode)),
+        Err(_) => {
+            tracing::warn!("Invalid mode value in cache: {}", token.token);
+            Ok(None)
+        }
+    }
 }

@@ -1,13 +1,8 @@
 use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
-use std::{net::SocketAddr, path::PathBuf};
+use std::net::SocketAddr;
 use tokio::task::JoinHandle;
-
-#[derive(Clone, Copy)]
-pub(crate) struct Ports {
-    pub(crate) http: u16,
-    pub(crate) https: u16,
-}
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 pub(crate) fn spawn_http_server(port: u16, app: Router) -> JoinHandle<()> {
     tokio::spawn(async move {
@@ -22,15 +17,11 @@ pub(crate) fn spawn_http_server(port: u16, app: Router) -> JoinHandle<()> {
 
 pub(crate) async fn spawn_https_server(port: u16, app: Router) -> JoinHandle<()> {
     let config = RustlsConfig::from_pem_file(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("self_signed_certs")
-            .join("cert.pem"),
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("self_signed_certs")
-            .join("key.pem"),
+        format!("{}/self_signed_certs/cert.pem", env!("CARGO_MANIFEST_DIR")),
+        format!("{}/self_signed_certs/key.pem", env!("CARGO_MANIFEST_DIR")),
     )
     .await
-    .unwrap();
+    .expect("Failed to load TLS certificates");
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::debug!("HTTPS server listening on {}:{}", addr, port);
@@ -40,4 +31,39 @@ pub(crate) async fn spawn_https_server(port: u16, app: Router) -> JoinHandle<()>
             .await
             .unwrap();
     })
+}
+
+pub(crate) fn init_tracing(app_name: &str) {
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        #[cfg(debug_assertions)]
+        {
+            format!(
+                "oauth2_passkey_axum=trace,oauth2_passkey=trace,{}=trace",
+                app_name
+            )
+            .into()
+        }
+
+        #[cfg(not(debug_assertions))]
+        {
+            "info".into()
+        }
+    });
+
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    #[cfg(debug_assertions)]
+    tracing::debug!("Debug mode enabled - showing detailed logs by default");
+    tracing::info!("You can increase verbosity by setting the RUST_LOG environment variable.");
+    tracing::info!("Log levels from least to most verbose: error < warn < info < debug < trace");
+    tracing::info!("Example: RUST_LOG=debug ./demo-xxxxx");
+
+    // Print the current log level
+    #[cfg(debug_assertions)]
+    tracing::info!("Current log level: DEBUG build with detailed logging");
+    #[cfg(not(debug_assertions))]
+    tracing::info!("Current log level: RELEASE build with standard logging");
 }

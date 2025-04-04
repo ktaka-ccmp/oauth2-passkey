@@ -15,18 +15,13 @@
 
     <div>
         <button onclick="Logout()">Logout</button>
+
+        <script src="{{auth_route_prefix}}/oauth2/oauth2.js"></script>
         <script>
+            const O2P_ROUTE_PREFIX = '{{auth_route_prefix}}';
             function Logout() {
                 window.location.href = "{{auth_route_prefix}}/user/logout?redirect=/";
             }
-        </script>
-    </div>
-    <div>
-        <button onclick="signOutAndRedirect();">signOutAndRedirect</button>
-        <script src="{{auth_route_prefix}}/oauth2/oauth2.js"></script>
-        <script>
-            const oauth2 = initOAuth2Popup();
-            const O2P_ROUTE_PREFIX = '{{auth_route_prefix}}';
         </script>
     </div>
 </body>

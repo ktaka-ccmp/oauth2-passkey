@@ -13,10 +13,7 @@ use std::{env, sync::LazyLock};
 
 use headers::{Cookie, HeaderMapExt};
 
-/// Name of the cookie where the user context token will be stored
-const USER_CONTEXT_TOKEN_COOKIE: &str = "auth_context_token";
-
-use crate::session::errors::SessionError;
+use crate::session::{config::USER_CONTEXT_TOKEN_COOKIE, errors::SessionError};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -80,6 +77,10 @@ fn generate_user_context_token(user_id: &str) -> String {
     format!("{}:{}", data, signature_base64)
 }
 
+/// Verify the user context token:
+/// 1. Verifies that the context user matches the session user ID
+/// 2. Verifies that the context token has not expired
+/// 3. Verifies that the context signature is valid
 fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(), SessionError> {
     // Parse token parts
     let parts: Vec<&str> = token.split(':').collect();
@@ -149,8 +150,8 @@ fn create_context_token_cookie(user_id: &str) -> HeaderMap {
 
     // Create cookie with the token that expires in 1 day
     let cookie = format!(
-        "{USER_CONTEXT_TOKEN_COOKIE}={}; Path=/; Max-Age=86400; HttpOnly; SameSite=Strict",
-        token
+        "{}={}; Path=/; Max-Age=86400; HttpOnly; Secure; SameSite=Strict",
+        *USER_CONTEXT_TOKEN_COOKIE, token
     );
 
     // Parse cookie. The parse function is used to convert the cookie string into a HeaderMap.
@@ -171,7 +172,9 @@ fn extract_context_token_from_cookies(headers: &HeaderMap) -> Option<String> {
 
     let token = headers.typed_get::<Cookie>().and_then(|cookie| {
         // Look for our specific context token cookie
-        cookie.get(USER_CONTEXT_TOKEN_COOKIE).map(|s| s.to_string())
+        cookie
+            .get(&USER_CONTEXT_TOKEN_COOKIE)
+            .map(|s| s.to_string())
     });
 
     token

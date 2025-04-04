@@ -1,6 +1,5 @@
 use axum::{Router, routing::get};
 use dotenv::dotenv;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use oauth2_passkey_axum::{O2P_ROUTE_PREFIX, oauth2_passkey_router};
 
@@ -9,7 +8,7 @@ mod server;
 
 use crate::{
     handlers::{index, protected},
-    server::{Ports, spawn_http_server, spawn_https_server},
+    server::{init_tracing, spawn_http_server, spawn_https_server},
 };
 
 #[tokio::main]
@@ -20,25 +19,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .install_default()
         .expect("Failed to install default CryptoProvider");
 
-    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        #[cfg(debug_assertions)]
-        {
-            "oauth2_passkey_axum=trace,oauth2_passkey=trace,demo_oauth2=trace".into()
-        }
-
-        #[cfg(not(debug_assertions))]
-        {
-            "info".into()
-        }
-    });
-
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    init_tracing("demo_oauth2");
 
     dotenv().ok();
-    // Initialize the OAuth2 library
     oauth2_passkey_axum::init().await?;
 
     let app = Router::new()
@@ -46,13 +29,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/protected", get(protected))
         .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
 
-    let ports = Ports {
-        http: 3001,
-        https: 3443,
-    };
+    // spawn_http_server doesn't need await because it's synchronous - it immediately returns a JoinHandle
+    let http_server = spawn_http_server(3001, app.clone());
 
-    let http_server = spawn_http_server(ports.http, app.clone());
-    let https_server = spawn_https_server(ports.https, app).await;
+    // spawn_https_server requires await because it loads TLS certificates asynchronously before returning a JoinHandle
+    let https_server = spawn_https_server(3443, app).await;
 
     // Wait for both servers to complete (which they never will in this case)
     tokio::try_join!(http_server, https_server).unwrap();

@@ -22,6 +22,7 @@ use super::utils::{
 
 pub async fn prepare_oauth2_auth_request(
     headers: HeaderMap,
+    mode: Option<&str>,
 ) -> Result<(String, HeaderMap), OAuth2Error> {
     let expires_at = Utc::now() + Duration::seconds((*OAUTH2_CSRF_COOKIE_MAX_AGE) as i64);
     let ttl = *OAUTH2_CSRF_COOKIE_MAX_AGE;
@@ -44,6 +45,12 @@ pub async fn prepare_oauth2_auth_request(
         None
     };
 
+    let mode_id = if let Some(mode) = mode {
+        Some(store_token_in_cache("mode", mode, ttl, expires_at, None).await?)
+    } else {
+        None
+    };
+
     tracing::debug!("PKCE ID: {:?}, PKCE verifier: {:?}", pkce_id, pkce_token);
     let pkce_challenge = base64url_encode(Sha256::digest(pkce_token.as_bytes()).to_vec())?;
 
@@ -53,6 +60,7 @@ pub async fn prepare_oauth2_auth_request(
         nonce_id,
         pkce_id,
         misc_id,
+        mode_id,
     };
 
     let encoded_state = encode_state(state_params)?;
