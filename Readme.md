@@ -17,6 +17,21 @@
 	- Can list and manage all users.
 - Does page context token verification work as csrf protection?
 	- Suppose the situation where a malicious user tries to let the admin give him admin privileges, or modify arbitrary user's account details.
+- Modify demo pages to include link to available pages.
+- Make demo-oauth2 and demo-passkey pages to implement login page and account summary page without relying on oauth2_passkey_axum's summary and login pages.
+- Add additional attributes to PasskeyCredentials.
+	- For example, authenticator_name, like Google Password Manager, App Password Manager, YubiKey etc.
+	- It is also possible that a user has multiple Google Password Managers with different Google accounts, so is possible for Apple Password Managers.
+	- A user may also have multiple YubiKeys.
+- Add AAGUID to PasskeyCredentials.
+	- or information about the authenticator retrieved using AAGUID
+	- need to figure out how to get an authenticator icon using AAGUID
+	- https://web.dev/articles/webauthn-aaguid
+	- https://fidoalliance.org/metadata/
+	- https://github.com/passkeydeveloper/passkey-authenticator-aaguids
+	- https://passkeydeveloper.github.io/passkey-authenticator-aaguids/explorer/
+	- https://www.corbado.com/glossary/aaguid
+- Once we have AAGUID, we should fix the logic for deleting credentials in register.rs to use a combination of "AAGUID" and user_handle.
 
 ## Half Done
 

@@ -26,11 +26,15 @@ use crate::utils::{base64url_decode, base64url_encode, gen_random_string};
 
 /// Resolves a user handle for passkey registration
 ///
-/// If the user is logged in and has existing credentials, reuse the user handle
-/// from the first credential. Otherwise, generate a new user handle.
+/// Behavior depends on the PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting:
 ///
-/// This ensures that all credentials for the same user share the same user handle,
-/// which is important for proper credential syncing across devices.
+/// - When true: Always generates a unique user handle for each credential,
+///   allowing a user to have multiple credentials per site.
+///
+/// - When false: Reuses the user handle for logged-in users with existing credentials,
+///   which enforces a one-to-one relationship between users and credentials per site.
+///   This maintains compatibility with password managers that don't support multiple
+///   credentials per user handle.
 async fn get_or_create_user_handle(
     session_user: &Option<SessionUser>,
 ) -> Result<String, PasskeyError> {
@@ -184,6 +188,10 @@ pub(crate) async fn verify_session_then_finish_registration(
     // Delete the session info from the store
     remove_from_cache("session_info", user_handle).await?;
 
+    tracing::trace!("session_info.user.id: {:#?}", session_info.user.id);
+    tracing::trace!("session_user.id: {:#?}", session_user.id);
+    tracing::trace!("reg_data.user_handle: {:#?}", reg_data.user_handle);
+
     // Verify the user is the same as the one in the cache store i.e. used to start the registration
     if session_user.id != session_info.user.id {
         return Err(PasskeyError::Format("User ID mismatch".to_string()));
@@ -194,7 +202,13 @@ pub(crate) async fn verify_session_then_finish_registration(
     Ok("Registration successful".to_string())
 }
 
-// pub async fn finish_registration(reg_data: &RegisterCredential) -> Result<String, PasskeyError> {
+/// Finishes the registration process by storing the credential
+///
+/// 1. Verifies the client data
+/// 2. Extracts the public key
+/// 3. Validates the options
+/// 4. Stores the credential
+///
 pub(crate) async fn finish_registration(
     user_id: &str,
     reg_data: &RegisterCredential,
@@ -226,6 +240,35 @@ pub(crate) async fn finish_registration(
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
+
+    if !*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL {
+        // If PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL is true,
+        //there isn't any pre-existing credentials with this user handle to begin with.
+        // Therefore, we can skip the deletion step, I think.
+
+        // Important todo: we need to delete credentials for a combination of "AAGUID" and user_handle
+        // But we don't have AAGUID attribute in the PasskeyCredential struct yet.
+        match PasskeyStore::delete_credential_by(CredentialSearchField::UserHandle(
+            user_handle.to_string(),
+        ))
+        .await
+        {
+            Ok(_) => {
+                tracing::info!(
+                    "Removed existing credentials for user handle: {}",
+                    user_handle
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Error removing existing credentials for user handle {}: {}",
+                    user_handle,
+                    e
+                );
+                // Continue with registration - don't fail just because we couldn't remove existing credentials
+            }
+        }
+    }
 
     PasskeyStore::store_credential(credential_id_str, credential)
         .await
@@ -421,6 +464,24 @@ fn extract_key_coordinates(credential_data: &[u8]) -> Result<(Vec<u8>, Vec<u8>),
     }
 }
 
+/// Verifies the client data
+///
+/// 1. Decodes clientDataJSON as UTF-8
+/// 2. Parses JSON
+/// 3. Verifies type
+/// 4. Verifies challenge
+/// 5. Verifies origin
+/// 6. Verifies user
+///
+/// Returns Ok(()) if all checks pass, Err(PasskeyError) otherwise.
+///
+/// # Arguments
+/// * `reg_data` - A reference to the RegisterCredential struct containing the client data
+///
+/// # Returns
+/// * `Ok(())` if all checks pass
+/// * `Err(PasskeyError)` if any check fails
+///
 async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), PasskeyError> {
     // Step 5: Decode clientDataJSON as UTF-8
     let decoded_client_data =
