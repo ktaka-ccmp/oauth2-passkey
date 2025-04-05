@@ -1,6 +1,7 @@
 use ciborium::value::{Integer, Value as CborValue};
 use ring::{digest, signature::UnparsedPublicKey};
 use std::time::SystemTime;
+use uuid::Uuid;
 use webpki::EndEntityCert;
 use x509_parser::{certificate::X509Certificate, prelude::*, time::ASN1Time};
 
@@ -87,6 +88,11 @@ fn verify_none_attestation(attestation: &AttestationObject) -> Result<(), Passke
 
     // Extract AAGUID (starts at byte 37, 16 bytes long)
     let aaguid = &attestation.auth_data[37..53];
+
+    let aaguid = Uuid::from_slice(aaguid)
+        .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {}", e)))?
+        .hyphenated()
+        .to_string();
     tracing::debug!("AAGUID: {:?}", aaguid);
 
     // Verify credential public key format
@@ -268,6 +274,18 @@ fn verify_packed_attestation_cert(
         // 0x10: This byte represents the length of the OCTET STRING in hexadecimal, which is 16 bytes (decimal 16).
         // #[cfg(debug_assertions)]
         // println!("auth_data_aaguid: {:?}, cert_aaguid: {:?}", auth_data_aaguid, &cert_aaguid[2..]);
+
+        let auth_data_uuid = Uuid::from_slice(auth_data_aaguid)
+            .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {}", e)))?
+            .hyphenated()
+            .to_string();
+        tracing::debug!("Authenticator AAGUID: {:?}", auth_data_uuid);
+
+        let cert_uuid = Uuid::from_slice(&cert_aaguid[2..18])
+            .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {}", e)))?
+            .hyphenated()
+            .to_string();
+        tracing::debug!("Certificate AAGUID: {:?}", cert_uuid);
 
         if auth_data_aaguid != &cert_aaguid[2..] {
             return Err(PasskeyError::Verification(
