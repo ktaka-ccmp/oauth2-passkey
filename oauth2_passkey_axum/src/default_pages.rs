@@ -5,6 +5,9 @@ use axum::{
     response::{Html, IntoResponse, Json, Redirect, Response},
     routing::get,
 };
+use chrono::{DateTime, Utc};
+use chrono_tz::Tz;
+
 use serde_json::{Value, json};
 
 use oauth2_passkey::{
@@ -80,10 +83,19 @@ struct TemplateAccount {
     pub updated_at: String,
 }
 
+#[derive(Debug)]
+struct TemplateAuthUser {
+    pub id: String,
+    pub account: String,
+    pub label: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Template)]
 #[template(path = "summary.j2")]
 struct UserSummaryTemplate {
-    pub user: AuthUser,
+    pub user: TemplateAuthUser,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
@@ -102,7 +114,13 @@ impl UserSummaryTemplate {
         let obfuscated_user_id = obfuscate_user_id(&user.id);
 
         Self {
-            user,
+            user: TemplateAuthUser {
+                id: user.id.clone(),
+                account: user.account.clone(),
+                label: user.label.clone(),
+                created_at: format_date_tz(&user.created_at, "JST"),
+                updated_at: format_date_tz(&user.updated_at, "JST"),
+            },
             passkey_credentials,
             oauth2_accounts,
             o2p_route_prefix,
@@ -181,9 +199,9 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
                     user_handle: cred.user.user_handle.clone(),
                     aaguid: cred.aaguid.clone(),
                     counter: cred.counter.to_string(),
-                    created_at: cred.created_at.to_string(),
-                    updated_at: cred.updated_at.to_string(),
-                    last_used_at: cred.last_used_at.to_string(),
+                    created_at: format_date_tz(&cred.created_at, "JST"),
+                    updated_at: format_date_tz(&cred.updated_at, "JST"),
+                    last_used_at: format_date_tz(&cred.last_used_at, "JST"),
                     authenticator_info,
                 }
             }
@@ -217,8 +235,8 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
                 email: account.email,
                 picture: account.picture.unwrap_or_default(),
                 metadata_str: account.metadata.to_string(), // Convert metadata Value to string
-                created_at: account.created_at.to_string(),
-                updated_at: account.updated_at.to_string(),
+                created_at: format_date_tz(&account.created_at, "JST"),
+                updated_at: format_date_tz(&account.updated_at, "JST"),
             }
         })
         .collect();
@@ -262,4 +280,41 @@ async fn serve_summary_css() -> Response {
         .header(CONTENT_TYPE, "text/css")
         .body(css_content.to_string().into())
         .unwrap()
+}
+
+/// Helper function to format DateTime<Utc> to a specific timezone format (YYYY-MM-DD HH:MM TZ)
+///
+/// # Arguments
+/// * `date` - The UTC datetime to format
+/// * `timezone_name` - The name of the timezone to display (e.g., "JST", "UTC", "EST")
+fn format_date_tz(date: &DateTime<Utc>, timezone_name: &str) -> String {
+    // Map common abbreviations to full timezone names
+    let tz_name = match timezone_name {
+        "JST" => "Asia/Tokyo",
+        "EST" => "America/New_York",
+        "CST" => "America/Chicago",
+        "MST" => "America/Denver",
+        "PST" => "America/Los_Angeles",
+        "CET" => "Europe/Paris",
+        "EET" => "Europe/Helsinki",
+        "UTC" | "GMT" => "Etc/UTC",
+        _ => timezone_name, // Use as-is if it's already a full timezone name
+    };
+
+    // Parse the timezone string
+    let timezone = match tz_name.parse::<Tz>() {
+        Ok(tz) => tz,
+        Err(_) => {
+            tracing::error!("Failed to parse timezone: {}", tz_name);
+            // Fallback to UTC if timezone parsing fails
+            return format!("{} {}", date.format("%Y-%m-%d %H:%M"), "UTC");
+        }
+    };
+
+    // Convert to the target timezone
+    let local_time = date.with_timezone(&timezone);
+
+    // Format as YYYY-MM-DD HH:MM TZ
+    // Use the original timezone_name for display to keep it consistent with the user's request
+    format!("{} {}", local_time.format("%Y-%m-%d %H:%M"), timezone_name)
 }
