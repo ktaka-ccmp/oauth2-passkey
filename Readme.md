@@ -9,6 +9,7 @@
 	- Use tracing-error crate https://crates.io/crates/tracing-error
 	- Use https://docs.rs/tower-http/latest/tower_http/trace/index.html
 	- https://docs.rs/tracing/latest/tracing/
+- Use #[tracing::instrument]
 - Replace "if let", "unwrap_or_else", "ok_or_else" etc. with "match", where appropriate.
 - Implement Admin Account idea
 	- ~~Modify the User table to add admin flag and sequence number.~~
