@@ -1,5 +1,6 @@
 use crate::storage::validate_sqlite_table_schema;
 use crate::userdb::DB_TABLE_USERS;
+use chrono::{DateTime, Utc};
 use sqlx::{Pool, Sqlite};
 
 use crate::passkey::errors::PasskeyError;
@@ -22,8 +23,10 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
             user_handle TEXT NOT NULL,
             user_name TEXT NOT NULL,
             user_display_name TEXT NOT NULL,
+            aaguid TEXT NOT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES {}(id)
         )
         "#,
@@ -65,8 +68,10 @@ pub(super) async fn validate_passkey_tables_sqlite(
         ("user_handle", "TEXT"),
         ("user_name", "TEXT"),
         ("user_display_name", "TEXT"),
+        ("aaguid", "TEXT"),
         ("created_at", "TIMESTAMP"),
         ("updated_at", "TIMESTAMP"),
+        ("last_used_at", "TIMESTAMP"),
     ];
 
     validate_sqlite_table_schema(
@@ -89,15 +94,17 @@ pub(super) async fn store_credential_sqlite(
     let user_handle = &credential.user.user_handle;
     let user_name = &credential.user.name;
     let user_display_name = &credential.user.display_name;
+    let aaguid = &credential.aaguid;
     let created_at = &credential.created_at;
     let updated_at = &credential.updated_at;
+    let last_used_at = &credential.last_used_at;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
     sqlx::query(&format!(
         r#"
         INSERT OR REPLACE INTO {}
-        (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, created_at, updated_at, last_used_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#,
         passkey_table
     ))
@@ -108,8 +115,10 @@ pub(super) async fn store_credential_sqlite(
     .bind(user_handle)
     .bind(user_name)
     .bind(user_display_name)
+    .bind(aaguid)
     .bind(created_at)
     .bind(updated_at)
+    .bind(last_used_at)
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -236,6 +245,26 @@ pub(super) async fn update_credential_user_details_sqlite(
     ))
     .bind(name)
     .bind(display_name)
+    .bind(credential_id)
+    .execute(pool)
+    .await
+    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    Ok(())
+}
+
+pub(super) async fn update_credential_last_used_at_sqlite(
+    pool: &Pool<Sqlite>,
+    credential_id: &str,
+    last_used_at: DateTime<Utc>,
+) -> Result<(), PasskeyError> {
+    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
+
+    sqlx::query(&format!(
+        r#"UPDATE {} SET last_used_at = $1 WHERE credential_id = $2"#,
+        passkey_table
+    ))
+    .bind(last_used_at)
     .bind(credential_id)
     .execute(pool)
     .await

@@ -3,6 +3,8 @@ use ciborium::value::{Integer, Value as CborValue};
 
 use crate::session::User as SessionUser;
 
+use super::aaguid::{AuthenticatorInfo, get_authenticator_info};
+use super::attestation::{extract_aaguid, verify_attestation};
 use super::challenge::{get_and_validate_options, remove_options};
 use super::types::{
     AttestationObject, AuthenticatorSelection, PubKeyCredParam, RegisterCredential,
@@ -11,7 +13,7 @@ use super::types::{
 use super::utils::{get_from_cache, remove_from_cache, store_in_cache};
 
 use crate::passkey::config::{
-    ORIGIN, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
+    ORIGIN, PASSKEY_ATTESTATION, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
     PASSKEY_REQUIRE_RESIDENT_KEY, PASSKEY_RESIDENT_KEY, PASSKEY_RP_ID, PASSKEY_RP_NAME,
     PASSKEY_TIMEOUT, PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL, PASSKEY_USER_VERIFICATION,
 };
@@ -162,7 +164,7 @@ async fn create_registration_options(
         ],
         authenticator_selection,
         timeout: (*PASSKEY_TIMEOUT) * 1000, // Convert seconds to milliseconds
-        attestation: "direct".to_string(),
+        attestation: PASSKEY_ATTESTATION.to_string(),
     };
 
     tracing::debug!("Registration options: {:?}", options);
@@ -231,14 +233,34 @@ pub(crate) async fn finish_registration(
 
     let credential_id_str = reg_data.raw_id.clone();
 
+    let attestation_obj = parse_attestation_object(&reg_data.response.attestation_object)?;
+    let aaguid = extract_aaguid(&attestation_obj)?;
+    tracing::trace!("AAGUID: {}", aaguid);
+
+    let authenticator_info = match get_authenticator_info(&aaguid).await? {
+        Some(info) => info,
+        None => {
+            tracing::warn!("Authenticator info not found for AAGUID: {}", aaguid);
+            AuthenticatorInfo {
+                name: "Unknown".to_string(),
+                icon_dark: None,
+                icon_light: None,
+            }
+        }
+    };
+
+    tracing::trace!("Authenticator info: {:#?}", authenticator_info);
+
     let credential = PasskeyCredential {
         credential_id: credential_id_str.clone(),
         user_id: user_id.to_string(),
         public_key,
         counter: 0,
         user: stored_user,
+        aaguid,
         created_at: Utc::now(),
         updated_at: Utc::now(),
+        last_used_at: Utc::now(),
     };
 
     if !*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL {
@@ -297,7 +319,7 @@ fn extract_credential_public_key(reg_data: &RegisterCredential) -> Result<String
     let attestation_obj = parse_attestation_object(&reg_data.response.attestation_object)?;
 
     // Verify attestation based on format
-    super::attestation::verify_attestation(&attestation_obj, &decoded_client_data)?;
+    verify_attestation(&attestation_obj, &decoded_client_data)?;
 
     // Extract public key from authenticator data
     let public_key = extract_public_key_from_auth_data(&attestation_obj.auth_data)?;

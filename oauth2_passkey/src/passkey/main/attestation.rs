@@ -47,6 +47,15 @@ pub(super) fn verify_attestation(
     }
 }
 
+pub(super) fn extract_aaguid(attestation: &AttestationObject) -> Result<String, PasskeyError> {
+    let aaguid_bytes = &attestation.auth_data[37..53];
+    let aaguid = Uuid::from_slice(aaguid_bytes)
+        .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {}", e)))?
+        .hyphenated()
+        .to_string();
+    Ok(aaguid)
+}
+
 fn verify_none_attestation(attestation: &AttestationObject) -> Result<(), PasskeyError> {
     // Verify attStmt is empty
     if !attestation.att_stmt.is_empty() {
@@ -87,12 +96,7 @@ fn verify_none_attestation(attestation: &AttestationObject) -> Result<(), Passke
     }
 
     // Extract AAGUID (starts at byte 37, 16 bytes long)
-    let aaguid = &attestation.auth_data[37..53];
-
-    let aaguid = Uuid::from_slice(aaguid)
-        .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {}", e)))?
-        .hyphenated()
-        .to_string();
+    let aaguid = extract_aaguid(attestation)?;
     tracing::debug!("AAGUID: {:?}", aaguid);
 
     // Verify credential public key format

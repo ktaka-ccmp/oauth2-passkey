@@ -8,7 +8,8 @@ use axum::{
 use serde_json::{Value, json};
 
 use oauth2_passkey::{
-    O2P_ROUTE_PREFIX, SessionUser, list_accounts_core, list_credentials_core, obfuscate_user_id,
+    AuthenticatorInfo, O2P_ROUTE_PREFIX, SessionUser, get_authenticator_info, list_accounts_core,
+    list_credentials_core, obfuscate_user_id,
 };
 
 use crate::config::O2P_REDIRECT_ANON;
@@ -56,9 +57,12 @@ struct TemplateCredential {
     pub user_name: String,
     pub user_display_name: String,
     pub user_handle: String,
+    pub aaguid: String,
     pub counter: String,
     pub created_at: String,
     pub updated_at: String,
+    pub last_used_at: String,
+    pub authenticator_info: Option<AuthenticatorInfo>,
 }
 
 // Template-friendly version of OAuth2Account for display
@@ -157,17 +161,39 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
 
     // Convert StoredCredential to TemplateCredential
     let passkey_credentials = stored_credentials
-        .into_iter()
-        .map(|cred| TemplateCredential {
-            credential_id: cred.credential_id,
-            user_id: cred.user_id.clone(),
-            user_name: cred.user.name.clone(),
-            user_display_name: cred.user.display_name.clone(),
-            user_handle: cred.user.user_handle.clone(),
-            counter: cred.counter.to_string(),
-            created_at: cred.created_at.to_string(),
-            updated_at: cred.updated_at.to_string(),
+        .iter()
+        .map(|cred| {
+            let aaguid = cred.aaguid.clone();
+            // tracing::debug!("aaguid: {}", aaguid);
+            async move {
+                let authenticator_info =
+                    match get_authenticator_info(&aaguid).await.unwrap_or_default() {
+                        Some(a) => Some(a),
+                        None => Some(AuthenticatorInfo::default()),
+                    };
+
+                // tracing::debug!("Authenticator_info: {:#?}", authenticator_info);
+                TemplateCredential {
+                    credential_id: cred.credential_id.clone(),
+                    user_id: cred.user_id.clone(),
+                    user_name: cred.user.name.clone(),
+                    user_display_name: cred.user.display_name.clone(),
+                    user_handle: cred.user.user_handle.clone(),
+                    aaguid: cred.aaguid.clone(),
+                    counter: cred.counter.to_string(),
+                    created_at: cred.created_at.to_string(),
+                    updated_at: cred.updated_at.to_string(),
+                    last_used_at: cred.last_used_at.to_string(),
+                    authenticator_info,
+                }
+            }
         })
+        .collect::<Vec<_>>();
+
+    // Wait for all async operations to complete
+    let passkey_credentials = futures::future::join_all(passkey_credentials)
+        .await
+        .into_iter()
         .collect();
 
     // Fetch OAuth2 accounts using the public function from libauth

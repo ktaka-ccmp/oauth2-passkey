@@ -6,6 +6,17 @@
     <!-- Embed obfuscated user context for session boundary verification -->
     <!-- External CSS file -->
     <link rel="stylesheet" href="{{o2p_route_prefix}}/user/summary.css">
+    <style>
+        .authenticator-icon {
+            {# width: 24px;
+            height: 24px; #}
+            width: 36px;
+            height: 36px;
+            vertical-align: middle;
+            margin-left: 8px;
+            float: right;
+        }
+    </style>
 </head>
 <body>
     <div class="page-header">
@@ -65,10 +76,34 @@
                     <div class="item-detail"><strong>User Handle:</strong> {{ credential.user_handle }}</div>
                     <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
                     -->
-                    <div class="item-detail"><strong>User Name:</strong> <span id="credential-name-{{ credential.credential_id }}">{{ credential.user_name }}</span></div>
-                    <div class="item-detail"><strong>Display Name:</strong> <span id="credential-display-name-{{ credential.credential_id }}">{{ credential.user_display_name }}</span></div>
-                    <div class="item-detail created-row">
-                        <span><strong>Created:</strong> {{ credential.created_at }}</span>
+                    <div class="item-detail has-icon">
+                        {% if credential.authenticator_info.is_some() %}
+                            {% let auth_info = credential.authenticator_info.as_ref().unwrap() %}
+                            <strong>{{ auth_info.name }}</strong>
+                            {% if auth_info.icon_light.is_some() %}
+                                <img src="{{ auth_info.icon_light.as_ref().unwrap() }}"
+                                     alt="{{ auth_info.name }}"
+                                     class="authenticator-icon"
+                                     title="{{ auth_info.name }}">
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    <div class="item-detail"><strong>User Name:</strong>
+                        <span id="credential-name-{{ credential.credential_id }}">
+                            {{ credential.user_name }}
+                        </span>
+                    </div>
+                    <div class="item-detail"><strong>Display Name:</strong>
+                        <span id="credential-display-name-{{ credential.credential_id }}">
+                            {{ credential.user_display_name }}
+                        </span>
+                    </div>
+                    <!--
+                    <div class="item-detail"><strong>AAGUID:</strong>{{ credential.aaguid }}</div>
+                    <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
+                    -->
+                    <div class="item-detail  created-row">
+                        <span><strong>Last Used:</strong> {{ credential.last_used_at }}</span>
                         <div>
                             <button onclick="openUpdateCredentialModal('{{ credential.credential_id }}', '{{ credential.user_name }}', '{{ credential.user_display_name }}', '{{ credential.user_handle }}')" class="edit-button">Edit</button>
                             <button onclick="deletePasskeyCredential('{{ credential.credential_id }}', '{{ credential.user_handle }}')" class="delete-button">Delete</button>

@@ -25,8 +25,10 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             user_handle TEXT NOT NULL,
             user_name TEXT NOT NULL,
             user_display_name TEXT NOT NULL,
+            aaguid TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_used_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES {}(id)
         )
         "#,
@@ -76,8 +78,10 @@ pub(super) async fn validate_passkey_tables_postgres(
         ("user_handle", "text"),
         ("user_name", "text"),
         ("user_display_name", "text"),
+        ("aaguid", "text"),
         ("created_at", "timestamp with time zone"),
         ("updated_at", "timestamp with time zone"),
+        ("last_used_at", "timestamp with time zone"),
     ];
 
     validate_postgres_table_schema(
@@ -100,17 +104,19 @@ pub(super) async fn store_credential_postgres(
     let user_handle = &credential.user.user_handle;
     let user_name = &credential.user.name;
     let user_display_name = &credential.user.display_name;
+    let aaguid = &credential.aaguid;
     let created_at = &credential.created_at;
     let updated_at = &credential.updated_at;
+    let last_used_at = &credential.last_used_at;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
     sqlx::query_as::<_, (i32,)>(&format!(
         r#"
         INSERT INTO {}
-        (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, created_at, updated_at, last_used_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         ON CONFLICT (credential_id) DO UPDATE
-        SET user_id = $2, public_key = $3, counter = $4, user_handle = $5, user_name = $6, user_display_name = $7, updated_at = CURRENT_TIMESTAMP
+        SET user_id = $2, public_key = $3, counter = $4, user_handle = $5, user_name = $6, user_display_name = $7, aaguid = $8, updated_at = CURRENT_TIMESTAMP, last_used_at = CURRENT_TIMESTAMP
         RETURNING 1
         "#,
         passkey_table
@@ -122,8 +128,10 @@ pub(super) async fn store_credential_postgres(
     .bind(user_handle)
     .bind(user_name)
     .bind(user_display_name)
+    .bind(aaguid)
     .bind(created_at)
     .bind(updated_at)
+    .bind(last_used_at)
     .fetch_optional(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -274,8 +282,10 @@ impl<'r> FromRow<'r, SqliteRow> for PasskeyCredential {
         let user_handle: String = row.try_get("user_handle")?;
         let user_name: String = row.try_get("user_name")?;
         let user_display_name: String = row.try_get("user_display_name")?;
+        let aaguid: String = row.try_get("aaguid")?;
         let created_at: DateTime<Utc> = row.try_get("created_at")?;
         let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
+        let last_used_at: DateTime<Utc> = row.try_get("last_used_at")?;
 
         Ok(PasskeyCredential {
             credential_id,
@@ -287,8 +297,10 @@ impl<'r> FromRow<'r, SqliteRow> for PasskeyCredential {
                 name: user_name,
                 display_name: user_display_name,
             },
+            aaguid,
             created_at,
             updated_at,
+            last_used_at,
         })
     }
 }
@@ -303,8 +315,10 @@ impl<'r> FromRow<'r, PgRow> for PasskeyCredential {
         let user_handle: String = row.try_get("user_handle")?;
         let user_name: String = row.try_get("user_name")?;
         let user_display_name: String = row.try_get("user_display_name")?;
+        let aaguid: String = row.try_get("aaguid")?;
         let created_at: DateTime<Utc> = row.try_get("created_at")?;
         let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
+        let last_used_at: DateTime<Utc> = row.try_get("last_used_at")?;
 
         Ok(PasskeyCredential {
             credential_id,
@@ -316,8 +330,30 @@ impl<'r> FromRow<'r, PgRow> for PasskeyCredential {
                 name: user_name,
                 display_name: user_display_name,
             },
+            aaguid,
             created_at,
             updated_at,
+            last_used_at,
         })
     }
+}
+
+pub(super) async fn update_credential_last_used_at_postgres(
+    pool: &Pool<Postgres>,
+    credential_id: &str,
+    last_used_at: DateTime<Utc>,
+) -> Result<(), PasskeyError> {
+    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
+
+    sqlx::query(&format!(
+        r#"UPDATE {} SET last_used_at = $1 WHERE credential_id = $2"#,
+        passkey_table
+    ))
+    .bind(last_used_at)
+    .bind(credential_id)
+    .execute(pool)
+    .await
+    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    Ok(())
 }
