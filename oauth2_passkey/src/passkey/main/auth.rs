@@ -1,3 +1,4 @@
+use chrono::Utc;
 use ring::{digest, signature::UnparsedPublicKey};
 
 use crate::utils::{base64url_decode, gen_random_string};
@@ -150,6 +151,9 @@ pub(crate) async fn finish_authentication(
 
     // Verify signature and cleanup
     verify_signature(&auth_response, &client_data, &auth_data, &stored_credential).await?;
+
+    // Update last used at
+    PasskeyStore::update_credential_last_used_at(&auth_response.id, Utc::now()).await?;
 
     // Remove challenge from cache
     remove_options("auth_challenge", &auth_response.auth_id).await?;

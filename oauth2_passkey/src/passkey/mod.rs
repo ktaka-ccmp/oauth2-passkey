@@ -7,8 +7,8 @@ mod types;
 pub use errors::PasskeyError;
 
 pub use main::{
-    AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,
-    get_related_origin_json,
+    AuthenticationOptions, AuthenticatorInfo, AuthenticatorResponse, RegisterCredential,
+    RegistrationOptions, get_authenticator_info, get_related_origin_json,
 };
 
 pub use types::PasskeyCredential;
@@ -24,6 +24,7 @@ pub(crate) use types::CredentialSearchField;
 pub(crate) async fn init() -> Result<(), PasskeyError> {
     // Validate required environment variables early
     let _ = *config::PASSKEY_RP_ID;
+    self::main::store_aaguids().await?;
 
     crate::storage::init()
         .await

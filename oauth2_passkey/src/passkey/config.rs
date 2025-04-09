@@ -28,6 +28,21 @@ pub(super) static PASSKEY_CHALLENGE_TIMEOUT: LazyLock<u32> = LazyLock::new(|| {
         .unwrap_or(60)
 });
 
+pub(super) static PASSKEY_ATTESTATION: LazyLock<String> =
+    LazyLock::new(|| match env::var("PASSKEY_ATTESTATION").ok() {
+        None => "direct".to_string(),
+        Some(v) => match v.to_lowercase().as_str() {
+            "none" => "none".to_string(),
+            "direct" => "direct".to_string(),
+            "indirect" => "indirect".to_string(),
+            "enterprise" => "enterprise".to_string(),
+            invalid => {
+                tracing::warn!("Invalid attestation: {}. Using default 'direct'", invalid);
+                "direct".to_string()
+            }
+        },
+    });
+
 pub(super) static PASSKEY_AUTHENTICATOR_ATTACHMENT: LazyLock<String> = LazyLock::new(|| {
     match env::var("PASSKEY_AUTHENTICATOR_ATTACHMENT").ok() {
         None => "platform".to_string(),

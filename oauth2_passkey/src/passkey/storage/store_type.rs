@@ -1,3 +1,5 @@
+use chrono::{DateTime, Utc};
+
 use crate::passkey::PasskeyCredential;
 use crate::storage::GENERIC_DATA_STORE;
 
@@ -113,6 +115,21 @@ impl PasskeyStore {
             update_credential_user_details_sqlite(pool, credential_id, name, display_name).await
         } else if let Some(pool) = store.as_postgres() {
             update_credential_user_details_postgres(pool, credential_id, name, display_name).await
+        } else {
+            Err(PasskeyError::Storage("Unsupported database type".into()))
+        }
+    }
+
+    pub(crate) async fn update_credential_last_used_at(
+        credential_id: &str,
+        last_used_at: DateTime<Utc>,
+    ) -> Result<(), PasskeyError> {
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        if let Some(pool) = store.as_sqlite() {
+            update_credential_last_used_at_sqlite(pool, credential_id, last_used_at).await
+        } else if let Some(pool) = store.as_postgres() {
+            update_credential_last_used_at_postgres(pool, credential_id, last_used_at).await
         } else {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }

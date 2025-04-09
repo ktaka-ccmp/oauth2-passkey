@@ -40,9 +40,10 @@ esac
 
 # Define queries for each table
 QUERY_USERS="select sequence_number,is_admin,id,account,label,created_at from o2p_users;"
-QUERY_PASSKEY_CREDENTIALS="select user_id,user_name,credential_id,public_key,created_at from o2p_passkey_credentials;"
+QUERY_PASSKEY_CREDENTIALS="select user_id,user_name,credential_id,aaguid,created_at,last_used_at from o2p_passkey_credentials;"
 QUERY_OAUTH2_ACCOUNTS="select user_id,email,id,created_at from o2p_oauth2_accounts;"
 
+#QUERY_PASSKEY_CREDENTIALS="select user_id,user_name,credential_id,public_key,created_at from o2p_passkey_credentials;"
 #QUERY_PASSKEY_CREDENTIALS="select user_id,user_name,user_display_name,credential_id,public_key,created_at from passkey_credentials;"
 #QUERY_PASSKEY_CREDENTIALS="select user_id,hex(credential_id),user_handle,user_name,user_display_name,created_at from passkey_credentials;"
 #QUERY_OAUTH2_ACCOUNTS="select user_id,id,provider_user_id,email,created_at from oauth2_accounts;"

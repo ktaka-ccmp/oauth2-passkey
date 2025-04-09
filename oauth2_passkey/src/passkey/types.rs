@@ -29,6 +29,8 @@ pub struct PasskeyCredential {
     pub user_id: String,
     /// Public key bytes for the credential
     pub public_key: String,
+    /// AAGUID of the authenticator
+    pub aaguid: String,
     /// Counter value for the credential (used to prevent replay attacks)
     pub counter: u32,
     /// User entity information
@@ -37,6 +39,8 @@ pub struct PasskeyCredential {
     pub created_at: DateTime<Utc>,
     /// When the credential was last updated
     pub updated_at: DateTime<Utc>,
+    /// When the credential was last used
+    pub last_used_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

@@ -35,8 +35,8 @@ pub use config::O2P_ROUTE_PREFIX;
 pub use oauth2::{AuthResponse, OAuth2Account, OAuth2Mode, prepare_oauth2_auth_request};
 
 pub use passkey::{
-    AuthenticationOptions, AuthenticatorResponse, PasskeyCredential, RegisterCredential,
-    RegistrationOptions, get_related_origin_json,
+    AuthenticationOptions, AuthenticatorInfo, AuthenticatorResponse, PasskeyCredential,
+    RegisterCredential, RegistrationOptions, get_authenticator_info, get_related_origin_json,
 };
 
 pub use session::{
