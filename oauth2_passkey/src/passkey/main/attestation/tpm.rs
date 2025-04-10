@@ -16,6 +16,19 @@ const OID_FIDO_GEN_CE_AAGUID: &[u8] = &[
     0x2B, 0x06, 0x01, 0x04, 0x01, 0x82, 0xE5, 0x1C, 0x01, 0x01, 0x04,
 ];
 
+/// Verifies a TPM attestation statement
+///
+/// # Arguments
+/// * `auth_data` - A reference to the authenticator data
+/// * `client_data_hash` - A reference to the client data hash
+/// * `att_stmt` - A reference to the attestation statement
+///
+/// # Returns
+/// * `Result<(), PasskeyError>` - An empty result or an error if the attestation is invalid
+///
+/// # Errors
+/// * `PasskeyError::Verification` - If the attestation is invalid
+///
 pub(super) fn verify_tpm_attestation(
     auth_data: &[u8],
     client_data_hash: &[u8],
@@ -159,6 +172,17 @@ pub(super) fn verify_tpm_attestation(
 
 /// Provides a fallback verification for AIK certificates that can't be parsed by webpki,
 /// using the x509-parser library as a fallback when webpki fails.
+///
+/// # Arguments
+/// * `cert_bytes` - A reference to the certificate bytes
+/// * `auth_data` - A reference to the authenticator data
+///
+/// # Returns
+/// * `Result<(), PasskeyError>` - An empty result or an error if the certificate is invalid
+///
+/// # Errors
+/// * `PasskeyError::Verification` - If the certificate is invalid
+///
 fn verify_aik_certificate_fallback(
     cert_bytes: &[u8],
     auth_data: &[u8],
