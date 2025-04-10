@@ -8,7 +8,9 @@ use x509_parser::{certificate::X509Certificate, prelude::*, time::ASN1Time};
 use crate::passkey::config::{PASSKEY_RP_ID, PASSKEY_USER_VERIFICATION};
 use crate::passkey::errors::PasskeyError;
 
-use super::types::AttestationObject;
+use super::super::types::AttestationObject;
+use super::tpm::verify_tpm_attestation;
+use super::utils::get_sig_from_stmt;
 
 // Constants for FIDO OIDs id-fido-gen-ce-aaguid
 const OID_FIDO_GEN_CE_AAGUID: &str = "1.3.6.1.4.1.45724.1.1.4";
@@ -17,7 +19,7 @@ const EC2_KEY_TYPE: i64 = 2;
 const ES256_ALG: i64 = -7;
 const COORD_LENGTH: usize = 32;
 
-pub(super) fn verify_attestation(
+pub(crate) fn verify_attestation(
     attestation: &AttestationObject,
     client_data: &[u8],
 ) -> Result<(), PasskeyError> {
@@ -41,13 +43,25 @@ pub(super) fn verify_attestation(
                 PasskeyError::Verification(format!("Attestation verification failed: {:?}", e))
             })
         }
+        "tpm" => {
+            // for security keys
+            tracing::debug!("Using 'tpm' attestation format");
+            verify_tpm_attestation(
+                &attestation.auth_data,
+                client_data_hash.as_ref(),
+                &attestation.att_stmt,
+            )
+            .map_err(|e| {
+                PasskeyError::Verification(format!("Attestation verification failed: {:?}", e))
+            })
+        }
         _ => Err(PasskeyError::Format(
             "Unsupported attestation format".to_string(),
         )),
     }
 }
 
-pub(super) fn extract_aaguid(attestation: &AttestationObject) -> Result<String, PasskeyError> {
+pub(crate) fn extract_aaguid(attestation: &AttestationObject) -> Result<String, PasskeyError> {
     let aaguid_bytes = &attestation.auth_data[37..53];
     let aaguid = Uuid::from_slice(aaguid_bytes)
         .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {}", e)))?
@@ -213,38 +227,6 @@ fn verify_packed_attestation(
     }
 
     Ok(())
-}
-
-fn get_sig_from_stmt(
-    att_stmt: &Vec<(CborValue, CborValue)>,
-) -> Result<(i64, Vec<u8>), PasskeyError> {
-    let mut alg = None;
-    let mut sig = None;
-
-    for (key, value) in att_stmt {
-        match key {
-            CborValue::Text(k) if k == "alg" => {
-                if let CborValue::Integer(a) = value {
-                    if a == &Integer::from(ES256_ALG) {
-                        alg = Some(ES256_ALG);
-                    }
-                }
-            }
-            CborValue::Text(k) if k == "sig" => {
-                if let CborValue::Bytes(s) = value {
-                    sig = Some(s.clone());
-                }
-            }
-            _ => {}
-        }
-    }
-
-    match (alg, sig) {
-        (Some(a), Some(s)) => Ok((a, s)),
-        _ => Err(PasskeyError::Verification(
-            "Missing algorithm or signature in attestation statement".to_string(),
-        )),
-    }
 }
 
 fn verify_packed_attestation_cert(
