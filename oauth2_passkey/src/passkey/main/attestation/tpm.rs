@@ -1,14 +1,20 @@
-use ciborium::value::Value as CborValue;
-use std::convert::TryFrom;
-use webpki::EndEntityCert;
-use x509_parser::{certificate::X509Certificate, prelude::*};
-
 use super::utils::integer_to_i64;
 use crate::passkey::errors::PasskeyError;
+use ciborium::value::Value as CborValue;
+use der_parser::der::parse_der;
+use std::convert::TryFrom;
+use webpki::EndEntityCert;
+use x509_parser::{extensions::X509Extension, prelude::*};
 
-// Constants for TPM structures
 const TPM_GENERATED_VALUE: u32 = 0xff544347; // 0xFF + "TCG"
 const TPM_ST_ATTEST_CERTIFY: u16 = 0x8017;
+
+// OID for TCG-KP-AIKCertificate: 2.23.133.8.3
+const OID_TCG_KP_AIK_CERTIFICATE: &[u8] = &[0x67, 0x81, 0x05, 0x08, 0x03];
+// OID for FIDO AAGUID extension: 1.3.6.1.4.1.45724.1.1.4
+const OID_FIDO_GEN_CE_AAGUID: &[u8] = &[
+    0x2B, 0x06, 0x01, 0x04, 0x01, 0x82, 0xE5, 0x1C, 0x01, 0x01, 0x04,
+];
 
 pub(super) fn verify_tpm_attestation(
     auth_data: &[u8],
@@ -110,13 +116,7 @@ pub(super) fn verify_tpm_attestation(
     let webpki_cert = EndEntityCert::try_from(aik_cert_bytes.as_ref());
 
     // Verify the AIK certificate
-    if let Ok(ref aik_cert) = webpki_cert {
-        verify_aik_certificate(aik_cert)?;
-    } else {
-        // Fall back to x509-parser based verification
-        tracing::warn!("Using fallback AIK certificate verification");
-        verify_aik_certificate_fallback(aik_cert_bytes)?;
-    }
+    verify_aik_certificate_fallback(aik_cert_bytes, auth_data)?;
 
     // Verify the signature over certInfo
     if let Ok(ref aik_cert) = webpki_cert {
@@ -133,16 +133,22 @@ pub(super) fn verify_tpm_attestation(
         };
 
         // Verify the signature
-        aik_cert
-            .verify_signature(signature_alg, &cert_info, &sig)
-            .map_err(|_| {
-                PasskeyError::Verification("TPM attestation signature invalid".to_string())
-            })?;
+        match aik_cert.verify_signature(signature_alg, &cert_info, &sig) {
+            Ok(_) => {
+                // Verify the AIK certificate meets WebAuthn requirements
+                verify_aik_certificate_fallback(aik_cert_bytes, auth_data)?
+            }
+            Err(e) => {
+                return Err(PasskeyError::Verification(format!(
+                    "Failed to verify TPM signature: {:?}",
+                    e
+                )));
+            }
+        }
     } else {
         // Fall back to a more permissive verification
         tracing::warn!("Using fallback signature verification for TPM attestation");
-        // For now, we'll just log a warning and continue
-        // In a production environment, you might want to implement a more robust fallback
+        verify_aik_certificate_fallback(aik_cert_bytes, auth_data)?
     }
 
     // Verify the certInfo structure
@@ -151,28 +157,152 @@ pub(super) fn verify_tpm_attestation(
     Ok(())
 }
 
-/// Verifies that the AIK certificate meets the requirements specified in the WebAuthn specification.
-fn verify_aik_certificate(cert: &EndEntityCert) -> Result<(), PasskeyError> {
-    // Verify that the AIK certificate meets the requirements in the TPM attestation spec
-    // This is a placeholder for the actual verification logic
-    let _cert = cert; // Use the parameter to avoid unused variable warning
-    Ok(())
-}
-
 /// Provides a fallback verification for AIK certificates that can't be parsed by webpki,
 /// using the x509-parser library as a fallback when webpki fails.
-fn verify_aik_certificate_fallback(cert_bytes: &[u8]) -> Result<(), PasskeyError> {
-    // Fallback verification for AIK certificates that can't be parsed by webpki
+fn verify_aik_certificate_fallback(
+    cert_bytes: &[u8],
+    auth_data: &[u8],
+) -> Result<(), PasskeyError> {
     let (_, cert) = X509Certificate::from_der(cert_bytes).map_err(|e| {
         PasskeyError::Verification(format!("Failed to parse AIK certificate: {}", e))
     })?;
 
-    // Verify the certificate signature
-    let _signature_alg = cert.signature_algorithm.algorithm.to_id_string();
+    // 1. Verify that the certificate is version 3
+    if cert.version != x509_parser::prelude::X509Version(2) {
+        // X.509 versions are 0-indexed, so version 3 is represented as 2
+        return Err(PasskeyError::Verification(
+            "AIK certificate version must be 3".to_string(),
+        ));
+    }
 
-    // Note: The x509-parser API has changed, so we're just returning Ok for now
-    // In a real implementation, you would perform proper signature verification
-    tracing::warn!("AIK certificate signature verification is a placeholder");
+    // 2. Verify subject is empty
+    if !cert.subject().as_raw().is_empty() {
+        return Err(PasskeyError::Verification(
+            "AIK certificate must have an empty subject field".to_string(),
+        ));
+    }
+
+    // 3. Verify Subject Alternative Name extension
+    let has_san = cert
+        .extensions()
+        .iter()
+        .any(|ext| ext.oid.as_bytes() == [2, 5, 29, 17]);
+
+    if !has_san {
+        return Err(PasskeyError::Verification(
+            "AIK certificate must have Subject Alternative Name extension".to_string(),
+        ));
+    }
+
+    // 4. Verify Extended Key Usage extension
+    let has_eku = cert.extensions().iter().any(|ext| {
+        if ext.oid.as_bytes() != [2, 5, 29, 37] {
+            return false;
+        }
+
+        // Parse the extension value to get the OIDs
+        let parsed = match parse_der(ext.value) {
+            Ok((_, parsed)) => parsed,
+            Err(_) => return false,
+        };
+
+        // Convert the BerObject to a byte slice
+        match parsed.content {
+            der_parser::ber::BerObjectContent::Sequence(ref items) => {
+                // Check if the TCG-KP-AIKCertificate OID is present in the sequence
+                for item in items {
+                    if let der_parser::ber::BerObjectContent::OID(ref oid) = item.content {
+                        if oid.as_bytes() == OID_TCG_KP_AIK_CERTIFICATE {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
+    });
+
+    if !has_eku {
+        return Err(PasskeyError::Verification(
+            "AIK certificate must have TCG-KP-AIKCertificate EKU".to_string(),
+        ));
+    }
+
+    // 5. Verify Basic Constraints
+    let is_not_ca = cert.extensions().iter().any(|ext| {
+        if ext.oid.as_bytes() != [2, 5, 29, 19] {
+            return false;
+        }
+
+        // Parse the BasicConstraints extension
+        if let Ok((_, bc)) = x509_parser::extensions::BasicConstraints::from_der(ext.value) {
+            return !bc.ca;
+        }
+        false
+    });
+
+    if !is_not_ca {
+        return Err(PasskeyError::Verification(
+            "AIK certificate must not be a CA certificate".to_string(),
+        ));
+    }
+
+    // 6. Verify AAGUID extension if present
+    if let Some(aaguid_ext) = cert
+        .extensions()
+        .iter()
+        .find(|ext| ext.oid.as_bytes() == OID_FIDO_GEN_CE_AAGUID)
+    {
+        let aaguid = extract_aaguid_from_extension(aaguid_ext)?;
+        verify_aaguid_match(aaguid, auth_data)?;
+    }
+
+    Ok(())
+}
+
+/// Extracts the AAGUID from an X509 extension.
+fn extract_aaguid_from_extension(ext: &X509Extension) -> Result<[u8; 16], PasskeyError> {
+    // Parse the extension value to extract the AAGUID
+    let parsed = match parse_der(ext.value) {
+        Ok((_, parsed)) => parsed,
+        Err(_) => {
+            return Err(PasskeyError::Verification(
+                "Invalid AAGUID extension format".to_string(),
+            ));
+        }
+    };
+
+    // Extract the octet string content
+    if let der_parser::ber::BerObjectContent::OctetString(content) = &parsed.content {
+        if content.len() == 16 {
+            let mut aaguid = [0u8; 16];
+            aaguid.copy_from_slice(content);
+            return Ok(aaguid);
+        }
+    }
+
+    Err(PasskeyError::Verification(
+        "Invalid AAGUID extension format".to_string(),
+    ))
+}
+
+fn verify_aaguid_match(aaguid: [u8; 16], auth_data: &[u8]) -> Result<(), PasskeyError> {
+    // Extract AAGUID from authenticator data (bytes 37-53)
+    if auth_data.len() < 54 {
+        return Err(PasskeyError::Verification(
+            "Authenticator data too short to contain AAGUID".to_string(),
+        ));
+    }
+
+    let auth_aaguid = &auth_data[37..53];
+
+    if aaguid != auth_aaguid {
+        return Err(PasskeyError::Verification(
+            "AAGUID in AIK certificate does not match AAGUID in authenticator data".to_string(),
+        ));
+    }
+
     Ok(())
 }
 
