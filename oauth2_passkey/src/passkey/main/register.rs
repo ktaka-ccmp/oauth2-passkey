@@ -251,6 +251,61 @@ pub(crate) async fn finish_registration(
 
     tracing::trace!("Authenticator info: {:#?}", authenticator_info);
 
+    if !*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL {
+        // If PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL is true,
+        //there isn't any pre-existing credentials with this user handle to begin with.
+        // Therefore, we can skip the deletion step, I think.
+
+        // Important todo: we delete credentials for a combination of "AAGUID" and user_handle
+        // But we can't distinguish multiple authenticators of the same type, 
+        // e.g. Google Password Managers for different accounts or two Yubikeys with the same model.
+        //
+        // Current implementation will overwrite existing credentials for the same AAGUID regardless of difference in actual authenticator.
+
+        let credentials_with_matching_handle = match PasskeyStore::get_credentials_by(
+            CredentialSearchField::UserHandle(user_handle.to_string()),
+        )
+        .await
+        {
+            Ok(creds) => creds,
+            Err(e) => {
+                tracing::warn!(
+                    "Error getting credentials for user handle {}: {}",
+                    user_handle,
+                    e
+                );
+                // Continue with registration - don't fail just because we couldn't get existing credentials
+                vec![]
+            }
+        };
+
+        // Filter and delete credentials that match user_handle, user_id, and aaguid
+        for cred in credentials_with_matching_handle {
+            if cred.aaguid == aaguid && cred.user_id == user_id {
+                match PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
+                    cred.credential_id.clone(),
+                ))
+                .await
+                {
+                    Ok(_) => {
+                        tracing::info!(
+                            "Removed existing credential with matching user_handle, user_id, and aaguid: {}",
+                            cred.credential_id
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Error removing existing credential {}: {}",
+                            cred.credential_id,
+                            e
+                        );
+                        // Continue with registration - don't fail just because we couldn't remove existing credentials
+                    }
+                }
+            }
+        }
+    }
+
     let credential = PasskeyCredential {
         credential_id: credential_id_str.clone(),
         user_id: user_id.to_string(),
@@ -262,35 +317,6 @@ pub(crate) async fn finish_registration(
         updated_at: Utc::now(),
         last_used_at: Utc::now(),
     };
-
-    if !*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL {
-        // If PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL is true,
-        //there isn't any pre-existing credentials with this user handle to begin with.
-        // Therefore, we can skip the deletion step, I think.
-
-        // Important todo: we need to delete credentials for a combination of "AAGUID" and user_handle
-        // But we don't have AAGUID attribute in the PasskeyCredential struct yet.
-        match PasskeyStore::delete_credential_by(CredentialSearchField::UserHandle(
-            user_handle.to_string(),
-        ))
-        .await
-        {
-            Ok(_) => {
-                tracing::info!(
-                    "Removed existing credentials for user handle: {}",
-                    user_handle
-                );
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "Error removing existing credentials for user handle {}: {}",
-                    user_handle,
-                    e
-                );
-                // Continue with registration - don't fail just because we couldn't remove existing credentials
-            }
-        }
-    }
 
     PasskeyStore::store_credential(credential_id_str, credential)
         .await
