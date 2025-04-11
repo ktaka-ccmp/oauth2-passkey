@@ -3,7 +3,6 @@
 3. I want to make the code dependencies on other crates as little as possible 
 4. I hear anyhow crate is not for library crates so I want to use thiserror crate instead
 5. I want to include nice tutorial and examples
-6. I want to make the liboauth2 and libpasskey crates usable just by nesting as a route
 7. I want the code modifications by cascade to be minimal, as simple as possible while fullfilling the needs of the prompt
 8. I want to make the visibility of the library and module internals as minimal as possible
 9. When we need more visibility I want to re-export necessary items only
