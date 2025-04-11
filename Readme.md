@@ -23,8 +23,7 @@
 - Modify demo pages to include link to available pages.
 - Make demo-oauth2 and demo-passkey pages to implement login page and account summary page without relying on oauth2_passkey_axum's summary and login pages.
 
-- Once we have AAGUID, we should fix the logic for deleting credentials in register.rs to use a combination of "AAGUID" and user_handle.
-  - probably using signalAllAcceptedCredentials?
+- Syncing of credentials using signalAllAcceptedCredentials?
 
 ## Half Done
 
@@ -34,6 +33,11 @@
 
 - signalUnknownCredential seems not working on Android device.
   - Seems like it hasn't been supported yet.
+
+- Once we have AAGUID, we should fix the logic for deleting credentials in register.rs to use a combination of "AAGUID" and user_handle.
+- Important todo: we delete credentials for a combination of "AAGUID" and user_handle
+  - But we can't distinguish multiple authenticators of the same type, 
+  - e.g. Google Password Managers for different accounts or two Yubikeys with the same model
 
 ## Done
 
