@@ -1,7 +1,6 @@
 use crate::oauth2::{AccountSearchField, OAuth2Store};
 use crate::passkey::{CredentialSearchField, PasskeyStore};
 use crate::userdb::{User, UserStore};
-use crate::utils::gen_random_string;
 
 use super::errors::CoordinationError;
 
@@ -73,8 +72,8 @@ pub async fn delete_user_account(user_id: &str) -> Result<Vec<String>, Coordinat
 pub(super) async fn gen_new_user_id() -> Result<String, CoordinationError> {
     // Try up to 3 times to generate a unique ID
     for _ in 0..3 {
-        // let id = Uuid::new_v4().to_string();
-        let id = gen_random_string(32)?;
+        let id = uuid::Uuid::new_v4().to_string();
+        // let id = crate::utils::gen_random_string(32)?;
 
         // Check if a user with this ID already exists
         match UserStore::get_user(&id).await {

@@ -144,10 +144,11 @@ async fn list_oauth2_accounts(
     auth_user: Option<AuthUser>,
 ) -> Result<Json<Vec<OAuth2Account>>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser if present using deref coercion
-    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+    // let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
 
     // Call the core function with the extracted data
-    let accounts = list_accounts_core(session_user)
+    // let accounts = list_accounts_core(session_user)
+    let accounts = list_accounts_core(&auth_user.unwrap().id)
         .await
         .into_response_error()?;
     Ok(Json(accounts))

@@ -1,6 +1,5 @@
+mod admin;
 mod config;
-#[cfg(feature = "default-pages")]
-mod default_pages;
 mod error;
 mod middleware;
 mod oauth2;
@@ -9,7 +8,7 @@ mod router;
 mod session;
 mod user;
 
-pub use config::{O2P_LOGIN_URL, O2P_REDIRECT_ANON, O2P_SUMMARY_URL};
+pub use config::{O2P_ADMIN_URL, O2P_LOGIN_URL, O2P_REDIRECT_ANON, O2P_SUMMARY_URL};
 pub use middleware::{
     is_authenticated_401, is_authenticated_redirect, is_authenticated_user_401,
     is_authenticated_user_redirect,

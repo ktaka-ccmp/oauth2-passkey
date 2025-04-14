@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User List</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <div class="page-header">
+        <h1>User List</h1>
+        <div class="header-buttons">
+            <button onclick="Logout()" class="action-button">Logout</button>
+        </div>
+    </div>
+    <div class="content">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Account</th>
+                    <th>Label</th>
+                    <th>Is Admin</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr class="user-row">
+                    <td><a href="{{o2p_route_prefix}}/admin/user/{{ user.id }}">{{ user.id }}</a></td>
+                    <td>{{ user.account }}</td>
+                    <td>{{ user.label }}</td>
+                    <td>{{ user.is_admin }}</td>
+                    <td>
+                        <button onclick="DeleteAccount({{ user.id }})" class="action-button delete-button">Delete</button>
+                        <button onclick="Logout({{ user.id }})" class="action-button">Logout</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <script>
+        function Logout() {
+            window.location.href = "{{o2p_route_prefix}}/user/logout?redirect={{o2p_redirect_anon}}";
+        }
+    </script>
+
+</body>
+</html>

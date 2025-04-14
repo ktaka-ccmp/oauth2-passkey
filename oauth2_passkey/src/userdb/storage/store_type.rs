@@ -26,6 +26,18 @@ impl UserStore {
         }
     }
 
+    pub(crate) async fn get_all_users() -> Result<Vec<User>, UserError> {
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        if let Some(pool) = store.as_sqlite() {
+            get_all_users_sqlite(pool).await
+        } else if let Some(pool) = store.as_postgres() {
+            get_all_users_postgres(pool).await
+        } else {
+            Err(UserError::Storage("Unsupported database type".to_string()))
+        }
+    }
+
     /// Get a user by their ID
     pub(crate) async fn get_user(id: &str) -> Result<Option<User>, UserError> {
         let store = GENERIC_DATA_STORE.lock().await;

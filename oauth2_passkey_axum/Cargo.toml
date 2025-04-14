@@ -4,8 +4,9 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [features]
-default = ["default-pages"]
-default-pages = []
+default = ["admin-pages", "optional-pages"]
+admin-pages = []
+optional-pages = []
 
 [dependencies]
 askama = { version = "0.13.0" }
