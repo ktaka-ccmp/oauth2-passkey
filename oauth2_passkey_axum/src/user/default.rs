@@ -15,7 +15,7 @@ use oauth2_passkey::{delete_user_account, prepare_logout_response, update_user_a
 use crate::session::AuthUser;
 
 /// Create a router for the user summary endpoints
-pub(super) fn router() -> Router<()> {
+pub(crate) fn router() -> Router<()> {
     Router::new()
         .route("/logout", get(logout))
         .route("/delete", delete(delete_user_account_handler))
@@ -150,7 +150,7 @@ pub(super) async fn delete_user_account_handler(
     tracing::debug!("Deleting user account: {}", session_user_id);
 
     // Call the core function to delete the user account and all associated data
-    // Using the imported function from libauth
+    // Using the imported function from oauth2_passkey
     let credential_ids = delete_user_account(&session_user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

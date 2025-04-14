@@ -217,17 +217,14 @@ pub async fn handle_finish_authentication_core(
 
 /// Core function that handles the business logic of listing passkey credentials
 ///
-/// This function takes an optional reference to a SessionUser and returns the list of stored credentials
+/// This function takes a user ID and returns the list of stored credentials
 /// associated with that user, or an error if the user is not logged in.
 pub async fn list_credentials_core(
-    user: Option<&SessionUser>,
+    user_id: &str,
 ) -> Result<Vec<PasskeyCredential>, CoordinationError> {
-    // Ensure user is authenticated
-    let user = user.ok_or_else(|| CoordinationError::Unauthorized.log())?;
-
-    tracing::trace!("list_credentials_core: User: {:#?}", user);
+    tracing::trace!("list_credentials_core: User ID: {:#?}", user_id);
     let credentials =
-        PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user.id.to_owned())).await?;
+        PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_owned())).await?;
     Ok(credentials)
 }
 

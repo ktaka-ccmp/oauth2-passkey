@@ -308,12 +308,6 @@ async fn get_oauth2_accounts(user_id: &str) -> Result<Vec<OAuth2Account>, Coordi
     Ok(accounts)
 }
 
-pub async fn list_accounts_core(
-    user: Option<&SessionUser>,
-) -> Result<Vec<OAuth2Account>, CoordinationError> {
-    // Ensure user is authenticated
-    let user = user.ok_or_else(|| CoordinationError::Unauthorized.log())?;
-    tracing::trace!("list_accounts_core: User: {:#?}", user);
-
-    get_oauth2_accounts(&user.id).await
+pub async fn list_accounts_core(user_id: &str) -> Result<Vec<OAuth2Account>, CoordinationError> {
+    get_oauth2_accounts(user_id).await
 }

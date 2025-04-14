@@ -257,7 +257,7 @@ pub(crate) async fn finish_registration(
         // Therefore, we can skip the deletion step, I think.
 
         // Important todo: we delete credentials for a combination of "AAGUID" and user_handle
-        // But we can't distinguish multiple authenticators of the same type, 
+        // But we can't distinguish multiple authenticators of the same type,
         // e.g. Google Password Managers for different accounts or two Yubikeys with the same model.
         //
         // Current implementation will overwrite existing credentials for the same AAGUID regardless of difference in actual authenticator.
