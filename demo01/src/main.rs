@@ -19,13 +19,7 @@ use server::{init_tracing, spawn_http_server, spawn_https_server};
 // O2P_LOGIN_URL is /o2p/user/login and O2P_SUMMARY_URL is /o2p/user/summary by default
 async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
     match user {
-        Some(user) => {
-            if user.is_admin {
-                Ok(Redirect::to(O2P_ADMIN_URL.as_str()).into_response())
-            } else {
-                Ok(Redirect::to(O2P_SUMMARY_URL.as_str()).into_response())
-            }
-        }
+        Some(_) => Ok(Redirect::to(O2P_SUMMARY_URL.as_str()).into_response()),
         None => Ok(Redirect::to(O2P_LOGIN_URL.as_str()).into_response()),
     }
 }

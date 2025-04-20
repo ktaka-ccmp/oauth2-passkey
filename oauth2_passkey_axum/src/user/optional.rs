@@ -86,6 +86,7 @@ struct TemplateAccount {
 #[derive(Debug)]
 struct TemplateAuthUser {
     pub id: String,
+    pub is_admin: bool,
     pub account: String,
     pub label: String,
     pub created_at: String,
@@ -116,6 +117,7 @@ impl UserSummaryTemplate {
         Self {
             user: TemplateAuthUser {
                 id: user.id.clone(),
+                is_admin: user.is_admin,
                 account: user.account.clone(),
                 label: user.label.clone(),
                 created_at: format_date_tz(&user.created_at, "JST"),
