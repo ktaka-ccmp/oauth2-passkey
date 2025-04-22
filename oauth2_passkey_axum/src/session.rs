@@ -4,23 +4,34 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
 };
 use axum_extra::{TypedHeader, headers};
-use http::request::Parts;
+use http::{request::Parts, Method, StatusCode};
 
 use super::config::O2P_REDIRECT_ANON;
 use oauth2_passkey::{SESSION_COOKIE_NAME, SessionError, SessionUser, get_user_from_session};
 
-pub struct AuthRedirect;
+pub struct AuthRedirect {
+    method: Method,
+}
 
-impl IntoResponse for AuthRedirect {
-    fn into_response(self) -> Response {
-        println!("AuthRedirect called.");
-        Redirect::temporary(O2P_REDIRECT_ANON.as_str()).into_response()
+impl AuthRedirect {
+    fn new(method: Method) -> Self {
+        Self { method }
+    }
+
+    fn into_response_with_method(self) -> Response {
+        tracing::debug!("AuthRedirect called.");
+        if self.method == Method::GET {
+            Redirect::temporary(O2P_REDIRECT_ANON.as_str()).into_response()
+        } else {
+            (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
+        }
     }
 }
 
-impl From<SessionError> for AuthRedirect {
-    fn from(_: SessionError) -> Self {
-        AuthRedirect
+impl IntoResponse for AuthRedirect {
+    fn into_response(self) -> Response {
+        tracing::debug!("AuthRedirect called.");
+        self.into_response_with_method()
     }
 }
 
@@ -49,19 +60,19 @@ where
     type Rejection = AuthRedirect;
 
     async fn from_request_parts(parts: &mut Parts, _: &B) -> Result<Self, Self::Rejection> {
+        let method = parts.method.clone();
         let cookies: TypedHeader<headers::Cookie> =
-            parts.extract().await.map_err(|_| AuthRedirect)?;
+            parts.extract().await.map_err(|_| AuthRedirect::new(method.clone()))?;
 
         // Get session from cookie
         let session_cookie = cookies
             .get(SESSION_COOKIE_NAME.as_str())
-            .ok_or(AuthRedirect)?
-            .to_string();
+            .ok_or(AuthRedirect::new(method.clone()))?;
 
         // Convert libuserdb::User to libsession::User to AuthUser
         let user: SessionUser = get_user_from_session(&session_cookie)
             .await
-            .map_err(AuthRedirect::from)?;
+            .map_err(|_| AuthRedirect::new(method.clone()))?;
         Ok(AuthUser::from(user))
     }
 }
