@@ -196,7 +196,11 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
                         }
                     },
                     Err(e) => {
-                        tracing::warn!("Failed to fetch authenticator info for AAGUID {}: {}", aaguid, e);
+                        tracing::warn!(
+                            "Failed to fetch authenticator info for AAGUID {}: {}",
+                            aaguid,
+                            e
+                        );
                         Some(AuthenticatorInfo::default())
                     }
                 };

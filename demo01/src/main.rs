@@ -8,8 +8,7 @@ use axum::{
 use dotenv::dotenv;
 
 use oauth2_passkey_axum::{
-    AuthUser, O2P_ADMIN_URL, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, O2P_SUMMARY_URL,
-    oauth2_passkey_router,
+    AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, O2P_SUMMARY_URL, oauth2_passkey_router,
 };
 
 mod protected;

@@ -9,7 +9,6 @@ use crate::oauth2::{
     validate_origin,
 };
 
-use crate::session::User as SessionUser;
 use crate::userdb::{User as DbUser, UserStore};
 use crate::utils::header_set_cookie;
 

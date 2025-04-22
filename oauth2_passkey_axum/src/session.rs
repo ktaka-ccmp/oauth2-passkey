@@ -4,10 +4,10 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
 };
 use axum_extra::{TypedHeader, headers};
-use http::{request::Parts, Method, StatusCode};
+use http::{Method, StatusCode, request::Parts};
 
 use super::config::O2P_REDIRECT_ANON;
-use oauth2_passkey::{SESSION_COOKIE_NAME, SessionError, SessionUser, get_user_from_session};
+use oauth2_passkey::{SESSION_COOKIE_NAME, SessionUser, get_user_from_session};
 
 pub struct AuthRedirect {
     method: Method,
@@ -61,8 +61,10 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _: &B) -> Result<Self, Self::Rejection> {
         let method = parts.method.clone();
-        let cookies: TypedHeader<headers::Cookie> =
-            parts.extract().await.map_err(|_| AuthRedirect::new(method.clone()))?;
+        let cookies: TypedHeader<headers::Cookie> = parts
+            .extract()
+            .await
+            .map_err(|_| AuthRedirect::new(method.clone()))?;
 
         // Get session from cookie
         let session_cookie = cookies
@@ -70,7 +72,7 @@ where
             .ok_or(AuthRedirect::new(method.clone()))?;
 
         // Convert libuserdb::User to libsession::User to AuthUser
-        let user: SessionUser = get_user_from_session(&session_cookie)
+        let user: SessionUser = get_user_from_session(session_cookie)
             .await
             .map_err(|_| AuthRedirect::new(method.clone()))?;
         Ok(AuthUser::from(user))

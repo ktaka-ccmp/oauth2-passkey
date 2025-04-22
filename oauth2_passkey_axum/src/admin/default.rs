@@ -8,12 +8,13 @@ use axum::{
 };
 
 use oauth2_passkey::{
-    delete_oauth2_account_core, delete_passkey_credential_core, delete_user_account_admin, obfuscate_user_id, verify_context_token_and_page, DbUser, O2P_ROUTE_PREFIX
+    DbUser, O2P_ROUTE_PREFIX, delete_oauth2_account_core, delete_passkey_credential_core,
+    delete_user_account_admin, verify_context_token_and_page,
 };
 
+use super::super::error::IntoResponseError;
 use crate::config::O2P_REDIRECT_ANON;
 use crate::session::AuthUser;
-use super::super::error::IntoResponseError;
 
 pub(super) fn router() -> Router<()> {
     Router::new()
@@ -111,7 +112,7 @@ async fn delete_passkey_credential(
     }
 
     verify_context_token_and_page(&headers, Some(&payload.page_user_context), &auth_user.id)
-    .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
 
     delete_passkey_credential_core(&payload.user_id, &credential_id)
         .await

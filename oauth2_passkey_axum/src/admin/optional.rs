@@ -154,7 +154,11 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
                         }
                     },
                     Err(e) => {
-                        tracing::warn!("Failed to fetch authenticator info for AAGUID {}: {}", aaguid, e);
+                        tracing::warn!(
+                            "Failed to fetch authenticator info for AAGUID {}: {}",
+                            aaguid,
+                            e
+                        );
                         Some(AuthenticatorInfo::default())
                     }
                 };
