@@ -30,10 +30,10 @@ function DeleteAccount() {
     }
 }
 
-function unlinkOAuth2Account(providerUserId, accountUserId) {
+function unlinkOAuth2Account(provider, providerUserId, accountUserId) {
     if (confirm("Are you sure you want to unlink this OAuth2 account?")) {
         fetch(
-            `${O2P_ROUTE_PREFIX}/admin/delete_oauth2_account/${providerUserId}`,
+            `${O2P_ROUTE_PREFIX}/admin/delete_oauth2_account/${provider}/${providerUserId}`,
             {
                 method: "DELETE",
                 headers: {
@@ -75,20 +75,24 @@ function deletePasskeyCredential(credentialId, credentialUserId) {
                 page_user_context: PAGE_USER_CONTEXT,
             }),
         })
-            .then((response) => {
-                if (response.ok) {
-                    // Refresh the page to show updated credential list
-                    window.location.reload();
-                } else {
-                    return response.text().then((text) => {
-                        throw new Error(
-                            `Failed to unlink passkey credential: ${text}`
-                        );
-                    });
+        .then(async (response) => {
+            if (response.ok) {
+                // Refresh the page to show updated credential list
+                window.location.reload();
+            } else {
+                // Parse error response safely
+                let errorText = "Unknown error";
+                try {
+                    errorText = await response.text();
+                } catch (parseError) {
+                    console.error("Error parsing response:", parseError);
                 }
-            })
-            .catch((error) => {
-                alert(`Error: ${error.message}`);
-            });
+                throw new Error(`Failed to unlink passkey credential: ${errorText}`);
+            }
+        })
+        .catch((error) => {
+            console.error(`Error: ${error.message}`);
+            alert(`Error: ${error.message}`);
+        });
     }
 }

@@ -19,8 +19,8 @@ use crate::{O2P_ADMIN_URL, session::AuthUser};
 pub(crate) fn router() -> Router<()> {
     Router::new()
         .route("/user/{user_id}", get(user_summary))
-        .route("/admin_summary.js", get(serve_summary_js))
-        .route("/admin_summary.css", get(serve_summary_css))
+        .route("/admin_user.js", get(serve_admin_user_js))
+        .route("/admin_user.css", get(serve_admin_user_css))
 }
 
 // Template-friendly version of StoredCredential for display
@@ -43,7 +43,7 @@ struct TemplateCredential {
 struct TemplateAccount {
     pub id: String,
     pub user_id: String,
-    pub _provider: String,
+    pub provider: String,
     pub provider_user_id: String,
     pub name: String,
     pub email: String,
@@ -56,6 +56,7 @@ struct TemplateAccount {
 #[derive(Debug)]
 struct TemplateUser {
     pub id: String,
+    pub is_admin: bool,
     pub account: String,
     pub label: String,
     pub created_at: String,
@@ -84,6 +85,7 @@ impl UserSummaryTemplate {
         Self {
             user: TemplateUser {
                 id: user.id.clone(),
+                is_admin: user.is_admin,
                 account: user.account.clone(),
                 label: user.label.clone(),
                 created_at: format_date_tz(&user.created_at, "JST"),
@@ -143,11 +145,19 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
             let aaguid = cred.aaguid.clone();
             // tracing::debug!("aaguid: {}", aaguid);
             async move {
-                let authenticator_info =
-                    match get_authenticator_info(&aaguid).await.unwrap_or_default() {
+                let authenticator_info = match get_authenticator_info(&aaguid).await {
+                    Ok(info) => match info {
                         Some(a) => Some(a),
-                        None => Some(AuthenticatorInfo::default()),
-                    };
+                        None => {
+                            tracing::debug!("No authenticator info found for AAGUID: {}", aaguid);
+                            Some(AuthenticatorInfo::default())
+                        }
+                    },
+                    Err(e) => {
+                        tracing::warn!("Failed to fetch authenticator info for AAGUID {}: {}", aaguid, e);
+                        Some(AuthenticatorInfo::default())
+                    }
+                };
 
                 // tracing::debug!("Authenticator_info: {:#?}", authenticator_info);
                 TemplateCredential {
@@ -188,7 +198,7 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
             TemplateAccount {
                 id: account.id,
                 user_id: account.user_id,
-                _provider: account.provider,
+                provider: account.provider,
                 provider_user_id: account.provider_user_id,
                 name: account.name,
                 email: account.email,
@@ -201,14 +211,15 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
         .collect();
 
     // Create template with all data
-    // Create the route strings first
-
-    let template = UserSummaryTemplate::new(
+    let mut template = UserSummaryTemplate::new(
         user,
         passkey_credentials,
         oauth2_accounts,
         O2P_ROUTE_PREFIX.to_string(),
     );
+
+    // Override obfuscated user ID with the current session user ID
+    template.obfuscated_user_id = obfuscate_user_id(&auth_user.id);
 
     // Render the template
     let html = template.render().map_err(|e| {
@@ -221,8 +232,8 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
     Ok(Html(html).into_response())
 }
 
-async fn serve_summary_js() -> Response {
-    let js_content = include_str!("../../static/admin_summary.js");
+async fn serve_admin_user_js() -> Response {
+    let js_content = include_str!("../../static/admin_user.js");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
@@ -230,8 +241,8 @@ async fn serve_summary_js() -> Response {
         .unwrap()
 }
 
-async fn serve_summary_css() -> Response {
-    let css_content = include_str!("../../static/admin_summary.css");
+async fn serve_admin_user_css() -> Response {
+    let css_content = include_str!("../../static/admin_user.css");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "text/css")

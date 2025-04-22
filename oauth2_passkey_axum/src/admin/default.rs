@@ -2,18 +2,18 @@ use askama::Template;
 use axum::{
     Router,
     extract::{Json as ExtractJson, Path},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::Html,
     routing::{delete, get},
 };
 
 use oauth2_passkey::{
-    DbUser, O2P_ROUTE_PREFIX, delete_oauth2_account_admin, delete_passkey_credential_admin,
-    delete_user_account_admin, obfuscate_user_id,
+    delete_oauth2_account_core, delete_passkey_credential_core, delete_user_account_admin, obfuscate_user_id, verify_context_token_and_page, DbUser, O2P_ROUTE_PREFIX
 };
 
 use crate::config::O2P_REDIRECT_ANON;
 use crate::session::AuthUser;
+use super::super::error::IntoResponseError;
 
 pub(super) fn router() -> Router<()> {
     Router::new()
@@ -24,7 +24,7 @@ pub(super) fn router() -> Router<()> {
             delete(delete_passkey_credential),
         )
         .route(
-            "/delete_oauth2_account/{provider_user_id}",
+            "/delete_oauth2_account/{provider}/{provider_user_id}",
             delete(delete_oauth2_account),
         )
 }
@@ -101,55 +101,40 @@ pub(super) struct PageUserContext {
 
 async fn delete_passkey_credential(
     auth_user: AuthUser,
+    headers: HeaderMap,
     Path(credential_id): Path<String>,
     ExtractJson(payload): ExtractJson<PageUserContext>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    validate_admin_and_page_context(&auth_user, &payload.user_id, &payload.page_user_context)?;
+    // Check admin status
+    if !auth_user.is_admin {
+        return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
+    }
 
-    delete_passkey_credential_admin(&auth_user, &credential_id)
+    verify_context_token_and_page(&headers, Some(&payload.page_user_context), &auth_user.id)
+    .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+
+    delete_passkey_credential_core(&payload.user_id, &credential_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
         .map(|()| StatusCode::NO_CONTENT)
+        .into_response_error()
 }
 
 async fn delete_oauth2_account(
     auth_user: AuthUser,
-    Path(provider_user_id): Path<String>,
+    Path((provider, provider_user_id)): Path<(String, String)>,
+    headers: HeaderMap,
     ExtractJson(payload): ExtractJson<PageUserContext>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    validate_admin_and_page_context(&auth_user, &payload.user_id, &payload.page_user_context)?;
-
-    delete_oauth2_account_admin(&auth_user, &provider_user_id)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-        .map(|()| StatusCode::NO_CONTENT)
-}
-
-fn validate_admin_and_page_context(
-    auth_user: &AuthUser,
-    user_id: &str,
-    page_user_context: &str,
-) -> Result<(), (StatusCode, String)> {
+    // Check admin status
     if !auth_user.is_admin {
-        tracing::warn!(
-            "User {} is not authorized to delete another user's passkey credential",
-            auth_user.id
-        );
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    if obfuscate_user_id(user_id) != page_user_context {
-        tracing::debug!(
-            "Page user context mismatch for user {}: {} != {}",
-            user_id,
-            obfuscate_user_id(user_id),
-            page_user_context
-        );
-        return Err((
-            StatusCode::UNAUTHORIZED,
-            "Page user context mismatch".to_string(),
-        ));
-    }
+    verify_context_token_and_page(&headers, Some(&payload.page_user_context), &auth_user.id)
+        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
 
-    Ok(())
+    delete_oauth2_account_core(&payload.user_id, &provider, &provider_user_id)
+        .await
+        .map(|()| StatusCode::NO_CONTENT)
+        .into_response_error()
 }

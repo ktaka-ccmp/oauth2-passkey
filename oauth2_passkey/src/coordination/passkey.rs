@@ -233,13 +233,9 @@ pub async fn list_credentials_core(
 /// This function checks that the credential belongs to the authenticated user
 /// before deleting it to prevent unauthorized deletions.
 pub async fn delete_passkey_credential_core(
-    user: Option<&SessionUser>,
+    user_id: &str,
     credential_id: &str,
 ) -> Result<(), CoordinationError> {
-    // Ensure user is authenticated
-    let user = user.ok_or_else(|| CoordinationError::Unauthorized.log())?;
-
-    tracing::debug!("delete_passkey_credential_core: User: {:#?}", user);
     tracing::debug!("Attempting to delete credential with ID: {}", credential_id);
 
     let credential = PasskeyStore::get_credentials_by(CredentialSearchField::CredentialId(
@@ -257,7 +253,7 @@ pub async fn delete_passkey_credential_core(
     )?;
 
     // Verify the credential belongs to the authenticated user
-    if credential.user_id != user.id {
+    if credential.user_id != user_id {
         return Err(CoordinationError::Unauthorized.log());
     }
 

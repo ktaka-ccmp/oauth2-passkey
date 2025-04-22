@@ -146,11 +146,10 @@ async fn list_passkey_credentials(
 }
 
 async fn delete_passkey_credential(
-    auth_user: Option<AuthUser>,
+    auth_user: AuthUser,
     Path(credential_id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
-    delete_passkey_credential_core(session_user, &credential_id)
+    delete_passkey_credential_core(&auth_user.id, &credential_id)
         .await
         .into_response_error()
         .map(|()| StatusCode::NO_CONTENT)

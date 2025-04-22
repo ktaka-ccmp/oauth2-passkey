@@ -187,11 +187,19 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
             let aaguid = cred.aaguid.clone();
             // tracing::debug!("aaguid: {}", aaguid);
             async move {
-                let authenticator_info =
-                    match get_authenticator_info(&aaguid).await.unwrap_or_default() {
+                let authenticator_info = match get_authenticator_info(&aaguid).await {
+                    Ok(info) => match info {
                         Some(a) => Some(a),
-                        None => Some(AuthenticatorInfo::default()),
-                    };
+                        None => {
+                            tracing::debug!("No authenticator info found for AAGUID: {}", aaguid);
+                            Some(AuthenticatorInfo::default())
+                        }
+                    },
+                    Err(e) => {
+                        tracing::warn!("Failed to fetch authenticator info for AAGUID {}: {}", aaguid, e);
+                        Some(AuthenticatorInfo::default())
+                    }
+                };
 
                 // tracing::debug!("Authenticator_info: {:#?}", authenticator_info);
                 TemplateCredential {
