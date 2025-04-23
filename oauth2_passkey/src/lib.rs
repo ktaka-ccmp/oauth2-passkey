@@ -37,7 +37,8 @@ pub use oauth2::{AuthResponse, OAuth2Account, OAuth2Mode, prepare_oauth2_auth_re
 
 pub use passkey::{
     AuthenticationOptions, AuthenticatorInfo, AuthenticatorResponse, PasskeyCredential,
-    RegisterCredential, RegistrationOptions, get_authenticator_info, get_related_origin_json,
+    RegisterCredential, RegistrationOptions, get_authenticator_info, get_authenticator_info_batch,
+    get_related_origin_json,
 };
 
 pub use session::{

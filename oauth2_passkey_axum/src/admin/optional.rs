@@ -8,9 +8,10 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
+use std::collections::HashSet;
 
 use oauth2_passkey::{
-    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, get_authenticator_info, get_user,
+    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, get_authenticator_info_batch, get_user,
     list_accounts_core, list_credentials_core, obfuscate_user_id,
 };
 
@@ -138,53 +139,43 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
         )
     })?;
 
+    let unique_aaguids: HashSet<String> = stored_credentials
+        .iter()
+        .map(|c| c.aaguid.clone())
+        .collect();
+    let auth_info_map =
+        get_authenticator_info_batch(&unique_aaguids.into_iter().collect::<Vec<_>>())
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to fetch authenticator info: {:?}", e),
+                )
+            })?;
+
     // Convert PasskeyCredential to TemplateCredential
     let passkey_credentials = stored_credentials
         .iter()
         .map(|cred| {
-            let aaguid = cred.aaguid.clone();
-            // tracing::debug!("aaguid: {}", aaguid);
-            async move {
-                let authenticator_info = match get_authenticator_info(&aaguid).await {
-                    Ok(info) => match info {
-                        Some(a) => Some(a),
-                        None => {
-                            tracing::debug!("No authenticator info found for AAGUID: {}", aaguid);
-                            Some(AuthenticatorInfo::default())
-                        }
-                    },
-                    Err(e) => {
-                        tracing::warn!(
-                            "Failed to fetch authenticator info for AAGUID {}: {}",
-                            aaguid,
-                            e
-                        );
-                        Some(AuthenticatorInfo::default())
-                    }
-                };
+            let authenticator_info = auth_info_map
+                .get(&cred.aaguid)
+                .cloned()
+                .or_else(|| Some(AuthenticatorInfo::default()));
 
-                // tracing::debug!("Authenticator_info: {:#?}", authenticator_info);
-                TemplateCredential {
-                    credential_id: cred.credential_id.clone(),
-                    user_id: cred.user_id.clone(),
-                    user_name: cred.user.name.clone(),
-                    user_display_name: cred.user.display_name.clone(),
-                    user_handle: cred.user.user_handle.clone(),
-                    aaguid: cred.aaguid.clone(),
-                    created_at: format_date_tz(&cred.created_at, "JST"),
-                    updated_at: format_date_tz(&cred.updated_at, "JST"),
-                    last_used_at: format_date_tz(&cred.last_used_at, "JST"),
-                    authenticator_info,
-                }
+            TemplateCredential {
+                credential_id: cred.credential_id.clone(),
+                user_id: cred.user_id.clone(),
+                user_name: cred.user.name.clone(),
+                user_display_name: cred.user.display_name.clone(),
+                user_handle: cred.user.user_handle.clone(),
+                aaguid: cred.aaguid.clone(),
+                created_at: format_date_tz(&cred.created_at, "JST"),
+                updated_at: format_date_tz(&cred.updated_at, "JST"),
+                last_used_at: format_date_tz(&cred.last_used_at, "JST"),
+                authenticator_info,
             }
         })
         .collect::<Vec<_>>();
-
-    // Wait for all async operations to complete
-    let passkey_credentials = futures::future::join_all(passkey_credentials)
-        .await
-        .into_iter()
-        .collect();
 
     // Fetch OAuth2 accounts using the public function from libauth
     // let oauth2_accounts = list_accounts_core(Some(session_user)).await.map_err(|e| {

@@ -8,7 +8,8 @@ pub use errors::PasskeyError;
 
 pub use main::{
     AuthenticationOptions, AuthenticatorInfo, AuthenticatorResponse, RegisterCredential,
-    RegistrationOptions, get_authenticator_info, get_related_origin_json,
+    RegistrationOptions, get_authenticator_info, get_authenticator_info_batch,
+    get_related_origin_json,
 };
 
 pub use types::PasskeyCredential;
