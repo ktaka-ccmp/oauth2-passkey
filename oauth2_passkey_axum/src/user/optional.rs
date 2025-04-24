@@ -7,7 +7,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
-use std::collections::HashSet;
+use std::{collections::{HashMap, HashSet}, sync::LazyLock};
 
 use serde_json::{Value, json};
 
@@ -289,37 +289,30 @@ async fn serve_summary_css() -> Response {
         .unwrap()
 }
 
+static TIMEZONE_MAP: LazyLock<HashMap<&'static str, Tz>> = LazyLock::new(|| {
+    let mut map = HashMap::new();
+    map.insert("JST", "Asia/Tokyo".parse::<Tz>().unwrap());
+    map.insert("EST", "America/New_York".parse::<Tz>().unwrap());
+    map.insert("CST", "America/Chicago".parse::<Tz>().unwrap());
+    map.insert("MST", "America/Denver".parse::<Tz>().unwrap());
+    map.insert("PST", "America/Los_Angeles".parse::<Tz>().unwrap());
+    map.insert("CET", "Europe/Paris".parse::<Tz>().unwrap());
+    map.insert("EET", "Europe/Helsinki".parse::<Tz>().unwrap());
+    map.insert("UTC", "Etc/UTC".parse::<Tz>().unwrap());
+    map
+});
+
 /// Helper function to format DateTime<Utc> to a specific timezone format (YYYY-MM-DD HH:MM TZ)
 ///
 /// # Arguments
 /// * `date` - The UTC datetime to format
 /// * `timezone_name` - The name of the timezone to display (e.g., "JST", "UTC", "EST")
 fn format_date_tz(date: &DateTime<Utc>, timezone_name: &str) -> String {
-    // Map common abbreviations to full timezone names
-    let tz_name = match timezone_name {
-        "JST" => "Asia/Tokyo",
-        "EST" => "America/New_York",
-        "CST" => "America/Chicago",
-        "MST" => "America/Denver",
-        "PST" => "America/Los_Angeles",
-        "CET" => "Europe/Paris",
-        "EET" => "Europe/Helsinki",
-        "UTC" | "GMT" => "Etc/UTC",
-        _ => timezone_name, // Use as-is if it's already a full timezone name
-    };
 
-    // Parse the timezone string
-    let timezone = match tz_name.parse::<Tz>() {
-        Ok(tz) => tz,
-        Err(_) => {
-            tracing::error!("Failed to parse timezone: {}", tz_name);
-            // Fallback to UTC if timezone parsing fails
-            return format!("{} {}", date.format("%Y-%m-%d %H:%M"), "UTC");
-        }
-    };
+    let timezone = TIMEZONE_MAP.get(timezone_name).unwrap_or(&Tz::UTC);
 
     // Convert to the target timezone
-    let local_time = date.with_timezone(&timezone);
+    let local_time = date.with_timezone(timezone);
 
     // Format as YYYY-MM-DD HH:MM TZ
     // Use the original timezone_name for display to keep it consistent with the user's request
