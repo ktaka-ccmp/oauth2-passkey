@@ -11,7 +11,7 @@ use crate::passkey::{
     verify_session_then_finish_registration,
 };
 use crate::session::User as SessionUser;
-use crate::session::{renew_session_header, verify_context_token_and_page};
+use crate::session::{new_session_header, verify_context_token_and_page};
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
@@ -119,7 +119,7 @@ pub async fn handle_finish_registration_core(
             match result {
                 Ok((message, stored_user_id)) => {
                     // Create session with the user_id
-                    let headers = renew_session_header(stored_user_id).await?;
+                    let headers = new_session_header(stored_user_id).await?;
 
                     Ok((headers, message))
                 }
@@ -210,7 +210,7 @@ pub async fn handle_finish_authentication_core(
     tracing::debug!("User ID: {:#?}", uid);
 
     // Create a session for the authenticated user
-    let headers = renew_session_header(uid.clone()).await?;
+    let headers = new_session_header(uid.clone()).await?;
 
     Ok((uid, name, headers))
 }

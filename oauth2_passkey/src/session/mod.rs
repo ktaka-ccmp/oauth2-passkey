@@ -14,5 +14,5 @@ pub use main::{
 };
 
 pub(crate) use main::{
-    delete_session_from_store_by_session_id, get_session_id_from_headers, renew_session_header,
+    delete_session_from_store_by_session_id, get_session_id_from_headers, new_session_header,
 };

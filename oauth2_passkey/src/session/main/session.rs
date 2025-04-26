@@ -2,11 +2,9 @@ use chrono::{Duration, Utc};
 use headers::Cookie;
 use http::header::{COOKIE, HeaderMap};
 
-use super::context_token::add_context_token_to_header;
-
 use crate::session::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
 use crate::session::errors::SessionError;
-use crate::session::types::{SessionInfo, StoredSession, User as SessionUser};
+use crate::session::types::{StoredSession, User as SessionUser};
 use crate::utils::{gen_random_string, header_set_cookie};
 
 use crate::storage::GENERIC_CACHE_STORE;
@@ -32,27 +30,13 @@ pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderM
     Ok(headers)
 }
 
-async fn create_new_session(session_info: SessionInfo) -> Result<HeaderMap, SessionError> {
-    let mut headers = HeaderMap::new();
-    let expires_at = session_info.expires_at;
-
-    let session_id = create_and_store_session(session_info).await?;
-    header_set_cookie(
-        &mut headers,
-        SESSION_COOKIE_NAME.to_string(),
-        session_id,
-        expires_at,
-        *SESSION_COOKIE_MAX_AGE as i64,
-    )?;
-
-    tracing::debug!("Headers: {:#?}", headers);
-    Ok(headers)
-}
-
-async fn create_and_store_session(session_info: SessionInfo) -> Result<String, SessionError> {
+pub(super) async fn create_new_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {
     let session_id = gen_random_string(32)?;
+    let expires_at = Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64);
+
     let stored_session = StoredSession {
-        info: session_info,
+        user_id: user_id.to_string(),
+        expires_at,
         ttl: *SESSION_COOKIE_MAX_AGE,
     };
 
@@ -67,7 +51,18 @@ async fn create_and_store_session(session_info: SessionInfo) -> Result<String, S
         )
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?;
-    Ok(session_id)
+
+    let mut headers = HeaderMap::new();
+    header_set_cookie(
+        &mut headers,
+        SESSION_COOKIE_NAME.to_string(),
+        session_id,
+        expires_at,
+        *SESSION_COOKIE_MAX_AGE as i64,
+    )?;
+
+    tracing::debug!("Headers: {:#?}", headers);
+    Ok(headers)
 }
 
 async fn delete_session_from_store(
@@ -97,16 +92,6 @@ pub(crate) async fn delete_session_from_store_by_session_id(
     Ok(())
 }
 
-async fn create_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {
-    // Create minimal session info
-    let session_info = SessionInfo {
-        user_id: user_id.to_string(),
-        expires_at: Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64),
-    };
-
-    create_new_session(session_info).await
-}
-
 /// Retrieves the user information from the session
 ///
 /// # Arguments
@@ -125,7 +110,7 @@ pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, 
 
     let stored_session: StoredSession = cached_session.try_into()?;
 
-    let user = UserStore::get_user(&stored_session.info.user_id)
+    let user = UserStore::get_user(&stored_session.user_id)
         .await
         .map_err(|_| SessionError::SessionError)?
         .ok_or(SessionError::SessionError)?;
@@ -211,14 +196,14 @@ async fn is_authenticated(
     };
 
     // Check if session has expired
-    if stored_session.info.expires_at < Utc::now() {
-        tracing::debug!("Session expired at {}", stored_session.info.expires_at);
+    if stored_session.expires_at < Utc::now() {
+        tracing::debug!("Session expired at {}", stored_session.expires_at);
         return Ok(false);
     }
 
     // Optionally check if the user exists in the database
     if verify_user_exists {
-        let user_exists = UserStore::get_user(&stored_session.info.user_id)
+        let user_exists = UserStore::get_user(&stored_session.user_id)
             .await
             .map_err(|e| {
                 tracing::error!("Error checking user existence: {}", e);
@@ -258,16 +243,4 @@ pub async fn is_authenticated_basic(headers: &HeaderMap) -> Result<bool, Session
 /// * `Result<bool, SessionError>` - True if authenticated, false if not authenticated, or an error
 pub async fn is_authenticated_strict(headers: &HeaderMap) -> Result<bool, SessionError> {
     is_authenticated(headers, true).await
-}
-
-#[tracing::instrument]
-pub(crate) async fn renew_session_header(user_id: String) -> Result<HeaderMap, SessionError> {
-    // Create session cookie for authentication
-    let mut headers = create_session_with_uid(&user_id).await?;
-
-    add_context_token_to_header(&user_id, &mut headers)?;
-
-    tracing::debug!("Created session and context token cookies: {headers:?}");
-
-    Ok(headers)
 }
