@@ -15,7 +15,7 @@ use crate::utils::header_set_cookie;
 use super::errors::CoordinationError;
 use super::user::gen_new_user_id;
 
-use crate::session::renew_session_header;
+use crate::session::new_session_header;
 
 pub async fn get_authorized_core(
     auth_response: &AuthResponse,
@@ -187,7 +187,7 @@ async fn process_oauth2_authorization(
         }
     };
 
-    let mut headers = renew_session_header(user_id).await?;
+    let mut headers = new_session_header(user_id).await?;
 
     let _ = header_set_cookie(
         &mut headers,

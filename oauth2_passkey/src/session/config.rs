@@ -1,3 +1,4 @@
+use std::env;
 use std::sync::LazyLock;
 
 pub static SESSION_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
@@ -16,4 +17,29 @@ pub static USER_CONTEXT_TOKEN_COOKIE: LazyLock<String> = LazyLock::new(|| {
     std::env::var("USER_CONTEXT_TOKEN_COOKIE")
         .ok()
         .unwrap_or("__Host-ContextToken".to_string())
+});
+
+// We're using a simple string representation for tokens instead of a struct
+// to minimize dependencies and complexity
+
+pub(super) static AUTH_SERVER_SECRET: LazyLock<Vec<u8>> =
+    LazyLock::new(|| match env::var("AUTH_SERVER_SECRET") {
+        Ok(secret) => secret.into_bytes(),
+        Err(_) => "default_secret_key_change_in_production"
+            .to_string()
+            .into_bytes(),
+    });
+
+pub(super) static USE_CONTEXT_TOKEN_COOKIE: LazyLock<bool> = LazyLock::new(|| {
+    match env::var("USE_CONTEXT_TOKEN_COOKIE") {
+        Ok(val) => match val.as_str() {
+            "true" => true,
+            "false" => false,
+            _ => panic!(
+                "USE_CONTEXT_TOKEN_COOKIE must be 'true' or 'false', got '{}'.",
+                val
+            ),
+        },
+        Err(_) => true, // Default to true when not specified
+    }
 });

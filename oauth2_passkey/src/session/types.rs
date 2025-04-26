@@ -5,14 +5,6 @@ use crate::session::errors::SessionError;
 use crate::storage::CacheData;
 use crate::userdb::User as DbUser;
 
-// Minimal session information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(super) struct SessionInfo {
-    pub(super) user_id: String,
-    // pub provider: String,
-    pub(super) expires_at: DateTime<Utc>,
-}
-
 // User information from libuserdb
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
@@ -41,7 +33,8 @@ impl From<DbUser> for User {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct StoredSession {
-    pub(super) info: SessionInfo,
+    pub(super) user_id: String,
+    pub(super) expires_at: DateTime<Utc>,
     pub(super) ttl: u64,
 }
 
