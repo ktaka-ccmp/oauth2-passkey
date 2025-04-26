@@ -17,5 +17,10 @@ pub static O2P_SUMMARY_URL: LazyLock<String> = LazyLock::new(|| {
         .unwrap_or_else(|_| format!("{}/user/summary", *O2P_ROUTE_PREFIX))
 });
 
+pub static O2P_ADMIN_URL: LazyLock<String> = LazyLock::new(|| {
+    std::env::var("O2P_ADMIN_URL")
+        .unwrap_or_else(|_| format!("{}/admin/list_users", *O2P_ROUTE_PREFIX))
+});
+
 pub static O2P_REDIRECT_ANON: LazyLock<String> =
     LazyLock::new(|| std::env::var("O2P_REDIRECT_ANON").unwrap_or_else(|_| "/".to_string()));

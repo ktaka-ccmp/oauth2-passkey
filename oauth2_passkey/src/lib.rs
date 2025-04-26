@@ -15,8 +15,8 @@ mod utils;
 // Re-export the main coordination components
 // pub use coordinate::AuthError;
 pub use coordination::{
-    CoordinationError, RegistrationStartRequest, delete_passkey_credential_core,
-    handle_finish_authentication_core, handle_finish_registration_core,
+    CoordinationError, RegistrationStartRequest, delete_passkey_credential_core, get_all_users,
+    get_user, handle_finish_authentication_core, handle_finish_registration_core,
     handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
 };
 // pub use coordinate::{
@@ -25,7 +25,8 @@ pub use coordination::{
 // };
 
 pub use coordination::{
-    delete_oauth2_account_core, delete_user_account, get_authorized_core, list_accounts_core,
+    delete_oauth2_account_admin, delete_oauth2_account_core, delete_passkey_credential_admin,
+    delete_user_account, delete_user_account_admin, get_authorized_core, list_accounts_core,
     post_authorized_core, update_passkey_credential_core, update_user_account,
 };
 
@@ -36,7 +37,8 @@ pub use oauth2::{AuthResponse, OAuth2Account, OAuth2Mode, prepare_oauth2_auth_re
 
 pub use passkey::{
     AuthenticationOptions, AuthenticatorInfo, AuthenticatorResponse, PasskeyCredential,
-    RegisterCredential, RegistrationOptions, get_authenticator_info, get_related_origin_json,
+    RegisterCredential, RegistrationOptions, get_authenticator_info, get_authenticator_info_batch,
+    get_related_origin_json,
 };
 
 pub use session::{
@@ -44,6 +46,8 @@ pub use session::{
     is_authenticated_basic, is_authenticated_strict, obfuscate_user_id, prepare_logout_response,
     verify_context_token_and_page,
 };
+
+pub use userdb::User as DbUser;
 
 /// Initialize the authentication coordination layer
 pub async fn init() -> Result<(), Box<dyn std::error::Error>> {

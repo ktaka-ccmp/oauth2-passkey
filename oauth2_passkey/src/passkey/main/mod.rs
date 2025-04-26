@@ -7,7 +7,7 @@ mod related_origin;
 mod types;
 mod utils;
 
-pub use aaguid::{AuthenticatorInfo, get_authenticator_info};
+pub use aaguid::{AuthenticatorInfo, get_authenticator_info, get_authenticator_info_batch};
 
 pub use types::{
     AuthenticationOptions, AuthenticatorResponse, RegisterCredential, RegistrationOptions,

@@ -96,3 +96,21 @@ pub async fn get_authenticator_info(
         None => Ok(None),
     }
 }
+
+pub async fn get_authenticator_info_batch(
+    aaguids: &[String],
+) -> Result<HashMap<String, AuthenticatorInfo>, PasskeyError> {
+    let mut result = HashMap::new();
+    let cache = GENERIC_CACHE_STORE.lock().await;
+
+    // If your cache store supports MGET, use it here for efficiency.
+    // For now, do it sequentially (still avoids duplicate lookups).
+    for aaguid in aaguids {
+        if let Some(cache_data) = cache.get("aaguid", aaguid).await.ok().flatten() {
+            if let Ok(info) = serde_json::from_str::<AuthenticatorInfo>(&cache_data.value) {
+                result.insert(aaguid.clone(), info);
+            }
+        }
+    }
+    Ok(result)
+}

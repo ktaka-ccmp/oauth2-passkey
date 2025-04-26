@@ -9,7 +9,6 @@ use crate::oauth2::{
     validate_origin,
 };
 
-use crate::session::User as SessionUser;
 use crate::userdb::{User as DbUser, UserStore};
 use crate::utils::header_set_cookie;
 
@@ -255,12 +254,12 @@ fn get_oauth2_field_mappings() -> (String, String) {
 /// This function checks that the OAuth2 account belongs to the authenticated user
 /// before deleting it to prevent unauthorized deletions.
 pub async fn delete_oauth2_account_core(
-    user: Option<&SessionUser>,
+    user_id: &str,
     provider: &str,
     provider_user_id: &str,
 ) -> Result<(), CoordinationError> {
     // Ensure user is authenticated
-    let user = user.ok_or_else(|| CoordinationError::Unauthorized.log())?;
+    // let user = user.ok_or_else(|| CoordinationError::Unauthorized.log())?;
 
     // Get the OAuth2 account to verify it belongs to the user
     let accounts = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::ProviderUserId(
@@ -283,7 +282,7 @@ pub async fn delete_oauth2_account_core(
         )?;
 
     // Verify the account belongs to the authenticated user
-    if account.user_id != user.id {
+    if account.user_id != user_id {
         return Err(CoordinationError::Unauthorized.log());
     }
 
@@ -297,7 +296,7 @@ pub async fn delete_oauth2_account_core(
         "Successfully deleted OAuth2 account {}/{} for user {}",
         provider,
         provider_user_id,
-        user.id
+        user_id
     );
     Ok(())
 }
@@ -308,12 +307,6 @@ async fn get_oauth2_accounts(user_id: &str) -> Result<Vec<OAuth2Account>, Coordi
     Ok(accounts)
 }
 
-pub async fn list_accounts_core(
-    user: Option<&SessionUser>,
-) -> Result<Vec<OAuth2Account>, CoordinationError> {
-    // Ensure user is authenticated
-    let user = user.ok_or_else(|| CoordinationError::Unauthorized.log())?;
-    tracing::trace!("list_accounts_core: User: {:#?}", user);
-
-    get_oauth2_accounts(&user.id).await
+pub async fn list_accounts_core(user_id: &str) -> Result<Vec<OAuth2Account>, CoordinationError> {
+    get_oauth2_accounts(user_id).await
 }

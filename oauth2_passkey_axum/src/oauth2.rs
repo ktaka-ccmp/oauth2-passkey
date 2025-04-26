@@ -144,10 +144,11 @@ async fn list_oauth2_accounts(
     auth_user: Option<AuthUser>,
 ) -> Result<Json<Vec<OAuth2Account>>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser if present using deref coercion
-    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+    // let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
 
     // Call the core function with the extracted data
-    let accounts = list_accounts_core(session_user)
+    // let accounts = list_accounts_core(session_user)
+    let accounts = list_accounts_core(&auth_user.unwrap().id)
         .await
         .into_response_error()?;
     Ok(Json(accounts))
@@ -158,12 +159,10 @@ async fn list_oauth2_accounts(
 /// This endpoint requires authentication and verifies that the account
 /// belongs to the authenticated user before deleting it.
 async fn delete_oauth2_account(
-    auth_user: Option<AuthUser>,
+    auth_user: AuthUser,
     Path((provider, provider_user_id)): Path<(String, String)>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
-
-    delete_oauth2_account_core(session_user, &provider, &provider_user_id)
+    delete_oauth2_account_core(&auth_user.id, &provider, &provider_user_id)
         .await
         .map(|()| StatusCode::NO_CONTENT)
         .into_response_error()

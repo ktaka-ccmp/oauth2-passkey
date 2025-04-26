@@ -49,6 +49,20 @@ pub(super) async fn validate_user_tables_postgres(pool: &Pool<Postgres>) -> Resu
     validate_postgres_table_schema(pool, users_table, &expected_columns, UserError::Storage).await
 }
 
+pub(super) async fn get_all_users_postgres(pool: &Pool<Postgres>) -> Result<Vec<User>, UserError> {
+    let table_name = DB_TABLE_USERS.as_str();
+
+    sqlx::query_as::<_, User>(&format!(
+        r#"
+        SELECT * FROM {} ORDER BY sequence_number ASC
+        "#,
+        table_name
+    ))
+    .fetch_all(pool)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))
+}
+
 pub(super) async fn get_user_postgres(
     pool: &Pool<Postgres>,
     id: &str,
