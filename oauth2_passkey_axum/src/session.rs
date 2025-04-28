@@ -7,7 +7,7 @@ use axum_extra::{TypedHeader, headers};
 use http::{Method, StatusCode, request::Parts};
 
 use super::config::O2P_REDIRECT_ANON;
-use oauth2_passkey::{SESSION_COOKIE_NAME, SessionUser, get_user_from_session_with_user_agent};
+use oauth2_passkey::{SESSION_COOKIE_NAME, SessionUser, get_user_from_session};
 
 pub struct AuthRedirect {
     method: Method,
@@ -72,16 +72,9 @@ where
             .ok_or(AuthRedirect::new(method.clone()))?;
 
         // Convert libuserdb::User to libsession::User to AuthUser
-        let user: SessionUser = get_user_from_session_with_user_agent(
-            session_cookie,
-            parts
-                .headers
-                .get(http::header::USER_AGENT)
-                .and_then(|h| h.to_str().ok())
-                .map(String::from),
-        )
-        .await
-        .map_err(|_| AuthRedirect::new(method.clone()))?;
+        let user: SessionUser = get_user_from_session(session_cookie)
+            .await
+            .map_err(|_| AuthRedirect::new(method.clone()))?;
 
         Ok(AuthUser::from(user))
     }

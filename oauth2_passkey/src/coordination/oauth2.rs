@@ -26,7 +26,7 @@ pub async fn get_authorized_core(
 
     csrf_checks(cookies.clone(), auth_response, headers.clone()).await?;
 
-    process_oauth2_authorization(auth_response, headers).await
+    process_oauth2_authorization(auth_response).await
 }
 
 pub async fn post_authorized_core(
@@ -41,12 +41,11 @@ pub async fn post_authorized_core(
         ));
     }
 
-    process_oauth2_authorization(auth_response, headers).await
+    process_oauth2_authorization(auth_response).await
 }
 
 async fn process_oauth2_authorization(
     auth_response: &AuthResponse,
-    headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
     let (idinfo, userinfo) = get_idinfo_userinfo(auth_response).await?;
 
@@ -188,7 +187,7 @@ async fn process_oauth2_authorization(
         }
     };
 
-    let mut headers = new_session_header(user_id, headers.clone()).await?;
+    let mut headers = new_session_header(user_id).await?;
 
     let _ = header_set_cookie(
         &mut headers,

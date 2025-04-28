@@ -32,19 +32,12 @@ pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderM
 
 pub(super) async fn create_new_session_with_uid(
     user_id: &str,
-    headers: HeaderMap,
 ) -> Result<(HeaderMap, String), SessionError> {
     let session_id = gen_random_string(32)?;
     let expires_at = Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64);
 
-    let user_agent = headers
-        .get(http::header::USER_AGENT)
-        .and_then(|h| h.to_str().ok())
-        .map(String::from);
-
     let stored_session = StoredSession {
         user_id: user_id.to_string(),
-        user_agent,
         expires_at,
         ttl: *SESSION_COOKIE_MAX_AGE,
     };
@@ -118,50 +111,6 @@ pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, 
         .ok_or(SessionError::SessionError)?;
 
     let stored_session: StoredSession = cached_session.try_into()?;
-
-    let user = UserStore::get_user(&stored_session.user_id)
-        .await
-        .map_err(|_| SessionError::SessionError)?
-        .ok_or(SessionError::SessionError)?;
-
-    Ok(SessionUser::from(user))
-}
-
-/// Retrieves the user information from the session, verifying the user agent
-///
-/// # Arguments
-/// * `session_cookie` - The session cookie from the request
-/// * `user_agent` - The user agent from the request
-///
-/// # Returns
-/// * `Result<SessionUser, SessionError>` - The user information from the session, or an error
-///
-/// # Errors
-/// * `SessionError::SessionError` - If the session is invalid or expired or the user agent does not match
-/// * `SessionError::Storage` - If the session store is unavailable
-///
-pub async fn get_user_from_session_with_user_agent(
-    session_cookie: &str,
-    user_agent: Option<String>,
-) -> Result<SessionUser, SessionError> {
-    let cached_session = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get("session", session_cookie)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
-        .ok_or(SessionError::SessionError)?;
-
-    let stored_session: StoredSession = cached_session.try_into()?;
-
-    if stored_session.user_agent != user_agent {
-        tracing::debug!(
-            "User agent mismatch: {:?} != {:?}",
-            stored_session.user_agent,
-            user_agent
-        );
-        return Err(SessionError::SessionError);
-    }
 
     let user = UserStore::get_user(&stored_session.user_id)
         .await
@@ -251,20 +200,6 @@ async fn is_authenticated(
     // Check if session has expired
     if stored_session.expires_at < Utc::now() {
         tracing::debug!("Session expired at {}", stored_session.expires_at);
-        return Ok(false);
-    }
-
-    let user_agent = headers
-        .get(http::header::USER_AGENT)
-        .and_then(|h| h.to_str().ok())
-        .map(String::from);
-
-    if stored_session.user_agent != user_agent {
-        tracing::debug!(
-            "User agent mismatch: {:?} != {:?}",
-            stored_session.user_agent,
-            user_agent
-        );
         return Ok(false);
     }
 
