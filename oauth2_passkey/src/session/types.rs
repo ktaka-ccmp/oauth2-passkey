@@ -34,6 +34,7 @@ impl From<DbUser> for User {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct StoredSession {
     pub(super) user_id: String,
+    pub(super) user_agent: Option<String>,
     pub(super) expires_at: DateTime<Utc>,
     pub(super) ttl: u64,
 }

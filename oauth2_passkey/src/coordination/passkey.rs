@@ -119,7 +119,8 @@ pub async fn handle_finish_registration_core(
             match result {
                 Ok((message, stored_user_id)) => {
                     // Create session with the user_id
-                    let headers = new_session_header(stored_user_id).await?;
+                    let headers =
+                        new_session_header(stored_user_id, request_headers.clone()).await?;
 
                     Ok((headers, message))
                 }
@@ -201,6 +202,7 @@ pub async fn handle_start_authentication_core(
 /// authenticated user, and returns the user ID, name, and session headers.
 pub async fn handle_finish_authentication_core(
     auth_response: AuthenticatorResponse,
+    headers: HeaderMap,
 ) -> Result<(String, String, HeaderMap), CoordinationError> {
     tracing::debug!("Auth response: {:#?}", auth_response);
 
@@ -210,7 +212,7 @@ pub async fn handle_finish_authentication_core(
     tracing::debug!("User ID: {:#?}", uid);
 
     // Create a session for the authenticated user
-    let headers = new_session_header(uid.clone()).await?;
+    let headers = new_session_header(uid.clone(), headers).await?;
 
     Ok((uid, name, headers))
 }

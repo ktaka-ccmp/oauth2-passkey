@@ -8,7 +8,10 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
-use std::{collections::{HashMap, HashSet}, sync::LazyLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
 use oauth2_passkey::{
     AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, get_authenticator_info_batch, get_user,
@@ -264,7 +267,6 @@ static TIMEZONE_MAP: LazyLock<HashMap<&'static str, Tz>> = LazyLock::new(|| {
 /// * `date` - The UTC datetime to format
 /// * `timezone_name` - The name of the timezone to display (e.g., "JST", "UTC", "EST")
 fn format_date_tz(date: &DateTime<Utc>, timezone_name: &str) -> String {
-
     let timezone = TIMEZONE_MAP.get(timezone_name).unwrap_or(&Tz::UTC);
 
     // Convert to the target timezone

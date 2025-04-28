@@ -43,3 +43,30 @@ pub(super) static USE_CONTEXT_TOKEN_COOKIE: LazyLock<bool> = LazyLock::new(|| {
         Err(_) => true, // Default to true when not specified
     }
 });
+
+pub static O2P_CSRF_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
+    std::env::var("O2P_CSRF_COOKIE_NAME")
+        .ok()
+        .unwrap_or("__Host-CsrfId".to_string())
+});
+
+pub static O2P_CSRF_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
+    std::env::var("O2P_CSRF_COOKIE_MAX_AGE")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(600) // Default to 10 minutes if not set or invalid
+});
+
+pub(super) static USE_O2P_CSRF_COOKIE: LazyLock<bool> = LazyLock::new(|| {
+    match env::var("USE_O2P_CSRF_COOKIE") {
+        Ok(val) => match val.as_str() {
+            "true" => true,
+            "false" => false,
+            _ => panic!(
+                "USE_O2P_CSRF_COOKIE must be 'true' or 'false', got '{}'.",
+                val
+            ),
+        },
+        Err(_) => true, // Default to true when not specified
+    }
+});

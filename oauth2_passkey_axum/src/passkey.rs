@@ -92,12 +92,14 @@ async fn handle_start_authentication(
 }
 
 async fn handle_finish_authentication(
+    request_headers: HeaderMap,
     Json(auth_response): Json<AuthenticatorResponse>,
 ) -> Result<(HeaderMap, String), (StatusCode, String)> {
     // Call the core function with the extracted data
-    let (_, name, headers) = handle_finish_authentication_core(auth_response)
-        .await
-        .into_response_error()?;
+    let (_, name, headers) =
+        handle_finish_authentication_core(auth_response, request_headers.clone())
+            .await
+            .into_response_error()?;
 
     // Return the headers and name
     Ok((headers, name))
