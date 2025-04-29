@@ -2,14 +2,14 @@ use askama::Template;
 use axum::{
     Router,
     extract::{Json as ExtractJson, Path},
-    http::{HeaderMap, StatusCode},
+    http::StatusCode,
     response::Html,
     routing::{delete, get},
 };
 
 use oauth2_passkey::{
     DbUser, O2P_ROUTE_PREFIX, delete_oauth2_account_core, delete_passkey_credential_core,
-    delete_user_account_admin, verify_context_token_and_page,
+    delete_user_account_admin,
 };
 
 use super::super::error::IntoResponseError;
@@ -97,12 +97,10 @@ pub(super) async fn delete_user_account_handler(
 #[derive(serde::Deserialize)]
 pub(super) struct PageUserContext {
     user_id: String,
-    page_user_context: String,
 }
 
 async fn delete_passkey_credential(
     auth_user: AuthUser,
-    headers: HeaderMap,
     Path(credential_id): Path<String>,
     ExtractJson(payload): ExtractJson<PageUserContext>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -110,9 +108,6 @@ async fn delete_passkey_credential(
     if !auth_user.is_admin {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
-
-    verify_context_token_and_page(&headers, Some(&payload.page_user_context), &auth_user.id)
-        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
 
     delete_passkey_credential_core(&payload.user_id, &credential_id)
         .await
@@ -123,16 +118,12 @@ async fn delete_passkey_credential(
 async fn delete_oauth2_account(
     auth_user: AuthUser,
     Path((provider, provider_user_id)): Path<(String, String)>,
-    headers: HeaderMap,
     ExtractJson(payload): ExtractJson<PageUserContext>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Check admin status
     if !auth_user.is_admin {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
-
-    verify_context_token_and_page(&headers, Some(&payload.page_user_context), &auth_user.id)
-        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
 
     delete_oauth2_account_core(&payload.user_id, &provider, &provider_user_id)
         .await

@@ -13,12 +13,6 @@ pub static SESSION_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
         .unwrap_or(600) // Default to 10 minutes if not set or invalid
 });
 
-pub static USER_CONTEXT_TOKEN_COOKIE: LazyLock<String> = LazyLock::new(|| {
-    std::env::var("USER_CONTEXT_TOKEN_COOKIE")
-        .ok()
-        .unwrap_or("__Host-ContextToken".to_string())
-});
-
 // We're using a simple string representation for tokens instead of a struct
 // to minimize dependencies and complexity
 
@@ -29,17 +23,3 @@ pub(super) static AUTH_SERVER_SECRET: LazyLock<Vec<u8>> =
             .to_string()
             .into_bytes(),
     });
-
-pub(super) static USE_CONTEXT_TOKEN_COOKIE: LazyLock<bool> = LazyLock::new(|| {
-    match env::var("USE_CONTEXT_TOKEN_COOKIE") {
-        Ok(val) => match val.as_str() {
-            "true" => true,
-            "false" => false,
-            _ => panic!(
-                "USE_CONTEXT_TOKEN_COOKIE must be 'true' or 'false', got '{}'.",
-                val
-            ),
-        },
-        Err(_) => true, // Default to true when not specified
-    }
-});

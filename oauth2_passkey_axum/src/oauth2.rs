@@ -12,8 +12,7 @@ use std::collections::HashMap;
 
 use oauth2_passkey::{
     AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, delete_oauth2_account_core, get_authorized_core,
-    list_accounts_core, post_authorized_core, prepare_oauth2_auth_request,
-    verify_context_token_and_page,
+    list_accounts_core, post_authorized_core, prepare_oauth2_auth_request, verify_context_token,
 };
 
 use super::error::IntoResponseError;
@@ -73,17 +72,16 @@ async fn google_auth(
 
     if mode.is_some() && mode.as_ref().unwrap() == "add_to_user" {
         if context.is_none() {
-            return Err((StatusCode::BAD_REQUEST, "Missing context".to_string()));
+            return Err((StatusCode::BAD_REQUEST, "Missing Context".to_string()));
         }
 
-        let session_user = auth_user.as_ref().map(|u| u.id.clone());
-        let user_id: String = session_user.unwrap_or_default();
+        if auth_user.is_none() {
+            return Err((StatusCode::BAD_REQUEST, "Missing Session".to_string()));
+        }
 
-        // Verify the user context token:
-        // 1. Verifies that the context user matches the session user ID
-        // 2. Verifies that the context token has not expired
-        // 3. Verifies that the context signature is valid
-        verify_context_token_and_page(&headers, Some(&context.unwrap()), &user_id)
+        // Verify that received context_token(obfuscated csrf_token) as a part of query param is same as the one in the current user's session cache.
+        verify_context_token(&headers, Some(&context.unwrap()))
+            .await
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     }
 

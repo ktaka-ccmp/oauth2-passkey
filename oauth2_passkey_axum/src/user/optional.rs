@@ -16,7 +16,7 @@ use serde_json::{Value, json};
 
 use oauth2_passkey::{
     AuthenticatorInfo, O2P_ROUTE_PREFIX, get_authenticator_info_batch, list_accounts_core,
-    list_credentials_core, obfuscate_user_id,
+    list_credentials_core, obfuscate_token,
 };
 
 use crate::config::O2P_REDIRECT_ANON;
@@ -106,7 +106,7 @@ struct UserSummaryTemplate {
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
     pub o2p_redirect_anon: String,
-    pub obfuscated_user_id: String,
+    pub page_context_token: String,
 }
 
 impl UserSummaryTemplate {
@@ -117,7 +117,7 @@ impl UserSummaryTemplate {
         o2p_route_prefix: String,
         o2p_redirect_anon: String,
     ) -> Self {
-        let obfuscated_user_id = obfuscate_user_id(&user.id);
+        let page_context_token = obfuscate_token(&user.csrf_token);
 
         Self {
             user: TemplateAuthUser {
@@ -133,7 +133,7 @@ impl UserSummaryTemplate {
             oauth2_accounts,
             o2p_route_prefix,
             o2p_redirect_anon,
-            obfuscated_user_id,
+            page_context_token,
         }
     }
 }

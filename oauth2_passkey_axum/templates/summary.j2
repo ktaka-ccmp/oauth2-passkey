@@ -194,7 +194,7 @@
     <script src="{{o2p_route_prefix}}/user/summary.js"></script>
     <script>
         // Page context for session boundary protection
-        const PAGE_USER_CONTEXT = "{{ obfuscated_user_id }}";
+        const PAGE_USER_CONTEXT = "{{ page_context_token }}";
         // Global route prefix for API calls
         const O2P_ROUTE_PREFIX = "{{o2p_route_prefix}}";
         const accountName = "{{user.account}}";
