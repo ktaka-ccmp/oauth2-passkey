@@ -7,6 +7,7 @@ function DeleteAccount() {
         fetch(`${O2P_ROUTE_PREFIX}/admin/delete_user`, {
             method: "DELETE",
             headers: {
+                "X-CSRF-Token": `${csrfToken}`,
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
@@ -37,6 +38,7 @@ function unlinkOAuth2Account(provider, providerUserId, accountUserId) {
             {
                 method: "DELETE",
                 headers: {
+                    "X-CSRF-Token": `${csrfToken}`,
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
@@ -68,6 +70,7 @@ function deletePasskeyCredential(credentialId, credentialUserId) {
         fetch(`${O2P_ROUTE_PREFIX}/admin/delete_passkey_credential/${credentialId}`, {
             method: "DELETE",
             headers: {
+                "X-CSRF-Token": `${csrfToken}`,
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({

@@ -199,6 +199,7 @@
         const O2P_ROUTE_PREFIX = "{{o2p_route_prefix}}";
         const accountName = "{{user.account}}";
         const userId = "{{user.id}}";
+        const csrfToken = "{{csrf_token}}";
         function Logout() {
             window.location.href = "{{o2p_route_prefix}}/user/logout?redirect={{o2p_redirect_anon}}";
         }

@@ -7,7 +7,10 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
-use std::{collections::{HashMap, HashSet}, sync::LazyLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
 use serde_json::{Value, json};
 
@@ -16,8 +19,8 @@ use oauth2_passkey::{
     list_credentials_core, obfuscate_user_id,
 };
 
-use crate::config::O2P_REDIRECT_ANON;
 use crate::session::AuthUser;
+use crate::{config::O2P_REDIRECT_ANON, session::AuthUserWithCsrfToken};
 
 pub(crate) fn router() -> Router<()> {
     Router::new()
@@ -98,6 +101,7 @@ struct TemplateAuthUser {
 #[template(path = "summary.j2")]
 struct UserSummaryTemplate {
     pub user: TemplateAuthUser,
+    pub csrf_token: String,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
@@ -112,6 +116,7 @@ impl UserSummaryTemplate {
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
         o2p_redirect_anon: String,
+        csrf_token: String,
     ) -> Self {
         let obfuscated_user_id = obfuscate_user_id(&user.id);
 
@@ -128,6 +133,7 @@ impl UserSummaryTemplate {
             oauth2_accounts,
             o2p_route_prefix,
             o2p_redirect_anon,
+            csrf_token,
             obfuscated_user_id,
         }
     }
@@ -167,10 +173,10 @@ async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCo
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
-async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
+async fn summary(auth_user: AuthUserWithCsrfToken) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
     // let session_user: &SessionUser = &auth_user;
-    let user_id = &auth_user.id;
+    let user_id = &auth_user.auth_user.id;
 
     // Fetch passkey credentials using the public function from libauth
     // let stored_credentials = list_credentials_core(Some(session_user))
@@ -252,12 +258,13 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
     // Create the route strings first
 
     let template = UserSummaryTemplate::new(
-        auth_user,
+        auth_user.auth_user,
         passkey_credentials,
         oauth2_accounts,
         // Pass owned String values to the template
         O2P_ROUTE_PREFIX.to_string(),
         O2P_REDIRECT_ANON.to_string(),
+        auth_user.csrf_token,
     );
 
     // Render the template
@@ -308,7 +315,6 @@ static TIMEZONE_MAP: LazyLock<HashMap<&'static str, Tz>> = LazyLock::new(|| {
 /// * `date` - The UTC datetime to format
 /// * `timezone_name` - The name of the timezone to display (e.g., "JST", "UTC", "EST")
 fn format_date_tz(date: &DateTime<Utc>, timezone_name: &str) -> String {
-
     let timezone = TIMEZONE_MAP.get(timezone_name).unwrap_or(&Tz::UTC);
 
     // Convert to the target timezone

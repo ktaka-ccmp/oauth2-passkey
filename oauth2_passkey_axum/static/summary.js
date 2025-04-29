@@ -23,6 +23,7 @@ function updateUserAccount() {
     fetch(`${O2P_ROUTE_PREFIX}/user/update`, {
         method: "PUT",
         headers: {
+            "X-CSRF-Token": `${csrfToken}`,
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -66,6 +67,7 @@ function DeleteAccount() {
         fetch(`${O2P_ROUTE_PREFIX}/user/delete`, {
             method: "DELETE",
             headers: {
+                "X-CSRF-Token": `${csrfToken}`,
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({ user_id: userId }),
@@ -126,6 +128,7 @@ function unlinkOAuth2Account(provider, providerUserId) {
             {
                 method: "DELETE",
                 headers: {
+                    "X-CSRF-Token": `${csrfToken}`,
                     "Content-Type": "application/json",
                 },
             }
@@ -251,6 +254,7 @@ function deletePasskeyCredential(credentialId, userHandle) {
         fetch(`${O2P_ROUTE_PREFIX}/passkey/credentials/${credentialId}`, {
             method: "DELETE",
             headers: {
+                "X-CSRF-Token": `${csrfToken}`,
                 "Content-Type": "application/json",
             },
         })
@@ -326,7 +330,10 @@ function updateCredentialDetails() {
 
     fetch(`${O2P_ROUTE_PREFIX}/passkey/credential/update`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "X-CSRF-Token": `${csrfToken}`,
+            "Content-Type": "application/json",
+        },
         body: JSON.stringify({
             credential_id: credentialId,
             name: name,

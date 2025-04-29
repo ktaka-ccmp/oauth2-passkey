@@ -42,8 +42,9 @@ pub use passkey::{
 };
 
 pub use session::{
-    SESSION_COOKIE_NAME, SessionError, User as SessionUser, get_user_from_session,
-    is_authenticated_basic, is_authenticated_strict, obfuscate_user_id, prepare_logout_response,
+    SESSION_COOKIE_NAME, SessionError, User as SessionUser, get_csrf_token_from_session,
+    get_user_and_csrf_token_from_session, get_user_from_session, is_authenticated_basic,
+    is_authenticated_strict, obfuscate_user_id, prepare_logout_response,
     verify_context_token_and_page,
 };
 
