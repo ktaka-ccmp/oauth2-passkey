@@ -82,9 +82,8 @@ where
             let x_csrf_token = parts
                 .headers
                 .get("X-Csrf-Token")
-                .ok_or(AuthRedirect::new(method.clone()))
-                .map(|h| h.to_str().unwrap().to_string())
-                .map_err(|_| AuthRedirect::new(method.clone()))?;
+                .and_then(|h| h.to_str().ok().map(|s| s.to_string()))
+                .ok_or(AuthRedirect::new(method.clone()))?;
 
             tracing::trace!(
                 "CSRF token: X-Csrf-Token: {}, from Session: {}",
