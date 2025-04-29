@@ -207,6 +207,7 @@ async function startRegistration(mode, username = null, displayname = null) {
         startResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/start', {
             method: 'POST',
             headers: {
+                'X-CSRF-Token': `${csrfToken}`,
                 'Content-Type': 'application/json',
             },
             credentials: 'same-origin', // Important for cookie-based context token
@@ -256,7 +257,10 @@ async function startRegistration(mode, username = null, displayname = null) {
         // is included in the credential for additional verification
         const finishResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/finish', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'X-CSRF-Token': `${csrfToken}`,
+                'Content-Type': 'application/json',
+            },
             // Include credentials to ensure cookies are sent with the request
             credentials: 'same-origin',
             body: JSON.stringify(credentialResponse)

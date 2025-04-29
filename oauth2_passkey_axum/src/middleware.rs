@@ -10,14 +10,14 @@ use super::session::AuthUser;
 
 // Authentication checker with custom redirect URL
 pub async fn is_authenticated_401(req: Request, next: Next) -> impl IntoResponse {
-    match oauth2_passkey::is_authenticated_basic(req.headers()).await {
+    match oauth2_passkey::is_authenticated_basic(req.headers(), req.method()).await {
         Ok(true) => next.run(req).await,
         Ok(false) | Err(_) => (StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     }
 }
 
 pub async fn is_authenticated_redirect(req: Request, next: Next) -> impl IntoResponse {
-    match oauth2_passkey::is_authenticated_basic(req.headers()).await {
+    match oauth2_passkey::is_authenticated_basic(req.headers(), req.method()).await {
         Ok(true) => next.run(req).await,
         Ok(false) | Err(_) => Redirect::temporary(O2P_REDIRECT_ANON.as_str()).into_response(),
     }

@@ -18,7 +18,7 @@ use oauth2_passkey::{
     list_accounts_core, list_credentials_core, obfuscate_user_id,
 };
 
-use crate::{O2P_ADMIN_URL, session::AuthUser};
+use crate::{O2P_ADMIN_URL, session::AuthUserWithCsrfToken};
 
 pub(crate) fn router() -> Router<()> {
     Router::new()
@@ -71,6 +71,7 @@ struct TemplateUser {
 #[template(path = "admin_user.j2")]
 struct UserSummaryTemplate {
     pub user: TemplateUser,
+    pub csrf_token: String,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
@@ -80,6 +81,7 @@ struct UserSummaryTemplate {
 impl UserSummaryTemplate {
     fn new(
         user: DbUser,
+        csrf_token: String,
         passkey_credentials: Vec<TemplateCredential>,
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
@@ -95,6 +97,7 @@ impl UserSummaryTemplate {
                 created_at: format_date_tz(&user.created_at, "JST"),
                 updated_at: format_date_tz(&user.updated_at, "JST"),
             },
+            csrf_token,
             passkey_credentials,
             oauth2_accounts,
             o2p_route_prefix,
@@ -104,12 +107,14 @@ impl UserSummaryTemplate {
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
-async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoResponse {
-    // ) -> Result<Html<String>, (StatusCode, String)> {
-    if !auth_user.is_admin {
+async fn user_summary(
+    auth_user: AuthUserWithCsrfToken,
+    user_id: Path<String>,
+) -> impl IntoResponse {
+    if !auth_user.auth_user.is_admin {
         tracing::warn!(
             "User {} is not authorized to view user summary",
-            auth_user.id
+            auth_user.auth_user.id
         );
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
@@ -208,16 +213,19 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
         })
         .collect();
 
+    let csrf_token = auth_user.csrf_token;
+
     // Create template with all data
     let mut template = UserSummaryTemplate::new(
         user,
+        csrf_token,
         passkey_credentials,
         oauth2_accounts,
         O2P_ROUTE_PREFIX.to_string(),
     );
 
     // Override obfuscated user ID with the current session user ID
-    template.obfuscated_user_id = obfuscate_user_id(&auth_user.id);
+    template.obfuscated_user_id = obfuscate_user_id(&auth_user.auth_user.id);
 
     // Render the template
     let html = template.render().map_err(|e| {
