@@ -18,7 +18,7 @@ use oauth2_passkey::{
     list_accounts_core, list_credentials_core, obfuscate_user_id,
 };
 
-use crate::{O2P_ADMIN_URL, session::AuthUserWithCsrfToken};
+use crate::{O2P_ADMIN_URL, session::AuthUser};
 
 pub(crate) fn router() -> Router<()> {
     Router::new()
@@ -107,14 +107,11 @@ impl UserSummaryTemplate {
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
-async fn user_summary(
-    auth_user: AuthUserWithCsrfToken,
-    user_id: Path<String>,
-) -> impl IntoResponse {
-    if !auth_user.auth_user.is_admin {
+async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoResponse {
+    if !auth_user.is_admin {
         tracing::warn!(
             "User {} is not authorized to view user summary",
-            auth_user.auth_user.id
+            auth_user.id
         );
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
@@ -225,7 +222,7 @@ async fn user_summary(
     );
 
     // Override obfuscated user ID with the current session user ID
-    template.obfuscated_user_id = obfuscate_user_id(&auth_user.auth_user.id);
+    template.obfuscated_user_id = obfuscate_user_id(&auth_user.id);
 
     // Render the template
     let html = template.render().map_err(|e| {

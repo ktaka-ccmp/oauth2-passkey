@@ -11,8 +11,8 @@ use axum_extra::{TypedHeader, headers};
 use std::collections::HashMap;
 
 use oauth2_passkey::{
-    AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, SessionUser, delete_oauth2_account_core,
-    get_authorized_core, list_accounts_core, post_authorized_core, prepare_oauth2_auth_request,
+    AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, delete_oauth2_account_core, get_authorized_core,
+    list_accounts_core, post_authorized_core, prepare_oauth2_auth_request,
     verify_context_token_and_page,
 };
 
@@ -76,8 +76,8 @@ async fn google_auth(
             return Err((StatusCode::BAD_REQUEST, "Missing context".to_string()));
         }
 
-        let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
-        let user_id: String = session_user.map(|u| u.id.clone()).unwrap_or_default();
+        let session_user = auth_user.as_ref().map(|u| u.id.clone());
+        let user_id: String = session_user.unwrap_or_default();
 
         // Verify the user context token:
         // 1. Verifies that the context user matches the session user ID
@@ -141,14 +141,14 @@ async fn post_authorized(
 }
 
 async fn list_oauth2_accounts(
-    auth_user: Option<AuthUser>,
+    auth_user: AuthUser,
 ) -> Result<Json<Vec<OAuth2Account>>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser if present using deref coercion
     // let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
 
     // Call the core function with the extracted data
     // let accounts = list_accounts_core(session_user)
-    let accounts = list_accounts_core(&auth_user.unwrap().id)
+    let accounts = list_accounts_core(&auth_user.id)
         .await
         .into_response_error()?;
     Ok(Json(accounts))
