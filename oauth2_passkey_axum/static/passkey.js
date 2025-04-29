@@ -195,12 +195,10 @@ async function startRegistration(mode, username = null, displayname = null) {
         // Log the explicitly provided mode
         console.log('Registration mode:', mode);
 
-        // Include mode and page context for session boundary verification
         const request = {
             username,
             displayname,
             mode: mode,
-            page_context: typeof PAGE_USER_CONTEXT !== 'undefined' ? PAGE_USER_CONTEXT : '',
         };
 
         let startResponse;
@@ -247,14 +245,11 @@ async function startRegistration(mode, username = null, displayname = null) {
             },
             user_handle: userHandle,
             mode: mode,
-            page_context: typeof PAGE_USER_CONTEXT !== 'undefined' ? PAGE_USER_CONTEXT : '',
         };
 
         console.log('Registration response:', credentialResponse);
 
         // Use the single registration finish endpoint
-        // The mode has already been verified at the start stage, and the page_context
-        // is included in the credential for additional verification
         const finishResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/finish', {
             method: 'POST',
             headers: {

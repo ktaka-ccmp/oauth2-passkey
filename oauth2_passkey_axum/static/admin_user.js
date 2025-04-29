@@ -43,7 +43,6 @@ function unlinkOAuth2Account(provider, providerUserId, accountUserId) {
                 },
                 body: JSON.stringify({
                     user_id: accountUserId,
-                    page_user_context: PAGE_USER_CONTEXT
                 }),
             }
         )
@@ -66,7 +65,6 @@ function deletePasskeyCredential(credentialId, credentialUserId) {
     if (confirm("Are you sure you want to unlink this passkey credential?")) {
         console.log("Deleting passkey credential with ID: " + credentialId);
         console.log("User ID: " + credentialUserId);
-        console.log("Page user context: " + PAGE_USER_CONTEXT);
         fetch(`${O2P_ROUTE_PREFIX}/admin/delete_passkey_credential/${credentialId}`, {
             method: "DELETE",
             headers: {
@@ -75,7 +73,6 @@ function deletePasskeyCredential(credentialId, credentialUserId) {
             },
             body: JSON.stringify({
                 user_id: credentialUserId,
-                page_user_context: PAGE_USER_CONTEXT,
             }),
         })
         .then(async (response) => {

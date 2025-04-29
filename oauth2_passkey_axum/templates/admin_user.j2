@@ -32,7 +32,6 @@
         <div class="item" id="user-info-display">
             <div class="item-detail"><strong>User ID:</strong> {{ user.id }}</div>
             <div class="item-detail"><strong>Is Admin:</strong> {{ user.is_admin }}</div>
-            <div class="item-detail"><strong>Obfuscated User ID:</strong> {{ obfuscated_user_id }}</div>
             <div class="item-detail"><strong>Account:</strong> {{ user.account }}</div>
             <div class="item-detail"><strong>Label:</strong> {{ user.label }}</div>
             <div class="item-detail"><strong>Created:</strong> {{ user.created_at }}</div>
@@ -122,8 +121,6 @@
 
     <script src="{{o2p_route_prefix}}/admin/admin_user.js"></script>
     <script>
-        // Page context for session boundary protection
-        const PAGE_USER_CONTEXT = "{{ obfuscated_user_id }}";
         // Global route prefix for API calls
         const O2P_ROUTE_PREFIX = "{{o2p_route_prefix}}";
         const accountName = "{{user.account}}";

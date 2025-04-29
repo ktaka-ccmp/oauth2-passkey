@@ -25,9 +25,9 @@ We created a clear separation of intent through explicit registration modes:
 #[serde(rename_all = "snake_case")]
 pub enum RegistrationMode {
     /// Adding a passkey to an existing user (requires authentication)
-    AddToExistingUser,
+    AddToUser,
     /// Creating a new user with a passkey (no authentication required)
-    NewUser,
+    CreateUser,
 }
 ```
 
@@ -35,7 +35,7 @@ These modes are used in the client JavaScript and server-side handlers to explic
 
 ```javascript
 // Client-side: Explicit mode when showing registration modal
-function showRegistrationModal(mode) { // 'new_user' or 'add_to_existing_user'
+function showRegistrationModal(mode) { // 'create_user' or 'add_to_user'
     const modal = createRegistrationModal();
     modal.style.display = 'block';
     modal.dataset.mode = mode;
@@ -46,138 +46,142 @@ function showRegistrationModal(mode) { // 'new_user' or 'add_to_existing_user'
 ```rust
 // Server-side: Mode-specific handling
 match body.mode {
-    RegistrationMode::AddToExistingUser => {
+    RegistrationMode::AddToUser => {
         // Verify user is authenticated
-        // Verify context token matches session
+        // Verify CSRF token matches session
         // Add passkey to existing user
     },
-    RegistrationMode::NewUser => {
+    RegistrationMode::CreateUser => {
         // Create new user with passkey
     },
 }
 ```
 
-### 2. Session/Page Synchronization with Signed Tokens
+### 2. Session/Page Synchronization with Page Context Tokens
 
-We implemented a dual verification approach using signed context tokens:
+We leverage obfuscated CSRF tokens as page context tokens for both CSRF protection and session boundary verification:
 
-#### Signed Composite Token Implementation
+#### CSRF Token Implementation
 
-The token generation function creates a signed token containing the obfuscated user ID, expiration, and signature:
+The CSRF token mechanism is integrated with the session management system:
 
 ```rust
-pub fn generate_user_context_token(user_id: &str) -> String {
-    let expires_at = Utc::now() + Duration::days(1);
-    let expiry_str = expires_at.timestamp().to_string();
+// When creating a new session, a CSRF token is generated and stored
+pub(super) async fn create_new_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {
+    let session_id = gen_random_string(32)?;
+    let expires_at = Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64);
 
-    // Obfuscate user ID
-    let obfuscated_user_id = obfuscate_user_id(user_id);
+    let csrf_token = gen_random_string(32)?;
 
-    // Create the data string
-    let data = format!("{}{}", obfuscated_user_id, expiry_str);
+    let stored_session = StoredSession {
+        user_id: user_id.to_string(),
+        csrf_token: csrf_token.to_string(),
+        expires_at,
+        ttl: *SESSION_COOKIE_MAX_AGE,
+    };
 
-    // Sign the data with HMAC-SHA256
-    let mut mac = HmacSha256::new_from_slice(&AUTH_SERVER_SECRET)
-        .expect("HMAC can take key of any size");
-    mac.update(data.as_bytes());
-    let signature = mac.finalize().into_bytes();
-    let signature_base64 = URL_SAFE_NO_PAD.encode(signature);
+    // Store the session with the CSRF token
+    GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .put_with_ttl(
+            "session",
+            &session_id,
+            stored_session.into(),
+            *SESSION_COOKIE_MAX_AGE as usize,
+        )
+        .await
+        .map_err(|e| SessionError::Storage(e.to_string()))?;
 
-    // Format as data:signature
-    format!("{}{}", data, signature_base64)
+    // Set the session cookie
+    let mut headers = HeaderMap::new();
+    header_set_cookie(
+        &mut headers,
+        SESSION_COOKIE_NAME.to_string(),
+        session_id.clone(),
+        expires_at,
+        *SESSION_COOKIE_MAX_AGE as i64,
+    )?;
+
+    Ok(headers)
 }
 ```
 
-The token verification function checks that the token is valid, not expired, and belongs to the correct user:
+The CSRF token is verified for all state-changing operations:
 
 ```rust
-pub fn verify_user_context_token(token: &str, session_user_id: &str) -> Result<(), SessionError> {
-    // Parse token parts
-    let parts: Vec<&str> = token.split(':').collect();
-    if parts.len() != 3 {
-        return Err(SessionError::ContextToken(
-            "Invalid token format".to_string(),
-        ));
+// CSRF verification for state-changing methods
+if method == Method::POST || method == Method::PUT || method == Method::DELETE {
+    let x_csrf_token = headers
+        .get("X-Csrf-Token")
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string());
+
+    if let Some(csrf_token) = x_csrf_token {
+        if csrf_token != stored_session.csrf_token {
+            return Ok(false);
+        }
+    } else {
+        return Ok(false);
     }
-
-    let token_obfuscated_user_id = parts[0];
-    let expiry_str = parts[1];
-    let signature_base64 = parts[2];
-
-    // Verify obfuscated user ID
-    let session_obfuscated_user_id = obfuscate_user_id(session_user_id);
-    if token_obfuscated_user_id != session_obfuscated_user_id {
-        return Err(SessionError::ContextToken(
-            "Your session has changed since this page was loaded".to_string(),
-        ));
-    }
-
-    // Check expiration
-    let expiry = expiry_str
-        .parse::<i64>()
-        .map_err(|_| SessionError::ContextToken("Invalid expiration format in token".to_string()))?;
-
-    let now = Utc::now().timestamp();
-    if now > expiry {
-        return Err(SessionError::ContextToken("Token has expired".to_string()));
-    }
-
-    // Verify signature
-    let data = format!("{}{}", token_obfuscated_user_id, expiry_str);
-    let mut mac = HmacSha256::new_from_slice(&AUTH_SERVER_SECRET)
-        .map_err(|_| SessionError::ContextToken("Failed to create HMAC".to_string()))?;
-    mac.update(data.as_bytes());
-
-    let signature = URL_SAFE_NO_PAD
-        .decode(signature_base64)
-        .map_err(|_| SessionError::ContextToken("Invalid signature encoding".to_string()))?;
-
-    mac.verify_slice(&signature)
-        .map_err(|_| SessionError::ContextToken("Invalid token signature".to_string()))?;
-
-    Ok(())
 }
 ```
 
-#### Dual Token Delivery
+For session boundary protection, we use an obfuscated version of the CSRF token:
 
-We implemented both approaches for maximum protection:
+```rust
+// Obfuscate the CSRF token for page context
+pub fn obfuscate_token(token: &str) -> String {
+    let mut mac =
+        HmacSha256::new_from_slice(&AUTH_SERVER_SECRET).expect("HMAC can take key of any size");
+    mac.update(token.as_bytes());
+    let result = mac.finalize().into_bytes();
+    URL_SAFE_NO_PAD.encode(result)
+}
+```
 
-1. **HTTP Cookie**:
-   - Set a cookie containing the signed token with a 1-day expiration
-   - The cookie is HttpOnly and SameSite=Strict for security
-   - Example: `auth_context_token=abc123:1742511092:0uOGXo_4fc9umHuDzMg_HRjbptC562Slkjw9alOEmWk`
-   - Where `abc123` is the obfuscated user ID, not the actual user ID
+#### Token Delivery
+
+The CSRF token is delivered through two mechanisms:
+
+1. **HTTP Headers**:
+   - The CSRF token is required in the `X-CSRF-Token` header for all state-changing operations
+   - This protects against cross-site request forgery attacks
 
 2. **Page Embedding**:
-   - Embed the obfuscated user ID in the page as a JavaScript constant: `PAGE_USER_CONTEXT`
-   - Include this context with sensitive operations like adding passkeys or OAuth2 accounts
-   - Example: `<script>const PAGE_USER_CONTEXT = "{{ obfuscated_user_id }}";</script>`
+   - The obfuscated CSRF token is embedded in the page as a JavaScript constant: `PAGE_CONTEXT_TOKEN`
+   - This is used for session boundary verification
+   - Example: `<script>const PAGE_CONTEXT_TOKEN = "{{ page_context_token }}";</script>`
 
-### Combined Verification
+### Page Context Token Verification
 
-The `verify_context_token_and_page` function checks both the cookie token and page context:
+The `verify_context_token` function verifies that the page context token matches the obfuscated CSRF token:
 
 ```rust
-pub fn verify_context_token_and_page(
+pub async fn verify_context_token(
     headers: &HeaderMap,
     page_context: Option<&String>,
-    user_id: &str,
 ) -> Result<(), SessionError> {
-    if *USE_CONTEXT_TOKEN_COOKIE {
-        // Extract token
-        let context_token = extract_context_token_from_cookies(headers)
-            .ok_or_else(|| SessionError::ContextToken("Context token missing".to_string()))?;
+    let session_id: &str = match get_session_id_from_headers(headers) {
+        Ok(Some(session_id)) => session_id,
+        _ => return Err(SessionError::ContextToken("Session ID missing".to_string())),
+    };
 
-        // Verify token belongs to user
-        verify_user_context_token(&context_token, user_id)?;
-    }
+    let cached_session = GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .get("session", session_id)
+        .await
+        .map_err(|e| SessionError::Storage(e.to_string()))?
+        .ok_or(SessionError::SessionError)?;
 
-    // Verify page context matches user (if provided)
-    if let Some(context) = page_context {
-        if !context.is_empty() && context != &obfuscate_user_id(user_id) {
+    let stored_session: StoredSession = cached_session.try_into()?;
+
+    if let Some(page_context) = page_context {
+        if page_context.as_str() != obfuscate_token(&stored_session.csrf_token) {
+            tracing::error!("Page context token does not match session user");
             return Err(SessionError::ContextToken(
-                "Page context does not match session user".to_string(),
+                "Page context token does not match session user".to_string(),
             ));
         }
     }
@@ -189,21 +193,38 @@ pub fn verify_context_token_and_page(
 ## Benefits of the Implemented Approach
 
 1. **Clear Intent Separation**: The `RegistrationMode` enum explicitly declares whether operations create users or modify existing ones
-2. **Defense in Depth**: Dual verification with both cookies and page context catches session changes
-3. **Stateless Implementation**: No additional server-side storage needed
-4. **Performance**: No database lookups required for verification
-5. **Separation of Concerns**: Authentication logic remains separate from page synchronization logic
-6. **User Experience**: Clear error messages guide users when synchronization fails
-7. **Privacy Enhancement**: User IDs are obfuscated to prevent direct exposure
+2. **Simplified Security Model**: Using CSRF tokens for both CSRF protection and session boundary verification
+3. **Integrated Implementation**: Session management and security are tightly integrated
+4. **Performance**: No additional storage or database lookups required
+5. **User Experience**: Clear error messages guide users when synchronization fails
+6. **Reduced Complexity**: Fewer mechanisms to maintain and understand
 
 ## Security Considerations
 
-- User IDs are obfuscated using HMAC-SHA256 to prevent direct exposure
+- CSRF tokens are obfuscated using HMAC-SHA256 to prevent direct exposure
 - Token expiration is set to 1 day, balancing security and user experience
 - Tokens are signed with HMAC-SHA256 using a configurable server secret
 - Cookies are set with HttpOnly and SameSite=Strict to prevent XSS and CSRF attacks
 - Error messages are user-friendly but don't expose sensitive information
-- The feature can be toggled with the `USE_CONTEXT_TOKEN_COOKIE` environment variable
+
+## Special Considerations for OAuth2 Flows
+
+OAuth2 flows present unique challenges for session boundary protection:
+
+1. **Redirect and Cross-Domain Limitations**:
+   - OAuth2 redirects to third-party providers and back
+   - Cookies may not be preserved across domains
+   - Custom headers like `X-CSRF-Token` cannot be set on redirects
+
+2. **Our Solution**:
+   - Use obfuscated CSRF tokens as page context tokens
+   - Pass these tokens as query parameters in OAuth2 redirects
+   - Verify the tokens when processing OAuth2 callbacks
+
+3. **Security Benefits**:
+   - Maintains session boundary protection despite redirect constraints
+   - Avoids exposing raw CSRF tokens in URLs
+   - Provides a consistent security model across all authentication flows
 
 ## Appendix: Alternative Approaches Considered
 

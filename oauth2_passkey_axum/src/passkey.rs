@@ -54,27 +54,24 @@ pub fn passkey_well_known_router() -> Router {
 
 async fn handle_start_registration(
     auth_user: Option<AuthUser>,
-    request_headers: HeaderMap,
     Json(request): Json<RegistrationStartRequest>,
 ) -> Result<Json<RegistrationOptions>, (StatusCode, String)> {
     let session_user = auth_user.as_ref().map(SessionUser::from);
 
     // Use the new wrapper function that handles headers directly
-    let registration_options =
-        handle_start_registration_core(session_user.as_ref(), &request_headers, request)
-            .await
-            .into_response_error()?;
+    let registration_options = handle_start_registration_core(session_user.as_ref(), request)
+        .await
+        .into_response_error()?;
 
     Ok(Json(registration_options))
 }
 
 async fn handle_finish_registration(
     auth_user: Option<AuthUser>,
-    request_headers: HeaderMap,
     Json(reg_data): Json<RegisterCredential>,
 ) -> Result<(HeaderMap, String), (StatusCode, String)> {
     let session_user = auth_user.as_ref().map(SessionUser::from);
-    handle_finish_registration_core(session_user.as_ref(), &request_headers, reg_data)
+    handle_finish_registration_core(session_user.as_ref(), reg_data)
         .await
         .into_response_error()
 }

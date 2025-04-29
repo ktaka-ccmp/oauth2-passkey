@@ -15,7 +15,7 @@ use std::{
 
 use oauth2_passkey::{
     AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, get_authenticator_info_batch, get_user,
-    list_accounts_core, list_credentials_core, obfuscate_user_id,
+    list_accounts_core, list_credentials_core,
 };
 
 use crate::{O2P_ADMIN_URL, session::AuthUser};
@@ -75,7 +75,6 @@ struct UserSummaryTemplate {
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
-    pub obfuscated_user_id: String,
 }
 
 impl UserSummaryTemplate {
@@ -86,8 +85,6 @@ impl UserSummaryTemplate {
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
     ) -> Self {
-        let obfuscated_user_id = obfuscate_user_id(&user.id);
-
         Self {
             user: TemplateUser {
                 id: user.id.clone(),
@@ -101,7 +98,6 @@ impl UserSummaryTemplate {
             passkey_credentials,
             oauth2_accounts,
             o2p_route_prefix,
-            obfuscated_user_id,
         }
     }
 }
@@ -210,19 +206,16 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
         })
         .collect();
 
-    let csrf_token = auth_user.csrf_token;
+    let csrf_token = auth_user.csrf_token.clone();
 
     // Create template with all data
-    let mut template = UserSummaryTemplate::new(
+    let template = UserSummaryTemplate::new(
         user,
         csrf_token,
         passkey_credentials,
         oauth2_accounts,
         O2P_ROUTE_PREFIX.to_string(),
     );
-
-    // Override obfuscated user ID with the current session user ID
-    template.obfuscated_user_id = obfuscate_user_id(&auth_user.id);
 
     // Render the template
     let html = template.render().map_err(|e| {

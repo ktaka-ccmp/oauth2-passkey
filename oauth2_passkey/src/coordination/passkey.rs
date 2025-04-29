@@ -11,7 +11,7 @@ use crate::passkey::{
     verify_session_then_finish_registration,
 };
 use crate::session::User as SessionUser;
-use crate::session::{new_session_header, verify_context_token_and_page};
+use crate::session::new_session_header;
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
@@ -52,7 +52,6 @@ pub struct RegistrationStartRequest {
 /// from the request body, and returns registration options.
 pub async fn handle_start_registration_core(
     auth_user: Option<&SessionUser>,
-    request_headers: &HeaderMap,
     body: RegistrationStartRequest,
 ) -> Result<RegistrationOptions, CoordinationError> {
     match body.mode {
@@ -61,12 +60,6 @@ pub async fn handle_start_registration_core(
                 Some(user) => user,
                 None => return Err(CoordinationError::Unauthorized.log()),
             };
-
-            verify_context_token_and_page(
-                request_headers,
-                body.page_context.as_ref(),
-                &auth_user.id,
-            )?;
 
             let result =
                 start_registration(Some(auth_user.clone()), body.username, body.displayname)
@@ -94,18 +87,11 @@ pub async fn handle_start_registration_core(
 /// with the credential.
 pub async fn handle_finish_registration_core(
     auth_user: Option<&SessionUser>,
-    request_headers: &HeaderMap,
     reg_data: RegisterCredential,
 ) -> Result<(HeaderMap, String), CoordinationError> {
     match auth_user {
         Some(session_user) => {
             tracing::debug!("handle_finish_registration_core: User: {:#?}", session_user);
-
-            verify_context_token_and_page(
-                request_headers,
-                reg_data.page_context.as_ref(),
-                &session_user.id,
-            )?;
 
             // Handle authenticated user registration
             let message =

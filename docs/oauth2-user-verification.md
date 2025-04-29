@@ -8,10 +8,12 @@ This document analyzes the user verification mechanism in the OAuth2 authenticat
 
 ### Before OAuth2 Redirect (Initiation)
 
-1. **Context Token Verification**
-   - When adding an OAuth2 account to an existing user, the system verifies the context token
-   - Checks that the user ID in the session matches the obfuscated user ID in the page context
-   - Verification occurs **before** redirecting to the OAuth2 provider's endpoint
+1. **Page Context Token Verification**
+   - When adding an OAuth2 account to an existing user, the system verifies:
+     - That the user has a valid session
+     - That the page context token matches the obfuscated CSRF token from the session
+   - This verification occurs **before** redirecting to the OAuth2 provider's endpoint
+   - Ensures the user who loaded the page is the same user making the request
 
 2. **State Parameter Management**
    - A state parameter is generated and stored in the session with the user ID
@@ -34,7 +36,7 @@ This document analyzes the user verification mechanism in the OAuth2 authenticat
 
 3. **Session Renewal**
    - Creates a completely new session for the user after authentication
-   - Generates fresh session cookies and context tokens
+   - Generates fresh session cookies with new CSRF tokens
    - Mitigates session fixation attacks
    - Invalidates any previously captured credentials
 
@@ -42,9 +44,11 @@ This document analyzes the user verification mechanism in the OAuth2 authenticat
 
 The system implements multiple layers of security:
 
-1. **Context Token Verification**
+1. **Page Context Token Verification**
    - Verifies user identity before initiating the OAuth2 flow
    - Prevents unauthorized account linking attempts
+   - Ensures session continuity between page load and action
+   - Uses obfuscated CSRF tokens as page context tokens
 
 2. **State Parameter as Security Token**
    - Cryptographically secure random token
@@ -66,7 +70,7 @@ The system implements multiple layers of security:
 The current implementation follows OAuth 2.0 security best practices and provides robust protection:
 
 1. **Pre-Authorization Verification**
-   - Context token verification ensures legitimate user before redirect
+   - Page context token verification ensures legitimate user before redirect
 
 2. **Cross-Request Correlation**
    - State parameter securely binds initial request to callback
@@ -77,7 +81,7 @@ The current implementation follows OAuth 2.0 security best practices and provide
 
 ### OAuth2 Callback Limitations
 
-Context token verification cannot be added to the callback process due to technical limitations of the OAuth2 protocol:
+Page context token verification cannot be added to the callback process due to technical limitations of the OAuth2 protocol:
 
 1. **Form Post Response Mode Constraints**
    - When using `response_mode=form_post`, the callback doesn't receive cookies
@@ -91,8 +95,8 @@ Context token verification cannot be added to the callback process due to techni
    - The state parameter serves as the binding between the authorization request and callback
 
 3. **Technical Constraints**
-   - Without access to cookies in the callback, there is no reliable way to access the context token
-   - Alternative approaches (embedding context token in state parameter or URL) would expose sensitive information
+   - Without access to cookies in the callback, there is no reliable way to access the page context token
+   - Alternative approaches (embedding page context token in state parameter or URL) would expose sensitive information
    - The OAuth2 protocol is designed to work with the state parameter as the primary cross-request identifier
 
 ## Conclusion
@@ -104,4 +108,4 @@ The implemented security measures provide strong protection against common OAuth
 - Session hijacking
 - Unauthorized account linking
 
-The system uses a combination of context tokens, state parameters, and session renewal to create a secure authentication flow without unnecessary complexity or dependencies, aligning with the project's goals of simplicity and security.
+The system uses a combination of CSRF tokens, state parameters, and session renewal to create a secure authentication flow without unnecessary complexity or dependencies, aligning with the project's goals of simplicity and security.
