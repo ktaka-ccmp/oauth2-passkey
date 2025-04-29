@@ -40,7 +40,7 @@ struct UserListTemplate {
 
 async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
-    if !auth_user.is_admin {
+    if !auth_user.session_user.is_admin {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     };
 
@@ -70,10 +70,10 @@ pub(super) async fn delete_user_account_handler(
     ExtractJson(payload): ExtractJson<DeleteUserRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Verify that the user has admin privileges
-    if !auth_user.is_admin {
+    if !auth_user.session_user.is_admin {
         tracing::warn!(
             "User {} is not authorized to delete another user's account",
-            auth_user.id
+            auth_user.session_user.id
         );
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
@@ -87,7 +87,7 @@ pub(super) async fn delete_user_account_handler(
     tracing::debug!(
         "User account deleted: {} by {}",
         payload.user_id,
-        auth_user.id
+        auth_user.session_user.id
     );
 
     // Return the credential IDs in the response for client-side notification
@@ -107,12 +107,16 @@ async fn delete_passkey_credential(
     ExtractJson(payload): ExtractJson<PageUserContext>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Check admin status
-    if !auth_user.is_admin {
+    if !auth_user.session_user.is_admin {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    verify_context_token_and_page(&headers, Some(&payload.page_user_context), &auth_user.id)
-        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+    verify_context_token_and_page(
+        &headers,
+        Some(&payload.page_user_context),
+        &auth_user.session_user.id,
+    )
+    .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
 
     delete_passkey_credential_core(&payload.user_id, &credential_id)
         .await
@@ -127,12 +131,16 @@ async fn delete_oauth2_account(
     ExtractJson(payload): ExtractJson<PageUserContext>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Check admin status
-    if !auth_user.is_admin {
+    if !auth_user.session_user.is_admin {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    verify_context_token_and_page(&headers, Some(&payload.page_user_context), &auth_user.id)
-        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+    verify_context_token_and_page(
+        &headers,
+        Some(&payload.page_user_context),
+        &auth_user.session_user.id,
+    )
+    .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
 
     delete_oauth2_account_core(&payload.user_id, &provider, &provider_user_id)
         .await

@@ -11,8 +11,8 @@ use axum_extra::{TypedHeader, headers};
 use std::collections::HashMap;
 
 use oauth2_passkey::{
-    AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, SessionUser, delete_oauth2_account_core,
-    get_authorized_core, list_accounts_core, post_authorized_core, prepare_oauth2_auth_request,
+    AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, delete_oauth2_account_core, get_authorized_core,
+    list_accounts_core, post_authorized_core, prepare_oauth2_auth_request,
     verify_context_token_and_page,
 };
 
@@ -76,7 +76,7 @@ async fn google_auth(
             return Err((StatusCode::BAD_REQUEST, "Missing context".to_string()));
         }
 
-        let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+        let session_user = auth_user.as_ref().map(|u| u.session_user.clone());
         let user_id: String = session_user.map(|u| u.id.clone()).unwrap_or_default();
 
         // Verify the user context token:
@@ -141,14 +141,14 @@ async fn post_authorized(
 }
 
 async fn list_oauth2_accounts(
-    auth_user: Option<AuthUser>,
+    auth_user: AuthUser,
 ) -> Result<Json<Vec<OAuth2Account>>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser if present using deref coercion
     // let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
 
     // Call the core function with the extracted data
     // let accounts = list_accounts_core(session_user)
-    let accounts = list_accounts_core(&auth_user.unwrap().id)
+    let accounts = list_accounts_core(&auth_user.session_user.id)
         .await
         .into_response_error()?;
     Ok(Json(accounts))
@@ -162,7 +162,7 @@ async fn delete_oauth2_account(
     auth_user: AuthUser,
     Path((provider, provider_user_id)): Path<(String, String)>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    delete_oauth2_account_core(&auth_user.id, &provider, &provider_user_id)
+    delete_oauth2_account_core(&auth_user.session_user.id, &provider, &provider_user_id)
         .await
         .map(|()| StatusCode::NO_CONTENT)
         .into_response_error()

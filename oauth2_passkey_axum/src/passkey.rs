@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use oauth2_passkey::{
     AuthenticationOptions, AuthenticatorResponse, O2P_ROUTE_PREFIX, PasskeyCredential,
-    RegisterCredential, RegistrationOptions, RegistrationStartRequest, SessionUser,
+    RegisterCredential, RegistrationOptions, RegistrationStartRequest,
     delete_passkey_credential_core, get_related_origin_json, handle_finish_authentication_core,
     handle_finish_registration_core, handle_start_authentication_core,
     handle_start_registration_core, list_credentials_core, update_passkey_credential_core,
@@ -57,7 +57,7 @@ async fn handle_start_registration(
     request_headers: HeaderMap,
     Json(request): Json<RegistrationStartRequest>,
 ) -> Result<Json<RegistrationOptions>, (StatusCode, String)> {
-    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+    let session_user = auth_user.as_ref().map(|u| &u.session_user);
 
     // Use the new wrapper function that handles headers directly
     let registration_options =
@@ -73,7 +73,7 @@ async fn handle_finish_registration(
     request_headers: HeaderMap,
     Json(reg_data): Json<RegisterCredential>,
 ) -> Result<(HeaderMap, String), (StatusCode, String)> {
-    let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+    let session_user = auth_user.as_ref().map(|u| &u.session_user);
     handle_finish_registration_core(session_user, &request_headers, reg_data)
         .await
         .into_response_error()
@@ -135,11 +135,11 @@ async fn serve_conditional_ui_js() -> Response {
 }
 
 async fn list_passkey_credentials(
-    auth_user: Option<AuthUser>,
+    auth_user: AuthUser,
 ) -> Result<Json<Vec<PasskeyCredential>>, (StatusCode, String)> {
     // let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
     // let credentials = list_credentials_core(session_user)
-    let credentials = list_credentials_core(&auth_user.unwrap().id)
+    let credentials = list_credentials_core(&auth_user.session_user.id)
         .await
         .into_response_error()?;
     Ok(Json(credentials))
@@ -149,7 +149,7 @@ async fn delete_passkey_credential(
     auth_user: AuthUser,
     Path(credential_id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    delete_passkey_credential_core(&auth_user.id, &credential_id)
+    delete_passkey_credential_core(&auth_user.session_user.id, &credential_id)
         .await
         .into_response_error()
         .map(|()| StatusCode::NO_CONTENT)
@@ -183,18 +183,18 @@ struct UpdateCredentialUserDetailsRequest {
 /// It also provides the necessary information for the client to call the WebAuthn
 /// signalCurrentUserDetails API to update the credential in the authenticator.
 async fn update_passkey_credential(
-    auth_user: Option<AuthUser>,
+    auth_user: AuthUser,
     Json(payload): Json<UpdateCredentialUserDetailsRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser if present using deref coercion
-    let session_user = auth_user.as_ref().map(|u| u as &SessionUser).cloned();
+    let session_user = auth_user.session_user;
 
     // Call the update function
     let response = update_passkey_credential_core(
         &payload.credential_id,
         &payload.name,
         &payload.display_name,
-        session_user,
+        Some(session_user),
     )
     .await
     .into_response_error()?;

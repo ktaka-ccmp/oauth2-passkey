@@ -31,23 +31,23 @@
         <table style="width: 100%; border-collapse: collapse;">
             <tr>
                 <td>User ID</td>
-                <td>{{ user.id }}</td>
+                <td>{{ user.session_user.id }}</td>
             </tr>
             <tr>
                 <td>Account</td>
-                <td>{{ user.account }}</td>
+                <td>{{ user.session_user.account }}</td>
             </tr>
             <tr>
                 <td>Label</td>
-                <td>{{ user.label }}</td>
+                <td>{{ user.session_user.label }}</td>
             </tr>
             <tr>
                 <td>Created At</td>
-                <td>{{ user.created_at }}</td>
+                <td>{{ user.session_user.created_at }}</td>
             </tr>
             <tr>
                 <td>Updated At</td>
-                <td>{{ user.updated_at }}</td>
+                <td>{{ user.session_user.updated_at }}</td>
             </tr>
         </table>
     </div>

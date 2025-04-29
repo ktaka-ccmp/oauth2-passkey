@@ -182,13 +182,6 @@ async fn is_authenticated(
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?;
 
-    // let _sessions = GENERIC_CACHE_STORE
-    //     .lock()
-    //     .await
-    //     .gets("session", session_id)
-    //     .await
-    //     .map_err(|e| SessionError::Storage(e.to_string()))?;
-
     // If no session found, return false
     let Some(cached_session) = session_result else {
         return Ok(false);

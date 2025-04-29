@@ -30,7 +30,7 @@ async fn index(user: Option<AuthUser>) -> impl IntoResponse {
     match user {
         Some(u) => {
             let template = IndexUserTemplate {
-                message: &format!("Hello, {}!", u.account),
+                message: &format!("Hello, {}!", u.session_user.account),
                 o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
             };
             (StatusCode::OK, Html(template.render().unwrap())).into_response()

@@ -78,13 +78,13 @@ pub(crate) async fn p2(
 
 // Example handler that will redirect to a page defined by AuthRedirect when user is not authenticated
 pub(crate) async fn p3(user: AuthUser) -> impl IntoResponse {
-    Html(format!("Hey {}!", user.account))
+    Html(format!("Hey {}!", user.session_user.account))
 }
 
 // Example handler that will show a message when user is not authenticated
 pub(crate) async fn p4(user: Option<AuthUser>) -> impl IntoResponse {
     match user {
-        Some(u) => Html(format!("Hey {}!", u.account)),
+        Some(u) => Html(format!("Hey {}!", u.session_user.account)),
         None => Html("Not Authenticated!".to_string()),
     }
 }
