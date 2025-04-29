@@ -26,7 +26,7 @@ struct ProtectedTemplate<'a> {
 pub(crate) async fn index(user: Option<AuthUser>) -> Result<Html<String>, (StatusCode, String)> {
     match user {
         Some(u) => {
-            let message = format!("Hey {}!", u.session_user.account);
+            let message = format!("Hey {}!", u.account);
             let template = IndexTemplateUser {
                 message: &message,
                 auth_route_prefix: O2P_ROUTE_PREFIX.as_str(),
@@ -55,11 +55,8 @@ pub(crate) async fn index(user: Option<AuthUser>) -> Result<Html<String>, (Statu
 }
 
 pub(crate) async fn protected(user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
-    tracing::trace!("User is admin?: {}", user.session_user.is_admin);
-    tracing::trace!(
-        "User sequence number: {}",
-        user.session_user.sequence_number
-    );
+    tracing::trace!("User is admin?: {}", user.is_admin);
+    tracing::trace!("User sequence number: {}", user.sequence_number);
     let template = ProtectedTemplate {
         user,
         auth_route_prefix: O2P_ROUTE_PREFIX.as_str(),

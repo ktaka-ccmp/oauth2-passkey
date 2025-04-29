@@ -15,8 +15,8 @@ use std::{
 use serde_json::{Value, json};
 
 use oauth2_passkey::{
-    AuthenticatorInfo, O2P_ROUTE_PREFIX, SessionUser, get_authenticator_info_batch,
-    list_accounts_core, list_credentials_core, obfuscate_user_id,
+    AuthenticatorInfo, O2P_ROUTE_PREFIX, get_authenticator_info_batch, list_accounts_core,
+    list_credentials_core, obfuscate_user_id,
 };
 
 use crate::config::O2P_REDIRECT_ANON;
@@ -95,13 +95,13 @@ struct TemplateAuthUser {
     pub label: String,
     pub created_at: String,
     pub updated_at: String,
+    pub csrf_token: String,
 }
 
 #[derive(Template)]
 #[template(path = "summary.j2")]
 struct UserSummaryTemplate {
     pub user: TemplateAuthUser,
-    pub csrf_token: String,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
@@ -111,12 +111,11 @@ struct UserSummaryTemplate {
 
 impl UserSummaryTemplate {
     fn new(
-        user: SessionUser,
+        user: AuthUser,
         passkey_credentials: Vec<TemplateCredential>,
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
         o2p_redirect_anon: String,
-        csrf_token: String,
     ) -> Self {
         let obfuscated_user_id = obfuscate_user_id(&user.id);
 
@@ -128,12 +127,12 @@ impl UserSummaryTemplate {
                 label: user.label.clone(),
                 created_at: format_date_tz(&user.created_at, "JST"),
                 updated_at: format_date_tz(&user.updated_at, "JST"),
+                csrf_token: user.csrf_token.clone(),
             },
             passkey_credentials,
             oauth2_accounts,
             o2p_route_prefix,
             o2p_redirect_anon,
-            csrf_token,
             obfuscated_user_id,
         }
     }
@@ -148,21 +147,18 @@ async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCo
         Some(user) => {
             // Get passkey credentials count for the user
             // let stored_credentials = list_credentials_core(Some(&user)).await.map_err(|e| {
-            let stored_credentials =
-                list_credentials_core(&user.session_user.id)
-                    .await
-                    .map_err(|e| {
-                        (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("Failed to fetch credentials: {:?}", e),
-                        )
-                    })?;
+            let stored_credentials = list_credentials_core(&user.id).await.map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to fetch credentials: {:?}", e),
+                )
+            })?;
 
             // Return user information as JSON
             let user_data = json!({
-                "id": user.session_user.id,
-                "account": user.session_user.account,
-                "label": user.session_user.label,
+                "id": user.id,
+                "account": user.account,
+                "label": user.label,
                 "passkey_count": stored_credentials.len()
             });
 
@@ -179,7 +175,7 @@ async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCo
 async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
     // let session_user: &SessionUser = &auth_user;
-    let user_id = &auth_user.session_user.id;
+    let user_id = &auth_user.id;
 
     // Fetch passkey credentials using the public function from libauth
     // let stored_credentials = list_credentials_core(Some(session_user))
@@ -261,13 +257,12 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
     // Create the route strings first
 
     let template = UserSummaryTemplate::new(
-        auth_user.session_user,
+        auth_user,
         passkey_credentials,
         oauth2_accounts,
         // Pass owned String values to the template
         O2P_ROUTE_PREFIX.to_string(),
         O2P_REDIRECT_ANON.to_string(),
-        auth_user.csrf_token,
     );
 
     // Render the template

@@ -71,7 +71,7 @@ pub(super) async fn update_user_account_handler(
     ExtractJson(payload): ExtractJson<UpdateUserRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     // Get the user ID from the authenticated user
-    let session_user_id = auth_user.session_user.id.clone();
+    let session_user_id = auth_user.id.clone();
     let request_user_id = payload.user_id.clone();
 
     // Verify that the user ID in the request matches the session user ID
@@ -131,7 +131,7 @@ pub(super) async fn delete_user_account_handler(
     ExtractJson(payload): ExtractJson<DeleteUserRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     // Get the user ID from the authenticated user
-    let session_user_id = auth_user.session_user.id.clone();
+    let session_user_id = auth_user.id.clone();
     let request_user_id = payload.user_id;
 
     // Verify that the user ID in the request matches the session user ID

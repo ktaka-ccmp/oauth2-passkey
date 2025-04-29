@@ -4,6 +4,7 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
 };
 use axum_extra::{TypedHeader, headers};
+use chrono::{DateTime, Utc};
 use http::{Method, StatusCode, request::Parts};
 
 use super::config::O2P_REDIRECT_ANON;
@@ -37,8 +38,43 @@ impl IntoResponse for AuthRedirect {
 
 #[derive(Clone, Debug)]
 pub struct AuthUser {
-    pub session_user: SessionUser,
+    pub id: String,
+    pub account: String,
+    pub label: String,
+    pub is_admin: bool,
+    pub sequence_number: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub csrf_token: String,
+}
+
+impl From<&AuthUser> for SessionUser {
+    fn from(auth_user: &AuthUser) -> Self {
+        SessionUser {
+            id: auth_user.id.clone(),
+            account: auth_user.account.clone(),
+            label: auth_user.label.clone(),
+            is_admin: auth_user.is_admin,
+            sequence_number: auth_user.sequence_number,
+            created_at: auth_user.created_at,
+            updated_at: auth_user.updated_at,
+        }
+    }
+}
+
+impl From<SessionUser> for AuthUser {
+    fn from(session_user: SessionUser) -> Self {
+        AuthUser {
+            id: session_user.id,
+            account: session_user.account,
+            label: session_user.label,
+            is_admin: session_user.is_admin,
+            sequence_number: session_user.sequence_number,
+            created_at: session_user.created_at,
+            updated_at: session_user.updated_at,
+            csrf_token: String::new(),
+        }
+    }
 }
 
 impl<B> FromRequestParts<B> for AuthUser
@@ -87,10 +123,10 @@ where
             }
         }
 
-        Ok(AuthUser {
-            session_user,
-            csrf_token,
-        })
+        let mut auth_user = AuthUser::from(session_user);
+        auth_user.csrf_token = csrf_token;
+
+        Ok(auth_user)
     }
 }
 
