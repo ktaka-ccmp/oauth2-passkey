@@ -32,6 +32,9 @@
   - In the summary page, the admin can unlink OAuth2 accounts and delete passkey credentials.
   - I am wondering if we should utilize existing handler for summary page for a login user and helper functions or create a new handler and set of helper functions dedicated for admin. My worries is that we can reduce the code by utilizing existing handlers but we have functions with mixed concerns, thus resulting in higher chances of creating security bugs
 
+- Modify is_authenticated middleware so that it can embed csrf_token in the extention field.
+
+
 ## ChatGPT's assessment
 
 After reviewing the changes more carefully, I've identified a few areas that could be improved:
@@ -41,7 +44,6 @@ Error Handling:
 - The get_authenticator_info(&aaguid).await.unwrap_or_default() in optional.rs could be handled with better error logging.
 
 Code Organization:
-- The feature flags (admin-pages and optional-pages) are introduced but their purpose isn't well-documented in the code.
 - The relationship between default.rs and optional.rs modules could be clarified with better comments.
 
 Modularity:
@@ -162,6 +164,9 @@ Performance:
   - The N+1 query issue in user_summary has been fixed by batching authenticator info retrieval.
 - The format_date_tz function could be optimized to avoid parsing the timezone for each date formatting operation.
   - The format_date_tz function now uses a cached timezone map, avoiding repeated parsing.
+
+- The feature flags (admin-pages and optional-pages) are introduced but their purpose isn't well-documented in the code.
+
 
 ## Memo
 
