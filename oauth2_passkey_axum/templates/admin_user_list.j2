@@ -28,18 +28,31 @@
                     <td><a href="{{o2p_route_prefix}}/admin/user/{{ user.id }}">{{ user.id }}</a></td>
                     <td>{{ user.account }}</td>
                     <td>{{ user.label }}</td>
-                    <td>{{ user.is_admin }}</td>
-                    <td>
-                        <button onclick="DeleteAccount({{ user.id }})" class="action-button delete-button">Delete</button>
-                        <button onclick="Logout({{ user.id }})" class="action-button">Logout</button>
-                    </td>
+                    {% if user.sequence_number.is_some() && user.sequence_number.unwrap() == 1 %}
+                        <td>
+                            <span>{{ user.is_admin }}</span>
+                        </td>
+                        <td>
+                        </td>
+                    {% else %}
+                        <td>
+                            <button onclick="toggleAdminStatus('{{ user.id }}', {{ user.is_admin }})">
+                                <span id="admin-status-{{ user.id }}">{{ user.is_admin }}</span>
+                            </button>
+                        </td>
+                        <td>
+                            <button onclick="DeleteAccount('{{ user.id }}')" class="action-button delete-button">Delete</button>
+                        </td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+    <script src="{{o2p_route_prefix}}/admin/admin_user.js"></script>
     <script>
-        const csrfToken = "_NOT_SET_YET_";
+        const csrfToken = "{{csrf_token}}";
+        const O2P_ROUTE_PREFIX = "{{o2p_route_prefix}}";
         function Logout() {
             window.location.href = "{{o2p_route_prefix}}/user/logout?redirect={{o2p_redirect_anon}}";
         }

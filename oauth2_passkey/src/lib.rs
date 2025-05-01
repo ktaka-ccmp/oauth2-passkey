@@ -15,8 +15,8 @@ mod utils;
 // Re-export the main coordination components
 // pub use coordinate::AuthError;
 pub use coordination::{
-    CoordinationError, RegistrationStartRequest, delete_passkey_credential_core, get_all_users,
-    get_user, handle_finish_authentication_core, handle_finish_registration_core,
+    CoordinationError, RegistrationStartRequest, get_all_users, get_user,
+    handle_finish_authentication_core, handle_finish_registration_core,
     handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
 };
 // pub use coordinate::{
@@ -26,8 +26,9 @@ pub use coordination::{
 
 pub use coordination::{
     delete_oauth2_account_admin, delete_oauth2_account_core, delete_passkey_credential_admin,
-    delete_user_account, delete_user_account_admin, get_authorized_core, list_accounts_core,
-    post_authorized_core, update_passkey_credential_core, update_user_account,
+    delete_passkey_credential_core, delete_user_account, delete_user_account_admin,
+    get_authorized_core, list_accounts_core, post_authorized_core, update_passkey_credential_core,
+    update_user_account, update_user_admin_status,
 };
 
 // Re-export the route prefixes

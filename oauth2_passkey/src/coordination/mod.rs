@@ -10,7 +10,7 @@ pub use oauth2::{
 
 pub use admin::{
     delete_oauth2_account_admin, delete_passkey_credential_admin, delete_user_account_admin,
-    get_all_users, get_user,
+    get_all_users, get_user, update_user_admin_status,
 };
 pub use passkey::{
     RegistrationStartRequest, delete_passkey_credential_core, handle_finish_authentication_core,

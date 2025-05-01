@@ -111,3 +111,41 @@ pub async fn delete_user_account_admin(user_id: &str) -> Result<(), Coordination
 
     Ok(())
 }
+
+pub async fn update_user_admin_status(
+    admin_user: &SessionUser,
+    user_id: &str,
+    is_admin: bool,
+) -> Result<User, CoordinationError> {
+    // Verify that the user has admin privileges
+    if !admin_user.is_admin {
+        tracing::debug!("User is not authorized to update admin status");
+        return Err(CoordinationError::Unauthorized.log());
+    }
+
+    // Get the current user
+    let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
+        CoordinationError::ResourceNotFound {
+            resource_type: "User".to_string(),
+            resource_id: user_id.to_string(),
+        }
+        .log()
+    })?;
+
+    // Prevent changing admin status of the first user (sequence_number = 1)
+    if user.sequence_number == Some(1) {
+        tracing::debug!("Cannot change admin status of the first user");
+        return Err(CoordinationError::Coordination(
+            "Cannot change admin status of the first user for security reasons".to_string(),
+        )
+        .log());
+    }
+
+    // Update the user with the new admin status
+    let updated_user = User { is_admin, ..user };
+
+    // Save the updated user
+    let user = UserStore::upsert_user(updated_user).await?;
+
+    Ok(user)
+}
