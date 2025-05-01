@@ -1,158 +1,181 @@
-# oauth2-passkey
+# oauth2_passkey
 
-## Todo
+## Table of Contents
 
-- Tests
-- GitHub Actions
-- Decide on Public API
-- Tracing
-  - Use tracing-error crate https://crates.io/crates/tracing-error
-  - Use https://docs.rs/tower-http/latest/tower_http/trace/index.html
-  - https://docs.rs/tracing/latest/tracing/
-- Use #[tracing::instrument]
-  - async-backtrace
-  - tokio-console https://zenn.dev/tfutada/articles/4dbb9659bb8102
-- Replace "if let", "unwrap_or_else", "ok_or_else" etc. with "match", where appropriate.
-- Implement Admin Account idea
-  - ~~Modify the User table to add admin flag and sequence number.~~
-  - ~~The first user i.e. sequence number 1 will be the admin.~~
-  - He has the power to modify all attributes of all users.
-  - Can list and manage all users.
-- Does page context token verification work as csrf protection?
-  - Suppose the situation where a malicious user tries to let the admin give him admin privileges, or modify arbitrary user's account details.
-- Modify demo pages to include link to available pages.
-- Make demo-oauth2 and demo-passkey pages to implement login page and account summary page without relying on oauth2_passkey_axum's summary and login pages.
+- [Basic usage](#basic-usage)
+- [Prepare database and cache server](#prepare-database-and-cache-server)
+- [Prepare .env file](#prepare-env-file)
+- [Rust code](#rust-code)
+- [Feature flags](#feature-flags)
+- [Route protection](#route-protection)
+- [Security](#security)
 
-- Syncing of credentials using signalAllAcceptedCredentials?
+## Basic usage
 
-- Create a page to list all users which will be accessible only by admin.
-  - The page will have button that will delete the user.
-  - The page will have button that will toggle the admin flag.
-  - The page will have button or link to the summary page of the user.
-  - In the summary page, the admin can unlink OAuth2 accounts and delete passkey credentials.
-  - I am wondering if we should utilize existing handler for summary page for a login user and helper functions or create a new handler and set of helper functions dedicated for admin. My worries is that we can reduce the code by utilizing existing handlers but we have functions with mixed concerns, thus resulting in higher chances of creating security bugs
+### Prepare database and cache
 
-```
-After reviewing the changes more carefully, I've identified a few areas that could be improved:
+#### Database
 
-Error Handling:
-In some admin functions, there are .unwrap() calls in admin_summary.js that could lead to runtime errors if data is missing.
-The get_authenticator_info(&aaguid).await.unwrap_or_default() in optional.rs could be handled with better error logging.
-Code Organization:
-The feature flags (admin-pages and optional-pages) are introduced but their purpose isn't well-documented in the code.
-The relationship between default.rs and optional.rs modules could be clarified with better comments.
-Security Considerations:
-The admin authentication relies solely on the is_admin flag without additional safeguards like CSRF protection for critical operations.
-The page context validation is good, but could benefit from a more robust token-based approach.
-Performance:
-In user_summary function, there's a potential N+1 query issue when fetching authenticator info for each credential.
-The format_date_tz function could be optimized to avoid parsing the timezone for each date formatting operation.
-Modularity:
-The admin functionality is tightly coupled with the axum implementation, which might make it harder to use with other web frameworks.
-The UUID generation in gen_new_user_id switched from a custom function to the standard UUID library, which is good, but the commented-out code could be removed.
-Documentation:
-Some of the new admin functions lack comprehensive documentation explaining their purpose and security implications.
-The templates could benefit from more comments explaining the data structure they expect.
-UI/UX:
-The admin UI lacks proper responsive design for smaller screens in some areas.
-Error messages could be more user-friendly and provide clearer guidance on how to resolve issues.
-These improvements would enhance the maintainability, security, and user experience of the admin functionality while keeping the code minimal and focused on the core requirements.
+##### sqlite:
+
+Make sure db url you specified is writable.
+
+##### Postgres:
+
+```bash
+docker compose -f db/postgresql/docker-compose.yaml up -d
 ```
 
-## Half Done
+#### Cache
 
-- [Need to investigate] I'm wondering if we should stop creating new user_handle everytime we create a new passkey credential.Instead we might have to use the existing user_handle for a logged in user. This will align well with syncing of credentials using the signalAllAcceptedCredentials.
-  - We can now control this by setting PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL environment variable.
-  - By having user_handle unique for user i.e. not for every credential, we seem to be able to only register one passkey credential per user in Google Password Manager.
+##### Memory:
 
-- signalUnknownCredential seems not working on Android device.
-  - Seems like it hasn't been supported yet.
+No preparation needed.
 
-- Once we have AAGUID, we should fix the logic for deleting credentials in register.rs to use a combination of "AAGUID" and user_handle.
-- Important todo: we delete credentials for a combination of "AAGUID" and user_handle
-  - But we can't distinguish multiple authenticators of the same type, 
-  - e.g. Google Password Managers for different accounts or two Yubikeys with the same model
+##### Redis:
 
-## Done
+```bash
+docker compose -f db/redis/docker-compose.yaml up -d
+```
 
-- Passkey sync between RP and Authenticator using signalAllAcceptedCredentials.
-- Enable modification of User.account and User.label for logged in user.
-- Enable deletion of logged in user then logout.
-- Enable deletion of Passkey credential for logged in user.
-- Enable unlinking of OAuth2 account for logged in user.
-- Examine if we should use OAuth2Coordinator and PasskeyCoordinator.
-- Autofill user.name as default values for Passkey register dialog's name and display name.
-- Related Origin Requests
-(https://passkeys.dev/docs/advanced/related-origins/)
-- Use parseCreationOptionsFromJSON and parseAuthenticationOptionsFromJSON to simplify passkey.js implementation. Won't do as this requires webauthn-json dependency.
-- Deal with halfway registration and authentication in passkey.js.
+### .env file
 
-- Standardize binary data encoding throughout the backend codebase:
-  - Use Base64 URL_SAFE_NO_PAD consistently for all credential IDs and public keys
-  - Update database schema and existing records if necessary
+```toml
+ORIGIN='https://your-domain.example.com'
 
-- Make user id and OAuth2 account id collision-less.
-- ~~[Need to investigate]~~(It's working now) Passkey sync between RP and Authenticator using signalUnknownCredential not working.
+OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
+OAUTH2_GOOGLE_CLIENT_SECRET='your-client-secret'
 
-- ✔️ Session boundary protection for authentication flows. When a user adds a new passkey credential or links a new OAuth2 account, we ensure session consistency:
-  - Implemented dedicated functions with clear intent separation through explicit modes:
-    - `add_to_existing_user` mode - For adding credentials to existing users
-    - Default mode - For creating new users with credentials when no user is logged in
-  - For OAuth2 account linking:
-    - Context token verification before redirecting to OAuth2 provider
-    - State parameter used to maintain user context across the redirect
-    - Session renewal after successful authentication
-    - See detailed analysis in [docs/oauth2-user-verification.md](docs/oauth2-user-verification.md)
-  - For Passkey credential addition:
-    - Context token verification before initiating registration
-    - Session verification during the registration process
-- Prefix of tables in database can be configured in .env file.
+GENERIC_CACHE_STORE_TYPE=redis
+GENERIC_CACHE_STORE_URL='redis://localhost:6379'
 
-- Consolidate liboauth2, libpasskey, libsession and libstorage into libauth.
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL='sqlite:///tmp/sqlite.db'
+```
 
-- Want to change the directory structure of the endpoints for Passkey and OAuth2
-  - Currently Passkey endpoints should be mounted at OAUTH2_ROUTE_PREFIX(default: /passkey)
-  - OAuth2 endpoints should be mounted at OAUTH2_ROUTE_PREFIX(default: /oauth2)
-  - OAUTH2_ROUTE_PREFIX and PASSKEY_ROUTE_PREFIX are referenced by handlers and the endpoints are reflected in the templates and javascript files.
-  - I want to change it to O2P_ROUTE_PREFIX/passkey and O2P_ROUTE_PREFIX/oauth2 respectively. By doing so we only need to nest single tree in the application. The summary endpoint can be also nested in the same tree freeing from necessity of explicitly mounting it in the application.
+Note:
+- ORIGIN should not have trailing slash
+- ORIGIN should be https, otherwise OAuth2 and Passkey will not work
+- You can have a SSL proxy in front of your app, but the ORIGIN should be the one that is accessible from the outside and should have the https:// prefix.
 
-- Middleware based page protection i.e. create a likes of is_authorized middleware.
-- Fix: add O2P_ROUTE_PREFIX to "fetch('/summary/user-info', {"
-- Currently if a user is showing two pages, the one for index page for unauthenticated user and the one for summary page for authenticated user, then tries to create a new user with a new passkey in the first page, the passkey will be registered for the authenticated user in the second page.
-  - Fixed by checking if the user isn't authenticated
+- You can get OAuth2 client ID and secret from [Google API Console](https://console.cloud.google.com/auth/clients).
+- You should place `$ORIGIN/o2p/oauth2/authorized` as a Authorized redirect URI in the Google. For example if the ORIGIN is `https://example.com` then place `https://example.com/o2p/oauth2/` there.
+
+
+### Rust code
+
+In your rust code do the followings:
+- import the oauth2_passkey_axum crate
+- call init().await?
+- nest the oauth2_passkey_router to your router
+
 ```rust
-						match auth_user {
-								Some(_) => return Err(CoordinationError::UnexpectedlyAuthorized.log()),
-								None => {}
-						};
+use oauth2_passkey_axum::{
+    AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, O2P_SUMMARY_URL, oauth2_passkey_router,
+};
 ```
-- When using Delete User button, deletion of passkey credentials aren't notified to Passkey Authenticator.
-- Change name: libaxum to oauth2_passkey_axum
-- Schema check when initializing database connection. Make sure the schema the program is expecting is the same as the one in the database.
-- Enable update of name and displayname feild for passkey credentials. Also notify the update to autheticator using signalCurrentUserDetails.
 
-- Cleanup frontend
-- Adjust visibility of functions, structs, enums, etc. What needs to be public?
-- idtoken.rs: make it use CacheStore instead of current mechanisms.
-- Utilize feature gate to enable/disable supplementary frontend templates and JavaScript.
-- Completely separate create_account function from add_to_user function to avoid the case where new user is created even though user is already logged in.
-- Debug: there are cases signalCurrentUserDetails doesn't work properly.
+Just call the init() and nest the "oauth2_passkey_router()" under O2P_ROUTE_PREFIX(default=/o2p).
 
-- Add additional attributes to PasskeyCredentials.
-  - For example, authenticator_name, like Google Password Manager, App Password Manager, YubiKey etc.
-  - It is also possible that a user has multiple Google Password Managers with different Google accounts, so is possible for Apple Password Managers.
-  - A user may also have multiple YubiKeys.
-- Add AAGUID to PasskeyCredentials.
-  - or information about the authenticator retrieved using AAGUID
-  - need to figure out how to get an authenticator icon using AAGUID
-  - https://web.dev/articles/webauthn-aaguid
-  - https://fidoalliance.org/metadata/
-  - https://github.com/passkeydeveloper/passkey-authenticator-aaguids
-  - https://passkeydeveloper.github.io/passkey-authenticator-aaguids/explorer/
-  - https://www.corbado.com/glossary/aaguid
+```rust
+  dotenv().ok();
+  oauth2_passkey_axum::init().await?;
 
-## Memo
-
-```text
-Can you take a look the following diff carefully and if we aren't introducing any bugs and every change is OK suggest a commit message plz.
+  let app = Router::new()
+      .route("/", get(index))
+      .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
+      .merge(protected::router());
 ```
+
+## Feature flags
+
+oauth2_passkey_axum prepares optional admin and user interfaces, which is enabled by default.
+
+To controle the features we use two feature flags:
+"admin-ui" and "user-ui" to enable admin and user interfaces respectively. 
+
+The default feature is set in oauth2_passkey_axum/Cargo.toml as:
+
+```toml
+default = ["admin-ui", "user-ui"]
+```
+
+If you want to disable default features, set the following in your app's Cargo.toml:
+
+```toml
+oauth2_passkey_axum = { default-features = false, features = [] }
+```
+
+If you want to enable user-ui only, disable the default first, then specify "user-ui" in features option:
+
+```toml
+oauth2_passkey_axum = { default-features = false, features = ["user-ui"] }
+```
+
+## Who is admin
+
+- The first user has admin previllage and never lose it.
+- Any admin can give admin previllage to another user.
+
+## Route Protection
+
+#### Axum Extractor
+
+checks if session_id is valid
+extract struct AuthUser 
+Redirect(GET) or 40x(PUT/POST/DELETE) if it fails
+
+#### Middleware
+
+We have prepared a setof functions for middleware.
+
+is_authenticated
+
+## Security
+
+### CSRF protection
+
+Every state changing endpoint must have csrf token verification.
+You should include the csrf token in a header.
+
+A csrf_token is automatically generated upon session creation and stored in session cache as a part of the session. 
+
+Embedding the csrf_token in the page is the responsibility of the template engine. 
+
+Use the csrf_token when making a state changing request.
+
+The validity of the csrf_token is automatically verified either by axum extractor or middleware.
+
+#### Axum Extractor
+
+If you use axum extractor to protect a page....
+
+If your handle has "user: AuthUser" as an argument the route is protected and axum extractor extract the user, which in our implementation includes csrf_token.
+
+```rust
+async fn handler_a(user: AuthUser) -> impl IntoResponse {
+```
+
+You should pass the csrf_token through your templating system to the page.
+When you make a state changing request from the page, you should inclide the csrf_token as:
+
+```javascript
+fetch('/some_end_point', {
+    method: 'POST',
+    headers: {
+        'X-CSRF-Token': 'your-csrf-token'
+        ...
+    },
+    ...
+});
+```
+
+Our extractor for the AuthUser automatically checks the validity of the X-CSRF-Token against the csrf token stored in session cache when extracting the AuthUser.
+
+#### Middleware
+
+is_authenticated_401, is_authenticated_redirect:
+Verify the X-CSRF-Token against the one stored in the session cache.
+
+is_authenticated_user_401, is_authenticated_user_redirect
+The X-CSRF-Token is verified by AuthUser axum extractor
