@@ -31,7 +31,16 @@
         </div>
         <div class="item" id="user-info-display">
             <div class="item-detail"><strong>User ID:</strong> {{ user.id }}</div>
-            <div class="item-detail"><strong>Is Admin:</strong> {{ user.is_admin }}</div>
+            <div class="item-detail">
+                <strong>Is Admin:</strong> 
+                {% if user.sequence_number.is_some() && user.sequence_number.unwrap() == 1 %}
+                    <span>{{ user.is_admin }} (First User)</span>
+                {% else %}
+                    <button onclick="toggleAdminStatus('{{ user.id }}', {{ user.is_admin }})">
+                        <span id="admin-status-{{ user.id }}">{{ user.is_admin }}</span>
+                    </button>
+                {% endif %}
+            </div>
             <div class="item-detail"><strong>Account:</strong> {{ user.account }}</div>
             <div class="item-detail"><strong>Label:</strong> {{ user.label }}</div>
             <div class="item-detail"><strong>Created:</strong> {{ user.created_at }}</div>

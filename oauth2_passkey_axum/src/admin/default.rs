@@ -4,12 +4,12 @@ use axum::{
     extract::{Json as ExtractJson, Path},
     http::StatusCode,
     response::Html,
-    routing::{delete, get},
+    routing::{delete, get, put},
 };
 
 use oauth2_passkey::{
-    DbUser, O2P_ROUTE_PREFIX, delete_oauth2_account_core, delete_passkey_credential_core,
-    delete_user_account_admin,
+    DbUser, O2P_ROUTE_PREFIX, SessionUser, delete_oauth2_account_core,
+    delete_passkey_credential_core, delete_user_account_admin, update_user_admin_status,
 };
 
 use super::super::error::IntoResponseError;
@@ -28,6 +28,7 @@ pub(super) fn router() -> Router<()> {
             "/delete_oauth2_account/{provider}/{provider_user_id}",
             delete(delete_oauth2_account),
         )
+        .route("/update_admin_status", put(update_admin_status_handler))
 }
 
 #[derive(Template)]
@@ -36,6 +37,7 @@ struct UserListTemplate {
     users: Vec<DbUser>,
     o2p_route_prefix: String,
     o2p_redirect_anon: String,
+    csrf_token: String,
 }
 
 async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
@@ -49,11 +51,14 @@ async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, St
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    let csrf_token = auth_user.csrf_token.clone();
+
     // Render the template
     let template = UserListTemplate {
         users,
         o2p_route_prefix: O2P_ROUTE_PREFIX.to_string(),
         o2p_redirect_anon: O2P_REDIRECT_ANON.to_string(),
+        csrf_token,
     };
     Ok(Html(template.render().map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
@@ -129,4 +134,41 @@ async fn delete_oauth2_account(
         .await
         .map(|()| StatusCode::NO_CONTENT)
         .into_response_error()
+}
+
+#[derive(serde::Deserialize)]
+pub(super) struct UpdateAdminStatusRequest {
+    user_id: String,
+    is_admin: bool,
+}
+
+pub(super) async fn update_admin_status_handler(
+    auth_user: AuthUser,
+    ExtractJson(payload): ExtractJson<UpdateAdminStatusRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    // Convert AuthUser to SessionUser for the core function
+    let session_user = SessionUser::from(&auth_user);
+
+    // Verify that the user has admin privileges
+    if !session_user.is_admin {
+        tracing::warn!(
+            "User {} is not authorized to update admin status",
+            session_user.id
+        );
+        return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
+    }
+
+    // Call the core function to update the user's admin status
+    update_user_admin_status(&session_user, &payload.user_id, payload.is_admin)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    tracing::debug!(
+        "User admin status updated: {} is_admin={} by {}",
+        payload.user_id,
+        payload.is_admin,
+        session_user.id
+    );
+
+    Ok(StatusCode::OK)
 }

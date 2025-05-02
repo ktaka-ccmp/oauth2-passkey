@@ -13,24 +13,11 @@
   - async-backtrace
   - tokio-console https://zenn.dev/tfutada/articles/4dbb9659bb8102
 - Replace "if let", "unwrap_or_else", "ok_or_else" etc. with "match", where appropriate.
-- Implement Admin Account idea
-  - ~~Modify the User table to add admin flag and sequence number.~~
-  - ~~The first user i.e. sequence number 1 will be the admin.~~
-  - He has the power to modify all attributes of all users.
-  - Can list and manage all users.
-- Does page context token verification work as csrf protection?
-  - Suppose the situation where a malicious user tries to let the admin give him admin privileges, or modify arbitrary user's account details.
+
 - Modify demo pages to include link to available pages.
 - Make demo-oauth2 and demo-passkey pages to implement login page and account summary page without relying on oauth2_passkey_axum's summary and login pages.
 
 - Syncing of credentials using signalAllAcceptedCredentials?
-
-- Create a page to list all users which will be accessible only by admin.
-  - The page will have button that will delete the user.
-  - The page will have button that will toggle the admin flag.
-  - The page will have button or link to the summary page of the user.
-  - In the summary page, the admin can unlink OAuth2 accounts and delete passkey credentials.
-  - I am wondering if we should utilize existing handler for summary page for a login user and helper functions or create a new handler and set of helper functions dedicated for admin. My worries is that we can reduce the code by utilizing existing handlers but we have functions with mixed concerns, thus resulting in higher chances of creating security bugs
 
 - Modify is_authenticated middleware so that it can embed csrf_token in the extention field.
 
@@ -167,6 +154,21 @@ Performance:
 
 - The feature flags (admin-pages and optional-pages) are introduced but their purpose isn't well-documented in the code.
 
+- Create a page to list all users which will be accessible only by admin.
+  - The page will have button that will delete the user.
+  - The page will have button that will toggle the admin flag.
+  - The page will have button or link to the summary page of the user.
+  - In the summary page, the admin can unlink OAuth2 accounts and delete passkey credentials.
+  - I am wondering if we should utilize existing handler for summary page for a login user and helper functions or create a new handler and set of helper functions dedicated for admin. My worries is that we can reduce the code by utilizing existing handlers but we have functions with mixed concerns, thus resulting in higher chances of creating security bugs
+
+- Does page context token verification work as csrf protection?
+  - Suppose the situation where a malicious user tries to let the admin give him admin privileges, or modify arbitrary user's account details.
+
+- Implement Admin Account idea
+  - ~~Modify the User table to add admin flag and sequence number.~~
+  - ~~The first user i.e. sequence number 1 will be the admin.~~
+  - He has the power to modify all attributes of all users.
+  - Can list and manage all users.
 
 ## Memo
 

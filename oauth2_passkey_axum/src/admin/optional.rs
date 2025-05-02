@@ -65,6 +65,7 @@ struct TemplateUser {
     pub label: String,
     pub created_at: String,
     pub updated_at: String,
+    pub sequence_number: Option<i64>,
 }
 
 #[derive(Template)]
@@ -93,6 +94,7 @@ impl UserSummaryTemplate {
                 label: user.label.clone(),
                 created_at: format_date_tz(&user.created_at, "JST"),
                 updated_at: format_date_tz(&user.updated_at, "JST"),
+                sequence_number: user.sequence_number,
             },
             csrf_token,
             passkey_credentials,
