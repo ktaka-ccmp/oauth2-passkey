@@ -61,6 +61,12 @@ These improvements would enhance the maintainability, security, and user experie
   - But we can't distinguish multiple authenticators of the same type, 
   - e.g. Google Password Managers for different accounts or two Yubikeys with the same model
 
+  - FIDO U2F attestation is implemented experimentally. It requires to send non-empty allowedCredentials parameter i.e. first decide which user to authenticate. It may also require the following settings:
+    - PASSKEY_USER_VERIFICATION='preferred'
+    - PASSKEY_AUTHENTICATOR_ATTACHMENT='cross-platform'
+    - PASSKEY_REQUIRE_RESIDENT_KEY=false
+    - PASSKEY_RESIDENT_KEY='preferred'
+
 ## Done
 
 - Passkey sync between RP and Authenticator using signalAllAcceptedCredentials.
