@@ -25,7 +25,7 @@ pub(super) fn verify_u2f_attestation(
     att_stmt: &Vec<(CborValue, CborValue)>,
 ) -> Result<(), PasskeyError> {
     tracing::debug!("Verifying FIDO-U2F attestation");
-    
+
     // Debug: Log the attestation statement structure
     for (i, (k, v)) in att_stmt.iter().enumerate() {
         tracing::debug!("U2F att_stmt[{}]: key={:?}, value={:?}", i, k, v);
@@ -43,7 +43,7 @@ pub(super) fn verify_u2f_attestation(
                         sig = Some(s.clone());
                         tracing::debug!("Found sig: {} bytes", s.len());
                     }
-                },
+                }
                 "x5c" => {
                     if let CborValue::Array(certs) = v {
                         let mut cert_chain = Vec::new();
@@ -57,7 +57,7 @@ pub(super) fn verify_u2f_attestation(
                             tracing::debug!("Found x5c with {} certificates", cert_chain.len());
                         }
                     }
-                },
+                }
                 _ => {
                     tracing::debug!("Unexpected key in U2F attestation: {}", key_str);
                 }
@@ -116,33 +116,35 @@ pub(super) fn verify_u2f_attestation(
     // Extract credential ID length and credential ID
     let credential_id_length = ((auth_data[53] as u16) << 8) | (auth_data[54] as u16);
     let credential_id_end = 55 + credential_id_length as usize;
-    
+
     if auth_data.len() <= credential_id_end {
-        return Err(PasskeyError::Verification("Invalid auth_data length".to_string()));
+        return Err(PasskeyError::Verification(
+            "Invalid auth_data length".to_string(),
+        ));
     }
 
     // Construct verification data according to U2F format
     let mut verification_data = Vec::new();
-    
+
     // U2F verification data starts with a reserved byte (0x00)
     verification_data.push(0x00);
-    
+
     // Add the application parameter (RP ID hash)
     verification_data.extend_from_slice(&auth_data[0..32]);
-    
+
     // Add the challenge parameter (client data hash)
     verification_data.extend_from_slice(client_data_hash);
-    
+
     // Add the credential ID
     let credential_id = &auth_data[55..credential_id_end];
     verification_data.extend_from_slice(credential_id);
-    
+
     // Add the public key
     let public_key_cbor = ciborium::from_reader(&auth_data[credential_id_end..])
         .map_err(|e| PasskeyError::Format(format!("Failed to parse public key CBOR: {}", e)))?;
-    
+
     let (x_coord, y_coord) = extract_public_key_coords(&public_key_cbor)?;
-    
+
     // For U2F, we need to use the raw coordinates
     verification_data.push(0x04); // Uncompressed point format
     verification_data.extend_from_slice(&x_coord);
@@ -151,9 +153,7 @@ pub(super) fn verify_u2f_attestation(
     // Verify the signature
     attestn_cert
         .verify_signature(&webpki::ECDSA_P256_SHA256, &verification_data, &sig)
-        .map_err(|_| {
-            PasskeyError::Verification("U2F attestation signature invalid".to_string())
-        })?;
+        .map_err(|_| PasskeyError::Verification("U2F attestation signature invalid".to_string()))?;
 
     tracing::debug!("FIDO-U2F attestation verification successful");
     Ok(())
