@@ -7,6 +7,7 @@ use super::super::types::AttestationObject;
 use super::none::verify_none_attestation;
 use super::packed::verify_packed_attestation;
 use super::tpm::verify_tpm_attestation;
+use super::u2f::verify_u2f_attestation;
 
 pub(crate) fn verify_attestation(
     attestation: &AttestationObject,
@@ -36,6 +37,18 @@ pub(crate) fn verify_attestation(
             // for security keys
             tracing::debug!("Using 'tpm' attestation format");
             verify_tpm_attestation(
+                &attestation.auth_data,
+                client_data_hash.as_ref(),
+                &attestation.att_stmt,
+            )
+            .map_err(|e| {
+                PasskeyError::Verification(format!("Attestation verification failed: {:?}", e))
+            })
+        }
+        "fido-u2f" => {
+            // for FIDO U2F security keys
+            tracing::debug!("Using 'fido-u2f' attestation format");
+            verify_u2f_attestation(
                 &attestation.auth_data,
                 client_data_hash.as_ref(),
                 &attestation.att_stmt,
