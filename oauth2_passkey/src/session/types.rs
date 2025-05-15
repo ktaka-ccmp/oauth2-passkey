@@ -54,3 +54,27 @@ impl TryFrom<CacheData> for StoredSession {
         serde_json::from_str(&data.value).map_err(|e| SessionError::Storage(e.to_string()))
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct CsrfToken(String);
+
+impl CsrfToken {
+    pub fn new(token: String) -> Self {
+        Self(token)
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UserId(String);
+
+impl UserId {
+    pub fn new(id: String) -> Self {
+        Self(id)
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}

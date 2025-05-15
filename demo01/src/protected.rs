@@ -9,6 +9,7 @@ use axum::{
 
 use oauth2_passkey_axum::{
     AuthUser,
+    CsrfToken,
     O2P_ROUTE_PREFIX,
     // Middleware, redirect to O2P_REDIRECT_ANON(default: /)
     is_authenticated_redirect,
@@ -21,11 +22,17 @@ pub(super) fn router() -> Router<()> {
         .route("/p2", get(p2))
         .route(
             "/p3",
-            get(p3).route_layer(from_fn(is_authenticated_redirect)),
+            get(p3)
+                .post(p3_post)
+                .route_layer(from_fn(is_authenticated_redirect)),
         )
         .route(
             "/p4",
             get(p4).route_layer(from_fn(is_authenticated_user_redirect)),
+        )
+        .route(
+            "/p5",
+            get(p5).route_layer(from_fn(is_authenticated_redirect)),
         )
         .nest(
             "/nested",
@@ -69,6 +76,10 @@ pub(crate) async fn p3() -> impl IntoResponse {
     }
 }
 
+pub(crate) async fn p3_post() -> impl IntoResponse {
+    Html("POST request received").into_response()
+}
+
 #[derive(Template)]
 #[template(path = "p4.j2")]
 struct P4Template<'a> {
@@ -80,6 +91,27 @@ struct P4Template<'a> {
 pub(crate) async fn p4(Extension(user): Extension<AuthUser>) -> impl IntoResponse {
     let template = P4Template {
         user,
+        prefix: O2P_ROUTE_PREFIX.as_str(),
+    };
+    match template.render() {
+        Ok(html) => Html(html).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[derive(Template)]
+#[template(path = "p5.j2")]
+struct P5Template<'a> {
+    message: &'a str,
+    csrf_token: &'a str,
+    prefix: &'a str,
+}
+
+// Protected page by middleware does not need user argument
+pub(crate) async fn p5(Extension(csrf_token): Extension<CsrfToken>) -> impl IntoResponse {
+    let template = P5Template {
+        message: "The CSRF token can also be embedded in a template.",
+        csrf_token: csrf_token.as_str(),
         prefix: O2P_ROUTE_PREFIX.as_str(),
     };
     match template.render() {

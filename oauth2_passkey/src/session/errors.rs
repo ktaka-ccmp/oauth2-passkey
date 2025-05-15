@@ -20,6 +20,9 @@ pub enum SessionError {
     #[error("Context token error: {0}")]
     ContextToken(String),
 
+    #[error("CSRF token error: {0}")]
+    CsrfToken(String),
+
     /// Error from utils operations
     #[error("Utils error: {0}")]
     Utils(#[from] UtilError),

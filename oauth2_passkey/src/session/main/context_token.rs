@@ -47,11 +47,19 @@ pub async fn verify_context_token(
 
     let stored_session: StoredSession = cached_session.try_into()?;
 
-    if let Some(page_context) = page_context {
-        if page_context.as_str() != obfuscate_token(&stored_session.csrf_token) {
-            tracing::error!("Page context does not match session user");
+    match page_context {
+        Some(context) => {
+            if context.as_str() != obfuscate_token(&stored_session.csrf_token) {
+                tracing::error!("Page context does not match session user");
+                return Err(SessionError::ContextToken(
+                    "Page context does not match session user".to_string(),
+                ));
+            }
+        }
+        None => {
+            tracing::error!("Page context missing");
             return Err(SessionError::ContextToken(
-                "Page context does not match session user".to_string(),
+                "Page context missing".to_string(),
             ));
         }
     }
