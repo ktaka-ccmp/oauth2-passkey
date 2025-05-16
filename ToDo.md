@@ -19,8 +19,8 @@
 
 - Syncing of credentials using signalAllAcceptedCredentials?
 
-- Modify is_authenticated middleware so that it can embed csrf_token in the extention field.
-
+- Re-examine the role of page context token.
+- Re-examine the current implementation of CSRF protection in OAuth2 flow.
 
 ## ChatGPT's assessment
 
@@ -175,6 +175,9 @@ Performance:
   - ~~The first user i.e. sequence number 1 will be the admin.~~
   - He has the power to modify all attributes of all users.
   - Can list and manage all users.
+
+- Modify is_authenticated middleware so that it can embed csrf_token in the extention field.
+- csrf_token is also automatically delivered to the client as an X-CSRF-Token response header.
 
 ## Memo
 
