@@ -9,7 +9,9 @@ pub(crate) use session::{delete_session_from_store_by_session_id, get_session_id
 pub use context_token::{obfuscate_token, verify_context_token};
 pub use session::{
     get_csrf_token_from_session, get_user_and_csrf_token_from_session, get_user_from_session,
-    is_authenticated_basic, is_authenticated_strict, prepare_logout_response,
+    is_authenticated_basic, is_authenticated_basic_then_csrf,
+    is_authenticated_basic_then_user_and_csrf, is_authenticated_strict,
+    is_authenticated_strict_then_csrf, prepare_logout_response,
 };
 
 pub(crate) async fn new_session_header(user_id: String) -> Result<HeaderMap, SessionError> {
@@ -18,3 +20,5 @@ pub(crate) async fn new_session_header(user_id: String) -> Result<HeaderMap, Ses
 
     Ok(headers)
 }
+
+// pub(crate) use session::create_new_session_with_uid as new_session_header;

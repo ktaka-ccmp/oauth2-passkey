@@ -21,6 +21,32 @@
         .user-info dd {
             margin-left: 1rem;
         }
+
+        .button-container {
+            margin: 1rem 0;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            margin-right: 1rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #result {
+            margin-top: 1rem;
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
     </style>
 </head>
 
@@ -30,7 +56,62 @@
     {{message}}
     </div>
 
+    <div class="button-container">
+        <button id="withCsrf">POST with CSRF Token</button>
+        <button id="withoutCsrf">POST without CSRF Token</button>
+    </div>
+
+    <div id="result"></div>
+
     <p><a href="{{ prefix }}/user/logout?redirect=/">Logout</a></p>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const resultDiv = document.getElementById('result');
+            let csrfToken = null;
+
+            // Get initial CSRF token
+            fetch(window.location.href)
+                .then(response => csrfToken = response.headers.get('X-CSRF-Token') || null);
+
+            // Handle button clicks
+            document.querySelectorAll('#withCsrf, #withoutCsrf').forEach(button => {
+                button.addEventListener('click', async function() {
+                    let includeCsrf = false;
+                    if (this.id === 'withCsrf') {
+                        includeCsrf = true;
+                    }
+
+                    // Show loading state
+                    resultDiv.style.display = 'block';
+                    resultDiv.textContent = 'Sending request...';
+
+                    try {
+                        // Prepare headers
+                        const headers = { 'Content-Type': 'application/json' };
+                        if (includeCsrf && csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
+                        // Send request
+                        const response = await fetch('/p3', {
+                            method: 'POST',
+                            headers: headers,
+                            body: JSON.stringify({ test: 'data' })
+                        });
+
+                        // Display result
+                        const text = await response.text();
+                        resultDiv.textContent = `Response (${response.status}): ${text}`;
+
+                        // Update token if available
+                        const newToken = response.headers.get('X-CSRF-Token');
+                        if (newToken) csrfToken = newToken;
+                    } catch (error) {
+                        resultDiv.textContent = `Error: ${error.message}`;
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 
 </html>

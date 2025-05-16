@@ -5,7 +5,7 @@ use http::header::{COOKIE, HeaderMap};
 
 use crate::session::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
 use crate::session::errors::SessionError;
-use crate::session::types::{StoredSession, User as SessionUser};
+use crate::session::types::{CsrfToken, StoredSession, User as SessionUser, UserId};
 use crate::utils::{gen_random_string, header_set_cookie};
 
 use crate::storage::GENERIC_CACHE_STORE;
@@ -168,10 +168,10 @@ async fn is_authenticated(
     headers: &HeaderMap,
     method: &Method,
     verify_user_exists: bool,
-) -> Result<bool, SessionError> {
+) -> Result<(bool, Option<UserId>, Option<CsrfToken>), SessionError> {
     // Get session ID from headers
     let Some(session_id) = get_session_id_from_headers(headers)? else {
-        return Ok(false);
+        return Ok((false, None, None));
     };
 
     // Check if the session exists in the store
@@ -184,33 +184,39 @@ async fn is_authenticated(
 
     // If no session found, return false
     let Some(cached_session) = session_result else {
-        return Ok(false);
+        return Ok((false, None, None));
     };
 
     // Convert to StoredSession and check expiration
     let stored_session: StoredSession = match cached_session.try_into() {
         Ok(session) => session,
-        Err(_) => return Ok(false),
+        Err(_) => return Ok((false, None, None)),
     };
 
     // Check if session has expired
     if stored_session.expires_at < Utc::now() {
         tracing::debug!("Session expired at {}", stored_session.expires_at);
-        return Ok(false);
+        return Ok((false, None, None));
     }
 
-    if method == Method::POST || method == Method::PUT || method == Method::DELETE {
+    if method == Method::POST
+        || method == Method::PUT
+        || method == Method::DELETE
+        || method == Method::PATCH
+    {
         let x_csrf_token = headers
             .get("X-Csrf-Token")
             .and_then(|h| h.to_str().ok())
             .map(|s| s.to_string());
 
-        if let Some(csrf_token) = x_csrf_token {
-            if csrf_token != stored_session.csrf_token {
-                return Ok(false);
+        if let Some(x_csrf_token) = x_csrf_token {
+            if x_csrf_token != stored_session.csrf_token {
+                tracing::debug!("CSRF token mismatch");
+                return Err(SessionError::CsrfToken("CSRF token mismatch".to_string()));
             }
         } else {
-            return Ok(false);
+            tracing::debug!("No CSRF token found");
+            return Err(SessionError::CsrfToken("No CSRF token found".to_string()));
         }
     }
 
@@ -224,10 +230,18 @@ async fn is_authenticated(
             })?
             .is_some();
 
-        Ok(user_exists)
+        Ok((
+            user_exists,
+            Some(UserId::new(stored_session.user_id)),
+            Some(CsrfToken::new(stored_session.csrf_token)),
+        ))
     } else {
         // If we don't need to verify user existence, the session is valid at this point
-        Ok(true)
+        Ok((
+            true,
+            Some(UserId::new(stored_session.user_id)),
+            Some(CsrfToken::new(stored_session.csrf_token)),
+        ))
     }
 }
 
@@ -244,7 +258,18 @@ pub async fn is_authenticated_basic(
     headers: &HeaderMap,
     method: &Method,
 ) -> Result<bool, SessionError> {
-    is_authenticated(headers, method, false).await
+    let (authenticated, _, _) = is_authenticated(headers, method, false).await?;
+    Ok(authenticated)
+}
+
+pub async fn is_authenticated_basic_then_csrf(
+    headers: &HeaderMap,
+    method: &Method,
+) -> Result<CsrfToken, SessionError> {
+    match is_authenticated(headers, method, false).await? {
+        (true, _, Some(csrf_token)) => Ok(csrf_token),
+        _ => Err(SessionError::SessionError),
+    }
 }
 
 /// Check if the request is authenticated by examining the session headers and verifying user existence
@@ -261,10 +286,40 @@ pub async fn is_authenticated_strict(
     headers: &HeaderMap,
     method: &Method,
 ) -> Result<bool, SessionError> {
-    is_authenticated(headers, method, true).await
+    let (authenticated, _, _) = is_authenticated(headers, method, true).await?;
+    Ok(authenticated)
 }
 
-pub async fn get_csrf_token_from_session(session_id: &str) -> Result<String, SessionError> {
+pub async fn is_authenticated_strict_then_csrf(
+    headers: &HeaderMap,
+    method: &Method,
+) -> Result<CsrfToken, SessionError> {
+    match is_authenticated(headers, method, true).await? {
+        (true, _, Some(csrf_token)) => Ok(csrf_token),
+        _ => Err(SessionError::SessionError),
+    }
+}
+
+pub async fn is_authenticated_basic_then_user_and_csrf(
+    headers: &HeaderMap,
+    method: &Method,
+) -> Result<(SessionUser, CsrfToken), SessionError> {
+    match is_authenticated(headers, method, false).await? {
+        (true, Some(user_id), Some(csrf_token)) => {
+            let user = UserStore::get_user(user_id.as_str())
+                .await
+                .map_err(|e| {
+                    tracing::error!("Error checking user existence: {}", e);
+                    SessionError::from(e)
+                })?
+                .ok_or(SessionError::SessionError)?;
+            Ok((SessionUser::from(user), csrf_token))
+        }
+        _ => Err(SessionError::SessionError),
+    }
+}
+
+pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, SessionError> {
     let cached_session = GENERIC_CACHE_STORE
         .lock()
         .await
@@ -275,12 +330,12 @@ pub async fn get_csrf_token_from_session(session_id: &str) -> Result<String, Ses
 
     let stored_session: StoredSession = cached_session.try_into()?;
 
-    Ok(stored_session.csrf_token)
+    Ok(CsrfToken::new(stored_session.csrf_token))
 }
 
 pub async fn get_user_and_csrf_token_from_session(
     session_id: &str,
-) -> Result<(SessionUser, String), SessionError> {
+) -> Result<(SessionUser, CsrfToken), SessionError> {
     let cached_session = GENERIC_CACHE_STORE
         .lock()
         .await
@@ -299,5 +354,8 @@ pub async fn get_user_and_csrf_token_from_session(
         })?
         .ok_or(SessionError::SessionError)?;
 
-    Ok((SessionUser::from(user), stored_session.csrf_token))
+    Ok((
+        SessionUser::from(user),
+        CsrfToken::new(stored_session.csrf_token),
+    ))
 }

@@ -20,10 +20,11 @@ impl AuthRedirect {
     }
 
     fn into_response_with_method(self) -> Response {
-        tracing::debug!("AuthRedirect called.");
         if self.method == Method::GET {
+            tracing::debug!("Redirecting to {}", O2P_REDIRECT_ANON.as_str());
             Redirect::temporary(O2P_REDIRECT_ANON.as_str()).into_response()
         } else {
+            tracing::debug!("Unauthorized");
             (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
         }
     }
@@ -31,7 +32,7 @@ impl AuthRedirect {
 
 impl IntoResponse for AuthRedirect {
     fn into_response(self) -> Response {
-        tracing::debug!("AuthRedirect called.");
+        tracing::debug!("IntoResponse for AuthRedirect");
         self.into_response_with_method()
     }
 }
@@ -85,46 +86,61 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _: &B) -> Result<Self, Self::Rejection> {
         let method = parts.method.clone();
-        let cookies: TypedHeader<headers::Cookie> = parts
-            .extract()
-            .await
-            .map_err(|_| AuthRedirect::new(method.clone()))?;
+        let cookies: TypedHeader<headers::Cookie> = parts.extract().await.map_err(|_| {
+            tracing::error!("Failed to extract cookies");
+            AuthRedirect::new(method.clone())
+        })?;
 
         // Get session from cookie
-        let session_cookie = cookies
-            .get(SESSION_COOKIE_NAME.as_str())
-            .ok_or(AuthRedirect::new(method.clone()))?;
+        let session_cookie = cookies.get(SESSION_COOKIE_NAME.as_str()).ok_or_else(|| {
+            tracing::error!(
+                "Failed to get session cookie: {:?} from cookies: {:#?}",
+                SESSION_COOKIE_NAME.as_str(),
+                cookies
+            );
+            AuthRedirect::new(method.clone())
+        })?;
 
         let (session_user, csrf_token) = get_user_and_csrf_token_from_session(session_cookie)
             .await
-            .map_err(|_| AuthRedirect::new(method.clone()))?;
+            .map_err(|_| {
+                tracing::error!("Failed to get user and csrf token from session");
+                AuthRedirect::new(method.clone())
+            })?;
 
         // Verify CSRF token for POST, PUT, DELETE requests
-        if method == Method::POST || method == Method::PUT || method == Method::DELETE {
+        if method == Method::POST
+            || method == Method::PUT
+            || method == Method::DELETE
+            || method == Method::PATCH
+        {
             let x_csrf_token = parts
                 .headers
                 .get("X-Csrf-Token")
                 .and_then(|h| h.to_str().ok().map(|s| s.to_string()))
-                .ok_or(AuthRedirect::new(method.clone()))?;
+                .ok_or_else(|| {
+                    tracing::error!("Failed to get X-Csrf-Token");
+                    AuthRedirect::new(method.clone())
+                })?;
 
             tracing::trace!(
-                "CSRF token: X-Csrf-Token: {}, from Session: {}",
+                "CSRF token: X-Csrf-Token: {}, In Cache: {}",
                 x_csrf_token,
-                csrf_token
+                csrf_token.as_str()
             );
 
-            if x_csrf_token != csrf_token {
+            if x_csrf_token != csrf_token.as_str() {
                 tracing::error!(
-                    "CSRF token mismatch, X-Csrf-Token: {}, from Session: {}",
+                    "Token mismatch, X-Csrf-Token: {}, In Cache: {}",
                     x_csrf_token,
-                    csrf_token
+                    csrf_token.as_str()
                 );
                 return Err(AuthRedirect::new(method.clone()));
             }
         }
 
         let mut auth_user = AuthUser::from(session_user);
-        auth_user.csrf_token = csrf_token;
+        auth_user.csrf_token = csrf_token.as_str().to_string();
 
         Ok(auth_user)
     }

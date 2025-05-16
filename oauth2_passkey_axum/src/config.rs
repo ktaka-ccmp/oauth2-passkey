@@ -24,3 +24,9 @@ pub static O2P_ADMIN_URL: LazyLock<String> = LazyLock::new(|| {
 
 pub static O2P_REDIRECT_ANON: LazyLock<String> =
     LazyLock::new(|| std::env::var("O2P_REDIRECT_ANON").unwrap_or_else(|_| "/".to_string()));
+
+pub static O2P_RESPOND_WITH_X_CSRF_TOKEN: LazyLock<bool> = LazyLock::new(|| {
+    std::env::var("O2P_RESPOND_WITH_X_CSRF_TOKEN")
+        .map(|val| val.to_lowercase() != "false")
+        .unwrap_or(true)
+});
