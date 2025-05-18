@@ -116,22 +116,22 @@ where
         {
             let x_csrf_token = parts
                 .headers
-                .get("X-Csrf-Token")
+                .get("X-CSRF-Token")
                 .and_then(|h| h.to_str().ok().map(|s| s.to_string()))
                 .ok_or_else(|| {
-                    tracing::error!("Failed to get X-Csrf-Token");
+                    tracing::error!("Failed to get X-CSRF-Token");
                     AuthRedirect::new(method.clone())
                 })?;
 
             tracing::trace!(
-                "CSRF token: X-Csrf-Token: {}, In Cache: {}",
+                "CSRF token: X-CSRF-Token: {}, In Cache: {}",
                 x_csrf_token,
                 csrf_token.as_str()
             );
 
             if x_csrf_token != csrf_token.as_str() {
                 tracing::error!(
-                    "Token mismatch, X-Csrf-Token: {}, In Cache: {}",
+                    "Token mismatch, X-CSRF-Token: {}, In Cache: {}",
                     x_csrf_token,
                     csrf_token.as_str()
                 );

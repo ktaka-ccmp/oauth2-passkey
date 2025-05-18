@@ -71,8 +71,19 @@
             let csrfToken = null;
 
             // Get initial CSRF token
-            fetch(window.location.href)
-                .then(response => csrfToken = response.headers.get('X-CSRF-Token') || null);
+            fetch(window.location.href, { method: 'HEAD' })
+                .then(response => {
+                    const headers = {};
+                    response.headers.forEach((value, key) => {
+                        headers[key] = value;
+                    });
+                    console.log('Response headers:', headers);
+                    // Always use lowercase when accessing the plain object
+                    // csrfToken = headers['x-csrf-token'] || null;
+                    csrfToken = response.headers.get('X-CSRF-Token') || null;
+                    console.log('CSRF Token:', csrfToken);
+                })
+                .catch(error => console.error('Error fetching CSRF token:', error));
 
             // Handle button clicks
             document.querySelectorAll('#withCsrf, #withoutCsrf').forEach(button => {
