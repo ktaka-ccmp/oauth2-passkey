@@ -46,13 +46,19 @@ pub(super) fn nested_router() -> Router<()> {
 
 // Having user as an argument causes redirect to O2P_LOGIN_URL for anonymous users by axum extractor
 pub(crate) async fn p1(user: AuthUser) -> impl IntoResponse {
-    Html(format!("Hey {}!", user.account))
+    Html(format!(
+        "Hey {}!<br/>Your CSRF Token is: {}",
+        user.account, user.csrf_token
+    ))
 }
 
 // Having user as an optional argument prevents redirect by axum extractor
 pub(crate) async fn p2(user: Option<AuthUser>) -> impl IntoResponse {
     match user {
-        Some(u) => Html(format!("Hey {}!", u.account)),
+        Some(u) => Html(format!(
+            "Hey {}!<br/>Your CSRF Token is: {}",
+            u.account, u.csrf_token
+        )),
         None => Html("Hey Anonymous User!".to_string()),
     }
 }

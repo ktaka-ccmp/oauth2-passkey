@@ -205,7 +205,7 @@ async fn is_authenticated(
         || method == Method::PATCH
     {
         let x_csrf_token = headers
-            .get("X-Csrf-Token")
+            .get("X-CSRF-Token")
             .and_then(|h| h.to_str().ok())
             .map(|s| s.to_string());
 
