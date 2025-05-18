@@ -43,11 +43,11 @@ pub use passkey::{
 };
 
 pub use session::{
-    CsrfToken, SESSION_COOKIE_NAME, SessionError, User as SessionUser, get_csrf_token_from_session,
-    get_user_and_csrf_token_from_session, get_user_from_session, is_authenticated_basic,
-    is_authenticated_basic_then_csrf, is_authenticated_basic_then_user_and_csrf,
-    is_authenticated_strict, is_authenticated_strict_then_csrf, obfuscate_token,
-    prepare_logout_response, verify_context_token,
+    CsrfToken, SESSION_COOKIE_NAME, SessionError, User as SessionUser, generate_page_session_token,
+    get_csrf_token_from_session, get_user_and_csrf_token_from_session, get_user_from_session,
+    is_authenticated_basic, is_authenticated_basic_then_csrf,
+    is_authenticated_basic_then_user_and_csrf, is_authenticated_strict,
+    is_authenticated_strict_then_csrf, prepare_logout_response, verify_page_session_token,
 };
 
 pub use userdb::User as DbUser;

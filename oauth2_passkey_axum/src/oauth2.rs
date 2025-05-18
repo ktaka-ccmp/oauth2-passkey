@@ -12,7 +12,8 @@ use std::collections::HashMap;
 
 use oauth2_passkey::{
     AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, delete_oauth2_account_core, get_authorized_core,
-    list_accounts_core, post_authorized_core, prepare_oauth2_auth_request, verify_context_token,
+    list_accounts_core, post_authorized_core, prepare_oauth2_auth_request,
+    verify_page_session_token,
 };
 
 use super::error::IntoResponseError;
@@ -79,8 +80,8 @@ async fn google_auth(
             return Err((StatusCode::BAD_REQUEST, "Missing Session".to_string()));
         }
 
-        // Verify that received context_token(obfuscated csrf_token) as a part of query param is same as the one in the current user's session cache.
-        verify_context_token(&headers, Some(&context.unwrap()))
+        // Verify that received page_session_token (obfuscated csrf_token) as a part of query param is same as the one in the current user's session cache.
+        verify_page_session_token(&headers, Some(&context.unwrap()))
             .await
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     }

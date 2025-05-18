@@ -17,8 +17,8 @@ pub enum SessionError {
     #[error("Cookie error: {0}")]
     Cookie(String),
 
-    #[error("Context token error: {0}")]
-    ContextToken(String),
+    #[error("Page session token error: {0}")]
+    PageSessionToken(String),
 
     #[error("CSRF token error: {0}")]
     CsrfToken(String),
