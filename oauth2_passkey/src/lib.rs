@@ -19,10 +19,6 @@ pub use coordination::{
     handle_finish_authentication_core, handle_finish_registration_core,
     handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
 };
-// pub use coordinate::{
-//     USER_CONTEXT_TOKEN_COOKIE, extract_context_token_from_cookies, generate_user_context_token,
-//     obfuscate_user_id, verify_context_token_and_page, verify_user_context_token,
-// };
 
 pub use coordination::{
     delete_oauth2_account_admin, delete_oauth2_account_core, delete_passkey_credential_admin,
@@ -43,11 +39,11 @@ pub use passkey::{
 };
 
 pub use session::{
-    CsrfToken, SESSION_COOKIE_NAME, SessionError, User as SessionUser, get_csrf_token_from_session,
-    get_user_and_csrf_token_from_session, get_user_from_session, is_authenticated_basic,
-    is_authenticated_basic_then_csrf, is_authenticated_basic_then_user_and_csrf,
-    is_authenticated_strict, is_authenticated_strict_then_csrf, obfuscate_token,
-    prepare_logout_response, verify_context_token,
+    CsrfToken, SESSION_COOKIE_NAME, SessionError, User as SessionUser, generate_page_session_token,
+    get_csrf_token_from_session, get_user_and_csrf_token_from_session, get_user_from_session,
+    is_authenticated_basic, is_authenticated_basic_then_csrf,
+    is_authenticated_basic_then_user_and_csrf, is_authenticated_strict,
+    is_authenticated_strict_then_csrf, prepare_logout_response, verify_page_session_token,
 };
 
 pub use userdb::User as DbUser;

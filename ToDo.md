@@ -19,7 +19,6 @@
 
 - Syncing of credentials using signalAllAcceptedCredentials?
 
-- Re-examine the role of page context token.
 - Re-examine the current implementation of CSRF protection in OAuth2 flow.
 
 ## ChatGPT's assessment
@@ -178,6 +177,7 @@ Performance:
 
 - Modify is_authenticated middleware so that it can embed csrf_token in the extention field.
 - csrf_token is also automatically delivered to the client as an X-CSRF-Token response header.
+- Re-examine the role of page context token.
 
 ## Memo
 

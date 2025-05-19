@@ -8,24 +8,38 @@ This document analyzes the user verification mechanism in the OAuth2 authenticat
 
 ### Before OAuth2 Redirect (Initiation)
 
-1. **Page Context Token Verification**
+1. **Page Session Token Verification**
    - When adding an OAuth2 account to an existing user, the system verifies:
      - That the user has a valid session
-     - That the page context token matches the obfuscated CSRF token from the session
+     - That the page session token matches the obfuscated CSRF token from the session
    - This verification occurs **before** redirecting to the OAuth2 provider's endpoint
    - Ensures the user who loaded the page is the same user making the request
 
-2. **State Parameter Management**
-   - A state parameter is generated and stored in the session with the user ID
-   - This state parameter is included in the redirect URL to the OAuth2 provider
-   - Acts as a secure binding between the initial request and the callback
+2. **State Parameter and Session Preservation**
+   - A state parameter containing several security components is generated:
+     - CSRF token for flow integrity
+     - Nonce for ID token verification
+     - PKCE for code exchange
+     - Session reference (`misc_id`) that points to the original session ID
+   - The current session ID is stored in cache with a reference ID (`misc_id`)
+   - This enables session continuity throughout the OAuth2 flow
+   - The state parameter is included in the redirect URL to the OAuth2 provider
 
 ### After OAuth2 Redirect (Callback)
 
 1. **Callback Handling**
    - State parameter is extracted and decoded from the callback
-   - User ID is retrieved from the stored session using the state parameter
-   - OAuth2 account is processed based on the retrieved user ID
+   - For redirect-based flow, CSRF token in state is verified against the stored token
+   - Original user context is retrieved using the session reference in state parameter:
+     ```rust
+     // Decode state to access misc_id (session reference)
+     let state_in_response = decode_state(&query.state);
+
+     // Retrieve the original user context from when the flow started
+     let state_user = get_uid_from_stored_session_by_state_param(&state_in_response).await?;
+     ```
+   - This mechanism works for both redirect-based and form post response modes
+   - OAuth2 account is processed based on the original user context
 
 2. **Account Linking Logic**
    - Handles multiple scenarios:
@@ -44,25 +58,30 @@ This document analyzes the user verification mechanism in the OAuth2 authenticat
 
 The system implements multiple layers of security:
 
-1. **Page Context Token Verification**
+1. **Page Session Token Verification**
    - Verifies user identity before initiating the OAuth2 flow
    - Prevents unauthorized account linking attempts
    - Ensures session continuity between page load and action
-   - Uses obfuscated CSRF tokens as page context tokens
+   - Uses obfuscated CSRF tokens as page session tokens
 
-2. **State Parameter as Security Token**
-   - Cryptographically secure random token
-   - Stored server-side with user session information
-   - Single-use and verified during callback
+2. **State Parameter as Multi-Purpose Security Container**
+   - Contains multiple security components:
+     - CSRF token for flow integrity verification
+     - Session reference (`misc_id`) for user context preservation
+     - Additional parameters for OAuth2 protocol security (nonce, PKCE)
+   - Original session ID stored server-side via `misc_session` mechanism
+   - Single-use state parameter verified during callback
    - Creates secure binding between initial request and callback
 
-3. **CSRF Protection**
-   - State parameter serves as CSRF protection
-   - Prevents cross-site request forgery attacks
+3. **Multi-Layered Protection**
+   - Page session token verification before flow initiation
+   - State parameter with CSRF token for redirect-based flow integrity
+   - Session context preservation via `misc_session` mechanism for all flow types
+   - These layers prevent cross-site request forgery and session desynchronization
 
 4. **Complete Session Rotation**
    - New session created after successful authentication
-   - Fresh credentials issued (session ID and context token)
+   - Fresh credentials issued (session ID and page session token)
    - Ensures clean state after authentication
 
 ## Security Analysis
@@ -70,34 +89,21 @@ The system implements multiple layers of security:
 The current implementation follows OAuth 2.0 security best practices and provides robust protection:
 
 1. **Pre-Authorization Verification**
-   - Page context token verification ensures legitimate user before redirect
+   - Page session token verification ensures legitimate user before redirect
+   - Prevents session desynchronization between page load and action initiation
 
-2. **Cross-Request Correlation**
-   - State parameter securely binds initial request to callback
+2. **Session Continuity Through Flow**
+   - Original session preserved via the `misc_session` mechanism
+   - Ensures the OAuth2 account links to the user who initiated the flow
+   - Works consistently across redirect-based and form post response modes
 
-3. **Post-Authorization Session Renewal**
+3. **Flow Integrity Verification**
+   - State parameter with CSRF token secures redirect-based flow
+   - Prevents tampering during redirects
+
+4. **Post-Authorization Session Renewal**
    - Complete session rotation after authentication
    - Mitigates session fixation and hijacking attempts
-
-### OAuth2 Callback Limitations
-
-Page context token verification cannot be added to the callback process due to technical limitations of the OAuth2 protocol:
-
-1. **Form Post Response Mode Constraints**
-   - When using `response_mode=form_post`, the callback doesn't receive cookies
-   - This is because the OAuth2 provider redirects the user via a cross-domain POST request
-   - Browsers don't include cookies from the original domain in cross-domain POST submissions
-   - As noted in the codebase: "While browsers automatically include cookies in normal navigation, they don't include cookies from the original request in this cross-domain POST submission"
-
-2. **OAuth2 Protocol Design**
-   - The OAuth2 specification (RFC 6749) designates the state parameter as the mechanism for cross-request validation
-   - Section 10.12 of RFC 6749 specifies the state parameter as the standard protection against CSRF attacks
-   - The state parameter serves as the binding between the authorization request and callback
-
-3. **Technical Constraints**
-   - Without access to cookies in the callback, there is no reliable way to access the page context token
-   - Alternative approaches (embedding page context token in state parameter or URL) would expose sensitive information
-   - The OAuth2 protocol is designed to work with the state parameter as the primary cross-request identifier
 
 ## Conclusion
 
