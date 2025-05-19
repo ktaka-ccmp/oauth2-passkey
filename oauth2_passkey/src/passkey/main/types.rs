@@ -88,10 +88,6 @@ pub struct RegisterCredential {
     #[serde(rename = "type")]
     pub(super) type_: String,
     pub(super) user_handle: Option<String>,
-    // Optional context from the page where the credential was created
-    // Used for session boundary protection alongside the context token cookie
-    // #[serde(default)]
-    // pub page_context: Option<String>,
 }
 
 impl RegisterCredential {

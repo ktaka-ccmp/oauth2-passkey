@@ -19,10 +19,6 @@ pub use coordination::{
     handle_finish_authentication_core, handle_finish_registration_core,
     handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
 };
-// pub use coordinate::{
-//     USER_CONTEXT_TOKEN_COOKIE, extract_context_token_from_cookies, generate_user_context_token,
-//     obfuscate_user_id, verify_context_token_and_page, verify_user_context_token,
-// };
 
 pub use coordination::{
     delete_oauth2_account_admin, delete_oauth2_account_core, delete_passkey_credential_admin,
