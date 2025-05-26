@@ -1,311 +1,181 @@
-# Session Boundary Solutions
+# Session Boundary Protection
 
 ## Problem Statement
 
-The authentication system had session boundary problems:
+Web applications with authentication systems face session boundary problems at different phases of credential management:
 
-1. When a user intends to add a new passkey credential or link a new OAuth2 account to an existing user account, the system may incorrectly create a new user if there is no valid session.
+1. **Page-to-Request Desynchronization**: A user loads a page with account #1, then switches to account #2 in another tab, and finally returns to the original page (still showing account #1's UI) and clicks an action button. Without proper protection, the action would execute in the context of account #2.
 
-2. A specific edge case exists where a user might have multiple accounts and accidentally add credentials to the wrong account due to session desynchronization:
-   - User views account #1's page with "add credential" button
-   - User gets distracted, logs in as account #2 in another tab
-   - User returns to account #1's page, but now has a session for account #2
-   - User clicks "add credential" button, believing it will add to account #1, but it actually adds to account #2
+2. **Process Start-to-Completion Desynchronization**: During multi-step processes (like passkey registration), a user might start the process with one account and complete it with another due to session changes in between steps.
 
-## Implemented Solution
+## Protection Mechanisms for Different Desynchronization Phases
 
-We implemented a dual approach to solve these session boundary issues:
+We implement different protection mechanisms for different phases of potential session desynchronization:
 
-### 1. Explicit Registration Modes
+### Passkey Registration Flow
 
-We created a clear separation of intent through explicit registration modes:
+#### Phase 1: Protection Against Page-to-Request Desynchronization
+
+When a user clicks "Add Passkey" on a user profile page, we use **standard CSRF protection** to detect if the session has changed since the page was loaded:
 
 ```rust
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum RegistrationMode {
-    /// Adding a passkey to an existing user (requires authentication)
-    AddToUser,
-    /// Creating a new user with a passkey (no authentication required)
-    CreateUser,
+// When user clicks "Add Passkey", the CSRF token from the page must match the session
+if x_csrf_token != stored_session.csrf_token {
+    return Err("CSRF token mismatch");
 }
 ```
 
-These modes are used in the client JavaScript and server-side handlers to explicitly indicate the user's intent:
+This ensures the user who clicks the button is the same one who loaded the page, preventing accidental credential addition to the wrong account.
 
-```javascript
-// Client-side: Explicit mode when showing registration modal
-function showRegistrationModal(mode) { // 'create_user' or 'add_to_user'
-    const modal = createRegistrationModal();
-    modal.style.display = 'block';
-    modal.dataset.mode = mode;
+#### Phase 2: Protection Against Start-to-Completion Desynchronization
+
+During the passkey registration process itself, we verify the user ID at completion time to ensure it matches the ID from when registration started:
+
+```rust
+// When completing passkey registration:
+if session_user.id != session_info.user.id { // session_info from registration start
+    return Err(PasskeyError::Format("User ID mismatch"));
+}
+```
+
+This catches any session changes that might have occurred during the registration process.
+
+### OAuth2 Account Linking Flow
+
+#### Phase 1: Protection Against Page-to-Request Desynchronization
+
+For OAuth2 account linking, standard CSRF protection isn't sufficient because the flow involves redirects to third-party providers. Instead, we use **page session tokens**:
+
+```rust
+// Generate an obfuscated version of the CSRF token for use in redirects
+pub fn generate_page_session_token(token: &str) -> String {
+    // HMAC-SHA256 of the CSRF token
     // ...
 }
 ```
 
-```rust
-// Server-side: Mode-specific handling
-match body.mode {
-    RegistrationMode::AddToUser => {
-        // Verify user is authenticated
-        // Verify CSRF token matches session
-        // Add passkey to existing user
-    },
-    RegistrationMode::CreateUser => {
-        // Create new user with passkey
-    },
-}
-```
+This token is embedded in the page and included when initiating the OAuth2 flow:
 
-### 2. Session/Page Synchronization with Page Context Tokens
+```html
+<script>
+    const SESSION_BINDING_TOKEN = "{{ page_session_token }}";
 
-We leverage obfuscated CSRF tokens as page context tokens for both CSRF protection and session boundary verification:
-
-#### CSRF Token Implementation
-
-The CSRF token mechanism is integrated with the session management system:
-
-```rust
-// When creating a new session, a CSRF token is generated and stored
-pub(super) async fn create_new_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {
-    let session_id = gen_random_string(32)?;
-    let expires_at = Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64);
-
-    let csrf_token = gen_random_string(32)?;
-
-    let stored_session = StoredSession {
-        user_id: user_id.to_string(),
-        csrf_token: csrf_token.to_string(),
-        expires_at,
-        ttl: *SESSION_COOKIE_MAX_AGE,
-    };
-
-    // Store the session with the CSRF token
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .put_with_ttl(
-            "session",
-            &session_id,
-            stored_session.into(),
-            *SESSION_COOKIE_MAX_AGE as usize,
-        )
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?;
-
-    // Set the session cookie
-    let mut headers = HeaderMap::new();
-    header_set_cookie(
-        &mut headers,
-        SESSION_COOKIE_NAME.to_string(),
-        session_id.clone(),
-        expires_at,
-        *SESSION_COOKIE_MAX_AGE as i64,
-    )?;
-
-    Ok(headers)
-}
-```
-
-The CSRF token is verified for all state-changing operations:
-
-```rust
-// CSRF verification for state-changing methods
-if method == Method::POST || method == Method::PUT || method == Method::DELETE {
-    let x_csrf_token = headers
-        .get("X-Csrf-Token")
-        .and_then(|h| h.to_str().ok())
-        .map(|s| s.to_string());
-
-    if let Some(csrf_token) = x_csrf_token {
-        if csrf_token != stored_session.csrf_token {
-            return Ok(false);
-        }
-    } else {
-        return Ok(false);
+    function addOAuth2Account() {
+        oauth2.openPopup('add_to_user', SESSION_BINDING_TOKEN);
     }
-}
+</script>
 ```
 
-For session boundary protection, we use an obfuscated version of the CSRF token:
+When the OAuth2 flow begins, we verify the page session token matches the current session:
 
 ```rust
-// Obfuscate the CSRF token for page context
-pub fn obfuscate_token(token: &str) -> String {
-    let mut mac =
-        HmacSha256::new_from_slice(&AUTH_SERVER_SECRET).expect("HMAC can take key of any size");
-    mac.update(token.as_bytes());
-    let result = mac.finalize().into_bytes();
-    URL_SAFE_NO_PAD.encode(result)
-}
-```
-
-#### Token Delivery
-
-The CSRF token is delivered through two mechanisms:
-
-1. **HTTP Headers**:
-   - The CSRF token is required in the `X-CSRF-Token` header for all state-changing operations
-   - This protects against cross-site request forgery attacks
-
-2. **Page Embedding**:
-   - The obfuscated CSRF token is embedded in the page as a JavaScript constant: `PAGE_CONTEXT_TOKEN`
-   - This is used for session boundary verification
-   - Example: `<script>const PAGE_CONTEXT_TOKEN = "{{ page_context_token }}";</script>`
-
-### Page Context Token Verification
-
-The `verify_context_token` function verifies that the page context token matches the obfuscated CSRF token:
-
-```rust
-pub async fn verify_context_token(
-    headers: &HeaderMap,
-    page_context: Option<&String>,
-) -> Result<(), SessionError> {
-    let session_id: &str = match get_session_id_from_headers(headers) {
-        Ok(Some(session_id)) => session_id,
-        _ => return Err(SessionError::ContextToken("Session ID missing".to_string())),
-    };
-
-    let cached_session = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get("session", session_id)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
-        .ok_or(SessionError::SessionError)?;
-
-    let stored_session: StoredSession = cached_session.try_into()?;
-
-    if let Some(page_context) = page_context {
-        if page_context.as_str() != obfuscate_token(&stored_session.csrf_token) {
-            tracing::error!("Page context token does not match session user");
-            return Err(SessionError::ContextToken(
-                "Page context token does not match session user".to_string(),
-            ));
-        }
-    }
-
-    Ok(())
-}
-```
-
-## Benefits of the Implemented Approach
-
-1. **Clear Intent Separation**: The `RegistrationMode` enum explicitly declares whether operations create users or modify existing ones
-2. **Simplified Security Model**: Using CSRF tokens for both CSRF protection and session boundary verification
-3. **Integrated Implementation**: Session management and security are tightly integrated
-4. **Performance**: No additional storage or database lookups required
-5. **User Experience**: Clear error messages guide users when synchronization fails
-6. **Reduced Complexity**: Fewer mechanisms to maintain and understand
-
-## Security Considerations
-
-- CSRF tokens are obfuscated using HMAC-SHA256 to prevent direct exposure
-- Token expiration is set to 1 day, balancing security and user experience
-- Tokens are signed with HMAC-SHA256 using a configurable server secret
-- Cookies are set with HttpOnly and SameSite=Strict to prevent XSS and CSRF attacks
-- Error messages are user-friendly but don't expose sensitive information
-
-## Special Considerations for OAuth2 Flows
-
-OAuth2 flows present unique challenges for session boundary protection:
-
-1. **Redirect and Cross-Domain Limitations**:
-   - OAuth2 redirects to third-party providers and back
-   - Cookies may not be preserved across domains
-   - Custom headers like `X-CSRF-Token` cannot be set on redirects
-
-2. **Our Solution**:
-   - Use obfuscated CSRF tokens as page context tokens
-   - Pass these tokens as query parameters in OAuth2 redirects
-   - Verify the tokens when processing OAuth2 callbacks
-
-3. **Security Benefits**:
-   - Maintains session boundary protection despite redirect constraints
-   - Avoids exposing raw CSRF tokens in URLs
-   - Provides a consistent security model across all authentication flows
-
-## Appendix: Alternative Approaches Considered
-
-Several alternative approaches were considered before arriving at the signed composite token solution:
-
-### 1. Using Raw User IDs
-
-**Approach:**
-
-- Embed raw user IDs in pages and/or cookies
-- Compare embedded user ID against session user ID
-
-**Advantages:**
-
-- Extremely simple implementation
-- No cryptographic operations needed
-- Direct comparison logic
-
-**Why Disregarded:**
-
-- Exposes internal identifiers
-- No built-in expiration mechanism
-- No protection against tampering
-- Limited security properties
-
-### 2. Extending SessionInfo with User Token
-
-**Approach:**
-
-```rust
-pub struct SessionInfo {
-    pub user_id: String,
-    pub user_token: String,  // New field 
-    pub expires_at: DateTime<Utc>,
-}
-```
-
-**Advantages:**
-
-- Simplicity of implementation
-- Token automatically expires with session
-- Directly tied to user's session
-
-**Why Disregarded:**
-
-- Blurs separation of concerns - session management vs. page context
-- Mixes authentication logic with UI synchronization concerns
-- Session component shouldn't need to know about UI state synchronization
-
-### 3. Page Context Manager with Server-side Storage
-
-**Approach:**
-
-```rust
-pub struct PageContextManager {
-    storage: Arc<dyn Storage>,
-}
-
-impl PageContextManager {
-    pub async fn create_context(&self, user_id: &str) -> Result<String, Error> {
-        // Generate random token
-        // Store in Redis/database with user_id
-    }
+async fn google_auth(
+    auth_user: Option<AuthUser>,
+    headers: HeaderMap,
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
+    // Verify that page session token matches current session
+    verify_page_session_token(&headers, Some(&context.unwrap())).await?;
     
-    pub async fn verify_context(&self, token: &str, session_user_id: &str) -> Result<(), Error> {
-        // Retrieve from storage
-        // Verify user_id matches
-    }
+    // Only after verification passes do we proceed
+    // ...
 }
 ```
 
-**Advantages:**
+#### Phase 2: Protection During the OAuth2 Flow
 
-- Clean separation of concerns
-- Can store additional context beyond user ID
-- Tokens can be invalidated immediately
-- More flexible for future extensions
+The primary mechanism for maintaining session continuity throughout the OAuth2 flow is the preservation of the original session context:
 
-**Why Disregarded:**
+1. **Session Context Preservation**:
+   When starting the OAuth2 flow, we store the current session ID to maintain user context:
 
-- Requires additional infrastructure (Redis, database)
-- Storage lookups become potential bottleneck
-- More complex implementation
-- Unnecessary operational complexity for this specific use case
+   ```rust
+   // In prepare_oauth2_auth_request: Store the current session ID in cache
+   let misc_id = if let Some(session_id) = get_session_id_from_headers(&headers)? {
+       tracing::info!("Session ID found: {}", session_id);
+       Some(store_token_in_cache("misc_session", session_id, ttl, expires_at, None).await?)
+   } else {
+       tracing::debug!("No session ID found");
+       None
+   };
+
+   // Include the misc_id in the state parameter
+   let state_params = StateParams {
+       csrf_token,
+       nonce_id,
+       pkce_id,
+       misc_id,  // Reference to stored session ID - critical for session continuity
+       mode_id,
+   };
+   ```
+
+2. **Session Context Retrieval**:
+   When completing the OAuth2 flow, we retrieve the original user context regardless of the current session state:
+
+   ```rust
+   // Get the original user from the session stored at flow initiation
+   pub(crate) async fn get_uid_from_stored_session_by_state_param(
+       state_params: &StateParams,
+   ) -> Result<Option<SessionUser>, OAuth2Error> {
+       // Extract the misc_id from the state parameter
+       let Some(misc_id) = &state_params.misc_id else {
+           return Ok(None);
+       };
+
+       // Get the session ID that was stored at the beginning of the flow
+       let token = get_token_from_store::<StoredToken>("misc_session", misc_id).await?;
+
+       // Retrieve the user from that original session
+       match get_user_from_session(&token.token).await {
+           Ok(user) => {
+               tracing::debug!("Found user ID: {}", user.id);
+               Ok(Some(user))
+           },
+           Err(e) => {
+               tracing::debug!("Failed to get user from session: {}", e);
+               Ok(None)
+           }
+       }
+   }
+   ```
+
+3. **Session Context Usage**:
+   The preserved session context is retrieved and used during OAuth2 account linking, regardless of flow type:
+
+   ```rust
+   // During OAuth2 account linking process
+   // First decode the state parameter to access misc_id
+   let state_in_response = decode_state(&auth_response.state)?;
+
+   // Extract user_id from the stored session if available
+   let state_user = get_uid_from_stored_session_by_state_param(&state_in_response).await?;
+
+   // Use this preserved user context for account linking
+   if let Some(user) = state_user {
+       // Link the OAuth2 account to the original user who initiated the flow
+       // regardless of current session state
+       // ...
+   }
+   ```
+
+This approach ensures that:
+
+- The OAuth2 account is always linked to the user who initiated the flow
+- Session changes during the OAuth2 process don't affect the final account linking
+- We maintain a continuous user context from flow initiation to completion
+
+## Key Security Characteristics
+
+1. **Phase-Specific Protection**: Each mechanism addresses a specific phase where session desynchronization can occur:
+   - CSRF protection: Between page load and request submission
+   - User ID verification: Between process start and completion
+   - Page session tokens: Throughout redirect-based flows
+
+2. **Early Detection**: Problems are caught at the earliest possible point:
+   - Page-level desynchronization is caught before the process starts
+   - Process-level desynchronization is caught before registration completes
+
+3. **Minimal Implementation**:
+   - Leverages existing CSRF token mechanism wherever possible
+   - Uses simple verification logic with clear error handling
+   - No additional database storage required beyond temporary process state

@@ -1,4 +1,4 @@
-mod context_token;
+mod page_session_token;
 mod session;
 
 use crate::session::errors::SessionError;
@@ -6,7 +6,7 @@ use http::HeaderMap;
 
 pub(crate) use session::{delete_session_from_store_by_session_id, get_session_id_from_headers};
 
-pub use context_token::{obfuscate_token, verify_context_token};
+pub use page_session_token::{generate_page_session_token, verify_page_session_token};
 pub use session::{
     get_csrf_token_from_session, get_user_and_csrf_token_from_session, get_user_from_session,
     is_authenticated_basic, is_authenticated_basic_then_csrf,

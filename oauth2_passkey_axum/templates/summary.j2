@@ -129,7 +129,7 @@
     <div class="section">
         <div class="section-header">
             <h2 class="section-title">OAuth2 Accounts</h2>
-            <button onclick="oauth2.openPopup('add_to_user', PAGE_USER_CONTEXT)" class="action-button">Add New OAuth2 Account</button>
+            <button onclick="oauth2.openPopup('add_to_user', PAGE_SESSION_TOKEN)" class="action-button">Add New OAuth2 Account</button>
         </div>
         {% if oauth2_accounts.is_empty() %}
             <p>You don't have any linked OAuth2 accounts yet.</p>
@@ -193,8 +193,8 @@
     <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
     <script src="{{o2p_route_prefix}}/user/summary.js"></script>
     <script>
-        // Page context for session boundary protection
-        const PAGE_USER_CONTEXT = "{{ page_context_token }}";
+        // Page session token for session boundary protection
+        const PAGE_SESSION_TOKEN = "{{ page_session_token }}";
         // Global route prefix for API calls
         const O2P_ROUTE_PREFIX = "{{o2p_route_prefix}}";
         const accountName = "{{user.account}}";

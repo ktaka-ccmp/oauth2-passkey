@@ -15,8 +15,8 @@ use std::{
 use serde_json::{Value, json};
 
 use oauth2_passkey::{
-    AuthenticatorInfo, O2P_ROUTE_PREFIX, get_authenticator_info_batch, list_accounts_core,
-    list_credentials_core, obfuscate_token,
+    AuthenticatorInfo, O2P_ROUTE_PREFIX, generate_page_session_token, get_authenticator_info_batch,
+    list_accounts_core, list_credentials_core,
 };
 
 use crate::config::O2P_REDIRECT_ANON;
@@ -106,7 +106,7 @@ struct UserSummaryTemplate {
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
     pub o2p_redirect_anon: String,
-    pub page_context_token: String,
+    pub page_session_token: String,
 }
 
 impl UserSummaryTemplate {
@@ -117,7 +117,7 @@ impl UserSummaryTemplate {
         o2p_route_prefix: String,
         o2p_redirect_anon: String,
     ) -> Self {
-        let page_context_token = obfuscate_token(&user.csrf_token);
+        let page_session_token = generate_page_session_token(&user.csrf_token);
 
         Self {
             user: TemplateAuthUser {
@@ -133,7 +133,7 @@ impl UserSummaryTemplate {
             oauth2_accounts,
             o2p_route_prefix,
             o2p_redirect_anon,
-            page_context_token,
+            page_session_token,
         }
     }
 }

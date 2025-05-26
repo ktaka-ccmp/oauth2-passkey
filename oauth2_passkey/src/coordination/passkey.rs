@@ -41,9 +41,6 @@ pub struct RegistrationStartRequest {
     pub username: String,
     pub displayname: String,
     pub mode: RegistrationMode,
-    /// Optional page context for session boundary verification
-    #[serde(default)]
-    pub page_context: Option<String>,
 }
 
 /// Core function that handles the business logic of starting registration with provided user info

@@ -40,7 +40,7 @@ The following is a blueprint of the architecture of this application. It reflect
 
 - **session**: Manages user sessions
   - Creates and validates session tokens
-  - Handles session cookies and context tokens
+  - Handles session cookies and page session tokens
   - Provides user information from sessions
 
 - **storage**: Provides data persistence
@@ -71,7 +71,7 @@ The following is a blueprint of the architecture of this application. It reflect
 ## Security Considerations
 
 - Session tokens are securely managed with proper expiration
-- Context tokens provide protection against session desynchronization
+- Page session tokens provide protection against session desynchronization
 - Passkey credentials follow WebAuthn security standards
 - OAuth2 implementation follows best practices for authorization flow
 
