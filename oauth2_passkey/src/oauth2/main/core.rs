@@ -57,7 +57,7 @@ pub async fn prepare_oauth2_auth_request(
 
     tracing::debug!("PKCE Challenge: {:#?}", pkce_challenge);
     let state_params = StateParams {
-        csrf_token,
+        csrf_id,
         nonce_id,
         pkce_id,
         misc_id,
@@ -91,7 +91,7 @@ pub async fn prepare_oauth2_auth_request(
     };
     let cookie = format!(
         "{}={}; SameSite={}; Secure; HttpOnly; Path=/; Max-Age={}",
-        *OAUTH2_CSRF_COOKIE_NAME, csrf_id, samesite, *OAUTH2_CSRF_COOKIE_MAX_AGE as i64
+        *OAUTH2_CSRF_COOKIE_NAME, csrf_token, samesite, *OAUTH2_CSRF_COOKIE_MAX_AGE as i64
     );
 
     headers.append(
@@ -175,11 +175,17 @@ pub(crate) async fn csrf_checks(
     query: &AuthResponse,
     headers: HeaderMap,
 ) -> Result<(), OAuth2Error> {
-    let csrf_id = cookies
+    let csrf_token = cookies
         .get(OAUTH2_CSRF_COOKIE_NAME.as_str())
         .ok_or_else(|| {
             OAuth2Error::SecurityTokenNotFound("No CSRF session cookie found".to_string())
         })?;
+
+    let state_in_response = decode_state(&query.state)?;
+    tracing::debug!("State in response: {:#?}", state_in_response);
+
+    // Get the csrf_id from the state parameter
+    let csrf_id = &state_in_response.csrf_id;
 
     let csrf_session: StoredToken = get_token_from_store("csrf", csrf_id).await?;
     tracing::debug!("CSRF Session: {:#?}", csrf_session);
@@ -192,14 +198,9 @@ pub(crate) async fn csrf_checks(
         .unwrap_or("Unknown")
         .to_string();
 
-    let state_in_response = decode_state(&query.state)?;
-    tracing::debug!("State in response: {:#?}", state_in_response);
-
-    if state_in_response.csrf_token != csrf_session.token {
-        tracing::error!(
-            "CSRF Token in state param: {:#?}",
-            state_in_response.csrf_token
-        );
+    // Compare the token from the cookie with the token stored in the session
+    if csrf_token != csrf_session.token {
+        tracing::error!("CSRF Token in cookie: {:#?}", csrf_token);
         tracing::error!("Stored CSRF Token: {:#?}", csrf_session.token);
         return Err(OAuth2Error::CsrfTokenMismatch);
     }
