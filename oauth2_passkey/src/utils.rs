@@ -45,7 +45,6 @@ pub(crate) fn header_set_cookie(
 ) -> Result<&HeaderMap, UtilError> {
     let cookie =
         format!("{name}={value}; SameSite=Lax; Secure; HttpOnly; Path=/; Max-Age={max_age}");
-    println!("Cookie: {:#?}", cookie);
     headers.append(
         SET_COOKIE,
         cookie

@@ -123,9 +123,10 @@ async fn get_authorized(
 ///    typed Cookie header that would be available in a standard browser navigation
 async fn post_authorized(
     headers: HeaderMap,
+    TypedHeader(cookies): TypedHeader<headers::Cookie>,
     Form(form): Form<AuthResponse>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (headers, message) = post_authorized_core(&form, &headers)
+    let (headers, message) = post_authorized_core(&form, &cookies, &headers)
         .await
         .into_response_error()?;
 
