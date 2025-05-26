@@ -3,10 +3,10 @@ use http::HeaderMap;
 use std::env;
 
 use crate::oauth2::{
-    AccountSearchField, AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAuth2Account,
-    OAuth2Mode, OAuth2Store, csrf_checks, decode_state, delete_session_and_misc_token_from_store,
-    get_idinfo_userinfo, get_mode_from_stored_session, get_uid_from_stored_session_by_state_param,
-    validate_origin,
+    AccountSearchField, AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME,
+    OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS, OAuth2Account, OAuth2Mode, OAuth2Store, csrf_checks,
+    decode_state, delete_session_and_misc_token_from_store, get_idinfo_userinfo,
+    get_mode_from_stored_session, get_uid_from_stored_session_by_state_param, validate_origin,
 };
 
 use crate::userdb::{User as DbUser, UserStore};
@@ -31,9 +31,21 @@ pub async fn get_authorized_core(
 
 pub async fn post_authorized_core(
     auth_response: &AuthResponse,
+    cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
     validate_origin(headers, OAUTH2_AUTH_URL.as_str()).await?;
+
+    // Only perform CSRF checks if enabled for POST callbacks
+    if *OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS {
+        // CSRF protection for POST is enabled, perform checks
+        csrf_checks(cookies.clone(), auth_response, headers.clone()).await?
+    } else {
+        // CSRF protection for POST is disabled, skip checks
+        tracing::info!(
+            "Skipping CSRF checks for POST request as OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS is disabled"
+        );
+    }
 
     if auth_response.state.is_empty() {
         return Err(CoordinationError::InvalidState(

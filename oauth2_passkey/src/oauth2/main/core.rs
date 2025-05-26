@@ -1,17 +1,18 @@
 use headers::Cookie;
-use http::header::HeaderMap;
+use http::header::{HeaderMap, SET_COOKIE};
 
 use chrono::{Duration, Utc};
 use sha2::{Digest, Sha256};
 
 use crate::oauth2::config::{
-    OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_GOOGLE_CLIENT_ID,
-    OAUTH2_QUERY_STRING, OAUTH2_REDIRECT_URI,
+    OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME,
+    OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS, OAUTH2_GOOGLE_CLIENT_ID, OAUTH2_QUERY_STRING,
+    OAUTH2_REDIRECT_URI,
 };
 use crate::oauth2::errors::OAuth2Error;
 use crate::oauth2::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken};
 use crate::session::get_session_id_from_headers;
-use crate::utils::{base64url_encode, header_set_cookie};
+use crate::utils::base64url_encode;
 
 use super::google::{exchange_code_for_token, fetch_user_data_from_google};
 use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
@@ -81,14 +82,24 @@ pub async fn prepare_oauth2_auth_request(
     tracing::debug!("Auth URL: {:#?}", auth_url);
 
     let mut headers = HeaderMap::new();
-    header_set_cookie(
-        &mut headers,
-        OAUTH2_CSRF_COOKIE_NAME.to_string(),
-        csrf_id,
-        expires_at,
-        *OAUTH2_CSRF_COOKIE_MAX_AGE as i64,
-    )
-    .map_err(|e| OAuth2Error::Cookie(e.to_string()))?;
+
+    // Set SameSite=None when CSRF for POST callbacks is enabled, otherwise use Lax for better security
+    let samesite = if *OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS {
+        "None"
+    } else {
+        "Lax"
+    };
+    let cookie = format!(
+        "{}={}; SameSite={}; Secure; HttpOnly; Path=/; Max-Age={}",
+        *OAUTH2_CSRF_COOKIE_NAME, csrf_id, samesite, *OAUTH2_CSRF_COOKIE_MAX_AGE as i64
+    );
+
+    headers.append(
+        SET_COOKIE,
+        cookie
+            .parse()
+            .map_err(|_| OAuth2Error::Cookie("Failed to parse cookie".to_string()))?,
+    );
 
     tracing::debug!("Headers: {:#?}", headers);
 
@@ -182,6 +193,7 @@ pub(crate) async fn csrf_checks(
         .to_string();
 
     let state_in_response = decode_state(&query.state)?;
+    tracing::debug!("State in response: {:#?}", state_in_response);
 
     if state_in_response.csrf_token != csrf_session.token {
         tracing::error!(
