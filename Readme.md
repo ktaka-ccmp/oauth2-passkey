@@ -2,13 +2,16 @@
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Basic usage](#basic-usage)
-- [Prepare database and cache server](#prepare-database-and-cache-server)
-- [Prepare .env file](#prepare-env-file)
-- [Rust code](#rust-code)
+  - [Prepare database and cache](#prepare-database-and-cache)
+  - [.env file](#env-file)
+  - [Rust code](#rust-code)
 - [Feature flags](#feature-flags)
-- [Route protection](#route-protection)
+- [Who is admin](#who-is-admin)
+- [Route Protection](#route-protection)
 - [Security](#security)
+  - [CSRF protection](#csrf-protection)
 
 ## Basic usage
 
@@ -125,11 +128,63 @@ checks if session_id is valid
 extract struct AuthUser 
 Redirect(GET) or 40x(PUT/POST/DELETE) if it fails
 
+The AuthUser struct includes csrf_token.
+The handler protected by this extractor can extract the csrf_token from the AuthUser struct.
+
+```rust
+async fn protected_handler(user: AuthUser) {
+    let csrf_token = user.csrf_token;
+}
+```
+
 #### Middleware
 
-We have prepared a setof functions for middleware.
+We have prepared a set of functions for middleware.
 
 is_authenticated
+
+#### Delivering csrf_token
+
+##### Have handlers extract csrf_token and embed it in the page
+
+The prepared middleware embeds the csrf_token in the extension field. The handles protected by the middleware can extract the csrf_token from the extension field as:
+
+```rust
+async fn protected_handler(Extension(user): Extension<AuthUser>) {
+    // AuthUser includes csrf_token
+    let csrf_token = user.csrf_token;
+    
+}
+```
+
+```rust
+async fn protected_handler(Extension(csrf_token): Extension<CsrfToken>) {
+    // CsrfToken is a struct that only has a csrf_token field
+}
+```
+
+##### Have the middleware automatically embed the csrf_token in the response header
+
+Alternativly you can automatically embed the csrf_token in the response header.
+O2P_RESPOND_WITH_X_CSRF_TOKEN, which is set to true by default, determines if the response should include the csrf_token in the X-CSRF-Token header.
+
+This is only available for the routes protected by is_authenticated middleware(example 1), i.e. not available for the routes protected by AuthUser extractor(example 2).
+
+Example 1:
+```rust
+// The response will include the csrf_token in the X-CSRF-Token header automatically
+router.route("/protected", get(protected_handler).layer(is_authenticated_xxx()));
+async fn protected_handler() {
+}
+```
+
+Example 2:
+```rust
+// You have to extract the csrf_token and embed it in the page yourself
+async fn protected_handler(user: AuthUser) {
+    let csrf_token = user.csrf_token;
+}
+```
 
 ## Security
 
