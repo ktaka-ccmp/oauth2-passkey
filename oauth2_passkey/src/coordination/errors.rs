@@ -81,6 +81,10 @@ pub enum CoordinationError {
     /// Error from utils operations
     #[error("Utils error: {0}")]
     UtilsError(UtilError),
+
+    /// Invalid response mode
+    #[error("Invalid response mode: {0}")]
+    InvalidResponseMode(String),
 }
 
 impl CoordinationError {
@@ -137,6 +141,9 @@ impl CoordinationError {
             Self::PasskeyError(err) => tracing::error!("Passkey error: {}", err),
             Self::SessionError(err) => tracing::error!("Session error: {}", err),
             Self::UtilsError(err) => tracing::error!("Utils error: {}", err),
+            Self::InvalidResponseMode(message) => {
+                tracing::error!("Invalid response mode: {}", message)
+            }
         }
         self
     }

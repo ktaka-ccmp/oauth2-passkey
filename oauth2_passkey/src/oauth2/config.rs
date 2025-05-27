@@ -17,8 +17,19 @@ pub(crate) static OAUTH2_TOKEN_URL: LazyLock<String> = LazyLock::new(|| {
 static OAUTH2_SCOPE: LazyLock<String> =
     LazyLock::new(|| std::env::var("OAUTH2_SCOPE").unwrap_or("openid+email+profile".to_string()));
 
-static OAUTH2_RESPONSE_MODE: LazyLock<String> =
-    LazyLock::new(|| std::env::var("OAUTH2_RESPONSE_MODE").unwrap_or("form_post".to_string()));
+pub(crate) static OAUTH2_RESPONSE_MODE: LazyLock<String> = LazyLock::new(|| {
+    let mode = std::env::var("OAUTH2_RESPONSE_MODE").unwrap_or("form_post".to_string());
+    match mode.to_lowercase().as_str() {
+        "form_post" => "form_post".to_string(),
+        "query" => "query".to_string(),
+        _ => {
+            panic!(
+                "Invalid OAUTH2_RESPONSE_MODE '{}'. Must be 'form_post' or 'query'.",
+                mode
+            );
+        }
+    }
+});
 
 static OAUTH2_RESPONSE_TYPE: LazyLock<String> =
     LazyLock::new(|| std::env::var("OAUTH2_RESPONSE_TYPE").unwrap_or("code".to_string()));
@@ -46,13 +57,6 @@ pub(crate) static OAUTH2_CSRF_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
     std::env::var("OAUTH2_CSRF_COOKIE_NAME")
         .ok()
         .unwrap_or("__Host-CsrfId".to_string())
-});
-
-pub(crate) static OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS: LazyLock<bool> = LazyLock::new(|| {
-    std::env::var("OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS")
-        .ok()
-        .map(|s| s.to_lowercase() == "true")
-        .unwrap_or(true) // Default to true for better security
 });
 
 pub(super) static OAUTH2_CSRF_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
