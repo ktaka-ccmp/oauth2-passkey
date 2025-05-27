@@ -5,9 +5,8 @@ use chrono::{Duration, Utc};
 use sha2::{Digest, Sha256};
 
 use crate::oauth2::config::{
-    OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME,
-    OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS, OAUTH2_GOOGLE_CLIENT_ID, OAUTH2_QUERY_STRING,
-    OAUTH2_REDIRECT_URI,
+    OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_GOOGLE_CLIENT_ID,
+    OAUTH2_QUERY_STRING, OAUTH2_REDIRECT_URI, OAUTH2_RESPONSE_MODE,
 };
 use crate::oauth2::errors::OAuth2Error;
 use crate::oauth2::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken};
@@ -83,12 +82,15 @@ pub async fn prepare_oauth2_auth_request(
 
     let mut headers = HeaderMap::new();
 
-    // Set SameSite=None when CSRF for POST callbacks is enabled, otherwise use Lax for better security
-    let samesite = if *OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS {
-        "None"
-    } else {
-        "Lax"
+    // Set SameSite attribute based on response mode
+    // form_post requires SameSite=None because it's a cross-site POST
+    // query (redirect) can use SameSite=Lax for better security
+    let samesite = match OAUTH2_RESPONSE_MODE.to_lowercase().as_str() {
+        "form_post" => "None",
+        "query" => "Lax",
+        _ => "Lax", // Default to Lax for unknown response modes
     };
+
     let cookie = format!(
         "{}={}; SameSite={}; Secure; HttpOnly; Path=/; Max-Age={}",
         *OAUTH2_CSRF_COOKIE_NAME, csrf_token, samesite, *OAUTH2_CSRF_COOKIE_MAX_AGE as i64

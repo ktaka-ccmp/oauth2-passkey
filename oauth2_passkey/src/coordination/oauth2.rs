@@ -4,9 +4,9 @@ use std::env;
 
 use crate::oauth2::{
     AccountSearchField, AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME,
-    OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS, OAuth2Account, OAuth2Mode, OAuth2Store, csrf_checks,
-    decode_state, delete_session_and_misc_token_from_store, get_idinfo_userinfo,
-    get_mode_from_stored_session, get_uid_from_stored_session_by_state_param, validate_origin,
+    OAUTH2_RESPONSE_MODE, OAuth2Account, OAuth2Mode, OAuth2Store, csrf_checks, decode_state,
+    delete_session_and_misc_token_from_store, get_idinfo_userinfo, get_mode_from_stored_session,
+    get_uid_from_stored_session_by_state_param, validate_origin,
 };
 
 use crate::userdb::{User as DbUser, UserStore};
@@ -17,35 +17,42 @@ use super::user::gen_new_user_id;
 
 use crate::session::new_session_header;
 
-pub async fn get_authorized_core(
-    auth_response: &AuthResponse,
-    cookies: &headers::Cookie,
-    headers: &HeaderMap,
-) -> Result<(HeaderMap, String), CoordinationError> {
-    validate_origin(headers, OAUTH2_AUTH_URL.as_str()).await?;
-
-    csrf_checks(cookies.clone(), auth_response, headers.clone()).await?;
-
-    process_oauth2_authorization(auth_response).await
+/// HTTP method enum for the authorized_core function
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum HttpMethod {
+    Get,
+    Post,
 }
 
-pub async fn post_authorized_core(
+/// Unified function for processing OAuth2 authorization callbacks
+///
+/// This function handles both GET and POST callbacks with appropriate validation:
+/// 1. Validates the HTTP method matches the configured response mode
+/// 2. Validates the state parameter is not empty
+/// 3. Performs CSRF checks
+/// 4. Processes the OAuth2 authorization
+pub async fn authorized_core(
+    method: HttpMethod,
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    validate_origin(headers, OAUTH2_AUTH_URL.as_str()).await?;
-
-    // Only perform CSRF checks if enabled for POST callbacks
-    if *OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS {
-        // CSRF protection for POST is enabled, perform checks
-        csrf_checks(cookies.clone(), auth_response, headers.clone()).await?
-    } else {
-        // CSRF protection for POST is disabled, skip checks
-        tracing::info!(
-            "Skipping CSRF checks for POST request as OAUTH2_ENABLE_CSRF_FOR_POST_CALLBACKS is disabled"
-        );
+    // Verify this is the correct response mode for the HTTP method
+    match (method, OAUTH2_RESPONSE_MODE.to_lowercase().as_str()) {
+        (HttpMethod::Get, "form_post") => {
+            return Err(CoordinationError::InvalidResponseMode(
+                "GET is not allowed for form_post response mode".to_string(),
+            ));
+        }
+        (HttpMethod::Post, "query") => {
+            return Err(CoordinationError::InvalidResponseMode(
+                "POST is not allowed for query response mode".to_string(),
+            ));
+        }
+        _ => {} // Valid combination, continue processing
     }
+
+    validate_origin(headers, OAUTH2_AUTH_URL.as_str()).await?;
 
     if auth_response.state.is_empty() {
         return Err(CoordinationError::InvalidState(
@@ -53,7 +60,24 @@ pub async fn post_authorized_core(
         ));
     }
 
+    csrf_checks(cookies.clone(), auth_response, headers.clone()).await?;
     process_oauth2_authorization(auth_response).await
+}
+
+pub async fn get_authorized_core(
+    auth_response: &AuthResponse,
+    cookies: &headers::Cookie,
+    headers: &HeaderMap,
+) -> Result<(HeaderMap, String), CoordinationError> {
+    authorized_core(HttpMethod::Get, auth_response, cookies, headers).await
+}
+
+pub async fn post_authorized_core(
+    auth_response: &AuthResponse,
+    cookies: &headers::Cookie,
+    headers: &HeaderMap,
+) -> Result<(HeaderMap, String), CoordinationError> {
+    authorized_core(HttpMethod::Post, auth_response, cookies, headers).await
 }
 
 async fn process_oauth2_authorization(
