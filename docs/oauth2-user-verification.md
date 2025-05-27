@@ -17,7 +17,7 @@ This document analyzes the user verification mechanism in the OAuth2 authenticat
 
 2. **State Parameter and Session Preservation**
    - A state parameter containing several security components is generated:
-     - CSRF token for flow integrity
+     - CSRF ID for flow integrity (references a secret token stored server-side)
      - Nonce for ID token verification
      - PKCE for code exchange
      - Session reference (`misc_id`) that points to the original session ID
@@ -29,7 +29,12 @@ This document analyzes the user verification mechanism in the OAuth2 authenticat
 
 1. **Callback Handling**
    - State parameter is extracted and decoded from the callback
-   - For redirect-based flow, CSRF token in state is verified against the stored token
+   - CSRF protection works as follows for both redirect and form_post modes:
+     - CSRF ID is extracted from the state parameter
+     - CSRF token is retrieved from the cookie
+     - The stored token associated with the CSRF ID is fetched
+     - Cookie token is compared with the stored token
+     - SameSite cookie attribute is set based on response mode (None for form_post, Lax for query)
    - Original user context is retrieved using the session reference in state parameter:
      ```rust
      // Decode state to access misc_id (session reference)
@@ -66,7 +71,7 @@ The system implements multiple layers of security:
 
 2. **State Parameter as Multi-Purpose Security Container**
    - Contains multiple security components:
-     - CSRF token for flow integrity verification
+     - CSRF ID for flow integrity verification (references a secret token)
      - Session reference (`misc_id`) for user context preservation
      - Additional parameters for OAuth2 protocol security (nonce, PKCE)
    - Original session ID stored server-side via `misc_session` mechanism
@@ -98,8 +103,10 @@ The current implementation follows OAuth 2.0 security best practices and provide
    - Works consistently across redirect-based and form post response modes
 
 3. **Flow Integrity Verification**
-   - State parameter with CSRF token secures redirect-based flow
+   - State parameter with CSRF ID and cookie with CSRF token secure both redirect and form_post flows
    - Prevents tampering during redirects
+   - Minimizes exposure of the secret token (only ID is passed to the Authorization Server)
+   - Cookie SameSite attribute is automatically set based on response mode for optimal security
 
 4. **Post-Authorization Session Renewal**
    - Complete session rotation after authentication
@@ -114,4 +121,36 @@ The implemented security measures provide strong protection against common OAuth
 - Session hijacking
 - Unauthorized account linking
 
-The system uses a combination of CSRF tokens, state parameters, and session renewal to create a secure authentication flow without unnecessary complexity or dependencies, aligning with the project's goals of simplicity and security.
+The system uses a combination of CSRF protection, state parameters, response mode validation, and session renewal to create a secure authentication flow without unnecessary complexity or dependencies, aligning with the project's goals of simplicity and security.
+
+## Note on CSRF Tokens in the System
+
+It's important to understand that there are distinct CSRF protection mechanisms in different parts of the system:
+
+1. **OAuth2 Flow CSRF Protection**
+   - Implemented in `oauth2/main/core.rs`
+   - Uses a double-submit pattern with:
+     - CSRF ID stored in the state parameter
+     - CSRF token stored in a cookie
+     - Token verification during callback
+   - Applied to both redirect and form_post response modes
+   - Cookie SameSite attribute is automatically set based on response mode:
+     - SameSite=None for form_post mode (required for cross-site POST requests)
+     - SameSite=Lax for query mode (more secure for redirect-based flows)
+   - HTTP method is strictly enforced based on response mode:
+     - Only POST requests allowed for form_post mode
+     - Only GET requests allowed for query mode
+
+2. **Session CSRF Protection**
+   - Implemented in `session/main/session.rs`
+   - Used for general API endpoint protection
+   - Stored as part of the user session
+   - Verified via X-CSRF-Token header in requests
+   - Used throughout the application for non-OAuth2 endpoints
+
+3. **Page Session Token**
+   - An obfuscated version of the session CSRF token
+   - Used to verify that the user who loaded a page is the same one making a subsequent request
+   - Implemented as a query parameter for certain actions
+
+These mechanisms work together but serve different purposes in the security architecture of the system.
