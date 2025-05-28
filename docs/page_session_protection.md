@@ -21,7 +21,7 @@ This created a serious usability and security problem:
 We solved this problem by implementing **Page Session Tokens** specifically for the OAuth2 account addition flow. Here's how we addressed it:
 
 1. When rendering the user account page, we generate a token derived from the user's CSRF token
-2. We embed this token in the page as a JavaScript constant: `SESSION_BINDING_TOKEN`
+2. We embed this token in the page as a JavaScript constant: `PAGE_SESSION_TOKEN`
 3. When the user clicks "Add OAuth2 Account", this token is included in the OAuth2 authorization request
 4. Before redirecting to the OAuth2 provider, we verify that this token matches the current session
 
@@ -50,14 +50,14 @@ When we render the user's account page, we include this token as a JavaScript co
 ```html
 <script>
     // Page session token for session boundary protection
-    const SESSION_BINDING_TOKEN = "{{ page_session_token }}";
+    const PAGE_SESSION_TOKEN = "{{ page_session_token }}";
 </script>
 ```
 
 And we use it in the OAuth2 account addition button:
 
 ```html
-<button onclick="oauth2.openPopup('add_to_user', SESSION_BINDING_TOKEN)" class="action-button">
+<button onclick="oauth2.openPopup('add_to_user', PAGE_SESSION_TOKEN)" class="action-button">
     Add New OAuth2 Account
 </button>
 ```
@@ -69,17 +69,25 @@ The critical part is verifying this token before we redirect the user to the OAu
 ```rust
 // In oauth2.rs
 async fn google_auth(
+    auth_user: Option<AuthUser>,
     headers: HeaderMap,
     Query(params): Query<HashMap<String, String>>,
-) -> Result<Response, (StatusCode, String)> {
-    // Extract the page session token from the request
-    if let Some(token) = params.get("context") {
-        if token.is_empty() {
+) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
+    // Extract the mode and context (page session token) from the request
+    let mode = params.get("mode").cloned();
+    let context = params.get("context").cloned();
+
+    if mode.is_some() && mode.as_ref().unwrap() == "add_to_user" {
+        if context.is_none() {
+            return Err((StatusCode::BAD_REQUEST, "Missing Context".to_string()));
+        }
+
+        if auth_user.is_none() {
             return Err((StatusCode::BAD_REQUEST, "Missing Session".to_string()));
         }
 
         // Verify that the token matches the current session
-        verify_page_session_token(&headers, Some(token))
+        verify_page_session_token(&headers, Some(&context.unwrap()))
             .await
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     }
@@ -92,27 +100,42 @@ async fn google_auth(
 The verification function checks that the token matches what we'd expect for the current session:
 
 ```rust
+/// Verify that received page_session_token (obfuscated csrf_token) as a part of query param is same as the one
+/// in the current user's session cache.
 pub async fn verify_page_session_token(
     headers: &HeaderMap,
     page_session_token: Option<&String>,
 ) -> Result<(), SessionError> {
-    // Get the current session
-    let session_id = get_session_id_from_headers(headers)?
-        .ok_or_else(|| SessionError::PageSessionToken("Session ID missing".to_string()))?;
+    let session_id: &str = match get_session_id_from_headers(headers) {
+        Ok(Some(session_id)) => session_id,
+        _ => {
+            return Err(SessionError::PageSessionToken(
+                "Session ID missing".to_string(),
+            ));
+        }
+    };
 
-    let stored_session = get_session_from_store(session_id).await?;
+    let cached_session = GENERIC_CACHE_STORE
+        .lock()
+        .await
+        .get("session", session_id)
+        .await
+        .map_err(|e| SessionError::Storage(e.to_string()))?
+        .ok_or(SessionError::SessionError)?;
 
-    // Verify the token matches what we'd generate for this session
+    let stored_session: StoredSession = cached_session.try_into()?;
+
     match page_session_token {
-        Some(token) => {
-            let expected_token = generate_page_session_token(&stored_session.csrf_token);
-            if token != &expected_token {
+        Some(context) => {
+            if context.as_str() != generate_page_session_token(&stored_session.csrf_token) {
+                tracing::error!("Page session token does not match session user");
                 return Err(SessionError::PageSessionToken(
                     "Page session token does not match session user".to_string(),
                 ));
             }
         }
         None => {
+            tracing::error!("Page session token missing");
             return Err(SessionError::PageSessionToken(
                 "Page session token missing".to_string(),
             ));

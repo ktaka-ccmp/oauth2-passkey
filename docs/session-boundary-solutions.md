@@ -2,11 +2,17 @@
 
 ## Problem Statement
 
-Web applications with authentication systems face session boundary problems at different phases of credential management:
+Modern web applications that support authentication and multi-account workflows are vulnerable to session boundary problems-situations where actions are performed in the wrong user context. These issues can lead to serious security and usability risks, such as accidental credential linking or unauthorized account access.
 
-1. **Page-to-Request Desynchronization**: A user loads a page with account #1, then switches to account #2 in another tab, and finally returns to the original page (still showing account #1's UI) and clicks an action button. Without proper protection, the action would execute in the context of account #2.
+Two common session boundary problems are:
 
-2. **Process Start-to-Completion Desynchronization**: During multi-step processes (like passkey registration), a user might start the process with one account and complete it with another due to session changes in between steps.
+1. **Page-to-Request Desynchronization**: 
+   A user loads a page while logged in as Account #1. Later, they log in as Account #2 in another tab or window. If they return to the original page and perform an action (e.g., add credentials), that action may be executed as Account #2, not Account #1-potentially linking credentials to the wrong user.
+
+2. **Process Start-to-Completion Desynchronization**: 
+   In multi-step processes (such as passkey or OAuth2 registration), a user might start the process with one account but complete it after switching sessions. This can result in credentials being registered to an unintended user or session.
+
+We address these risks by implementing specific protection mechanisms tailored to each phase of potential session desynchronization.
 
 ## Protection Mechanisms for Different Desynchronization Phases
 
@@ -58,10 +64,10 @@ This token is embedded in the page and included when initiating the OAuth2 flow:
 
 ```html
 <script>
-    const SESSION_BINDING_TOKEN = "{{ page_session_token }}";
+    const PAGE_SESSION_TOKEN = "{{ page_session_token }}";
 
     function addOAuth2Account() {
-        oauth2.openPopup('add_to_user', SESSION_BINDING_TOKEN);
+        oauth2.openPopup('add_to_user', PAGE_SESSION_TOKEN);
     }
 </script>
 ```
@@ -75,7 +81,9 @@ async fn google_auth(
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
     // Verify that page session token matches current session
-    verify_page_session_token(&headers, Some(&context.unwrap())).await?;
+    verify_page_session_token(&headers, Some(&context.unwrap()))
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     
     // Only after verification passes do we proceed
     // ...
@@ -101,7 +109,7 @@ The primary mechanism for maintaining session continuity throughout the OAuth2 f
 
    // Include the misc_id in the state parameter
    let state_params = StateParams {
-       csrf_token,
+       csrf_id,
        nonce_id,
        pkce_id,
        misc_id,  // Reference to stored session ID - critical for session continuity
@@ -119,11 +127,21 @@ The primary mechanism for maintaining session continuity throughout the OAuth2 f
    ) -> Result<Option<SessionUser>, OAuth2Error> {
        // Extract the misc_id from the state parameter
        let Some(misc_id) = &state_params.misc_id else {
+           tracing::debug!("No misc_id in state");
            return Ok(None);
        };
 
+       tracing::debug!("misc_id: {:#?}", misc_id);
+
        // Get the session ID that was stored at the beginning of the flow
-       let token = get_token_from_store::<StoredToken>("misc_session", misc_id).await?;
+       let Ok(token) = get_token_from_store::<StoredToken>("misc_session", misc_id).await else {
+           tracing::debug!("Failed to get session from cache");
+           return Ok(None);
+       };
+
+       tracing::debug!("Token: {:#?}", token);
+       // Note: The actual codebase has a commented-out call here:
+       // // remove_token_from_store("misc_session", misc_id).await?;
 
        // Retrieve the user from that original session
        match get_user_from_session(&token.token).await {

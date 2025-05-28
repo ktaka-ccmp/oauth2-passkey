@@ -1,8 +1,8 @@
-# OAuth2 User Verification in Authentication System
+# OAuth2 User and Session Verification in the Authentication Flow
 
 ## Overview
 
-This document analyzes the user verification mechanism in the OAuth2 authentication flow, highlighting the security measures implemented in the system.
+This document details the user and session verification mechanisms within the OAuth2 authentication flow. It outlines the security measures implemented at each critical stage, from pre-redirect initiation to post-redirect callback processing, to ensure robust identity confirmation and maintain session integrity.
 
 ## Current Verification Mechanism
 
@@ -80,7 +80,7 @@ The system implements multiple layers of security:
 
 3. **Multi-Layered Protection**
    - Page session token verification before flow initiation
-   - State parameter with CSRF token for redirect-based flow integrity
+   - State parameter with CSRF ID for redirect-based flow integrity
    - Session context preservation via `misc_session` mechanism for all flow types
    - These layers prevent cross-site request forgery and session desynchronization
 
