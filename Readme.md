@@ -159,7 +159,8 @@ router.route("/protected", get(protected_handler).layer(is_authenticated()));
 
 ### Delivering CSRF Token to the Client
 
-- **Via Extension:**
+#### Via Extension:
+
 Include the csrf_token in the page using the template engine etc. after extracting it from the AuthUser.
 
 ```rust
@@ -182,77 +183,45 @@ async fn handler(Extension(user): Extension<AuthUser>) -> impl IntoResponse {
 <!-- Or as a hidden field in a form -->
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 ```
-
-```javascript
-// JS fetch example
-fetch('/some_end_point', {
-    method: 'POST',
-    headers: {
-        'X-CSRF-Token': csrfToken,
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ /* your data here */ })
-});
-```
-
 ---
 
-- **Via Dedicated Endpoint:**
-For single-page applications or API clients, provide a dedicated endpoint (e.g., `/api/csrf-token`) that returns the CSRF token as JSON. 
+#### Via Dedicated Endpoint:
 
-```rust
-// Example Axum handler for /api/csrf-token
-use axum::{extract::Extension, Json};
-use serde::Serialize;
-
-#[derive(Serialize)]
-struct CsrfTokenResponse {
-    csrf_token: String,
-}
-
-async fn csrf_token_endpoint(Extension(user): Extension<AuthUser>) -> Json<CsrfTokenResponse> {
-    Json(CsrfTokenResponse {
-        csrf_token: user.csrf_token.clone(),
-    })
-}
-
-// Route registration:
-// router.route("/api/csrf-token", get(csrf_token_endpoint).layer(is_authenticated()));
-```
+We also provide a dedicated endpoint `/o2p/user/csrf_token` that returns the CSRF token as JSON for the authenticated user. 
 
 ```javascript
 // JS: Fetch CSRF token from the dedicated endpoint (make sure to include credentials)
-fetch('/api/csrf-token', { credentials: 'include' })
+fetch('/o2p/user/csrf_token', { credentials: 'include' })
   .then(response => response.json())
   .then(data => {
     const csrfToken = data.csrf_token;
     // Use csrfToken in subsequent requests
   });
 ```
+---
 
-- **Via Header (automatic):**
-  The middleware can automatically add the CSRF token to the response header as `X-CSRF-Token`.
+#### Via Header (automatic):
+
+The middleware automatically add the CSRF token to the response header as `X-CSRF-Token`.
 The client can fetch the CSRF token from the response header by sending a HEAD request to the current URL.
 
 ```javascript
 fetch(window.location.href, { method: 'HEAD', credentials: 'include' })
     .then(response => {
         const csrfToken = response.headers.get('X-CSRF-Token') || null;
-        // ...
+        // Use csrfToken in subsequent requests
     });
 ```
-
 ---
 
-## Security Model
+### Making a Request with CSRF Token
 
-- All state-changing endpoints must verify the CSRF token.
-- The CSRF token is generated per session and must be included in state-changing requests, typically as an `X-CSRF-Token` header.
+All state-changing endpoints must verify the CSRF token.
 
-**Examples: State-changing requests with CSRF token**
+The CSRF token is generated per session and must be included in state-changing requests, typically as an `X-CSRF-Token` header.
 
-<details>
-<summary>JavaScript fetch (SPA/AJAX)</summary>
+
+#### JavaScript fetch (SPA/AJAX)
 
 ```javascript
 fetch('/some_end_point', {
@@ -264,10 +233,8 @@ fetch('/some_end_point', {
     // ...
 });
 ```
-</details>
 
-<details>
-<summary>Traditional HTML form POST</summary>
+#### Traditional HTML form POST
 
 ```html
 <form method="POST" action="/some_end_point">
@@ -276,8 +243,45 @@ fetch('/some_end_point', {
     <button type="submit">Submit</button>
 </form>
 ```
-</details>
-
-The validity of the CSRF token is checked automatically by either the Axum extractor or middleware, depending on your route setup.
-
 ---
+
+### Verification
+
+#### Automatic Verification via Header
+
+CSRF token verification for state-changing requests (POST, PUT, DELETE, PATCH) works as follows, whether using the Axum middleware or `AuthUser` extractor directly:
+
+**1. `X-CSRF-Token` Header Present:**
+    *   The header token is compared to the session token.
+    *   **Match:** `AuthUser.csrf_via_header_verified` becomes `true`. Request proceeds.
+    *   **Mismatch:** Request is rejected (FORBIDDEN).
+
+**2. `X-CSRF-Token` Header Absent:**
+    *   `AuthUser.csrf_via_header_verified` is `false`.
+    *   The request's `Content-Type` is then checked:
+        *   **Form submissions** (`application/x-www-form-urlencoded`, `multipart/form-data`):
+            *   The request proceeds to your handler.
+            *   **Handler MUST manually verify** the CSRF token from the form body against `AuthUser.csrf_token`. Reject if mismatched.
+        *   **Other `Content-Type`s** (e.g., `application/json`) or if `Content-Type` is missing:
+            *   Request is rejected (FORBIDDEN). This protects AJAX/API endpoints that submit non-form data without the `X-CSRF-Token` header.
+
+This dual approach ensures header-based CSRF (common for SPAs/AJAX) is handled automatically, while traditional forms require explicit verification in your handler.
+
+#### Manual Verification
+
+For traditional HTML form submissions (where the `X-CSRF-Token` header is typically absent), your request handler **must** manually verify the CSRF token that was submitted in the form body. 
+
+```rust
+// Ensure `use subtle::ConstantTimeEq;` is in scope
+if !auth_user.csrf_via_header_verified {
+    if !form_data.csrf_token.as_bytes().ct_eq(auth_user.csrf_token.as_bytes()).into() {
+        tracing::error!(
+            "CSRF token mismatch (form field). Submitted: {}, Expected: {}",
+            form_data.csrf_token,
+            auth_user.csrf_token
+        );
+        return Err((StatusCode::FORBIDDEN, "Invalid CSRF token.".to_string()));
+    }
+    tracing::trace!("CSRF token via form field verified.");
+}
+```

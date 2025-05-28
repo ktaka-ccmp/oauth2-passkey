@@ -6,6 +6,7 @@ use axum::{
 use axum_extra::{TypedHeader, headers};
 use chrono::{DateTime, Utc};
 use http::{Method, StatusCode, request::Parts};
+use subtle::ConstantTimeEq;
 
 use super::config::O2P_REDIRECT_ANON;
 use oauth2_passkey::{SESSION_COOKIE_NAME, SessionUser, get_user_and_csrf_token_from_session};
@@ -47,6 +48,7 @@ pub struct AuthUser {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub csrf_token: String,
+    pub csrf_via_header_verified: bool,
 }
 
 impl From<&AuthUser> for SessionUser {
@@ -74,6 +76,7 @@ impl From<SessionUser> for AuthUser {
             created_at: session_user.created_at,
             updated_at: session_user.updated_at,
             csrf_token: String::new(),
+            csrf_via_header_verified: false,
         }
     }
 }
@@ -101,46 +104,78 @@ where
             AuthRedirect::new(method.clone())
         })?;
 
-        let (session_user, csrf_token) = get_user_and_csrf_token_from_session(session_cookie)
-            .await
-            .map_err(|_| {
-                tracing::error!("Failed to get user and csrf token from session");
-                AuthRedirect::new(method.clone())
-            })?;
+        let (session_user, session_csrf_token_str) =
+            get_user_and_csrf_token_from_session(session_cookie)
+                .await
+                .map_err(|_| {
+                    tracing::error!("Failed to get user and csrf token from session");
+                    AuthRedirect::new(method.clone())
+                })?;
 
-        // Verify CSRF token for POST, PUT, DELETE requests
+        let mut auth_user = AuthUser::from(session_user);
+        auth_user.csrf_token = session_csrf_token_str.as_str().to_string(); // Store the session's CSRF token
+
+        // Verify CSRF token for state-changing methods
         if method == Method::POST
             || method == Method::PUT
             || method == Method::DELETE
             || method == Method::PATCH
         {
-            let x_csrf_token = parts
+            if let Some(header_csrf_token) = parts
                 .headers
                 .get("X-CSRF-Token")
-                .and_then(|h| h.to_str().ok().map(|s| s.to_string()))
-                .ok_or_else(|| {
-                    tracing::error!("Failed to get X-CSRF-Token");
-                    AuthRedirect::new(method.clone())
-                })?;
+                .and_then(|h| h.to_str().ok())
+            {
+                // X-CSRF-Token header is present, try to verify it
+                if header_csrf_token
+                    .as_bytes()
+                    .ct_eq(session_csrf_token_str.as_str().as_bytes())
+                    .into()
+                {
+                    auth_user.csrf_via_header_verified = true;
+                    tracing::trace!("CSRF token via X-CSRF-Token header verified.");
+                } else {
+                    tracing::error!(
+                        "CSRF token mismatch (X-CSRF-Token). Submitted: {}, Expected: {}",
+                        header_csrf_token,
+                        session_csrf_token_str.as_str()
+                    );
+                    return Err(AuthRedirect::new(method.clone())); // Mismatch is an error
+                }
+            } else {
+                // X-CSRF-Token header is NOT present (and we are in a state-changing method context).
+                // auth_user.csrf_via_header_verified remains false (its initial value).
+                let content_type_header = parts
+                    .headers
+                    .get(http::header::CONTENT_TYPE)
+                    .and_then(|h| h.to_str().ok());
 
-            tracing::trace!(
-                "CSRF token: X-CSRF-Token: {}, In Cache: {}",
-                x_csrf_token,
-                csrf_token.as_str()
-            );
+                let is_form_like = match content_type_header {
+                    Some(ct) => {
+                        ct.starts_with("application/x-www-form-urlencoded")
+                            || ct.starts_with("multipart/form-data")
+                    }
+                    None => false, // No Content-Type header, assume not form-like for safety
+                };
 
-            if x_csrf_token != csrf_token.as_str() {
-                tracing::error!(
-                    "Token mismatch, X-CSRF-Token: {}, In Cache: {}",
-                    x_csrf_token,
-                    csrf_token.as_str()
-                );
-                return Err(AuthRedirect::new(method.clone()));
+                if is_form_like {
+                    // Allowed to proceed for form submissions, CSRF token expected in body.
+                    tracing::trace!(
+                        "X-CSRF-Token header not found, but Content-Type ('{:?}') is form-like. Form-based CSRF check may be needed in handler.",
+                        content_type_header
+                    );
+                } else {
+                    // Not form-like and X-CSRF-Token header is missing. This is a CSRF violation.
+                    tracing::warn!(
+                        "CSRF protection: X-CSRF-Token header missing for state-changing request with non-form Content-Type ('{:?}'). Rejecting.",
+                        content_type_header
+                    );
+                    return Err(AuthRedirect::new(method.clone())); // Reject
+                }
             }
+        } else {
+            // For GET, HEAD, OPTIONS, etc., no CSRF check needed by default from header.
         }
-
-        let mut auth_user = AuthUser::from(session_user);
-        auth_user.csrf_token = csrf_token.as_str().to_string();
 
         Ok(auth_user)
     }
