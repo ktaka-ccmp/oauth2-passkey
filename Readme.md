@@ -1,17 +1,38 @@
 # oauth2_passkey
 
+A minimal-dependency, security-focused library for adding OAuth2 and passkey authentication to Axum-based Rust web apps.
+
+[![Crates.io](https://img.shields.io/crates/v/oauth2_passkey_axum.svg)](https://crates.io/crates/oauth2_passkey_axum)
+[![Docs.rs](https://docs.rs/oauth2_passkey_axum/badge.svg)](https://docs.rs/oauth2_passkey_axum)
+
+---
+
 ## Table of Contents
 
-- [Table of Contents](#table-of-contents)
-- [Basic usage](#basic-usage)
-  - [Prepare database and cache](#prepare-database-and-cache)
-  - [.env file](#env-file)
-  - [Rust code](#rust-code)
-- [Feature flags](#feature-flags)
-- [Who is admin](#who-is-admin)
-- [Route Protection](#route-protection)
-- [Security](#security)
-  - [CSRF protection](#csrf-protection)
+- [Getting Started](#getting-started)
+- [Basic Usage](#basic-usage)
+  - [Prepare Database and Cache](#prepare-database-and-cache)
+  - [.env File](#env-file)
+  - [Rust Code Example](#rust-code-example)
+- [Feature Flags](#feature-flags)
+- [Admin Privileges](#admin-privileges)
+- [Route Protection & CSRF](#route-protection--csrf)
+- [Security Model](#security-model)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+
+---
+
+## Getting Started
+
+1. **Add to your `Cargo.toml`:**
+   ```toml
+oauth2_passkey_axum = "..."
+   ```
+2. **Prepare your `.env` and database/cache (see below).**
+3. **Integrate the router and middleware into your Axum app.**
+
+---
 
 ## Basic usage
 
@@ -65,71 +86,54 @@ Note:
 - You should place `$ORIGIN/o2p/oauth2/authorized` as a Authorized redirect URI in the Google. For example if the ORIGIN is `https://example.com` then place `https://example.com/o2p/oauth2/` there.
 
 
-### Rust code
-
-In your rust code do the followings:
-- import the oauth2_passkey_axum crate
-- call init().await?
-- nest the oauth2_passkey_router to your router
+### Rust Code Example
 
 ```rust
 use oauth2_passkey_axum::{
     AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, O2P_SUMMARY_URL, oauth2_passkey_router,
 };
+
+#[tokio::main]
+async fn main() {
+    dotenv::dotenv().ok();
+    oauth2_passkey_axum::init().await.expect("init failed");
+
+    let app = Router::new()
+        .route("/", get(index))
+        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
+        .merge(protected::router());
+}
 ```
+---
 
-Just call the init() and nest the "oauth2_passkey_router()" under O2P_ROUTE_PREFIX(default=/o2p).
+## Feature Flags
 
-```rust
-  dotenv().ok();
-  oauth2_passkey_axum::init().await?;
-
-  let app = Router::new()
-      .route("/", get(index))
-      .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
-      .merge(protected::router());
-```
-
-## Feature flags
-
-oauth2_passkey_axum prepares optional admin and user interfaces, which is enabled by default.
-
-To controle the features we use two feature flags:
-"admin-ui" and "user-ui" to enable admin and user interfaces respectively. 
-
-The default feature is set in oauth2_passkey_axum/Cargo.toml as:
-
-```toml
-default = ["admin-ui", "user-ui"]
-```
-
-If you want to disable default features, set the following in your app's Cargo.toml:
-
+- **Default features:**  
+  Both admin and user UIs are enabled by default.
+- **To disable all UIs:**
 ```toml
 oauth2_passkey_axum = { default-features = false, features = [] }
 ```
-
-If you want to enable user-ui only, disable the default first, then specify "user-ui" in features option:
-
+- **To enable only user UI:**
 ```toml
 oauth2_passkey_axum = { default-features = false, features = ["user-ui"] }
 ```
+---
 
-## Who is admin
+## Admin Privileges
 
-- The first user has admin previllage and never lose it.
-- Any admin can give admin previllage to another user.
+- The first registered user is always an admin.
+- Admins can grant admin privileges to other users.
+
+---
 
 ## Route Protection
 
-#### Axum Extractor
+### Axum Extractor
 
-checks if session_id is valid
-extract struct AuthUser 
-Redirect(GET) or 40x(PUT/POST/DELETE) if it fails
-
-The AuthUser struct includes csrf_token.
-The handler protected by this extractor can extract the csrf_token from the AuthUser struct.
+- Protect routes by requiring `AuthUser` as an argument.
+- The extractor validates the session.
+- The extractor also validates the CSRF token for state-changing requests.
 
 ```rust
 async fn protected_handler(user: AuthUser) {
@@ -137,100 +141,143 @@ async fn protected_handler(user: AuthUser) {
 }
 ```
 
-#### Middleware
+### Middleware
 
-We have prepared a set of functions for middleware.
-
-is_authenticated
-
-#### Delivering csrf_token
-
-##### Have handlers extract csrf_token and embed it in the page
-
-The prepared middleware embeds the csrf_token in the extension field. The handles protected by the middleware can extract the csrf_token from the extension field as:
+- Use `is_authenticated` middleware to protect routes.
+- The middleware validates the session.
+- The middleware also validates the CSRF token for state-changing requests.
 
 ```rust
-async fn protected_handler(Extension(user): Extension<AuthUser>) {
-    // AuthUser includes csrf_token
-    let csrf_token = user.csrf_token;
-    
+router.route("/protected", get(protected_handler).layer(is_authenticated()));
+```
+
+## CSRF Protection
+
+- All state-changing endpoints must verify the CSRF token.
+- The CSRF token is generated per session and must be included in state-changing requests, typically as an `X-CSRF-Token` header.
+- Verification of the CSRF token is automatically handled by the extractor and middleware for state-changing requests.
+
+### Delivering CSRF Token to the Client
+
+- **Via Extension:**
+Include the csrf_token in the page using the template engine etc. after extracting it from the AuthUser.
+
+```rust
+// Handler: extract csrf_token and pass to template context
+async fn handler(Extension(user): Extension<AuthUser>) -> impl IntoResponse {
+    let csrf_token = user.csrf_token.clone();
+    HtmlTemplate::render("my_template.j2", json!({
+        "csrf_token": csrf_token,
+        // ... other context ...
+    }))
 }
 ```
 
+```html
+<!-- In your template -->
+<script>
+    // Embed CSRF token as a JS variable
+    const csrfToken = "{{ csrf_token }}";
+</script>
+<!-- Or as a hidden field in a form -->
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+```
+
+```javascript
+// JS fetch example
+fetch('/some_end_point', {
+    method: 'POST',
+    headers: {
+        'X-CSRF-Token': csrfToken,
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ /* your data here */ })
+});
+```
+
+---
+
+- **Via Dedicated Endpoint:**
+For single-page applications or API clients, provide a dedicated endpoint (e.g., `/api/csrf-token`) that returns the CSRF token as JSON. 
+
 ```rust
-async fn protected_handler(Extension(csrf_token): Extension<CsrfToken>) {
-    // CsrfToken is a struct that only has a csrf_token field
+// Example Axum handler for /api/csrf-token
+use axum::{extract::Extension, Json};
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct CsrfTokenResponse {
+    csrf_token: String,
 }
-```
 
-##### Have the middleware automatically embed the csrf_token in the response header
-
-Alternativly you can automatically embed the csrf_token in the response header.
-O2P_RESPOND_WITH_X_CSRF_TOKEN, which is set to true by default, determines if the response should include the csrf_token in the X-CSRF-Token header.
-
-This is only available for the routes protected by is_authenticated middleware(example 1), i.e. not available for the routes protected by AuthUser extractor(example 2).
-
-Example 1:
-```rust
-// The response will include the csrf_token in the X-CSRF-Token header automatically
-router.route("/protected", get(protected_handler).layer(is_authenticated_xxx()));
-async fn protected_handler() {
+async fn csrf_token_endpoint(Extension(user): Extension<AuthUser>) -> Json<CsrfTokenResponse> {
+    Json(CsrfTokenResponse {
+        csrf_token: user.csrf_token.clone(),
+    })
 }
+
+// Route registration:
+// router.route("/api/csrf-token", get(csrf_token_endpoint).layer(is_authenticated()));
 ```
 
-Example 2:
-```rust
-// You have to extract the csrf_token and embed it in the page yourself
-async fn protected_handler(user: AuthUser) {
-    let csrf_token = user.csrf_token;
-}
+```javascript
+// JS: Fetch CSRF token from the dedicated endpoint (make sure to include credentials)
+fetch('/api/csrf-token', { credentials: 'include' })
+  .then(response => response.json())
+  .then(data => {
+    const csrfToken = data.csrf_token;
+    // Use csrfToken in subsequent requests
+  });
 ```
 
-## Security
+- **Via Header (automatic):**
+  The middleware can automatically add the CSRF token to the response header as `X-CSRF-Token`.
+The client can fetch the CSRF token from the response header by sending a HEAD request to the current URL.
 
-### CSRF protection
-
-Every state changing endpoint must have csrf token verification.
-You should include the csrf token in a header.
-
-A csrf_token is automatically generated upon session creation and stored in session cache as a part of the session. 
-
-Embedding the csrf_token in the page is the responsibility of the template engine. 
-
-Use the csrf_token when making a state changing request.
-
-The validity of the csrf_token is automatically verified either by axum extractor or middleware.
-
-#### Axum Extractor
-
-If you use axum extractor to protect a page....
-
-If your handle has "user: AuthUser" as an argument the route is protected and axum extractor extract the user, which in our implementation includes csrf_token.
-
-```rust
-async fn handler_a(user: AuthUser) -> impl IntoResponse {
+```javascript
+fetch(window.location.href, { method: 'HEAD', credentials: 'include' })
+    .then(response => {
+        const csrfToken = response.headers.get('X-CSRF-Token') || null;
+        // ...
+    });
 ```
 
-You should pass the csrf_token through your templating system to the page.
-When you make a state changing request from the page, you should inclide the csrf_token as:
+---
+
+## Security Model
+
+- All state-changing endpoints must verify the CSRF token.
+- The CSRF token is generated per session and must be included in state-changing requests, typically as an `X-CSRF-Token` header.
+
+**Examples: State-changing requests with CSRF token**
+
+<details>
+<summary>JavaScript fetch (SPA/AJAX)</summary>
 
 ```javascript
 fetch('/some_end_point', {
     method: 'POST',
     headers: {
-        'X-CSRF-Token': 'your-csrf-token'
-        ...
+        'X-CSRF-Token': 'your-csrf-token',
+        // ...
     },
-    ...
+    // ...
 });
 ```
+</details>
 
-Our extractor for the AuthUser automatically checks the validity of the X-CSRF-Token against the csrf token stored in session cache when extracting the AuthUser.
+<details>
+<summary>Traditional HTML form POST</summary>
 
-#### Middleware
+```html
+<form method="POST" action="/some_end_point">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <!-- other fields -->
+    <button type="submit">Submit</button>
+</form>
+```
+</details>
 
-is_authenticated_401, is_authenticated_redirect:
-Verify the X-CSRF-Token against the one stored in the session cache.
+The validity of the CSRF token is checked automatically by either the Axum extractor or middleware, depending on your route setup.
 
-is_authenticated_user_401, is_authenticated_user_redirect
-The X-CSRF-Token is verified by AuthUser axum extractor
+---
