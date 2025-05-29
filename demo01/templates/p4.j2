@@ -29,11 +29,28 @@
         .user-info dd {
             margin-left: 1rem;
         }
+        body { font-family: sans-serif; margin: 20px; }
+        nav { margin-bottom: 20px; }
+        nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
+        nav a:hover { text-decoration: underline; }
     </style>
 </head>
 
 <body>
     <div class="container">
+        <nav>
+            <a href="/">Home</a>
+            <a href="{{ prefix }}/user/summary">User</a>
+            <a href="/p1">p1</a>
+            <a href="/p2">p2</a>
+            <a href="/p3">p3</a>
+            <a href="/p4">p4</a>
+            <a href="/p5">p5</a>
+            <a href="/p6">p6</a>
+            <a href="/nested/p3">nested/p3</a>
+            <a href="{{ prefix }}/user/logout?redirect=/">Logout</a>
+        </nav>
+
     <h1>Welcome to the Protected Area</h1>
     <div class="user-info">
         <h2>Your Account Information:</h2>

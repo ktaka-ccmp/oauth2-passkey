@@ -14,11 +14,30 @@ use oauth2_passkey_axum::{
 mod protected;
 mod server;
 use server::{init_tracing, spawn_http_server, spawn_https_server};
+use askama::Template;
+use axum::response::Html;
+
+#[derive(Template)]
+#[template(path = "index.j2")]
+struct IndexTemplate<'a> {
+    message: &'a str,
+    prefix: &'a str,
+}
 
 // O2P_LOGIN_URL is /o2p/user/login and O2P_SUMMARY_URL is /o2p/user/summary by default
 async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
     match user {
-        Some(_) => Ok(Redirect::to(O2P_SUMMARY_URL.as_str()).into_response()),
+        // Some(_) => Ok(Redirect::to(O2P_SUMMARY_URL.as_str()).into_response()),
+        Some(_) => {
+            let template = IndexTemplate {
+                message: "This is a protected page.",
+                prefix: O2P_ROUTE_PREFIX.as_str(),
+            };
+            match template.render() {
+                Ok(html) => Ok(Html(html).into_response()),
+                Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+            }
+        }
         None => Ok(Redirect::to(O2P_LOGIN_URL.as_str()).into_response()),
     }
 }

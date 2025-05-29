@@ -18,10 +18,13 @@
 </head>
 <body>
     <div class="page-header">
-        <h1>User Summary</h1>
-        {% if user.is_admin %}
-        <a href="{{o2p_route_prefix}}/admin/list_users">Admin Panel</a>
-        {% endif %}
+        <h1>User</h1>
+        <nav>
+            <a href="/">Home</a>
+            {% if user.is_admin %}
+            <a href="{{o2p_route_prefix}}/admin/list_users">User List</a>
+            {% endif %}
+        </nav>
         <div class="header-buttons">
             <button onclick="DeleteAccount()" class="action-button delete-button">Delete Account</button>
             <button onclick="Logout()" class="action-button">Logout</button>
