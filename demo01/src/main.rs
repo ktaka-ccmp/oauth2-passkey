@@ -7,15 +7,13 @@ use axum::{
 
 use dotenv::dotenv;
 
-use oauth2_passkey_axum::{
-    AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, O2P_SUMMARY_URL, oauth2_passkey_router,
-};
+use oauth2_passkey_axum::{AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, oauth2_passkey_router};
 
 mod protected;
 mod server;
-use server::{init_tracing, spawn_http_server, spawn_https_server};
 use askama::Template;
 use axum::response::Html;
+use server::{init_tracing, spawn_http_server, spawn_https_server};
 
 #[derive(Template)]
 #[template(path = "index.j2")]
