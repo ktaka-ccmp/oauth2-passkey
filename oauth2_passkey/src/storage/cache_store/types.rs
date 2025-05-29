@@ -33,9 +33,6 @@ pub(crate) trait CacheStore: Send + Sync + 'static {
     /// Get a token from the store.
     async fn get(&self, prefix: &str, key: &str) -> Result<Option<CacheData>, StorageError>;
 
-    /// Gets multiple tokens from the store.
-    async fn gets(&self, prefix: &str, key: &str) -> Result<Vec<CacheData>, StorageError>;
-
     /// Remove a token from the store.
     async fn remove(&mut self, prefix: &str, key: &str) -> Result<(), StorageError>;
 }
