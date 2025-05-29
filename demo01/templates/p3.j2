@@ -6,22 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Protected Area</title>
     <style>
-        .user-info {
-            background: #f5f5f5;
+        .container {
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+            /* border: 1px solid #ccc; */
             border-radius: 8px;
-            padding: 1rem;
-            margin: 1rem 0;
         }
-
-        .user-info dt {
-            font-weight: bold;
-            margin-top: 0.5rem;
-        }
-
-        .user-info dd {
-            margin-left: 1rem;
-        }
-
         .button-container {
             margin: 1rem 0;
         }
@@ -51,10 +42,9 @@
 </head>
 
 <body>
+    <div class="container">
     <h1>Welcome to the Protected Area</h1>
-    <div class="user-info">
     {{message}}
-    </div>
 
     <div class="button-container">
         <button id="withCsrf">POST with CSRF Token</button>
@@ -64,6 +54,7 @@
     <div id="result"></div>
 
     <p><a href="{{ prefix }}/user/logout?redirect=/">Logout</a></p>
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {

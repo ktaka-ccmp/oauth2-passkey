@@ -342,7 +342,7 @@ pub async fn is_authenticated_basic_then_csrf(
         (AuthenticationStatus(true), _, Some(csrf_token), csrf_via_header_verified) => {
             Ok((csrf_token, csrf_via_header_verified))
         }
-        _ => Err(SessionError::SessionError), // Or a more specific error if needed
+        _ => Err(SessionError::SessionError),
     }
 }
 

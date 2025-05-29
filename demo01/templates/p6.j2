@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protected Page P6 - CSRF Form Demo</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .container { max-width: 600px; margin: auto; padding: 20px; /* border: 1px solid #ccc; */ border-radius: 8px; }
+        h1, h2 { color: #333; }
+        label { display: block; margin-bottom: 3px; }
+        input[type="text"], input[type="submit"] { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        input[type="submit"] { background-color: #4CAF50; color: white; cursor: pointer; }
+        input[type="submit"]:hover { background-color: #45a049; }
+        .result { margin-top: 20px; padding: 15px; border-radius: 4px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        nav { margin-bottom: 20px; }
+        nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
+        nav a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav>
+            <a href="/">Home</a>
+            <a href="{{ prefix }}/user/summary">User Summary</a>
+            <a href="{{ prefix }}/user/logout?redirect=/">Logout</a>
+        </nav>
+
+        <h1>CSRF Form Submission Demo</h1>
+
+        <h2>With CSRF Token</h2>
+        <form method="POST" action="">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div>
+                {# <label for="message_with_csrf">Message:</label> #}
+                <input type="text" id="message_with_csrf" name="message" value="Hello with CSRF token!">
+            </div>
+            <input type="submit" value="Submit with CSRF Token">
+        </form>
+
+        <h2>Without CSRF Token</h2>
+        <form method="POST" action="">
+            <div>
+                {# <label for="message_without_csrf">Message:</label> #}
+                <input type="text" id="message_without_csrf" name="message" value="Hello without CSRF token!">
+            </div>
+            <input type="submit" value="Submit without CSRF Token (should fail or warn)">
+        </form>
+
+        {% match post_result_message %}
+        {% when Some with (message) %}
+            {# post_success will also be Some if post_result_message is Some #}
+            <div class="result {% if post_success %}success{% else %}error{% endif %}">
+                <h2>Submission Result:</h2>
+                <p>{{ message }}</p>
+            </div>
+        {% when None %}
+            {# No message to display #}
+        {% endmatch %}
+    </div>
+</body>
+</html>
