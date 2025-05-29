@@ -60,24 +60,6 @@ impl CacheStore for RedisCacheStore {
         }
     }
 
-    async fn gets(&self, prefix: &str, key: &str) -> Result<Vec<CacheData>, StorageError> {
-        let mut conn = self.client.get_multiplexed_async_connection().await?;
-
-        let key = Self::make_key(prefix, key);
-        let keys: Vec<String> = conn.keys(&key).await?;
-
-        let mut results = Vec::new();
-        for key in keys {
-            let value: Option<String> = conn.get(&key).await?;
-
-            if let Some(v) = value {
-                let data: CacheData = serde_json::from_str(&v)?;
-                results.push(data);
-            }
-        }
-        Ok(results)
-    }
-
     async fn remove(&mut self, prefix: &str, key: &str) -> Result<(), StorageError> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 

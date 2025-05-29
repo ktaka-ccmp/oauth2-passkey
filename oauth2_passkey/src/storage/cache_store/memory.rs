@@ -50,22 +50,6 @@ impl CacheStore for InMemoryCacheStore {
         Ok(self.entry.get(&key).cloned())
     }
 
-    async fn gets(&self, prefix: &str, key: &str) -> Result<Vec<CacheData>, StorageError> {
-        let prefix_key = Self::make_key(prefix, key);
-        let matching_entries = self
-            .entry
-            .iter()
-            .filter_map(|(k, v)| {
-                if k.starts_with(&prefix_key) {
-                    Some(v.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
-        Ok(matching_entries)
-    }
-
     async fn remove(&mut self, prefix: &str, key: &str) -> Result<(), StorageError> {
         let key = Self::make_key(prefix, key);
         self.entry.remove(&key);
