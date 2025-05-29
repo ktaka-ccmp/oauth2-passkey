@@ -218,6 +218,10 @@ h1, h2 {
     display: none;
 }
 
+nav { margin-bottom: 20px; }
+nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
+nav a:hover { text-decoration: underline; }
+
 /* Responsive adjustments */
 @media screen and (max-width: 600px) {
     html, body {

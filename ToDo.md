@@ -14,7 +14,6 @@
   - tokio-console https://zenn.dev/tfutada/articles/4dbb9659bb8102
 - Replace "if let", "unwrap_or_else", "ok_or_else" etc. with "match", where appropriate.
 
-- Modify demo pages to include link to available pages.
 - Make demo-oauth2 and demo-passkey pages to implement login page and account summary page without relying on oauth2_passkey_axum's summary and login pages.
 
 - Syncing of credentials using signalAllAcceptedCredentials?
@@ -190,6 +189,7 @@ Performance:
 - csrf_token is also automatically delivered to the client as an X-CSRF-Token response header.
 - Re-examine the role of page context token.
 - Re-examine the current implementation of CSRF protection in OAuth2 flow.
+- Modify demo pages to include link to available pages.
 
 ## Memo
 
