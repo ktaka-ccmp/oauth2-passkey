@@ -1,4 +1,5 @@
 use askama::Template;
+use axum::extract::Form;
 use axum::{
     Extension, Router,
     http::StatusCode,
@@ -6,9 +7,12 @@ use axum::{
     response::{Html, IntoResponse},
     routing::get,
 };
+use serde::Deserialize;
+use subtle::ConstantTimeEq;
 
 use oauth2_passkey_axum::{
     AuthUser,
+    CsrfHeaderVerified,
     CsrfToken,
     O2P_ROUTE_PREFIX,
     // Middleware, redirect to O2P_REDIRECT_ANON(default: /)
@@ -33,6 +37,12 @@ pub(super) fn router() -> Router<()> {
         .route(
             "/p5",
             get(p5).route_layer(from_fn(is_authenticated_redirect)),
+        )
+        .route(
+            "/p6",
+            get(p6)
+                .post(p6_post)
+                .route_layer(from_fn(is_authenticated_redirect)),
         )
         .nest(
             "/nested",
@@ -119,6 +129,116 @@ pub(crate) async fn p5(Extension(csrf_token): Extension<CsrfToken>) -> impl Into
         message: "The CSRF token can also be embedded in a template.",
         csrf_token: csrf_token.as_str(),
         prefix: O2P_ROUTE_PREFIX.as_str(),
+    };
+    match template.render() {
+        Ok(html) => Html(html).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+// New struct for p6 form data
+#[derive(Deserialize, Debug)]
+pub(crate) struct P6FormData {
+    message: String,
+    csrf_token: Option<String>,
+}
+
+#[derive(Template)]
+#[template(path = "p6.j2")]
+struct P6Template<'a> {
+    csrf_token: &'a str,
+    prefix: &'a str,
+    post_result_message: Option<String>,
+    post_success: bool,
+}
+
+// GET handler for /p6
+pub(crate) async fn p6(
+    Extension(csrf_token): Extension<CsrfToken>,
+    // Extension(csrf_via_header_verified): Extension<CsrfHeaderVerified>,
+    // Extension(user): Extension<AuthUser>,
+) -> impl IntoResponse {
+    let template = P6Template {
+        csrf_token: csrf_token.as_str(),
+        prefix: O2P_ROUTE_PREFIX.as_str(),
+        post_result_message: None,
+        post_success: false,
+    };
+    match template.render() {
+        Ok(html) => Html(html).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+// POST handler for /p6
+pub(crate) async fn p6_post(
+    Extension(csrf_token): Extension<CsrfToken>,
+    Extension(csrf_via_header_verified): Extension<CsrfHeaderVerified>,
+    // Extension(user): Extension<AuthUser>,
+    Form(form_data): Form<P6FormData>,
+) -> impl IntoResponse {
+    let post_result_message_str: String;
+    let mut is_success = false;
+
+    tracing::info!(
+        "p6_post received: {:?}, CSRF via header: {}",
+        form_data,
+        csrf_token.as_str()
+    );
+
+    if csrf_via_header_verified.0 {
+        // This case should ideally not happen for a direct form post without X-CSRF-Token header.
+        post_result_message_str = format!(
+            "POST successful (CSRF token verified via X-CSRF-Token header). Message: {}",
+            form_data.message
+        );
+        is_success = true;
+        tracing::info!("{}", post_result_message_str);
+    } else {
+        // X-CSRF-Token header was NOT present or not verified.
+        // Middleware allowed the request because Content-Type was form-like.
+        // We MUST manually verify the CSRF token from the form body.
+        match &form_data.csrf_token {
+            Some(token_from_form) => {
+                if token_from_form
+                    .as_bytes()
+                    .ct_eq(csrf_token.as_str().as_bytes())
+                    .into()
+                {
+                    post_result_message_str = format!(
+                        "POST successful (CSRF token from form field verified). Message: {}",
+                        form_data.message
+                    );
+                    is_success = true;
+                    tracing::info!("{}", post_result_message_str);
+                } else {
+                    post_result_message_str = format!(
+                        "CSRF token mismatch! Form token: '{}', Expected: '{}'. Message: {}",
+                        token_from_form,
+                        csrf_token.as_str(),
+                        form_data.message
+                    );
+                    // is_success remains false
+                    tracing::warn!("{}", post_result_message_str);
+                }
+            }
+            None => {
+                post_result_message_str = format!(
+                    "CSRF token missing from form! This request would typically be rejected. Message: {}",
+                    form_data.message
+                );
+                // is_success remains false
+                tracing::warn!("{}", post_result_message_str);
+            }
+        }
+    }
+
+    // Re-render the page with the result message
+    let template = P6Template {
+        csrf_token: csrf_token.as_str(),
+        prefix: O2P_ROUTE_PREFIX.as_str(),
+        post_result_message: Some(post_result_message_str),
+        post_success: is_success,
     };
     match template.render() {
         Ok(html) => Html(html).into_response(),

@@ -15,3 +15,5 @@ tokio = { workspace = true }
 rustls = { workspace = true }
 
 oauth2_passkey_axum = { workspace = true }
+subtle = "2.5"
+serde = { version = "1.0", features = ["derive"] }

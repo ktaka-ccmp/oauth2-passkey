@@ -194,5 +194,5 @@ Performance:
 ## Memo
 
 ```text
-Can you take a look the following diff carefully and if we aren't introducing any bugs and every change is OK suggest a commit message plz.
+Can you take a look the following diff carefully and suggest improvements. If it doesn't introduce any bugs and every change is OK suggest a commit message plz.
 ```
