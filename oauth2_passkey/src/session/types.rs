@@ -58,6 +58,26 @@ impl TryFrom<CacheData> for StoredSession {
 #[derive(Debug, Clone)]
 pub struct CsrfToken(String);
 
+/// Indicates whether the CSRF token was verified via an HTTP header by a calling layer (e.g., middleware).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CsrfHeaderVerified(pub bool);
+
+/// Indicates the overall authentication status of a session.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AuthenticationStatus(pub bool);
+
+impl std::fmt::Display for AuthenticationStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::fmt::Display for CsrfHeaderVerified {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl CsrfToken {
     pub fn new(token: String) -> Self {
         Self(token)

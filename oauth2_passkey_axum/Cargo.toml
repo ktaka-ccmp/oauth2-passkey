@@ -24,3 +24,4 @@ urlencoding = { workspace = true }
 futures = { workspace = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
+subtle = "2.5"

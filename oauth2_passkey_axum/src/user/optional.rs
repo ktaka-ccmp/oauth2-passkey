@@ -25,6 +25,7 @@ use crate::session::AuthUser;
 pub(crate) fn router() -> Router<()> {
     Router::new()
         .route("/info", get(user_info))
+        .route("/csrf_token", get(csrf_token))
         .route("/login", get(login))
         .route("/summary", get(summary))
         .route("/summary.js", get(serve_summary_js))
@@ -169,6 +170,15 @@ async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCo
             Err((StatusCode::UNAUTHORIZED, "Not authenticated".to_string()))
         }
     }
+}
+
+/// Return the CSRF token for the authenticated user
+///
+/// This endpoint provides the CSRF token for the authenticated user to be used by the client-side JavaScript.
+async fn csrf_token(auth_user: AuthUser) -> Result<Json<Value>, (StatusCode, String)> {
+    Ok(Json(json!({
+        "csrf_token": auth_user.csrf_token
+    })))
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
