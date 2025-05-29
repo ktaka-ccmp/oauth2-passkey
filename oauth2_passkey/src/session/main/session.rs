@@ -6,7 +6,9 @@ use subtle::ConstantTimeEq;
 
 use crate::session::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
 use crate::session::errors::SessionError;
-use crate::session::types::{CsrfToken, StoredSession, User as SessionUser, UserId};
+use crate::session::types::{
+    AuthenticationStatus, CsrfHeaderVerified, CsrfToken, StoredSession, User as SessionUser, UserId,
+};
 use crate::userdb::UserStore;
 use crate::utils::{gen_random_string, header_set_cookie};
 
@@ -166,10 +168,25 @@ async fn is_authenticated(
     headers: &HeaderMap,
     method: &Method,
     verify_user_exists: bool,
-) -> Result<(bool, Option<UserId>, Option<CsrfToken>, bool), SessionError> {
+) -> Result<
+    (
+        AuthenticationStatus,
+        Option<UserId>,
+        Option<CsrfToken>,
+        CsrfHeaderVerified,
+    ),
+    SessionError,
+> {
     let session_id = match get_session_id_from_headers(headers)? {
         Some(id) => id,
-        None => return Ok((false, None, None, false)), // Not authenticated, no CSRF check done
+        None => {
+            return Ok((
+                AuthenticationStatus(false),
+                None,
+                None,
+                CsrfHeaderVerified(false),
+            ));
+        } // Not authenticated, no CSRF check done
     };
 
     let session_result = GENERIC_CACHE_STORE
@@ -180,17 +197,35 @@ async fn is_authenticated(
         .map_err(|e| SessionError::Storage(e.to_string()))?;
 
     let Some(cached_session) = session_result else {
-        return Ok((false, None, None, false)); // No session, no CSRF check done
+        return Ok((
+            AuthenticationStatus(false),
+            None,
+            None,
+            CsrfHeaderVerified(false),
+        )); // Session ID not found, no CSRF check done
     };
 
     let stored_session: StoredSession = match cached_session.try_into() {
         Ok(session) => session,
-        Err(_) => return Ok((false, None, None, false)), // Invalid session, no CSRF check done
+        Err(_) => {
+            return Ok((
+                AuthenticationStatus(false),
+                None,
+                None,
+                CsrfHeaderVerified(false),
+            ));
+        } // Invalid session, no CSRF check done
     };
 
     if stored_session.expires_at < Utc::now() {
         tracing::debug!("Session expired at {}", stored_session.expires_at);
-        return Ok((false, None, None, false)); // Expired session, no CSRF check done
+        delete_session_from_store_by_session_id(session_id).await?;
+        return Ok((
+            AuthenticationStatus(false),
+            None,
+            None,
+            CsrfHeaderVerified(false),
+        )); // Expired session, no CSRF check done
     }
 
     let mut csrf_via_header_verified = false;
@@ -265,15 +300,20 @@ async fn is_authenticated(
             .is_some();
 
         if !user_exists {
-            return Ok((false, None, None, csrf_via_header_verified)); // User not found
+            return Ok((
+                AuthenticationStatus(false),
+                None,
+                None,
+                CsrfHeaderVerified(csrf_via_header_verified),
+            )); // User not found
         }
     }
 
     Ok((
-        true, // Authenticated if we reached here
+        AuthenticationStatus(true), // Authenticated if we reached here
         Some(UserId::new(stored_session.user_id)),
         Some(CsrfToken::new(stored_session.csrf_token)),
-        csrf_via_header_verified,
+        CsrfHeaderVerified(csrf_via_header_verified),
     ))
 }
 
@@ -289,9 +329,7 @@ async fn is_authenticated(
 pub async fn is_authenticated_basic(
     headers: &HeaderMap,
     method: &Method,
-) -> Result<bool, SessionError> {
-    // The fourth element (csrf_via_header_verified) is ignored here as this function
-    // only cares about basic authentication status.
+) -> Result<AuthenticationStatus, SessionError> {
     let (authenticated, _, _, _) = is_authenticated(headers, method, false).await?;
     Ok(authenticated)
 }
@@ -299,10 +337,9 @@ pub async fn is_authenticated_basic(
 pub async fn is_authenticated_basic_then_csrf(
     headers: &HeaderMap,
     method: &Method,
-) -> Result<(CsrfToken, bool), SessionError> {
-    // bool is csrf_via_header_verified
+) -> Result<(CsrfToken, CsrfHeaderVerified), SessionError> {
     match is_authenticated(headers, method, false).await? {
-        (true, _, Some(csrf_token), csrf_via_header_verified) => {
+        (AuthenticationStatus(true), _, Some(csrf_token), csrf_via_header_verified) => {
             Ok((csrf_token, csrf_via_header_verified))
         }
         _ => Err(SessionError::SessionError), // Or a more specific error if needed
@@ -322,9 +359,7 @@ pub async fn is_authenticated_basic_then_csrf(
 pub async fn is_authenticated_strict(
     headers: &HeaderMap,
     method: &Method,
-) -> Result<bool, SessionError> {
-    // The fourth element (csrf_via_header_verified) is ignored here as this function
-    // only cares about basic authentication status (with user verification).
+) -> Result<AuthenticationStatus, SessionError> {
     let (authenticated, _, _, _) = is_authenticated(headers, method, true).await?;
     Ok(authenticated)
 }
@@ -332,23 +367,21 @@ pub async fn is_authenticated_strict(
 pub async fn is_authenticated_strict_then_csrf(
     headers: &HeaderMap,
     method: &Method,
-) -> Result<(CsrfToken, bool), SessionError> {
-    // bool is csrf_via_header_verified
+) -> Result<(CsrfToken, CsrfHeaderVerified), SessionError> {
     match is_authenticated(headers, method, true).await? {
-        (true, _, Some(csrf_token), csrf_via_header_verified) => {
+        (AuthenticationStatus(true), _, Some(csrf_token), csrf_via_header_verified) => {
             Ok((csrf_token, csrf_via_header_verified))
         }
-        _ => Err(SessionError::SessionError), // Or a more specific error if needed
+        _ => Err(SessionError::SessionError),
     }
 }
 
 pub async fn is_authenticated_basic_then_user_and_csrf(
     headers: &HeaderMap,
     method: &Method,
-) -> Result<(SessionUser, CsrfToken, bool), SessionError> {
-    // bool is csrf_via_header_verified
+) -> Result<(SessionUser, CsrfToken, CsrfHeaderVerified), SessionError> {
     match is_authenticated(headers, method, false).await? {
-        (true, Some(user_id), Some(csrf_token), csrf_via_header_verified) => {
+        (AuthenticationStatus(true), Some(user_id), Some(csrf_token), csrf_via_header_verified) => {
             // Retrieve the user details from the database
             let user = UserStore::get_user(user_id.as_str()).await?;
             if let Some(user) = user {

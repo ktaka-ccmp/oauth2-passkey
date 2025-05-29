@@ -55,8 +55,8 @@ pub async fn is_authenticated_401(mut req: Request, next: Next) -> Response {
     match oauth2_passkey::is_authenticated_basic_then_csrf(req.headers(), req.method()).await {
         Ok((csrf_token, csrf_via_header_verified)) => {
             // Store token and verification status in extensions
-            req.extensions_mut()
-                .insert((csrf_token.clone(), csrf_via_header_verified));
+            req.extensions_mut().insert(csrf_token.clone());
+            req.extensions_mut().insert(csrf_via_header_verified);
             // Run next handler and add CSRF header to the response
             let response = next.run(req).await;
             add_csrf_header(response, csrf_token.as_str())
@@ -70,8 +70,8 @@ pub async fn is_authenticated_redirect(mut req: Request, next: Next) -> Response
     match oauth2_passkey::is_authenticated_basic_then_csrf(req.headers(), req.method()).await {
         Ok((csrf_token, csrf_via_header_verified)) => {
             // Store token and verification status in extensions
-            req.extensions_mut()
-                .insert((csrf_token.clone(), csrf_via_header_verified));
+            req.extensions_mut().insert(csrf_token.clone());
+            req.extensions_mut().insert(csrf_via_header_verified);
             let response = next.run(req).await;
             add_csrf_header(response, csrf_token.as_str())
         }
@@ -87,7 +87,7 @@ pub async fn is_authenticated_user_401(mut req: Request, next: Next) -> Response
         Ok((user, csrf_token, csrf_via_header_verified)) => {
             let mut auth_user = AuthUser::from(user);
             auth_user.csrf_token = csrf_token.as_str().to_string();
-            auth_user.csrf_via_header_verified = csrf_via_header_verified; // Set this field
+            auth_user.csrf_via_header_verified = csrf_via_header_verified.0; // Set this field
             tracing::debug!(
                 "User: {:?}, CSRF via header: {}",
                 auth_user,
@@ -109,7 +109,7 @@ pub async fn is_authenticated_user_redirect(mut req: Request, next: Next) -> Res
         Ok((user, csrf_token, csrf_via_header_verified)) => {
             let mut auth_user = AuthUser::from(user);
             auth_user.csrf_token = csrf_token.as_str().to_string();
-            auth_user.csrf_via_header_verified = csrf_via_header_verified; // Set this field
+            auth_user.csrf_via_header_verified = csrf_via_header_verified.0; // Set this field
             tracing::debug!(
                 "User: {:?}, CSRF via header: {}",
                 auth_user,
