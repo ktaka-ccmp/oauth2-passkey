@@ -1,5 +1,5 @@
 use askama::Template;
-use axum::extract::Form; // Added for form data extraction
+use axum::extract::Form;
 use axum::{
     Extension, Router,
     http::StatusCode,
@@ -7,8 +7,8 @@ use axum::{
     response::{Html, IntoResponse},
     routing::get,
 };
-use serde::Deserialize; // Added for deserializing form data
-use subtle::ConstantTimeEq; // Added for constant-time CSRF token comparison
+use serde::Deserialize;
+use subtle::ConstantTimeEq;
 
 use oauth2_passkey_axum::{
     AuthUser,
@@ -39,7 +39,6 @@ pub(super) fn router() -> Router<()> {
             get(p5).route_layer(from_fn(is_authenticated_redirect)),
         )
         .route(
-            // New route for p6
             "/p6",
             get(p6)
                 .post(p6_post)
@@ -141,18 +140,16 @@ pub(crate) async fn p5(Extension(csrf_token): Extension<CsrfToken>) -> impl Into
 #[derive(Deserialize, Debug)]
 pub(crate) struct P6FormData {
     message: String,
-    csrf_token: Option<String>, // CSRF token might be missing from one form
-                                // submit_action: String,   // Removed as it's not used
+    csrf_token: Option<String>,
 }
 
-// New template for p6
 #[derive(Template)]
 #[template(path = "p6.j2")]
 struct P6Template<'a> {
-    csrf_token: &'a str, // To pre-fill in the "good" form
+    csrf_token: &'a str,
     prefix: &'a str,
-    post_result_message: Option<String>, // To display result after POST
-    post_success: bool,                  // Changed to bool
+    post_result_message: Option<String>,
+    post_success: bool,
 }
 
 // GET handler for /p6
@@ -165,7 +162,7 @@ pub(crate) async fn p6(
         csrf_token: csrf_token.as_str(),
         prefix: O2P_ROUTE_PREFIX.as_str(),
         post_result_message: None,
-        post_success: false, // Default to false, only used if post_result_message is Some
+        post_success: false,
     };
     match template.render() {
         Ok(html) => Html(html).into_response(),
@@ -181,7 +178,7 @@ pub(crate) async fn p6_post(
     Form(form_data): Form<P6FormData>,
 ) -> impl IntoResponse {
     let post_result_message_str: String;
-    let mut is_success = false; // Default to false
+    let mut is_success = false;
 
     tracing::info!(
         "p6_post received: {:?}, CSRF via header: {}",
