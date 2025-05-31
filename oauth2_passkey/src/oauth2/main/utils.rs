@@ -247,3 +247,167 @@ pub(crate) async fn get_mode_from_stored_session(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http::HeaderValue;
+
+    #[test]
+    fn test_encode_decode_state() {
+        // Create a state params object with all fields populated
+        let state_params = StateParams {
+            csrf_id: "csrf123".to_string(),
+            nonce_id: "nonce456".to_string(),
+            pkce_id: "pkce789".to_string(),
+            misc_id: Some("misc123".to_string()),
+            mode_id: Some("mode456".to_string()),
+        };
+
+        // Encode the state
+        let encoded = encode_state(state_params).unwrap();
+
+        // Verify the encoded state is a valid base64url string
+        assert!(!encoded.contains('+'));
+        assert!(!encoded.contains('/'));
+        assert!(!encoded.contains('='));
+
+        // Decode the state
+        let decoded = decode_state(&encoded).unwrap();
+
+        // Verify all fields match the original
+        assert_eq!(decoded.csrf_id, "csrf123");
+        assert_eq!(decoded.nonce_id, "nonce456");
+        assert_eq!(decoded.pkce_id, "pkce789");
+        assert_eq!(decoded.misc_id, Some("misc123".to_string()));
+        assert_eq!(decoded.mode_id, Some("mode456".to_string()));
+    }
+
+    #[test]
+    fn test_encode_decode_state_minimal() {
+        // Create a state params object with only required fields
+        let state_params = StateParams {
+            csrf_id: "csrf123".to_string(),
+            nonce_id: "nonce456".to_string(),
+            pkce_id: "pkce789".to_string(),
+            misc_id: None,
+            mode_id: None,
+        };
+
+        // Encode the state
+        let encoded = encode_state(state_params).unwrap();
+
+        // Decode the state
+        let decoded = decode_state(&encoded).unwrap();
+
+        // Verify all fields match the original
+        assert_eq!(decoded.csrf_id, "csrf123");
+        assert_eq!(decoded.nonce_id, "nonce456");
+        assert_eq!(decoded.pkce_id, "pkce789");
+        assert_eq!(decoded.misc_id, None);
+        assert_eq!(decoded.mode_id, None);
+    }
+
+    #[test]
+    fn test_decode_state_invalid_base64() {
+        // Try to decode an invalid base64 string
+        let result = decode_state("this is not base64!!!");
+
+        // Verify it returns an error
+        assert!(result.is_err());
+        match result {
+            Err(OAuth2Error::DecodeState(_)) => {}
+            _ => panic!("Expected DecodeState error"),
+        }
+    }
+
+    #[test]
+    fn test_decode_state_invalid_json() {
+        // Encode some invalid JSON
+        let invalid_json = "not valid json";
+        let encoded = URL_SAFE_NO_PAD.encode(invalid_json);
+
+        // Try to decode it
+        let result = decode_state(&encoded);
+
+        // Verify it returns an error
+        assert!(result.is_err());
+        match result {
+            Err(OAuth2Error::Serde(_)) => {}
+            _ => panic!("Expected Serde error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_validate_origin_success() {
+        // Create headers with matching origin
+        let mut headers = HeaderMap::new();
+        headers.insert("Origin", HeaderValue::from_static("https://example.com"));
+
+        // Validate against matching URL
+        let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+
+        // Should succeed
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_validate_origin_with_referer() {
+        // Create headers with matching referer but no origin
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "Referer",
+            HeaderValue::from_static("https://example.com/login"),
+        );
+
+        // Validate against matching URL
+        let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+
+        // Should succeed
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_validate_origin_mismatch() {
+        // Create headers with non-matching origin
+        let mut headers = HeaderMap::new();
+        headers.insert("Origin", HeaderValue::from_static("https://attacker.com"));
+
+        // Validate against different URL
+        let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+
+        // Should fail
+        assert!(result.is_err());
+        match result {
+            Err(OAuth2Error::InvalidOrigin(_)) => {}
+            _ => panic!("Expected InvalidOrigin error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_validate_origin_missing() {
+        // Create headers with no origin or referer
+        let headers = HeaderMap::new();
+
+        // Validate against URL
+        let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+
+        // Should fail
+        assert!(result.is_err());
+        match result {
+            Err(OAuth2Error::InvalidOrigin(_)) => {}
+            _ => panic!("Expected InvalidOrigin error"),
+        }
+    }
+
+    #[test]
+    fn test_get_client() {
+        // Create a client
+        let _client = get_client();
+
+        // Just verify that the client is created successfully
+        // We can't directly test the timeout configuration as there's no public API to access it
+        // Just make sure the client is created without panicking
+        assert!(true);
+    }
+}

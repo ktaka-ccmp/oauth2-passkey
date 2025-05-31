@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 /// Represents a core user identity in the system
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, PartialEq)]
 pub struct User {
     /// Database-assigned sequence number (primary key)
     #[serde(skip_serializing_if = "Option::is_none")]

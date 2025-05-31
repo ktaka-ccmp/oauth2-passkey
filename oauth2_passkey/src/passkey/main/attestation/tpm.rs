@@ -985,3 +985,300 @@ enum KeyDetails {
     Rsa { modulus: Vec<u8>, exponent: Vec<u8> },
     Ecc { x: Vec<u8>, y: Vec<u8> },
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ciborium::value::Value;
+    use ring::digest;
+    use std::sync::Once;
+
+    // Initialize test environment once
+    static INIT: Once = Once::new();
+
+    unsafe fn setup() {
+        // Set up required environment variables for testing
+        unsafe {
+            std::env::set_var("ORIGIN", "https://example.com");
+            std::env::set_var("PASSKEY_RP_ID", "example.com");
+            std::env::set_var("PASSKEY_USER_VERIFICATION", "required");
+        }
+    }
+
+    // Helper function to create basic auth_data for testing
+    fn create_test_auth_data() -> Vec<u8> {
+        // Ensure test environment is set up
+        INIT.call_once(|| {
+            // This is safe in the context of tests
+            unsafe {
+                setup();
+            }
+        });
+
+        // Create a valid auth_data with proper RP ID hash and flags
+        let mut auth_data = Vec::new();
+
+        // Add RP ID hash (SHA-256 of "example.com")
+        let rp_id_hash = digest::digest(&digest::SHA256, "example.com".as_bytes());
+        auth_data.extend_from_slice(rp_id_hash.as_ref());
+
+        // Add flags (user present, user verified, attested credential data)
+        auth_data.push(0x01 | 0x04 | 0x40);
+
+        // Add sign count (4 bytes, big-endian)
+        auth_data.extend_from_slice(&[0x00, 0x00, 0x00, 0x01]);
+
+        // Add AAGUID (16 bytes)
+        auth_data.extend_from_slice(&[0x01; 16]);
+
+        // Add credential ID length (2 bytes, big-endian) and credential ID (16 bytes)
+        auth_data.extend_from_slice(&[0x00, 0x10]); // Length: 16 bytes
+        auth_data.extend_from_slice(&[0x02; 16]); // Credential ID
+
+        // Add CBOR-encoded public key
+        // Create a CBOR map with key-value pairs
+        let public_key_entries = vec![
+            // kty: EC2 (2)
+            (Value::Integer(1i64.into()), Value::Integer(2i64.into())),
+            // alg: ES256 (-7)
+            (Value::Integer(3i64.into()), Value::Integer((-7i64).into())),
+            // crv: P-256 (1)
+            (Value::Integer((-1i64).into()), Value::Integer(1i64.into())),
+            // x coordinate (32 bytes)
+            (Value::Integer((-2i64).into()), Value::Bytes(vec![0x02; 32])),
+            // y coordinate (32 bytes)
+            (Value::Integer((-3i64).into()), Value::Bytes(vec![0x03; 32])),
+        ];
+
+        let public_key = Value::Map(public_key_entries);
+        let mut public_key_bytes = Vec::new();
+        ciborium::ser::into_writer(&public_key, &mut public_key_bytes).unwrap();
+        auth_data.extend_from_slice(&public_key_bytes);
+
+        auth_data
+    }
+
+    // Helper function to create a client data hash for testing
+    fn create_test_client_data_hash() -> Vec<u8> {
+        // Create a SHA-256 hash of a sample client data JSON
+        let client_data = r#"{"type":"webauthn.create","challenge":"dGVzdGNoYWxsZW5nZQ","origin":"https://example.com"}"#;
+        let hash = digest::digest(&digest::SHA256, client_data.as_bytes());
+        hash.as_ref().to_vec()
+    }
+
+    // Helper to create a basic TPM attestation statement
+    fn create_test_tpm_att_stmt(
+        include_ver: bool,
+        include_alg: bool,
+        include_sig: bool,
+        include_x5c: bool,
+        include_pub_area: bool,
+        include_cert_info: bool,
+    ) -> Vec<(CborValue, CborValue)> {
+        let mut att_stmt = Vec::new();
+
+        if include_ver {
+            att_stmt.push((
+                Value::Text("ver".to_string()),
+                Value::Text("2.0".to_string()),
+            ));
+        }
+
+        if include_alg {
+            att_stmt.push((
+                Value::Text("alg".to_string()),
+                Value::Integer((-257i64).into()), // RS256
+            ));
+        }
+
+        if include_sig {
+            att_stmt.push((
+                Value::Text("sig".to_string()),
+                Value::Bytes(vec![0x01, 0x02, 0x03, 0x04]), // Dummy signature
+            ));
+        }
+
+        if include_x5c {
+            let cert_bytes = vec![0x30, 0x82, 0x01, 0x01]; // Dummy certificate bytes
+            let certs = vec![Value::Bytes(cert_bytes)];
+            att_stmt.push((Value::Text("x5c".to_string()), Value::Array(certs)));
+        }
+
+        if include_pub_area {
+            att_stmt.push((
+                Value::Text("pubArea".to_string()),
+                Value::Bytes(vec![0x01, 0x02, 0x03, 0x04]), // Dummy pubArea
+            ));
+        }
+
+        if include_cert_info {
+            att_stmt.push((
+                Value::Text("certInfo".to_string()),
+                Value::Bytes(vec![0x01, 0x02, 0x03, 0x04]), // Dummy certInfo
+            ));
+        }
+
+        att_stmt
+    }
+
+    #[test]
+    fn test_verify_tpm_attestation_missing_ver() {
+        let auth_data = create_test_auth_data();
+        let client_data_hash = create_test_client_data_hash();
+
+        // Create attestation statement missing the ver field
+        let att_stmt = create_test_tpm_att_stmt(
+            false, // no ver
+            true,  // include alg
+            true,  // include sig
+            true,  // include x5c
+            true,  // include pubArea
+            true,  // include certInfo
+        );
+
+        // Verify the attestation
+        let result = verify_tpm_attestation(&auth_data, &client_data_hash, &att_stmt);
+
+        // Should fail with Verification error
+        assert!(result.is_err());
+        if let Err(PasskeyError::Verification(msg)) = result {
+            assert!(msg.contains("Missing version in TPM attestation"));
+        } else {
+            panic!("Expected PasskeyError::Verification");
+        }
+    }
+
+    #[test]
+    fn test_verify_tpm_attestation_missing_alg() {
+        let auth_data = create_test_auth_data();
+        let client_data_hash = create_test_client_data_hash();
+
+        // Create attestation statement missing the alg field
+        let att_stmt = create_test_tpm_att_stmt(
+            true,  // include ver
+            false, // no alg
+            true,  // include sig
+            true,  // include x5c
+            true,  // include pubArea
+            true,  // include certInfo
+        );
+
+        // Verify the attestation
+        let result = verify_tpm_attestation(&auth_data, &client_data_hash, &att_stmt);
+
+        // Should fail with Verification error
+        assert!(result.is_err());
+        if let Err(PasskeyError::Verification(msg)) = result {
+            assert!(msg.contains("Missing algorithm in TPM attestation"));
+        } else {
+            panic!("Expected PasskeyError::Verification");
+        }
+    }
+
+    #[test]
+    fn test_verify_tpm_attestation_missing_sig() {
+        let auth_data = create_test_auth_data();
+        let client_data_hash = create_test_client_data_hash();
+
+        // Create attestation statement missing the sig field
+        let att_stmt = create_test_tpm_att_stmt(
+            true,  // include ver
+            true,  // include alg
+            false, // no sig
+            true,  // include x5c
+            true,  // include pubArea
+            true,  // include certInfo
+        );
+
+        // Verify the attestation
+        let result = verify_tpm_attestation(&auth_data, &client_data_hash, &att_stmt);
+
+        // Should fail with Verification error
+        assert!(result.is_err());
+        if let Err(PasskeyError::Verification(msg)) = result {
+            assert!(msg.contains("Missing signature in TPM attestation"));
+        } else {
+            panic!("Expected PasskeyError::Verification");
+        }
+    }
+
+    #[test]
+    fn test_verify_tpm_attestation_missing_x5c() {
+        let auth_data = create_test_auth_data();
+        let client_data_hash = create_test_client_data_hash();
+
+        // Create attestation statement missing the x5c field
+        let att_stmt = create_test_tpm_att_stmt(
+            true,  // include ver
+            true,  // include alg
+            true,  // include sig
+            false, // no x5c
+            true,  // include pubArea
+            true,  // include certInfo
+        );
+
+        // Verify the attestation
+        let result = verify_tpm_attestation(&auth_data, &client_data_hash, &att_stmt);
+
+        // Should fail with Verification error
+        assert!(result.is_err());
+        if let Err(PasskeyError::Verification(msg)) = result {
+            assert!(msg.contains("Missing certificate chain in TPM attestation"));
+        } else {
+            panic!("Expected PasskeyError::Verification");
+        }
+    }
+
+    #[test]
+    fn test_verify_tpm_attestation_missing_pub_area() {
+        let auth_data = create_test_auth_data();
+        let client_data_hash = create_test_client_data_hash();
+
+        // Create attestation statement missing the pubArea field
+        let att_stmt = create_test_tpm_att_stmt(
+            true,  // include ver
+            true,  // include alg
+            true,  // include sig
+            true,  // include x5c
+            false, // no pubArea
+            true,  // include certInfo
+        );
+
+        // Verify the attestation
+        let result = verify_tpm_attestation(&auth_data, &client_data_hash, &att_stmt);
+
+        // Should fail with Verification error
+        assert!(result.is_err());
+        if let Err(PasskeyError::Verification(msg)) = result {
+            assert!(msg.contains("Missing pubArea in TPM attestation"));
+        } else {
+            panic!("Expected PasskeyError::Verification");
+        }
+    }
+
+    #[test]
+    fn test_verify_tpm_attestation_missing_cert_info() {
+        let auth_data = create_test_auth_data();
+        let client_data_hash = create_test_client_data_hash();
+
+        // Create attestation statement missing the certInfo field
+        let att_stmt = create_test_tpm_att_stmt(
+            true,  // include ver
+            true,  // include alg
+            true,  // include sig
+            true,  // include x5c
+            true,  // include pubArea
+            false, // no certInfo
+        );
+
+        // Verify the attestation
+        let result = verify_tpm_attestation(&auth_data, &client_data_hash, &att_stmt);
+
+        // Should fail with Verification error
+        assert!(result.is_err());
+        if let Err(PasskeyError::Verification(msg)) = result {
+            assert!(msg.contains("Missing certInfo in TPM attestation"));
+        } else {
+            panic!("Expected PasskeyError::Verification");
+        }
+    }
+}

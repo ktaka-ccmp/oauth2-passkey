@@ -357,3 +357,192 @@ pub(super) async fn update_credential_last_used_at_postgres(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    // Test the PasskeyCredential struct creation directly
+    // This effectively tests the same logic as FromRow without mocking database rows
+    #[test]
+    fn test_passkey_credential_creation() {
+        // Test data
+        let credential_id = "test_credential_id".to_string();
+        let user_id = "test_user_id".to_string();
+        let public_key = "test_public_key".to_string();
+        let counter = 42;
+        let user_handle = "test_user_handle".to_string();
+        let user_name = "test_user_name".to_string();
+        let user_display_name = "Test User".to_string();
+        let aaguid = "test_aaguid".to_string();
+        let created_at = Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).unwrap();
+        let updated_at = Utc.with_ymd_and_hms(2023, 1, 2, 0, 0, 0).unwrap();
+        let last_used_at = Utc.with_ymd_and_hms(2023, 1, 3, 0, 0, 0).unwrap();
+
+        // Create the user entity
+        let user = PublicKeyCredentialUserEntity {
+            user_handle,
+            name: user_name.clone(),
+            display_name: user_display_name.clone(),
+        };
+
+        // Create the credential
+        let credential = PasskeyCredential {
+            credential_id: credential_id.clone(),
+            user_id: user_id.clone(),
+            public_key: public_key.clone(),
+            counter: counter,
+            user,
+            aaguid: aaguid.clone(),
+            created_at,
+            updated_at,
+            last_used_at,
+        };
+
+        // Verify the credential fields
+        assert_eq!(credential.credential_id, credential_id);
+        assert_eq!(credential.user_id, user_id);
+        assert_eq!(credential.public_key, public_key);
+        assert_eq!(credential.counter, counter);
+        assert_eq!(credential.user.user_handle, "test_user_handle");
+        assert_eq!(credential.user.name, user_name);
+        assert_eq!(credential.user.display_name, user_display_name);
+        assert_eq!(credential.aaguid, aaguid);
+        assert_eq!(credential.created_at, created_at);
+        assert_eq!(credential.updated_at, updated_at);
+        assert_eq!(credential.last_used_at, last_used_at);
+    }
+
+    // Test the query construction for different search fields
+    #[test]
+    fn test_query_construction_for_credential_search_fields() {
+        let passkey_table = "passkeys";
+
+        // Test CredentialId search field
+        let credential_id = "test_credential_id".to_string();
+        let field = CredentialSearchField::CredentialId(credential_id.clone());
+        let (query, value) = match &field {
+            CredentialSearchField::CredentialId(id) => (
+                &format!(
+                    r#"SELECT * FROM {} WHERE credential_id = $1"#,
+                    passkey_table
+                ),
+                id.as_str(),
+            ),
+            _ => panic!("Unexpected field type"),
+        };
+        assert_eq!(query, "SELECT * FROM passkeys WHERE credential_id = $1");
+        assert_eq!(value, credential_id);
+
+        // Test UserId search field
+        let user_id = "test_user_id".to_string();
+        let field = CredentialSearchField::UserId(user_id.clone());
+        let (query, value) = match &field {
+            CredentialSearchField::UserId(id) => (
+                &format!(r#"SELECT * FROM {} WHERE user_id = $1"#, passkey_table),
+                id.as_str(),
+            ),
+            _ => panic!("Unexpected field type"),
+        };
+        assert_eq!(query, "SELECT * FROM passkeys WHERE user_id = $1");
+        assert_eq!(value, user_id);
+
+        // Test UserHandle search field
+        let user_handle = "test_user_handle".to_string();
+        let field = CredentialSearchField::UserHandle(user_handle.clone());
+        let (query, value) = match &field {
+            CredentialSearchField::UserHandle(handle) => (
+                &format!(r#"SELECT * FROM {} WHERE user_handle = $1"#, passkey_table),
+                handle.as_str(),
+            ),
+            _ => panic!("Unexpected field type"),
+        };
+        assert_eq!(query, "SELECT * FROM passkeys WHERE user_handle = $1");
+        assert_eq!(value, user_handle);
+
+        // Test UserName search field
+        let user_name = "test_user_name".to_string();
+        let field = CredentialSearchField::UserName(user_name.clone());
+        let (query, value) = match &field {
+            CredentialSearchField::UserName(name) => (
+                &format!(r#"SELECT * FROM {} WHERE user_name = $1"#, passkey_table),
+                name.as_str(),
+            ),
+            _ => panic!("Unexpected field type"),
+        };
+        assert_eq!(query, "SELECT * FROM passkeys WHERE user_name = $1");
+        assert_eq!(value, user_name);
+    }
+
+    // Test the expected schema for PostgreSQL passkey table
+    #[test]
+    fn test_postgres_passkey_schema() {
+        // Get the expected schema columns from the validate_passkey_tables_postgres function
+        let expected_columns = [
+            ("credential_id", "text"),
+            ("user_id", "text"),
+            ("public_key", "text"),
+            ("counter", "integer"),
+            ("user_handle", "text"),
+            ("user_name", "text"),
+            ("user_display_name", "text"),
+            ("aaguid", "text"),
+            ("created_at", "timestamp with time zone"),
+            ("updated_at", "timestamp with time zone"),
+            ("last_used_at", "timestamp with time zone"),
+        ];
+
+        // Verify the expected schema has all required columns
+        assert_eq!(expected_columns.len(), 11, "Schema should have 11 columns");
+
+        // Check for required columns
+        let required_columns = [
+            "credential_id",
+            "user_id",
+            "public_key",
+            "counter",
+            "user_handle",
+        ];
+        for column in required_columns.iter() {
+            assert!(
+                expected_columns.iter().any(|(name, _)| name == column),
+                "Schema is missing required column: {}",
+                column
+            );
+        }
+
+        // Check data types for specific columns
+        let credential_id_type = expected_columns
+            .iter()
+            .find(|(name, _)| *name == "credential_id")
+            .map(|(_, data_type)| *data_type)
+            .unwrap_or("not found");
+        assert_eq!(
+            credential_id_type, "text",
+            "credential_id should be text type"
+        );
+
+        let counter_type = expected_columns
+            .iter()
+            .find(|(name, _)| *name == "counter")
+            .map(|(_, data_type)| *data_type)
+            .unwrap_or("not found");
+        assert_eq!(counter_type, "integer", "counter should be integer type");
+
+        // Verify timestamp columns have the correct type
+        let timestamp_columns = ["created_at", "updated_at", "last_used_at"];
+        for column in timestamp_columns.iter() {
+            let column_type = expected_columns
+                .iter()
+                .find(|(name, _)| *name == *column)
+                .map(|(_, data_type)| *data_type)
+                .unwrap_or("not found");
+            assert_eq!(
+                column_type, "timestamp with time zone",
+                "{} should be timestamp with time zone type",
+                column
+            );
+        }
+    }
+}

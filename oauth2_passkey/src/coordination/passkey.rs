@@ -318,3 +318,313 @@ pub async fn update_passkey_credential_core(
         "userHandle": updated_credential.user.user_handle,
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::passkey::PasskeyCredential;
+    use crate::userdb::User;
+
+    async fn setup_test_db() -> Result<(), Box<dyn std::error::Error>> {
+        // Use a consistent prefix for all tests to ensure tables are properly created and accessed
+        let _db_path = "/tmp/test_passkey_fixed.db";
+        let db_url = "sqlite:/tmp/test_passkey_fixed.db";
+        let table_prefix = "test_o2p_fixed_";
+
+        // Set environment variables for testing
+        // Using unsafe block as env::set_var is not thread-safe
+        unsafe {
+            std::env::set_var("GENERIC_DATA_STORE_TYPE", "sqlite");
+            std::env::set_var("GENERIC_DATA_STORE_URL", db_url);
+            std::env::set_var("DB_TABLE_PREFIX", table_prefix);
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        // Initialize the database
+        crate::userdb::init().await?;
+        crate::passkey::init().await?;
+
+        Ok(())
+    }
+
+    async fn create_test_user_in_db(user_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let user = User {
+            id: user_id.to_string(),
+            account: "test_account".to_string(),
+            label: "Test User".to_string(),
+            is_admin: false,
+            sequence_number: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        UserStore::upsert_user(user).await?;
+        Ok(())
+    }
+
+    async fn insert_test_passkey_credential(
+        credential_id: &str,
+        user_id: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Create a simple user object for the credential
+        let user = serde_json::json!({
+            "name": "Test User",
+            "displayName": "Test Display Name",
+            "user_handle": user_id.to_string()
+        });
+
+        // Convert to the required format
+        let passkey_user = serde_json::from_value(user).expect("Failed to create user entity");
+
+        let credential = PasskeyCredential {
+            credential_id: credential_id.to_string(),
+            user_id: user_id.to_string(),
+            public_key: "test_public_key".to_string(),
+            aaguid: "test-aaguid".to_string(),
+            user: passkey_user,
+            counter: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_used_at: Utc::now(),
+        };
+
+        PasskeyStore::store_credential(credential.credential_id.clone(), credential).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_delete_passkey_credential_core_success() -> Result<(), Box<dyn std::error::Error>>
+    {
+        // Setup test database
+        setup_test_db().await?;
+
+        // Create test user and passkey credential
+        let user_id = "test_user_1";
+        let credential_id = "test_credential_1";
+
+        create_test_user_in_db(user_id).await?;
+        insert_test_passkey_credential(credential_id, user_id).await?;
+
+        // Delete the passkey credential
+        let result = delete_passkey_credential_core(user_id, credential_id).await;
+        assert!(
+            result.is_ok(),
+            "Failed to delete passkey credential: {:?}",
+            result
+        );
+
+        // Verify the credential was deleted
+        let credentials = PasskeyStore::get_credentials_by(CredentialSearchField::CredentialId(
+            credential_id.to_string(),
+        ))
+        .await?;
+        assert!(credentials.is_empty(), "Passkey credential was not deleted");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_delete_passkey_credential_core_unauthorized()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Setup test database
+        setup_test_db().await?;
+
+        // Create test users and passkey credential
+        let user_id = "test_user_2";
+        let other_user_id = "test_user_3";
+        let credential_id = "test_credential_2";
+
+        create_test_user_in_db(user_id).await?;
+        create_test_user_in_db(other_user_id).await?;
+        insert_test_passkey_credential(credential_id, user_id).await?;
+
+        // Try to delete the passkey credential as a different user
+        let result = delete_passkey_credential_core(other_user_id, credential_id).await;
+        assert!(
+            matches!(result, Err(CoordinationError::Unauthorized)),
+            "Expected Unauthorized error, got: {:?}",
+            result
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_delete_passkey_credential_core_not_found()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Setup test database
+        setup_test_db().await?;
+
+        // Create test user
+        let user_id = "test_user_4";
+        let credential_id = "nonexistent_credential";
+
+        create_test_user_in_db(user_id).await?;
+
+        // Try to delete a nonexistent passkey credential
+        let result = delete_passkey_credential_core(user_id, credential_id).await;
+        assert!(
+            matches!(result, Err(CoordinationError::ResourceNotFound { .. })),
+            "Expected ResourceNotFound error, got: {:?}",
+            result
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_credentials_core() -> Result<(), Box<dyn std::error::Error>> {
+        // Setup test database
+        setup_test_db().await?;
+
+        // Create test user and passkey credentials
+        let user_id = "test_user_5";
+        let credential_id1 = "test_credential_5_1";
+        let credential_id2 = "test_credential_5_2";
+
+        create_test_user_in_db(user_id).await?;
+        insert_test_passkey_credential(credential_id1, user_id).await?;
+        insert_test_passkey_credential(credential_id2, user_id).await?;
+
+        // List the passkey credentials
+        let credentials = list_credentials_core(user_id).await?;
+        assert_eq!(
+            credentials.len(),
+            2,
+            "Expected 2 passkey credentials, got: {}",
+            credentials.len()
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_update_passkey_credential_core_success() -> Result<(), Box<dyn std::error::Error>>
+    {
+        // Setup test database
+        setup_test_db().await?;
+
+        // Create test user and passkey credential
+        let user_id = "test_user_6";
+        let credential_id = "test_credential_6";
+
+        create_test_user_in_db(user_id).await?;
+        insert_test_passkey_credential(credential_id, user_id).await?;
+
+        // Create a session user for authentication
+        let session_user = SessionUser {
+            id: user_id.to_string(),
+            account: "test_account".to_string(),
+            label: "Test User".to_string(),
+            is_admin: false,
+            sequence_number: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        // Update the passkey credential
+        let new_name = "Updated Name";
+        let new_display_name = "Updated Display Name";
+        let result = update_passkey_credential_core(
+            credential_id,
+            new_name,
+            new_display_name,
+            Some(session_user),
+        )
+        .await;
+
+        assert!(
+            result.is_ok(),
+            "Failed to update passkey credential: {:?}",
+            result
+        );
+
+        // Verify the credential was updated
+        let updated_credential = PasskeyStore::get_credential(credential_id).await?.unwrap();
+        assert_eq!(
+            updated_credential.user.name, new_name,
+            "Name was not updated"
+        );
+        assert_eq!(
+            updated_credential.user.display_name, new_display_name,
+            "Display name was not updated"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_update_passkey_credential_core_unauthorized()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Setup test database
+        setup_test_db().await?;
+
+        // Create test users and passkey credential
+        let user_id = "test_user_7";
+        let other_user_id = "test_user_8";
+        let credential_id = "test_credential_7";
+
+        create_test_user_in_db(user_id).await?;
+        create_test_user_in_db(other_user_id).await?;
+        insert_test_passkey_credential(credential_id, user_id).await?;
+
+        // Create a session user for authentication with a different user ID
+        let session_user = SessionUser {
+            id: other_user_id.to_string(),
+            account: "other_account".to_string(),
+            label: "Other User".to_string(),
+            is_admin: false,
+            sequence_number: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        // Try to update the passkey credential as a different user
+        let result = update_passkey_credential_core(
+            credential_id,
+            "Updated Name",
+            "Updated Display Name",
+            Some(session_user),
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(CoordinationError::Unauthorized)),
+            "Expected Unauthorized error, got: {:?}",
+            result
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_update_passkey_credential_core_no_session()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Setup test database
+        setup_test_db().await?;
+
+        // Create test user and passkey credential
+        let user_id = "test_user_9";
+        let credential_id = "test_credential_9";
+
+        create_test_user_in_db(user_id).await?;
+        insert_test_passkey_credential(credential_id, user_id).await?;
+
+        // Try to update the passkey credential without a session user
+        let result = update_passkey_credential_core(
+            credential_id,
+            "Updated Name",
+            "Updated Display Name",
+            None,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(CoordinationError::Unauthorized)),
+            "Expected Unauthorized error, got: {:?}",
+            result
+        );
+
+        Ok(())
+    }
+}

@@ -93,32 +93,6 @@ impl CoordinationError {
     /// This method logs the error with appropriate context and returns self,
     /// allowing for method chaining and explicit logging when needed.
     ///
-    /// # Example
-    /// ```
-    /// fn some_function() -> Result<(), CoordinationError> {
-    ///     // Case 1: Creating an error directly with explicit logging
-    ///     if some_condition {
-    ///         // For simple variants without data
-    ///         return Err(CoordinationError::Unauthorized.log());
-    ///
-    ///         // For variants with data
-    ///         return Err(CoordinationError::ResourceNotFound {
-    ///             resource_type: "User".to_string(),
-    ///             resource_id: "123".to_string(),
-    ///         }.log());
-    ///
-    ///         // For variants that wrap other errors
-    ///         let util_error = UtilError::SomeVariant("error message".to_string());
-    ///         return Err(CoordinationError::UtilsError(util_error).log());
-    ///     }
-    ///
-    ///     // Case 2: Using the ? operator with automatic logging
-    ///     // The From implementations automatically log errors when using ?
-    ///     let result = some_function_that_returns_result()?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn log(self) -> Self {
         match &self {
             Self::Coordination(msg) => tracing::error!("Coordination error: {}", msg),
