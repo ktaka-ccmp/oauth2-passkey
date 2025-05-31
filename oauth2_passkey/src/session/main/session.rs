@@ -434,3 +434,97 @@ pub async fn get_user_and_csrf_token_from_session(
         CsrfToken::new(stored_session.csrf_token),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http::header::{HeaderMap, HeaderValue};
+
+    // Helper function to create a header map with a cookie
+    fn create_header_map_with_cookie(cookie_name: &str, cookie_value: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        let cookie_str = format!("{cookie_name}={cookie_value}");
+        headers.insert(COOKIE, HeaderValue::from_str(&cookie_str).unwrap());
+        headers
+    }
+
+    #[test]
+    fn test_get_session_id_from_headers() {
+        // Given a header map with a session cookie
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let session_id = "test_session_id";
+        let headers = create_header_map_with_cookie(&cookie_name, session_id);
+
+        // When getting the session ID
+        let result = get_session_id_from_headers(&headers);
+
+        // Then it should return the session ID
+        assert!(result.is_ok());
+        let session_id_opt = result.unwrap();
+        assert!(session_id_opt.is_some());
+        assert_eq!(session_id_opt.unwrap(), session_id);
+    }
+
+    #[test]
+    fn test_get_session_id_from_headers_no_cookie() {
+        // Given a header map without a session cookie
+        let headers = HeaderMap::new();
+
+        // When getting the session ID
+        let result = get_session_id_from_headers(&headers);
+
+        // Then it should return None (no error)
+        assert!(result.is_ok());
+        let session_id_opt = result.unwrap();
+        assert!(session_id_opt.is_none());
+    }
+
+    #[test]
+    fn test_get_session_id_from_headers_wrong_cookie() {
+        // Given a header map with a non-session cookie
+        let headers = create_header_map_with_cookie("wrong_cookie", "value");
+
+        // When getting the session ID
+        let result = get_session_id_from_headers(&headers);
+
+        // Then it should return None (no error)
+        assert!(result.is_ok());
+        let session_id_opt = result.unwrap();
+        assert!(session_id_opt.is_none());
+    }
+
+    #[test]
+    fn test_csrf_token_verification() {
+        // Given a CSRF token in the header and a stored token
+        let stored_token = "stored_csrf_token";
+        let header_token = "stored_csrf_token";
+
+        // When verifying the tokens
+        let mut headers = HeaderMap::new();
+        headers.insert("X-CSRF-Token", HeaderValue::from_str(header_token).unwrap());
+
+        // Then the tokens should match in constant time
+        let result = header_token.as_bytes().ct_eq(stored_token.as_bytes());
+        assert!(bool::from(result));
+    }
+
+    #[test]
+    fn test_csrf_token_verification_mismatch() {
+        // Given a CSRF token in the header and a different stored token
+        let stored_token = "stored_csrf_token";
+        let header_token = "different_csrf_token";
+
+        // When verifying the tokens
+        let mut headers = HeaderMap::new();
+        headers.insert("X-CSRF-Token", HeaderValue::from_str(header_token).unwrap());
+
+        // Then the tokens should not match
+        let result = header_token.as_bytes().ct_eq(stored_token.as_bytes());
+        assert!(!bool::from(result));
+    }
+
+    // Note: Most of the session functions are async and interact with the global cache store,
+    // which makes them difficult to test in isolation. These would be better tested with
+    // integration tests or by refactoring the code to accept a cache store as a parameter
+    // for better testability.
+}

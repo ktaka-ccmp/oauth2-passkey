@@ -70,3 +70,66 @@ pub async fn verify_page_session_token(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_page_session_token() {
+        // Given a CSRF token
+        let csrf_token = "test_csrf_token";
+
+        // When generating a page session token
+        let page_token = generate_page_session_token(csrf_token);
+
+        // Then the token should be a non-empty string
+        assert!(!page_token.is_empty());
+
+        // And generating the token again with the same input should produce the same output
+        let page_token2 = generate_page_session_token(csrf_token);
+        assert_eq!(page_token, page_token2);
+
+        // And different inputs should produce different outputs
+        let different_token = generate_page_session_token("different_token");
+        assert_ne!(page_token, different_token);
+    }
+
+    #[test]
+    fn test_generate_page_session_token_hmac_properties() {
+        // Given two similar CSRF tokens
+        let token1 = "token1";
+        let token2 = "token2";
+
+        // When generating page session tokens
+        let page_token1 = generate_page_session_token(token1);
+        let page_token2 = generate_page_session_token(token2);
+
+        // Then the tokens should be different (avalanche effect)
+        assert_ne!(page_token1, page_token2);
+
+        // And the tokens should be URL-safe (no +, /, or = characters)
+        assert!(!page_token1.contains('+'));
+        assert!(!page_token1.contains('/'));
+        assert!(!page_token1.contains('='));
+        assert!(!page_token2.contains('+'));
+        assert!(!page_token2.contains('/'));
+        assert!(!page_token2.contains('='));
+    }
+
+    #[test]
+    fn test_generate_page_session_token_with_empty_string() {
+        // Given an empty CSRF token
+        let empty_token = "";
+
+        // When generating a page session token
+        let page_token = generate_page_session_token(empty_token);
+
+        // Then the token should still be a non-empty string
+        assert!(!page_token.is_empty());
+    }
+
+    // Note: We can't easily test verify_page_session_token directly because it depends on
+    // GENERIC_CACHE_STORE which is a global singleton. We would need to mock this dependency
+    // for proper unit testing. This would be a good candidate for integration testing.
+}

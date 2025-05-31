@@ -98,3 +98,143 @@ impl UserId {
         &self.0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn test_user_from_db_user() {
+        let now = Utc::now();
+        let db_user = DbUser {
+            id: "user123".to_string(),
+            account: "test@example.com".to_string(),
+            label: "Test User".to_string(),
+            is_admin: true,
+            sequence_number: Some(42),
+            created_at: now,
+            updated_at: now,
+        };
+
+        let session_user = User::from(db_user);
+
+        assert_eq!(session_user.id, "user123");
+        assert_eq!(session_user.account, "test@example.com");
+        assert_eq!(session_user.label, "Test User");
+        assert!(session_user.is_admin);
+        assert_eq!(session_user.sequence_number, 42);
+        assert_eq!(session_user.created_at, now);
+        assert_eq!(session_user.updated_at, now);
+    }
+
+    #[test]
+    fn test_user_from_db_user_with_no_sequence() {
+        let now = Utc::now();
+        let db_user = DbUser {
+            id: "user123".to_string(),
+            account: "test@example.com".to_string(),
+            label: "Test User".to_string(),
+            is_admin: false,
+            sequence_number: None,
+            created_at: now,
+            updated_at: now,
+        };
+
+        let session_user = User::from(db_user);
+
+        assert_eq!(session_user.id, "user123");
+        assert_eq!(session_user.account, "test@example.com");
+        assert_eq!(session_user.label, "Test User");
+        assert!(!session_user.is_admin);
+        assert_eq!(session_user.sequence_number, 0); // Default to 0 when None
+        assert_eq!(session_user.created_at, now);
+        assert_eq!(session_user.updated_at, now);
+    }
+
+    #[test]
+    fn test_stored_session_to_cache_data() {
+        let expires_at = Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).unwrap();
+        let stored_session = StoredSession {
+            user_id: "user123".to_string(),
+            csrf_token: "token123".to_string(),
+            expires_at,
+            ttl: 3600,
+        };
+
+        let cache_data = CacheData::from(stored_session.clone());
+
+        // Verify the serialization worked correctly by deserializing and comparing
+        let deserialized: StoredSession = serde_json::from_str(&cache_data.value).unwrap();
+        assert_eq!(deserialized.user_id, "user123");
+        assert_eq!(deserialized.csrf_token, "token123");
+        assert_eq!(deserialized.expires_at, expires_at);
+        assert_eq!(deserialized.ttl, 3600);
+    }
+
+    #[test]
+    fn test_cache_data_to_stored_session() {
+        let expires_at = Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).unwrap();
+        let stored_session = StoredSession {
+            user_id: "user123".to_string(),
+            csrf_token: "token123".to_string(),
+            expires_at,
+            ttl: 3600,
+        };
+
+        let json = serde_json::to_string(&stored_session).unwrap();
+        let cache_data = CacheData { value: json };
+
+        let result = StoredSession::try_from(cache_data);
+        assert!(result.is_ok());
+
+        let converted = result.unwrap();
+        assert_eq!(converted.user_id, "user123");
+        assert_eq!(converted.csrf_token, "token123");
+        assert_eq!(converted.expires_at, expires_at);
+        assert_eq!(converted.ttl, 3600);
+    }
+
+    #[test]
+    fn test_cache_data_to_stored_session_invalid_json() {
+        let cache_data = CacheData {
+            value: "invalid json".to_string(),
+        };
+        let result = StoredSession::try_from(cache_data);
+        assert!(result.is_err());
+        match result {
+            Err(SessionError::Storage(_)) => {} // Expected error type
+            _ => panic!("Expected SessionError::Storage"),
+        }
+    }
+
+    #[test]
+    fn test_csrf_token_new_and_as_str() {
+        let token = CsrfToken::new("token123".to_string());
+        assert_eq!(token.as_str(), "token123");
+    }
+
+    #[test]
+    fn test_user_id_new_and_as_str() {
+        let user_id = UserId::new("user123".to_string());
+        assert_eq!(user_id.as_str(), "user123");
+    }
+
+    #[test]
+    fn test_authentication_status_display() {
+        let status_true = AuthenticationStatus(true);
+        let status_false = AuthenticationStatus(false);
+
+        assert_eq!(format!("{}", status_true), "true");
+        assert_eq!(format!("{}", status_false), "false");
+    }
+
+    #[test]
+    fn test_csrf_header_verified_display() {
+        let verified_true = CsrfHeaderVerified(true);
+        let verified_false = CsrfHeaderVerified(false);
+
+        assert_eq!(format!("{}", verified_true), "true");
+        assert_eq!(format!("{}", verified_false), "false");
+    }
+}
