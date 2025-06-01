@@ -9,3 +9,8 @@
 10. I want the commit messages reflecting the changes actually made, and with intentions
 11. Avoid using unwrap() or expect() unless absolutely reasonable.
 12. Even when you voluntarily notice some changes are feasible, never modify the code beyond my requests without first discussing the changes and explicit approval from me.
+13. When I write unit tests for the library, I want to write them one by one, making sure each test passes before writing the next one.
+14. When you want to proceed to the next file, ask for my approval first.
+15. When you want to write multiple tests at once, ask for my approval first.
+16. When writing tests, you should never modify the code that is not directly related to the test module.
+17. The block of unit tests that is written in the same file as the code under test should be placed below the code block under test.

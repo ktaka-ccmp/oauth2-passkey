@@ -2,6 +2,14 @@
 
 ## Todo
 
+### Security
+- [ ] Add cookie name validation in `utils::header_set_cookie` to ensure compliance with RFC 6265
+  - Should validate cookie names contain only allowed characters (ASCII alphanumeric or `!#$%&'*+-.^_`|~`)
+  - Include tests for valid/invalid cookie names
+  - Document the validation in function documentation
+  - Consider making this configurable behind a feature flag
+
+
 - Tests
 - GitHub Actions
 - Decide on Public API
@@ -195,4 +203,6 @@ Performance:
 
 ```text
 Can you take a look the following diff carefully and suggest improvements. If it doesn't introduce any bugs and every change is OK suggest a commit message plz.
+
+Make sure that we are not modifying any existing functionality except for just adding inline unit tests.
 ```
