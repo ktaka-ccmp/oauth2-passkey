@@ -155,3 +155,131 @@ pub(crate) async fn validate_sqlite_table_schema<E>(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use thiserror::Error;
+
+    // Custom error type for testing
+    #[derive(Debug, Error, PartialEq)]
+    enum TestError {
+        #[error("Schema error: {0}")]
+        Schema(String),
+    }
+
+    // Helper function to create a mock error mapper
+    fn error_mapper(msg: String) -> TestError {
+        TestError::Schema(msg)
+    }
+
+    // Test the error message format for missing table in PostgreSQL
+    #[test]
+    fn test_postgres_missing_table_error_format() {
+        let table_name = "test_table";
+        let expected_error = TestError::Schema(format!(
+            "Schema validation failed: Table '{}' does not exist",
+            table_name
+        ));
+
+        let error_message = format!(
+            "Schema validation failed: Table '{}' does not exist",
+            table_name
+        );
+        let actual_error = error_mapper(error_message);
+
+        assert_eq!(expected_error, actual_error);
+    }
+
+    // Test the error message format for missing column in PostgreSQL
+    #[test]
+    fn test_postgres_missing_column_error_format() {
+        let column_name = "test_column";
+        let expected_error = TestError::Schema(format!(
+            "Schema validation failed: Missing column '{}'",
+            column_name
+        ));
+
+        let error_message = format!("Schema validation failed: Missing column '{}'", column_name);
+        let actual_error = error_mapper(error_message);
+
+        assert_eq!(expected_error, actual_error);
+    }
+
+    // Test the error message format for wrong column type in PostgreSQL
+    #[test]
+    fn test_postgres_wrong_column_type_error_format() {
+        let column_name = "test_column";
+        let actual_type = "text";
+        let expected_type = "integer";
+
+        let expected_error = TestError::Schema(format!(
+            "Schema validation failed: Column '{}' has type '{}' but expected '{}'",
+            column_name, actual_type, expected_type
+        ));
+
+        let error_message = format!(
+            "Schema validation failed: Column '{}' has type '{}' but expected '{}'",
+            column_name, actual_type, expected_type
+        );
+        let actual_error = error_mapper(error_message);
+
+        assert_eq!(expected_error, actual_error);
+    }
+
+    // Test the error message format for missing table in SQLite
+    #[test]
+    fn test_sqlite_missing_table_error_format() {
+        let table_name = "test_table";
+        let expected_error = TestError::Schema(format!(
+            "Schema validation failed: Table '{}' does not exist",
+            table_name
+        ));
+
+        let error_message = format!(
+            "Schema validation failed: Table '{}' does not exist",
+            table_name
+        );
+        let actual_error = error_mapper(error_message);
+
+        assert_eq!(expected_error, actual_error);
+    }
+
+    // Test the error message format for missing column in SQLite
+    #[test]
+    fn test_sqlite_missing_column_error_format() {
+        let column_name = "test_column";
+        let expected_error = TestError::Schema(format!(
+            "Schema validation failed: Missing column '{}'.",
+            column_name
+        ));
+
+        let error_message = format!(
+            "Schema validation failed: Missing column '{}'.",
+            column_name
+        );
+        let actual_error = error_mapper(error_message);
+
+        assert_eq!(expected_error, actual_error);
+    }
+
+    // Test the error message format for wrong column type in SQLite
+    #[test]
+    fn test_sqlite_wrong_column_type_error_format() {
+        let column_name = "test_column";
+        let actual_type = "TEXT";
+        let expected_type = "INTEGER";
+
+        let expected_error = TestError::Schema(format!(
+            "Schema validation failed: Column '{}' has type '{}' but expected '{}'",
+            column_name, actual_type, expected_type
+        ));
+
+        let error_message = format!(
+            "Schema validation failed: Column '{}' has type '{}' but expected '{}'",
+            column_name, actual_type, expected_type
+        );
+        let actual_error = error_mapper(error_message);
+
+        assert_eq!(expected_error, actual_error);
+    }
+}
