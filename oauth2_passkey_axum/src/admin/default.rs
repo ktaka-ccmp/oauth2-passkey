@@ -8,7 +8,7 @@ use axum::{
 };
 
 use oauth2_passkey::{
-    DbUser, O2P_ROUTE_PREFIX, SessionUser, delete_oauth2_account_core,
+    CoordinationError, DbUser, O2P_ROUTE_PREFIX, SessionUser, delete_oauth2_account_core,
     delete_passkey_credential_core, delete_user_account_admin, update_user_admin_status,
 };
 
@@ -171,4 +171,174 @@ pub(super) async fn update_admin_status_handler(
     );
 
     Ok(StatusCode::OK)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_delete_user_request_struct() {
+        // Test the DeleteUserRequest struct
+        let request = DeleteUserRequest {
+            user_id: "user123".to_string(),
+        };
+        assert_eq!(request.user_id, "user123");
+    }
+
+    #[tokio::test]
+    async fn test_delete_user_account_handler_unauthorized() {
+        // Create a non-admin user
+        let auth_user = AuthUser {
+            id: "user123".to_string(),
+            account: "test@example.com".to_string(),
+            label: "Test User".to_string(),
+            is_admin: false,
+            sequence_number: 1,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            csrf_token: "token123".to_string(),
+            csrf_via_header_verified: true,
+        };
+
+        // Create a delete request
+        let payload = DeleteUserRequest {
+            user_id: "user456".to_string(),
+        };
+
+        // Call the handler
+        let result = delete_user_account_handler(auth_user, ExtractJson(payload)).await;
+
+        // Verify that it returns an unauthorized error
+        assert!(result.is_err());
+        if let Err((status, message)) = result {
+            assert_eq!(status, StatusCode::UNAUTHORIZED);
+            assert_eq!(message, "Not authorized".to_string());
+        } else {
+            panic!("Expected an error but got Ok");
+        }
+    }
+}
+
+#[cfg(test)]
+mod page_user_context_tests {
+    use super::*;
+
+    #[test]
+    fn test_page_user_context_struct() {
+        // Test the PageUserContext struct
+        let context = PageUserContext {
+            user_id: "user123".to_string(),
+        };
+        assert_eq!(context.user_id, "user123");
+    }
+}
+
+#[cfg(test)]
+mod update_admin_status_tests {
+    use super::*;
+
+    #[test]
+    fn test_update_admin_status_request_struct() {
+        // Test with admin status true
+        let request_admin_true = UpdateAdminStatusRequest {
+            user_id: "user123".to_string(),
+            is_admin: true,
+        };
+        assert_eq!(request_admin_true.user_id, "user123");
+        assert_eq!(request_admin_true.is_admin, true);
+
+        // Test with admin status false
+        let request_admin_false = UpdateAdminStatusRequest {
+            user_id: "user456".to_string(),
+            is_admin: false,
+        };
+        assert_eq!(request_admin_false.user_id, "user456");
+        assert_eq!(request_admin_false.is_admin, false);
+    }
+
+    #[tokio::test]
+    async fn test_update_admin_status_handler_unauthorized() {
+        // Create a non-admin user
+        let auth_user = AuthUser {
+            id: "user123".to_string(),
+            account: "test@example.com".to_string(),
+            label: "Test User".to_string(),
+            is_admin: false,
+            sequence_number: 1,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            csrf_token: "token123".to_string(),
+            csrf_via_header_verified: true,
+        };
+
+        // Create an update request
+        let payload = UpdateAdminStatusRequest {
+            user_id: "user456".to_string(),
+            is_admin: true,
+        };
+
+        // Call the handler
+        let result = update_admin_status_handler(auth_user, ExtractJson(payload)).await;
+
+        // Verify that it returns an unauthorized error
+        assert!(result.is_err());
+        if let Err((status, message)) = result {
+            assert_eq!(status, StatusCode::UNAUTHORIZED);
+            assert_eq!(message, "Not authorized".to_string());
+        } else {
+            panic!("Expected an error but got Ok");
+        }
+    }
+}
+
+#[cfg(test)]
+mod router_tests {
+    use super::*;
+
+    #[test]
+    fn test_router_creation() {
+        // Test that the router can be created without panicking
+        let _router = router();
+        // Just creating the router without panicking is considered a success
+    }
+}
+
+#[cfg(test)]
+mod user_list_template_tests {
+    use super::*;
+
+    #[test]
+    fn test_user_list_template_struct() {
+        // Create a test datetime
+        let now = chrono::Utc::now();
+
+        // Create a mock DbUser
+        let user = DbUser {
+            id: "user123".to_string(),
+            is_admin: true,
+            account: "test@example.com".to_string(),
+            label: "Test User".to_string(),
+            created_at: now,
+            updated_at: now,
+            // Note: sequence_number is now optional based on the memory about optimization
+            sequence_number: None,
+        };
+
+        // Create the template
+        let template = UserListTemplate {
+            users: vec![user],
+            o2p_route_prefix: "/auth".to_string(),
+            o2p_redirect_anon: "/login".to_string(),
+            csrf_token: "token123".to_string(),
+        };
+
+        // Verify the template fields
+        assert_eq!(template.users.len(), 1);
+        assert_eq!(template.users[0].id, "user123");
+        assert_eq!(template.users[0].is_admin, true);
+        assert_eq!(template.o2p_route_prefix, "/auth");
+        assert_eq!(template.o2p_redirect_anon, "/login");
+        assert_eq!(template.csrf_token, "token123");
+    }
 }
