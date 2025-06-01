@@ -265,6 +265,20 @@ mod tests {
     }
 
     #[test]
+    fn test_auth_redirect_new() {
+        // Test creating AuthRedirect with different HTTP methods
+        // We're just testing that the constructor doesn't panic with different methods
+        // The variables are prefixed with _ to indicate they're intentionally unused
+        let _get_redirect = AuthRedirect::new(Method::GET);
+        let _post_redirect = AuthRedirect::new(Method::POST);
+        let _put_redirect = AuthRedirect::new(Method::PUT);
+        let _delete_redirect = AuthRedirect::new(Method::DELETE);
+
+        // If we get here without panicking, the test passes
+        assert!(true);
+    }
+
+    #[test]
     fn test_auth_redirect_into_response_with_method() {
         // Test with GET method
         let auth_redirect = AuthRedirect::new(Method::GET);
@@ -278,6 +292,11 @@ mod tests {
 
         // Test with PUT method
         let auth_redirect = AuthRedirect::new(Method::PUT);
+        let response = auth_redirect.into_response_with_method();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        // Test with DELETE method
+        let auth_redirect = AuthRedirect::new(Method::DELETE);
         let response = auth_redirect.into_response_with_method();
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }

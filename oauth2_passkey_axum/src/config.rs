@@ -86,15 +86,33 @@ mod tests {
     }
 
     #[test]
+    fn test_summary_url_custom() {
+        let url = get_summary_url("/o2p", Some("/custom/summary"));
+        assert_eq!(url, "/custom/summary");
+    }
+
+    #[test]
     fn test_admin_url_default() {
         let url = get_admin_url("/o2p", None);
         assert_eq!(url, "/o2p/admin/list_users");
     }
 
     #[test]
+    fn test_admin_url_custom() {
+        let url = get_admin_url("/o2p", Some("/custom/admin"));
+        assert_eq!(url, "/custom/admin");
+    }
+
+    #[test]
     fn test_redirect_anon_default() {
         let url = get_redirect_anon(None);
         assert_eq!(url, "/");
+    }
+
+    #[test]
+    fn test_redirect_anon_custom() {
+        let url = get_redirect_anon(Some("/custom/login"));
+        assert_eq!(url, "/custom/login");
     }
 
     #[test]
