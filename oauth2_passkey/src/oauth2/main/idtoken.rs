@@ -349,3 +349,185 @@ pub(super) async fn verify_idtoken(
 
     Ok(idinfo)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Duration, Utc};
+    use jsonwebtoken::{EncodingKey, Header};
+    use serde_json::json;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_error_is_sync_and_send() {
+        fn assert_sync_send<T: Sync + Send>() {}
+        assert_sync_send::<TokenVerificationError>();
+    }
+
+    #[test]
+    fn test_error_display() {
+        // Test basic error variants
+        let err = TokenVerificationError::InvalidTokenFormat;
+        assert_eq!(err.to_string(), "Invalid token format");
+
+        let err = TokenVerificationError::InvalidTokenSignature;
+        assert_eq!(err.to_string(), "Invalid token signature");
+
+        let err = TokenVerificationError::InvalidTokenAudience(
+            "expected".to_string(),
+            "actual".to_string(),
+        );
+        assert_eq!(
+            err.to_string(),
+            "Invalid token audience, expected: expected, actual: actual"
+        );
+
+        let err = TokenVerificationError::InvalidTokenIssuer(
+            "expected".to_string(),
+            "actual".to_string(),
+        );
+        assert_eq!(
+            err.to_string(),
+            "Invalid token issuer, expected: expected, actual: actual"
+        );
+
+        let err = TokenVerificationError::TokenExpired;
+        assert_eq!(err.to_string(), "Token expired");
+
+        let err = TokenVerificationError::TokenNotYetValidNotBeFore(100, 200);
+        assert_eq!(err.to_string(), "Token not yet valid, now: 100, nbf: 200");
+
+        let err = TokenVerificationError::TokenNotYetValidIssuedAt(100, 200);
+        assert_eq!(err.to_string(), "Token not yet valid, now: 100, iat: 200");
+
+        let err = TokenVerificationError::NoMatchingKey;
+        assert_eq!(err.to_string(), "No matching key found in JWKS");
+
+        let err = TokenVerificationError::MissingKeyComponent("n".to_string());
+        assert_eq!(err.to_string(), "Missing key component: n");
+
+        let err = TokenVerificationError::UnsupportedAlgorithm("HS384".to_string());
+        assert_eq!(err.to_string(), "Unsupported algorithm: HS384");
+
+        let err = TokenVerificationError::JwksParsing("parse error".to_string());
+        assert_eq!(err.to_string(), "JWKS parsing error: parse error");
+
+        let err = TokenVerificationError::JwksFetch("fetch error".to_string());
+        assert_eq!(err.to_string(), "JWKS fetch error: fetch error");
+    }
+
+    #[test]
+    fn test_find_jwk() {
+        let jwks = Jwks {
+            keys: vec![
+                Jwk {
+                    kty: "RSA".to_string(),
+                    kid: "key1".to_string(),
+                    alg: "RS256".to_string(),
+                    n: Some("n_value".to_string()),
+                    e: Some("e_value".to_string()),
+                    x: None,
+                    y: None,
+                    crv: None,
+                    k: None,
+                },
+                Jwk {
+                    kty: "RSA".to_string(),
+                    kid: "key2".to_string(),
+                    alg: "RS256".to_string(),
+                    n: Some("n_value2".to_string()),
+                    e: Some("e_value2".to_string()),
+                    x: None,
+                    y: None,
+                    crv: None,
+                    k: None,
+                },
+            ],
+        };
+
+        // Should find the key with matching kid
+        let jwk = find_jwk(&jwks, "key1");
+        assert!(jwk.is_some());
+        assert_eq!(jwk.unwrap().kid, "key1");
+
+        // Should find the second key
+        let jwk = find_jwk(&jwks, "key2");
+        assert!(jwk.is_some());
+        assert_eq!(jwk.unwrap().kid, "key2");
+
+        // Should return None for non-existent key
+        let jwk = find_jwk(&jwks, "key3");
+        assert!(jwk.is_none());
+    }
+
+    #[test]
+    fn test_jwks_cache_conversion() {
+        let jwks = Jwks {
+            keys: vec![Jwk {
+                kty: "RSA".to_string(),
+                kid: "key1".to_string(),
+                alg: "RS256".to_string(),
+                n: Some("n_value".to_string()),
+                e: Some("e_value".to_string()),
+                x: None,
+                y: None,
+                crv: None,
+                k: None,
+            }],
+        };
+
+        let expires_at = Utc::now() + Duration::seconds(600);
+        let jwks_cache = JwksCache {
+            jwks: jwks.clone(),
+            expires_at,
+        };
+
+        // Convert to CacheData
+        let cache_data: CacheData = jwks_cache.clone().into();
+
+        // Convert back to JwksCache
+        let recovered_cache: JwksCache = cache_data.try_into().unwrap();
+
+        // Verify the keys are preserved
+        assert_eq!(recovered_cache.jwks.keys.len(), 1);
+        assert_eq!(recovered_cache.jwks.keys[0].kid, "key1");
+        assert_eq!(recovered_cache.jwks.keys[0].kty, "RSA");
+        assert_eq!(recovered_cache.jwks.keys[0].alg, "RS256");
+        assert_eq!(recovered_cache.jwks.keys[0].n, Some("n_value".to_string()));
+        assert_eq!(recovered_cache.jwks.keys[0].e, Some("e_value".to_string()));
+
+        // Verify the expiration time is preserved (within a second)
+        let time_diff = (recovered_cache.expires_at - jwks_cache.expires_at).num_seconds();
+        assert!(time_diff.abs() < 1);
+    }
+
+    #[test]
+    fn test_jwks_cache_invalid_data() {
+        // Create invalid cache data
+        let invalid_data = CacheData {
+            value: "not valid json".to_string(),
+        };
+
+        // Try to convert to JwksCache
+        let result: Result<JwksCache, TokenVerificationError> = invalid_data.try_into();
+
+        // Should fail
+        assert!(result.is_err());
+        match result {
+            Err(TokenVerificationError::JwksParsing(_)) => {}
+            _ => panic!("Expected JwksParsing error"),
+        }
+    }
+
+    #[test]
+    fn test_decode_base64_url_safe() {
+        // Valid base64url encoded string
+        let encoded = "SGVsbG8gV29ybGQ";
+        let decoded = decode_base64_url_safe(encoded).unwrap();
+        assert_eq!(String::from_utf8(decoded).unwrap(), "Hello World");
+
+        // Invalid base64 string
+        let result = decode_base64_url_safe("not!valid!base64");
+        assert!(result.is_err());
+    }
+}

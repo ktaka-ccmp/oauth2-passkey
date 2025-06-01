@@ -150,7 +150,7 @@ impl TryFrom<CacheData> for StoredToken {
 
 /// Search field options for credential lookup
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(crate) enum AccountSearchField {
     /// Search by ID
     Id(String),
@@ -197,6 +197,184 @@ impl std::str::FromStr for OAuth2Mode {
             "login" => Ok(Self::Login),
             "create_user_or_login" => Ok(Self::CreateUserOrLogin),
             _ => Err(OAuth2Error::InvalidMode(s.to_string())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Duration, Utc};
+    use serde_json::json;
+
+    #[test]
+    fn test_oauth2_mode_serde() {
+        let mode = OAuth2Mode::AddToUser;
+        let serialized = serde_json::to_string(&mode).unwrap();
+        assert_eq!(serialized, "\"add_to_user\"");
+        let deserialized: OAuth2Mode = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, OAuth2Mode::AddToUser);
+
+        let mode = OAuth2Mode::CreateUser;
+        let serialized = serde_json::to_string(&mode).unwrap();
+        assert_eq!(serialized, "\"create_user\"");
+        let deserialized: OAuth2Mode = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, OAuth2Mode::CreateUser);
+    }
+
+    #[test]
+    fn test_oauth2_mode_from_str() {
+        use std::str::FromStr;
+
+        // Test valid modes
+        let mode = OAuth2Mode::from_str("add_to_user").unwrap();
+        assert_eq!(mode, OAuth2Mode::AddToUser);
+
+        let mode = OAuth2Mode::from_str("create_user").unwrap();
+        assert_eq!(mode, OAuth2Mode::CreateUser);
+
+        let mode = OAuth2Mode::from_str("login").unwrap();
+        assert_eq!(mode, OAuth2Mode::Login);
+
+        let mode = OAuth2Mode::from_str("create_user_or_login").unwrap();
+        assert_eq!(mode, OAuth2Mode::CreateUserOrLogin);
+
+        // Test with unknown string - should return an error
+        let result = OAuth2Mode::from_str("unknown_mode");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_oauth2_mode_as_str() {
+        assert_eq!(OAuth2Mode::AddToUser.as_str(), "add_to_user");
+        assert_eq!(OAuth2Mode::CreateUser.as_str(), "create_user");
+        assert_eq!(OAuth2Mode::Login.as_str(), "login");
+        assert_eq!(
+            OAuth2Mode::CreateUserOrLogin.as_str(),
+            "create_user_or_login"
+        );
+    }
+
+    #[test]
+    fn test_from_google_user_info() {
+        let google_user = GoogleUserInfo {
+            id: "12345".to_string(),
+            family_name: "Doe".to_string(),
+            name: "John Doe".to_string(),
+            picture: Some("https://example.com/pic.jpg".to_string()),
+            email: "john@example.com".to_string(),
+            given_name: "John".to_string(),
+            hd: Some("example.com".to_string()),
+            verified_email: true,
+        };
+
+        let account = OAuth2Account::from(google_user.clone());
+
+        // Check that fields are correctly mapped
+        assert_eq!(account.name, "John Doe");
+        assert_eq!(account.email, "john@example.com");
+        assert_eq!(
+            account.picture,
+            Some("https://example.com/pic.jpg".to_string())
+        );
+        assert_eq!(account.provider, "google");
+        assert_eq!(account.provider_user_id, "google_12345");
+
+        // Check metadata
+        let metadata = account.metadata.as_object().unwrap();
+        assert_eq!(metadata["family_name"], json!("Doe"));
+        assert_eq!(metadata["given_name"], json!("John"));
+        assert_eq!(metadata["hd"], json!("example.com"));
+        assert_eq!(metadata["verified_email"], json!(true));
+    }
+
+    #[test]
+    fn test_from_google_id_info() {
+        // Create a mock GoogleIdInfo
+        let id_info = GoogleIdInfo {
+            iss: "https://accounts.google.com".to_string(),
+            azp: "client_id".to_string(),
+            aud: "client_id".to_string(),
+            sub: "12345".to_string(),
+            email: "john@example.com".to_string(),
+            email_verified: true,
+            at_hash: Some("hash".to_string()),
+            name: "John Doe".to_string(),
+            picture: Some("https://example.com/pic.jpg".to_string()),
+            given_name: "John".to_string(),
+            family_name: "Doe".to_string(),
+            locale: Some("en".to_string()),
+            iat: 0,
+            exp: 0,
+            nbf: Some(0),
+            jti: Some("jti_value".to_string()),
+            nonce: Some("nonce_value".to_string()),
+            hd: Some("example.com".to_string()),
+        };
+
+        let account = OAuth2Account::from(id_info.clone());
+
+        // Check that fields are correctly mapped
+        assert_eq!(account.name, "John Doe");
+        assert_eq!(account.email, "john@example.com");
+        assert_eq!(
+            account.picture,
+            Some("https://example.com/pic.jpg".to_string())
+        );
+        assert_eq!(account.provider, "google");
+        assert_eq!(account.provider_user_id, "google_12345");
+
+        // Check metadata
+        let metadata = account.metadata.as_object().unwrap();
+        assert_eq!(metadata["family_name"], json!("Doe"));
+        assert_eq!(metadata["given_name"], json!("John"));
+        assert_eq!(metadata["hd"], json!("example.com"));
+        assert_eq!(metadata["verified_email"], json!(true));
+    }
+
+    #[test]
+    fn test_stored_token_cache_data_conversion() {
+        // Create a StoredToken
+        let now = Utc::now();
+        let expires_at = now + Duration::seconds(3600);
+        let stored_token = StoredToken {
+            token: "test_token".to_string(),
+            expires_at,
+            user_agent: Some("test_agent".to_string()),
+            ttl: 3600,
+        };
+
+        // Convert to CacheData
+        let cache_data = CacheData::from(stored_token.clone());
+
+        // Convert back to StoredToken
+        let recovered_token = StoredToken::try_from(cache_data).unwrap();
+
+        // Verify all fields match
+        assert_eq!(recovered_token.token, stored_token.token);
+        assert_eq!(
+            recovered_token.expires_at.timestamp(),
+            stored_token.expires_at.timestamp()
+        );
+        assert_eq!(recovered_token.user_agent, stored_token.user_agent);
+        assert_eq!(recovered_token.ttl, stored_token.ttl);
+    }
+
+    #[test]
+    fn test_stored_token_invalid_cache_data() {
+        // Create invalid cache data
+        let invalid_data = CacheData {
+            value: "not valid json".to_string(),
+        };
+
+        // Try to convert to StoredToken
+        let result = StoredToken::try_from(invalid_data);
+
+        // Should fail
+        assert!(result.is_err());
+        match result {
+            Err(OAuth2Error::Storage(_)) => {}
+            _ => panic!("Expected Storage error"),
         }
     }
 }
