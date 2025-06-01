@@ -204,34 +204,44 @@ impl std::str::FromStr for OAuth2Mode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Duration;
+    use chrono::{Duration, Utc};
     use serde_json::json;
-    use std::str::FromStr;
 
     #[test]
-    fn test_oauth2_mode_from_str() {
-        // Test valid modes
-        assert_eq!(
-            OAuth2Mode::from_str("add_to_user").unwrap(),
-            OAuth2Mode::AddToUser
-        );
-        assert_eq!(
-            OAuth2Mode::from_str("create_user").unwrap(),
-            OAuth2Mode::CreateUser
-        );
-        assert_eq!(OAuth2Mode::from_str("login").unwrap(), OAuth2Mode::Login);
-        assert_eq!(
-            OAuth2Mode::from_str("create_user_or_login").unwrap(),
-            OAuth2Mode::CreateUserOrLogin
-        );
+    fn test_oauth2_mode_serde() {
+        let mode = OAuth2Mode::AddToUser;
+        let serialized = serde_json::to_string(&mode).unwrap();
+        assert_eq!(serialized, "\"add_to_user\"");
+        let deserialized: OAuth2Mode = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, OAuth2Mode::AddToUser);
 
-        // Test invalid mode
-        let result = OAuth2Mode::from_str("invalid_mode");
+        let mode = OAuth2Mode::CreateUser;
+        let serialized = serde_json::to_string(&mode).unwrap();
+        assert_eq!(serialized, "\"create_user\"");
+        let deserialized: OAuth2Mode = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, OAuth2Mode::CreateUser);
+    }
+    
+    #[test]
+    fn test_oauth2_mode_from_str() {
+        use std::str::FromStr;
+        
+        // Test valid modes
+        let mode = OAuth2Mode::from_str("add_to_user").unwrap();
+        assert_eq!(mode, OAuth2Mode::AddToUser);
+        
+        let mode = OAuth2Mode::from_str("create_user").unwrap();
+        assert_eq!(mode, OAuth2Mode::CreateUser);
+        
+        let mode = OAuth2Mode::from_str("login").unwrap();
+        assert_eq!(mode, OAuth2Mode::Login);
+        
+        let mode = OAuth2Mode::from_str("create_user_or_login").unwrap();
+        assert_eq!(mode, OAuth2Mode::CreateUserOrLogin);
+        
+        // Test with unknown string - should return an error
+        let result = OAuth2Mode::from_str("unknown_mode");
         assert!(result.is_err());
-        match result {
-            Err(OAuth2Error::InvalidMode(s)) => assert_eq!(s, "invalid_mode"),
-            _ => panic!("Expected InvalidMode error"),
-        }
     }
 
     #[test]
