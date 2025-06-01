@@ -81,6 +81,92 @@ impl From<SessionUser> for AuthUser {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    
+    #[test]
+    fn test_from_session_user_to_auth_user() {
+        // Create a SessionUser instance
+        let now = Utc::now();
+        let session_user = SessionUser {
+            id: "user123".to_string(),
+            account: "test@example.com".to_string(),
+            label: "Test User".to_string(),
+            is_admin: true,
+            sequence_number: 42,
+            created_at: now,
+            updated_at: now,
+        };
+        
+        // Convert to AuthUser
+        let auth_user = AuthUser::from(session_user);
+        
+        // Verify all fields were correctly converted
+        assert_eq!(auth_user.id, "user123");
+        assert_eq!(auth_user.account, "test@example.com");
+        assert_eq!(auth_user.label, "Test User");
+        assert!(auth_user.is_admin);
+        assert_eq!(auth_user.sequence_number, 42);
+        assert_eq!(auth_user.created_at, now);
+        assert_eq!(auth_user.updated_at, now);
+        
+        // Verify default values for AuthUser-specific fields
+        assert_eq!(auth_user.csrf_token, "");
+        assert!(!auth_user.csrf_via_header_verified);
+    }
+    
+    #[test]
+    fn test_from_auth_user_to_session_user() {
+        // Create an AuthUser instance
+        let now = Utc::now();
+        let auth_user = AuthUser {
+            id: "user123".to_string(),
+            account: "test@example.com".to_string(),
+            label: "Test User".to_string(),
+            is_admin: true,
+            sequence_number: 42,
+            created_at: now,
+            updated_at: now,
+            csrf_token: "csrf-token-value".to_string(),
+            csrf_via_header_verified: true,
+        };
+        
+        // Convert to SessionUser
+        let session_user = SessionUser::from(&auth_user);
+        
+        // Verify all fields were correctly converted
+        assert_eq!(session_user.id, "user123");
+        assert_eq!(session_user.account, "test@example.com");
+        assert_eq!(session_user.label, "Test User");
+        assert!(session_user.is_admin);
+        assert_eq!(session_user.sequence_number, 42);
+        assert_eq!(session_user.created_at, now);
+        assert_eq!(session_user.updated_at, now);
+        
+        // AuthUser-specific fields should not be present in SessionUser
+    }
+    
+    #[test]
+    fn test_auth_redirect_into_response_with_method() {
+        // Test with GET method
+        let redirect_get = AuthRedirect::new(Method::GET);
+        let response_get = redirect_get.into_response_with_method();
+        assert_eq!(response_get.status(), StatusCode::TEMPORARY_REDIRECT);
+        
+        // Test with POST method
+        let redirect_post = AuthRedirect::new(Method::POST);
+        let response_post = redirect_post.into_response_with_method();
+        assert_eq!(response_post.status(), StatusCode::UNAUTHORIZED);
+        
+        // Test with PUT method
+        let redirect_put = AuthRedirect::new(Method::PUT);
+        let response_put = redirect_put.into_response_with_method();
+        assert_eq!(response_put.status(), StatusCode::UNAUTHORIZED);
+    }
+}
+
 impl<B> FromRequestParts<B> for AuthUser
 where
     B: Send + Sync,

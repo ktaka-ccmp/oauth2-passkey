@@ -25,3 +25,6 @@ futures = { workspace = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
 subtle = "2.5"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
