@@ -173,64 +173,64 @@ mod tests {
     use crate::session::SessionError;
     use crate::userdb::UserError;
     use crate::utils::UtilError;
-    
+
     #[test]
     fn test_error_is_sync_and_send() {
         fn assert_sync_send<T: Sync + Send>() {}
         assert_sync_send::<CoordinationError>();
     }
-    
+
     #[test]
     fn test_error_display() {
         // Test basic error variants
         let err = CoordinationError::Coordination("test error".to_string());
         assert_eq!(err.to_string(), "Coordination error: test error");
-        
+
         let err = CoordinationError::Database("db error".to_string());
         assert_eq!(err.to_string(), "Database error: db error");
-        
+
         let err = CoordinationError::Authentication("auth error".to_string());
         assert_eq!(err.to_string(), "Authentication error: auth error");
-        
+
         let err = CoordinationError::SessionMismatch("mismatch".to_string());
         assert_eq!(err.to_string(), "Session mismatch: mismatch");
-        
+
         let err = CoordinationError::MissingContextToken;
         assert_eq!(err.to_string(), "Context token is missing");
-        
+
         let err = CoordinationError::Unauthorized;
         assert_eq!(err.to_string(), "Unauthorized access");
-        
+
         let err = CoordinationError::UnexpectedlyAuthorized;
         assert_eq!(err.to_string(), "You are already authenticated");
-        
+
         let err = CoordinationError::NoContent;
         assert_eq!(err.to_string(), "No content");
-        
+
         let err = CoordinationError::InvalidMode;
         assert_eq!(err.to_string(), "Invalid mode");
-        
+
         let err = CoordinationError::Conflict("conflict reason".to_string());
         assert_eq!(err.to_string(), "Conflict: conflict reason");
-        
+
         let err = CoordinationError::InvalidState("invalid state".to_string());
         assert_eq!(err.to_string(), "Invalid state: invalid state");
-        
+
         let err = CoordinationError::ResourceNotFound {
             resource_type: "User".to_string(),
             resource_id: "123".to_string(),
         };
         assert_eq!(err.to_string(), "Resource not found: User 123");
-        
+
         let err = CoordinationError::InvalidResponseMode("mode".to_string());
         assert_eq!(err.to_string(), "Invalid response mode: mode");
     }
-    
+
     #[test]
     fn test_from_oauth2_error() {
         let oauth2_err = OAuth2Error::Storage("storage error".to_string());
         let err: CoordinationError = oauth2_err.into();
-        
+
         if let CoordinationError::OAuth2Error(inner) = err {
             if let OAuth2Error::Storage(msg) = inner {
                 assert_eq!(msg, "storage error");
@@ -241,12 +241,12 @@ mod tests {
             panic!("Wrong error type");
         }
     }
-    
+
     #[test]
     fn test_from_passkey_error() {
         let passkey_err = PasskeyError::Storage("passkey storage error".to_string());
         let err: CoordinationError = passkey_err.into();
-        
+
         if let CoordinationError::PasskeyError(inner) = err {
             if let PasskeyError::Storage(msg) = inner {
                 assert_eq!(msg, "passkey storage error");
@@ -257,12 +257,12 @@ mod tests {
             panic!("Wrong error type");
         }
     }
-    
+
     #[test]
     fn test_from_session_error() {
         let session_err = SessionError::Storage("session storage error".to_string());
         let err: CoordinationError = session_err.into();
-        
+
         if let CoordinationError::SessionError(inner) = err {
             if let SessionError::Storage(msg) = inner {
                 assert_eq!(msg, "session storage error");
@@ -273,12 +273,12 @@ mod tests {
             panic!("Wrong error type");
         }
     }
-    
+
     #[test]
     fn test_from_user_error() {
         let user_err = UserError::Storage("user db error".to_string());
         let err: CoordinationError = user_err.into();
-        
+
         if let CoordinationError::UserError(inner) = err {
             if let UserError::Storage(msg) = inner {
                 assert_eq!(msg, "user db error");
@@ -289,12 +289,12 @@ mod tests {
             panic!("Wrong error type");
         }
     }
-    
+
     #[test]
     fn test_from_util_error() {
         let util_err = UtilError::Format("format error".to_string());
         let err: CoordinationError = util_err.into();
-        
+
         if let CoordinationError::UtilsError(inner) = err {
             if let UtilError::Format(msg) = inner {
                 assert_eq!(msg, "format error");
@@ -305,14 +305,14 @@ mod tests {
             panic!("Wrong error type");
         }
     }
-    
+
     #[test]
     fn test_error_log() {
         // This test just ensures the log method returns self
         // We can't easily test the actual logging output
         let err = CoordinationError::Coordination("test error".to_string());
         let logged_err = err.log();
-        
+
         if let CoordinationError::Coordination(msg) = logged_err {
             assert_eq!(msg, "test error");
         } else {

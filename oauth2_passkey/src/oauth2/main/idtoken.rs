@@ -373,11 +373,23 @@ mod tests {
         let err = TokenVerificationError::InvalidTokenSignature;
         assert_eq!(err.to_string(), "Invalid token signature");
 
-        let err = TokenVerificationError::InvalidTokenAudience("expected".to_string(), "actual".to_string());
-        assert_eq!(err.to_string(), "Invalid token audience, expected: expected, actual: actual");
+        let err = TokenVerificationError::InvalidTokenAudience(
+            "expected".to_string(),
+            "actual".to_string(),
+        );
+        assert_eq!(
+            err.to_string(),
+            "Invalid token audience, expected: expected, actual: actual"
+        );
 
-        let err = TokenVerificationError::InvalidTokenIssuer("expected".to_string(), "actual".to_string());
-        assert_eq!(err.to_string(), "Invalid token issuer, expected: expected, actual: actual");
+        let err = TokenVerificationError::InvalidTokenIssuer(
+            "expected".to_string(),
+            "actual".to_string(),
+        );
+        assert_eq!(
+            err.to_string(),
+            "Invalid token issuer, expected: expected, actual: actual"
+        );
 
         let err = TokenVerificationError::TokenExpired;
         assert_eq!(err.to_string(), "Token expired");
@@ -502,7 +514,7 @@ mod tests {
         // Should fail
         assert!(result.is_err());
         match result {
-            Err(TokenVerificationError::JwksParsing(_)) => {},
+            Err(TokenVerificationError::JwksParsing(_)) => {}
             _ => panic!("Expected JwksParsing error"),
         }
     }

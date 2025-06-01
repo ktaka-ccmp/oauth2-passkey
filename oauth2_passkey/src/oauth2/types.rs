@@ -221,24 +221,24 @@ mod tests {
         let deserialized: OAuth2Mode = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized, OAuth2Mode::CreateUser);
     }
-    
+
     #[test]
     fn test_oauth2_mode_from_str() {
         use std::str::FromStr;
-        
+
         // Test valid modes
         let mode = OAuth2Mode::from_str("add_to_user").unwrap();
         assert_eq!(mode, OAuth2Mode::AddToUser);
-        
+
         let mode = OAuth2Mode::from_str("create_user").unwrap();
         assert_eq!(mode, OAuth2Mode::CreateUser);
-        
+
         let mode = OAuth2Mode::from_str("login").unwrap();
         assert_eq!(mode, OAuth2Mode::Login);
-        
+
         let mode = OAuth2Mode::from_str("create_user_or_login").unwrap();
         assert_eq!(mode, OAuth2Mode::CreateUserOrLogin);
-        
+
         // Test with unknown string - should return an error
         let result = OAuth2Mode::from_str("unknown_mode");
         assert!(result.is_err());
