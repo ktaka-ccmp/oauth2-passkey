@@ -250,3 +250,182 @@ fn verify_self_attestation(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ciborium::value::Value;
+    use ring::digest;
+    use std::sync::Once;
+
+    // Initialize test environment once
+    static INIT: Once = Once::new();
+
+    unsafe fn setup() {
+        // Set up required environment variables for testing
+        unsafe {
+            std::env::set_var("ORIGIN", "https://example.com");
+            std::env::set_var("PASSKEY_RP_ID", "example.com");
+            std::env::set_var("PASSKEY_USER_VERIFICATION", "required");
+        }
+    }
+
+    // Helper function to create basic auth_data for testing
+    fn create_test_auth_data() -> Vec<u8> {
+        // Ensure test environment is set up
+        INIT.call_once(|| {
+            // This is safe in the context of tests
+            unsafe {
+                setup();
+            }
+        });
+
+        // Create a valid auth_data with proper RP ID hash and flags
+        let mut auth_data = Vec::new();
+
+        // Add RP ID hash (SHA-256 of "example.com")
+        let rp_id_hash = digest::digest(&digest::SHA256, "example.com".as_bytes());
+        auth_data.extend_from_slice(rp_id_hash.as_ref());
+
+        // Add flags (user present, user verified, attested credential data)
+        auth_data.push(0x01 | 0x04 | 0x40);
+
+        // Add sign count (4 bytes, big-endian)
+        auth_data.extend_from_slice(&[0x00, 0x00, 0x00, 0x01]);
+
+        // Add AAGUID (16 bytes)
+        auth_data.extend_from_slice(&[0x01; 16]);
+
+        // Add credential ID length (2 bytes, big-endian) and credential ID (16 bytes)
+        auth_data.extend_from_slice(&[0x00, 0x10]); // Length: 16 bytes
+        auth_data.extend_from_slice(&[0x02; 16]); // Credential ID
+
+        // Add CBOR-encoded public key
+        // Create a CBOR map with key-value pairs
+        let public_key_entries = vec![
+            // kty: EC2 (2)
+            (Value::Integer(1i64.into()), Value::Integer(2i64.into())),
+            // alg: ES256 (-7)
+            (Value::Integer(3i64.into()), Value::Integer((-7i64).into())),
+            // crv: P-256 (1)
+            (Value::Integer((-1i64).into()), Value::Integer(1i64.into())),
+            // x coordinate (32 bytes)
+            (Value::Integer((-2i64).into()), Value::Bytes(vec![0x02; 32])),
+            // y coordinate (32 bytes)
+            (Value::Integer((-3i64).into()), Value::Bytes(vec![0x03; 32])),
+        ];
+
+        let public_key = Value::Map(public_key_entries);
+        let mut public_key_bytes = Vec::new();
+        ciborium::ser::into_writer(&public_key, &mut public_key_bytes).unwrap();
+        auth_data.extend_from_slice(&public_key_bytes);
+
+        auth_data
+    }
+
+    // Helper function to create a client data hash for testing
+    fn create_test_client_data_hash() -> Vec<u8> {
+        // Create a SHA-256 hash of a sample client data JSON
+        let client_data = r#"{"type":"webauthn.create","challenge":"dGVzdGNoYWxsZW5nZQ","origin":"https://example.com"}"#;
+        let hash = digest::digest(&digest::SHA256, client_data.as_bytes());
+        hash.as_ref().to_vec()
+    }
+
+    // Helper to create an attestation statement with alg and sig
+    fn create_test_att_stmt(
+        alg: i64,
+        sig: &[u8],
+        include_x5c: bool,
+    ) -> Vec<(CborValue, CborValue)> {
+        let mut att_stmt = vec![
+            (Value::Text("alg".to_string()), Value::Integer(alg.into())),
+            (Value::Text("sig".to_string()), Value::Bytes(sig.to_vec())),
+        ];
+
+        if include_x5c {
+            // Create a simple self-signed certificate for testing
+            // In a real test, we would need to generate a proper x509 certificate
+            let cert_bytes = vec![0x30, 0x82, 0x01, 0x01]; // Dummy certificate bytes
+            let certs = vec![Value::Bytes(cert_bytes)];
+            att_stmt.push((Value::Text("x5c".to_string()), Value::Array(certs)));
+        }
+
+        att_stmt
+    }
+
+    #[test]
+    fn test_verify_packed_attestation_unsupported_alg() {
+        let auth_data = create_test_auth_data();
+        let client_data_hash = create_test_client_data_hash();
+
+        // Create attestation statement with unsupported algorithm
+        let unsupported_alg = -8; // Not ES256
+        let sig = vec![0x01, 0x02, 0x03, 0x04]; // Dummy signature
+        let att_stmt = create_test_att_stmt(unsupported_alg, &sig, false);
+
+        // Verify the attestation
+        let result = verify_packed_attestation(&auth_data, &client_data_hash, &att_stmt);
+
+        // Should fail with Verification error
+        assert!(result.is_err());
+        if let Err(PasskeyError::Verification(msg)) = result {
+            assert!(msg.contains("Unsupported or unrecognized algorithm"));
+        } else {
+            panic!("Expected PasskeyError::Verification");
+        }
+    }
+
+    #[test]
+    fn test_verify_packed_attestation_ecdaa_not_supported() {
+        let auth_data = create_test_auth_data();
+        let client_data_hash = create_test_client_data_hash();
+
+        // Create attestation statement with ES256 algorithm
+        let sig = vec![0x01, 0x02, 0x03, 0x04]; // Dummy signature
+        let mut att_stmt = create_test_att_stmt(ES256_ALG, &sig, false);
+
+        // Add ecdaaKeyId to trigger the ECDAA path
+        att_stmt.push((
+            Value::Text("ecdaaKeyId".to_string()),
+            Value::Bytes(vec![0x01, 0x02, 0x03, 0x04]),
+        ));
+
+        // Verify the attestation
+        let result = verify_packed_attestation(&auth_data, &client_data_hash, &att_stmt);
+
+        // Should fail with Verification error
+        assert!(result.is_err());
+        if let Err(PasskeyError::Verification(msg)) = result {
+            assert!(msg.contains("ECDAA attestation not supported"));
+        } else {
+            panic!("Expected PasskeyError::Verification");
+        }
+    }
+
+    #[test]
+    fn test_verify_packed_attestation_both_x5c_and_ecdaa() {
+        let auth_data = create_test_auth_data();
+        let client_data_hash = create_test_client_data_hash();
+
+        // Create attestation statement with ES256 algorithm and x5c
+        let sig = vec![0x01, 0x02, 0x03, 0x04]; // Dummy signature
+        let mut att_stmt = create_test_att_stmt(ES256_ALG, &sig, true);
+
+        // Add ecdaaKeyId to trigger the error case
+        att_stmt.push((
+            Value::Text("ecdaaKeyId".to_string()),
+            Value::Bytes(vec![0x01, 0x02, 0x03, 0x04]),
+        ));
+
+        // Verify the attestation
+        let result = verify_packed_attestation(&auth_data, &client_data_hash, &att_stmt);
+
+        // Should fail with Verification error
+        assert!(result.is_err());
+        if let Err(PasskeyError::Verification(msg)) = result {
+            assert!(msg.contains("both x5c and ecdaaKeyId present"));
+        } else {
+            panic!("Expected PasskeyError::Verification");
+        }
+    }
+}

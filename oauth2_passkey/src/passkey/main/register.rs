@@ -594,3 +594,497 @@ async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), Passkey
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ciborium::value::Value as CborValue;
+
+    #[test]
+    fn test_parse_attestation_object_success_none_fmt() {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+
+        // Construct the expected AttestationObject fields
+        let expected_fmt = "none".to_string();
+        let expected_auth_data = b"authdata".to_vec();
+        let expected_att_stmt_map = Vec::<(CborValue, CborValue)>::new(); // Empty map
+
+        // Create the CBOR structure programmatically
+        let mut cbor_map = Vec::new();
+        cbor_map.push((
+            CborValue::Text("fmt".to_string()),
+            CborValue::Text(expected_fmt.clone()),
+        ));
+        cbor_map.push((
+            CborValue::Text("attStmt".to_string()),
+            CborValue::Map(expected_att_stmt_map.clone()),
+        ));
+        cbor_map.push((
+            CborValue::Text("authData".to_string()),
+            CborValue::Bytes(expected_auth_data.clone()),
+        ));
+        let cbor_value = CborValue::Map(cbor_map);
+
+        // Serialize CBOR to bytes
+        let mut cbor_bytes = Vec::new();
+        ciborium::ser::into_writer(&cbor_value, &mut cbor_bytes)
+            .expect("CBOR serialization failed");
+
+        // Encode bytes to base64url string
+        let attestation_base64 = URL_SAFE_NO_PAD.encode(&cbor_bytes);
+
+        let result = parse_attestation_object(&attestation_base64);
+        assert!(
+            result.is_ok(),
+            "Parsing failed for input '{}': {:?}",
+            attestation_base64,
+            result.err()
+        );
+        let att_obj = result.unwrap();
+
+        assert_eq!(att_obj.fmt, expected_fmt);
+        assert_eq!(att_obj.auth_data, expected_auth_data);
+        assert_eq!(
+            att_obj.att_stmt, expected_att_stmt_map,
+            "attStmt should be an empty map"
+        );
+    }
+
+    #[test]
+    fn test_parse_attestation_object_invalid_base64() {
+        let attestation_base64 = "not-valid-base64!@#";
+
+        let result = parse_attestation_object(attestation_base64);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert!(msg.contains("Failed to decode attestation object"));
+            }
+            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_parse_attestation_object_valid_base64_invalid_cbor() {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+        // This is valid base64url for "this is not cbor"
+        let attestation_base64 = URL_SAFE_NO_PAD.encode(b"this is not cbor");
+
+        let result = parse_attestation_object(&attestation_base64);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert!(
+                    msg.contains("Invalid CBOR data"),
+                    "Error message was: {}",
+                    msg
+                );
+            }
+            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_parse_attestation_object_cbor_map_missing_fmt() {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+
+        // CBOR: { "attStmt": {}, "authData": b"authdata" } (missing "fmt")
+        let mut cbor_map = Vec::new();
+        cbor_map.push((
+            CborValue::Text("attStmt".to_string()),
+            CborValue::Map(Vec::new()),
+        ));
+        cbor_map.push((
+            CborValue::Text("authData".to_string()),
+            CborValue::Bytes(b"authdata".to_vec()),
+        ));
+        let cbor_value = CborValue::Map(cbor_map);
+
+        let mut cbor_bytes = Vec::new();
+        ciborium::ser::into_writer(&cbor_value, &mut cbor_bytes).unwrap();
+        let attestation_base64 = URL_SAFE_NO_PAD.encode(&cbor_bytes);
+
+        let result = parse_attestation_object(&attestation_base64);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert_eq!(msg, "Missing required attestation data");
+            }
+            e => panic!(
+                "Expected PasskeyError::Format with specific message, got {:?}",
+                e
+            ),
+        }
+    }
+
+    #[test]
+    fn test_parse_attestation_object_cbor_map_missing_auth_data() {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+
+        // CBOR: { "fmt": "none", "attStmt": {} } (missing "authData")
+        let mut cbor_map = Vec::new();
+        cbor_map.push((
+            CborValue::Text("fmt".to_string()),
+            CborValue::Text("none".to_string()),
+        ));
+        cbor_map.push((
+            CborValue::Text("attStmt".to_string()),
+            CborValue::Map(Vec::new()),
+        ));
+        let cbor_value = CborValue::Map(cbor_map);
+
+        let mut cbor_bytes = Vec::new();
+        ciborium::ser::into_writer(&cbor_value, &mut cbor_bytes).unwrap();
+        let attestation_base64 = URL_SAFE_NO_PAD.encode(&cbor_bytes);
+
+        let result = parse_attestation_object(&attestation_base64);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert_eq!(msg, "Missing required attestation data");
+            }
+            e => panic!(
+                "Expected PasskeyError::Format with specific message, got {:?}",
+                e
+            ),
+        }
+    }
+
+    #[test]
+    fn test_parse_attestation_object_cbor_map_missing_att_stmt() {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+
+        // CBOR: { "fmt": "none", "authData": b"authdata" } (missing "attStmt")
+        let mut cbor_map = Vec::new();
+        cbor_map.push((
+            CborValue::Text("fmt".to_string()),
+            CborValue::Text("none".to_string()),
+        ));
+        cbor_map.push((
+            CborValue::Text("authData".to_string()),
+            CborValue::Bytes(b"authdata".to_vec()),
+        ));
+        let cbor_value = CborValue::Map(cbor_map);
+
+        let mut cbor_bytes = Vec::new();
+        ciborium::ser::into_writer(&cbor_value, &mut cbor_bytes).unwrap();
+        let attestation_base64 = URL_SAFE_NO_PAD.encode(&cbor_bytes);
+
+        let result = parse_attestation_object(&attestation_base64);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert_eq!(msg, "Missing required attestation data");
+            }
+            e => panic!(
+                "Expected PasskeyError::Format with specific message, got {:?}",
+                e
+            ),
+        }
+    }
+
+    #[test]
+    fn test_parse_attestation_object_cbor_not_a_map() {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+
+        // Create a CBOR value that is not a map (using an array instead)
+        let cbor_value = CborValue::Array(vec![]);
+
+        // Serialize CBOR to bytes
+        let mut cbor_bytes = Vec::new();
+        ciborium::ser::into_writer(&cbor_value, &mut cbor_bytes)
+            .expect("CBOR serialization failed");
+
+        // Encode bytes to base64url string
+        let attestation_base64 = URL_SAFE_NO_PAD.encode(&cbor_bytes);
+
+        let result = parse_attestation_object(&attestation_base64);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert_eq!(msg, "Invalid attestation format");
+            }
+            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_extract_key_coordinates_success() {
+        use ciborium::value::Integer;
+
+        // Create a CBOR map with valid X and Y coordinates
+        // COSE key format uses -2 and -3 for X and Y coordinates
+        let x_coord = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]; // 16 bytes for X
+        let y_coord = vec![16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]; // 16 bytes for Y
+
+        let mut cbor_map = Vec::new();
+        cbor_map.push((
+            CborValue::Integer(Integer::from(-2)),
+            CborValue::Bytes(x_coord.clone()),
+        ));
+        cbor_map.push((
+            CborValue::Integer(Integer::from(-3)),
+            CborValue::Bytes(y_coord.clone()),
+        ));
+        let cbor_value = CborValue::Map(cbor_map);
+
+        // Serialize CBOR to bytes
+        let mut credential_data = Vec::new();
+        ciborium::ser::into_writer(&cbor_value, &mut credential_data)
+            .expect("CBOR serialization failed");
+
+        // Call the function
+        let result = extract_key_coordinates(&credential_data);
+
+        // Verify the result
+        assert!(result.is_ok(), "Extraction failed: {:?}", result.err());
+        let (extracted_x, extracted_y) = result.unwrap();
+
+        assert_eq!(extracted_x, x_coord, "X coordinate doesn't match");
+        assert_eq!(extracted_y, y_coord, "Y coordinate doesn't match");
+    }
+
+    #[test]
+    fn test_extract_key_coordinates_missing_x() {
+        use ciborium::value::Integer;
+
+        // Create a CBOR map with only Y coordinate, missing X
+        let y_coord = vec![16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+
+        let mut cbor_map = Vec::new();
+        // Only add Y coordinate (-3)
+        cbor_map.push((
+            CborValue::Integer(Integer::from(-3)),
+            CborValue::Bytes(y_coord),
+        ));
+        let cbor_value = CborValue::Map(cbor_map);
+
+        // Serialize CBOR to bytes
+        let mut credential_data = Vec::new();
+        ciborium::ser::into_writer(&cbor_value, &mut credential_data)
+            .expect("CBOR serialization failed");
+
+        // Call the function
+        let result = extract_key_coordinates(&credential_data);
+
+        // Verify the result is an error
+        assert!(
+            result.is_err(),
+            "Expected error but got success: {:?}",
+            result.ok()
+        );
+
+        // Check the error type and message
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert_eq!(msg, "Missing or invalid key coordinates");
+            }
+            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_extract_key_coordinates_missing_y() {
+        use ciborium::value::Integer;
+
+        // Create a CBOR map with only X coordinate, missing Y
+        let x_coord = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+
+        let mut cbor_map = Vec::new();
+        // Only add X coordinate (-2)
+        cbor_map.push((
+            CborValue::Integer(Integer::from(-2)),
+            CborValue::Bytes(x_coord),
+        ));
+        let cbor_value = CborValue::Map(cbor_map);
+
+        // Serialize CBOR to bytes
+        let mut credential_data = Vec::new();
+        ciborium::ser::into_writer(&cbor_value, &mut credential_data)
+            .expect("CBOR serialization failed");
+
+        // Call the function
+        let result = extract_key_coordinates(&credential_data);
+
+        // Verify the result is an error
+        assert!(
+            result.is_err(),
+            "Expected error but got success: {:?}",
+            result.ok()
+        );
+
+        // Check the error type and message
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert_eq!(msg, "Missing or invalid key coordinates");
+            }
+            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_parse_credential_data_success() {
+        // Create a mock authenticator data array
+        // Structure:
+        // - 32 bytes RP ID hash
+        // - 1 byte flags (with attested credential data flag set)
+        // - 4 bytes counter
+        // - 16 bytes AAGUID
+        // - 2 bytes credential ID length
+        // - credential ID bytes
+        // - credential public key bytes
+
+        // Create a mock auth_data with all required fields
+        let mut auth_data = Vec::new();
+
+        // 32 bytes RP ID hash (just zeros for test)
+        auth_data.extend_from_slice(&[0u8; 32]);
+
+        // 1 byte flags with attested credential data flag set (0x40 = 01000000)
+        auth_data.push(0x40);
+
+        // 4 bytes counter
+        auth_data.extend_from_slice(&[0, 0, 0, 0]);
+
+        // 16 bytes AAGUID
+        auth_data.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+
+        // 2 bytes credential ID length (10 bytes)
+        auth_data.extend_from_slice(&[0, 10]);
+
+        // 10 bytes credential ID
+        auth_data.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+        // Some mock credential public key bytes
+        let public_key_bytes = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+        auth_data.extend_from_slice(&public_key_bytes);
+
+        // Call the function
+        let result = parse_credential_data(&auth_data);
+
+        // Verify the result
+        assert!(result.is_ok(), "Parsing failed: {:?}", result.err());
+
+        // The result should be the credential public key bytes
+        let credential_data = result.unwrap();
+        assert_eq!(credential_data, &public_key_bytes);
+    }
+
+    #[test]
+    fn test_parse_credential_data_too_short() {
+        // Create a mock authenticator data array that's too short
+        // Only include RP ID hash and flags, missing the rest
+        let mut auth_data = Vec::new();
+
+        // 32 bytes RP ID hash
+        auth_data.extend_from_slice(&[0u8; 32]);
+
+        // 1 byte flags with attested credential data flag set
+        auth_data.push(0x40);
+
+        // Missing counter, AAGUID, credential ID length, etc.
+
+        // Call the function
+        let result = parse_credential_data(&auth_data);
+
+        // Verify the result is an error
+        assert!(
+            result.is_err(),
+            "Expected error but got success: {:?}",
+            result.ok()
+        );
+
+        // Check the error type and message
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert_eq!(msg, "Authenticator data too short");
+            }
+            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_parse_credential_data_invalid_length() {
+        // Create a mock authenticator data array with invalid credential ID length
+        let mut auth_data = Vec::new();
+
+        // 32 bytes RP ID hash
+        auth_data.extend_from_slice(&[0u8; 32]);
+
+        // 1 byte flags (with attested credential data flag set)
+        auth_data.push(0x40);
+
+        // 4 bytes counter
+        auth_data.extend_from_slice(&[0, 0, 0, 0]);
+
+        // 16 bytes AAGUID
+        auth_data.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+
+        // 2 bytes credential ID length (set to 0, which is invalid)
+        auth_data.extend_from_slice(&[0, 0]);
+
+        // Call the function
+        let result = parse_credential_data(&auth_data);
+
+        // Verify the result is an error
+        assert!(
+            result.is_err(),
+            "Expected error but got success: {:?}",
+            result.ok()
+        );
+
+        // Check the error type and message
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert_eq!(msg, "Invalid credential ID length");
+            }
+            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_parse_credential_data_too_short_for_credential_id() {
+        // Create a mock authenticator data array that's too short for the credential ID
+        let mut auth_data = Vec::new();
+
+        // 32 bytes RP ID hash
+        auth_data.extend_from_slice(&[0u8; 32]);
+
+        // 1 byte flags (with attested credential data flag set)
+        auth_data.push(0x40);
+
+        // 4 bytes counter
+        auth_data.extend_from_slice(&[0, 0, 0, 0]);
+
+        // 16 bytes AAGUID
+        auth_data.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+
+        // 2 bytes credential ID length (set to 20, but we'll only provide 10 bytes)
+        auth_data.extend_from_slice(&[0, 20]);
+
+        // Only 10 bytes for credential ID (less than the 20 we specified)
+        auth_data.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+        // Call the function
+        let result = parse_credential_data(&auth_data);
+
+        // Verify the result is an error
+        assert!(
+            result.is_err(),
+            "Expected error but got success: {:?}",
+            result.ok()
+        );
+
+        // Check the error type and message
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert_eq!(msg, "Authenticator data too short for credential ID");
+            }
+            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+        }
+    }
+
+    // Note: verify_client_data is an async function that depends on external state
+    // (ORIGIN, get_and_validate_options, etc.), making it challenging to test directly.
+    // It would be better tested in integration tests where the actual environment is available.
+}

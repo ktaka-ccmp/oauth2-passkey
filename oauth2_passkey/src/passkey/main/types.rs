@@ -332,3 +332,681 @@ pub(super) struct WebAuthnClientData {
     pub(super) challenge: String, // base64url encoded
     pub(super) origin: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils::base64url_encode;
+    use ring::digest;
+    use serde_json::json;
+    use std::env;
+
+    mod register_credential_tests {
+        use super::*;
+        // Removed unused import: crate::passkey::main::challenge
+        use std::sync::Once;
+
+        static INIT: Once = Once::new();
+
+        // Setup function to initialize test environment
+        fn setup() {
+            INIT.call_once(|| {
+                // Initialize any required test environment
+                // This runs only once for all tests in this module
+            });
+        }
+
+        #[tokio::test]
+        async fn test_get_registration_user_fields_with_no_user_handle() {
+            setup();
+
+            // Create a RegisterCredential with no user_handle
+            let credential = RegisterCredential {
+                id: "test-id".to_string(),
+                raw_id: "test-raw-id".to_string(),
+                response: AuthenticatorAttestationResponse {
+                    client_data_json: "test-data".to_string(),
+                    attestation_object: "test-object".to_string(),
+                },
+                type_: "public-key".to_string(),
+                user_handle: None,
+            };
+
+            // Call the method
+            let (name, display_name) = credential.get_registration_user_fields().await;
+
+            // Verify default values are returned
+            assert_eq!(name, "Passkey User");
+            assert_eq!(display_name, "Passkey User");
+        }
+    }
+
+    mod webauthn_client_data_tests {
+        use super::*;
+
+        #[test]
+        fn test_webauthn_client_data_serialization() {
+            // Create a WebAuthnClientData instance
+            let client_data = WebAuthnClientData {
+                type_: "webauthn.get".to_string(),
+                challenge: "dGVzdF9jaGFsbGVuZ2U".to_string(), // base64url for "test_challenge"
+                origin: "https://example.com".to_string(),
+            };
+
+            // Serialize to JSON
+            let json = serde_json::to_string(&client_data).expect("Failed to serialize");
+
+            // Deserialize back to struct
+            let deserialized: WebAuthnClientData =
+                serde_json::from_str(&json).expect("Failed to deserialize");
+
+            // Verify fields match
+            assert_eq!(deserialized.type_, "webauthn.get");
+            assert_eq!(deserialized.challenge, "dGVzdF9jaGFsbGVuZ2U");
+            assert_eq!(deserialized.origin, "https://example.com");
+        }
+
+        #[test]
+        fn test_webauthn_client_data_field_mapping() {
+            // Create JSON with "type" field (not "type_")
+            let json_str = r#"{
+                "type": "webauthn.create",
+                "challenge": "YW5vdGhlcl9jaGFsbGVuZ2U",
+                "origin": "https://test.example.org"
+            }"#;
+
+            // Deserialize to struct
+            let deserialized: WebAuthnClientData =
+                serde_json::from_str(json_str).expect("Failed to deserialize");
+
+            // Verify field mapping works correctly
+            assert_eq!(deserialized.type_, "webauthn.create");
+            assert_eq!(deserialized.challenge, "YW5vdGhlcl9jaGFsbGVuZ2U");
+            assert_eq!(deserialized.origin, "https://test.example.org");
+
+            // Verify serialization produces correct field names
+            let serialized = serde_json::to_string(&deserialized).expect("Failed to serialize");
+            let json_value: serde_json::Value =
+                serde_json::from_str(&serialized).expect("Failed to parse JSON");
+
+            // Check that we have "type" in the JSON (not "type_")
+            assert!(json_value.get("type").is_some());
+            assert!(json_value.get("type_").is_none());
+        }
+    }
+
+    // Helper function to create a mock ParsedClientData for testing
+    fn create_parsed_client_data(challenge: &str, origin: &str, type_: &str) -> ParsedClientData {
+        ParsedClientData {
+            challenge: challenge.to_string(),
+            origin: origin.to_string(),
+            type_: type_.to_string(),
+            raw_data: vec![],
+        }
+    }
+
+    // Tests for ParsedClientData
+    mod parsed_client_data_tests {
+        use super::*;
+
+        // Test successful parsing of client data JSON
+        #[test]
+        fn test_from_base64_success() {
+            let client_data = json!({
+                "challenge": "sample-challenge",
+                "origin": "https://example.com",
+                "type": "webauthn.get"
+            });
+            let client_data_str = client_data.to_string();
+            let client_data_b64 = base64url_encode(client_data_str.as_bytes().to_vec()).unwrap();
+            let result = ParsedClientData::from_base64(&client_data_b64);
+            assert!(result.is_ok(), "Expected Ok result, got {:?}", result);
+            let parsed = result.unwrap();
+            assert_eq!(parsed.challenge, "sample-challenge");
+            assert_eq!(parsed.origin, "https://example.com");
+            assert_eq!(parsed.type_, "webauthn.get");
+            assert_eq!(parsed.raw_data, client_data_str.as_bytes());
+        }
+
+        #[test]
+        fn test_from_base64_invalid_base64() {
+            let result = ParsedClientData::from_base64("invalid-base64!");
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::Format(msg)) => {
+                    assert!(msg.contains("Failed to decode"));
+                }
+                _ => panic!("Expected Format error"),
+            }
+        }
+
+        #[test]
+        fn test_from_base64_invalid_utf8() {
+            let invalid_utf8 = vec![0xFF, 0xFF, 0xFF];
+            let encoded = base64url_encode(invalid_utf8).unwrap();
+            let result = ParsedClientData::from_base64(&encoded);
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::Format(msg)) => {
+                    assert!(msg.contains("Invalid UTF-8"));
+                }
+                _ => panic!("Expected Format error"),
+            }
+        }
+
+        #[test]
+        fn test_from_base64_invalid_json() {
+            let invalid_json = "not valid json";
+            let encoded = base64url_encode(invalid_json.as_bytes().to_vec()).unwrap();
+            let result = ParsedClientData::from_base64(&encoded);
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::Format(msg)) => {
+                    assert!(msg.contains("Invalid JSON"));
+                }
+                _ => panic!("Expected Format error"),
+            }
+        }
+
+        #[test]
+        fn test_from_base64_missing_challenge() {
+            let client_data = json!({
+                "origin": "https://example.com",
+                "type": "webauthn.get"
+            });
+            let client_data_str = client_data.to_string();
+            let client_data_b64 = base64url_encode(client_data_str.as_bytes().to_vec()).unwrap();
+            let result = ParsedClientData::from_base64(&client_data_b64);
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::ClientData(msg)) => {
+                    assert_eq!(msg, "Missing challenge");
+                }
+                _ => panic!("Expected ClientData error"),
+            }
+        }
+
+        #[test]
+        fn test_from_base64_missing_origin() {
+            let client_data = json!({
+                "challenge": "sample-challenge",
+                "type": "webauthn.get"
+            });
+            let client_data_str = client_data.to_string();
+            let client_data_b64 = base64url_encode(client_data_str.as_bytes().to_vec()).unwrap();
+            let result = ParsedClientData::from_base64(&client_data_b64);
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::ClientData(msg)) => {
+                    assert_eq!(msg, "Missing origin");
+                }
+                _ => panic!("Expected ClientData error"),
+            }
+        }
+
+        #[test]
+        fn test_from_base64_missing_type() {
+            let client_data = json!({
+                "challenge": "sample-challenge",
+                "origin": "https://example.com"
+            });
+            let client_data_str = client_data.to_string();
+            let client_data_b64 = base64url_encode(client_data_str.as_bytes().to_vec()).unwrap();
+            let result = ParsedClientData::from_base64(&client_data_b64);
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::ClientData(msg)) => {
+                    assert_eq!(msg, "Missing type");
+                }
+                _ => panic!("Expected ClientData error"),
+            }
+        }
+
+        #[test]
+        fn test_verify_success() {
+            let original_origin = env::var("ORIGIN").ok();
+            unsafe {
+                env::set_var("ORIGIN", "https://example.com");
+            }
+            let parsed_data = create_parsed_client_data(
+                "sample-challenge",
+                "https://example.com",
+                "webauthn.get",
+            );
+            let result = parsed_data.verify("sample-challenge");
+            assert!(result.is_ok(), "Expected Ok result, got {:?}", result);
+            unsafe {
+                match original_origin {
+                    Some(val) => env::set_var("ORIGIN", val),
+                    None => env::remove_var("ORIGIN"),
+                }
+            }
+        }
+
+        #[test]
+        fn test_verify_challenge_mismatch() {
+            let original_origin = env::var("ORIGIN").ok();
+            unsafe {
+                env::set_var("ORIGIN", "https://example.com");
+            }
+            let parsed_data = create_parsed_client_data(
+                "sample-challenge",
+                "https://example.com",
+                "webauthn.get",
+            );
+            let result = parsed_data.verify("different-challenge");
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::Challenge(msg)) => {
+                    assert!(msg.contains("Challenge mismatch"));
+                }
+                _ => panic!("Expected Challenge error"),
+            }
+            unsafe {
+                match original_origin {
+                    Some(val) => env::set_var("ORIGIN", val),
+                    None => env::remove_var("ORIGIN"),
+                }
+            }
+        }
+
+        #[test]
+        fn test_verify_origin_mismatch() {
+            let original_origin = env::var("ORIGIN").ok();
+            unsafe {
+                env::set_var("ORIGIN", "https://example.com");
+            }
+            let parsed_data = create_parsed_client_data(
+                "sample-challenge",
+                "https://attacker.com",
+                "webauthn.get",
+            );
+            let result = parsed_data.verify("sample-challenge");
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::ClientData(msg)) => {
+                    assert!(msg.contains("Invalid origin"));
+                    assert!(msg.contains("https://example.com"));
+                    assert!(msg.contains("https://attacker.com"));
+                }
+                _ => panic!("Expected ClientData error"),
+            }
+            unsafe {
+                match original_origin {
+                    Some(val) => env::set_var("ORIGIN", val),
+                    None => env::remove_var("ORIGIN"),
+                }
+            }
+        }
+
+        #[test]
+        fn test_verify_invalid_type() {
+            let original_origin = env::var("ORIGIN").ok();
+            unsafe {
+                env::set_var("ORIGIN", "https://example.com");
+            }
+            let parsed_data = create_parsed_client_data(
+                "sample-challenge",
+                "https://example.com",
+                "webauthn.create",
+            );
+            let result = parsed_data.verify("sample-challenge");
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::ClientData(msg)) => {
+                    assert!(msg.contains("Invalid type"));
+                    assert!(msg.contains("webauthn.get"));
+                    assert!(msg.contains("webauthn.create"));
+                }
+                _ => panic!("Expected ClientData error"),
+            }
+            unsafe {
+                match original_origin {
+                    Some(val) => env::set_var("ORIGIN", val),
+                    None => env::remove_var("ORIGIN"),
+                }
+            }
+        }
+    }
+
+    // Tests for AuthenticatorData
+    mod authenticator_data_tests {
+        use super::*;
+
+        fn create_test_auth_data(
+            rp_id_hash: Vec<u8>,
+            flags: u8,
+            counter: u32,
+            extra_data: Option<Vec<u8>>,
+        ) -> Vec<u8> {
+            let mut data = Vec::with_capacity(37);
+            data.extend_from_slice(&rp_id_hash);
+            data.push(flags);
+            data.extend_from_slice(&counter.to_be_bytes());
+            if let Some(extra) = extra_data {
+                data.extend_from_slice(&extra);
+            }
+            data
+        }
+
+        #[test]
+        fn test_from_base64_success() {
+            let rp_id_hash = vec![0; 32];
+            let flags = 0x01 | 0x04; // UP | UV
+            let counter = 12345u32;
+            let auth_data_vec = create_test_auth_data(rp_id_hash.clone(), flags, counter, None);
+            let auth_data_b64 = base64url_encode(auth_data_vec.clone()).unwrap();
+            let result = AuthenticatorData::from_base64(&auth_data_b64);
+            assert!(result.is_ok(), "Expected Ok result, got {:?}", result);
+            let parsed = result.unwrap();
+            assert_eq!(parsed.rp_id_hash, rp_id_hash);
+            assert_eq!(parsed.flags, flags);
+            assert_eq!(parsed.counter, counter);
+            assert_eq!(parsed.raw_data, auth_data_vec);
+        }
+
+        #[test]
+        fn test_from_base64_invalid_base64() {
+            let result = AuthenticatorData::from_base64("invalid-base64!");
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::Format(msg)) => {
+                    assert!(msg.contains("Failed to decode"));
+                }
+                _ => panic!("Expected Format error"),
+            }
+        }
+
+        #[test]
+        fn test_from_base64_too_short() {
+            let short_data = vec![0; 36];
+            let short_data_b64 = base64url_encode(short_data).unwrap();
+            let result = AuthenticatorData::from_base64(&short_data_b64);
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::AuthenticatorData(msg)) => {
+                    assert!(msg.contains("too short"));
+                }
+                _ => panic!("Expected AuthenticatorData error"),
+            }
+        }
+
+        #[test]
+        fn test_individual_flag_methods() {
+            // Create AuthenticatorData with various flags set
+            let rp_id_hash = vec![0; 32];
+            let counter = 0;
+
+            // Test User Present flag (0x01)
+            let auth_data_up = AuthenticatorData {
+                rp_id_hash: rp_id_hash.clone(),
+                flags: auth_data_flags::UP,
+                counter,
+                raw_data: vec![],
+            };
+            assert!(auth_data_up.is_user_present());
+            assert!(!auth_data_up.is_user_verified());
+            assert!(!auth_data_up.is_discoverable());
+            assert!(!auth_data_up.is_backed_up());
+            assert!(!auth_data_up.has_attested_credential_data());
+            assert!(!auth_data_up.has_extension_data());
+
+            // Test User Verified flag (0x04)
+            let auth_data_uv = AuthenticatorData {
+                rp_id_hash: rp_id_hash.clone(),
+                flags: auth_data_flags::UV,
+                counter,
+                raw_data: vec![],
+            };
+            assert!(!auth_data_uv.is_user_present());
+            assert!(auth_data_uv.is_user_verified());
+
+            // Test Discoverable Credential flag (0x08)
+            let auth_data_be = AuthenticatorData {
+                rp_id_hash: rp_id_hash.clone(),
+                flags: auth_data_flags::BE,
+                counter,
+                raw_data: vec![],
+            };
+            assert!(auth_data_be.is_discoverable());
+            assert!(!auth_data_be.is_backed_up());
+
+            // Test Backup State flag (0x10)
+            let auth_data_bs = AuthenticatorData {
+                rp_id_hash: rp_id_hash.clone(),
+                flags: auth_data_flags::BS,
+                counter,
+                raw_data: vec![],
+            };
+            assert!(auth_data_bs.is_backed_up());
+
+            // Test Attested Credential Data flag (0x40)
+            let auth_data_at = AuthenticatorData {
+                rp_id_hash: rp_id_hash.clone(),
+                flags: auth_data_flags::AT,
+                counter,
+                raw_data: vec![],
+            };
+            assert!(auth_data_at.has_attested_credential_data());
+
+            // Test Extension Data flag (0x80)
+            let auth_data_ed = AuthenticatorData {
+                rp_id_hash: rp_id_hash.clone(),
+                flags: auth_data_flags::ED,
+                counter,
+                raw_data: vec![],
+            };
+            assert!(auth_data_ed.has_extension_data());
+
+            // Test multiple flags
+            let auth_data_multi = AuthenticatorData {
+                rp_id_hash,
+                flags: auth_data_flags::UP | auth_data_flags::UV | auth_data_flags::BE,
+                counter,
+                raw_data: vec![],
+            };
+            assert!(auth_data_multi.is_user_present());
+            assert!(auth_data_multi.is_user_verified());
+            assert!(auth_data_multi.is_discoverable());
+            assert!(!auth_data_multi.is_backed_up());
+        }
+
+        #[test]
+        fn test_flag_methods() {
+            let all_flags = 0x01 | 0x04 | 0x08 | 0x10 | 0x40 | 0x80;
+            let auth_data = AuthenticatorData {
+                rp_id_hash: vec![0; 32],
+                flags: all_flags,
+                counter: 0,
+                raw_data: vec![],
+            };
+            assert!(auth_data.is_user_present());
+            assert!(auth_data.is_user_verified());
+            assert!(auth_data.is_discoverable());
+            assert!(auth_data.is_backed_up());
+            assert!(auth_data.has_attested_credential_data());
+            assert!(auth_data.has_extension_data());
+
+            let no_flags = 0u8;
+            let auth_data_no_flags = AuthenticatorData {
+                rp_id_hash: vec![0; 32],
+                flags: no_flags,
+                counter: 0,
+                raw_data: vec![],
+            };
+            assert!(!auth_data_no_flags.is_user_present());
+            assert!(!auth_data_no_flags.is_user_verified());
+            assert!(!auth_data_no_flags.is_discoverable());
+            assert!(!auth_data_no_flags.is_backed_up());
+            assert!(!auth_data_no_flags.has_attested_credential_data());
+            assert!(!auth_data_no_flags.has_extension_data());
+
+            let up_flag = 0x01;
+            let auth_data_up = AuthenticatorData {
+                rp_id_hash: vec![0; 32],
+                flags: up_flag,
+                counter: 0,
+                raw_data: vec![],
+            };
+            assert!(auth_data_up.is_user_present());
+            assert!(!auth_data_up.is_user_verified());
+
+            let uv_flag = 0x04;
+            let auth_data_uv = AuthenticatorData {
+                rp_id_hash: vec![0; 32],
+                flags: uv_flag,
+                counter: 0,
+                raw_data: vec![],
+            };
+            assert!(!auth_data_uv.is_user_present());
+            assert!(auth_data_uv.is_user_verified());
+        }
+
+        #[test]
+        fn test_verify_success() {
+            let original_rp_id = env::var("PASSKEY_RP_ID").ok();
+            let original_origin = env::var("ORIGIN").ok();
+
+            unsafe {
+                env::set_var("PASSKEY_RP_ID", "example.com");
+                env::set_var("ORIGIN", "https://example.com");
+            }
+
+            let expected_hash = digest::digest(&digest::SHA256, "example.com".as_bytes());
+            let auth_data = AuthenticatorData {
+                rp_id_hash: expected_hash.as_ref().to_vec(),
+                flags: 0x05, // User present (0x01) and User verified (0x04) flags set
+                counter: 0,
+                raw_data: vec![],
+            };
+            let result = auth_data.verify();
+            assert!(result.is_ok(), "Expected Ok result, got {:?}", result);
+
+            unsafe {
+                match original_rp_id {
+                    Some(val) => env::set_var("PASSKEY_RP_ID", val),
+                    None => env::remove_var("PASSKEY_RP_ID"),
+                }
+                match original_origin {
+                    Some(val) => env::set_var("ORIGIN", val),
+                    None => env::remove_var("ORIGIN"),
+                }
+            }
+        }
+
+        #[test]
+        fn test_verify_invalid_rp_id_hash() {
+            let original_rp_id = env::var("PASSKEY_RP_ID").ok();
+            let original_origin = env::var("ORIGIN").ok();
+
+            unsafe {
+                env::set_var("PASSKEY_RP_ID", "example.com");
+                env::set_var("ORIGIN", "https://example.com");
+            }
+
+            let auth_data = AuthenticatorData {
+                rp_id_hash: vec![1; 32], // Wrong hash
+                flags: 0x01,             // UP
+                counter: 0,
+                raw_data: vec![],
+            };
+            let result = auth_data.verify();
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::AuthenticatorData(msg)) => {
+                    assert!(msg.contains("Invalid RP ID hash"));
+                }
+                _ => panic!("Expected AuthenticatorData error"),
+            }
+
+            unsafe {
+                match original_rp_id {
+                    Some(val) => env::set_var("PASSKEY_RP_ID", val),
+                    None => env::remove_var("PASSKEY_RP_ID"),
+                }
+                match original_origin {
+                    Some(val) => env::set_var("ORIGIN", val),
+                    None => env::remove_var("ORIGIN"),
+                }
+            }
+        }
+
+        #[test]
+        fn test_verify_user_not_present() {
+            let original_rp_id = env::var("PASSKEY_RP_ID").ok();
+            let original_origin = env::var("ORIGIN").ok();
+
+            unsafe {
+                env::set_var("PASSKEY_RP_ID", "example.com");
+                env::set_var("ORIGIN", "https://example.com");
+            }
+
+            let expected_hash = digest::digest(&digest::SHA256, "example.com".as_bytes());
+            let auth_data = AuthenticatorData {
+                rp_id_hash: expected_hash.as_ref().to_vec(),
+                flags: 0, // No flags set, user not present
+                counter: 0,
+                raw_data: vec![],
+            };
+            let result = auth_data.verify();
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::Authentication(msg)) => {
+                    assert!(msg.contains("User not present"));
+                }
+                _ => panic!("Expected Authentication error"),
+            }
+
+            unsafe {
+                match original_rp_id {
+                    Some(val) => env::set_var("PASSKEY_RP_ID", val),
+                    None => env::remove_var("PASSKEY_RP_ID"),
+                }
+                match original_origin {
+                    Some(val) => env::set_var("ORIGIN", val),
+                    None => env::remove_var("ORIGIN"),
+                }
+            }
+        }
+
+        #[test]
+        fn test_verify_user_verification_required_but_not_verified() {
+            let original_rp_id = env::var("PASSKEY_RP_ID").ok();
+            let original_origin = env::var("ORIGIN").ok();
+            let original_user_verification = env::var("PASSKEY_USER_VERIFICATION").ok();
+
+            unsafe {
+                env::set_var("PASSKEY_RP_ID", "example.com");
+                env::set_var("ORIGIN", "https://example.com");
+                env::set_var("PASSKEY_USER_VERIFICATION", "required");
+            }
+
+            let expected_hash = digest::digest(&digest::SHA256, "example.com".as_bytes());
+            let auth_data = AuthenticatorData {
+                rp_id_hash: expected_hash.as_ref().to_vec(),
+                flags: 0x01, // User present but not verified
+                counter: 0,
+                raw_data: vec![],
+            };
+            let result = auth_data.verify();
+            assert!(result.is_err());
+            match result {
+                Err(PasskeyError::AuthenticatorData(msg)) => {
+                    assert!(msg.contains("User verification required but flag not set"));
+                }
+                _ => panic!("Expected AuthenticatorData error"),
+            }
+
+            unsafe {
+                match original_rp_id {
+                    Some(val) => env::set_var("PASSKEY_RP_ID", val),
+                    None => env::remove_var("PASSKEY_RP_ID"),
+                }
+                match original_origin {
+                    Some(val) => env::set_var("ORIGIN", val),
+                    None => env::remove_var("ORIGIN"),
+                }
+            }
+        }
+    }
+}

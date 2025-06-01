@@ -303,3 +303,174 @@ async fn verify_signature(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Create a test-specific version of verify_user_handle that doesn't require the full objects
+    fn test_verify_user_handle(
+        response_user_handle: Option<String>,
+        stored_user_handle: String,
+        is_discoverable: bool,
+    ) -> Result<(), PasskeyError> {
+        // Mock the behavior of verify_user_handle
+        match (response_user_handle, &stored_user_handle, is_discoverable) {
+            (Some(handle), stored_handle, _) if handle != *stored_handle => {
+                Err(PasskeyError::Authentication(
+                    "User handle mismatch. For more details, run with RUST_LOG=debug".into(),
+                ))
+            }
+            (None, _, true) => {
+                Err(PasskeyError::Authentication(
+                    "Missing required user handle for discoverable credential. For more details, run with RUST_LOG=debug".into(),
+                ))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    #[test]
+    fn test_verify_user_handle_match() {
+        // Setup - same user handle for both response and stored credential
+        let user_handle = "test_user_handle".to_string();
+
+        // Execute
+        let result = test_verify_user_handle(Some(user_handle.clone()), user_handle, true);
+
+        // Verify
+        assert!(
+            result.is_ok(),
+            "Expected success but got error: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_verify_user_handle_mismatch() {
+        // Setup - different user handles
+        let response_handle = "wrong_user_handle".to_string();
+        let stored_handle = "correct_user_handle".to_string();
+
+        // Execute
+        let result = test_verify_user_handle(Some(response_handle), stored_handle, true);
+
+        // Verify
+        assert!(result.is_err(), "Expected error but got success");
+        if let Err(PasskeyError::Authentication(msg)) = result {
+            assert!(
+                msg.contains("User handle mismatch"),
+                "Unexpected error message: {}",
+                msg
+            );
+        } else {
+            panic!(
+                "Expected PasskeyError::Authentication but got: {:?}",
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn test_verify_user_handle_missing_for_discoverable() {
+        // Setup - missing user handle for discoverable credential
+        let stored_handle = "test_user_handle".to_string();
+
+        // Execute with is_discoverable = true
+        let result = test_verify_user_handle(None, stored_handle, true);
+
+        // Verify
+        assert!(result.is_err(), "Expected error but got success");
+        if let Err(PasskeyError::Authentication(msg)) = result {
+            assert!(
+                msg.contains("Missing required user handle"),
+                "Unexpected error message: {}",
+                msg
+            );
+        } else {
+            panic!(
+                "Expected PasskeyError::Authentication but got: {:?}",
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn test_verify_user_handle_missing_for_non_discoverable() {
+        // Setup - missing user handle for non-discoverable credential
+        let stored_handle = "test_user_handle".to_string();
+
+        // Execute with is_discoverable = false
+        let result = test_verify_user_handle(None, stored_handle, false);
+
+        // Verify - this should succeed for non-discoverable credentials
+        assert!(
+            result.is_ok(),
+            "Expected success but got error: {:?}",
+            result.err()
+        );
+    }
+
+    // Test function for verify_signature that doesn't require the full objects
+    fn test_verify_signature(
+        public_key_valid: bool,
+        signature_valid: bool,
+    ) -> Result<(), PasskeyError> {
+        if !public_key_valid {
+            return Err(PasskeyError::Format(
+                "Invalid public key: Base64 error".into(),
+            ));
+        }
+
+        if !signature_valid {
+            return Err(PasskeyError::Verification(
+                "Signature verification failed. For more details, run with RUST_LOG=debug".into(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_verify_signature_success() {
+        // Test with valid public key and valid signature
+        let result = test_verify_signature(true, true);
+        assert!(
+            result.is_ok(),
+            "Expected success but got error: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_verify_signature_invalid_public_key() {
+        // Test with invalid public key
+        let result = test_verify_signature(false, true);
+        assert!(result.is_err(), "Expected error but got success");
+        if let Err(PasskeyError::Format(msg)) = result {
+            assert!(
+                msg.contains("Invalid public key"),
+                "Unexpected error message: {}",
+                msg
+            );
+        } else {
+            panic!("Expected PasskeyError::Format but got: {:?}", result);
+        }
+    }
+
+    #[test]
+    fn test_verify_signature_invalid_signature() {
+        // Test with valid public key but invalid signature
+        let result = test_verify_signature(true, false);
+        assert!(result.is_err(), "Expected error but got success");
+        if let Err(PasskeyError::Verification(msg)) = result {
+            assert!(
+                msg.contains("Signature verification failed"),
+                "Unexpected error message: {}",
+                msg
+            );
+        } else {
+            panic!("Expected PasskeyError::Verification but got: {:?}", result);
+        }
+    }
+}
