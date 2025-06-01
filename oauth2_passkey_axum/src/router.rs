@@ -18,3 +18,20 @@ pub fn oauth2_passkey_router() -> Router {
         .nest("/user", super::user::router())
         .nest("/admin", super::admin::router())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_oauth2_passkey_router() {
+        // Create the router
+        let _router = oauth2_passkey_router();
+
+        // We can't easily test the exact routes in a unit test,
+        // but we can verify the router is created successfully without panicking
+
+        // If we get here without panicking, the test passes
+        assert!(true);
+    }
+}

@@ -276,3 +276,113 @@ fn format_date_tz(date: &DateTime<Utc>, timezone_name: &str) -> String {
     // Use the original timezone_name for display to keep it consistent with the user's request
     format!("{} {}", local_time.format("%Y-%m-%d %H:%M"), timezone_name)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oauth2_passkey::DbUser;
+
+    #[test]
+    fn test_format_date_tz_jst() {
+        // Create a fixed UTC datetime for testing
+        let utc_date = DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        // Format with JST timezone
+        let formatted = format_date_tz(&utc_date, "JST");
+
+        // JST is UTC+9, so 00:00 UTC becomes 09:00 JST
+        assert_eq!(formatted, "2023-01-01 09:00 JST");
+    }
+
+    #[test]
+    fn test_format_date_tz_utc() {
+        // Create a fixed UTC datetime for testing
+        let utc_date = DateTime::parse_from_rfc3339("2023-01-01T12:30:45Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        // Format with UTC timezone
+        let formatted = format_date_tz(&utc_date, "UTC");
+
+        // UTC time should remain the same
+        assert_eq!(formatted, "2023-01-01 12:30 UTC");
+    }
+
+    #[test]
+    fn test_format_date_tz_unknown_timezone() {
+        // Create a fixed UTC datetime for testing
+        let utc_date = DateTime::parse_from_rfc3339("2023-01-01T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        // Format with an unknown timezone (should default to UTC)
+        let formatted = format_date_tz(&utc_date, "UNKNOWN");
+
+        // Should default to UTC but display the requested timezone name
+        assert_eq!(formatted, "2023-01-01 12:00 UNKNOWN");
+    }
+
+    #[test]
+    fn test_user_summary_template_new() {
+        // Create a fixed UTC datetime for testing
+        let created_at = DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let updated_at = DateTime::parse_from_rfc3339("2023-01-02T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        // Create a mock DbUser
+        let user = DbUser {
+            id: "user123".to_string(),
+            is_admin: true,
+            account: "test@example.com".to_string(),
+            label: "Test User".to_string(),
+            created_at,
+            updated_at,
+            sequence_number: Some(1),
+        };
+
+        // Create mock credentials and accounts
+        let passkey_credentials = vec![];
+        let oauth2_accounts = vec![];
+
+        // Create the template
+        let template = UserSummaryTemplate::new(
+            user.clone(),
+            "csrf_token_123".to_string(),
+            passkey_credentials,
+            oauth2_accounts,
+            "/auth".to_string(),
+        );
+
+        // Verify the template fields
+        assert_eq!(template.user.id, "user123");
+        assert_eq!(template.user.is_admin, true);
+        assert_eq!(template.user.account, "test@example.com");
+        assert_eq!(template.user.label, "Test User");
+        assert_eq!(template.user.created_at, "2023-01-01 09:00 JST"); // JST is UTC+9
+        assert_eq!(template.user.updated_at, "2023-01-02 21:00 JST"); // JST is UTC+9
+        assert_eq!(template.user.sequence_number, Some(1));
+        assert_eq!(template.csrf_token, "csrf_token_123");
+        assert_eq!(template.o2p_route_prefix, "/auth");
+        assert!(template.passkey_credentials.is_empty());
+        assert!(template.oauth2_accounts.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod router_tests {
+    use super::*;
+
+    #[test]
+    fn test_router_creation() {
+        // This test simply verifies that the router can be created without errors
+        // It confirms that all handler functions exist and have compatible signatures
+        let _router = router();
+        // If router creation succeeds without panicking, the test passes
+        // This verifies that all handler functions exist and have compatible signatures
+    }
+}

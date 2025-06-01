@@ -204,5 +204,6 @@ Last Updated: 2025-05-29
 
 Do we have anything that needs unit tests here?
 
+Do we have functions to which we should write inline unit tests rather than integration test here?
 
 I'd like you to identify the functions for which writing unit tests a more appropriate than leaving it to integration tests, first. 

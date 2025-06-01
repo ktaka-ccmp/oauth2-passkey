@@ -13,4 +13,4 @@
 14. When you want to proceed to the next file, ask for my approval first.
 15. When you want to write multiple tests at once, ask for my approval first.
 16. When writing tests, you should never modify the code that is not directly related to the test module.
-17. The block of unit tests that is written in the same file as the code under test should be placed below the code block under test.
+17. The block of inline unit tests should be placed at the bottom of the file.

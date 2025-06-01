@@ -195,4 +195,6 @@ Performance:
 
 ```text
 Can you take a look the following diff carefully and suggest improvements. If it doesn't introduce any bugs and every change is OK suggest a commit message plz.
+
+Make sure that we are not modifying any existing functionality except for just adding inline unit tests.
 ```
