@@ -346,3 +346,200 @@ async fn get_oauth2_accounts(user_id: &str) -> Result<Vec<OAuth2Account>, Coordi
 pub async fn list_accounts_core(user_id: &str) -> Result<Vec<OAuth2Account>, CoordinationError> {
     get_oauth2_accounts(user_id).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::oauth2::OAuth2Account;
+    use crate::userdb::User;
+
+    async fn setup_test_db() -> Result<(), Box<dyn std::error::Error>> {
+        // Use a consistent prefix for all tests to ensure tables are properly created and accessed
+        let _db_path = "/tmp/test_oauth2_fixed.db";
+        let db_url = "sqlite:/tmp/test_oauth2_fixed.db";
+        let table_prefix = "test_o2p_fixed_";
+
+        // Set environment variables for testing
+        // Using unsafe block as env::set_var is not thread-safe
+        unsafe {
+            std::env::set_var("GENERIC_DATA_STORE_TYPE", "sqlite");
+            std::env::set_var("GENERIC_DATA_STORE_URL", db_url);
+            std::env::set_var("DB_TABLE_PREFIX", table_prefix);
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        // Initialize the database
+        crate::userdb::init().await?;
+        crate::oauth2::init().await?;
+
+        Ok(())
+    }
+
+    async fn create_test_user_in_db(user_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let user = User {
+            id: user_id.to_string(),
+            account: "test_account".to_string(),
+            label: "Test User".to_string(),
+            is_admin: false,
+            sequence_number: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        UserStore::upsert_user(user).await?;
+        Ok(())
+    }
+
+    async fn create_test_oauth2_account_in_db(
+        user_id: &str,
+        provider: &str,
+        provider_user_id: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        // Generate a unique timestamp to ensure uniqueness
+        let timestamp = Utc::now().timestamp_nanos_opt().unwrap_or(0);
+
+        // Generate a unique provider_user_id by appending a timestamp
+        let unique_provider_user_id = format!("{}-{}", provider_user_id, timestamp);
+
+        // Generate a unique ID for the account
+        let account_id = format!("test-id-{}", timestamp);
+
+        let oauth2_account = OAuth2Account {
+            id: account_id.clone(),
+            user_id: user_id.to_string(),
+            provider: provider.to_string(),
+            provider_user_id: unique_provider_user_id.clone(),
+            name: "Test User".to_string(),
+            email: "test@example.com".to_string(),
+            picture: Some("https://example.com/picture.jpg".to_string()),
+            metadata: serde_json::json!({}),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        OAuth2Store::upsert_oauth2_account(oauth2_account).await?;
+
+        // Return the unique provider_user_id so we can use it in the test
+        Ok(unique_provider_user_id)
+    }
+
+    #[tokio::test]
+    async fn test_delete_oauth2_account_core_success() -> Result<(), Box<dyn std::error::Error>> {
+        // Setup test database
+        setup_test_db().await?;
+
+        // Create test user and OAuth2 account
+        let user_id = "test_user_1";
+        let provider = "test_provider";
+        let provider_user_id = "test_provider_user_1";
+
+        create_test_user_in_db(user_id).await?;
+        let unique_provider_user_id =
+            create_test_oauth2_account_in_db(user_id, provider, provider_user_id).await?;
+
+        // Delete the OAuth2 account
+        let result = delete_oauth2_account_core(user_id, provider, &unique_provider_user_id).await;
+        assert!(
+            result.is_ok(),
+            "Failed to delete OAuth2 account: {:?}",
+            result
+        );
+
+        // Verify the account was deleted
+        let accounts = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::ProviderUserId(
+            unique_provider_user_id,
+        ))
+        .await?;
+        assert!(accounts.is_empty(), "OAuth2 account was not deleted");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_delete_oauth2_account_core_unauthorized() -> Result<(), Box<dyn std::error::Error>>
+    {
+        // Setup test database
+        setup_test_db().await?;
+
+        // Create test users and OAuth2 account
+        let user_id = "test_user_2";
+        let other_user_id = "test_user_3";
+        let provider = "test_provider";
+        let provider_user_id = "test_provider_user_2";
+
+        create_test_user_in_db(user_id).await?;
+        create_test_user_in_db(other_user_id).await?;
+        let unique_provider_user_id =
+            create_test_oauth2_account_in_db(user_id, provider, provider_user_id).await?;
+
+        // Try to delete the OAuth2 account as a different user
+        let result =
+            delete_oauth2_account_core(other_user_id, provider, &unique_provider_user_id).await;
+        assert!(
+            matches!(result, Err(CoordinationError::Unauthorized)),
+            "Expected Unauthorized error, got: {:?}",
+            result
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_oauth2_accounts() -> Result<(), Box<dyn std::error::Error>> {
+        // Setup test database
+        setup_test_db().await?;
+
+        // Create test user and OAuth2 accounts
+        let user_id = "test_user_4";
+        let provider1 = "test_provider_1";
+        let provider2 = "test_provider_2";
+        let provider_user_id1 = "test_provider_user_4_1";
+        let provider_user_id2 = "test_provider_user_4_2";
+
+        create_test_user_in_db(user_id).await?;
+        let _unique_provider_user_id1 =
+            create_test_oauth2_account_in_db(user_id, provider1, provider_user_id1).await?;
+        let _unique_provider_user_id2 =
+            create_test_oauth2_account_in_db(user_id, provider2, provider_user_id2).await?;
+
+        // Get the OAuth2 accounts
+        let accounts = get_oauth2_accounts(user_id).await?;
+        assert_eq!(
+            accounts.len(),
+            2,
+            "Expected 2 OAuth2 accounts, got: {}",
+            accounts.len()
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_accounts_core() -> Result<(), Box<dyn std::error::Error>> {
+        // Setup test database
+        setup_test_db().await?;
+
+        // Create test user and OAuth2 accounts
+        let user_id = "test_user_5";
+        let provider1 = "test_provider_1";
+        let provider2 = "test_provider_2";
+        let provider_user_id1 = "test_provider_user_5_1";
+        let provider_user_id2 = "test_provider_user_5_2";
+
+        create_test_user_in_db(user_id).await?;
+        let _unique_provider_user_id1 =
+            create_test_oauth2_account_in_db(user_id, provider1, provider_user_id1).await?;
+        let _unique_provider_user_id2 =
+            create_test_oauth2_account_in_db(user_id, provider2, provider_user_id2).await?;
+
+        // List the OAuth2 accounts
+        let accounts = list_accounts_core(user_id).await?;
+        assert_eq!(
+            accounts.len(),
+            2,
+            "Expected 2 OAuth2 accounts, got: {}",
+            accounts.len()
+        );
+
+        Ok(())
+    }
+}
