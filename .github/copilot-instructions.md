@@ -1,0 +1,15 @@
+1. I want to publish this as a crate on crates.io
+2. I want to make the code as simple as possible yet feasible
+3. I want to make the code dependencies on other crates as little as possible 
+4. I hear anyhow crate is not for library crates so I want to use thiserror crate instead
+5. I want to include nice tutorial and examples
+7. I want the code modifications by cascade to be minimal, as simple as possible while fullfilling the needs of the prompt
+8. I want to make the visibility of the library and module internals as minimal as possible
+9. When we need more visibility I want to re-export necessary items only
+10. I want the commit messages reflecting the changes actually made, and with intentions
+11. Avoid using unwrap() or expect() unless absolutely reasonable.
+12. Even when you voluntarily notice some changes are feasible, never modify the code beyond my requests without first discussing the changes and explicit approval from me.
+13. When I write unit tests for the library, I want to write them one by one, making sure each test passes before writing the next one.
+14. When you want to proceed to the next file, ask for my approval first.
+15. When you want to write multiple tests at once, ask for my approval first.
+17. The block of inline unit tests should be placed at the bottom of the file.
