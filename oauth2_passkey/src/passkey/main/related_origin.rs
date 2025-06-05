@@ -34,13 +34,21 @@ static ADDITIONAL_ORIGINS: LazyLock<Vec<String>> = LazyLock::new(|| {
 /// This function returns the WebAuthn configuration as a JSON string.
 /// It includes the RP ID and all allowed origins (main origin + additional origins).
 pub fn get_related_origin_json() -> Result<String, PasskeyError> {
-    // Get the RP ID and origin
-    let rp_id = PASSKEY_RP_ID.clone();
-    let origin = ORIGIN.clone();
+    get_related_origin_json_with_core(
+        PASSKEY_RP_ID.clone(),
+        ORIGIN.clone(),
+        ADDITIONAL_ORIGINS.clone(),
+    )
+}
 
+fn get_related_origin_json_with_core(
+    rp_id: String,
+    origin: String,
+    additional_origins: Vec<String>,
+) -> Result<String, PasskeyError> {
     // Collect all origins (main origin + additional origins)
     let mut origins = vec![origin];
-    origins.extend(ADDITIONAL_ORIGINS.iter().cloned());
+    origins.extend(additional_origins.iter().cloned());
 
     // Create the WebAuthn configuration
     let config = WebAuthnConfig { rp_id, origins };
@@ -48,78 +56,119 @@ pub fn get_related_origin_json() -> Result<String, PasskeyError> {
     // Serialize to JSON
     serde_json::to_string_pretty(&config).map_err(|e| PasskeyError::Serde(e.to_string()))
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::Value;
 
-    // Test the WebAuthnConfig struct serialization
+    // Test get_related_origin_json_with_core with additional origins
     #[test]
-    fn test_webauthn_config_serialization() {
-        let config = WebAuthnConfig {
-            rp_id: "example.com".to_string(),
-            origins: vec!["https://example.com".to_string()],
-        };
+    fn test_get_related_origin_json_with_core_with_additional() {
+        let rp_id = "core.example.com".to_string();
+        let origin = "https://core.example.com".to_string();
+        let additional_origins = vec![
+            "https://app1.core.com".to_string(),
+            "https://app2.core.com".to_string(),
+        ];
 
-        let json = serde_json::to_string_pretty(&config).unwrap();
+        let result = get_related_origin_json_with_core(rp_id, origin, additional_origins)
+            .expect("Failed to get related origin JSON with core");
 
-        // Parse the JSON and verify the structure
-        let parsed: Value = serde_json::from_str(&json).unwrap();
+        let parsed: Value = serde_json::from_str(&result).expect("Failed to parse JSON");
+
+        assert_eq!(parsed["rp_id"], "core.example.com");
+        assert!(parsed["origins"].is_array());
+        let origins_array = parsed["origins"].as_array().unwrap();
+        assert_eq!(origins_array.len(), 3);
+        assert_eq!(origins_array[0], "https://core.example.com");
+        assert_eq!(origins_array[1], "https://app1.core.com");
+        assert_eq!(origins_array[2], "https://app2.core.com");
+    }
+
+    // Test get_related_origin_json_with_core with no additional origins
+    #[test]
+    fn test_get_related_origin_json_with_core_no_additional() {
+        let rp_id = "core.example.com".to_string();
+        let origin = "https://core.example.com".to_string();
+        let additional_origins: Vec<String> = vec![];
+
+        let result = get_related_origin_json_with_core(rp_id, origin, additional_origins)
+            .expect("Failed to get related origin JSON with core");
+
+        let parsed: Value = serde_json::from_str(&result).expect("Failed to parse JSON");
+
+        assert_eq!(parsed["rp_id"], "core.example.com");
+        assert!(parsed["origins"].is_array());
+        let origins_array = parsed["origins"].as_array().unwrap();
+        assert_eq!(origins_array.len(), 1);
+        assert_eq!(origins_array[0], "https://core.example.com");
+    }
+
+    // Test get_related_origin_json_with_core with duplicate origins
+    #[test]
+    fn test_get_related_origin_json_with_core_duplicate_origins() {
+        let rp_id = "example.com".to_string();
+        let origin = "https://example.com".to_string();
+        let additional_origins = vec![
+            "https://example.com".to_string(), // Duplicate of main origin
+            "https://app.example.com".to_string(),
+        ];
+
+        let result = get_related_origin_json_with_core(rp_id, origin, additional_origins)
+            .expect("Failed to get related origin JSON with core");
+
+        let parsed: Value = serde_json::from_str(&result).expect("Failed to parse JSON");
+
         assert_eq!(parsed["rp_id"], "example.com");
         assert!(parsed["origins"].is_array());
-        assert_eq!(parsed["origins"][0], "https://example.com");
+        let origins_array = parsed["origins"].as_array().unwrap();
+        assert_eq!(origins_array.len(), 3); // Should contain duplicates as implemented
+        assert_eq!(origins_array[0], "https://example.com");
+        assert_eq!(origins_array[1], "https://example.com"); // Duplicate
+        assert_eq!(origins_array[2], "https://app.example.com");
     }
 
-    // Test parsing of additional origins
+    // Test get_related_origin_json_with_core with empty strings
     #[test]
-    fn test_parse_additional_origins() {
-        // Test with empty string
-        let empty = "";
-        let empty_result: Vec<String> = empty
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-        assert!(empty_result.is_empty());
+    fn test_get_related_origin_json_with_core_empty_strings() {
+        let rp_id = "".to_string();
+        let origin = "".to_string();
+        let additional_origins: Vec<String> = vec![];
 
-        // Test with whitespace and empty entries
-        let with_spaces = "https://app1.example.com, , https://app2.example.com,  ,";
-        let spaces_result: Vec<String> = with_spaces
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
+        let result = get_related_origin_json_with_core(rp_id, origin, additional_origins)
+            .expect("Failed to get related origin JSON with empty strings");
 
-        assert_eq!(spaces_result.len(), 2);
-        assert_eq!(spaces_result[0], "https://app1.example.com");
-        assert_eq!(spaces_result[1], "https://app2.example.com");
-    }
+        let parsed: Value = serde_json::from_str(&result).expect("Failed to parse JSON");
 
-    // Test the JSON structure directly without relying on environment variables
-    #[test]
-    fn test_json_structure() {
-        // Create a WebAuthnConfig directly
-        let config = WebAuthnConfig {
-            rp_id: "test.example.com".to_string(),
-            origins: vec![
-                "https://test.example.com".to_string(),
-                "https://app1.example.com".to_string(),
-                "https://app2.example.com".to_string(),
-            ],
-        };
-
-        // Serialize to JSON
-        let json = serde_json::to_string_pretty(&config).unwrap();
-
-        // Parse and verify the structure
-        let parsed: Value = serde_json::from_str(&json).unwrap();
-
-        // Verify the structure
-        assert_eq!(parsed["rp_id"], "test.example.com");
+        assert_eq!(parsed["rp_id"], "");
         assert!(parsed["origins"].is_array());
-        assert_eq!(parsed["origins"].as_array().unwrap().len(), 3);
-        assert_eq!(parsed["origins"][0], "https://test.example.com");
-        assert_eq!(parsed["origins"][1], "https://app1.example.com");
-        assert_eq!(parsed["origins"][2], "https://app2.example.com");
+        let origins_array = parsed["origins"].as_array().unwrap();
+        assert_eq!(origins_array.len(), 1);
+        assert_eq!(origins_array[0], "");
+    }
+
+    // Test get_related_origin_json_with_core with special characters
+    #[test]
+    fn test_get_related_origin_json_with_core_special_characters() {
+        let rp_id = "test-domain.com".to_string();
+        let origin = "https://test-domain.com:8080".to_string();
+        let additional_origins = vec![
+            "https://app.test-domain.com:3000".to_string(),
+            "https://api-v2.test-domain.com".to_string(),
+        ];
+
+        let result = get_related_origin_json_with_core(rp_id, origin, additional_origins)
+            .expect("Failed to get related origin JSON with special characters");
+
+        let parsed: Value = serde_json::from_str(&result).expect("Failed to parse JSON");
+
+        assert_eq!(parsed["rp_id"], "test-domain.com");
+        assert!(parsed["origins"].is_array());
+        let origins_array = parsed["origins"].as_array().unwrap();
+        assert_eq!(origins_array.len(), 3);
+        assert_eq!(origins_array[0], "https://test-domain.com:8080");
+        assert_eq!(origins_array[1], "https://app.test-domain.com:3000");
+        assert_eq!(origins_array[2], "https://api-v2.test-domain.com");
     }
 }
