@@ -199,10 +199,66 @@ RUST_LOG=debug cargo test -- --nocapture
 
 ---
 
-Last Updated: 2025-05-29
+Last Updated: 2025-06-04
 
+## Configuration Testing
+
+### Current Configuration Options
+
+- `O2P_ROUTE_PREFIX`: Sets the route prefix for all oauth2_passkey endpoints (default: `/o2p`)
+
+### Manual Testing Approach
+
+Configuration can be tested manually using the demo01 example:
+
+```bash
+# Test with default prefix
+cargo run --example demo01
+# Then verify http://localhost:8080/o2p/auth works
+
+# Test with custom prefix
+O2P_ROUTE_PREFIX=/custom cargo run --example demo01
+# Then verify http://localhost:8080/custom/auth works
+```
+
+### Future Automated Testing Considerations
+
+In the future, a dedicated test application could be created to automate testing of configuration options:
+
+1. **Minimal Test Application**
+   - Similar to demo01 but focused specifically on testing configuration
+   - Include endpoints that don't require complex authentication flows
+   - Designed for automated testing with clear success/failure criteria
+
+2. **Test Cases to Cover**
+   - Default route prefix works correctly (`/o2p`)
+   - Custom route prefix from environment variable works correctly
+   - Routes are properly mounted under the configured prefix
+   - Any future configuration options
+
+3. **Implementation Options**
+   - Integration tests that spawn the test application with different configurations
+   - Shell script that runs the application with different configurations and tests endpoints
+   - Dedicated test runner that manages the application lifecycle and runs tests
+
+### Implementation Priority
+
+This testing plan is considered low priority since:
+1. The configuration system is relatively simple
+2. Manual testing is currently sufficient
+3. The focus should be on core functionality and user-facing features
+
+The plan should be revisited when:
+1. More configuration options are added
+2. The configuration system becomes more complex
+3. There's a need for more comprehensive automated testing
+
+---
 
 Do we have anything that needs unit tests here?
 
 
 I'd like you to identify the functions for which writing unit tests a more appropriate than leaving it to integration tests, first. 
+
+
+What do you think about unit tests in this file? Aren't there any meaningless tests? Is there room for improvement?
