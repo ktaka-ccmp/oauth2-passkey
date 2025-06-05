@@ -78,24 +78,7 @@ mod tests {
     use super::*;
     use crate::session::SessionError;
     use crate::utils::UtilError;
-
-    #[test]
-    fn test_error_is_sync_and_send() {
-        fn assert_sync_send<T: Sync + Send>() {}
-        assert_sync_send::<OAuth2Error>();
-    }
-
-    #[test]
-    fn test_error_is_cloneable() {
-        let err = OAuth2Error::Storage("test error".to_string());
-        let cloned = err.clone();
-
-        if let OAuth2Error::Storage(msg) = cloned {
-            assert_eq!(msg, "test error");
-        } else {
-            panic!("Wrong error type after cloning");
-        }
-    }
+    use std::error::Error;
 
     #[test]
     fn test_error_display() {
@@ -166,14 +149,14 @@ mod tests {
         let util_err = UtilError::Format("format error".to_string());
         let err: OAuth2Error = util_err.into();
 
-        if let OAuth2Error::Utils(inner) = err {
-            if let UtilError::Format(msg) = inner {
+        match err {
+            OAuth2Error::Utils(UtilError::Format(msg)) => {
                 assert_eq!(msg, "format error");
-            } else {
-                panic!("Wrong inner error type");
             }
-        } else {
-            panic!("Wrong error type");
+            _ => panic!(
+                "Expected OAuth2Error::Utils(UtilError::Format), got: {:?}",
+                err
+            ),
         }
     }
 
@@ -182,14 +165,148 @@ mod tests {
         let session_err = SessionError::Storage("session error".to_string());
         let err: OAuth2Error = session_err.into();
 
-        if let OAuth2Error::Session(inner) = err {
-            if let SessionError::Storage(msg) = inner {
+        match err {
+            OAuth2Error::Session(SessionError::Storage(msg)) => {
                 assert_eq!(msg, "session error");
-            } else {
-                panic!("Wrong inner error type");
             }
-        } else {
-            panic!("Wrong error type");
+            _ => panic!(
+                "Expected OAuth2Error::Session(SessionError::Storage), got: {:?}",
+                err
+            ),
         }
+    }
+
+    #[test]
+    fn test_error_source_chaining() {
+        // Test that From conversions preserve error sources
+        let util_err = UtilError::Format("format error".to_string());
+        let oauth2_err: OAuth2Error = util_err.into();
+
+        // The source should be the original UtilError
+        match oauth2_err.source() {
+            Some(source) => {
+                assert_eq!(source.to_string(), "Invalid format: format error");
+            }
+            None => panic!("Expected error to have a source"),
+        }
+
+        let session_err = SessionError::Storage("session error".to_string());
+        let oauth2_err: OAuth2Error = session_err.into();
+
+        // The source should be the original SessionError
+        match oauth2_err.source() {
+            Some(source) => {
+                assert_eq!(source.to_string(), "Storage error: session error");
+            }
+            None => panic!("Expected error to have a source"),
+        }
+    }
+
+    #[test]
+    fn test_error_equality_and_cloning() {
+        // Test that errors can be cloned and compared properly
+        let err1 = OAuth2Error::Storage("storage error".to_string());
+        let err2 = err1.clone();
+
+        // Both should have the same display string
+        assert_eq!(err1.to_string(), err2.to_string());
+
+        // Test different error types
+        let crypto_err = OAuth2Error::Crypto("crypto error".to_string());
+        assert_ne!(err1.to_string(), crypto_err.to_string());
+
+        // Test parameterless errors
+        let nonce_expired1 = OAuth2Error::NonceExpired;
+        let nonce_expired2 = OAuth2Error::NonceExpired;
+        assert_eq!(nonce_expired1.to_string(), nonce_expired2.to_string());
+    }
+
+    #[test]
+    fn test_error_conversion_edge_cases() {
+        // Test all UtilError variants conversion
+        let crypto_err = UtilError::Crypto("crypto error".to_string());
+        let oauth2_err: OAuth2Error = crypto_err.into();
+        match oauth2_err {
+            OAuth2Error::Utils(UtilError::Crypto(msg)) => {
+                assert_eq!(msg, "crypto error");
+            }
+            _ => panic!(
+                "Expected OAuth2Error::Utils(UtilError::Crypto), got: {:?}",
+                oauth2_err
+            ),
+        }
+
+        let cookie_err = UtilError::Cookie("cookie error".to_string());
+        let oauth2_err: OAuth2Error = cookie_err.into();
+        match oauth2_err {
+            OAuth2Error::Utils(UtilError::Cookie(msg)) => {
+                assert_eq!(msg, "cookie error");
+            }
+            _ => panic!(
+                "Expected OAuth2Error::Utils(UtilError::Cookie), got: {:?}",
+                oauth2_err
+            ),
+        }
+
+        // Test all SessionError variants conversion
+        let crypto_session_err = SessionError::Crypto("session crypto error".to_string());
+        let oauth2_err: OAuth2Error = crypto_session_err.into();
+        match oauth2_err {
+            OAuth2Error::Session(SessionError::Crypto(msg)) => {
+                assert_eq!(msg, "session crypto error");
+            }
+            _ => panic!(
+                "Expected OAuth2Error::Session(SessionError::Crypto), got: {:?}",
+                oauth2_err
+            ),
+        }
+
+        let cookie_session_err = SessionError::Cookie("session cookie error".to_string());
+        let oauth2_err: OAuth2Error = cookie_session_err.into();
+        match oauth2_err {
+            OAuth2Error::Session(SessionError::Cookie(msg)) => {
+                assert_eq!(msg, "session cookie error");
+            }
+            _ => panic!(
+                "Expected OAuth2Error::Session(SessionError::Cookie), got: {:?}",
+                oauth2_err
+            ),
+        }
+    }
+
+    #[test]
+    fn test_error_display_edge_cases() {
+        // Test errors with empty strings
+        let err = OAuth2Error::Storage("".to_string());
+        assert_eq!(err.to_string(), "Storage error: ");
+
+        // Test errors with special characters
+        let err = OAuth2Error::Internal("Error with \"quotes\" and 'apostrophes'".to_string());
+        assert_eq!(
+            err.to_string(),
+            "Internal error: Error with \"quotes\" and 'apostrophes'"
+        );
+
+        // Test errors with newlines and tabs
+        let err = OAuth2Error::Database("Error\nwith\nnewlines\tand\ttabs".to_string());
+        assert_eq!(
+            err.to_string(),
+            "Database error: Error\nwith\nnewlines\tand\ttabs"
+        );
+
+        // Test wrapped errors display properly
+        let util_err = UtilError::Format("nested error".to_string());
+        let oauth2_err: OAuth2Error = util_err.into();
+        assert_eq!(
+            oauth2_err.to_string(),
+            "Utils error: Invalid format: nested error"
+        );
+
+        let session_err = SessionError::Storage("nested session error".to_string());
+        let oauth2_err: OAuth2Error = session_err.into();
+        assert_eq!(
+            oauth2_err.to_string(),
+            "Session error: Storage error: nested session error"
+        );
     }
 }

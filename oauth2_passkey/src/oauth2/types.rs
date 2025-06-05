@@ -98,7 +98,7 @@ impl From<GoogleIdInfo> for OAuth2Account {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct StateParams {
     pub(crate) csrf_id: String,
     pub(crate) nonce_id: String,
@@ -374,7 +374,12 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(OAuth2Error::Storage(_)) => {}
-            _ => panic!("Expected Storage error"),
+            Ok(_) => {
+                assert!(false, "Expected Storage error but got Ok");
+            }
+            Err(err) => {
+                assert!(false, "Expected Storage error, got {:?}", err);
+            }
         }
     }
 }
