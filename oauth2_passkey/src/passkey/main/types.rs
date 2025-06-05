@@ -47,7 +47,7 @@ pub struct AuthenticatorResponse {
 
 impl AuthenticatorResponse {
     #[cfg(test)]
-    pub(crate) fn new_for_test(
+    pub(super) fn new_for_test(
         id: String,
         response: AuthenticatorAssertionResponse,
         auth_id: String,
@@ -1006,7 +1006,7 @@ mod tests {
         fn test_verify_user_verification_required_but_not_verified() {
             let original_rp_id = env::var("PASSKEY_RP_ID").ok();
             let original_origin = env::var("ORIGIN").ok();
-            let original_user_verification = env::var("PASSKEY_USER_VERIFICATION").ok();
+            let _original_user_verification = env::var("PASSKEY_USER_VERIFICATION").ok();
 
             unsafe {
                 env::set_var("PASSKEY_RP_ID", "example.com");

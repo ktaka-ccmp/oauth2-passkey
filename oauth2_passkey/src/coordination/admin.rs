@@ -559,6 +559,7 @@ mod tests {
     }
 
     // Helper function to check if a credential exists in the database
+    #[allow(dead_code)]
     async fn credential_exists(credential_id: &str) -> Result<bool, Box<dyn std::error::Error>> {
         let store = crate::storage::GENERIC_DATA_STORE.lock().await;
 
@@ -646,6 +647,7 @@ mod tests {
     }
 
     // Helper function to create a test OAuth2 account
+    #[allow(dead_code)]
     async fn create_test_oauth2_account(
         user_id: &str,
         provider: &str,
@@ -686,6 +688,7 @@ mod tests {
     }
 
     // Helper function to check if an OAuth2 account exists
+    #[allow(dead_code)]
     async fn oauth2_account_exists(
         provider_user_id: &str,
     ) -> Result<bool, Box<dyn std::error::Error>> {

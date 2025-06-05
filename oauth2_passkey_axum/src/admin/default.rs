@@ -8,7 +8,7 @@ use axum::{
 };
 
 use oauth2_passkey::{
-    CoordinationError, DbUser, O2P_ROUTE_PREFIX, SessionUser, delete_oauth2_account_core,
+    DbUser, O2P_ROUTE_PREFIX, SessionUser, delete_oauth2_account_core,
     delete_passkey_credential_core, delete_user_account_admin, update_user_admin_status,
 };
 
