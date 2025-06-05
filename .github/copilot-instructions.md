@@ -7,7 +7,7 @@
 8. I want to make the visibility of the library and module internals as minimal as possible
 9. When we need more visibility I want to re-export necessary items only
 10. I want the commit messages reflecting the changes actually made, and with intentions
-11. Avoid using unwrap() or expect() unless absolutely reasonable.
+11. Avoid using unwrap() or expect() unless absolutely reasonable except in unit tests.
 12. Even when you voluntarily notice some changes are feasible, never modify the code beyond my requests without first discussing the changes and explicit approval from me.
 13. When I write unit tests for the library, I want to write them one by one, making sure each test passes before writing the next one.
 14. When you want to proceed to the next file, ask for my approval first.
