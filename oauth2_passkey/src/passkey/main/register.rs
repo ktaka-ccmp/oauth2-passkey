@@ -815,7 +815,9 @@ mod tests {
         // Create a CBOR map with valid X and Y coordinates
         // COSE key format uses -2 and -3 for X and Y coordinates
         let x_coord = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]; // 16 bytes for X
-        let y_coord = vec![16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]; // 16 bytes for Y
+        let y_coord = vec![
+            17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+        ]; // 16 bytes for Y
 
         let mut cbor_map = Vec::new();
         cbor_map.push((
@@ -828,26 +830,18 @@ mod tests {
         ));
         let cbor_value = CborValue::Map(cbor_map);
 
-        // Serialize CBOR to bytes
-        let mut credential_data = Vec::new();
-        ciborium::ser::into_writer(&cbor_value, &mut credential_data)
-            .expect("CBOR serialization failed");
+        let mut cbor_bytes = Vec::new();
+        ciborium::ser::into_writer(&cbor_value, &mut cbor_bytes).unwrap();
 
-        // Call the function
-        let result = extract_key_coordinates(&credential_data);
-
-        // Verify the result
-        assert!(result.is_ok(), "Extraction failed: {:?}", result.err());
+        let result = extract_key_coordinates(&cbor_bytes);
+        assert!(result.is_ok());
         let (extracted_x, extracted_y) = result.unwrap();
-
-        assert_eq!(extracted_x, x_coord, "X coordinate doesn't match");
-        assert_eq!(extracted_y, y_coord, "Y coordinate doesn't match");
+        assert_eq!(extracted_x, x_coord);
+        assert_eq!(extracted_y, y_coord);
     }
 
     #[test]
     fn test_extract_key_coordinates_missing_x() {
-        use ciborium::value::Integer;
-
         // Create a CBOR map with only Y coordinate, missing X
         let y_coord = vec![16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 
@@ -885,8 +879,6 @@ mod tests {
 
     #[test]
     fn test_extract_key_coordinates_missing_y() {
-        use ciborium::value::Integer;
-
         // Create a CBOR map with only X coordinate, missing Y
         let x_coord = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
@@ -1084,7 +1076,63 @@ mod tests {
         }
     }
 
-    // Note: verify_client_data is an async function that depends on external state
-    // (ORIGIN, get_and_validate_options, etc.), making it challenging to test directly.
-    // It would be better tested in integration tests where the actual environment is available.
+    #[test]
+    fn test_parse_credential_data_large_credential_id_length() {
+        // Create authenticator data with credential ID length > 1024 bytes
+        let mut auth_data = Vec::new();
+
+        // RP ID hash (32 bytes)
+        auth_data.extend_from_slice(&[0u8; 32]);
+
+        // Flags (1 byte) - set attested credential data flag
+        auth_data.push(0x40);
+
+        // Counter (4 bytes)
+        auth_data.extend_from_slice(&[0u8; 4]);
+
+        // AAGUID (16 bytes)
+        auth_data.extend_from_slice(&[0u8; 16]);
+
+        // Credential ID length (2 bytes) - set to 1025 (exceeds 1024 limit)
+        let large_cred_id_len = 1025u16;
+        auth_data.push((large_cred_id_len >> 8) as u8);
+        auth_data.push((large_cred_id_len & 0xFF) as u8);
+
+        // Add some credential ID data (we don't need all 1025 bytes for this test)
+        auth_data.extend_from_slice(&[0xAAu8; 100]);
+
+        let result = parse_credential_data(&auth_data);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert_eq!(msg, "Invalid credential ID length");
+            }
+            e => panic!(
+                "Expected PasskeyError::Format with 'Invalid credential ID length', got {:?}",
+                e
+            ),
+        }
+    }
+
+    #[test]
+    fn test_extract_key_coordinates_invalid_cbor() {
+        // Create malformed CBOR data that cannot be parsed
+        let invalid_cbor_data = b"not valid cbor data";
+
+        let result = extract_key_coordinates(invalid_cbor_data);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert!(
+                    msg.contains("Invalid public key format"),
+                    "Error message was: {}",
+                    msg
+                );
+            }
+            e => panic!(
+                "Expected PasskeyError::Format with public key format error, got {:?}",
+                e
+            ),
+        }
+    }
 }

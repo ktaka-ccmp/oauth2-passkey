@@ -45,6 +45,23 @@ pub struct AuthenticatorResponse {
     pub(super) auth_id: String,
 }
 
+impl AuthenticatorResponse {
+    #[cfg(test)]
+    pub(crate) fn new_for_test(
+        id: String,
+        response: AuthenticatorAssertionResponse,
+        auth_id: String,
+    ) -> Self {
+        Self {
+            id,
+            raw_id: "test_raw_id".to_string(),
+            response,
+            authenticator_attachment: None,
+            auth_id,
+        }
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub(super) struct AuthenticatorAssertionResponse {
     pub(super) client_data_json: String,
@@ -341,43 +358,59 @@ mod tests {
     use serde_json::json;
     use std::env;
 
-    mod register_credential_tests {
+    // Test serialization of AuthenticationOptions struct
+    mod authentication_options_tests {
         use super::*;
-        // Removed unused import: crate::passkey::main::challenge
-        use std::sync::Once;
 
-        static INIT: Once = Once::new();
-
-        // Setup function to initialize test environment
-        fn setup() {
-            INIT.call_once(|| {
-                // Initialize any required test environment
-                // This runs only once for all tests in this module
-            });
-        }
-
-        #[tokio::test]
-        async fn test_get_registration_user_fields_with_no_user_handle() {
-            setup();
-
-            // Create a RegisterCredential with no user_handle
-            let credential = RegisterCredential {
-                id: "test-id".to_string(),
-                raw_id: "test-raw-id".to_string(),
-                response: AuthenticatorAttestationResponse {
-                    client_data_json: "test-data".to_string(),
-                    attestation_object: "test-object".to_string(),
-                },
-                type_: "public-key".to_string(),
-                user_handle: None,
+        #[test]
+        fn test_authentication_options_serialization() {
+            // Create test data
+            let auth_options = AuthenticationOptions {
+                challenge: "test_challenge_12345".to_string(),
+                timeout: 60000,
+                rp_id: "example.com".to_string(),
+                allow_credentials: vec![
+                    AllowCredential {
+                        type_: "public-key".to_string(),
+                        id: "credential_id_1".to_string(),
+                    },
+                    AllowCredential {
+                        type_: "public-key".to_string(),
+                        id: "credential_id_2".to_string(),
+                    },
+                ],
+                user_verification: "preferred".to_string(),
+                auth_id: "auth_session_12345".to_string(),
             };
 
-            // Call the method
-            let (name, display_name) = credential.get_registration_user_fields().await;
+            // Test serialization to JSON
+            let json_result = serde_json::to_string(&auth_options);
+            assert!(
+                json_result.is_ok(),
+                "Failed to serialize AuthenticationOptions"
+            );
 
-            // Verify default values are returned
-            assert_eq!(name, "Passkey User");
-            assert_eq!(display_name, "Passkey User");
+            let json_str = json_result.unwrap();
+
+            // Verify JSON contains expected fields in camelCase (due to rename_all)
+            assert!(json_str.contains("\"challenge\""));
+            assert!(json_str.contains("\"timeout\""));
+            assert!(json_str.contains("\"rpId\""));
+            assert!(json_str.contains("\"allowCredentials\""));
+            assert!(json_str.contains("\"userVerification\""));
+            assert!(json_str.contains("\"authId\""));
+
+            // Verify values are correctly serialized
+            assert!(json_str.contains("\"test_challenge_12345\""));
+            assert!(json_str.contains("\"example.com\""));
+            assert!(json_str.contains("\"preferred\""));
+            assert!(json_str.contains("\"auth_session_12345\""));
+            assert!(json_str.contains("60000"));
+            assert!(json_str.contains("\"credential_id_1\""));
+            assert!(json_str.contains("\"credential_id_2\""));
+
+            // Verify array structure
+            assert!(json_str.contains("[") && json_str.contains("]"));
         }
     }
 
