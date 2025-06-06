@@ -405,6 +405,13 @@ pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, 
 
     let stored_session: StoredSession = cached_session.try_into()?;
 
+    // Check if session is expired
+    if stored_session.expires_at < Utc::now() {
+        tracing::debug!("Session expired at {}", stored_session.expires_at);
+        delete_session_from_store_by_session_id(session_id).await?;
+        return Err(SessionError::SessionExpiredError);
+    }
+
     Ok(CsrfToken::new(stored_session.csrf_token))
 }
 
@@ -420,6 +427,13 @@ pub async fn get_user_and_csrf_token_from_session(
         .ok_or(SessionError::SessionError)?;
 
     let stored_session: StoredSession = cached_session.try_into()?;
+
+    // Check if session is expired
+    if stored_session.expires_at < Utc::now() {
+        tracing::debug!("Session expired at {}", stored_session.expires_at);
+        delete_session_from_store_by_session_id(session_id).await?;
+        return Err(SessionError::SessionExpiredError);
+    }
 
     let user = UserStore::get_user(&stored_session.user_id)
         .await
@@ -1086,18 +1100,22 @@ mod tests {
 
         // Should return an error for expired session
         assert!(result.is_err());
+        match result {
+            Err(SessionError::SessionExpiredError) => {} // Expected error for expired session
+            other => panic!(
+                "Expected SessionError::SessionExpiredError, got: {:?}",
+                other
+            ),
+        }
 
-        // NOTE: Currently get_user_and_csrf_token_from_session doesn't
-        // automatically delete expired sessions like is_authenticated does.
-        // This may be a bug that should be addressed in the future.
-        // For now, we test the current behavior where expired session remains in cache.
+        // Verify that the expired session was deleted from the cache
         let cached_session = GENERIC_CACHE_STORE
             .lock()
             .await
             .get("session", session_id)
             .await
             .unwrap();
-        assert!(cached_session.is_some()); // Expired session currently remains in cache
+        assert!(cached_session.is_none()); // Expired session should be deleted
     }
 
     #[tokio::test]
@@ -1255,84 +1273,105 @@ mod tests {
     // Tests that require UserStore (will fail without database environment variables)
 
     #[tokio::test]
-    #[ignore] // Ignored by default because it requires database setup
     async fn test_get_user_from_session_requires_database() {
-        // This test demonstrates functions that need UserStore::get_user()
-        // It requires both cache store AND database environment variables
+        use crate::session::main::test_utils::{
+            cleanup_test_resources, create_test_user_and_session,
+        };
 
-        // Note: This test would fail because:
-        // 1. It needs GENERIC_CACHE_STORE environment variables
-        // 2. It needs GENERIC_DATA_STORE environment variables for UserStore
-        // 3. UserStore::get_user() requires an actual user in the database
+        // Initialize test environment
+        init_test_environment().await;
 
+        // Create test user and session
         let user_id = "test_user_database";
+        let account = "test@example.com";
+        let label = "Test User";
+        let is_admin = false;
+        let session_id = "test_session_database_123";
+        let csrf_token = "test_csrf_token_database";
+        let ttl = 3600;
 
-        // First create a session (needs cache env vars)
-        let session_result = create_new_session_with_uid(user_id).await;
-        assert!(session_result.is_ok());
+        // Insert test user and session
+        let user = create_test_user_and_session(
+            user_id, account, label, is_admin, session_id, csrf_token, ttl,
+        )
+        .await;
+        assert!(user.is_ok());
 
-        // Extract session ID
-        let headers = session_result.unwrap();
-        let cookie_header = headers
-            .get(http::header::SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap();
-        let session_id = cookie_header
-            .split(';')
-            .next()
-            .unwrap()
-            .split('=')
-            .nth(1)
-            .unwrap();
-
-        // This will fail because:
-        // - UserStore::get_user() needs database connection (GENERIC_DATA_STORE_*)
-        // - The user probably doesn't exist in the database
+        // Now test getting the user from session
         let user_result = get_user_from_session(session_id).await;
 
-        // This will likely fail with SessionError::SessionError
-        // because the user doesn't exist in the database
-        assert!(user_result.is_err());
+        // Should succeed now that we have added the user to the database
+        assert!(user_result.is_ok());
+        let session_user = user_result.unwrap();
+
+        // Verify retrieved user data
+        assert_eq!(session_user.id, user_id);
+        assert_eq!(session_user.account, account);
+        assert_eq!(session_user.label, label);
+        assert_eq!(session_user.is_admin, is_admin);
+
+        // Clean up test resources
+        let _ = cleanup_test_resources(user_id, session_id).await;
     }
 
     #[tokio::test]
-    #[ignore] // Ignored by default because it requires database setup
     async fn test_is_authenticated_strict_requires_database() {
-        // This test shows how is_authenticated_strict needs both cache and database
+        use crate::session::main::test_utils::{
+            cleanup_test_resources, create_test_user_and_session,
+        };
 
+        // Initialize test environment
+        init_test_environment().await;
+
+        // Test case 1: User exists in database - should authenticate
         let user_id = "test_user_strict_auth";
+        let account = "strict_auth@example.com";
+        let label = "Strict Auth User";
+        let is_admin = false;
+        let session_id = "test_strict_auth_session";
+        let csrf_token = "test_csrf_token_strict_auth";
+        let ttl = 3600;
 
-        // Create session (needs cache env vars)
-        let session_result = create_new_session_with_uid(user_id).await;
-        assert!(session_result.is_ok());
+        // Insert test user and session
+        let user = create_test_user_and_session(
+            user_id, account, label, is_admin, session_id, csrf_token, ttl,
+        )
+        .await;
+        assert!(user.is_ok());
 
         // Create headers with session cookie
-        let response_headers = session_result.unwrap();
-        let cookie_header = response_headers
-            .get(http::header::SET_COOKIE)
-            .unwrap()
-            .to_str()
-            .unwrap();
-        let session_id = cookie_header
-            .split(';')
-            .next()
-            .unwrap()
-            .split('=')
-            .nth(1)
-            .unwrap();
-
         let cookie_name = SESSION_COOKIE_NAME.to_string();
         let headers = create_header_map_with_cookie(&cookie_name, session_id);
 
-        // This will fail because:
-        // - verify_user_exists=true requires UserStore::get_user()
-        // - UserStore needs database environment variables
-        // - The user probably doesn't exist in the database
+        // Test strict authentication - should succeed now that user exists
         let auth_result = is_authenticated_strict(&headers, &Method::GET).await;
+        assert!(auth_result.is_ok());
+        assert!(auth_result.unwrap().0); // Should BE authenticated
 
-        // This should return AuthenticationStatus(false) because user doesn't exist
+        // Test case 2: Session exists but user doesn't - should not authenticate
+        let nonexistent_user_id = "nonexistent_user";
+        let nonexistent_session_id = "nonexistent_session";
+        let nonexistent_csrf = "nonexistent_csrf";
+
+        // Create session but don't create the user in database
+        let _ = crate::session::main::test_utils::insert_test_session(
+            nonexistent_session_id,
+            nonexistent_user_id,
+            nonexistent_csrf,
+            ttl,
+        )
+        .await;
+
+        // Create headers for nonexistent user
+        let headers = create_header_map_with_cookie(&cookie_name, nonexistent_session_id);
+
+        // Test strict authentication - should fail since user doesn't exist
+        let auth_result = is_authenticated_strict(&headers, &Method::GET).await;
         assert!(auth_result.is_ok());
         assert!(!auth_result.unwrap().0); // Should NOT be authenticated
+
+        // Clean up test resources
+        let _ = cleanup_test_resources(user_id, session_id).await;
+        let _ = crate::session::main::test_utils::delete_test_session(nonexistent_session_id).await;
     }
 }

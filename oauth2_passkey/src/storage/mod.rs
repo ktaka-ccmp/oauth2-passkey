@@ -11,10 +11,7 @@ pub(crate) async fn init() -> Result<(), errors::StorageError> {
     Ok(())
 }
 
-pub(crate) use cache_store::{CacheStore, GENERIC_CACHE_STORE};
-// InMemoryCacheStore is only re-exported for tests
-#[cfg(test)]
-pub(crate) use cache_store::InMemoryCacheStore;
+pub(crate) use cache_store::GENERIC_CACHE_STORE;
 pub(crate) use types::CacheData;
 
 pub(crate) use data_store::{DB_TABLE_PREFIX, GENERIC_DATA_STORE};
