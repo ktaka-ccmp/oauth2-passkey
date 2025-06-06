@@ -1,5 +1,9 @@
 mod page_session_token;
 mod session;
+#[cfg(test)]
+mod session_edge_cases_tests;
+#[cfg(test)]
+mod test_utils;
 
 use crate::session::errors::SessionError;
 use http::HeaderMap;

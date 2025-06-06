@@ -167,3 +167,37 @@ async fn delete_oauth2_account(
         .map(|()| StatusCode::NO_CONTENT)
         .into_response_error()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::StatusCode;
+
+    #[test]
+    fn test_router() {
+        // Test that the router can be created without panicking
+        let _router = router();
+        // No assertions needed, we just want to make sure it doesn't panic
+    }
+
+    #[tokio::test]
+    async fn test_serve_oauth2_js() {
+        // Call the function
+        let response = serve_oauth2_js().await;
+
+        // Verify the result is Ok
+        assert!(response.is_ok());
+
+        if let Ok(response) = response {
+            // Verify status code
+            assert_eq!(response.status(), StatusCode::OK);
+
+            // Verify content type header
+            let headers = response.headers();
+            assert_eq!(
+                headers.get(CONTENT_TYPE).unwrap().to_str().unwrap(),
+                "application/javascript"
+            );
+        }
+    }
+}

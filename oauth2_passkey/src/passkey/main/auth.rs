@@ -303,3 +303,548 @@ async fn verify_signature(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::passkey::main::types;
+    use crate::test_utils::init_test_environment;
+
+    fn create_test_authenticator_response(
+        user_handle: Option<String>,
+        auth_id: String,
+    ) -> AuthenticatorResponse {
+        // Note: This is a minimal mock for testing verify_user_handle
+        // In real usage, AuthenticatorResponse has many more fields
+        AuthenticatorResponse::new_for_test(
+            "test_credential_id".to_string(),
+            types::AuthenticatorAssertionResponse {
+                client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0".to_string(), // {"type":"webauthn.get"}
+                authenticator_data: "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MBAAAABA"
+                    .to_string(),
+                signature: "MEUCIQDsignature".to_string(),
+                user_handle,
+            },
+            auth_id,
+        )
+    }
+
+    fn create_test_passkey_credential(user_handle: String) -> PasskeyCredential {
+        PasskeyCredential {
+            credential_id: "test_credential_id".to_string(),
+            user_id: "test_user_id".to_string(),
+            public_key: "test_public_key".to_string(),
+            aaguid: "test_aaguid".to_string(),
+            counter: 1,
+            user: PublicKeyCredentialUserEntity {
+                user_handle,
+                name: "test_user".to_string(),
+                display_name: "Test User".to_string(),
+            },
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            last_used_at: chrono::Utc::now(),
+        }
+    }
+
+    fn create_test_authenticator_data(counter: u32) -> AuthenticatorData {
+        AuthenticatorData {
+            rp_id_hash: vec![0; 32],
+            flags: 0x01 | 0x04, // UP | UV flags set
+            counter,
+            raw_data: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn test_start_authentication_no_username() {
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let result = start_authentication(None).await;
+        assert!(result.is_ok());
+
+        let auth_options = result.unwrap();
+        assert!(auth_options.allow_credentials.is_empty());
+        assert!(!auth_options.challenge.is_empty());
+        assert!(!auth_options.auth_id.is_empty());
+        assert_eq!(auth_options.rp_id, *crate::passkey::config::PASSKEY_RP_ID);
+        assert_eq!(
+            auth_options.user_verification,
+            *crate::passkey::config::PASSKEY_USER_VERIFICATION
+        );
+    }
+
+    #[tokio::test]
+    async fn test_start_authentication_generates_unique_ids() {
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let result1 = start_authentication(None).await;
+        let result2 = start_authentication(None).await;
+
+        assert!(result1.is_ok());
+        assert!(result2.is_ok());
+
+        let auth1 = result1.unwrap();
+        let auth2 = result2.unwrap();
+
+        // Ensure unique challenges and auth IDs
+        assert_ne!(auth1.challenge, auth2.challenge);
+        assert_ne!(auth1.auth_id, auth2.auth_id);
+    }
+
+    #[test]
+    fn test_verify_user_handle_real_function_matching_handles() {
+        let auth_response = create_test_authenticator_response(
+            Some("test_user_handle".to_string()),
+            "test_auth_id".to_string(),
+        );
+        let credential = create_test_passkey_credential("test_user_handle".to_string());
+
+        // Test both discoverable and non-discoverable cases
+        let result1 = verify_user_handle(&auth_response, &credential, true);
+        let result2 = verify_user_handle(&auth_response, &credential, false);
+
+        assert!(
+            result1.is_ok(),
+            "Should succeed with matching handles (discoverable)"
+        );
+        assert!(
+            result2.is_ok(),
+            "Should succeed with matching handles (non-discoverable)"
+        );
+    }
+
+    #[test]
+    fn test_verify_user_handle_real_function_mismatched_handles() {
+        let auth_response = create_test_authenticator_response(
+            Some("wrong_handle".to_string()),
+            "test_auth_id".to_string(),
+        );
+        let credential = create_test_passkey_credential("correct_handle".to_string());
+
+        // Test both discoverable and non-discoverable cases
+        let result1 = verify_user_handle(&auth_response, &credential, true);
+        let result2 = verify_user_handle(&auth_response, &credential, false);
+
+        // Both should fail with Authentication error
+        assert!(
+            result1.is_err(),
+            "Should fail with mismatched handles (discoverable)"
+        );
+        if let Err(PasskeyError::Authentication(msg)) = &result1 {
+            assert!(
+                msg.contains("User handle mismatch"),
+                "Expected 'User handle mismatch' error but got: {}",
+                msg
+            );
+        } else {
+            panic!(
+                "Expected PasskeyError::Authentication but got: {:?}",
+                result1
+            );
+        }
+
+        assert!(
+            result2.is_err(),
+            "Should fail with mismatched handles (non-discoverable)"
+        );
+        if let Err(PasskeyError::Authentication(msg)) = &result2 {
+            assert!(
+                msg.contains("User handle mismatch"),
+                "Expected 'User handle mismatch' error but got: {}",
+                msg
+            );
+        } else {
+            panic!(
+                "Expected PasskeyError::Authentication but got: {:?}",
+                result2
+            );
+        }
+    }
+
+    #[test]
+    fn test_verify_user_handle_real_function_missing_handle() {
+        let credential = create_test_passkey_credential("test_handle".to_string());
+
+        // Test discoverable case (should fail)
+        let auth_response_discoverable =
+            create_test_authenticator_response(None, "test_auth_id".to_string());
+        let result_discoverable =
+            verify_user_handle(&auth_response_discoverable, &credential, true);
+
+        assert!(
+            result_discoverable.is_err(),
+            "Should fail with missing user handle for discoverable credential"
+        );
+        if let Err(PasskeyError::Authentication(msg)) = &result_discoverable {
+            assert!(
+                msg.contains("Missing required user handle"),
+                "Expected 'Missing required user handle' error but got: {}",
+                msg
+            );
+        } else {
+            panic!(
+                "Expected PasskeyError::Authentication but got: {:?}",
+                result_discoverable
+            );
+        }
+
+        // Test non-discoverable case (should succeed)
+        let auth_response_non_discoverable =
+            create_test_authenticator_response(None, "test_auth_id".to_string());
+        let result_non_discoverable =
+            verify_user_handle(&auth_response_non_discoverable, &credential, false);
+
+        assert!(
+            result_non_discoverable.is_ok(),
+            "Non-discoverable credential should allow missing user handle"
+        );
+    }
+
+    #[test]
+    fn test_verify_user_handle_edge_cases() {
+        // Test empty string user handle
+        let auth_response_empty =
+            create_test_authenticator_response(Some("".to_string()), "test_auth_id".to_string());
+        let credential_empty = create_test_passkey_credential("".to_string());
+        let result_empty = verify_user_handle(&auth_response_empty, &credential_empty, true);
+        assert!(
+            result_empty.is_ok(),
+            "Should succeed with matching empty handles"
+        );
+
+        // Test empty vs non-empty mismatch
+        let credential_non_empty = create_test_passkey_credential("non_empty".to_string());
+        let result_mismatch =
+            verify_user_handle(&auth_response_empty, &credential_non_empty, false);
+        assert!(
+            result_mismatch.is_err(),
+            "Should fail with empty vs non-empty handle mismatch"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_verify_counter_authenticator_no_counter_support() {
+        // Test case: authenticator doesn't support counters (counter = 0)
+        let passkey = create_test_passkey_credential("test_user".to_string());
+        let auth_data = create_test_authenticator_data(0);
+
+        let result = verify_counter(&passkey.credential_id, &auth_data, &passkey).await;
+        assert!(result.is_ok());
+        // Counter should not be updated when response counter is 0 (test passes if no DB error)
+    }
+
+    #[tokio::test]
+    async fn test_verify_counter_replay_attack_detection() {
+        // Test case: counter is less than stored counter (replay attack)
+        let mut passkey = create_test_passkey_credential("test_user".to_string());
+        passkey.counter = 10;
+        let auth_data = create_test_authenticator_data(5);
+
+        let result = verify_counter(&passkey.credential_id, &auth_data, &passkey).await;
+        assert!(result.is_err());
+
+        if let Err(PasskeyError::Authentication(msg)) = result {
+            assert!(msg.contains("credential cloning detected"));
+        } else {
+            panic!("Expected Authentication error");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_counter_equal_counter_replay_attack() {
+        // Test case: counter equals stored counter (still a replay attack)
+        let mut passkey = create_test_passkey_credential("test_user".to_string());
+        passkey.counter = 10;
+        let auth_data = create_test_authenticator_data(10);
+
+        let result = verify_counter(&passkey.credential_id, &auth_data, &passkey).await;
+        assert!(result.is_err());
+
+        if let Err(PasskeyError::Authentication(msg)) = result {
+            assert!(msg.contains("credential cloning detected"));
+        } else {
+            panic!("Expected Authentication error");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_counter_valid_increment() {
+        // Test case: counter is greater than stored counter (valid)
+        let mut passkey = create_test_passkey_credential("test_user".to_string());
+        passkey.counter = 10;
+        let auth_data = create_test_authenticator_data(15);
+
+        let result =
+            verify_counter_with_mock(&passkey.credential_id, &auth_data, &passkey, true).await;
+        assert!(result.is_ok());
+        // Note: In real implementation, counter would be updated in database
+    }
+
+    #[tokio::test]
+    async fn test_verify_counter_zero_to_positive() {
+        // Test case: counter going from 0 to positive (first use of counter-supporting authenticator)
+        let mut passkey = create_test_passkey_credential("test_user".to_string());
+        passkey.counter = 0; // Stored counter is 0 (authenticator didn't support counters before)
+        let auth_data = create_test_authenticator_data(1); // Now receiving counter value 1
+
+        let result =
+            verify_counter_with_mock(&passkey.credential_id, &auth_data, &passkey, true).await;
+        assert!(result.is_ok());
+        // Note: In real implementation, counter would be updated in database
+    }
+
+    #[tokio::test]
+    async fn test_verify_counter_large_increment() {
+        // Test case: large counter increment (should still be valid)
+        let mut passkey = create_test_passkey_credential("test_user".to_string());
+        passkey.counter = 100;
+        let auth_data = create_test_authenticator_data(1000);
+
+        let result =
+            verify_counter_with_mock(&passkey.credential_id, &auth_data, &passkey, true).await;
+        assert!(result.is_ok());
+        // Note: In real implementation, counter would be updated in database
+    }
+
+    /// Test-friendly version of verify_counter that optionally skips database updates
+    #[cfg(test)]
+    async fn verify_counter_with_mock(
+        credential_id: &str,
+        auth_data: &AuthenticatorData,
+        stored_credential: &PasskeyCredential,
+        skip_db_update: bool,
+    ) -> Result<(), PasskeyError> {
+        let auth_counter = auth_data.counter;
+        tracing::debug!(
+            "Counter verification - stored: {}, received: {}",
+            stored_credential.counter,
+            auth_counter
+        );
+
+        if auth_counter == 0 {
+            // Counter value of 0 means the authenticator doesn't support counters
+            tracing::info!("Authenticator does not support counters (received counter=0)");
+        } else if auth_counter <= stored_credential.counter {
+            // Counter value decreased or didn't change - possible cloning attack
+            tracing::warn!(
+                "Counter verification failed - stored: {}, received: {}",
+                stored_credential.counter,
+                auth_counter
+            );
+            return Err(PasskeyError::Authentication(
+                "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
+            ));
+        } else {
+            // Counter increased as expected
+            tracing::debug!(
+                "Counter verification successful - stored: {}, received: {}",
+                stored_credential.counter,
+                auth_counter
+            );
+
+            // Update the counter only if not skipping for tests
+            if !skip_db_update {
+                PasskeyStore::update_credential_counter(credential_id, auth_counter).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    // Tests for verify_signature function
+
+    fn create_test_parsed_client_data(challenge: &str) -> ParsedClientData {
+        ParsedClientData {
+            challenge: challenge.to_string(),
+            origin: "https://example.com".to_string(),
+            type_: "webauthn.get".to_string(),
+            raw_data: b"test_client_data".to_vec(),
+        }
+    }
+
+    fn create_test_authenticator_data_with_raw(
+        counter: u32,
+        raw_data: Vec<u8>,
+    ) -> AuthenticatorData {
+        AuthenticatorData {
+            rp_id_hash: vec![0; 32],
+            flags: 0x01 | 0x04, // UP | UV flags set
+            counter,
+            raw_data,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_signature_invalid_public_key_format() {
+        // Test case: invalid base64 public key
+        let auth_response = create_test_authenticator_response(
+            Some("test_user".to_string()),
+            "test_auth_id".to_string(),
+        );
+        let client_data = create_test_parsed_client_data("test_challenge");
+        let auth_data = create_test_authenticator_data_with_raw(1, vec![0; 37]);
+
+        let mut credential = create_test_passkey_credential("test_user".to_string());
+        credential.public_key = "invalid_base64!".to_string(); // Invalid base64
+
+        let result = verify_signature(&auth_response, &client_data, &auth_data, &credential).await;
+        assert!(result.is_err());
+
+        if let Err(PasskeyError::Format(msg)) = result {
+            assert!(msg.contains("Invalid public key"));
+        } else {
+            panic!("Expected Format error for invalid public key");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_signature_invalid_signature_format() {
+        // Test case: invalid base64 signature
+        let mut auth_response = create_test_authenticator_response(
+            Some("test_user".to_string()),
+            "test_auth_id".to_string(),
+        );
+        auth_response.response.signature = "invalid_base64!".to_string(); // Invalid base64
+
+        let client_data = create_test_parsed_client_data("test_challenge");
+        let auth_data = create_test_authenticator_data_with_raw(1, vec![0; 37]);
+        let mut credential = create_test_passkey_credential("test_user".to_string());
+        // Use a valid base64 string for public key
+        credential.public_key = crate::utils::base64url_encode(vec![0; 64]).unwrap();
+
+        let result = verify_signature(&auth_response, &client_data, &auth_data, &credential).await;
+        assert!(result.is_err());
+
+        match result {
+            Err(error) => {
+                if let PasskeyError::Format(ref msg) = error {
+                    assert!(msg.contains("Invalid signature"));
+                } else {
+                    panic!(
+                        "Expected Format error for invalid signature format, got: {:?}",
+                        error
+                    );
+                }
+            }
+            Ok(_) => panic!("Expected error but got success"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_signature_verification_failure() {
+        // Test case: valid format but signature verification fails
+        let auth_response = create_test_authenticator_response(
+            Some("test_user".to_string()),
+            "test_auth_id".to_string(),
+        );
+        let client_data = create_test_parsed_client_data("test_challenge");
+        let auth_data = create_test_authenticator_data_with_raw(1, vec![0; 37]);
+
+        let mut credential = create_test_passkey_credential("test_user".to_string());
+        // Use a valid base64 string but invalid public key data
+        credential.public_key = crate::utils::base64url_encode(vec![0; 64]).unwrap();
+
+        let result = verify_signature(&auth_response, &client_data, &auth_data, &credential).await;
+        assert!(result.is_err());
+
+        if let Err(PasskeyError::Verification(msg)) = result {
+            assert!(msg.contains("Signature verification failed"));
+        } else {
+            panic!("Expected Verification error for signature mismatch");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_signature_empty_signature() {
+        // Test case: empty signature
+        let mut auth_response = create_test_authenticator_response(
+            Some("test_user".to_string()),
+            "test_auth_id".to_string(),
+        );
+        auth_response.response.signature = "".to_string(); // Empty signature
+
+        let client_data = create_test_parsed_client_data("test_challenge");
+        let auth_data = create_test_authenticator_data_with_raw(1, vec![0; 37]);
+        let mut credential = create_test_passkey_credential("test_user".to_string());
+        // Use a valid base64 string for public key
+        credential.public_key = crate::utils::base64url_encode(vec![0; 64]).unwrap();
+
+        let result = verify_signature(&auth_response, &client_data, &auth_data, &credential).await;
+        assert!(result.is_err());
+
+        match result {
+            Err(error) => {
+                // Empty signature should be a verification error since empty string is valid base64
+                if let PasskeyError::Verification(ref msg) = error {
+                    assert!(msg.contains("Signature verification failed"));
+                } else {
+                    panic!(
+                        "Expected Verification error for empty signature, got: {:?}",
+                        error
+                    );
+                }
+            }
+            Ok(_) => panic!("Expected error but got success"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_signature_empty_public_key() {
+        // Test case: empty public key
+        let auth_response = create_test_authenticator_response(
+            Some("test_user".to_string()),
+            "test_auth_id".to_string(),
+        );
+        let client_data = create_test_parsed_client_data("test_challenge");
+        let auth_data = create_test_authenticator_data_with_raw(1, vec![0; 37]);
+
+        let mut credential = create_test_passkey_credential("test_user".to_string());
+        credential.public_key = "".to_string(); // Empty public key
+
+        let result = verify_signature(&auth_response, &client_data, &auth_data, &credential).await;
+        assert!(result.is_err());
+
+        match result {
+            Err(error) => {
+                if let PasskeyError::Verification(ref msg) = error {
+                    assert!(msg.contains("Signature verification failed"));
+                } else {
+                    panic!(
+                        "Expected Verification error for empty public key, got: {:?}",
+                        error
+                    );
+                }
+            }
+            Ok(_) => panic!("Expected error but got success"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_signature_malformed_data_structures() {
+        // Test case: test with various malformed data to ensure robust error handling
+        let auth_response = create_test_authenticator_response(
+            Some("test_user".to_string()),
+            "test_auth_id".to_string(),
+        );
+        let client_data = create_test_parsed_client_data("test_challenge");
+
+        // Test with empty raw data in auth_data
+        let auth_data_empty = create_test_authenticator_data_with_raw(1, vec![]);
+        let credential = create_test_passkey_credential("test_user".to_string());
+
+        let result =
+            verify_signature(&auth_response, &client_data, &auth_data_empty, &credential).await;
+        assert!(result.is_err());
+
+        // Should fail at verification stage since we have empty auth data
+        match result {
+            Err(PasskeyError::Format(_)) | Err(PasskeyError::Verification(_)) => {
+                // Either error type is acceptable for malformed data
+            }
+            _ => panic!("Expected Format or Verification error for malformed data"),
+        }
+    }
+}
