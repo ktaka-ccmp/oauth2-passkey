@@ -129,7 +129,191 @@ mod tests {
         assert!(!page_token.is_empty());
     }
 
-    // Note: We can't easily test verify_page_session_token directly because it depends on
-    // GENERIC_CACHE_STORE which is a global singleton. We would need to mock this dependency
-    // for proper unit testing. This would be a good candidate for integration testing.
+    // Helper function to create a test StoredSession for unit tests
+    fn create_test_session(csrf_token: &str) -> serde_json::Value {
+        use chrono::Utc;
+
+        // Create a JSON representation matching StoredSession structure
+        serde_json::json!({
+            "user_id": "test_user",
+            "csrf_token": csrf_token,
+            "expires_at": Utc::now().to_rfc3339(),
+            "ttl": 3600_u64,
+        })
+    }
+
+    // Helper function to get the session cookie name for tests
+    fn get_session_cookie_name() -> &'static str {
+        "__Host-SessionId" // Match the default in SESSION_COOKIE_NAME
+    }
+
+    #[tokio::test]
+    async fn test_verify_page_session_token_success() {
+        use crate::storage::CacheData;
+        use crate::test_utils::init_test_environment;
+        use http::HeaderMap;
+        use http::header::{COOKIE, HeaderValue};
+
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let session_id = "test_session_123";
+        let csrf_token = "test_csrf_token_456";
+
+        // Create test session data as JSON
+        let session_json = create_test_session(csrf_token);
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: session_json.to_string(),
+        };
+
+        // Store the session in the global cache store
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Create headers with session cookie
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            COOKIE,
+            HeaderValue::from_str(&format!("{}={}", get_session_cookie_name(), session_id))
+                .unwrap(),
+        );
+
+        // Generate the expected page session token
+        let page_token = generate_page_session_token(csrf_token);
+
+        // Test verification success using global store
+        let result = verify_page_session_token(&headers, Some(&page_token)).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_verify_page_session_token_invalid_token() {
+        use crate::storage::CacheData;
+        use crate::test_utils::init_test_environment;
+        use http::HeaderMap;
+        use http::header::{COOKIE, HeaderValue};
+
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let session_id = "test_session_789";
+        let csrf_token = "actual_csrf_token";
+
+        // Create test session data as JSON
+        let session_json = create_test_session(csrf_token);
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: session_json.to_string(),
+        };
+
+        // Store the session in the global cache store
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Create headers with session cookie
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            COOKIE,
+            HeaderValue::from_str(&format!("{}={}", get_session_cookie_name(), session_id))
+                .unwrap(),
+        );
+
+        // Create an invalid page token
+        let invalid_token = "invalid_token".to_string();
+
+        // Test verification failure with invalid token using global store
+        let result = verify_page_session_token(&headers, Some(&invalid_token)).await;
+
+        assert!(result.is_err());
+        if let Err(SessionError::PageSessionToken(msg)) = result {
+            assert!(msg.contains("does not match"));
+        } else {
+            panic!("Expected PageSessionToken error");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_page_session_token_missing_token() {
+        use crate::storage::CacheData;
+        use crate::test_utils::init_test_environment;
+        use http::HeaderMap;
+        use http::header::{COOKIE, HeaderValue};
+
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let session_id = "test_session_012";
+        let csrf_token = "csrf_token_exists";
+
+        // Create test session data as JSON
+        let session_json = create_test_session(csrf_token);
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: session_json.to_string(),
+        };
+
+        // Store the session in the global cache store
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Create headers with session cookie
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            COOKIE,
+            HeaderValue::from_str(&format!("{}={}", get_session_cookie_name(), session_id))
+                .unwrap(),
+        );
+
+        // Test verification failure with missing token using global store
+        let result = verify_page_session_token(&headers, None).await;
+
+        assert!(result.is_err());
+        if let Err(SessionError::PageSessionToken(msg)) = result {
+            assert!(msg.contains("missing"));
+        } else {
+            panic!("Expected PageSessionToken error");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_page_session_token_missing_session() {
+        use crate::test_utils::init_test_environment;
+        use http::HeaderMap;
+
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        // Create headers with no session cookie
+        let headers = HeaderMap::new();
+
+        // Generate some token
+        let page_token = "some_token".to_string();
+
+        // Test verification failure with missing session using global store
+        let result = verify_page_session_token(&headers, Some(&page_token)).await;
+
+        assert!(result.is_err());
+        if let Err(SessionError::PageSessionToken(msg)) = result {
+            assert!(msg.contains("Session ID missing"));
+        } else {
+            panic!("Expected PageSessionToken error");
+        }
+    }
 }

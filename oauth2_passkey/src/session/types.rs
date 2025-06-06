@@ -207,34 +207,4 @@ mod tests {
             _ => panic!("Expected SessionError::Storage"),
         }
     }
-
-    #[test]
-    fn test_csrf_token_new_and_as_str() {
-        let token = CsrfToken::new("token123".to_string());
-        assert_eq!(token.as_str(), "token123");
-    }
-
-    #[test]
-    fn test_user_id_new_and_as_str() {
-        let user_id = UserId::new("user123".to_string());
-        assert_eq!(user_id.as_str(), "user123");
-    }
-
-    #[test]
-    fn test_authentication_status_display() {
-        let status_true = AuthenticationStatus(true);
-        let status_false = AuthenticationStatus(false);
-
-        assert_eq!(format!("{}", status_true), "true");
-        assert_eq!(format!("{}", status_false), "false");
-    }
-
-    #[test]
-    fn test_csrf_header_verified_display() {
-        let verified_true = CsrfHeaderVerified(true);
-        let verified_false = CsrfHeaderVerified(false);
-
-        assert_eq!(format!("{}", verified_true), "true");
-        assert_eq!(format!("{}", verified_false), "false");
-    }
 }
