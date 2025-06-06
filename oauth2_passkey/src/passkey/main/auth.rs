@@ -10,17 +10,15 @@ use crate::passkey::errors::PasskeyError;
 use crate::passkey::storage::PasskeyStore;
 use crate::passkey::types::{PasskeyCredential, PublicKeyCredentialUserEntity, StoredOptions};
 
-use super::challenge::{get_and_validate_options_with_store, remove_options_with_store};
+use super::challenge::{get_and_validate_options, remove_options};
 use super::types::{
     AllowCredential, AuthenticationOptions, AuthenticatorData, AuthenticatorResponse,
     ParsedClientData,
 };
-use super::utils::{name2cid_str_vec, store_in_cache_with_store};
-use crate::storage::CacheStore;
+use super::utils::{name2cid_str_vec, store_in_cache};
 
-pub(crate) async fn start_authentication_with_store(
+pub(crate) async fn start_authentication(
     username: Option<String>,
-    cache_store: Option<&tokio::sync::Mutex<Box<dyn CacheStore>>>,
 ) -> Result<AuthenticationOptions, PasskeyError> {
     let mut allow_credentials = Vec::new();
     match username.clone() {
@@ -56,8 +54,7 @@ pub(crate) async fn start_authentication_with_store(
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    store_in_cache_with_store(
-        cache_store,
+    store_in_cache(
         "auth_challenge",
         &auth_id,
         stored_options,
@@ -79,16 +76,8 @@ pub(crate) async fn start_authentication_with_store(
     Ok(auth_option)
 }
 
-pub(crate) async fn start_authentication(
-    username: Option<String>,
-) -> Result<AuthenticationOptions, PasskeyError> {
-    start_authentication_with_store(username, None::<&tokio::sync::Mutex<Box<dyn CacheStore>>>)
-        .await
-}
-
-pub(crate) async fn finish_authentication_with_cache_store(
+pub(crate) async fn finish_authentication(
     auth_response: AuthenticatorResponse,
-    cache_store: Option<&tokio::sync::Mutex<Box<dyn CacheStore>>>,
 ) -> Result<(String, String), PasskeyError> {
     tracing::debug!(
         "Starting authentication verification for response: {:?}",
@@ -96,9 +85,7 @@ pub(crate) async fn finish_authentication_with_cache_store(
     );
 
     // Get stored challenge and verify auth
-    let stored_options =
-        get_and_validate_options_with_store(cache_store, "auth_challenge", &auth_response.auth_id)
-            .await?;
+    let stored_options = get_and_validate_options("auth_challenge", &auth_response.auth_id).await?;
 
     tracing::debug!(
         "Parsing client data: {}",
@@ -169,21 +156,11 @@ pub(crate) async fn finish_authentication_with_cache_store(
     PasskeyStore::update_credential_last_used_at(&auth_response.id, Utc::now()).await?;
 
     // Remove challenge from cache
-    remove_options_with_store(cache_store, "auth_challenge", &auth_response.auth_id).await?;
+    remove_options("auth_challenge", &auth_response.auth_id).await?;
     let user_name = stored_credential.user.name.clone();
     let user_id = stored_credential.user_id.clone();
 
     Ok((user_id, user_name))
-}
-
-pub(crate) async fn finish_authentication(
-    auth_response: AuthenticatorResponse,
-) -> Result<(String, String), PasskeyError> {
-    finish_authentication_with_cache_store(
-        auth_response,
-        None::<&tokio::sync::Mutex<Box<dyn CacheStore>>>,
-    )
-    .await
 }
 
 /// Verifies that the user handle in the authenticator response matches the stored credential
@@ -331,12 +308,7 @@ async fn verify_signature(
 mod tests {
     use super::*;
     use crate::passkey::main::types;
-    use crate::storage::InMemoryCacheStore;
-    use tokio::sync::Mutex;
-
-    fn create_test_cache() -> Mutex<Box<dyn CacheStore>> {
-        Mutex::new(Box::new(InMemoryCacheStore::new()))
-    }
+    use crate::test_utils::init_test_environment;
 
     fn create_test_authenticator_response(
         user_handle: Option<String>,
@@ -385,10 +357,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_start_authentication_with_store_no_username() {
-        let cache = create_test_cache();
+    async fn test_start_authentication_no_username() {
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
 
-        let result = start_authentication_with_store(None, Some(&cache)).await;
+        let result = start_authentication(None).await;
         assert!(result.is_ok());
 
         let auth_options = result.unwrap();
@@ -403,11 +376,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_start_authentication_with_store_generates_unique_ids() {
-        let cache = create_test_cache();
+    async fn test_start_authentication_generates_unique_ids() {
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
 
-        let result1 = start_authentication_with_store(None, Some(&cache)).await;
-        let result2 = start_authentication_with_store(None, Some(&cache)).await;
+        let result1 = start_authentication(None).await;
+        let result2 = start_authentication(None).await;
 
         assert!(result1.is_ok());
         assert!(result2.is_ok());
