@@ -98,8 +98,8 @@ pub(super) async fn gen_new_user_id() -> Result<String, CoordinationError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::init_test_environment;
     use serial_test::serial;
-    use std::env; // Assuming you'll add `serial_test` to dev-dependencies
 
     use crate::oauth2::OAuth2Store;
     use crate::passkey::{PasskeyCredential, PasskeyStore};
@@ -165,30 +165,7 @@ mod tests {
 
     // Helper function to set up an in-memory SQLite database for testing
     async fn setup_test_db() -> Result<(), Box<dyn std::error::Error>> {
-        // Set environment variables for in-memory SQLite
-        // These must be set BEFORE GENERIC_DATA_STORE is first accessed.
-        // serial_test ensures this function runs before others in a test.
-        // Modifying environment variables is unsafe as it's a global state change.
-        unsafe {
-            env::set_var("GENERIC_DATA_STORE_TYPE", "sqlite");
-            env::set_var("GENERIC_DATA_STORE_URL", "sqlite::memory:");
-            // Optionally, ensure a consistent prefix or no prefix for tests
-            env::set_var("DB_TABLE_PREFIX", "test_o2p_");
-        }
-
-        // Initialize stores - this will create tables in the in-memory DB
-        // The GENERIC_DATA_STORE will be initialized with the env vars above
-        // when these init() functions first access it.
-        UserStore::init()
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        PasskeyStore::init()
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        OAuth2Store::init()
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-
+        init_test_environment().await;
         Ok(())
     }
 
@@ -378,10 +355,8 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_get_all_users() {
-        // Set up the test database
-        setup_test_db()
-            .await
-            .expect("Failed to set up test database");
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         // First, get all existing users and delete them to ensure a clean state
         let existing_users = UserStore::get_all_users()
