@@ -4,6 +4,88 @@
 
 This document captures detailed insights and lessons learned from implementing and fixing unit tests in the coordination module of the OAuth2-Passkey Rust library. The testing journey revealed critical issues with database initialization patterns, race conditions, and best practices for testing with in-memory databases.
 
+## Recent Additions: Passkey Register Module Test Fixes
+
+### Test Compilation Issues with `tokio_test::block_on`
+
+**Problem:** 
+- Tests were using `#[test]` with `tokio_test::block_on` pattern which failed to compile
+- Error: `tokio_test` crate wasn't available as a dependency
+
+**Solution:**
+```rust
+// Changed from:
+#[test]
+fn test_extract_credential_public_key_success() {
+    tokio_test::block_on(async { ... });
+}
+
+// To:
+#[tokio::test]
+async fn test_extract_credential_public_key_success() {
+    crate::test_utils::init_test_environment().await;
+    // ... test body
+}
+```
+
+**Key Insight:** For async tests in this codebase, use `#[tokio::test]` instead of blocking patterns. The `tokio` crate is already a dependency via `tokio = { version = "1.0", features = ["full"] }`.
+
+### WebAuthn RP ID Hash Validation Issues
+
+**Problem:**
+- Test was failing with "Invalid RP ID hash" error 
+- Root cause: Mismatch between test origins and expected RP ID hashes
+
+**Analysis:**
+- Test environment (`.env_test`) configured with `ORIGIN='https://example.com'`
+- Test helper functions were using `"https://localhost:3000"` origin
+- WebAuthn spec requires RP ID hash to match the origin's hostname
+
+**Solution:**
+1. **Origin Consistency:** Updated test helper to use `"https://example.com"` instead of `"https://localhost:3000"`
+2. **RP ID Hash Fix:** Changed from SHA256("localhost") to SHA256("example.com"):
+   ```rust
+   // Old hash (SHA256("localhost")):
+   auth_data.extend_from_slice(&[
+       0x6d, 0xc4, 0xc2, 0x9d, 0x90, 0x1f, 0x36, 0xf4,
+       // ... rest of localhost hash
+   ]);
+   
+   // New hash (SHA256("example.com")):
+   auth_data.extend_from_slice(&[
+       0xa3, 0x79, 0xa6, 0xf6, 0xee, 0xaf, 0xb9, 0xa5,
+       0x5e, 0x37, 0x8c, 0x11, 0x80, 0x34, 0xe2, 0x75,
+       0x1e, 0x68, 0x2f, 0xab, 0x9f, 0x2d, 0x30, 0xab,
+       0x13, 0xd2, 0x12, 0x55, 0x86, 0xce, 0x19, 0x47,
+   ]);
+   ```
+
+**Testing Insight:** Always ensure test data consistency across:
+- Environment configuration (`.env_test`)
+- Test helper functions (origin URLs)
+- Mock WebAuthn data (RP ID hashes, client data JSON)
+
+### User Verification Flag Issues
+
+**Additional Problem Found:**
+- Another test was failing due to incorrect authenticator data flags
+- WebAuthn requires User Verification flag when user verification is performed
+
+**Solution:**
+```rust
+// Changed from:
+auth_data.push(0x41); // user present + attested credential data
+
+// To:
+auth_data.push(0x45); // user present + user verified + attested credential data
+```
+
+**Key Learning:** WebAuthn authenticator data flags must accurately reflect the authentication ceremony:
+- `0x01`: User Present (UP)
+- `0x04`: User Verified (UV) 
+- `0x40`: Attested Credential Data Present (AT)
+- Combined: `0x45` = UP + UV + AT
+
 ## Problem Analysis
 
 ### Initial Issues
