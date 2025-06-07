@@ -382,4 +382,254 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_state_params_serialization() {
+        let state_params = StateParams {
+            csrf_id: "csrf123".to_string(),
+            nonce_id: "nonce456".to_string(),
+            pkce_id: "pkce789".to_string(),
+            misc_id: Some("misc012".to_string()),
+            mode_id: Some("mode345".to_string()),
+        };
+
+        // Test serialization
+        let serialized = serde_json::to_string(&state_params).unwrap();
+        let deserialized: StateParams = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.csrf_id, state_params.csrf_id);
+        assert_eq!(deserialized.nonce_id, state_params.nonce_id);
+        assert_eq!(deserialized.pkce_id, state_params.pkce_id);
+        assert_eq!(deserialized.misc_id, state_params.misc_id);
+        assert_eq!(deserialized.mode_id, state_params.mode_id);
+    }
+
+    #[test]
+    fn test_state_params_with_none_values() {
+        let state_params = StateParams {
+            csrf_id: "csrf123".to_string(),
+            nonce_id: "nonce456".to_string(),
+            pkce_id: "pkce789".to_string(),
+            misc_id: None,
+            mode_id: None,
+        };
+
+        let serialized = serde_json::to_string(&state_params).unwrap();
+        let deserialized: StateParams = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.csrf_id, state_params.csrf_id);
+        assert_eq!(deserialized.nonce_id, state_params.nonce_id);
+        assert_eq!(deserialized.pkce_id, state_params.pkce_id);
+        assert!(deserialized.misc_id.is_none());
+        assert!(deserialized.mode_id.is_none());
+    }
+
+    #[test]
+    fn test_auth_response_deserialization() {
+        let json_str = r#"{"code": "auth_code_123", "state": "state_456"}"#;
+        let auth_response: AuthResponse = serde_json::from_str(json_str).unwrap();
+
+        assert_eq!(auth_response.code, "auth_code_123");
+        assert_eq!(auth_response.state, "state_456");
+    }
+
+    #[test]
+    fn test_auth_response_with_id_token() {
+        let json_str =
+            r#"{"code": "auth_code_123", "state": "state_456", "id_token": "token_789"}"#;
+        let auth_response: AuthResponse = serde_json::from_str(json_str).unwrap();
+
+        assert_eq!(auth_response.code, "auth_code_123");
+        assert_eq!(auth_response.state, "state_456");
+        // Note: _id_token is private, but we can test that deserialization works
+    }
+
+    #[test]
+    fn test_oidc_token_response_serialization() {
+        let token_response = OidcTokenResponse {
+            access_token: "access_123".to_string(),
+            token_type: "Bearer".to_string(),
+            expires_in: 3600,
+            refresh_token: Some("refresh_456".to_string()),
+            scope: "openid email profile".to_string(),
+            id_token: Some("id_token_789".to_string()),
+        };
+
+        let serialized = serde_json::to_string(&token_response).unwrap();
+        let deserialized: OidcTokenResponse = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.access_token, token_response.access_token);
+        assert_eq!(deserialized.token_type, token_response.token_type);
+        assert_eq!(deserialized.expires_in, token_response.expires_in);
+        assert_eq!(deserialized.refresh_token, token_response.refresh_token);
+        assert_eq!(deserialized.scope, token_response.scope);
+        assert_eq!(deserialized.id_token, token_response.id_token);
+    }
+
+    #[test]
+    fn test_oauth2_account_default() {
+        let account = OAuth2Account::default();
+
+        assert!(account.id.is_empty());
+        assert!(account.user_id.is_empty());
+        assert!(account.provider.is_empty());
+        assert!(account.provider_user_id.is_empty());
+        assert!(account.name.is_empty());
+        assert!(account.email.is_empty());
+        assert!(account.picture.is_none());
+        assert_eq!(account.metadata, Value::Null);
+        // created_at and updated_at should be recent (within last second)
+        let now = Utc::now();
+        assert!((now - account.created_at).num_seconds() < 1);
+        assert!((now - account.updated_at).num_seconds() < 1);
+    }
+
+    #[test]
+    fn test_oauth2_account_serialization() {
+        let account = OAuth2Account {
+            id: "acc123".to_string(),
+            user_id: "user456".to_string(),
+            provider: "google".to_string(),
+            provider_user_id: "google_789".to_string(),
+            name: "John Doe".to_string(),
+            email: "john@example.com".to_string(),
+            picture: Some("https://example.com/pic.jpg".to_string()),
+            metadata: json!({"verified": true}),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let serialized = serde_json::to_string(&account).unwrap();
+        let deserialized: OAuth2Account = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.id, account.id);
+        assert_eq!(deserialized.user_id, account.user_id);
+        assert_eq!(deserialized.provider, account.provider);
+        assert_eq!(deserialized.provider_user_id, account.provider_user_id);
+        assert_eq!(deserialized.name, account.name);
+        assert_eq!(deserialized.email, account.email);
+        assert_eq!(deserialized.picture, account.picture);
+        assert_eq!(deserialized.metadata, account.metadata);
+    }
+
+    #[test]
+    fn test_google_user_info_serialization() {
+        let google_user = GoogleUserInfo {
+            id: "123456".to_string(),
+            family_name: "Doe".to_string(),
+            name: "John Doe".to_string(),
+            picture: Some("https://example.com/pic.jpg".to_string()),
+            email: "john@example.com".to_string(),
+            given_name: "John".to_string(),
+            hd: Some("example.com".to_string()),
+            verified_email: true,
+        };
+
+        let serialized = serde_json::to_string(&google_user).unwrap();
+        let deserialized: GoogleUserInfo = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.id, google_user.id);
+        assert_eq!(deserialized.family_name, google_user.family_name);
+        assert_eq!(deserialized.name, google_user.name);
+        assert_eq!(deserialized.picture, google_user.picture);
+        assert_eq!(deserialized.email, google_user.email);
+        assert_eq!(deserialized.given_name, google_user.given_name);
+        assert_eq!(deserialized.hd, google_user.hd);
+        assert_eq!(deserialized.verified_email, google_user.verified_email);
+    }
+
+    #[test]
+    fn test_stored_token_ttl_consistency() {
+        let now = Utc::now();
+        let ttl_seconds = 3600u64;
+        let expires_at = now + Duration::seconds(ttl_seconds as i64);
+
+        let stored_token = StoredToken {
+            token: "test_token".to_string(),
+            expires_at,
+            user_agent: Some("Mozilla/5.0".to_string()),
+            ttl: ttl_seconds,
+        };
+
+        // Verify that ttl and expires_at are consistent
+        let calculated_expires = now + Duration::seconds(stored_token.ttl as i64);
+        let diff = (stored_token.expires_at - calculated_expires)
+            .num_seconds()
+            .abs();
+        assert!(
+            diff <= 1,
+            "TTL and expires_at should be consistent within 1 second"
+        );
+    }
+
+    #[test]
+    fn test_account_search_field_variants() {
+        // Test that all variants can be created and compared
+        let id_field = AccountSearchField::Id("id123".to_string());
+        let user_id_field = AccountSearchField::UserId("user456".to_string());
+        let provider_field = AccountSearchField::Provider("google".to_string());
+        let provider_user_id_field = AccountSearchField::ProviderUserId("google_789".to_string());
+        let name_field = AccountSearchField::Name("John Doe".to_string());
+        let email_field = AccountSearchField::Email("john@example.com".to_string());
+
+        // Test equality
+        assert_eq!(id_field, AccountSearchField::Id("id123".to_string()));
+        assert_ne!(id_field, user_id_field);
+        assert_ne!(user_id_field, provider_field);
+        assert_ne!(provider_field, provider_user_id_field);
+        assert_ne!(provider_user_id_field, name_field);
+        assert_ne!(name_field, email_field);
+    }
+
+    #[test]
+    fn test_oauth2_mode_all_variants() {
+        // Test all variants exist and work correctly
+        let modes = vec![
+            OAuth2Mode::AddToUser,
+            OAuth2Mode::CreateUser,
+            OAuth2Mode::Login,
+            OAuth2Mode::CreateUserOrLogin,
+        ];
+
+        for mode in &modes {
+            // Test as_str
+            let str_repr = mode.as_str();
+            assert!(!str_repr.is_empty());
+
+            // Test from_str roundtrip
+            let parsed_mode = std::str::FromStr::from_str(str_repr).unwrap();
+            assert_eq!(*mode, parsed_mode);
+
+            // Test serde roundtrip
+            let serialized = serde_json::to_string(mode).unwrap();
+            let deserialized: OAuth2Mode = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(*mode, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_oauth2_mode_invalid_string() {
+        use std::str::FromStr;
+
+        let invalid_strings = vec![
+            "invalid_mode",
+            "",
+            "ADD_TO_USER", // wrong case
+            "add-to-user", // wrong separator
+            "add_user",    // missing "to"
+            "loginuser",   // missing separator
+        ];
+
+        for invalid_str in invalid_strings {
+            let result = OAuth2Mode::from_str(invalid_str);
+            assert!(result.is_err(), "Should fail to parse: {}", invalid_str);
+
+            match result {
+                Err(OAuth2Error::InvalidMode(msg)) => {
+                    assert_eq!(msg, invalid_str);
+                }
+                _ => panic!("Expected InvalidMode error for: {}", invalid_str),
+            }
+        }
+    }
 }
