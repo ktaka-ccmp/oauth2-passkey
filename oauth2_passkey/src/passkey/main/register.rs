@@ -1135,4 +1135,122 @@ mod tests {
             ),
         }
     }
+
+    #[tokio::test]
+    async fn test_create_registration_options_integration() {
+        use crate::passkey::main::test_utils as passkey_test_utils;
+        use crate::storage::GENERIC_CACHE_STORE;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        // Create user info for registration
+        let user_handle = "test_user_handle_456";
+        let user_info = crate::passkey::types::PublicKeyCredentialUserEntity {
+            user_handle: user_handle.to_string(),
+            name: "test_user_456".to_string(),
+            display_name: "Test User 456".to_string(),
+        };
+
+        // Call the function under test
+        let options = super::create_registration_options(user_info.clone()).await;
+        assert!(options.is_ok(), "Failed to create registration options");
+
+        let registration_options = options.unwrap();
+
+        // Verify that the options contain the expected user information
+        assert_eq!(registration_options.user.user_handle, user_handle);
+        assert_eq!(registration_options.user.name, "test_user_456");
+        assert_eq!(registration_options.user.display_name, "Test User 456");
+
+        // Verify that a challenge was stored in the cache
+        let cache_result = super::get_and_validate_options("regi_challenge", user_handle).await;
+        assert!(
+            cache_result.is_ok(),
+            "Challenge was not stored in cache properly"
+        );
+
+        // Clean up cache
+        let cleanup_result =
+            passkey_test_utils::remove_from_cache("regi_challenge", user_handle).await;
+        assert!(
+            cleanup_result.is_ok(),
+            "Failed to clean up test data from cache"
+        );
+
+        // Verify removal
+        let cache_get = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("regi_challenge", user_handle)
+            .await;
+        assert!(cache_get.is_ok(), "Error checking cache");
+        assert!(
+            cache_get.unwrap().is_none(),
+            "Cache entry should be removed"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_or_create_user_handle() {
+        use crate::passkey::main::test_utils as passkey_test_utils;
+        use crate::session::User as SessionUser;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        // Test with no user (should generate a new handle)
+        let no_user_result = super::get_or_create_user_handle(&None).await;
+        assert!(
+            no_user_result.is_ok(),
+            "Failed to create user handle with no user"
+        );
+        let no_user_handle = no_user_result.unwrap();
+        assert!(
+            !no_user_handle.is_empty(),
+            "User handle should not be empty"
+        );
+
+        // Test with logged-in user
+        let session_user = Some(SessionUser {
+            id: "test_user_id_789".to_string(),
+            account: "test_account_789".to_string(),
+            label: "Test User 789".to_string(),
+            is_admin: false,
+            sequence_number: 1,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        });
+
+        // First call with this user should create a new handle
+        let first_handle_result = super::get_or_create_user_handle(&session_user).await;
+        assert!(
+            first_handle_result.is_ok(),
+            "Failed to create user handle for logged-in user"
+        );
+        let first_handle = first_handle_result.unwrap();
+
+        // Insert a test credential for this user to simulate existing credentials
+        let credential_id = "test_cred_id_for_user_handle";
+        let result = passkey_test_utils::insert_test_user_and_credential(
+            credential_id,
+            "test_user_id_789", // Same as session user ID
+            &first_handle,      // Use the generated handle
+            "Test User 789",
+            "Test Display Name 789",
+            "test_public_key",
+            "test_aaguid",
+            0,
+        )
+        .await;
+        assert!(result.is_ok(), "Failed to insert test credential");
+
+        // Second call with same user might reuse the handle depending on PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL
+        let second_handle_result = super::get_or_create_user_handle(&session_user).await;
+        assert!(second_handle_result.is_ok());
+
+        // Clean up
+        let cleanup_result = passkey_test_utils::cleanup_test_credential(credential_id).await;
+        assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
+    }
 }

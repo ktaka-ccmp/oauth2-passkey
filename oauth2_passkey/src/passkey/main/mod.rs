@@ -4,6 +4,8 @@ mod auth;
 mod challenge;
 mod register;
 mod related_origin;
+#[cfg(test)]
+mod test_utils;
 mod types;
 mod utils;
 
