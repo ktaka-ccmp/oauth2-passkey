@@ -12,4 +12,7 @@
 13. When I write unit tests for the library, I want to write them one by one, making sure each test passes before writing the next one.
 14. When you want to proceed to the next file, ask for my approval first.
 15. When you want to write multiple tests at once, ask for my approval first.
+16. When you want to modify the original function which you are writing the test for, you must explain the reason and ask for permission.
 17. The block of inline unit tests should be placed at the bottom of the file.
+18. For the inline unit tests, we have prepared test_utils module, where we can initialize data store and cache dedicated for unit tests.
+19. Unit tests should test the functionality of the code by actually calling the functions and methods, not by mimicking the behavior of the code.
