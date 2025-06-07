@@ -41,74 +41,14 @@ impl DataStore for PostgresDataStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
-
-    #[tokio::test]
-    async fn test_sqlite_data_store_as_sqlite() {
-        // Given a SqliteDataStore instance
-        let opts = sqlx::sqlite::SqliteConnectOptions::from_str("sqlite::memory:")
-            .expect("Failed to parse SQLite connection string")
-            .create_if_missing(true);
-
-        let store = SqliteDataStore {
-            pool: sqlx::sqlite::SqlitePool::connect_lazy_with(opts),
-        };
-
-        // When calling as_sqlite
-        let sqlite_pool = store.as_sqlite();
-
-        // Then it should return Some with the pool
-        assert!(sqlite_pool.is_some());
-    }
-
-    #[tokio::test]
-    async fn test_sqlite_data_store_as_postgres() {
-        // Given a SqliteDataStore instance
-        let opts = sqlx::sqlite::SqliteConnectOptions::from_str("sqlite::memory:")
-            .expect("Failed to parse SQLite connection string")
-            .create_if_missing(true);
-
-        let store = SqliteDataStore {
-            pool: sqlx::sqlite::SqlitePool::connect_lazy_with(opts),
-        };
-
-        // When calling as_postgres
-        let postgres_pool = store.as_postgres();
-
-        // Then it should return None
-        assert!(postgres_pool.is_none());
-    }
-
-    #[tokio::test]
-    async fn test_sqlite_data_store_debug() {
-        // Given a SqliteDataStore instance
-        let opts = sqlx::sqlite::SqliteConnectOptions::from_str("sqlite::memory:")
-            .expect("Failed to parse SQLite connection string")
-            .create_if_missing(true);
-
-        let store = SqliteDataStore {
-            pool: sqlx::sqlite::SqlitePool::connect_lazy_with(opts),
-        };
-
-        // When formatting with Debug
-        let debug_string = format!("{:?}", store);
-
-        // Then it should include the type name
-        assert!(debug_string.contains("SqliteDataStore"));
-    }
 
     #[test]
     fn test_data_store_trait_bounds() {
-        // This test verifies that the trait bounds are correctly enforced
+        // Verify that the trait bounds are correctly enforced for Send + Sync
         fn assert_send_sync<T: Send + Sync>() {}
 
-        // SqliteDataStore should be Send + Sync
         assert_send_sync::<SqliteDataStore>();
-
-        // PostgresDataStore should be Send + Sync
         assert_send_sync::<PostgresDataStore>();
-
-        // Box<dyn DataStore> should be Send + Sync
         assert_send_sync::<Box<dyn DataStore>>();
     }
 }

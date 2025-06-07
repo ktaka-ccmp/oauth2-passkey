@@ -165,8 +165,8 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_update_user_account_success() {
-        use crate::test_utils::init_test_environment_with_db;
-        init_test_environment_with_db().await;
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         // 1. Create initial user directly in the DB
         let initial_user = create_test_user("test-user", "old-account", "Old Label");

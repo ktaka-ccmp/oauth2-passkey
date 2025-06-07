@@ -56,11 +56,11 @@ async fn ensure_database_initialized() {
     let _ = PasskeyStore::init().await;
 }
 
-/// Enhanced test initialization that ensures database tables exist for the current connection
-///
-/// **Note**: This function is now identical to `init_test_environment()` since we simplified
-/// the approach. SQLite functions handle table initialization directly.
-/// This function is kept for backward compatibility and clarity of intent.
-pub async fn init_test_environment_with_db() {
-    init_test_environment().await;
-}
+// /// Enhanced test initialization that ensures database tables exist for the current connection
+// ///
+// /// **Note**: This function is now identical to `init_test_environment()` since we simplified
+// /// the approach. SQLite functions handle table initialization directly.
+// /// This function is kept for backward compatibility and clarity of intent.
+// pub async fn init_test_environment_with_db() {
+//     init_test_environment().await;
+// }

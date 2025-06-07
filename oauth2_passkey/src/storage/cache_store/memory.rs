@@ -204,4 +204,58 @@ mod tests {
         assert_eq!(get1.value, "value for prefix1");
         assert_eq!(get2.value, "value for prefix2");
     }
+
+    #[tokio::test]
+    async fn test_overwrite_existing_key() {
+        // Given an in-memory cache store with an existing value
+        let mut store = InMemoryCacheStore::new();
+        let prefix = "test";
+        let key = "key1";
+
+        let original_value = CacheData {
+            value: "original value".to_string(),
+        };
+        let new_value = CacheData {
+            value: "new value".to_string(),
+        };
+
+        // When storing the original value and then overwriting it
+        let _ = store.put(prefix, key, original_value).await;
+        let _ = store.put(prefix, key, new_value).await;
+
+        // Then the retrieved value should be the new one
+        let retrieved = store.get(prefix, key).await.unwrap().unwrap();
+        assert_eq!(retrieved.value, "new value");
+    }
+
+    #[tokio::test]
+    async fn test_remove_nonexistent_key() {
+        // Given an in-memory cache store
+        let mut store = InMemoryCacheStore::new();
+
+        // When removing a non-existent key
+        let result = store.remove("test", "nonexistent").await;
+
+        // Then it should succeed without error
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_empty_prefix_and_key() {
+        // Given an in-memory cache store
+        let mut store = InMemoryCacheStore::new();
+
+        let value = CacheData {
+            value: "test with empty strings".to_string(),
+        };
+
+        // When using empty strings for prefix and key
+        let put_result = store.put("", "", value.clone()).await;
+
+        // Then it should work correctly
+        assert!(put_result.is_ok());
+
+        let get_result = store.get("", "").await.unwrap().unwrap();
+        assert_eq!(get_result.value, "test with empty strings");
+    }
 }

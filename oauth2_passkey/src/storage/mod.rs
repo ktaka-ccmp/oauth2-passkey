@@ -4,6 +4,9 @@ mod errors;
 mod schema_validation;
 mod types;
 
+#[cfg(test)]
+mod integration_tests;
+
 pub(crate) async fn init() -> Result<(), errors::StorageError> {
     let _ = *cache_store::GENERIC_CACHE_STORE;
     let _ = *data_store::GENERIC_DATA_STORE;
