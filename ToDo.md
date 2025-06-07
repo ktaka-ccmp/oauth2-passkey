@@ -5,6 +5,16 @@
 - Tests
 - GitHub Actions
 - Decide on Public API
+
+- **[FIXED] Session Expiration Handling Inconsistency**
+  - ✅ Fixed: Added expiration check and automatic deletion logic to `get_csrf_token_from_session()` and `get_user_and_csrf_token_from_session()`
+  - ✅ Both functions now consistently check `stored_session.expires_at < Utc::now()` and delete expired sessions
+  - ✅ Both functions return `SessionError::SessionExpiredError` for expired sessions, matching `is_authenticated()` behavior
+  - ✅ Updated test `test_get_user_and_csrf_token_from_session_expired_session` to verify expired sessions are properly deleted
+  - ✅ All session-related tests now pass (406 total tests passing)
+  - **Location**: `oauth2_passkey/src/session/main/session.rs`
+  - **Previously**: Memory leaks in cache store, inconsistent session validation behavior
+
 - Tracing
   - Use tracing-error crate https://crates.io/crates/tracing-error
   - Use https://docs.rs/tower-http/latest/tower_http/trace/index.html
