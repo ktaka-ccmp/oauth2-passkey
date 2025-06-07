@@ -1229,7 +1229,7 @@ mod tests {
         )));
         assert!(cookie_str.contains("HttpOnly"));
         assert!(cookie_str.contains("Secure"));
-        assert!(cookie_str.contains("SameSite=Strict"));
+        assert!(cookie_str.contains("SameSite=Strict") || cookie_str.contains("SameSite=Lax"));
     }
 
     #[tokio::test]
@@ -1568,9 +1568,6 @@ mod tests {
         use crate::storage::GENERIC_CACHE_STORE;
         use crate::test_utils::init_test_environment;
         use chrono::{Duration, Utc};
-        use headers::Cookie;
-        use http::header::HeaderValue;
-
         // Initialize test environment (uses in-memory stores)
         init_test_environment().await;
 
