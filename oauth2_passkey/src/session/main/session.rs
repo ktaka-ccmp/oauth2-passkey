@@ -552,6 +552,9 @@ mod tests {
         })
     }
 
+    #[cfg(test)]
+    use serial_test::serial;
+
     #[tokio::test]
     async fn test_get_csrf_token_from_session_success() {
         use crate::storage::CacheData;
@@ -1639,6 +1642,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_get_user_from_session_requires_database() {
         use crate::session::main::test_utils::{
             cleanup_test_resources, create_test_user_and_session,

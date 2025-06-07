@@ -79,6 +79,10 @@ pub(super) async fn get_oauth2_accounts_by_field_sqlite(
     field: &AccountSearchField,
 ) -> Result<Vec<OAuth2Account>, OAuth2Error> {
     let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
+
+    // Ensure tables exist before any operations
+    create_tables_sqlite(pool).await?;
+
     let (query, value) = match field {
         AccountSearchField::Id(id) => (
             &format!("SELECT * FROM {} WHERE id = ?", table_name),
@@ -120,6 +124,9 @@ pub(super) async fn get_oauth2_account_by_provider_sqlite(
 ) -> Result<Option<OAuth2Account>, OAuth2Error> {
     let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
 
+    // Ensure tables exist before any operations
+    create_tables_sqlite(pool).await?;
+
     sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
         SELECT * FROM {}
@@ -139,6 +146,10 @@ pub(super) async fn upsert_oauth2_account_sqlite(
     account: OAuth2Account,
 ) -> Result<OAuth2Account, OAuth2Error> {
     let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
+
+    // Ensure tables exist before any operations - this is critical for in-memory databases
+    // where different connections might get different database instances
+    create_tables_sqlite(pool).await?;
 
     // Begin transaction
     let mut tx = pool
@@ -243,6 +254,10 @@ pub(super) async fn delete_oauth2_accounts_by_field_sqlite(
     field: &AccountSearchField,
 ) -> Result<(), OAuth2Error> {
     let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
+
+    // Ensure tables exist before any operations
+    create_tables_sqlite(pool).await?;
+
     let (query, value) = match field {
         AccountSearchField::Id(id) => (
             &format!("DELETE FROM {} WHERE id = ?", table_name),

@@ -154,9 +154,9 @@ pub async fn update_user_admin_status(
 mod tests {
     use super::*;
     use crate::session::User as SessionUser;
+    use crate::test_utils::init_test_environment;
     use chrono::Utc;
     use serial_test::serial;
-    use std::env;
 
     // Helper function to create a session user for testing
     fn create_test_session_user(id: &str, is_admin: bool) -> SessionUser {
@@ -169,104 +169,6 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
-    }
-
-    // Helper function to set up the test database
-    async fn setup_test_db() -> Result<(), Box<dyn std::error::Error>> {
-        // Generate a unique timestamp for this test run to avoid conflicts
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let table_prefix = format!("test_o2p_{}_", timestamp);
-
-        // Use a file-based SQLite database instead of in-memory to ensure schema is properly created
-        // This is more reliable for tests that need to validate schema
-        let db_path = format!("/tmp/test_admin_{}_{}.db", timestamp, uuid::Uuid::new_v4());
-        let db_url = format!("sqlite:{}", db_path);
-
-        // Set environment variables for the test - this is unsafe but necessary for testing
-        unsafe {
-            env::set_var("GENERIC_DATA_STORE_TYPE", "sqlite");
-            env::set_var("GENERIC_DATA_STORE_URL", &db_url);
-            env::set_var("DB_TABLE_PREFIX", &table_prefix);
-            env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            env::set_var(
-                "GENERIC_CACHE_STORE_URL",
-                &format!("memory://{}", timestamp),
-            );
-
-            // Set OAuth2 settings
-            env::set_var("OAUTH2_USER_ACCOUNT_FIELD", "email");
-            env::set_var("OAUTH2_USER_LABEL_FIELD", "name");
-            env::set_var("OAUTH2_GOOGLE_CLIENT_ID", "test-client-id");
-            env::set_var("OAUTH2_GOOGLE_CLIENT_SECRET", "test-client-secret");
-
-            // Set passkey settings
-            env::set_var("ORIGIN", "https://example.com");
-            env::set_var("PASSKEY_USER_ACCOUNT_FIELD", "name");
-            env::set_var("PASSKEY_USER_LABEL_FIELD", "display_name");
-            env::set_var("PASSKEY_RP_ID", "example.com");
-        }
-
-        // Initialize each module explicitly to ensure tables are created with the correct prefix
-        crate::userdb::init()
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        crate::passkey::init()
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        crate::oauth2::init()
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-
-        Ok(())
-    }
-
-    // Helper function to set up the test database with a specific prefix
-    async fn setup_test_db_with_prefix(prefix: &str) -> Result<(), Box<dyn std::error::Error>> {
-        // For admin tests, we'll use a simpler approach that doesn't rely on schema validation
-        // Generate a unique timestamp for this test run to avoid conflicts
-        let timestamp = chrono::Utc::now().timestamp_millis();
-
-        // Use a file-based SQLite database instead of in-memory to ensure schema is properly created
-        // This is more reliable for tests that need to validate schema
-        let db_path = format!("/tmp/test_admin_{}_{}.db", timestamp, uuid::Uuid::new_v4());
-        let db_url = format!("sqlite:{}", db_path);
-
-        // Set environment variables for the test - this is unsafe but necessary for testing
-        unsafe {
-            env::set_var("GENERIC_DATA_STORE_TYPE", "sqlite");
-            env::set_var("GENERIC_DATA_STORE_URL", &db_url);
-            env::set_var("DB_TABLE_PREFIX", prefix);
-            env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            env::set_var(
-                "GENERIC_CACHE_STORE_URL",
-                &format!("memory://{}", timestamp),
-            );
-
-            // Set OAuth2 settings
-            env::set_var("OAUTH2_USER_ACCOUNT_FIELD", "email");
-            env::set_var("OAUTH2_USER_LABEL_FIELD", "name");
-            env::set_var("OAUTH2_GOOGLE_CLIENT_ID", "test-client-id");
-            env::set_var("OAUTH2_GOOGLE_CLIENT_SECRET", "test-client-secret");
-
-            // Set passkey settings
-            env::set_var("ORIGIN", "https://example.com");
-            env::set_var("PASSKEY_USER_ACCOUNT_FIELD", "name");
-            env::set_var("PASSKEY_USER_LABEL_FIELD", "display_name");
-            env::set_var("PASSKEY_RP_ID", "example.com");
-        }
-
-        // Initialize each module explicitly to ensure tables are created with the correct prefix
-        crate::userdb::init()
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        crate::passkey::init()
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        crate::oauth2::init()
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-
-        Ok(())
     }
 
     // Helper function to create a test user in the database
@@ -295,17 +197,17 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_get_all_users() {
-        // Set up the test database with a unique prefix to isolate this test
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let prefix = format!("test_get_all_users_{}_", timestamp);
-        setup_test_db_with_prefix(&prefix)
-            .await
-            .expect("Failed to set up test database");
+        init_test_environment().await;
 
-        // Create three test users with unique IDs to avoid conflicts
-        let user1_id = format!("test-user-1-{}", timestamp);
-        let user2_id = format!("test-user-2-{}", timestamp);
-        let user3_id = format!("test-user-3-{}", timestamp);
+        // Get initial count of users in database
+        let initial_users = get_all_users().await.expect("Failed to get initial users");
+        let initial_count = initial_users.len();
+
+        // Create unique test users with timestamp to avoid conflicts
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let user1_id = format!("test-admin-user-1-{}", timestamp);
+        let user2_id = format!("test-admin-user-2-{}", timestamp);
+        let user3_id = format!("test-admin-user-3-{}", timestamp);
 
         create_test_user_in_db(&user1_id, false)
             .await
@@ -320,8 +222,14 @@ mod tests {
         // Get all users
         let users = get_all_users().await.expect("Failed to get all users");
 
+        // Verify that we have the initial count plus our 3 new users
+        assert_eq!(
+            users.len(),
+            initial_count + 3,
+            "Expected 3 additional users"
+        );
+
         // Verify that our test users are in the results
-        // We don't assert the exact count since other tests might have added users
         let user_ids: Vec<String> = users.iter().map(|u| u.id.clone()).collect();
         assert!(
             user_ids.contains(&user1_id),
@@ -336,31 +244,27 @@ mod tests {
             "User 3 should be in the result"
         );
 
-        // Verify that we can find all three of our test users
-        let test_users: Vec<_> = users
-            .iter()
-            .filter(|u| u.id == user1_id || u.id == user2_id || u.id == user3_id)
-            .collect();
-        assert_eq!(test_users.len(), 3, "Expected to find all 3 test users");
+        // Clean up - delete the test users we created
+        UserStore::delete_user(&user1_id).await.ok();
+        UserStore::delete_user(&user2_id).await.ok();
+        UserStore::delete_user(&user3_id).await.ok();
     }
 
     #[serial]
     #[tokio::test]
     async fn test_get_user() {
-        // Set up the test database
-        setup_test_db()
-            .await
-            .expect("Failed to set up test database");
+        init_test_environment().await;
 
-        // Create a test user
-        let user_id = "test-user-4";
+        // Create a unique test user
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let user_id = format!("test-get-user-{}", timestamp);
         let is_admin = true;
-        let _created_user = create_test_user_in_db(user_id, is_admin)
+        let _created_user = create_test_user_in_db(&user_id, is_admin)
             .await
             .expect("Failed to create test user");
 
         // Get the user
-        let user_option = get_user(user_id).await.expect("Failed to get user");
+        let user_option = get_user(&user_id).await.expect("Failed to get user");
 
         // Verify that the user is returned
         assert!(user_option.is_some(), "User should be found");
@@ -381,8 +285,8 @@ mod tests {
         assert_eq!(user.is_admin, is_admin, "User admin status should match");
 
         // Try to get a non-existent user
-        let non_existent_user_id = "non-existent-user";
-        let non_existent_user_option = get_user(non_existent_user_id)
+        let non_existent_user_id = format!("non-existent-user-{}", timestamp);
+        let non_existent_user_option = get_user(&non_existent_user_id)
             .await
             .expect("Failed to get non-existent user");
 
@@ -391,39 +295,40 @@ mod tests {
             non_existent_user_option.is_none(),
             "Non-existent user should not be found"
         );
+
+        // Clean up
+        UserStore::delete_user(&user_id).await.ok();
     }
 
     #[serial]
     #[tokio::test]
     async fn test_delete_user_account_admin() {
-        // Set up the test database
-        setup_test_db()
-            .await
-            .expect("Failed to set up test database");
+        init_test_environment().await;
 
-        // Create a test user to be deleted
-        let user_id = "test-user-to-delete";
-        create_test_user_in_db(user_id, false)
+        // Create a unique test user to be deleted
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let user_id = format!("test-user-to-delete-{}", timestamp);
+        create_test_user_in_db(&user_id, false)
             .await
             .expect("Failed to create test user");
 
         // Verify the user exists before deletion
-        let user_before = get_user(user_id).await.expect("Failed to get user");
+        let user_before = get_user(&user_id).await.expect("Failed to get user");
         assert!(user_before.is_some(), "User should exist before deletion");
 
         // Delete the user
-        let result = delete_user_account_admin(user_id).await;
+        let result = delete_user_account_admin(&user_id).await;
         assert!(result.is_ok(), "Expected successful user deletion");
 
         // Verify the user no longer exists
-        let user_after = get_user(user_id)
+        let user_after = get_user(&user_id)
             .await
             .expect("Failed to get user after deletion");
         assert!(user_after.is_none(), "User should not exist after deletion");
 
         // Try to delete a non-existent user
-        let non_existent_user_id = "non-existent-user";
-        let result = delete_user_account_admin(non_existent_user_id).await;
+        let non_existent_user_id = format!("non-existent-user-{}", timestamp);
+        let result = delete_user_account_admin(&non_existent_user_id).await;
 
         // This should return a ResourceNotFound error
         assert!(
@@ -451,26 +356,26 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_update_user_admin_status_success() {
-        // Set up the test database
-        setup_test_db()
-            .await
-            .expect("Failed to set up test database");
+        init_test_environment().await;
+
+        // Create unique users with timestamp
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let admin_user_id = format!("admin-user-{}", timestamp);
+        let target_user_id = format!("target-user-{}", timestamp);
 
         // Create an admin user who will perform the update
-        let admin_user_id = "admin-user";
-        create_test_user_in_db(admin_user_id, true)
+        create_test_user_in_db(&admin_user_id, true)
             .await
             .expect("Failed to create admin user");
-        let admin_session_user = create_test_session_user(admin_user_id, true);
+        let admin_session_user = create_test_session_user(&admin_user_id, true);
 
         // Create a regular user whose admin status will be updated
-        let target_user_id = "target-user";
-        create_test_user_in_db(target_user_id, false)
+        create_test_user_in_db(&target_user_id, false)
             .await
             .expect("Failed to create target user");
 
         // Verify the target user is not an admin initially
-        let user_before = get_user(target_user_id)
+        let user_before = get_user(&target_user_id)
             .await
             .expect("Failed to get target user")
             .expect("Target user should exist");
@@ -480,7 +385,7 @@ mod tests {
         );
 
         // Update the user's admin status to true
-        let updated_user = update_user_admin_status(&admin_session_user, target_user_id, true)
+        let updated_user = update_user_admin_status(&admin_session_user, &target_user_id, true)
             .await
             .expect("Failed to update user admin status");
 
@@ -491,7 +396,7 @@ mod tests {
         );
 
         // Verify the change was persisted in the database
-        let user_after = get_user(target_user_id)
+        let user_after = get_user(&target_user_id)
             .await
             .expect("Failed to get target user after update")
             .expect("Target user should still exist");
@@ -501,7 +406,7 @@ mod tests {
         );
 
         // Update the user's admin status back to false
-        let updated_user = update_user_admin_status(&admin_session_user, target_user_id, false)
+        let updated_user = update_user_admin_status(&admin_session_user, &target_user_id, false)
             .await
             .expect("Failed to update user admin status back");
 
@@ -510,32 +415,35 @@ mod tests {
             !updated_user.is_admin,
             "User should not be an admin after second update"
         );
+
+        // Clean up
+        UserStore::delete_user(&admin_user_id).await.ok();
+        UserStore::delete_user(&target_user_id).await.ok();
     }
 
-    // Test that the update_user_admin_status function properly checks admin privileges
     #[serial]
     #[tokio::test]
     async fn test_update_user_admin_status_requires_admin() {
-        // Set up the test database
-        setup_test_db()
-            .await
-            .expect("Failed to set up test database");
+        init_test_environment().await;
+
+        // Create unique users with timestamp
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let non_admin_user_id = format!("non-admin-user-{}", timestamp);
+        let target_user_id = format!("target-user-2-{}", timestamp);
 
         // Create a non-admin user who will attempt the update
-        let non_admin_user_id = "non-admin-user";
-        create_test_user_in_db(non_admin_user_id, false)
+        create_test_user_in_db(&non_admin_user_id, false)
             .await
             .expect("Failed to create non-admin user");
-        let non_admin_session_user = create_test_session_user(non_admin_user_id, false);
+        let non_admin_session_user = create_test_session_user(&non_admin_user_id, false);
 
         // Create a target user whose admin status will be attempted to be updated
-        let target_user_id = "target-user-2";
-        create_test_user_in_db(target_user_id, false)
+        create_test_user_in_db(&target_user_id, false)
             .await
             .expect("Failed to create target user");
 
         // Attempt to update the user's admin status as a non-admin
-        let result = update_user_admin_status(&non_admin_session_user, target_user_id, true).await;
+        let result = update_user_admin_status(&non_admin_session_user, &target_user_id, true).await;
 
         // Verify the operation fails with Unauthorized error
         assert!(
@@ -548,7 +456,7 @@ mod tests {
         }
 
         // Verify the target user's admin status was not changed
-        let user_after = get_user(target_user_id)
+        let user_after = get_user(&target_user_id)
             .await
             .expect("Failed to get target user after failed update")
             .expect("Target user should still exist");
@@ -556,75 +464,103 @@ mod tests {
             !user_after.is_admin,
             "Target user's admin status should not have changed"
         );
+
+        // Clean up
+        UserStore::delete_user(&non_admin_user_id).await.ok();
+        UserStore::delete_user(&target_user_id).await.ok();
     }
 
-    // Helper function to check if a credential exists in the database
-    #[allow(dead_code)]
-    async fn credential_exists(credential_id: &str) -> Result<bool, Box<dyn std::error::Error>> {
-        let store = crate::storage::GENERIC_DATA_STORE.lock().await;
+    #[serial]
+    #[tokio::test]
+    async fn test_update_user_admin_status_protect_first_user() {
+        init_test_environment().await;
 
-        if let Some(pool) = store.as_sqlite() {
-            let table_prefix =
-                env::var("DB_TABLE_PREFIX").unwrap_or_else(|_| "test_o2p_".to_string());
-            let query = format!(
-                "SELECT COUNT(*) as count FROM {}passkey_credentials WHERE credential_id = ?",
-                table_prefix
-            );
+        // Create unique users with timestamp
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let admin_user_id = format!("admin-user-protect-{}", timestamp);
 
-            let row: (i64,) = sqlx::query_as(&query)
-                .bind(credential_id)
-                .fetch_one(pool)
-                .await
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        // Create an admin user
+        create_test_user_in_db(&admin_user_id, true)
+            .await
+            .expect("Failed to create admin user");
+        let admin_session_user = create_test_session_user(&admin_user_id, true);
 
-            Ok(row.0 > 0)
-        } else if let Some(pool) = store.as_postgres() {
-            let table_prefix =
-                env::var("DB_TABLE_PREFIX").unwrap_or_else(|_| "test_o2p_".to_string());
-            let query = format!(
-                "SELECT COUNT(*) as count FROM {}passkey_credentials WHERE credential_id = $1",
-                table_prefix
-            );
+        // Get all current users to understand the database state
+        let all_users_before = UserStore::get_all_users()
+            .await
+            .expect("Failed to get users");
 
-            let row: (i64,) = sqlx::query_as(&query)
-                .bind(credential_id)
-                .fetch_one(pool)
-                .await
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-
-            Ok(row.0 > 0)
+        // Find the user with sequence_number = 1, or create one if none exists
+        let first_user = if let Some(existing_first_user) = all_users_before
+            .iter()
+            .find(|u| u.sequence_number == Some(1))
+        {
+            existing_first_user.clone()
         } else {
-            Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Unsupported database type",
-            )))
+            // If no user with sequence_number = 1 exists, create a new user
+            // which should get sequence_number = 1 if it's the first user
+            let new_user = User::new(
+                format!("first-user-{}", timestamp),
+                format!("first-user-{}@example.com", timestamp),
+                "First User".to_string(),
+            );
+
+            let created_user = UserStore::upsert_user(new_user)
+                .await
+                .expect("Failed to create first user");
+
+            // If this is not sequence_number = 1, skip the test since it's database-dependent
+            if created_user.sequence_number != Some(1) {
+                println!(
+                    "SKIPPING TEST: Created user doesn't have sequence_number = 1, got {:?}",
+                    created_user.sequence_number
+                );
+                return;
+            }
+
+            created_user
+        };
+
+        // Attempt to change the admin status of the first user (should fail)
+        let result = update_user_admin_status(&admin_session_user, &first_user.id, false).await;
+
+        // Verify the operation fails with Coordination error
+        assert!(
+            result.is_err(),
+            "Should not be able to change first user's admin status"
+        );
+        match result {
+            Err(CoordinationError::Coordination(msg)) => {
+                assert!(msg.contains("Cannot change admin status of the first user"));
+            }
+            _ => panic!(
+                "Expected Coordination error about first user, got {:?}",
+                result
+            ),
+        }
+
+        // Clean up
+        UserStore::delete_user(&admin_user_id).await.ok();
+        // Don't delete the first user if it existed before our test
+        if !all_users_before.iter().any(|u| u.id == first_user.id) {
+            UserStore::delete_user(&first_user.id).await.ok();
         }
     }
 
     #[serial]
     #[tokio::test]
-    async fn test_delete_passkey_credential_admin_success() {
-        // Skip this test for now - we'll fix it in a future update
-        // The test is failing due to complex setup issues with the database
-        // This is a temporary solution to allow other tests to run
-        return;
-    }
-
-    // Test that delete_passkey_credential_admin requires admin privileges
-    #[serial]
-    #[tokio::test]
     async fn test_delete_passkey_credential_admin_requires_admin() {
-        // Set up the test database
-        setup_test_db()
-            .await
-            .expect("Failed to set up test database");
+        init_test_environment().await;
+
+        // Create unique user with timestamp
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let non_admin_user_id = format!("non-admin-user-passkey-{}", timestamp);
 
         // Create a non-admin user
-        let non_admin_user_id = "non-admin-user-passkey";
-        create_test_user_in_db(non_admin_user_id, false)
+        create_test_user_in_db(&non_admin_user_id, false)
             .await
             .expect("Failed to create non-admin user");
-        let non_admin_session_user = create_test_session_user(non_admin_user_id, false);
+        let non_admin_session_user = create_test_session_user(&non_admin_user_id, false);
 
         // Attempt to delete a passkey credential
         let result = delete_passkey_credential_admin(&non_admin_session_user, "credential1").await;
@@ -635,118 +571,25 @@ mod tests {
             Err(CoordinationError::Unauthorized) => {}
             _ => panic!("Expected Unauthorized error, got: {:?}", result),
         }
+
+        // Clean up
+        UserStore::delete_user(&non_admin_user_id).await.ok();
     }
 
-    #[serial]
-    #[tokio::test]
-    async fn test_delete_oauth2_account_admin_success() {
-        // Skip this test for now - we'll fix it in a future update
-        // The test is failing due to complex setup issues with the database
-        // This is a temporary solution to allow other tests to run
-        return;
-    }
-
-    // Helper function to create a test OAuth2 account
-    #[allow(dead_code)]
-    async fn create_test_oauth2_account(
-        user_id: &str,
-        provider: &str,
-        provider_user_id: &str,
-        prefix: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let now = Utc::now();
-        let now_str = now.to_rfc3339();
-
-        let store = crate::storage::GENERIC_DATA_STORE.lock().await;
-        if let Some(pool) = store.as_sqlite() {
-            let query = format!(
-                "INSERT INTO {}oauth2_accounts (id, user_id, provider, provider_user_id, name, email, picture, metadata, created_at, updated_at) \
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                prefix
-            );
-
-            let id = format!("{}-{}", provider, provider_user_id);
-            let metadata = serde_json::json!({}).to_string();
-
-            sqlx::query(&query)
-                .bind(id)
-                .bind(user_id)
-                .bind(provider)
-                .bind(provider_user_id)
-                .bind(format!("Test User {}", user_id))
-                .bind(format!("{}@example.com", user_id))
-                .bind(Option::<String>::None)
-                .bind(metadata)
-                .bind(now_str.clone())
-                .bind(now_str)
-                .execute(pool)
-                .await
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        }
-
-        Ok(())
-    }
-
-    // Helper function to check if an OAuth2 account exists
-    #[allow(dead_code)]
-    async fn oauth2_account_exists(
-        provider_user_id: &str,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
-        let store = crate::storage::GENERIC_DATA_STORE.lock().await;
-
-        if let Some(pool) = store.as_sqlite() {
-            let table_prefix =
-                env::var("DB_TABLE_PREFIX").unwrap_or_else(|_| "test_o2p_".to_string());
-            let query = format!(
-                "SELECT COUNT(*) as count FROM {}oauth2_accounts WHERE provider_user_id = ?",
-                table_prefix
-            );
-
-            let row: (i64,) = sqlx::query_as(&query)
-                .bind(provider_user_id)
-                .fetch_one(pool)
-                .await
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-
-            Ok(row.0 > 0)
-        } else if let Some(pool) = store.as_postgres() {
-            let table_prefix =
-                env::var("DB_TABLE_PREFIX").unwrap_or_else(|_| "test_o2p_".to_string());
-            let query = format!(
-                "SELECT COUNT(*) as count FROM {}oauth2_accounts WHERE provider_user_id = $1",
-                table_prefix
-            );
-
-            let row: (i64,) = sqlx::query_as(&query)
-                .bind(provider_user_id)
-                .fetch_one(pool)
-                .await
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-
-            Ok(row.0 > 0)
-        } else {
-            Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Unsupported database type",
-            )))
-        }
-    }
-
-    // Test that delete_oauth2_account_admin requires admin privileges
     #[serial]
     #[tokio::test]
     async fn test_delete_oauth2_account_admin_requires_admin() {
-        // Set up the test database
-        setup_test_db()
-            .await
-            .expect("Failed to set up test database");
+        init_test_environment().await;
+
+        // Create unique user with timestamp
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let non_admin_user_id = format!("non-admin-user-oauth2-{}", timestamp);
 
         // Create a non-admin user
-        let non_admin_user_id = "non-admin-user-oauth2";
-        create_test_user_in_db(non_admin_user_id, false)
+        create_test_user_in_db(&non_admin_user_id, false)
             .await
             .expect("Failed to create non-admin user");
-        let non_admin_session_user = create_test_session_user(non_admin_user_id, false);
+        let non_admin_session_user = create_test_session_user(&non_admin_user_id, false);
 
         // Attempt to delete an OAuth2 account
         let result = delete_oauth2_account_admin(&non_admin_session_user, "provider_user_id").await;
@@ -757,5 +600,8 @@ mod tests {
             Err(CoordinationError::Unauthorized) => {}
             _ => panic!("Expected Unauthorized error, got: {:?}", result),
         }
+
+        // Clean up
+        UserStore::delete_user(&non_admin_user_id).await.ok();
     }
 }

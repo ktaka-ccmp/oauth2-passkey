@@ -359,6 +359,9 @@ mod tests {
         }
     }
 
+    #[cfg(test)]
+    use serial_test::serial;
+
     #[tokio::test]
     async fn test_start_authentication_no_username() {
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
@@ -852,6 +855,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_finish_authentication_integration_test() {
         // Initialize test environment
         init_test_environment().await;
@@ -907,6 +911,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_start_authentication_integration() {
         use crate::passkey::main::test_utils as passkey_test_utils;
         use crate::storage::GENERIC_CACHE_STORE;
@@ -967,6 +972,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_verify_counter_and_update() {
         use crate::passkey::main::test_utils as passkey_test_utils;
         use crate::test_utils::init_test_environment;

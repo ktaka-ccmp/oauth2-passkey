@@ -169,6 +169,7 @@ mod tests {
     use crate::oauth2::types::{AccountSearchField, OAuth2Account};
     use crate::test_utils::init_test_environment;
     use crate::userdb::{User, UserStore};
+    use serial_test::serial;
 
     async fn create_test_account(
         user_id: &str,
@@ -256,6 +257,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_init_creates_tables() {
         init_test_environment().await;
 
@@ -265,12 +267,27 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_upsert_oauth2_account_create() {
         init_test_environment().await;
 
-        let test_account = create_test_user_and_account("user123", "google", "google123").await;
+        // First create a user to satisfy foreign key constraints
+        let user_id = generate_unique_test_id("user");
+        let user = User {
+            sequence_number: None,
+            id: user_id.clone(),
+            account: format!("{}@example.com", user_id),
+            label: format!("Test User {}", user_id),
+            is_admin: false,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
 
-        // Insert the account
+        // Insert the user - SQLite functions now ensure tables exist
+        UserStore::upsert_user(user).await.unwrap();
+
+        // Create and insert the OAuth2 account
+        let test_account = create_test_account(&user_id, "google", "google123").await;
         let inserted_account = OAuth2Store::upsert_oauth2_account(test_account.clone())
             .await
             .unwrap();
@@ -296,6 +313,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_upsert_oauth2_account_empty_user_id() {
         init_test_environment().await;
 
@@ -317,6 +335,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_upsert_oauth2_account_update() {
         init_test_environment().await;
 
@@ -349,6 +368,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_get_oauth2_accounts_by_user_id() {
         init_test_environment().await;
 
@@ -400,6 +420,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_get_oauth2_accounts_by_id() {
         init_test_environment().await;
 
@@ -423,6 +444,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_get_oauth2_accounts_by_provider() {
         init_test_environment().await;
 
@@ -433,6 +455,16 @@ mod tests {
         OAuth2Store::init()
             .await
             .expect("Failed to initialize OAuth2Store");
+
+        // Clean up any existing Google accounts from other tests to ensure test isolation
+        let existing_google_accounts =
+            OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Provider("google".to_string()))
+                .await
+                .unwrap_or_default();
+        for account in existing_google_accounts {
+            let _ =
+                OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(account.id)).await;
+        }
 
         let provider1_id = generate_unique_test_id("google");
         let provider2_id = generate_unique_test_id("google");
@@ -481,6 +513,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_get_oauth2_account_by_provider() {
         init_test_environment().await;
 
@@ -510,6 +543,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_delete_oauth2_accounts_by_id() {
         init_test_environment().await;
 
@@ -544,6 +578,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_delete_oauth2_accounts_by_user_id() {
         init_test_environment().await;
 
@@ -584,6 +619,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_get_oauth2_accounts_empty_result() {
         init_test_environment().await;
 
@@ -599,6 +635,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_account_search_field_variants() {
         init_test_environment().await;
 
@@ -652,6 +689,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_concurrent_account_operations() {
         init_test_environment().await;
 
