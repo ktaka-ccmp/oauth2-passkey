@@ -843,22 +843,20 @@ mod tests {
 
         let token_type = "test_max_ttl";
         let token = "test_token_max_ttl";
-        let ttl = u64::MAX; // Maximum TTL
-        let expires_at = Utc::now() + chrono::Duration::seconds(i64::MAX);
+        // Use a realistic maximum TTL (1 year = 31,536,000 seconds)
+        // instead of u64::MAX which causes chrono overflow
+        let ttl = 31_536_000_u64; // 1 year in seconds
+        let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
         let user_agent = None;
 
-        // Should handle large TTL values gracefully
+        // Should handle large but realistic TTL values gracefully
         let result = store_token_in_cache(token_type, token, ttl, expires_at, user_agent).await;
-        // This might fail due to conversion limits, which is expected behavior
-        // The test verifies the system handles edge cases appropriately
-        if result.is_ok() {
-            let token_id = result.unwrap();
-            let stored_token = get_token_from_store::<StoredToken>(token_type, &token_id).await;
-            if stored_token.is_ok() {
-                assert_eq!(stored_token.unwrap().ttl, ttl);
-            }
-        }
-        // If it fails, that's also acceptable for edge case handling
+        assert!(result.is_ok(), "Should handle realistic large TTL values");
+
+        let token_id = result.unwrap();
+        let stored_token = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        assert!(stored_token.is_ok(), "Should retrieve token with large TTL");
+        assert_eq!(stored_token.unwrap().ttl, ttl);
     }
 
     #[tokio::test]
