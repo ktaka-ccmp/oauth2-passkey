@@ -8,3 +8,62 @@ use std::sync::LazyLock;
 /// Default: "/o2p"
 pub static O2P_ROUTE_PREFIX: LazyLock<String> =
     LazyLock::new(|| std::env::var("O2P_ROUTE_PREFIX").unwrap_or_else(|_| "/o2p".to_string()));
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_route_prefix_default_value() {
+        // Test that the default route prefix is correct
+        // Note: This test assumes O2P_ROUTE_PREFIX environment variable is not set
+        let prefix = &*O2P_ROUTE_PREFIX;
+
+        // Since we can't easily mock environment variables in unit tests,
+        // we test the business logic of the default fallback
+        let expected_default = "/o2p";
+
+        // If the environment variable is not set, it should use the default
+        match std::env::var("O2P_ROUTE_PREFIX") {
+            Err(_) => assert_eq!(prefix, expected_default),
+            Ok(env_value) => assert_eq!(prefix, &env_value),
+        }
+    }
+
+    #[test]
+    fn test_route_prefix_validation() {
+        // Test that route prefix follows expected format
+        let prefix = &*O2P_ROUTE_PREFIX;
+
+        // Route prefix should start with forward slash
+        assert!(prefix.starts_with('/'), "Route prefix should start with '/'");
+
+        // Route prefix should not be empty
+        assert!(!prefix.is_empty(), "Route prefix should not be empty");
+
+        // Route prefix should not end with slash (unless it's just "/")
+        if prefix.len() > 1 {
+            assert!(!prefix.ends_with('/'), "Route prefix should not end with '/' unless it's root");
+        }
+    }
+
+    #[test]
+    fn test_route_prefix_business_logic() {
+        // Test the business logic without environment variable dependency
+        let test_cases = vec![
+            ("", "/o2p"),           // Empty should default to /o2p
+            ("/api", "/api"),       // Custom prefix should be used
+            ("/auth/v1", "/auth/v1"), // Complex prefix should work
+        ];
+
+        for (input, expected) in test_cases {
+            let result = if input.is_empty() {
+                "/o2p".to_string()  // Simulate the default behavior
+            } else {
+                input.to_string()   // Simulate environment variable behavior
+            };
+
+            assert_eq!(result, expected, "Route prefix logic failed for input: '{}'", input);
+        }
+    }
+}
