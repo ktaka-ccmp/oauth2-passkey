@@ -1,6 +1,11 @@
 #!/bin/bash
 
-SRCDIR="oauth2_passkey"
+#SRCDIR="oauth2_passkey"
+SRCDIR="$1"
+if [[ -z "$SRCDIR" ]]; then
+    echo "Usage: $0 <source_directory>"
+    exit 1
+fi
 
 # Track if this is the first file to avoid leading blank line
 first_file=true
