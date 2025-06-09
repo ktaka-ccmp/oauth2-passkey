@@ -29,7 +29,7 @@ find "$SRCDIR" -name "*.rs" | sort | while read -r file; do
             } else {
                 gsub(/\{.*$/, "{}", signature)
             }
-            file_functions = file_functions "  **" signature "**\n"
+            file_functions = file_functions "  " signature "\n"
             collecting = 0
             signature = ""
         }
@@ -55,7 +55,7 @@ find "$SRCDIR" -name "*.rs" | sort | while read -r file; do
                 gsub(/\{.*$/, "{}", signature)
             }
             
-            file_functions = file_functions "  **" signature "**\n"
+            file_functions = file_functions "  " signature "\n"
             collecting = 0
             signature = ""
         }
