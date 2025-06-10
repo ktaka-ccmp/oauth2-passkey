@@ -385,10 +385,6 @@ def analyze_rust_project(src_dir, output_format="json"):
                 for attr in func["attributes"]:
                     attr_strings.append(f"#[{attr}]")
             
-            # Display attributes
-            for attr_str in attr_strings:
-                output.append(f"  {attr_str}")
-            
             # Reconstruct signature for display
             modifiers = []
             if func["visibility"] != "private":
@@ -410,7 +406,15 @@ def analyze_rust_project(src_dir, output_format="json"):
             return_str = f" -> {func['return_type']}" if func["return_type"] else ""
             
             signature = f"{modifier_str}fn {func['name']}({params}){return_str}"
-            output.append(f"  {signature}")
+            
+            # Combine attributes and signature on a single line
+            if attr_strings:
+                attrs_str = " ".join(attr_strings)
+                full_line = f"{attrs_str} {signature}"
+            else:
+                full_line = signature
+            
+            output.append(f"  {full_line}")
         
         return "\n".join(output)
 
