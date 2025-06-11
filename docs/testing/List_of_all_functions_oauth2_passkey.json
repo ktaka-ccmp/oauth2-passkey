@@ -16831,27 +16831,6 @@
       "crate_name": "oauth2_passkey"
     },
     {
-      "name": "test_user_error_display",
-      "visibility": "private",
-      "is_async": false,
-      "is_unsafe": false,
-      "is_const": false,
-      "is_extern": false,
-      "parameters": [],
-      "return_type": "",
-      "description": "",
-      "canonical_name": "crate::src::userdb::errors::tests::test_user_error_display",
-      "module_path": "crate::src::userdb::errors::tests",
-      "file_path": "src/userdb/errors.rs",
-      "attributes": [
-        "test"
-      ],
-      "module_attributes": [
-        "cfg(test)"
-      ],
-      "crate_name": "oauth2_passkey"
-    },
-    {
       "name": "test_from_serde_json_error",
       "visibility": "private",
       "is_async": false,
@@ -16894,7 +16873,7 @@
       "crate_name": "oauth2_passkey"
     },
     {
-      "name": "test_error_is_sync_and_send",
+      "name": "test_error_propagation",
       "visibility": "private",
       "is_async": false,
       "is_unsafe": false,
@@ -16903,7 +16882,7 @@
       "parameters": [],
       "return_type": "",
       "description": "",
-      "canonical_name": "crate::src::userdb::errors::tests::test_error_is_sync_and_send",
+      "canonical_name": "crate::src::userdb::errors::tests::test_error_propagation",
       "module_path": "crate::src::userdb::errors::tests",
       "file_path": "src/userdb/errors.rs",
       "attributes": [
@@ -16915,16 +16894,21 @@
       "crate_name": "oauth2_passkey"
     },
     {
-      "name": "assert_send_sync",
+      "name": "validate_user_data",
       "visibility": "private",
       "is_async": false,
       "is_unsafe": false,
       "is_const": false,
       "is_extern": false,
-      "parameters": [],
-      "return_type": "",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "&str"
+        }
+      ],
+      "return_type": "Result<(), UserError>",
       "description": "",
-      "canonical_name": "crate::src::userdb::errors::tests::assert_send_sync",
+      "canonical_name": "crate::src::userdb::errors::tests::validate_user_data",
       "module_path": "crate::src::userdb::errors::tests",
       "file_path": "src/userdb/errors.rs",
       "attributes": [],
@@ -16934,21 +16918,130 @@
       "crate_name": "oauth2_passkey"
     },
     {
-      "name": "test_error_is_cloneable",
+      "name": "process_user",
       "visibility": "private",
       "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "id",
+          "type": "&str"
+        }
+      ],
+      "return_type": "Result<String, UserError>",
+      "description": "",
+      "canonical_name": "crate::src::userdb::errors::tests::process_user",
+      "module_path": "crate::src::userdb::errors::tests",
+      "file_path": "src/userdb/errors.rs",
+      "attributes": [],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey"
+    },
+    {
+      "name": "test_not_found_error_in_context",
+      "visibility": "private",
+      "is_async": true,
       "is_unsafe": false,
       "is_const": false,
       "is_extern": false,
       "parameters": [],
       "return_type": "",
       "description": "",
-      "canonical_name": "crate::src::userdb::errors::tests::test_error_is_cloneable",
+      "canonical_name": "crate::src::userdb::errors::tests::test_not_found_error_in_context",
       "module_path": "crate::src::userdb::errors::tests",
       "file_path": "src/userdb/errors.rs",
       "attributes": [
-        "test"
+        "tokio::test",
+        "serial"
       ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey"
+    },
+    {
+      "name": "get_existing_user",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "id",
+          "type": "&str"
+        }
+      ],
+      "return_type": "Result<crate::userdb::User, UserError>",
+      "description": "",
+      "canonical_name": "crate::src::userdb::errors::tests::get_existing_user",
+      "module_path": "crate::src::userdb::errors::tests",
+      "file_path": "src/userdb/errors.rs",
+      "attributes": [],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey"
+    },
+    {
+      "name": "test_database_error_handling",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::userdb::errors::tests::test_database_error_handling",
+      "module_path": "crate::src::userdb::errors::tests",
+      "file_path": "src/userdb/errors.rs",
+      "attributes": [
+        "tokio::test",
+        "serial"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey"
+    },
+    {
+      "name": "simulate_db_error",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Result<(), UserError>",
+      "description": "",
+      "canonical_name": "crate::src::userdb::errors::tests::simulate_db_error",
+      "module_path": "crate::src::userdb::errors::tests",
+      "file_path": "src/userdb/errors.rs",
+      "attributes": [],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey"
+    },
+    {
+      "name": "user_operation",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Result<(), UserError>",
+      "description": "",
+      "canonical_name": "crate::src::userdb::errors::tests::user_operation",
+      "module_path": "crate::src::userdb::errors::tests",
+      "file_path": "src/userdb/errors.rs",
+      "attributes": [],
       "module_attributes": [
         "cfg(test)"
       ],
@@ -17573,6 +17666,72 @@
       "crate_name": "oauth2_passkey"
     },
     {
+      "name": "test_userstore_error_handling_not_found",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::userdb::storage::store_type::tests::test_userstore_error_handling_not_found",
+      "module_path": "crate::src::userdb::storage::store_type::tests",
+      "file_path": "src/userdb/storage/store_type.rs",
+      "attributes": [
+        "tokio::test",
+        "serial"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey"
+    },
+    {
+      "name": "test_userstore_transaction_behavior",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::userdb::storage::store_type::tests::test_userstore_transaction_behavior",
+      "module_path": "crate::src::userdb::storage::store_type::tests",
+      "file_path": "src/userdb/storage/store_type.rs",
+      "attributes": [
+        "tokio::test",
+        "serial"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey"
+    },
+    {
+      "name": "test_userstore_admin_user_operations",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::userdb::storage::store_type::tests::test_userstore_admin_user_operations",
+      "module_path": "crate::src::userdb::storage::store_type::tests",
+      "file_path": "src/userdb/storage/store_type.rs",
+      "attributes": [
+        "tokio::test",
+        "serial"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey"
+    },
+    {
       "name": "new",
       "visibility": "public",
       "is_async": false,
@@ -17709,7 +17868,7 @@
       "crate_name": "oauth2_passkey"
     },
     {
-      "name": "test_user_serialization",
+      "name": "test_user_serde_roundtrip",
       "visibility": "private",
       "is_async": false,
       "is_unsafe": false,
@@ -17718,7 +17877,7 @@
       "parameters": [],
       "return_type": "",
       "description": "",
-      "canonical_name": "crate::src::userdb::types::tests::test_user_serialization",
+      "canonical_name": "crate::src::userdb::types::tests::test_user_serde_roundtrip",
       "module_path": "crate::src::userdb::types::tests",
       "file_path": "src/userdb/types.rs",
       "attributes": [
@@ -17730,7 +17889,7 @@
       "crate_name": "oauth2_passkey"
     },
     {
-      "name": "test_user_deserialization",
+      "name": "test_user_new_properties",
       "visibility": "private",
       "is_async": false,
       "is_unsafe": false,
@@ -17739,7 +17898,7 @@
       "parameters": [],
       "return_type": "",
       "description": "",
-      "canonical_name": "crate::src::userdb::types::tests::test_user_deserialization",
+      "canonical_name": "crate::src::userdb::types::tests::test_user_new_properties",
       "module_path": "crate::src::userdb::types::tests",
       "file_path": "src/userdb/types.rs",
       "attributes": [
@@ -17751,22 +17910,33 @@
       "crate_name": "oauth2_passkey"
     },
     {
-      "name": "test_user_sequence_number_serialization_when_none",
+      "name": "test_has_admin_privileges_properties",
       "visibility": "private",
       "is_async": false,
       "is_unsafe": false,
       "is_const": false,
       "is_extern": false,
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "is_admin in proptest",
+          "type": ":bool::ANY"
+        },
+        {
+          "name": "sequence_number in proptest",
+          "type": ":option::of(0..10000i64"
+        }
+      ],
       "return_type": "",
       "description": "",
-      "canonical_name": "crate::src::userdb::types::test_user_sequence_number_serialization_when_none",
-      "module_path": "crate::src::userdb::types",
+      "canonical_name": "crate::src::userdb::types::tests::test_has_admin_privileges_properties",
+      "module_path": "crate::src::userdb::types::tests",
       "file_path": "src/userdb/types.rs",
       "attributes": [
         "test"
       ],
-      "module_attributes": [],
+      "module_attributes": [
+        "cfg(test)"
+      ],
       "crate_name": "oauth2_passkey"
     },
     {
