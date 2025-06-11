@@ -144,7 +144,7 @@ mod tests {
         let result = UserStore::upsert_user(test_user.clone()).await;
         assert!(result.is_ok(), "Creating new user should succeed");
 
-        let created_user = result.unwrap();
+        let created_user = result.expect("User creation should succeed");
         assert_eq!(created_user.id, test_user.id);
         assert_eq!(created_user.account, test_user.account);
         assert_eq!(created_user.label, test_user.label);
@@ -176,7 +176,7 @@ mod tests {
         let result = UserStore::upsert_user(test_user.clone()).await;
         assert!(result.is_ok(), "Creating user should succeed");
 
-        let created_user = result.unwrap();
+        let created_user = result.expect("User creation should succeed");
         assert!(
             created_user.sequence_number.is_some(),
             "User should have a sequence number"
@@ -224,7 +224,7 @@ mod tests {
         let result = UserStore::upsert_user(updated_user.clone()).await;
         assert!(result.is_ok(), "Updating user should succeed");
 
-        let final_user = result.unwrap();
+        let final_user = result.expect("User update should succeed");
         assert_eq!(final_user.id, created_user.id);
         assert_eq!(final_user.label, "Updated Label");
         assert!(final_user.is_admin);
@@ -253,10 +253,10 @@ mod tests {
         let result = UserStore::get_user(&created_user.id).await;
         assert!(result.is_ok(), "Getting existing user should succeed");
 
-        let retrieved_user = result.unwrap();
+        let retrieved_user = result.expect("Getting user should succeed");
         assert!(retrieved_user.is_some(), "User should be found");
 
-        let user = retrieved_user.unwrap();
+        let user = retrieved_user.expect("User should exist");
         assert_eq!(user.id, created_user.id);
         assert_eq!(user.account, created_user.account);
         assert_eq!(user.label, created_user.label);
@@ -265,7 +265,9 @@ mod tests {
         let result = UserStore::get_user("non-existent-user-id").await;
         assert!(result.is_ok(), "Query for non-existent user should succeed");
         assert!(
-            result.unwrap().is_none(),
+            result
+                .expect("Query for non-existent user should succeed")
+                .is_none(),
             "Non-existent user should return None"
         );
 
@@ -304,7 +306,7 @@ mod tests {
         let result = UserStore::get_all_users().await;
         assert!(result.is_ok(), "Getting all users should succeed");
 
-        let all_users = result.unwrap();
+        let all_users = result.expect("Getting all users should succeed");
         assert_eq!(
             all_users.len(),
             initial_count + 3,
@@ -379,7 +381,10 @@ mod tests {
         // Test with empty string ID (should handle gracefully)
         let result = UserStore::get_user("").await;
         assert!(result.is_ok(), "Empty ID query should not panic");
-        assert!(result.unwrap().is_none(), "Empty ID should return None");
+        assert!(
+            result.expect("Empty ID query should succeed").is_none(),
+            "Empty ID should return None"
+        );
 
         // Test with very long ID
         let long_id = "a".repeat(1000);
@@ -424,8 +429,8 @@ mod tests {
         assert!(result1.is_ok(), "Concurrent user 1 creation should succeed");
         assert!(result2.is_ok(), "Concurrent user 2 creation should succeed");
 
-        let created1 = result1.unwrap();
-        let created2 = result2.unwrap();
+        let created1 = result1.expect("Concurrent user 1 creation should succeed");
+        let created2 = result2.expect("Concurrent user 2 creation should succeed");
 
         // Verify both users were created
         assert_ne!(
@@ -436,5 +441,183 @@ mod tests {
         // Clean up
         let _ = UserStore::delete_user(&created1.id).await;
         let _ = UserStore::delete_user(&created2.id).await;
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_userstore_error_handling_not_found() {
+        init_test_environment().await;
+        UserStore::init()
+            .await
+            .expect("Failed to initialize UserStore");
+
+        // Test getting a non-existent user
+        let nonexistent_id = format!("nonexistent-{}", Utc::now().timestamp_millis());
+        let result = UserStore::get_user(&nonexistent_id).await;
+
+        // Should return Ok(None), not an error
+        assert!(result.is_ok(), "Getting non-existent user should not error");
+        assert!(
+            result
+                .expect("Getting non-existent user should succeed")
+                .is_none(),
+            "Non-existent user should return None"
+        );
+
+        // Note: The current implementation of delete_user doesn't check if the user exists
+        // before attempting to delete, so it doesn't return NotFound for non-existent users.
+        // This is a potential improvement for the implementation.
+        let result = UserStore::delete_user(&nonexistent_id).await;
+        assert!(
+            result.is_ok(),
+            "Current implementation doesn't check existence before deletion"
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_userstore_transaction_behavior() {
+        init_test_environment().await;
+        UserStore::init()
+            .await
+            .expect("Failed to initialize UserStore");
+
+        // Create a test user
+        let test_user = create_test_user("transaction");
+        let created_user = UserStore::upsert_user(test_user.clone())
+            .await
+            .expect("Failed to create user");
+
+        // Verify user was created with correct sequence number
+        assert!(
+            created_user.sequence_number.is_some(),
+            "User should have a sequence number"
+        );
+
+        // Update the user
+        let mut updated_user = created_user.clone();
+        updated_user.label = "Updated Label".to_string();
+
+        let result = UserStore::upsert_user(updated_user.clone()).await;
+        assert!(result.is_ok(), "Updating user should succeed");
+
+        let updated = result.expect("User update should succeed");
+        assert_eq!(updated.label, "Updated Label");
+
+        // Sequence number should be preserved during update
+        assert_eq!(updated.sequence_number, created_user.sequence_number);
+
+        // created_at should be preserved but updated_at should change
+        assert_eq!(updated.created_at, created_user.created_at);
+        assert!(
+            updated.updated_at > created_user.updated_at,
+            "updated_at should be newer"
+        );
+
+        // Clean up
+        let _ = UserStore::delete_user(&created_user.id).await;
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_userstore_admin_user_operations() {
+        // First, clear any existing users to ensure we're starting fresh
+        init_test_environment().await;
+        UserStore::init()
+            .await
+            .expect("Failed to initialize UserStore");
+
+        // Get all existing users and delete them to ensure clean state
+        let existing_users = UserStore::get_all_users()
+            .await
+            .expect("Failed to get users");
+        for user in existing_users {
+            let _ = UserStore::delete_user(&user.id).await;
+        }
+
+        // Now create a first user - this should automatically get admin privileges via sequence_number = 1
+        let first_user = create_test_user("first");
+        let created_first = UserStore::upsert_user(first_user)
+            .await
+            .expect("Failed to create first user");
+
+        // The first user we create might not have sequence_number = 1 if there are residual users
+        // from other tests, but it should have a valid sequence number
+        println!(
+            "First user sequence_number: {:?}",
+            created_first.sequence_number
+        );
+        println!("First user is_admin: {}", created_first.is_admin);
+        assert!(
+            created_first.sequence_number.is_some(),
+            "First user should have a sequence number"
+        );
+
+        // If this user happens to be sequence_number = 1, it should have admin privileges
+        // Otherwise, we'll need to explicitly set is_admin = true for admin privileges
+        let first_user_has_admin =
+            created_first.sequence_number == Some(1) || created_first.is_admin;
+        assert_eq!(
+            created_first.has_admin_privileges(),
+            first_user_has_admin,
+            "User admin privileges should match expected value"
+        );
+
+        // Create a second user with is_admin = true
+        let mut admin_user = create_test_user("admin");
+        admin_user.is_admin = true;
+
+        let created_admin = UserStore::upsert_user(admin_user)
+            .await
+            .expect("Failed to create admin user");
+
+        // Verify the second user has admin privileges due to is_admin = true
+        println!(
+            "Admin user sequence_number: {:?}",
+            created_admin.sequence_number
+        );
+        println!("Admin user is_admin: {}", created_admin.is_admin);
+        assert!(
+            created_admin.sequence_number != Some(1),
+            "Admin user should not have sequence_number = 1"
+        );
+        assert!(
+            created_admin.is_admin,
+            "Admin user should have is_admin = true"
+        );
+        assert!(
+            created_admin.has_admin_privileges(),
+            "Admin user should have admin privileges"
+        );
+
+        // Create a regular user with no special privileges
+        let regular_user = create_test_user("regular");
+        let created_regular = UserStore::upsert_user(regular_user)
+            .await
+            .expect("Failed to create regular user");
+
+        // Verify the regular user doesn't have admin privileges
+        println!(
+            "Regular user sequence_number: {:?}",
+            created_regular.sequence_number
+        );
+        println!("Regular user is_admin: {}", created_regular.is_admin);
+        assert!(
+            created_regular.sequence_number != Some(1),
+            "Regular user should not have sequence_number = 1"
+        );
+        assert!(
+            !created_regular.is_admin,
+            "Regular user should have is_admin = false"
+        );
+        assert!(
+            !created_regular.has_admin_privileges(),
+            "Regular user should not have admin privileges"
+        );
+
+        // Clean up
+        let _ = UserStore::delete_user(&created_first.id).await;
+        let _ = UserStore::delete_user(&created_admin.id).await;
+        let _ = UserStore::delete_user(&created_regular.id).await;
     }
 }

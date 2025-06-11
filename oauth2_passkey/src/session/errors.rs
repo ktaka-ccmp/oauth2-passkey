@@ -37,5 +37,3 @@ pub enum SessionError {
     #[error("User error: {0}")]
     User(#[from] UserError),
 }
-
-

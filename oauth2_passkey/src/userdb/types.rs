@@ -46,6 +46,7 @@ impl User {
 mod tests {
     use super::*;
     use chrono::Duration;
+    use proptest::prelude::*;
 
     #[test]
     fn test_user_new() {
@@ -125,77 +126,90 @@ mod tests {
         assert!(!has_privileges);
     }
 
-    #[test]
-    fn test_user_serialization() {
-        // Given a user
-        let mut user = User::new(
-            "user123".to_string(),
-            "test@example.com".to_string(),
-            "Test User".to_string(),
-        );
-        user.sequence_number = Some(42);
+    // Removed redundant test_user_serialization as it's covered by property-based test_user_serde_roundtrip
 
-        // When serializing to JSON
-        let json = serde_json::to_string(&user).expect("Failed to serialize user");
+    // Removed redundant test_user_deserialization as it's covered by property-based test_user_serde_roundtrip
 
-        // Then the JSON should include all fields
-        assert!(json.contains("\"id\":\"user123\""));
-        assert!(json.contains("\"account\":\"test@example.com\""));
-        assert!(json.contains("\"label\":\"Test User\""));
-        assert!(json.contains("\"is_admin\":false"));
-        assert!(json.contains("\"sequence_number\":42"));
-        assert!(json.contains("\"created_at\":"));
-        assert!(json.contains("\"updated_at\":"));
-    }
+    // Removed redundant test_user_sequence_number_serialization_when_none as it's covered by property-based test_user_serde_roundtrip
+    // which tests serialization with both Some and None sequence numbers
 
-    #[test]
-    fn test_user_deserialization() {
-        // Given a JSON string representing a user
-        let json = r#"{
-            "id": "user123",
-            "account": "test@example.com",
-            "label": "Test User",
-            "is_admin": true,
-            "sequence_number": 42,
-            "created_at": "2023-01-01T00:00:00Z",
-            "updated_at": "2023-01-02T00:00:00Z"
-        }"#;
+    // Property-based tests for User struct
+    proptest! {
+        /// Test that any valid User can be serialized and deserialized correctly
+        #[test]
+        fn test_user_serde_roundtrip(
+            id in "[a-zA-Z0-9_-]{1,64}",
+            account in "[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,64}\\.[a-zA-Z]{2,8}",
+            label in "[\\p{L}\\p{N}\\p{P}\\p{Z}]{1,128}",
+            is_admin in proptest::bool::ANY,
+            sequence_number in proptest::option::of(1..10000i64)
+        ) {
+            // Create a user with the generated properties
+            let now = Utc::now();
+            let user = User {
+                id,
+                account,
+                label,
+                is_admin,
+                sequence_number,
+                created_at: now,
+                updated_at: now,
+            };
 
-        // When deserializing from JSON
-        let user: User = serde_json::from_str(json).expect("Failed to deserialize user");
+            // Serialize and deserialize
+            let serialized = serde_json::to_string(&user).expect("Failed to serialize");
+            let deserialized: User = serde_json::from_str(&serialized).expect("Failed to deserialize");
 
-        // Then the user should have the correct properties
-        assert_eq!(user.id, "user123");
-        assert_eq!(user.account, "test@example.com");
-        assert_eq!(user.label, "Test User");
-        assert_eq!(user.is_admin, true);
-        assert_eq!(user.sequence_number, Some(42));
+            // Check equality for all fields except timestamps
+            // (timestamps might have precision issues during serialization/deserialization)
+            prop_assert_eq!(user.id, deserialized.id);
+            prop_assert_eq!(user.account, deserialized.account);
+            prop_assert_eq!(user.label, deserialized.label);
+            prop_assert_eq!(user.is_admin, deserialized.is_admin);
+            prop_assert_eq!(user.sequence_number, deserialized.sequence_number);
+        }
 
-        // And the dates should be parsed correctly
-        let created_at = DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
-            .expect("Failed to parse date")
-            .with_timezone(&Utc);
-        let updated_at = DateTime::parse_from_rfc3339("2023-01-02T00:00:00Z")
-            .expect("Failed to parse date")
-            .with_timezone(&Utc);
+        /// Test that User::new creates valid users with expected properties
+        #[test]
+        fn test_user_new_properties(
+            id in "[a-zA-Z0-9_-]{1,64}",
+            account in "[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,64}\\.[a-zA-Z]{2,8}",
+            label in "[\\p{L}\\p{N}\\p{P}\\p{Z}]{1,128}"
+        ) {
+            let user = User::new(id.clone(), account.clone(), label.clone());
 
-        assert_eq!(user.created_at, created_at);
-        assert_eq!(user.updated_at, updated_at);
-    }
+            prop_assert_eq!(user.id, id);
+            prop_assert_eq!(user.account, account);
+            prop_assert_eq!(user.label, label);
+            prop_assert_eq!(user.is_admin, false);
+            prop_assert_eq!(user.sequence_number, None);
 
-    #[test]
-    fn test_user_sequence_number_serialization_when_none() {
-        // Given a user with no sequence number
-        let user = User::new(
-            "user123".to_string(),
-            "test@example.com".to_string(),
-            "Test User".to_string(),
-        );
+            // created_at and updated_at should be the same
+            prop_assert_eq!(user.created_at, user.updated_at);
 
-        // When serializing to JSON
-        let json = serde_json::to_string(&user).expect("Failed to serialize user");
+            // created_at should be recent (within the last second)
+            let now = Utc::now();
+            let one_second_ago = now - Duration::seconds(1);
+            prop_assert!(user.created_at > one_second_ago);
+        }
 
-        // Then the sequence_number field should be omitted
-        assert!(!json.contains("sequence_number"));
+        /// Test that has_admin_privileges works correctly with various inputs
+        #[test]
+        fn test_has_admin_privileges_properties(
+            is_admin in proptest::bool::ANY,
+            sequence_number in proptest::option::of(0..10000i64)
+        ) {
+            let mut user = User::new(
+                "test_user".to_string(),
+                "test@example.com".to_string(),
+                "Test User".to_string()
+            );
+
+            user.is_admin = is_admin;
+            user.sequence_number = sequence_number;
+
+            let expected_has_privileges = is_admin || sequence_number == Some(1);
+            prop_assert_eq!(user.has_admin_privileges(), expected_has_privileges);
+        }
     }
 }

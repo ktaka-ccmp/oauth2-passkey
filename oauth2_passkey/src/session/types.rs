@@ -98,5 +98,3 @@ impl UserId {
         &self.0
     }
 }
-
-

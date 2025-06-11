@@ -235,72 +235,77 @@ mod tests {
     #[tokio::test]
     async fn test_oauth2_request_preparation_with_session() {
         init_test_environment().await;
-        
+
         let mut headers = HeaderMap::new();
         headers.insert(
             http::header::USER_AGENT,
-            http::HeaderValue::from_static("test-user-agent")
+            http::HeaderValue::from_static("test-user-agent"),
         );
         headers.insert(
             http::header::COOKIE,
-            http::HeaderValue::from_static("session_id=test_session_123")
+            http::HeaderValue::from_static("session_id=test_session_123"),
         );
 
         let result = prepare_oauth2_auth_request(headers, Some("signup")).await;
-        
+
         assert!(result.is_ok());
         let (auth_url, response_headers) = result.unwrap();
-        
+
         // Verify URL contains expected components
         assert!(auth_url.contains("https://accounts.google.com/o/oauth2/v2/auth"));
         assert!(auth_url.contains("client_id="));
         assert!(auth_url.contains("response_type=code"));
         assert!(auth_url.contains("state="));
         assert!(auth_url.contains("nonce="));
-        
+
         // Verify CSRF cookie is set in response headers
         let set_cookie_headers: Vec<_> = response_headers
             .get_all(SET_COOKIE)
             .iter()
             .map(|v| v.to_str().unwrap())
             .collect();
-        
+
         assert!(!set_cookie_headers.is_empty());
-        let csrf_cookie = set_cookie_headers.iter()
+        let csrf_cookie = set_cookie_headers
+            .iter()
             .find(|cookie| cookie.contains(&*OAUTH2_CSRF_COOKIE_NAME))
             .expect("CSRF cookie should be set");
-        
+
         // Debug: print the actual cookie to see its format
         println!("Actual cookie: {}", csrf_cookie);
-        
+
         assert!(csrf_cookie.contains("HttpOnly"));
-        
+
         // Verify SameSite attribute matches the response mode
         // form_post mode should use SameSite=None, query mode should use SameSite=Lax
         let expected_samesite = match OAUTH2_RESPONSE_MODE.to_lowercase().as_str() {
             "form_post" => "SameSite=None",
-            "query" => "SameSite=Lax", 
+            "query" => "SameSite=Lax",
             _ => "SameSite=Lax", // Default fallback
         };
-        assert!(csrf_cookie.contains(expected_samesite), 
-                "Expected {} in cookie: {}", expected_samesite, csrf_cookie);
+        assert!(
+            csrf_cookie.contains(expected_samesite),
+            "Expected {} in cookie: {}",
+            expected_samesite,
+            csrf_cookie
+        );
     }
 
-    #[tokio::test] 
+    #[tokio::test]
     async fn test_oauth2_request_preparation_without_session() {
         init_test_environment().await;
-        
+
         let mut headers = HeaderMap::new();
         headers.insert(
             http::header::USER_AGENT,
-            http::HeaderValue::from_static("test-user-agent")
+            http::HeaderValue::from_static("test-user-agent"),
         );
 
         let result = prepare_oauth2_auth_request(headers, None).await;
-        
+
         assert!(result.is_ok());
         let (auth_url, _) = result.unwrap();
-        
+
         // Should still work without session and mode
         assert!(auth_url.contains("https://accounts.google.com/o/oauth2/v2/auth"));
         assert!(auth_url.contains("state="));
@@ -366,49 +371,62 @@ mod tests {
     #[tokio::test]
     async fn test_oauth2_csrf_cookie_samesite_based_on_response_mode() {
         init_test_environment().await;
-        
+
         let mut headers = HeaderMap::new();
         headers.insert(
             http::header::USER_AGENT,
-            http::HeaderValue::from_static("test-user-agent")
+            http::HeaderValue::from_static("test-user-agent"),
         );
 
         let result = prepare_oauth2_auth_request(headers, None).await;
-        
+
         assert!(result.is_ok());
         let (_, response_headers) = result.unwrap();
-        
+
         // Verify CSRF cookie is set with correct SameSite attribute
         let set_cookie_headers: Vec<_> = response_headers
             .get_all(SET_COOKIE)
             .iter()
             .map(|v| v.to_str().unwrap())
             .collect();
-        
+
         assert!(!set_cookie_headers.is_empty());
-        let csrf_cookie = set_cookie_headers.iter()
+        let csrf_cookie = set_cookie_headers
+            .iter()
             .find(|cookie| cookie.contains(&*OAUTH2_CSRF_COOKIE_NAME))
             .expect("CSRF cookie should be set");
-        
+
         // Verify the cookie has required security attributes
-        assert!(csrf_cookie.contains("HttpOnly"), "Cookie should be HttpOnly");
+        assert!(
+            csrf_cookie.contains("HttpOnly"),
+            "Cookie should be HttpOnly"
+        );
         assert!(csrf_cookie.contains("Secure"), "Cookie should be Secure");
         assert!(csrf_cookie.contains("Path=/"), "Cookie should have Path=/");
-        
+
         // Verify SameSite attribute matches the configured response mode
         let current_mode = OAUTH2_RESPONSE_MODE.to_lowercase();
         match current_mode.as_str() {
             "form_post" => {
-                assert!(csrf_cookie.contains("SameSite=None"), 
-                       "form_post mode should use SameSite=None for cross-origin POST requests. Cookie: {}", csrf_cookie);
-            },
+                assert!(
+                    csrf_cookie.contains("SameSite=None"),
+                    "form_post mode should use SameSite=None for cross-origin POST requests. Cookie: {}",
+                    csrf_cookie
+                );
+            }
             "query" => {
-                assert!(csrf_cookie.contains("SameSite=Lax"), 
-                       "query mode should use SameSite=Lax for redirect-based flows. Cookie: {}", csrf_cookie);
-            },
+                assert!(
+                    csrf_cookie.contains("SameSite=Lax"),
+                    "query mode should use SameSite=Lax for redirect-based flows. Cookie: {}",
+                    csrf_cookie
+                );
+            }
             _ => {
-                assert!(csrf_cookie.contains("SameSite=Lax"), 
-                       "Unknown response mode should default to SameSite=Lax. Cookie: {}", csrf_cookie);
+                assert!(
+                    csrf_cookie.contains("SameSite=Lax"),
+                    "Unknown response mode should default to SameSite=Lax. Cookie: {}",
+                    csrf_cookie
+                );
             }
         }
     }

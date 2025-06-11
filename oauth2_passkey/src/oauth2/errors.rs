@@ -80,8 +80,6 @@ mod tests {
     use crate::utils::UtilError;
     use std::error::Error;
 
-
-
     #[test]
     fn test_from_util_error() {
         let util_err = UtilError::Format("format error".to_string());
@@ -140,8 +138,6 @@ mod tests {
         }
     }
 
-
-
     #[test]
     fn test_error_conversion_edge_cases() {
         // Test all UtilError variants conversion
@@ -194,6 +190,4 @@ mod tests {
             ),
         }
     }
-
-
 }

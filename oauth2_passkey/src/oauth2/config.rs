@@ -85,8 +85,6 @@ pub(super) static OAUTH2_GOOGLE_CLIENT_SECRET: LazyLock<String> = LazyLock::new(
 #[cfg(test)]
 mod tests {
 
-
-
     #[test]
     fn test_oauth2_response_mode_validation_logic() {
         // Test business logic: case insensitive validation
