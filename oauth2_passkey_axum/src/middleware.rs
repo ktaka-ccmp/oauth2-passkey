@@ -145,7 +145,11 @@ mod tests {
         let headers = response_with_header.headers();
         assert!(headers.contains_key("X-CSRF-Token"));
         assert_eq!(
-            headers.get("X-CSRF-Token").unwrap().to_str().unwrap(),
+            headers
+                .get("X-CSRF-Token")
+                .expect("X-CSRF-Token header should exist")
+                .to_str()
+                .expect("X-CSRF-Token header should be valid UTF-8"),
             csrf_token
         );
     }
@@ -245,7 +249,7 @@ mod tests {
         let request = Request::builder()
             .method(Method::POST)
             .body(Body::empty())
-            .unwrap();
+            .expect("Failed to build POST request for auth error test");
 
         // Create an error
         let error = SessionError::SessionError;

@@ -262,7 +262,12 @@ mod tests {
             redirect: Some("/some/path".to_string()),
         };
         assert!(query_with_redirect.redirect.is_some());
-        assert_eq!(query_with_redirect.redirect.unwrap(), "/some/path");
+        assert_eq!(
+            query_with_redirect
+                .redirect
+                .expect("Redirect should be present"),
+            "/some/path"
+        );
 
         // Test without redirect
         let query_without_redirect = RedirectQuery { redirect: None };
@@ -278,8 +283,16 @@ mod tests {
             label: Some("New Label".to_string()),
         };
         assert_eq!(request_full.user_id, "user123");
-        assert_eq!(request_full.account.unwrap(), "new@example.com");
-        assert_eq!(request_full.label.unwrap(), "New Label");
+        assert_eq!(
+            request_full
+                .account
+                .expect("Account field should be present"),
+            "new@example.com"
+        );
+        assert_eq!(
+            request_full.label.expect("Label field should be present"),
+            "New Label"
+        );
 
         // Test with only account
         let request_account_only = UpdateUserRequest {
@@ -288,7 +301,12 @@ mod tests {
             label: None,
         };
         assert_eq!(request_account_only.user_id, "user123");
-        assert_eq!(request_account_only.account.unwrap(), "new@example.com");
+        assert_eq!(
+            request_account_only
+                .account
+                .expect("Account field should be present"),
+            "new@example.com"
+        );
         assert!(request_account_only.label.is_none());
 
         // Test with only label
@@ -299,7 +317,12 @@ mod tests {
         };
         assert_eq!(request_label_only.user_id, "user123");
         assert!(request_label_only.account.is_none());
-        assert_eq!(request_label_only.label.unwrap(), "New Label");
+        assert_eq!(
+            request_label_only
+                .label
+                .expect("Label field should be present"),
+            "New Label"
+        );
     }
 
     #[test]

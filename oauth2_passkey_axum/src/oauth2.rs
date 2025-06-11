@@ -195,7 +195,11 @@ mod tests {
             // Verify content type header
             let headers = response.headers();
             assert_eq!(
-                headers.get(CONTENT_TYPE).unwrap().to_str().unwrap(),
+                headers
+                    .get(CONTENT_TYPE)
+                    .expect("Content-Type header should exist")
+                    .to_str()
+                    .expect("Content-Type header should be valid UTF-8"),
                 "application/javascript"
             );
         }
