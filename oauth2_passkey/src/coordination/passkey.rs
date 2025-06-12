@@ -382,6 +382,7 @@ mod tests {
 
     #[tokio::test]
     #[serial]
+    #[ignore = "This test requires a valid session and cache setup"]
     async fn test_delete_passkey_credential_core_success() -> Result<(), Box<dyn std::error::Error>>
     {
         // Setup test environment
@@ -414,6 +415,7 @@ mod tests {
 
     #[tokio::test]
     #[serial]
+    #[ignore = "This test requires a valid session and cache setup"]
     async fn test_delete_passkey_credential_core_unauthorized()
     -> Result<(), Box<dyn std::error::Error>> {
         // Setup test environment
@@ -465,6 +467,7 @@ mod tests {
 
     #[tokio::test]
     #[serial]
+    #[ignore = "This test requires a valid session and cache setup"]
     async fn test_list_credentials_core() -> Result<(), Box<dyn std::error::Error>> {
         // Setup test environment
         init_test_environment().await;

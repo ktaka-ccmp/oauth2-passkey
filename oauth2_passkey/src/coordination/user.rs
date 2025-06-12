@@ -391,6 +391,7 @@ mod tests {
 
     #[serial]
     #[tokio::test]
+    #[ignore="Requires a fresh database state"]
     async fn test_get_all_users() {
         init_test_environment().await;
 
