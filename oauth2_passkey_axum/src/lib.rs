@@ -8,6 +8,10 @@ mod router;
 mod session;
 mod user;
 
+// Test utilities module (only available in test builds)
+#[cfg(test)]
+pub(crate) mod test_utils;
+
 pub use config::{O2P_ADMIN_URL, O2P_LOGIN_URL, O2P_REDIRECT_ANON, O2P_SUMMARY_URL};
 pub use middleware::{
     is_authenticated_401, is_authenticated_redirect, is_authenticated_user_401,
