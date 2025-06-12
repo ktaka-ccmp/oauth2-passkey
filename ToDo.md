@@ -5,6 +5,7 @@
 - Tests
 - GitHub Actions
 - Decide on Public API
+
 - Tracing
   - Use tracing-error crate https://crates.io/crates/tracing-error
   - Use https://docs.rs/tower-http/latest/tower_http/trace/index.html
@@ -15,8 +16,12 @@
 - Replace "if let", "unwrap_or_else", "ok_or_else" etc. with "match", where appropriate.
 
 - Make demo-oauth2 and demo-passkey pages to implement login page and account summary page without relying on oauth2_passkey_axum's summary and login pages.
+- Another demo would be the one that extend attributes of users.
 
 - Syncing of credentials using signalAllAcceptedCredentials?
+  
+- MySQL, MariaDB support
+- Add Support for other OAuth2 providers like Apple and GitHub etc.
 
 ## ChatGPT's assessment
 
@@ -190,6 +195,15 @@ Performance:
 - Re-examine the role of page context token.
 - Re-examine the current implementation of CSRF protection in OAuth2 flow.
 - Modify demo pages to include link to available pages.
+
+- **[FIXED] Session Expiration Handling Inconsistency**
+  - ✅ Fixed: Added expiration check and automatic deletion logic to `get_csrf_token_from_session()` and `get_user_and_csrf_token_from_session()`
+  - ✅ Both functions now consistently check `stored_session.expires_at < Utc::now()` and delete expired sessions
+  - ✅ Both functions return `SessionError::SessionExpiredError` for expired sessions, matching `is_authenticated()` behavior
+  - ✅ Updated test `test_get_user_and_csrf_token_from_session_expired_session` to verify expired sessions are properly deleted
+  - ✅ All session-related tests now pass (406 total tests passing)
+  - **Location**: `oauth2_passkey/src/session/main/session.rs`
+  - **Previously**: Memory leaks in cache store, inconsistent session validation behavior
 
 ## Memo
 

@@ -261,4 +261,6 @@ Do we have anything that needs unit tests here?
 I'd like you to identify the functions for which writing unit tests a more appropriate than leaving it to integration tests, first. 
 
 
-What do you think about unit tests in this file? Aren't there any meaningless tests? Is there room for improvement?
+What do you think about unit tests in this module? Aren't there any meaningless tests that should be removed? Is there room for improvement?
+
+Now that we can use in-memory GENERIC_DATA_STORE and in-memory GENERIC_CACHE_STORE, that are dedicated for unit testing, can you assess the unit tests in this module to see if there is a room for improvement?

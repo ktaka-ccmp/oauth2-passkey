@@ -1,3 +1,4 @@
+## General Instructions
 1. I want to publish this as a crate on crates.io
 2. I want to make the code as simple as possible yet feasible
 3. I want to make the code dependencies on other crates as little as possible 
@@ -12,4 +13,21 @@
 13. When I write unit tests for the library, I want to write them one by one, making sure each test passes before writing the next one.
 14. When you want to proceed to the next file, ask for my approval first.
 15. When you want to write multiple tests at once, ask for my approval first.
+16. When you want to modify the original function which you are writing the test for, you must explain the reason and ask for permission.
 17. The block of inline unit tests should be placed at the bottom of the file.
+18. For the inline unit tests, we have prepared test_utils module, where we can initialize data store and cache dedicated for unit tests.
+19. Unit tests should test the functionality of the code by actually calling the functions and methods, not by mimicking the behavior of the code.
+
+## Critical: Fact-Based Documentation Only
+**NEVER make assumptions about codebase structure, architecture, or implementation details.**
+
+Before writing ANY documentation or making statements about the codebase:
+1. **ALWAYS examine the actual code first** using `list_dir`, `file_search`, `semantic_search`, `read_file`, or `grep_search`
+2. **Base ALL statements on verified facts** from actual code examination
+3. **If you don't know something, say so explicitly** - use phrases like "Based on examination of..."
+
+**Forbidden:** Writing about architecture, modules, functions, or features without first verifying they exist in the actual codebase.
+**Required:** Start every documentation task with fact-gathering using appropriate tools.
+
+## Error Prevention Process
+Before making any statement about the codebase: **STOP** → Have I verified this? → **USE TOOLS** → Examine actual code → **DOCUMENT** only verified facts.
