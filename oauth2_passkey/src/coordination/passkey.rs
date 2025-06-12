@@ -2,7 +2,7 @@ use chrono::Utc;
 use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::env;
+use std::{env, sync::LazyLock};
 
 use crate::passkey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyCredential,
@@ -17,11 +17,20 @@ use crate::userdb::{User, UserStore};
 use super::errors::CoordinationError;
 use super::user::gen_new_user_id;
 
+/// Passkey user account field mapping configuration
+static PASSKEY_USER_ACCOUNT_FIELD: LazyLock<String> =
+    LazyLock::new(|| env::var("PASSKEY_USER_ACCOUNT_FIELD").unwrap_or_else(|_| "name".to_string()));
+
+/// Passkey user label field mapping configuration
+static PASSKEY_USER_LABEL_FIELD: LazyLock<String> = LazyLock::new(|| {
+    env::var("PASSKEY_USER_LABEL_FIELD").unwrap_or_else(|_| "display_name".to_string())
+});
+
 /// Get the configured Passkey field mappings or defaults
 fn get_passkey_field_mappings() -> (String, String) {
     (
-        env::var("PASSKEY_USER_ACCOUNT_FIELD").unwrap_or_else(|_| "name".to_string()),
-        env::var("PASSKEY_USER_LABEL_FIELD").unwrap_or_else(|_| "display_name".to_string()),
+        PASSKEY_USER_ACCOUNT_FIELD.clone(),
+        PASSKEY_USER_LABEL_FIELD.clone(),
     )
 }
 
@@ -323,30 +332,9 @@ pub async fn update_passkey_credential_core(
 mod tests {
     use super::*;
     use crate::passkey::PasskeyCredential;
+    use crate::test_utils::init_test_environment;
     use crate::userdb::User;
-
-    async fn setup_test_db() -> Result<(), Box<dyn std::error::Error>> {
-        // Use a consistent prefix for all tests to ensure tables are properly created and accessed
-        let _db_path = "/tmp/test_passkey_fixed.db";
-        let db_url = "sqlite:/tmp/test_passkey_fixed.db";
-        let table_prefix = "test_o2p_fixed_";
-
-        // Set environment variables for testing
-        // Using unsafe block as env::set_var is not thread-safe
-        unsafe {
-            std::env::set_var("GENERIC_DATA_STORE_TYPE", "sqlite");
-            std::env::set_var("GENERIC_DATA_STORE_URL", db_url);
-            std::env::set_var("DB_TABLE_PREFIX", table_prefix);
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
-
-        // Initialize the database
-        crate::userdb::init().await?;
-        crate::passkey::init().await?;
-
-        Ok(())
-    }
+    use serial_test::serial;
 
     async fn create_test_user_in_db(user_id: &str) -> Result<(), Box<dyn std::error::Error>> {
         let user = User {
@@ -393,10 +381,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_delete_passkey_credential_core_success() -> Result<(), Box<dyn std::error::Error>>
     {
-        // Setup test database
-        setup_test_db().await?;
+        // Setup test environment
+        init_test_environment().await;
 
         // Create test user and passkey credential
         let user_id = "test_user_1";
@@ -424,10 +413,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_delete_passkey_credential_core_unauthorized()
     -> Result<(), Box<dyn std::error::Error>> {
-        // Setup test database
-        setup_test_db().await?;
+        // Setup test environment
+        init_test_environment().await;
 
         // Create test users and passkey credential
         let user_id = "test_user_2";
@@ -450,10 +440,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_delete_passkey_credential_core_not_found()
     -> Result<(), Box<dyn std::error::Error>> {
         // Setup test database
-        setup_test_db().await?;
+        init_test_environment().await;
 
         // Create test user
         let user_id = "test_user_4";
@@ -473,9 +464,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_list_credentials_core() -> Result<(), Box<dyn std::error::Error>> {
-        // Setup test database
-        setup_test_db().await?;
+        // Setup test environment
+        init_test_environment().await;
 
         // Create test user and passkey credentials
         let user_id = "test_user_5";
@@ -499,10 +491,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_update_passkey_credential_core_success() -> Result<(), Box<dyn std::error::Error>>
     {
-        // Setup test database
-        setup_test_db().await?;
+        // Setup test environment
+        init_test_environment().await;
 
         // Create test user and passkey credential
         let user_id = "test_user_6";
@@ -554,10 +547,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_update_passkey_credential_core_unauthorized()
     -> Result<(), Box<dyn std::error::Error>> {
-        // Setup test database
-        setup_test_db().await?;
+        // Setup test environment
+        init_test_environment().await;
 
         // Create test users and passkey credential
         let user_id = "test_user_7";
@@ -598,10 +592,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_update_passkey_credential_core_no_session()
     -> Result<(), Box<dyn std::error::Error>> {
-        // Setup test database
-        setup_test_db().await?;
+        // Setup test environment
+        init_test_environment().await;
 
         // Create test user and passkey credential
         let user_id = "test_user_9";
@@ -626,5 +621,39 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn test_get_passkey_field_mappings_defaults() {
+        // Test default mappings - since .env_test doesn't set these variables,
+        // they should use their default values
+        let (account_field, label_field) = get_passkey_field_mappings();
+        assert_eq!(
+            account_field, "name",
+            "Default account field should be 'name'"
+        );
+        assert_eq!(
+            label_field, "display_name",
+            "Default label field should be 'display_name'"
+        );
+    }
+
+    #[test]
+    fn test_get_passkey_field_mappings_logic() {
+        // Test the logic of the field mapping function by simulating different scenarios
+        // We can't test LazyLock behavior directly without environment manipulation,
+        // but we can test that the function returns reasonable defaults
+        let (account_field, label_field) = get_passkey_field_mappings();
+
+        // Verify the returned values are valid field names
+        assert!(
+            !account_field.is_empty(),
+            "Account field should not be empty"
+        );
+        assert!(!label_field.is_empty(), "Label field should not be empty");
+
+        // These should be the default values since .env_test doesn't override them
+        assert_eq!(account_field, "name");
+        assert_eq!(label_field, "display_name");
     }
 }
