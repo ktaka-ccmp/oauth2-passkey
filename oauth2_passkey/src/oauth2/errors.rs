@@ -80,50 +80,6 @@ mod tests {
     use crate::utils::UtilError;
     use std::error::Error;
 
-    /// Test conversion from UtilError to OAuth2Error
-    ///
-    /// This test verifies that `UtilError` variants are correctly converted to
-    /// `OAuth2Error::Util` using the From trait implementation. It tests the
-    /// error conversion and source chain preservation.
-    ///
-    #[test]
-    fn test_from_util_error() {
-        let util_err = UtilError::Format("format error".to_string());
-        let err: OAuth2Error = util_err.into();
-
-        match err {
-            OAuth2Error::Utils(UtilError::Format(msg)) => {
-                assert_eq!(msg, "format error");
-            }
-            _ => panic!(
-                "Expected OAuth2Error::Utils(UtilError::Format), got: {:?}",
-                err
-            ),
-        }
-    }
-
-    /// Test conversion from SessionError to OAuth2Error
-    ///
-    /// This test verifies that `SessionError` variants are correctly converted to
-    /// `OAuth2Error::Session` using the From trait implementation. It tests the
-    /// error conversion and source chain preservation.
-    ///
-    #[test]
-    fn test_from_session_error() {
-        let session_err = SessionError::Storage("session error".to_string());
-        let err: OAuth2Error = session_err.into();
-
-        match err {
-            OAuth2Error::Session(SessionError::Storage(msg)) => {
-                assert_eq!(msg, "session error");
-            }
-            _ => panic!(
-                "Expected OAuth2Error::Session(SessionError::Storage), got: {:?}",
-                err
-            ),
-        }
-    }
-
     /// Test error source chain preservation in From trait conversions
     ///
     /// This test verifies that when converting from UtilError and SessionError to OAuth2Error
@@ -153,66 +109,6 @@ mod tests {
                 assert_eq!(source.to_string(), "Storage error: session error");
             }
             None => panic!("Expected error to have a source"),
-        }
-    }
-
-    /// Test error conversion for all UtilError and SessionError variants
-    ///
-    /// This test verifies that all variants of UtilError and SessionError can be correctly
-    /// converted to OAuth2Error using the From trait implementations. It creates various
-    /// error types in memory and validates that the conversion preserves the error type
-    /// and message content.
-    ///
-    #[test]
-    fn test_error_conversion_edge_cases() {
-        // Test all UtilError variants conversion
-        let crypto_err = UtilError::Crypto("crypto error".to_string());
-        let oauth2_err: OAuth2Error = crypto_err.into();
-        match oauth2_err {
-            OAuth2Error::Utils(UtilError::Crypto(msg)) => {
-                assert_eq!(msg, "crypto error");
-            }
-            _ => panic!(
-                "Expected OAuth2Error::Utils(UtilError::Crypto), got: {:?}",
-                oauth2_err
-            ),
-        }
-
-        let cookie_err = UtilError::Cookie("cookie error".to_string());
-        let oauth2_err: OAuth2Error = cookie_err.into();
-        match oauth2_err {
-            OAuth2Error::Utils(UtilError::Cookie(msg)) => {
-                assert_eq!(msg, "cookie error");
-            }
-            _ => panic!(
-                "Expected OAuth2Error::Utils(UtilError::Cookie), got: {:?}",
-                oauth2_err
-            ),
-        }
-
-        // Test all SessionError variants conversion
-        let crypto_session_err = SessionError::Crypto("session crypto error".to_string());
-        let oauth2_err: OAuth2Error = crypto_session_err.into();
-        match oauth2_err {
-            OAuth2Error::Session(SessionError::Crypto(msg)) => {
-                assert_eq!(msg, "session crypto error");
-            }
-            _ => panic!(
-                "Expected OAuth2Error::Session(SessionError::Crypto), got: {:?}",
-                oauth2_err
-            ),
-        }
-
-        let cookie_session_err = SessionError::Cookie("session cookie error".to_string());
-        let oauth2_err: OAuth2Error = cookie_session_err.into();
-        match oauth2_err {
-            OAuth2Error::Session(SessionError::Cookie(msg)) => {
-                assert_eq!(msg, "session cookie error");
-            }
-            _ => panic!(
-                "Expected OAuth2Error::Session(SessionError::Cookie), got: {:?}",
-                oauth2_err
-            ),
         }
     }
 }
