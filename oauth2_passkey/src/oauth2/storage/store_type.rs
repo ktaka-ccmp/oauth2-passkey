@@ -162,3 +162,592 @@ impl OAuth2Store {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::oauth2::types::{AccountSearchField, OAuth2Account};
+    use crate::test_utils::init_test_environment;
+    use crate::userdb::{User, UserStore};
+    use serial_test::serial;
+
+    async fn create_test_account(
+        user_id: &str,
+        provider: &str,
+        provider_user_id: &str,
+    ) -> OAuth2Account {
+        OAuth2Account {
+            id: String::new(), // Will be generated
+            user_id: user_id.to_string(),
+            provider: provider.to_string(),
+            provider_user_id: provider_user_id.to_string(),
+            name: format!("Test User {}", provider_user_id),
+            email: format!("{}@example.com", provider_user_id),
+            picture: Some("https://example.com/avatar.png".to_string()),
+            metadata: serde_json::json!({
+                "test": true,
+                "provider": provider
+            }),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    // Helper function to create a user first, then an OAuth2 account
+    // This ensures foreign key constraints are satisfied
+    async fn create_test_user_and_account(
+        user_id: &str,
+        provider: &str,
+        provider_user_id: &str,
+    ) -> OAuth2Account {
+        // Ensure both stores are initialized before using them
+        // This is necessary for in-memory databases where each test may get a fresh instance
+        UserStore::init()
+            .await
+            .expect("Failed to initialize UserStore");
+        OAuth2Store::init()
+            .await
+            .expect("Failed to initialize OAuth2Store");
+
+        // First create the user
+        let user = User {
+            sequence_number: None,
+            id: user_id.to_string(),
+            account: format!("{}@example.com", user_id),
+            label: format!("Test User {}", user_id),
+            is_admin: false,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        // Insert the user (ignore result, upsert handles existing users)
+        let _ = UserStore::upsert_user(user).await;
+
+        // Create and insert the OAuth2 account
+        let account = create_test_account(user_id, provider, provider_user_id).await;
+        OAuth2Store::upsert_oauth2_account(account)
+            .await
+            .expect("Failed to insert OAuth2 account")
+    }
+
+    // Helper function to generate unique test identifiers to avoid conflicts between parallel tests
+    fn generate_unique_test_id(base: &str) -> String {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(1);
+        let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let thread_id = std::thread::current().id();
+        format!("{}_{:?}_{}", base, thread_id, counter)
+    }
+
+    #[tokio::test]
+    async fn test_gen_unique_account_id() {
+        init_test_environment().await;
+
+        // Test that we can generate unique IDs
+        let id1 = OAuth2Store::gen_unique_account_id().await.unwrap();
+        let id2 = OAuth2Store::gen_unique_account_id().await.unwrap();
+
+        assert_ne!(id1, id2, "Generated IDs should be unique");
+        assert!(!id1.is_empty(), "Generated ID should not be empty");
+        assert!(!id2.is_empty(), "Generated ID should not be empty");
+
+        // Test that IDs are valid UUIDs
+        uuid::Uuid::parse_str(&id1).expect("ID should be a valid UUID");
+        uuid::Uuid::parse_str(&id2).expect("ID should be a valid UUID");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_init_creates_tables() {
+        init_test_environment().await;
+
+        // The init function should succeed without errors
+        let result = OAuth2Store::init().await;
+        assert!(result.is_ok(), "OAuth2Store::init() should succeed");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_upsert_oauth2_account_create() {
+        init_test_environment().await;
+
+        // First create a user to satisfy foreign key constraints
+        let user_id = generate_unique_test_id("user");
+        let user = User {
+            sequence_number: None,
+            id: user_id.clone(),
+            account: format!("{}@example.com", user_id),
+            label: format!("Test User {}", user_id),
+            is_admin: false,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        // Insert the user - SQLite functions now ensure tables exist
+        UserStore::upsert_user(user).await.unwrap();
+
+        // Create and insert the OAuth2 account
+        let test_account = create_test_account(&user_id, "google", "google123").await;
+        let inserted_account = OAuth2Store::upsert_oauth2_account(test_account.clone())
+            .await
+            .unwrap();
+
+        assert!(
+            !inserted_account.id.is_empty(),
+            "Account should have generated ID"
+        );
+        assert_eq!(inserted_account.user_id, test_account.user_id);
+        assert_eq!(inserted_account.provider, test_account.provider);
+        assert_eq!(
+            inserted_account.provider_user_id,
+            test_account.provider_user_id
+        );
+        assert_eq!(inserted_account.email, test_account.email);
+        assert_eq!(inserted_account.name, test_account.name);
+        assert_eq!(inserted_account.picture, test_account.picture);
+
+        // Clean up
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_upsert_oauth2_account_empty_user_id() {
+        init_test_environment().await;
+
+        let mut test_account = create_test_account("", "google", "google123").await;
+        test_account.user_id = String::new();
+
+        // Should fail with empty user_id
+        let result = OAuth2Store::upsert_oauth2_account(test_account).await;
+        assert!(result.is_err(), "Should fail with empty user_id");
+
+        if let Err(OAuth2Error::Storage(msg)) = result {
+            assert!(
+                msg.contains("user_id must be set"),
+                "Error should mention user_id requirement"
+            );
+        } else {
+            panic!("Expected OAuth2Error::Storage");
+        }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_upsert_oauth2_account_update() {
+        init_test_environment().await;
+
+        let test_account = create_test_user_and_account("user123", "google", "google123").await;
+
+        // Insert the account
+        let mut inserted_account = OAuth2Store::upsert_oauth2_account(test_account)
+            .await
+            .unwrap();
+
+        // Update the account
+        inserted_account.name = "Updated Name".to_string();
+        inserted_account.email = "updated@example.com".to_string();
+
+        let updated_account = OAuth2Store::upsert_oauth2_account(inserted_account.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            updated_account.id, inserted_account.id,
+            "ID should remain the same"
+        );
+        assert_eq!(updated_account.name, "Updated Name".to_string());
+        assert_eq!(updated_account.email, "updated@example.com".to_string());
+
+        // Clean up
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(updated_account.id))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_get_oauth2_accounts_by_user_id() {
+        init_test_environment().await;
+
+        // Explicitly ensure tables exist for this test's connection
+        UserStore::init()
+            .await
+            .expect("Failed to initialize UserStore");
+        OAuth2Store::init()
+            .await
+            .expect("Failed to initialize OAuth2Store");
+
+        let user_id = generate_unique_test_id("test_user");
+        let google_provider_id = generate_unique_test_id("google");
+        let github_provider_id = generate_unique_test_id("github");
+
+        let inserted1 = create_test_user_and_account(&user_id, "google", &google_provider_id).await;
+
+        // Create second account for the same user (user already exists)
+        let account2 = create_test_account(&user_id, "github", &github_provider_id).await;
+        let inserted2 = OAuth2Store::upsert_oauth2_account(account2).await.unwrap();
+
+        // Retrieve accounts
+        let accounts = OAuth2Store::get_oauth2_accounts(&user_id).await.unwrap();
+
+        assert_eq!(accounts.len(), 2, "Should have 2 accounts for the user");
+
+        let mut found_google = false;
+        let mut found_github = false;
+        for account in &accounts {
+            if account.provider == "google" {
+                found_google = true;
+                assert_eq!(account.provider_user_id, google_provider_id);
+            } else if account.provider == "github" {
+                found_github = true;
+                assert_eq!(account.provider_user_id, github_provider_id);
+            }
+        }
+
+        assert!(found_google, "Should find Google account");
+        assert!(found_github, "Should find GitHub account");
+
+        // Clean up
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted1.id))
+            .await
+            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted2.id))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_get_oauth2_accounts_by_id() {
+        init_test_environment().await;
+
+        let inserted_account = create_test_user_and_account("user123", "google", "google123").await;
+
+        // Search by ID
+        let accounts = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Id(
+            inserted_account.id.clone(),
+        ))
+        .await
+        .unwrap();
+
+        assert_eq!(accounts.len(), 1, "Should find exactly one account");
+        assert_eq!(accounts[0].id, inserted_account.id);
+        assert_eq!(accounts[0].provider, "google");
+
+        // Clean up
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_get_oauth2_accounts_by_provider() {
+        init_test_environment().await;
+
+        // Explicitly ensure tables exist for this test's connection
+        UserStore::init()
+            .await
+            .expect("Failed to initialize UserStore");
+        OAuth2Store::init()
+            .await
+            .expect("Failed to initialize OAuth2Store");
+
+        // Clean up any existing Google accounts from other tests to ensure test isolation
+        let existing_google_accounts =
+            OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Provider("google".to_string()))
+                .await
+                .unwrap_or_default();
+        for account in existing_google_accounts {
+            let _ =
+                OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(account.id)).await;
+        }
+
+        let provider1_id = generate_unique_test_id("google");
+        let provider2_id = generate_unique_test_id("google");
+        let provider3_id = generate_unique_test_id("github");
+
+        let inserted1 = create_test_user_and_account(
+            &generate_unique_test_id("user1"),
+            "google",
+            &provider1_id,
+        )
+        .await;
+        let inserted2 = create_test_user_and_account(
+            &generate_unique_test_id("user2"),
+            "google",
+            &provider2_id,
+        )
+        .await;
+        let inserted3 = create_test_user_and_account(
+            &generate_unique_test_id("user3"),
+            "github",
+            &provider3_id,
+        )
+        .await;
+
+        // Search by provider
+        let google_accounts =
+            OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Provider("google".to_string()))
+                .await
+                .unwrap();
+
+        assert_eq!(google_accounts.len(), 2, "Should find 2 Google accounts");
+        for account in &google_accounts {
+            assert_eq!(account.provider, "google");
+        }
+
+        // Clean up
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted1.id))
+            .await
+            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted2.id))
+            .await
+            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted3.id))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_get_oauth2_account_by_provider() {
+        init_test_environment().await;
+
+        let inserted_account = create_test_user_and_account("user123", "google", "google123").await;
+
+        // Find by provider and provider_user_id
+        let found_account = OAuth2Store::get_oauth2_account_by_provider("google", "google123")
+            .await
+            .unwrap();
+
+        assert!(found_account.is_some(), "Should find the account");
+        let found_account = found_account.unwrap();
+        assert_eq!(found_account.id, inserted_account.id);
+        assert_eq!(found_account.provider, "google");
+        assert_eq!(found_account.provider_user_id, "google123");
+
+        // Try to find non-existent account
+        let not_found = OAuth2Store::get_oauth2_account_by_provider("google", "nonexistent")
+            .await
+            .unwrap();
+        assert!(not_found.is_none(), "Should not find non-existent account");
+
+        // Clean up
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_delete_oauth2_accounts_by_id() {
+        init_test_environment().await;
+
+        let user_id = generate_unique_test_id("user");
+        let provider_user_id = generate_unique_test_id("google");
+        let inserted_account =
+            create_test_user_and_account(&user_id, "google", &provider_user_id).await;
+
+        // Verify account exists
+        let accounts_before = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Id(
+            inserted_account.id.clone(),
+        ))
+        .await
+        .unwrap();
+        assert_eq!(
+            accounts_before.len(),
+            1,
+            "Account should exist before deletion"
+        );
+
+        // Delete account
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id.clone()))
+            .await
+            .unwrap();
+
+        // Verify account is deleted
+        let accounts_after =
+            OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id))
+                .await
+                .unwrap();
+        assert_eq!(accounts_after.len(), 0, "Account should be deleted");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_delete_oauth2_accounts_by_user_id() {
+        init_test_environment().await;
+
+        // Explicitly ensure tables exist for this test's connection
+        UserStore::init()
+            .await
+            .expect("Failed to initialize UserStore");
+        OAuth2Store::init()
+            .await
+            .expect("Failed to initialize OAuth2Store");
+
+        let user_id = generate_unique_test_id("user_to_delete");
+        let _inserted1 =
+            create_test_user_and_account(&user_id, "google", &generate_unique_test_id("google"))
+                .await;
+
+        // Create second account for the same user (user already exists)
+        let account2 =
+            create_test_account(&user_id, "github", &generate_unique_test_id("github")).await;
+        let _inserted2 = OAuth2Store::upsert_oauth2_account(account2).await.unwrap();
+
+        // Verify accounts exist
+        let accounts_before = OAuth2Store::get_oauth2_accounts(&user_id).await.unwrap();
+        assert_eq!(
+            accounts_before.len(),
+            2,
+            "Should have 2 accounts before deletion"
+        );
+
+        // Delete all accounts for user
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.clone()))
+            .await
+            .unwrap();
+
+        // Verify accounts are deleted
+        let accounts_after = OAuth2Store::get_oauth2_accounts(&user_id).await.unwrap();
+        assert_eq!(accounts_after.len(), 0, "All accounts should be deleted");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_get_oauth2_accounts_empty_result() {
+        init_test_environment().await;
+
+        // Try to get accounts for non-existent user
+        let accounts = OAuth2Store::get_oauth2_accounts("nonexistent_user")
+            .await
+            .unwrap();
+        assert_eq!(
+            accounts.len(),
+            0,
+            "Should return empty vector for non-existent user"
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_account_search_field_variants() {
+        init_test_environment().await;
+
+        // Explicitly ensure tables exist for this test's connection
+        UserStore::init()
+            .await
+            .expect("Failed to initialize UserStore");
+        OAuth2Store::init()
+            .await
+            .expect("Failed to initialize OAuth2Store");
+
+        let user_id = generate_unique_test_id("search_test_user");
+        let provider_user_id = generate_unique_test_id("search_google");
+        let inserted_account =
+            create_test_user_and_account(&user_id, "google", &provider_user_id).await;
+
+        // Test search by ID
+        let by_id = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Id(
+            inserted_account.id.clone(),
+        ))
+        .await
+        .unwrap();
+        assert_eq!(by_id.len(), 1);
+
+        // Test search by UserId
+        let by_user_id =
+            OAuth2Store::get_oauth2_accounts_by(AccountSearchField::UserId(user_id.clone()))
+                .await
+                .unwrap();
+        assert_eq!(by_user_id.len(), 1);
+
+        // Test search by Provider
+        let by_provider =
+            OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Provider("google".to_string()))
+                .await
+                .unwrap();
+        assert!(!by_provider.is_empty());
+
+        // Test search by Email
+        let by_email = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Email(
+            inserted_account.email.clone(),
+        ))
+        .await
+        .unwrap();
+        assert!(!by_email.is_empty());
+
+        // Clean up
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_concurrent_account_operations() {
+        init_test_environment().await;
+
+        // Explicitly ensure tables exist for this test's connection
+        UserStore::init()
+            .await
+            .expect("Failed to initialize UserStore");
+        OAuth2Store::init()
+            .await
+            .expect("Failed to initialize OAuth2Store");
+
+        // Create accounts and insert them concurrently
+        let user_id = &generate_unique_test_id("concurrent_test_user");
+
+        // Create one account with user, then create additional accounts for the same user
+        let account0 =
+            create_test_user_and_account(user_id, "provider", &generate_unique_test_id("user0"))
+                .await;
+        let account1 =
+            create_test_account(user_id, "provider", &generate_unique_test_id("user1")).await;
+        let account2 =
+            create_test_account(user_id, "provider", &generate_unique_test_id("user2")).await;
+        let account3 =
+            create_test_account(user_id, "provider", &generate_unique_test_id("user3")).await;
+        let account4 = create_test_account(user_id, "provider", "user4").await;
+
+        let (result1, result2, result3, result4) = tokio::join!(
+            OAuth2Store::upsert_oauth2_account(account1),
+            OAuth2Store::upsert_oauth2_account(account2),
+            OAuth2Store::upsert_oauth2_account(account3),
+            OAuth2Store::upsert_oauth2_account(account4)
+        );
+
+        let inserted_accounts = vec![
+            account0, // already inserted by create_test_user_and_account
+            result1.unwrap(),
+            result2.unwrap(),
+            result3.unwrap(),
+            result4.unwrap(),
+        ];
+
+        assert_eq!(
+            inserted_accounts.len(),
+            5,
+            "All concurrent insertions should succeed"
+        );
+
+        // Verify all accounts have unique IDs
+        let mut ids = std::collections::HashSet::new();
+        for account in &inserted_accounts {
+            assert!(ids.insert(account.id.clone()), "All IDs should be unique");
+        }
+
+        // Clean up
+        for account in inserted_accounts {
+            OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(account.id))
+                .await
+                .unwrap();
+        }
+    }
+}

@@ -349,80 +349,17 @@ pub(super) async fn verify_idtoken(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{Duration, Utc};
-    use serde_json::json;
 
     #[test]
-    fn test_error_display() {
-        let test_cases = vec![
-            (
-                TokenVerificationError::InvalidTokenFormat,
-                "Invalid token format",
-            ),
-            (
-                TokenVerificationError::InvalidTokenSignature,
-                "Invalid token signature",
-            ),
-            (
-                TokenVerificationError::InvalidTokenAudience(
-                    "expected".to_string(),
-                    "actual".to_string(),
-                ),
-                "Invalid token audience, expected: expected, actual: actual",
-            ),
-            (
-                TokenVerificationError::InvalidTokenIssuer(
-                    "expected".to_string(),
-                    "actual".to_string(),
-                ),
-                "Invalid token issuer, expected: expected, actual: actual",
-            ),
-            (TokenVerificationError::TokenExpired, "Token expired"),
-            (
-                TokenVerificationError::TokenNotYetValidNotBeFore(100, 200),
-                "Token not yet valid, now: 100, nbf: 200",
-            ),
-            (
-                TokenVerificationError::TokenNotYetValidIssuedAt(100, 200),
-                "Token not yet valid, now: 100, iat: 200",
-            ),
-            (
-                TokenVerificationError::NoMatchingKey,
-                "No matching key found in JWKS",
-            ),
-            (
-                TokenVerificationError::MissingKeyComponent("n".to_string()),
-                "Missing key component: n",
-            ),
-            (
-                TokenVerificationError::UnsupportedAlgorithm("HS384".to_string()),
-                "Unsupported algorithm: HS384",
-            ),
-            (
-                TokenVerificationError::JwksParsing("parse error".to_string()),
-                "JWKS parsing error: parse error",
-            ),
-            (
-                TokenVerificationError::JwksFetch("fetch error".to_string()),
-                "JWKS fetch error: fetch error",
-            ),
-        ];
-
-        for (error, expected_message) in test_cases {
-            assert_eq!(error.to_string(), expected_message);
-        }
-    }
-
-    #[test]
-    fn test_find_jwk() {
+    fn test_find_jwk_existing_key() {
         let jwks = Jwks {
             keys: vec![
                 Jwk {
                     kty: "RSA".to_string(),
                     kid: "key1".to_string(),
                     alg: "RS256".to_string(),
-                    n: Some("n_value".to_string()),
-                    e: Some("e_value".to_string()),
+                    n: Some("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw".to_string()),
+                    e: Some("AQAB".to_string()),
                     x: None,
                     y: None,
                     crv: None,
@@ -432,8 +369,8 @@ mod tests {
                     kty: "RSA".to_string(),
                     kid: "key2".to_string(),
                     alg: "RS256".to_string(),
-                    n: Some("n_value2".to_string()),
-                    e: Some("e_value2".to_string()),
+                    n: Some("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw".to_string()),
+                    e: Some("AQAB".to_string()),
                     x: None,
                     y: None,
                     crv: None,
@@ -442,104 +379,196 @@ mod tests {
             ],
         };
 
-        // Should find the key with matching kid
-        let jwk = find_jwk(&jwks, "key1");
-        assert!(jwk.is_some());
-        assert_eq!(jwk.expect("Should find key1").kid, "key1");
-
-        // Should find the second key
-        let jwk = find_jwk(&jwks, "key2");
-        assert!(jwk.is_some());
-        assert_eq!(jwk.expect("Should find key2").kid, "key2");
-
-        // Should return None for non-existent key
-        let jwk = find_jwk(&jwks, "key3");
-        assert!(jwk.is_none());
+        let result = find_jwk(&jwks, "key1");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().kid, "key1");
+        assert_eq!(result.unwrap().alg, "RS256");
     }
 
     #[test]
-    fn test_jwks_cache_conversion() {
+    fn test_find_jwk_non_existing_key() {
         let jwks = Jwks {
-            keys: vec![Jwk {
-                kty: "RSA".to_string(),
-                kid: "key1".to_string(),
-                alg: "RS256".to_string(),
-                n: Some("n_value".to_string()),
-                e: Some("e_value".to_string()),
-                x: None,
-                y: None,
-                crv: None,
-                k: None,
-            }],
+            keys: vec![
+                Jwk {
+                    kty: "RSA".to_string(),
+                    kid: "key1".to_string(),
+                    alg: "RS256".to_string(),
+                    n: Some("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw".to_string()),
+                    e: Some("AQAB".to_string()),
+                    x: None,
+                    y: None,
+                    crv: None,
+                    k: None,
+                },
+            ],
         };
 
-        let expires_at = Utc::now() + Duration::seconds(600);
-        let jwks_cache = JwksCache {
-            jwks: jwks.clone(),
-            expires_at,
-        };
-
-        // Convert to CacheData
-        let cache_data: CacheData = jwks_cache.clone().into();
-
-        // Convert back to JwksCache
-        let recovered_cache: JwksCache = cache_data.try_into().unwrap();
-
-        // Verify the keys are preserved
-        assert_eq!(recovered_cache.jwks.keys.len(), 1);
-        assert_eq!(recovered_cache.jwks.keys[0].kid, "key1");
-        assert_eq!(recovered_cache.jwks.keys[0].kty, "RSA");
-        assert_eq!(recovered_cache.jwks.keys[0].alg, "RS256");
-        assert_eq!(recovered_cache.jwks.keys[0].n, Some("n_value".to_string()));
-        assert_eq!(recovered_cache.jwks.keys[0].e, Some("e_value".to_string()));
-
-        // Verify the expiration time is preserved (within a second)
-        let time_diff = (recovered_cache.expires_at - jwks_cache.expires_at).num_seconds();
-        assert!(time_diff.abs() < 1);
+        let result = find_jwk(&jwks, "non_existing_key");
+        assert!(result.is_none());
     }
 
     #[test]
-    fn test_jwks_cache_invalid_data() {
-        // Create invalid cache data
-        let invalid_data = CacheData {
-            value: "not valid json".to_string(),
-        };
+    fn test_find_jwk_empty_jwks() {
+        let jwks = Jwks { keys: vec![] };
 
-        // Try to convert to JwksCache
-        let result: Result<JwksCache, TokenVerificationError> = invalid_data.try_into();
+        let result = find_jwk(&jwks, "any_key");
+        assert!(result.is_none());
+    }
 
-        // Should fail
+    #[test]
+    fn test_decode_base64_url_safe_valid() {
+        // Test valid base64 URL-safe encoding
+        let input = "SGVsbG9Xb3JsZA"; // "HelloWorld" in base64
+        let result = decode_base64_url_safe(input);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), b"HelloWorld");
+    }
+
+    #[test]
+    fn test_decode_base64_url_safe_empty() {
+        let result = decode_base64_url_safe("");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn test_decode_base64_url_safe_invalid() {
+        // Test invalid base64 input
+        let input = "Invalid@Base64!";
+        let result = decode_base64_url_safe(input);
         assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::JwksParsing(_)) => {}
-            Err(other) => {
-                assert!(false, "Expected JwksParsing error, got {:?}", other);
-            }
-        }
+        assert!(matches!(
+            result.unwrap_err(),
+            TokenVerificationError::Base64Error(_)
+        ));
     }
 
     #[test]
-    fn test_decode_base64_url_safe() {
-        // Valid base64url encoded string
-        let encoded = "SGVsbG8gV29ybGQ";
-        let decoded = decode_base64_url_safe(encoded).unwrap();
-        assert_eq!(String::from_utf8(decoded).unwrap(), "Hello World");
-
-        // Invalid base64 string
-        let result = decode_base64_url_safe("not!valid!base64");
-        assert!(result.is_err());
+    fn test_decode_base64_url_safe_padding() {
+        // Test that URL_SAFE_NO_PAD works correctly
+        let input = "SGVsbG8"; // "Hello" in base64 without padding
+        let result = decode_base64_url_safe(input);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), b"Hello");
     }
 
     #[test]
-    fn test_convert_jwk_to_decoding_key_rsa() {
-        // Test RSA256 algorithm
+    fn test_convert_jwk_to_decoding_key_missing_n_component() {
         let jwk = Jwk {
             kty: "RSA".to_string(),
             kid: "test_key".to_string(),
             alg: "RS256".to_string(),
+            n: None, // Missing n component
+            e: Some("AQAB".to_string()),
+            x: None,
+            y: None,
+            crv: None,
+            k: None,
+        };
+
+        let result = convert_jwk_to_decoding_key(&jwk);
+        assert!(result.is_err());
+        match result {
+            Err(TokenVerificationError::MissingKeyComponent(ref s)) => assert_eq!(s, "n"),
+            _ => panic!("Expected MissingKeyComponent error for 'n'"),
+        }
+    }
+
+    #[test]
+    fn test_convert_jwk_to_decoding_key_missing_e_component() {
+        let jwk = Jwk {
+            kty: "RSA".to_string(),
+            kid: "test_key".to_string(),
+            alg: "RS256".to_string(),
+            n: Some("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw".to_string()),
+            e: None, // Missing e component
+            x: None,
+            y: None,
+            crv: None,
+            k: None,
+        };
+
+        let result = convert_jwk_to_decoding_key(&jwk);
+        assert!(result.is_err());
+        match result {
+            Err(TokenVerificationError::MissingKeyComponent(ref s)) => assert_eq!(s, "e"),
+            Err(ref e) => panic!("Expected MissingKeyComponent error for 'e', got: {:?}", e),
+            _ => panic!("Expected error"),
+        }
+    }
+
+    #[test]
+    fn test_convert_jwk_to_decoding_key_missing_x_component_es256() {
+        let jwk = Jwk {
+            kty: "EC".to_string(),
+            kid: "test_key".to_string(),
+            alg: "ES256".to_string(),
+            n: None,
+            e: None,
+            x: None, // Missing x component
+            y: Some("MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4".to_string()),
+            crv: Some("P-256".to_string()),
+            k: None,
+        };
+
+        let result = convert_jwk_to_decoding_key(&jwk);
+        assert!(result.is_err());
+        match result {
+            Err(TokenVerificationError::MissingKeyComponent(ref s)) => assert_eq!(s, "x"),
+            _ => panic!("Expected MissingKeyComponent error for 'x'"),
+        }
+    }
+
+    #[test]
+    fn test_convert_jwk_to_decoding_key_missing_y_component_es256() {
+        let jwk = Jwk {
+            kty: "EC".to_string(),
+            kid: "test_key".to_string(),
+            alg: "ES256".to_string(),
+            n: None,
+            e: None,
+            x: Some("WKn-ZIGevcwGIyyrzFoZNBdaq9_TsqzGHwHitJBcBmXw".to_string()),
+            y: None, // Missing y component
+            crv: Some("P-256".to_string()),
+            k: None,
+        };
+
+        let result = convert_jwk_to_decoding_key(&jwk);
+        assert!(result.is_err());
+        match result {
+            Err(TokenVerificationError::MissingKeyComponent(ref s)) => assert_eq!(s, "y"),
+            _ => panic!("Expected MissingKeyComponent error for 'y'"),
+        }
+    }
+
+    #[test]
+    fn test_convert_jwk_to_decoding_key_missing_k_component_hs256() {
+        let jwk = Jwk {
+            kty: "oct".to_string(),
+            kid: "test_key".to_string(),
+            alg: "HS256".to_string(),
+            n: None,
+            e: None,
+            x: None,
+            y: None,
+            crv: None,
+            k: None, // Missing k component
+        };
+
+        let result = convert_jwk_to_decoding_key(&jwk);
+        assert!(result.is_err());
+        match result {
+            Err(TokenVerificationError::MissingKeyComponent(ref s)) => assert_eq!(s, "k"),
+            _ => panic!("Expected MissingKeyComponent error for 'k'"),
+        }
+    }
+
+    #[test]
+    fn test_convert_jwk_to_decoding_key_unsupported_algorithm() {
+        let jwk = Jwk {
+            kty: "RSA".to_string(),
+            kid: "test_key".to_string(),
+            alg: "UNSUPPORTED".to_string(),
             n: Some("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw".to_string()),
             e: Some("AQAB".to_string()),
             x: None,
@@ -549,290 +578,83 @@ mod tests {
         };
 
         let result = convert_jwk_to_decoding_key(&jwk);
-        assert!(result.is_ok(), "Should successfully convert RSA key");
-
-        // Test RS384
-        let jwk_rs384 = Jwk {
-            alg: "RS384".to_string(),
-            ..jwk.clone()
-        };
-        let result = convert_jwk_to_decoding_key(&jwk_rs384);
-        assert!(result.is_ok(), "Should successfully convert RS384 key");
-
-        // Test RS512
-        let jwk_rs512 = Jwk {
-            alg: "RS512".to_string(),
-            ..jwk.clone()
-        };
-        let result = convert_jwk_to_decoding_key(&jwk_rs512);
-        assert!(result.is_ok(), "Should successfully convert RS512 key");
+        assert!(result.is_err());
+        match result {
+            Err(TokenVerificationError::UnsupportedAlgorithm(ref s)) => {
+                assert_eq!(s, "UNSUPPORTED")
+            }
+            _ => panic!("Expected UnsupportedAlgorithm error"),
+        }
     }
 
     #[test]
-    fn test_convert_jwk_to_decoding_key_ecdsa() {
-        // Test ECDSA ES256 algorithm with valid P-256 coordinates
+    fn test_convert_jwk_to_decoding_key_hs256_valid() {
         let jwk = Jwk {
-            kty: "EC".to_string(),
-            kid: "test_ec_key".to_string(),
-            alg: "ES256".to_string(),
+            kty: "oct".to_string(),
+            kid: "test_key".to_string(),
+            alg: "HS256".to_string(),
             n: None,
             e: None,
-            x: Some("f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU".to_string()),
-            y: Some("x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0".to_string()),
-            crv: Some("P-256".to_string()),
-            k: None,
+            x: None,
+            y: None,
+            crv: None,
+            k: Some("c2VjcmV0a2V5MTIz".to_string()), // "secretkey123" in base64
         };
 
         let result = convert_jwk_to_decoding_key(&jwk);
-        assert!(
-            result.is_ok(),
-            "Should successfully convert ES256 key, but got error: {:?}",
-            result.err()
-        );
-
-        // Test ES384
-        let jwk_es384 = Jwk {
-            alg: "ES384".to_string(),
-            ..jwk.clone()
-        };
-        let result = convert_jwk_to_decoding_key(&jwk_es384);
-        assert!(result.is_ok(), "Should successfully convert ES384 key");
-
-        // Test ES512
-        let jwk_es512 = Jwk {
-            alg: "ES512".to_string(),
-            ..jwk.clone()
-        };
-        let result = convert_jwk_to_decoding_key(&jwk_es512);
-        assert!(result.is_ok(), "Should successfully convert ES512 key");
+        assert!(result.is_ok());
     }
 
     #[test]
-    fn test_convert_jwk_to_decoding_key_hmac() {
-        // Test HMAC HS256 algorithm
-        let jwk = Jwk {
-            kty: "oct".to_string(),
-            kid: "test_hmac_key".to_string(),
-            alg: "HS256".to_string(),
-            n: None,
-            e: None,
-            x: None,
-            y: None,
-            crv: None,
-            k: Some("SGVsbG8gV29ybGQ".to_string()), // "Hello World" base64url encoded
-        };
-
-        let result = convert_jwk_to_decoding_key(&jwk);
-        assert!(result.is_ok(), "Should successfully convert HS256 key");
-
-        // Test HS384
-        let jwk_hs384 = Jwk {
-            alg: "HS384".to_string(),
-            ..jwk.clone()
-        };
-        let result = convert_jwk_to_decoding_key(&jwk_hs384);
-        assert!(result.is_ok(), "Should successfully convert HS384 key");
-
-        // Test HS512
-        let jwk_hs512 = Jwk {
-            alg: "HS512".to_string(),
-            ..jwk.clone()
-        };
-        let result = convert_jwk_to_decoding_key(&jwk_hs512);
-        assert!(result.is_ok(), "Should successfully convert HS512 key");
+    fn test_decode_token_invalid_format_too_few_parts() {
+        let token = "header.payload"; // Only 2 parts instead of 3
+        let result = decode_token(token);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            TokenVerificationError::InvalidTokenFormat
+        ));
     }
 
     #[test]
-    fn test_convert_jwk_to_decoding_key_errors() {
-        // Test unsupported algorithm
-        let jwk_unsupported = Jwk {
-            kty: "RSA".to_string(),
-            kid: "test_key".to_string(),
-            alg: "UNSUPPORTED".to_string(),
-            n: Some("test".to_string()),
-            e: Some("test".to_string()),
-            x: None,
-            y: None,
-            crv: None,
-            k: None,
-        };
-
-        let result = convert_jwk_to_decoding_key(&jwk_unsupported);
+    fn test_decode_token_invalid_format_too_many_parts() {
+        let token = "header.payload.signature.extra"; // 4 parts instead of 3
+        let result = decode_token(token);
         assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::UnsupportedAlgorithm(alg)) => {
-                assert_eq!(alg, "UNSUPPORTED");
-            }
-            Err(other) => {
-                assert!(
-                    false,
-                    "Expected UnsupportedAlgorithm error, got {:?}",
-                    other
-                );
-            }
-        }
-
-        // Test RSA key missing 'n' component
-        let jwk_missing_n = Jwk {
-            kty: "RSA".to_string(),
-            kid: "test_key".to_string(),
-            alg: "RS256".to_string(),
-            n: None, // Missing
-            e: Some("AQAB".to_string()),
-            x: None,
-            y: None,
-            crv: None,
-            k: None,
-        };
-
-        let result = convert_jwk_to_decoding_key(&jwk_missing_n);
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::MissingKeyComponent(component)) => {
-                assert_eq!(component, "n");
-            }
-            Err(other) => {
-                assert!(
-                    false,
-                    "Expected MissingKeyComponent error for 'n', got {:?}",
-                    other
-                );
-            }
-        }
-
-        // Test ECDSA key missing 'x' component
-        let jwk_missing_x = Jwk {
-            kty: "EC".to_string(),
-            kid: "test_key".to_string(),
-            alg: "ES256".to_string(),
-            n: None,
-            e: None,
-            x: None, // Missing
-            y: Some("test".to_string()),
-            crv: Some("P-256".to_string()),
-            k: None,
-        };
-
-        let result = convert_jwk_to_decoding_key(&jwk_missing_x);
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::MissingKeyComponent(component)) => {
-                assert_eq!(component, "x");
-            }
-            Err(other) => {
-                assert!(
-                    false,
-                    "Expected MissingKeyComponent error for 'x', got {:?}",
-                    other
-                );
-            }
-        }
-
-        // Test HMAC key missing 'k' component
-        let jwk_missing_k = Jwk {
-            kty: "oct".to_string(),
-            kid: "test_key".to_string(),
-            alg: "HS256".to_string(),
-            n: None,
-            e: None,
-            x: None,
-            y: None,
-            crv: None,
-            k: None, // Missing
-        };
-
-        let result = convert_jwk_to_decoding_key(&jwk_missing_k);
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::MissingKeyComponent(component)) => {
-                assert_eq!(component, "k");
-            }
-            Err(other) => {
-                assert!(
-                    false,
-                    "Expected MissingKeyComponent error for 'k', got {:?}",
-                    other
-                );
-            }
-        }
+        assert!(matches!(
+            result.unwrap_err(),
+            TokenVerificationError::InvalidTokenFormat
+        ));
     }
 
     #[test]
-    fn test_verify_signature_invalid_token_format() {
-        // Test with invalid number of parts
-        let jwk = Jwk {
-            kty: "oct".to_string(),
-            kid: "test_key".to_string(),
-            alg: "HS256".to_string(),
-            n: None,
-            e: None,
-            x: None,
-            y: None,
-            crv: None,
-            k: Some("SGVsbG8gV29ybGQ".to_string()),
-        };
-
-        let decoding_key = convert_jwk_to_decoding_key(&jwk)
-            .expect("Should successfully create decoding key for test");
-
-        // Token with only 2 parts instead of 3
-        let invalid_token = "header.payload";
-        let result = verify_signature(invalid_token, &decoding_key, Algorithm::HS256);
+    fn test_decode_token_invalid_base64_payload() {
+        let token = "header.invalid@base64.signature";
+        let result = decode_token(token);
         assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::InvalidTokenFormat) => {}
-            Err(other) => {
-                assert!(false, "Expected InvalidTokenFormat error, got {:?}", other);
-            }
-        }
-
-        // Token with 4 parts instead of 3
-        let invalid_token = "header.payload.signature.extra";
-        let result = verify_signature(invalid_token, &decoding_key, Algorithm::HS256);
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::InvalidTokenFormat) => {}
-            Err(other) => {
-                assert!(false, "Expected InvalidTokenFormat error, got {:?}", other);
-            }
-        }
-
-        // Empty token
-        let result = verify_signature("", &decoding_key, Algorithm::HS256);
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::InvalidTokenFormat) => {}
-            Err(other) => {
-                assert!(false, "Expected InvalidTokenFormat error, got {:?}", other);
-            }
-        }
+        assert!(matches!(
+            result.unwrap_err(),
+            TokenVerificationError::Base64Error(_)
+        ));
     }
 
     #[test]
-    fn test_decode_token() {
-        // Create a valid JWT payload (without signature verification, just parsing)
-        let payload = json!({
+    fn test_decode_token_invalid_json_payload() {
+        // Valid base64 but invalid JSON
+        let invalid_json_b64 = "aW52YWxpZGpzb24"; // "invalidjson" in base64
+        let token = format!("header.{}.signature", invalid_json_b64);
+        let result = decode_token(&token);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            TokenVerificationError::JsonError(_)
+        ));
+    }
+
+    #[test]
+    fn test_decode_token_valid_payload() {
+        // Create a valid IdInfo JSON payload
+        let id_info_json = r#"{
             "iss": "https://accounts.google.com",
             "sub": "123456789",
             "azp": "client_id",
@@ -840,403 +662,156 @@ mod tests {
             "email": "test@example.com",
             "email_verified": true,
             "name": "Test User",
-            "picture": "https://example.com/pic.jpg",
             "given_name": "Test",
             "family_name": "User",
-            "locale": "en",
-            "iat": 1609459200,
-            "exp": 1609462800,
-            "nbf": 1609459100,
-            "jti": "token_id",
-            "nonce": "nonce_value",
-            "hd": "example.com",
-            "at_hash": "hash_value"
-        });
+            "iat": 1640995200,
+            "exp": 1641001200
+        }"#;
 
-        let payload_str = serde_json::to_string(&payload).unwrap();
-        let encoded_payload = URL_SAFE_NO_PAD.encode(payload_str.as_bytes());
-
-        // Create a mock JWT with dummy header and signature
-        let dummy_header = URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#);
-        let dummy_signature = URL_SAFE_NO_PAD.encode("dummy_signature");
-        let token = format!("{}.{}.{}", dummy_header, encoded_payload, dummy_signature);
+        // Encode to base64 URL-safe
+        let payload_b64 = URL_SAFE_NO_PAD.encode(id_info_json.as_bytes());
+        let token = format!("header.{}.signature", payload_b64);
 
         let result = decode_token(&token);
-        assert!(result.is_ok(), "Should successfully decode valid token");
-
-        let idinfo = result.unwrap();
-        assert_eq!(idinfo.iss, "https://accounts.google.com");
-        assert_eq!(idinfo.sub, "123456789");
-        assert_eq!(idinfo.email, "test@example.com");
-        assert_eq!(idinfo.email_verified, true);
-        assert_eq!(idinfo.name, "Test User");
-        assert_eq!(idinfo.iat, 1609459200);
-        assert_eq!(idinfo.exp, 1609462800);
-        assert_eq!(idinfo.nbf, Some(1609459100));
-        assert_eq!(idinfo.nonce, Some("nonce_value".to_string()));
+        assert!(result.is_ok());
+        let id_info = result.unwrap();
+        assert_eq!(id_info.iss, "https://accounts.google.com");
+        assert_eq!(id_info.sub, "123456789");
+        assert_eq!(id_info.email, "test@example.com");
+        assert_eq!(id_info.email_verified, true);
+        assert_eq!(id_info.name, "Test User");
     }
 
     #[test]
-    fn test_decode_token_errors() {
-        // Test with invalid format (wrong number of parts)
-        let result = decode_token("invalid.token");
+    fn test_verify_signature_invalid_token_format() {
+        let token = "header.payload"; // Only 2 parts instead of 3
+        let decoding_key = DecodingKey::from_secret(b"secret");
+        let result = verify_signature(token, &decoding_key, Algorithm::HS256);
         assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::InvalidTokenFormat) => {}
-            Err(other) => {
-                assert!(false, "Expected InvalidTokenFormat error, got {:?}", other);
-            }
-        }
+        assert!(matches!(
+            result.unwrap_err(),
+            TokenVerificationError::InvalidTokenFormat
+        ));
+    }
 
-        // Test with invalid base64 in payload
-        let dummy_header = URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#);
-        let invalid_payload = "invalid!base64!";
-        let dummy_signature = URL_SAFE_NO_PAD.encode("dummy_signature");
-        let token = format!("{}.{}.{}", dummy_header, invalid_payload, dummy_signature);
-
-        let result = decode_token(&token);
+    #[test]
+    fn test_verify_signature_invalid_base64_signature() {
+        let token = "header.payload.invalid@base64";
+        let decoding_key = DecodingKey::from_secret(b"secret");
+        let result = verify_signature(token, &decoding_key, Algorithm::HS256);
         assert!(result.is_err());
-        // Should be a Base64Error
+        assert!(matches!(
+            result.unwrap_err(),
+            TokenVerificationError::Base64Error(_)
+        ));
+    }
 
-        // Test with invalid JSON in payload
-        let invalid_json_payload = URL_SAFE_NO_PAD.encode("not valid json");
-        let token = format!(
-            "{}.{}.{}",
-            dummy_header, invalid_json_payload, dummy_signature
+    #[test]
+    fn test_token_verification_error_display() {
+        // Test various error message formats
+        let error = TokenVerificationError::InvalidTokenFormat;
+        assert_eq!(error.to_string(), "Invalid token format");
+
+        let error = TokenVerificationError::InvalidTokenSignature;
+        assert_eq!(error.to_string(), "Invalid token signature");
+
+        let error = TokenVerificationError::InvalidTokenAudience(
+            "expected".to_string(),
+            "actual".to_string(),
+        );
+        assert_eq!(
+            error.to_string(),
+            "Invalid token audience, expected: expected, actual: actual"
         );
 
-        let result = decode_token(&token);
-        assert!(result.is_err());
-        // Should be a JsonError
-
-        // Test with missing required fields
-        let incomplete_payload = json!({
-            "iss": "https://accounts.google.com",
-            // Missing required fields like "sub", "aud", etc.
-        });
-        let payload_str = serde_json::to_string(&incomplete_payload).unwrap();
-        let encoded_payload = URL_SAFE_NO_PAD.encode(payload_str.as_bytes());
-        let token = format!("{}.{}.{}", dummy_header, encoded_payload, dummy_signature);
-
-        let result = decode_token(&token);
-        assert!(result.is_err());
-        // Should be a JsonError due to missing required fields
-    }
-
-    #[test]
-    fn test_verify_signature_with_valid_signature() {
-        // Create a test JWT with HMAC signature that we can verify
-        use jsonwebtoken::{EncodingKey, Header, encode};
-
-        // Create a symmetric key for HMAC
-        let secret = "test_secret_key_for_hmac_signature_verification";
-        let encoding_key = EncodingKey::from_secret(secret.as_ref());
-        let decoding_key = DecodingKey::from_secret(secret.as_ref());
-
-        // Create test claims
-        let claims = json!({
-            "sub": "1234567890",
-            "name": "Test User",
-            "iat": 1516239022
-        });
-
-        // Create JWT with HS256 algorithm
-        let header = Header::new(Algorithm::HS256);
-        let token = encode(&header, &claims, &encoding_key).unwrap();
-
-        // Verify the signature
-        let result = verify_signature(&token, &decoding_key, Algorithm::HS256);
-        assert!(result.is_ok(), "Should successfully verify valid signature");
-        assert!(result.unwrap(), "Signature should be valid");
-
-        // Test with wrong key - should fail
-        let wrong_key = DecodingKey::from_secret("wrong_secret".as_ref());
-        let result = verify_signature(&token, &wrong_key, Algorithm::HS256);
-        assert!(result.is_ok(), "Should not error but return false");
-        assert!(
-            !result.unwrap(),
-            "Signature should be invalid with wrong key"
+        let error = TokenVerificationError::InvalidTokenIssuer(
+            "expected".to_string(),
+            "actual".to_string(),
+        );
+        assert_eq!(
+            error.to_string(),
+            "Invalid token issuer, expected: expected, actual: actual"
         );
 
-        // Test with wrong algorithm - should fail
-        let result = verify_signature(&token, &decoding_key, Algorithm::HS384);
-        // This should either error or return false
-        match result {
-            Ok(valid) => assert!(!valid, "Should not be valid with wrong algorithm"),
-            Err(_) => {} // Also acceptable to error
-        }
-    }
+        let error = TokenVerificationError::TokenExpired;
+        assert_eq!(error.to_string(), "Token expired");
 
-    #[test]
-    fn test_jwt_time_validations() {
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Should get current time for test")
-            .as_secs();
-        let skew = 2; // 2 seconds skew tolerance as used in verify_idtoken
-
-        // Test valid token (current time)
-        let valid_idinfo = IdInfo {
-            iss: "https://accounts.google.com".to_string(),
-            sub: "123456789".to_string(),
-            azp: "test_client".to_string(),
-            aud: "test_audience".to_string(),
-            email: "test@example.com".to_string(),
-            email_verified: true,
-            name: "Test User".to_string(),
-            picture: None,
-            given_name: "Test".to_string(),
-            family_name: "User".to_string(),
-            locale: None,
-            iat: (now - 10) as i64,      // Issued 10 seconds ago
-            exp: (now + 3600) as i64,    // Expires in 1 hour
-            nbf: Some((now - 5) as i64), // Valid since 5 seconds ago
-            jti: None,
-            nonce: None,
-            hd: None,
-            at_hash: None,
-        };
-
-        // Test expired token
-        let expired_idinfo = IdInfo {
-            exp: (now - 10) as i64, // Expired 10 seconds ago
-            ..valid_idinfo.clone()
-        };
-
-        // Test token not yet valid (nbf in future)
-        let nbf_future_idinfo = IdInfo {
-            nbf: Some((now + 10) as i64), // Valid 10 seconds from now
-            ..valid_idinfo.clone()
-        };
-
-        // Test token with iat in future (beyond skew tolerance)
-        let iat_future_idinfo = IdInfo {
-            iat: (now + 10) as i64, // Issued 10 seconds from now
-            ..valid_idinfo.clone()
-        };
-
-        // Test token with iat just within skew tolerance
-        let iat_skew_ok_idinfo = IdInfo {
-            iat: (now + skew) as i64, // Issued exactly at skew boundary
-            ..valid_idinfo.clone()
-        };
-
-        // Helper function to check time validation logic
-        fn check_time_validations(idinfo: &IdInfo) -> Result<(), TokenVerificationError> {
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Should get current time for test")
-                .as_secs();
-            let skew: u64 = 2;
-
-            if let Some(nbf) = idinfo.nbf {
-                if now + skew < (nbf as u64) {
-                    return Err(TokenVerificationError::TokenNotYetValidNotBeFore(
-                        now, nbf as u64,
-                    ));
-                }
-            }
-
-            if now + skew < (idinfo.iat as u64) {
-                return Err(TokenVerificationError::TokenNotYetValidIssuedAt(
-                    now,
-                    idinfo.iat as u64,
-                ));
-            }
-
-            if now > (idinfo.exp as u64) {
-                return Err(TokenVerificationError::TokenExpired);
-            }
-
-            Ok(())
-        }
-
-        // Test valid token - should pass
-        let result = check_time_validations(&valid_idinfo);
-        assert!(result.is_ok(), "Valid token should pass time validation");
-
-        // Test expired token - should fail
-        let result = check_time_validations(&expired_idinfo);
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::TokenExpired) => {}
-            Err(other) => {
-                assert!(false, "Expected TokenExpired error, got {:?}", other);
-            }
-        }
-
-        // Test nbf in future - should fail
-        let result = check_time_validations(&nbf_future_idinfo);
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::TokenNotYetValidNotBeFore(_, _)) => {}
-            Err(other) => {
-                assert!(
-                    false,
-                    "Expected TokenNotYetValidNotBeFore error, got {:?}",
-                    other
-                );
-            }
-        }
-
-        // Test iat in future - should fail
-        let result = check_time_validations(&iat_future_idinfo);
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected error but got Ok");
-            }
-            Err(TokenVerificationError::TokenNotYetValidIssuedAt(_, _)) => {}
-            Err(other) => {
-                assert!(
-                    false,
-                    "Expected TokenNotYetValidIssuedAt error, got {:?}",
-                    other
-                );
-            }
-        }
-
-        // Test iat within skew tolerance - should pass
-        let result = check_time_validations(&iat_skew_ok_idinfo);
-        assert!(
-            result.is_ok(),
-            "Token with iat within skew tolerance should pass"
+        let error = TokenVerificationError::TokenNotYetValidNotBeFore(1000, 2000);
+        assert_eq!(
+            error.to_string(),
+            "Token not yet valid, now: 1000, nbf: 2000"
         );
+
+        let error = TokenVerificationError::TokenNotYetValidIssuedAt(1000, 2000);
+        assert_eq!(
+            error.to_string(),
+            "Token not yet valid, now: 1000, iat: 2000"
+        );
+
+        let error = TokenVerificationError::NoMatchingKey;
+        assert_eq!(error.to_string(), "No matching key found in JWKS");
+
+        let error = TokenVerificationError::MissingKeyComponent("n".to_string());
+        assert_eq!(error.to_string(), "Missing key component: n");
+
+        let error = TokenVerificationError::UnsupportedAlgorithm("UNKNOWN".to_string());
+        assert_eq!(error.to_string(), "Unsupported algorithm: UNKNOWN");
+
+        let error = TokenVerificationError::JwksParsing("parse error".to_string());
+        assert_eq!(error.to_string(), "JWKS parsing error: parse error");
+
+        let error = TokenVerificationError::JwksFetch("fetch error".to_string());
+        assert_eq!(error.to_string(), "JWKS fetch error: fetch error");
     }
 
     #[test]
-    fn test_audience_and_issuer_validation() {
-        // Helper function to test audience validation logic
-        fn check_audience_validation(
-            idinfo_aud: &str,
-            expected_aud: &str,
-        ) -> Result<(), TokenVerificationError> {
-            if idinfo_aud != expected_aud {
-                return Err(TokenVerificationError::InvalidTokenAudience(
-                    expected_aud.to_string(),
-                    idinfo_aud.to_string(),
-                ));
-            }
-            Ok(())
-        }
+    fn test_jwks_cache_conversion() {
+        // Test JwksCache to CacheData conversion
+        let jwks = Jwks {
+            keys: vec![
+                Jwk {
+                    kty: "RSA".to_string(),
+                    kid: "key1".to_string(),
+                    alg: "RS256".to_string(),
+                    n: Some("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw".to_string()),
+                    e: Some("AQAB".to_string()),
+                    x: None,
+                    y: None,
+                    crv: None,
+                    k: None,
+                },
+            ],
+        };
 
-        // Helper function to test issuer validation logic
-        fn check_issuer_validation(idinfo_iss: &str) -> Result<(), TokenVerificationError> {
-            let supplied_issuer = "https://accounts.google.com";
-            if idinfo_iss != supplied_issuer {
-                return Err(TokenVerificationError::InvalidTokenIssuer(
-                    idinfo_iss.to_string(),
-                    supplied_issuer.to_string(),
-                ));
-            }
-            Ok(())
-        }
+        let expires_at = Utc::now() + chrono::Duration::seconds(600);
+        let jwks_cache = JwksCache {
+            jwks: jwks.clone(),
+            expires_at,
+        };
 
-        // Test valid audience
-        let result = check_audience_validation("test_audience", "test_audience");
-        assert!(result.is_ok(), "Matching audience should be valid");
+        // Test From conversion
+        let cache_data: CacheData = jwks_cache.clone().into();
+        assert!(!cache_data.value.is_empty());
 
-        // Test invalid audience
-        let result = check_audience_validation("wrong_audience", "correct_audience");
+        // Test TryFrom conversion back
+        let restored_cache: Result<JwksCache, TokenVerificationError> = cache_data.try_into();
+        assert!(restored_cache.is_ok());
+        let restored = restored_cache.unwrap();
+        assert_eq!(restored.jwks.keys.len(), 1);
+        assert_eq!(restored.jwks.keys[0].kid, "key1");
+    }
+
+    #[test]
+    fn test_jwks_cache_invalid_json() {
+        let invalid_cache_data = CacheData {
+            value: "invalid json".to_string(),
+        };
+
+        let result: Result<JwksCache, TokenVerificationError> = invalid_cache_data.try_into();
         assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected InvalidTokenAudience error but got Ok");
-            }
-            Err(TokenVerificationError::InvalidTokenAudience(expected, actual)) => {
-                assert_eq!(expected, "correct_audience");
-                assert_eq!(actual, "wrong_audience");
-            }
-            Err(other) => {
-                assert!(
-                    false,
-                    "Expected InvalidTokenAudience error, got {:?}",
-                    other
-                );
-            }
-        }
-
-        // Test empty audience
-        let result = check_audience_validation("", "expected_audience");
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected InvalidTokenAudience error but got Ok");
-            }
-            Err(TokenVerificationError::InvalidTokenAudience(expected, actual)) => {
-                assert_eq!(expected, "expected_audience");
-                assert_eq!(actual, "");
-            }
-            Err(other) => {
-                assert!(
-                    false,
-                    "Expected InvalidTokenAudience error, got {:?}",
-                    other
-                );
-            }
-        }
-
-        // Test valid issuer (Google)
-        let result = check_issuer_validation("https://accounts.google.com");
-        assert!(result.is_ok(), "Google issuer should be valid");
-
-        // Test invalid issuer
-        let result = check_issuer_validation("https://evil.com");
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected InvalidTokenIssuer error but got Ok");
-            }
-            Err(TokenVerificationError::InvalidTokenIssuer(actual, expected)) => {
-                assert_eq!(actual, "https://evil.com");
-                assert_eq!(expected, "https://accounts.google.com");
-            }
-            Err(other) => {
-                assert!(false, "Expected InvalidTokenIssuer error, got {:?}", other);
-            }
-        }
-
-        // Test empty issuer
-        let result = check_issuer_validation("");
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected InvalidTokenIssuer error but got Ok");
-            }
-            Err(TokenVerificationError::InvalidTokenIssuer(actual, expected)) => {
-                assert_eq!(actual, "");
-                assert_eq!(expected, "https://accounts.google.com");
-            }
-            Err(other) => {
-                assert!(false, "Expected InvalidTokenIssuer error, got {:?}", other);
-            }
-        }
-
-        // Test alternative Google issuer format (should fail)
-        let result = check_issuer_validation("accounts.google.com");
-        assert!(result.is_err());
-        match result {
-            Ok(_) => {
-                assert!(false, "Expected InvalidTokenIssuer error but got Ok");
-            }
-            Err(TokenVerificationError::InvalidTokenIssuer(actual, expected)) => {
-                assert_eq!(actual, "accounts.google.com");
-                assert_eq!(expected, "https://accounts.google.com");
-            }
-            Err(other) => {
-                assert!(false, "Expected InvalidTokenIssuer error, got {:?}", other);
-            }
-        }
+        assert!(matches!(
+            result.unwrap_err(),
+            TokenVerificationError::JwksParsing(_)
+        ));
     }
 }

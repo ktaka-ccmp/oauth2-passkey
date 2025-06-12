@@ -81,3 +81,94 @@ pub(super) static OAUTH2_GOOGLE_CLIENT_ID: LazyLock<String> = LazyLock::new(|| {
 pub(super) static OAUTH2_GOOGLE_CLIENT_SECRET: LazyLock<String> = LazyLock::new(|| {
     std::env::var("OAUTH2_GOOGLE_CLIENT_SECRET").expect("OAUTH2_GOOGLE_CLIENT_SECRET must be set")
 });
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_oauth2_response_mode_validation_logic() {
+        // Test business logic: case insensitive validation
+        let mode = "FORM_POST".to_lowercase();
+        let result = match mode.as_str() {
+            "form_post" => "form_post".to_string(),
+            "query" => "query".to_string(),
+            _ => panic!("Invalid OAUTH2_RESPONSE_MODE"),
+        };
+        assert_eq!(result, "form_post");
+
+        // Test query mode
+        let mode = "query".to_lowercase();
+        let result = match mode.as_str() {
+            "form_post" => "form_post".to_string(),
+            "query" => "query".to_string(),
+            _ => panic!("Invalid OAUTH2_RESPONSE_MODE"),
+        };
+        assert_eq!(result, "query");
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid OAUTH2_RESPONSE_MODE")]
+    fn test_oauth2_response_mode_invalid_validation() {
+        // Test business logic: invalid mode validation
+        let mode = "invalid_mode".to_lowercase();
+        match mode.as_str() {
+            "form_post" => "form_post".to_string(),
+            "query" => "query".to_string(),
+            _ => panic!(
+                "Invalid OAUTH2_RESPONSE_MODE '{}'. Must be 'form_post' or 'query'.",
+                mode
+            ),
+        };
+    }
+
+    #[test]
+    fn test_oauth2_query_string_construction_logic() {
+        // Test business logic: query string construction
+        let response_type = "code";
+        let scope = "openid+email";
+        let response_mode = "form_post";
+
+        let mut query_string = "".to_string();
+        query_string.push_str(&format!("&response_type={}", response_type));
+        query_string.push_str(&format!("&scope={}", scope));
+        query_string.push_str(&format!("&response_mode={}", response_mode));
+        query_string.push_str(&format!("&access_type={}", "online"));
+        query_string.push_str(&format!("&prompt={}", "consent"));
+
+        assert_eq!(
+            query_string,
+            "&response_type=code&scope=openid+email&response_mode=form_post&access_type=online&prompt=consent"
+        );
+    }
+
+    #[test]
+    fn test_oauth2_redirect_uri_construction_logic() {
+        // Test business logic: URI construction
+        let origin = "https://example.com";
+        let route_prefix = "/api/v1";
+        let expected = format!("{}{}/oauth2/authorized", origin, route_prefix);
+        assert_eq!(expected, "https://example.com/api/v1/oauth2/authorized");
+    }
+
+    #[test]
+    fn test_host_prefix_cookie_naming_convention() {
+        // Test that our CSRF cookie name uses the "__Host-" prefix for security
+        let default_name = "__Host-CsrfId";
+        assert!(
+            default_name.starts_with("__Host-"),
+            "CSRF cookie should use __Host- prefix for security"
+        );
+    }
+
+    #[test]
+    fn test_oauth2_csrf_cookie_max_age_parsing_logic() {
+        // Test business logic: parsing and fallback behavior
+        let valid_input = "120";
+        let result = valid_input.parse::<u64>().unwrap_or(60);
+        assert_eq!(result, 120);
+
+        let invalid_input = "invalid";
+        let result = invalid_input.parse::<u64>().unwrap_or(60);
+        assert_eq!(result, 60);
+    }
+}

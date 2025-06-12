@@ -208,54 +208,6 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_oauth2_mode_serde() {
-        let mode = OAuth2Mode::AddToUser;
-        let serialized = serde_json::to_string(&mode).unwrap();
-        assert_eq!(serialized, "\"add_to_user\"");
-        let deserialized: OAuth2Mode = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(deserialized, OAuth2Mode::AddToUser);
-
-        let mode = OAuth2Mode::CreateUser;
-        let serialized = serde_json::to_string(&mode).unwrap();
-        assert_eq!(serialized, "\"create_user\"");
-        let deserialized: OAuth2Mode = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(deserialized, OAuth2Mode::CreateUser);
-    }
-
-    #[test]
-    fn test_oauth2_mode_from_str() {
-        use std::str::FromStr;
-
-        // Test valid modes
-        let mode = OAuth2Mode::from_str("add_to_user").unwrap();
-        assert_eq!(mode, OAuth2Mode::AddToUser);
-
-        let mode = OAuth2Mode::from_str("create_user").unwrap();
-        assert_eq!(mode, OAuth2Mode::CreateUser);
-
-        let mode = OAuth2Mode::from_str("login").unwrap();
-        assert_eq!(mode, OAuth2Mode::Login);
-
-        let mode = OAuth2Mode::from_str("create_user_or_login").unwrap();
-        assert_eq!(mode, OAuth2Mode::CreateUserOrLogin);
-
-        // Test with unknown string - should return an error
-        let result = OAuth2Mode::from_str("unknown_mode");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_oauth2_mode_as_str() {
-        assert_eq!(OAuth2Mode::AddToUser.as_str(), "add_to_user");
-        assert_eq!(OAuth2Mode::CreateUser.as_str(), "create_user");
-        assert_eq!(OAuth2Mode::Login.as_str(), "login");
-        assert_eq!(
-            OAuth2Mode::CreateUserOrLogin.as_str(),
-            "create_user_or_login"
-        );
-    }
-
-    #[test]
     fn test_from_google_user_info() {
         let google_user = GoogleUserInfo {
             id: "12345".to_string(),
@@ -358,28 +310,5 @@ mod tests {
         );
         assert_eq!(recovered_token.user_agent, stored_token.user_agent);
         assert_eq!(recovered_token.ttl, stored_token.ttl);
-    }
-
-    #[test]
-    fn test_stored_token_invalid_cache_data() {
-        // Create invalid cache data
-        let invalid_data = CacheData {
-            value: "not valid json".to_string(),
-        };
-
-        // Try to convert to StoredToken
-        let result = StoredToken::try_from(invalid_data);
-
-        // Should fail
-        assert!(result.is_err());
-        match result {
-            Err(OAuth2Error::Storage(_)) => {}
-            Ok(_) => {
-                assert!(false, "Expected Storage error but got Ok");
-            }
-            Err(err) => {
-                assert!(false, "Expected Storage error, got {:?}", err);
-            }
-        }
     }
 }

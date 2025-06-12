@@ -796,4 +796,454 @@ mod tests {
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
     }
+
+    // Additional comprehensive cache layer tests
+
+    #[tokio::test]
+    async fn test_cache_token_with_zero_ttl() {
+        unsafe {
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        let token_type = "test_zero_ttl";
+        let token = "test_token_zero_ttl";
+        let ttl = 0; // Zero TTL
+        let expires_at = Utc::now(); // Immediate expiration
+        let user_agent = Some("test-agent".to_string());
+
+        // Store token with zero TTL
+        let result =
+            store_token_in_cache(token_type, token, ttl, expires_at, user_agent.clone()).await;
+        assert!(
+            result.is_ok(),
+            "Should successfully store token with zero TTL"
+        );
+
+        let token_id = result.unwrap();
+
+        // Should still be able to retrieve it immediately (cache doesn't enforce TTL for memory store)
+        let stored_token = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        assert!(
+            stored_token.is_ok(),
+            "Should be able to retrieve token with zero TTL"
+        );
+
+        let token_data = stored_token.unwrap();
+        assert_eq!(token_data.ttl, 0);
+        assert_eq!(token_data.token, token);
+    }
+
+    #[tokio::test]
+    async fn test_cache_token_with_max_ttl() {
+        unsafe {
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        let token_type = "test_max_ttl";
+        let token = "test_token_max_ttl";
+        // Use a realistic maximum TTL (1 year = 31,536,000 seconds)
+        // instead of u64::MAX which causes chrono overflow
+        let ttl = 31_536_000_u64; // 1 year in seconds
+        let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
+        let user_agent = None;
+
+        // Should handle large but realistic TTL values gracefully
+        let result = store_token_in_cache(token_type, token, ttl, expires_at, user_agent).await;
+        assert!(result.is_ok(), "Should handle realistic large TTL values");
+
+        let token_id = result.unwrap();
+        let stored_token = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        assert!(stored_token.is_ok(), "Should retrieve token with large TTL");
+        assert_eq!(stored_token.unwrap().ttl, ttl);
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_token_operations() {
+        unsafe {
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        let token_type = "test_concurrent";
+        let ttl = 300;
+        let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
+
+        // Perform concurrent token storage operations
+        let handles = (0..10)
+            .map(|i| {
+                let user_agent = Some(format!("agent-{}", i));
+                tokio::spawn(async move {
+                    store_token_in_cache(
+                        token_type,
+                        &format!("token-{}", i),
+                        ttl,
+                        expires_at,
+                        user_agent,
+                    )
+                    .await
+                })
+            })
+            .collect::<Vec<_>>();
+
+        // Wait for all operations to complete
+        let mut results = Vec::new();
+        for handle in handles {
+            results.push(handle.await);
+        }
+
+        // Verify all operations succeeded
+        let mut token_ids = Vec::new();
+        for result in results {
+            let token_id = result.unwrap().unwrap();
+            token_ids.push(token_id);
+        }
+
+        // Verify all tokens are unique and can be retrieved
+        for (i, token_id) in token_ids.iter().enumerate() {
+            let stored_token = get_token_from_store::<StoredToken>(token_type, token_id).await;
+            assert!(stored_token.is_ok());
+
+            let token_data = stored_token.unwrap();
+            assert_eq!(token_data.token, format!("token-{}", i));
+            assert_eq!(token_data.user_agent, Some(format!("agent-{}", i)));
+        }
+
+        // Verify all token IDs are unique
+        let unique_count = token_ids
+            .iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+        assert_eq!(unique_count, 10, "All token IDs should be unique");
+    }
+
+    #[tokio::test]
+    async fn test_token_storage_with_different_prefixes() {
+        unsafe {
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        let ttl = 300;
+        let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
+        let user_agent = Some("test-agent".to_string());
+
+        // Store tokens with different prefixes but same token ID
+        let token_prefixes = ["csrf", "nonce", "pkce", "access", "refresh"];
+        let same_token_content = "same_token_content";
+
+        let mut stored_tokens = Vec::new();
+
+        for prefix in &token_prefixes {
+            let token_id = store_token_in_cache(
+                prefix,
+                same_token_content,
+                ttl,
+                expires_at,
+                user_agent.clone(),
+            )
+            .await
+            .unwrap();
+            stored_tokens.push((prefix, token_id));
+        }
+
+        // Verify each token can be retrieved with its respective prefix
+        for (prefix, token_id) in &stored_tokens {
+            let retrieved = get_token_from_store::<StoredToken>(prefix, token_id).await;
+            assert!(
+                retrieved.is_ok(),
+                "Should retrieve token for prefix: {}",
+                prefix
+            );
+
+            let token_data = retrieved.unwrap();
+            assert_eq!(token_data.token, same_token_content);
+            assert_eq!(token_data.user_agent, user_agent);
+        }
+
+        // Verify tokens with different prefixes don't interfere
+        for (prefix1, token_id1) in &stored_tokens {
+            for (prefix2, _) in &stored_tokens {
+                if prefix1 != prefix2 {
+                    // Trying to get token with wrong prefix should fail
+                    let wrong_retrieval =
+                        get_token_from_store::<StoredToken>(prefix2, token_id1).await;
+                    assert!(
+                        wrong_retrieval.is_err(),
+                        "Should not retrieve token for {} with {}'s token_id",
+                        prefix2,
+                        prefix1
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_token_storage_edge_cases() {
+        unsafe {
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        let ttl = 300;
+        let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
+
+        // Test with empty token content
+        let empty_token_result = store_token_in_cache("test", "", ttl, expires_at, None).await;
+        assert!(
+            empty_token_result.is_ok(),
+            "Should handle empty token content"
+        );
+
+        if let Ok(token_id) = empty_token_result {
+            let retrieved = get_token_from_store::<StoredToken>("test", &token_id).await;
+            assert!(retrieved.is_ok());
+            assert_eq!(retrieved.unwrap().token, "");
+        }
+
+        // Test with very long token content
+        let long_token = "a".repeat(10000); // 10KB token
+        let long_token_result =
+            store_token_in_cache("test_long", &long_token, ttl, expires_at, None).await;
+        assert!(
+            long_token_result.is_ok(),
+            "Should handle large token content"
+        );
+
+        if let Ok(token_id) = long_token_result {
+            let retrieved = get_token_from_store::<StoredToken>("test_long", &token_id).await;
+            assert!(retrieved.is_ok());
+            assert_eq!(retrieved.unwrap().token, long_token);
+        }
+
+        // Test with special characters in token
+        let special_token = "token_with_特殊字符_🔐_\n\t\r";
+        let special_result =
+            store_token_in_cache("test_special", special_token, ttl, expires_at, None).await;
+        assert!(
+            special_result.is_ok(),
+            "Should handle special characters in token"
+        );
+
+        if let Ok(token_id) = special_result {
+            let retrieved = get_token_from_store::<StoredToken>("test_special", &token_id).await;
+            assert!(retrieved.is_ok());
+            assert_eq!(retrieved.unwrap().token, special_token);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_token_overwrite_same_id() {
+        unsafe {
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        let token_type = "test_overwrite";
+        let ttl = 300;
+        let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
+
+        // Store first token
+        let token1 = "first_token";
+        let user_agent1 = Some("agent1".to_string());
+        let token_id1 =
+            store_token_in_cache(token_type, token1, ttl, expires_at, user_agent1.clone())
+                .await
+                .unwrap();
+
+        // Store second token
+        let token2 = "second_token";
+        let user_agent2 = Some("agent2".to_string());
+        let token_id2 =
+            store_token_in_cache(token_type, token2, ttl, expires_at, user_agent2.clone())
+                .await
+                .unwrap();
+
+        // Verify both tokens exist independently (different IDs should be generated)
+        assert_ne!(
+            token_id1, token_id2,
+            "Different tokens should have different IDs"
+        );
+
+        let retrieved1 = get_token_from_store::<StoredToken>(token_type, &token_id1)
+            .await
+            .unwrap();
+        let retrieved2 = get_token_from_store::<StoredToken>(token_type, &token_id2)
+            .await
+            .unwrap();
+
+        assert_eq!(retrieved1.token, token1);
+        assert_eq!(retrieved1.user_agent, user_agent1);
+        assert_eq!(retrieved2.token, token2);
+        assert_eq!(retrieved2.user_agent, user_agent2);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_remove_operations() {
+        unsafe {
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        let token_type = "test_multiple_remove";
+        let ttl = 300;
+        let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
+
+        // Store a token
+        let token_id = store_token_in_cache(token_type, "test_token", ttl, expires_at, None)
+            .await
+            .unwrap();
+
+        // Verify token exists
+        let retrieved = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        assert!(retrieved.is_ok());
+
+        // Remove the token
+        let remove_result1 = remove_token_from_store(token_type, &token_id).await;
+        assert!(remove_result1.is_ok());
+
+        // Verify token is gone
+        let get_after_remove = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        assert!(get_after_remove.is_err());
+
+        // Try to remove the same token again (should handle gracefully)
+        let remove_result2 = remove_token_from_store(token_type, &token_id).await;
+        assert!(remove_result2.is_ok(), "Second removal should not fail");
+
+        // Try multiple concurrent removals of the same token
+        let remove_handles = (0..5)
+            .map(|_| {
+                let token_id_clone = token_id.clone();
+                let token_type_clone = token_type;
+                tokio::spawn(async move {
+                    remove_token_from_store(token_type_clone, &token_id_clone).await
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let mut remove_results = Vec::new();
+        for handle in remove_handles {
+            remove_results.push(handle.await);
+        }
+        for result in remove_results {
+            assert!(
+                result.unwrap().is_ok(),
+                "Concurrent removals should not fail"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cache_operations_with_past_expiration() {
+        unsafe {
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        let token_type = "test_past_expiration";
+        let ttl = 300;
+        // Set expiration time in the past
+        let expires_at = Utc::now() - chrono::Duration::hours(1);
+
+        // Store token with past expiration
+        let token_id = store_token_in_cache(token_type, "expired_token", ttl, expires_at, None)
+            .await
+            .unwrap();
+
+        // Should still be able to retrieve it (cache doesn't automatically expire in memory store)
+        let retrieved = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        assert!(retrieved.is_ok());
+
+        let token_data = retrieved.unwrap();
+        assert_eq!(token_data.token, "expired_token");
+        // Verify the past expiration time is preserved
+        assert!(token_data.expires_at < Utc::now());
+    }
+
+    #[tokio::test]
+    async fn test_cache_serialization_round_trip() {
+        unsafe {
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        let _token_type = "test_serialization";
+        let ttl = 3600;
+        let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
+        let user_agent = Some("Mozilla/5.0 (Test) AppleWebKit/537.36".to_string());
+
+        // Create a complex token with various data types
+        let original_token = StoredToken {
+            token: "complex_token_12345!@#$%".to_string(),
+            expires_at,
+            user_agent: user_agent.clone(),
+            ttl,
+        };
+
+        // Convert to CacheData and back
+        let cache_data = CacheData::from(original_token.clone());
+        let recovered_token = StoredToken::try_from(cache_data);
+
+        assert!(recovered_token.is_ok());
+        let recovered = recovered_token.unwrap();
+
+        // Verify all fields are preserved exactly
+        assert_eq!(recovered.token, original_token.token);
+        assert_eq!(
+            recovered.expires_at.timestamp_millis(),
+            original_token.expires_at.timestamp_millis()
+        );
+        assert_eq!(recovered.user_agent, original_token.user_agent);
+        assert_eq!(recovered.ttl, original_token.ttl);
+    }
+
+    #[tokio::test]
+    async fn test_generate_store_token_consistency() {
+        unsafe {
+            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
+            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
+        }
+
+        let token_type = "test_consistency";
+        let ttl = 600;
+        let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
+        let user_agent = Some("consistency-test-agent".to_string());
+
+        // Generate multiple tokens and verify consistency
+        for i in 0..10 {
+            let (token, token_id) = generate_store_token(
+                &format!("{}-{}", token_type, i),
+                ttl,
+                expires_at,
+                user_agent.clone(),
+            )
+            .await
+            .unwrap();
+
+            // Verify token characteristics
+            assert_eq!(token.len(), 43, "Generated token should be 43 characters");
+            assert_eq!(
+                token_id.len(),
+                43,
+                "Generated token ID should be 43 characters"
+            );
+            assert_ne!(token, token_id, "Token and token ID should be different");
+
+            // Verify storage and retrieval
+            let retrieved =
+                get_token_from_store::<StoredToken>(&format!("{}-{}", token_type, i), &token_id)
+                    .await
+                    .unwrap();
+
+            assert_eq!(retrieved.token, token);
+            assert_eq!(retrieved.user_agent, user_agent);
+            assert_eq!(retrieved.ttl, ttl);
+
+            // Verify expiration time consistency (within 1 second tolerance)
+            let time_diff = (retrieved.expires_at - expires_at).num_seconds().abs();
+            assert!(time_diff <= 1, "Expiration time should be consistent");
+        }
+    }
 }
