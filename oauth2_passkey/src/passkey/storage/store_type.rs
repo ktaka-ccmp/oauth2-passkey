@@ -194,6 +194,11 @@ mod tests {
         assert!(result.is_ok(), "PasskeyStore initialization should succeed");
     }
 
+    /// Test storing and retrieving a passkey credential
+    ///
+    /// This test verifies the complete storage and retrieval cycle for passkey credentials.
+    /// It tests that credentials can be stored in the database and retrieved successfully
+    /// with all data integrity maintained throughout the process.
     #[tokio::test]
     #[serial]
     async fn test_store_and_get_credential() {
@@ -247,6 +252,11 @@ mod tests {
         let _ = UserStore::delete_user(user_id).await;
     }
 
+    /// Test retrieving a nonexistent passkey credential
+    ///
+    /// This test verifies the behavior when attempting to retrieve a credential
+    /// that doesn't exist in the database. It tests that the function handles
+    /// missing credentials gracefully without throwing errors.
     #[tokio::test]
     #[serial]
     async fn test_get_nonexistent_credential() {
@@ -264,6 +274,11 @@ mod tests {
         );
     }
 
+    /// Test retrieving multiple credentials by user ID
+    ///
+    /// This test verifies the ability to retrieve all credentials associated with
+    /// a specific user ID. It tests that multiple credentials for the same user
+    /// can be stored and retrieved correctly as a collection.
     #[tokio::test]
     #[serial]
     async fn test_get_credentials_by_user_id() {
@@ -315,6 +330,11 @@ mod tests {
         let _ = UserStore::delete_user(user_id).await;
     }
 
+    /// Test retrieving credentials by user handle
+    ///
+    /// This test verifies the ability to find credentials using the user handle
+    /// as a search key. It tests that credentials can be located efficiently
+    /// by their associated user handle for authentication purposes.
     #[tokio::test]
     #[serial]
     async fn test_get_credentials_by_user_handle() {
@@ -362,6 +382,11 @@ mod tests {
         let _ = UserStore::delete_user(user_id).await;
     }
 
+    /// Test retrieving credentials by username
+    ///
+    /// This test verifies the ability to find credentials using the username
+    /// as a search key. It tests that credentials can be located by their
+    /// associated username for user authentication scenarios.
     #[tokio::test]
     #[serial]
     async fn test_get_credentials_by_username() {
@@ -411,6 +436,11 @@ mod tests {
         let _ = UserStore::delete_user(user_id).await;
     }
 
+    /// Test updating credential counter for replay attack prevention
+    ///
+    /// This test verifies the ability to update the credential counter value
+    /// in the database. It tests that counter values can be incremented properly
+    /// to prevent replay attacks in passkey authentication.
     #[tokio::test]
     #[serial]
     async fn test_update_credential_counter() {
@@ -458,6 +488,11 @@ mod tests {
         let _ = UserStore::delete_user(user_id).await;
     }
 
+    /// Test updating credential user details
+    ///
+    /// This test verifies the ability to update user information associated
+    /// with a credential. It tests that user names and display names can be
+    /// modified in the database while maintaining credential integrity.
     #[tokio::test]
     #[serial]
     async fn test_update_credential_user_details() {
@@ -504,6 +539,13 @@ mod tests {
         let _ = UserStore::delete_user(user_id).await;
     }
 
+    /// Test updating credential last used at
+    /// This test verifies that credential last_used_at timestamp can be updated correctly.
+    /// It performs the following steps:
+    /// 1. Creates test user and credential with initial last_used_at timestamp
+    /// 2. Stores the credential in the database
+    /// 3. Calls update_credential_last_used_at with new timestamp
+    /// 4. Verifies that the last_used_at field was updated correctly
     #[tokio::test]
     #[serial]
     async fn test_update_credential_last_used_at() {
@@ -558,6 +600,13 @@ mod tests {
         let _ = UserStore::delete_user(user_id).await;
     }
 
+    /// Test deleting a credential by credential ID
+    /// This test verifies that credentials can be deleted from storage by their ID.
+    /// It performs the following steps:
+    /// 1. Creates test user and credential and stores them in the database
+    /// 2. Verifies that the credential exists before deletion
+    /// 3. Calls delete_credential to remove the credential
+    /// 4. Verifies that the credential no longer exists in storage
     #[tokio::test]
     #[serial]
     async fn test_delete_credential_by_credential_id() {
@@ -606,6 +655,13 @@ mod tests {
         let _ = UserStore::delete_user(user_id).await;
     }
 
+    /// Test deleting credentials by user ID
+    /// This test verifies that all credentials for a user can be deleted at once.
+    /// It performs the following steps:
+    /// 1. Creates test user and stores multiple credentials for the same user
+    /// 2. Verifies that both credentials exist in storage
+    /// 3. Calls delete_credentials_by_user_id to remove all user's credentials
+    /// 4. Verifies that no credentials remain for the user after deletion
     #[tokio::test]
     #[serial]
     async fn test_delete_credentials_by_user_id() {
@@ -662,6 +718,13 @@ mod tests {
         let _ = UserStore::delete_user(user_id).await;
     }
 
+    /// Test credential isolation
+    /// This test verifies that credentials are properly isolated between different users.
+    /// It performs the following steps:
+    /// 1. Creates two different users and stores credentials for each
+    /// 2. Retrieves credentials by user ID to test user isolation
+    /// 3. Verifies that each user can only access their own credentials
+    /// 4. Confirms that credential queries properly filter by user ownership
     #[tokio::test]
     #[serial]
     async fn test_credential_isolation() {
@@ -723,6 +786,13 @@ mod tests {
         let _ = UserStore::delete_user(user_id_2).await;
     }
 
+    /// Test concurrent operations
+    /// This test verifies that credential storage operations work correctly under concurrent access.
+    /// It performs the following steps:
+    /// 1. Spawns multiple concurrent tasks that create users and credentials
+    /// 2. Each task stores a credential and then retrieves it to verify success
+    /// 3. Waits for all concurrent operations to complete
+    /// 4. Verifies that all operations succeeded without data corruption or conflicts
     #[tokio::test]
     #[serial]
     async fn test_concurrent_operations() {

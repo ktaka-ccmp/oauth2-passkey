@@ -100,6 +100,11 @@ mod tests {
         }
     }
 
+    /// Test get and validate options success
+    ///
+    /// This test verifies that `get_and_validate_options` successfully retrieves and validates
+    /// stored challenge options from the cache. It stores valid options, retrieves them,
+    /// and validates that all fields are preserved correctly during the roundtrip.
     #[tokio::test]
     async fn test_get_and_validate_options_success() {
         init_test_environment().await;
@@ -125,6 +130,11 @@ mod tests {
         assert_eq!(retrieved_options.user.name, stored_options.user.name);
     }
 
+    /// Test get and validate options not found
+    ///
+    /// This test verifies that `get_and_validate_options` returns appropriate errors when
+    /// attempting to retrieve non-existent challenge options from the cache. It validates
+    /// the error handling for missing challenge data.
     #[tokio::test]
     async fn test_get_and_validate_options_not_found() {
         init_test_environment().await;
@@ -136,6 +146,11 @@ mod tests {
         }
     }
 
+    /// Test get and validate options expired
+    ///
+    /// This test verifies that `get_and_validate_options` correctly handles expired challenge
+    /// options by returning appropriate errors. It stores options with a past expiration time
+    /// and validates that they are properly rejected as expired.
     #[tokio::test]
     async fn test_get_and_validate_options_expired() {
         init_test_environment().await;
@@ -164,6 +179,11 @@ mod tests {
         }
     }
 
+    /// Test remove options success
+    ///
+    /// This test verifies that `remove_options` successfully removes stored challenge options
+    /// from the cache. It stores options, removes them, and validates that they are no longer
+    /// retrievable from the cache system.
     #[tokio::test]
     async fn test_remove_options_success() {
         init_test_environment().await;
@@ -200,6 +220,11 @@ mod tests {
         assert!(after_removal.is_none());
     }
 
+    /// Test remove options nonexistent
+    ///
+    /// This test verifies that `remove_options` handles attempts to remove non-existent
+    /// challenge options gracefully without errors. It validates that the function
+    /// succeeds even when the target options don't exist in the cache.
     #[tokio::test]
     async fn test_remove_options_nonexistent() {
         init_test_environment().await;
@@ -208,6 +233,11 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    /// Test ttl validation with passkey timeout
+    ///
+    /// This test verifies TTL (time-to-live) validation logic for challenge options using
+    /// the passkey timeout configuration. It tests that TTL calculations are performed
+    /// correctly and that timeout validations work as expected.
     #[tokio::test]
     async fn test_ttl_validation_with_passkey_timeout() {
         init_test_environment().await;
@@ -251,6 +281,11 @@ mod tests {
         }
     }
 
+    /// Test options cache basics
+    ///
+    /// This test verifies basic cache operations for challenge options including storage,
+    /// retrieval, and validation. It tests the fundamental caching functionality used
+    /// throughout the challenge management system.
     #[tokio::test]
     async fn test_options_cache_basics() {
         init_test_environment().await;
@@ -308,6 +343,11 @@ mod tests {
         );
     }
 
+    /// Test challenge lifecycle integration
+    ///
+    /// This test verifies the complete challenge lifecycle from creation to validation
+    /// in an integrated environment. It tests challenge generation, storage, retrieval,
+    /// and cleanup processes working together as a complete system.
     #[tokio::test]
     async fn test_challenge_lifecycle_integration() {
         use crate::passkey::main::test_utils as passkey_test_utils;
@@ -373,6 +413,11 @@ mod tests {
         }
     }
 
+    /// Test challenge expiration
+    ///
+    /// This test verifies that challenge expiration mechanisms work correctly by testing
+    /// time-based challenge invalidation. It validates that expired challenges are properly
+    /// rejected and that expiration times are enforced correctly.
     #[tokio::test]
     async fn test_challenge_expiration() {
         use crate::passkey::main::test_utils as passkey_test_utils;

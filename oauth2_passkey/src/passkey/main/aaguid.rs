@@ -118,7 +118,14 @@ pub async fn get_authenticator_info_batch(
 mod tests {
     use super::*;
 
-    // Test store_aaguid_in_cache function with valid JSON
+    /// Test store_aaguid_in_cache function with valid JSON
+    /// This test checks that the function stores the AAGUID mappings in the cache successfully.
+    /// It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test JSON string with valid AAGUID mappings
+    /// 3. Calls `store_aaguid_in_cache` to store the mappings in the cache
+    /// 4. Verifies that the mappings were successfully stored in the cache
+    ///
     #[tokio::test]
     async fn test_store_aaguid_in_cache_success() {
         use crate::test_utils::init_test_environment;
@@ -180,7 +187,13 @@ mod tests {
         assert_eq!(info2.icon_dark, None);
     }
 
-    // Test store_aaguid_in_cache function with invalid JSON
+    /// Test store_aaguid_in_cache function with invalid JSON
+    /// This test checks that the function returns an error when called with invalid JSON.
+    /// It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test JSON string with invalid AAGUID mappings
+    /// 3. Calls `store_aaguid_in_cache` to store the mappings in the cache
+    /// 4. Verifies that the function returns an error
     #[tokio::test]
     async fn test_store_aaguid_in_cache_invalid_json() {
         use crate::test_utils::init_test_environment;
@@ -210,7 +223,11 @@ mod tests {
         }
     }
 
-    // Test AuthenticatorInfo parsing with valid data
+    /// Test AuthenticatorInfo parsing with valid data
+    ///
+    /// This test verifies that `AuthenticatorInfo` can be correctly deserialized from
+    /// valid JSON containing all required fields. It tests the serde parsing of
+    /// authenticator metadata including name and icon URLs.
     #[test]
     fn test_authenticator_info_parsing() {
         let json = r#"
@@ -235,7 +252,11 @@ mod tests {
         );
     }
 
-    // Test AuthenticatorInfo parsing with null icons
+    /// Test AuthenticatorInfo parsing with null icons
+    ///
+    /// This test verifies that `AuthenticatorInfo` correctly handles null values for
+    /// optional icon fields during JSON deserialization. It tests that null icon
+    /// values are properly converted to None in the parsed structure.
     #[test]
     fn test_authenticator_info_parsing_null_icons() {
         let json = r#"
@@ -254,7 +275,11 @@ mod tests {
         assert_eq!(info.icon_light, None);
     }
 
-    // Test AuthenticatorInfo parsing with missing fields
+    /// Test AuthenticatorInfo parsing with missing fields
+    ///
+    /// This test verifies that `AuthenticatorInfo` correctly handles JSON with missing
+    /// optional fields during deserialization. It tests that missing icon fields
+    /// default to None and that the name field is properly parsed.
     #[test]
     fn test_authenticator_info_parsing_missing_fields() {
         let json = r#"
@@ -271,7 +296,11 @@ mod tests {
         );
     }
 
-    // Test AAGUID validation
+    /// Test AAGUID validation
+    ///
+    /// This test verifies AAGUID format validation logic by testing various AAGUID
+    /// string formats. It validates that proper UUID format AAGUIDs are accepted
+    /// and that invalid formats are properly rejected with appropriate errors.
     #[test]
     fn test_aaguid_format_validation() {
         // Valid AAGUID format
@@ -304,7 +333,13 @@ mod tests {
         );
     }
 
-    // Test batch retrieval with empty input
+    /// Test batch retrieval with empty input
+    /// This test checks that the function can retrieve a batch of authenticator information with an empty input.
+    /// It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates an empty vector of AAGUIDs
+    /// 3. Calls `get_authenticator_info_batch` to retrieve the batch of authenticator information
+    /// 4. Verifies that the function returns an empty map
     #[tokio::test]
     async fn test_get_authenticator_info_batch_empty() {
         use crate::test_utils::init_test_environment;
@@ -318,7 +353,11 @@ mod tests {
         assert!(info_map.is_empty());
     }
 
-    // Test successful retrieval after storage
+    /// Test successful retrieval after storage
+    ///
+    /// This test verifies that `get_authenticator_info_batch` can successfully retrieve
+    /// authenticator information after it has been stored in the cache. It stores AAGUID
+    /// data and then retrieves it to validate the complete storage and retrieval cycle.
     #[tokio::test]
     async fn test_get_authenticator_info_success() {
         use crate::test_utils::init_test_environment;
@@ -358,7 +397,11 @@ mod tests {
         );
     }
 
-    // Test batch retrieval with actual data
+    /// Test batch retrieval with actual data
+    ///
+    /// This test verifies that `get_authenticator_info_batch` correctly retrieves multiple
+    /// authenticator entries when queried with multiple AAGUIDs. It tests batch operations
+    /// with real data and validates that all requested entries are properly returned.
     #[tokio::test]
     async fn test_get_authenticator_info_batch_with_data() {
         use crate::test_utils::init_test_environment;
@@ -438,7 +481,11 @@ mod tests {
         assert!(!info_map.contains_key("nonexistent-aaguid-here"));
     }
 
-    // Test cache corruption handling (invalid JSON stored in cache)
+    /// Test cache corruption handling (invalid JSON stored in cache)
+    ///
+    /// This test verifies that `get_authenticator_info_batch` gracefully handles cache
+    /// corruption by returning appropriate errors when invalid JSON is stored in the cache.
+    /// It tests error handling for corrupted cache data scenarios.
     #[tokio::test]
     async fn test_get_authenticator_info_corrupted_cache() {
         use crate::storage::CacheData;
@@ -475,7 +522,11 @@ mod tests {
         }
     }
 
-    // Test edge case: empty JSON object
+    /// Test edge case: empty JSON object
+    ///
+    /// This test verifies that `store_aaguid_in_cache` correctly handles empty JSON objects
+    /// by successfully storing them and returning appropriate results. It tests the boundary
+    /// case of valid but empty AAGUID mapping data.
     #[tokio::test]
     async fn test_store_aaguid_in_cache_empty_object() {
         use crate::test_utils::init_test_environment;
@@ -496,7 +547,11 @@ mod tests {
         );
     }
 
-    // Test batch retrieval edge case: duplicate AAGUIDs in input
+    /// Test batch retrieval edge case: duplicate AAGUIDs in input
+    ///
+    /// This test verifies that `get_authenticator_info_batch` correctly handles duplicate
+    /// AAGUIDs in the input vector by deduplicating them and returning each unique entry
+    /// only once. It tests the function's handling of redundant input data.
     #[tokio::test]
     async fn test_get_authenticator_info_batch_duplicates() {
         use crate::test_utils::init_test_environment;

@@ -601,6 +601,11 @@ mod tests {
     use crate::passkey::main::types::AuthenticatorAttestationResponse;
     use ciborium::value::Value as CborValue;
 
+    /// Test parse attestation object success none fmt
+    ///
+    /// This test verifies that `parse_attestation_object` successfully parses a valid
+    /// attestation object with "none" format. It tests CBOR decoding and validates that
+    /// all fields (fmt, authData, attStmt) are correctly extracted from the attestation object.
     #[test]
     fn test_parse_attestation_object_success_none_fmt() {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -651,6 +656,11 @@ mod tests {
         );
     }
 
+    /// Test parse attestation object invalid base64
+    ///
+    /// This test verifies that `parse_attestation_object` returns appropriate errors when
+    /// given invalid base64 input that cannot be decoded. It tests the base64 validation
+    /// and error handling for malformed attestation data.
     #[test]
     fn test_parse_attestation_object_invalid_base64() {
         let attestation_base64 = "not-valid-base64!@#";
@@ -665,6 +675,11 @@ mod tests {
         }
     }
 
+    /// Test parse attestation object valid base64 invalid cbor
+    ///
+    /// This test verifies that `parse_attestation_object` returns appropriate errors when
+    /// given valid base64 that contains invalid CBOR data. It tests the CBOR parsing
+    /// validation and error handling for corrupted attestation objects.
     #[test]
     fn test_parse_attestation_object_valid_base64_invalid_cbor() {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -685,6 +700,11 @@ mod tests {
         }
     }
 
+    /// Test parse attestation object cbor map missing fmt
+    ///
+    /// This test verifies that `parse_attestation_object` returns appropriate errors when
+    /// the CBOR map is missing the required "fmt" field. It tests validation of required
+    /// attestation object structure and proper error reporting for incomplete data.
     #[test]
     fn test_parse_attestation_object_cbor_map_missing_fmt() {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -718,6 +738,11 @@ mod tests {
         }
     }
 
+    /// Test parse attestation object cbor map missing auth data
+    ///
+    /// This test verifies that `parse_attestation_object` returns appropriate errors when
+    /// the CBOR map is missing the required "authData" field. It tests validation of
+    /// required attestation structure and proper error handling for missing authenticator data.
     #[test]
     fn test_parse_attestation_object_cbor_map_missing_auth_data() {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -751,6 +776,11 @@ mod tests {
         }
     }
 
+    /// Test parse attestation object cbor map missing att stmt
+    ///
+    /// This test verifies that `parse_attestation_object` returns appropriate errors when
+    /// the CBOR map is missing the required "attStmt" field. It tests validation of
+    /// required attestation structure and proper error handling for missing attestation statements.
     #[test]
     fn test_parse_attestation_object_cbor_map_missing_att_stmt() {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -784,6 +814,11 @@ mod tests {
         }
     }
 
+    /// Test parse attestation object cbor not a map
+    ///
+    /// This test verifies that `parse_attestation_object` returns appropriate errors when
+    /// the CBOR data is not a map structure. It tests type validation and ensures that
+    /// non-map CBOR structures are properly rejected with descriptive error messages.
     #[test]
     fn test_parse_attestation_object_cbor_not_a_map() {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -809,6 +844,11 @@ mod tests {
         }
     }
 
+    /// Test extract key coordinates success
+    ///
+    /// This test verifies that `extract_key_coordinates` successfully extracts X and Y
+    /// coordinates from a valid CBOR key map. It tests the parsing of elliptic curve
+    /// public key coordinates from CBOR-encoded key data.
     #[test]
     fn test_extract_key_coordinates_success() {
         use ciborium::value::Integer;
@@ -841,6 +881,11 @@ mod tests {
         assert_eq!(extracted_y, y_coord);
     }
 
+    /// Test extract key coordinates missing x
+    ///
+    /// This test verifies that `extract_key_coordinates` returns appropriate errors when
+    /// the X coordinate is missing from the CBOR key map. It tests validation of required
+    /// key components and proper error handling for incomplete key data.
     #[test]
     fn test_extract_key_coordinates_missing_x() {
         // Create a CBOR map with only Y coordinate, missing X
@@ -878,6 +923,11 @@ mod tests {
         }
     }
 
+    /// Test extract key coordinates missing y
+    ///
+    /// This test verifies that `extract_key_coordinates` returns appropriate errors when
+    /// the Y coordinate is missing from the CBOR key map. It tests validation of required
+    /// key components and proper error handling for incomplete key data.
     #[test]
     fn test_extract_key_coordinates_missing_y() {
         // Create a CBOR map with only X coordinate, missing Y
@@ -915,6 +965,11 @@ mod tests {
         }
     }
 
+    /// Test parse credential data success
+    ///
+    /// This test verifies that `parse_credential_data` successfully extracts credential ID
+    /// and public key data from valid authenticator data. It tests the parsing of credential
+    /// information embedded in the authenticator data structure.
     #[test]
     fn test_parse_credential_data_success() {
         // Create a mock authenticator data array
@@ -963,6 +1018,11 @@ mod tests {
         assert_eq!(credential_data, &public_key_bytes);
     }
 
+    /// Test parse credential data too short
+    ///
+    /// This test verifies that `parse_credential_data` returns appropriate errors when
+    /// the authenticator data is too short to contain valid credential information.
+    /// It tests length validation and proper error handling for truncated data.
     #[test]
     fn test_parse_credential_data_too_short() {
         // Create a mock authenticator data array that's too short
@@ -996,6 +1056,11 @@ mod tests {
         }
     }
 
+    /// Test parse credential data invalid length
+    ///
+    /// This test verifies that `parse_credential_data` returns appropriate errors when
+    /// the credential ID length field contains invalid values. It tests validation of
+    /// length fields and proper error handling for malformed credential data.
     #[test]
     fn test_parse_credential_data_invalid_length() {
         // Create a mock authenticator data array with invalid credential ID length
@@ -1035,6 +1100,13 @@ mod tests {
         }
     }
 
+    /// Test parse credential data too short for credential id
+    /// This test verifies that parsing fails when authenticator data contains
+    /// insufficient data for the declared credential ID length.
+    /// It performs the following steps:
+    /// 1. Creates mock authenticator data with credential ID length set to 20 bytes
+    /// 2. Provides only 10 bytes of credential ID data (less than declared)
+    /// 3. Verifies that parsing returns a "too short for credential ID" error
     #[test]
     fn test_parse_credential_data_too_short_for_credential_id() {
         // Create a mock authenticator data array that's too short for the credential ID
@@ -1077,6 +1149,12 @@ mod tests {
         }
     }
 
+    /// Test parse credential data large credential id length
+    /// This test verifies that parsing fails when credential ID length exceeds the maximum allowed size.
+    /// It performs the following steps:
+    /// 1. Creates authenticator data with credential ID length set to 1025 bytes (exceeds 1024 limit)
+    /// 2. Calls parse_credential_data with the oversized credential ID length
+    /// 3. Verifies that parsing returns an "Invalid credential ID length" error
     #[test]
     fn test_parse_credential_data_large_credential_id_length() {
         // Create authenticator data with credential ID length > 1024 bytes
@@ -1115,6 +1193,12 @@ mod tests {
         }
     }
 
+    /// Test extract key coordinates invalid cbor
+    /// This test verifies that key coordinate extraction fails when provided with invalid CBOR data.
+    /// It performs the following steps:
+    /// 1. Creates malformed data that cannot be parsed as valid CBOR
+    /// 2. Calls extract_key_coordinates with the invalid CBOR data
+    /// 3. Verifies that extraction returns an "Invalid public key format" error
     #[test]
     fn test_extract_key_coordinates_invalid_cbor() {
         // Create malformed CBOR data that cannot be parsed
@@ -1137,6 +1221,11 @@ mod tests {
         }
     }
 
+    /// Test create registration options integration
+    ///
+    /// This test verifies the complete registration options creation process in an integrated
+    /// environment. It tests the generation of registration challenges, options formatting,
+    /// and proper integration with cache and session systems.
     #[tokio::test]
     async fn test_create_registration_options_integration() {
         use crate::passkey::main::test_utils as passkey_test_utils;
@@ -1192,6 +1281,11 @@ mod tests {
         );
     }
 
+    /// Test get or create user handle integration
+    ///
+    /// This test verifies the user handle creation and retrieval functionality for both
+    /// anonymous and authenticated users. It tests user handle generation for new users
+    /// and retrieval for existing users in different session states.
     #[tokio::test]
     #[ignore = "This test requires a valid session and cache setup"]
     async fn test_get_or_create_user_handle() {
@@ -1256,6 +1350,13 @@ mod tests {
         assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
     }
 
+    /// Test verify session then finish registration success
+    /// This test verifies the complete registration flow with valid session and challenge data.
+    /// It performs the following steps:
+    /// 1. Sets up test environment with user session and registration challenge
+    /// 2. Creates test credential data and stores it in the database
+    /// 3. Calls verify_session_then_finish_registration with valid attestation response
+    /// 4. Verifies that registration completes successfully with proper cleanup
     #[tokio::test]
     #[ignore = "This test requires a valid session and cache setup"]
     async fn test_verify_session_then_finish_registration_success() {
@@ -1424,6 +1525,13 @@ mod tests {
         let _ = remove_from_cache("regi_challenge", user_handle).await;
     }
 
+    /// Test verify session then finish registration missing user handle
+    /// This test verifies that registration fails when user handle is missing from the request.
+    /// It performs the following steps:
+    /// 1. Initializes test environment with session user
+    /// 2. Creates RegisterCredential with missing user_handle field (set to None)
+    /// 3. Calls verify_session_then_finish_registration with incomplete data
+    /// 4. Verifies that it returns a "User handle is missing" error
     #[tokio::test]
     async fn test_verify_session_then_finish_registration_missing_user_handle() {
         use crate::passkey::main::types::AuthenticatorAttestationResponse;
@@ -1465,6 +1573,13 @@ mod tests {
         }
     }
 
+    /// Test verify session then finish registration session not found
+    /// This test verifies that registration fails when session information is not found in cache.
+    /// It performs the following steps:
+    /// 1. Initializes test environment with session user
+    /// 2. Creates RegisterCredential with valid user handle but no session stored in cache
+    /// 3. Calls verify_session_then_finish_registration with missing session data
+    /// 4. Verifies that it returns a "Session not found" error
     #[tokio::test]
     async fn test_verify_session_then_finish_registration_session_not_found() {
         use crate::passkey::main::types::AuthenticatorAttestationResponse;
@@ -1508,6 +1623,13 @@ mod tests {
         }
     }
 
+    /// Test verify session then finish registration user id mismatch
+    /// This test verifies that registration fails when session user ID doesn't match stored session.
+    /// It performs the following steps:
+    /// 1. Stores session info in cache with one user ID ("stored_user_id")
+    /// 2. Attempts registration with different user ID ("current_user_id")
+    /// 3. Calls verify_session_then_finish_registration with mismatched user data
+    /// 4. Verifies that it returns a "User ID mismatch" error (prevents session hijacking)
     #[tokio::test]
     async fn test_verify_session_then_finish_registration_user_id_mismatch() {
         use crate::passkey::main::types::AuthenticatorAttestationResponse;
@@ -1616,6 +1738,13 @@ mod tests {
         serde_json::to_string(&client_data).unwrap()
     }
 
+    /// Test verify client data success
+    /// This test verifies that client data verification succeeds with valid registration data.
+    /// It performs the following steps:
+    /// 1. Stores registration challenge in cache with valid user and challenge data
+    /// 2. Creates properly formatted client data JSON with matching challenge and origin
+    /// 3. Calls verify_client_data with valid registration credential
+    /// 4. Verifies that verification succeeds and cleans up cache data
     #[tokio::test]
     async fn test_verify_client_data_success() {
         use crate::passkey::main::utils::store_in_cache;
@@ -1671,6 +1800,13 @@ mod tests {
         let _ = remove_from_cache("regi_challenge", user_handle).await;
     }
 
+    /// Test verify client data invalid base64
+    /// This test verifies that client data verification fails with invalid base64 encoding.
+    /// It performs the following steps:
+    /// 1. Creates RegisterCredential with malformed base64 client data JSON
+    /// 2. Calls verify_client_data with invalid base64 data
+    /// 3. Verifies that verification fails with "Failed to decode client data" error
+    /// 4. Confirms proper error handling for base64 decoding issues
     #[tokio::test]
     async fn test_verify_client_data_invalid_base64() {
         use crate::test_utils::init_test_environment;
@@ -1696,6 +1832,13 @@ mod tests {
         }
     }
 
+    /// Test verify client data invalid utf8
+    /// This test verifies that client data verification fails with invalid UTF-8 encoding.
+    /// It performs the following steps:
+    /// 1. Creates invalid UTF-8 byte sequence (0xFF, 0xFE, 0xFD)
+    /// 2. Encodes the invalid UTF-8 data as base64 and creates RegisterCredential
+    /// 3. Calls verify_client_data with non-UTF-8 client data
+    /// 4. Verifies that verification fails with "Client data is not valid UTF-8" error
     #[tokio::test]
     async fn test_verify_client_data_invalid_utf8() {
         use crate::test_utils::init_test_environment;
@@ -1725,6 +1868,13 @@ mod tests {
         }
     }
 
+    /// Test verify client data invalid json
+    /// This test verifies that client data verification fails with malformed JSON.
+    /// It performs the following steps:
+    /// 1. Creates invalid JSON structure with malformed syntax
+    /// 2. Encodes the invalid JSON as base64 and creates RegisterCredential
+    /// 3. Calls verify_client_data with malformed JSON data
+    /// 4. Verifies that verification fails with "Failed to parse client data JSON" error
     #[tokio::test]
     async fn test_verify_client_data_invalid_json() {
         use crate::test_utils::init_test_environment;
@@ -1755,6 +1905,13 @@ mod tests {
         }
     }
 
+    /// Test verify client data wrong type
+    /// This test verifies that client data verification fails with incorrect WebAuthn type.
+    /// It performs the following steps:
+    /// 1. Creates client data JSON with "webauthn.get" type (authentication) instead of "webauthn.create" (registration)
+    /// 2. Encodes the wrong-type client data as base64 and creates RegisterCredential
+    /// 3. Calls verify_client_data with incorrect ceremony type
+    /// 4. Verifies that verification fails with appropriate type validation error
     #[tokio::test]
     async fn test_verify_client_data_wrong_type() {
         use crate::test_utils::init_test_environment;
@@ -1789,6 +1946,13 @@ mod tests {
         }
     }
 
+    /// Test verify client data missing user handle
+    /// This test verifies that client data verification fails when user handle is missing.
+    /// It performs the following steps:
+    /// 1. Creates valid client data JSON with proper format and challenge
+    /// 2. Creates RegisterCredential with user_handle set to None
+    /// 3. Calls verify_client_data with missing user identification
+    /// 4. Verifies that verification fails with "User handle is missing" error
     #[tokio::test]
     async fn test_verify_client_data_missing_user_handle() {
         use crate::test_utils::init_test_environment;
@@ -1822,6 +1986,13 @@ mod tests {
         }
     }
 
+    /// Test verify client data challenge not found
+    /// This test verifies that client data verification fails when challenge is not found in cache.
+    /// It performs the following steps:
+    /// 1. Creates valid client data JSON with challenge but doesn't store it in cache
+    /// 2. Calls verify_client_data without pre-storing registration challenge
+    /// 3. Verifies that verification fails with NotFound error
+    /// 4. Confirms proper handling when challenge lookup fails
     #[tokio::test]
     async fn test_verify_client_data_challenge_not_found() {
         use crate::test_utils::init_test_environment;
@@ -1862,6 +2033,13 @@ mod tests {
         }
     }
 
+    /// Test verify client data challenge mismatch
+    /// This test verifies that client data verification fails when challenge doesn't match stored value.
+    /// It performs the following steps:
+    /// 1. Stores registration challenge "stored_challenge_123" in cache
+    /// 2. Creates client data JSON with different challenge "different_challenge_456"
+    /// 3. Calls verify_client_data with mismatched challenge values
+    /// 4. Verifies that verification fails with challenge validation error
     #[tokio::test]
     async fn test_verify_client_data_challenge_mismatch() {
         use crate::passkey::main::utils::store_in_cache;
@@ -1923,6 +2101,13 @@ mod tests {
         let _ = remove_from_cache("regi_challenge", user_handle).await;
     }
 
+    /// Test verify client data origin mismatch
+    /// This test verifies that client data verification fails when origin doesn't match configuration.
+    /// It performs the following steps:
+    /// 1. Stores valid registration challenge in cache
+    /// 2. Creates client data JSON with malicious origin "https://evil-site.com"
+    /// 3. Calls verify_client_data with origin different from configured ORIGIN
+    /// 4. Verifies that verification fails with "Invalid origin" error (prevents origin spoofing)
     #[tokio::test]
     async fn test_verify_client_data_origin_mismatch() {
         use crate::passkey::main::utils::store_in_cache;
@@ -2121,6 +2306,13 @@ mod tests {
         crate::utils::base64url_encode(full_attestation).map_err(|e| e.to_string())
     }
 
+    /// Test extract credential public key success
+    /// This test verifies that public key extraction succeeds with valid registration data.
+    /// It performs the following steps:
+    /// 1. Creates valid RegisterCredential with properly formatted attestation object
+    /// 2. Calls extract_credential_public_key with valid credential data
+    /// 3. Verifies that extraction succeeds and returns non-empty public key
+    /// 4. Confirms proper parsing of credential and public key data
     #[tokio::test]
     async fn test_extract_credential_public_key_success() {
         // Initialize test environment properly
@@ -2143,6 +2335,13 @@ mod tests {
         assert!(!public_key.is_empty());
     }
 
+    /// Test extract credential public key invalid client data
+    /// This test verifies that public key extraction fails with invalid client data encoding.
+    /// It performs the following steps:
+    /// 1. Creates RegisterCredential with malformed base64 client data JSON
+    /// 2. Calls extract_credential_public_key with invalid client data encoding
+    /// 3. Verifies that extraction fails with "Failed to decode client data" error
+    /// 4. Confirms proper error handling for base64 decoding issues
     #[test]
     fn test_extract_credential_public_key_invalid_client_data() {
         let mut reg_data = create_test_register_credential_for_extract_credential_public_key();
@@ -2159,6 +2358,11 @@ mod tests {
         );
     }
 
+    /// Test extract credential public key with invalid attestation object encoding
+    ///
+    /// This test verifies that `extract_credential_public_key` properly handles invalid
+    /// base64 encoding in the attestation object. It tests error handling when the
+    /// attestation object contains malformed base64 data that cannot be decoded.
     #[test]
     fn test_extract_credential_public_key_invalid_attestation_object() {
         let mut reg_data = create_test_register_credential_for_extract_credential_public_key();
@@ -2175,6 +2379,11 @@ mod tests {
         );
     }
 
+    /// Test extract credential public key with malformed CBOR data
+    ///
+    /// This test verifies that `extract_credential_public_key` properly handles invalid
+    /// CBOR content in the attestation object. It tests error handling when the
+    /// attestation object contains valid base64 but invalid CBOR data structures.
     #[test]
     fn test_extract_credential_public_key_malformed_attestation_object() {
         let mut reg_data = create_test_register_credential_for_extract_credential_public_key();

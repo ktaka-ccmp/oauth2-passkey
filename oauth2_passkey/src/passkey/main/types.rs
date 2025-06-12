@@ -362,6 +362,11 @@ mod tests {
     mod authentication_options_tests {
         use super::*;
 
+        /// Test serialization of AuthenticationOptions struct
+        ///
+        /// This test verifies that `AuthenticationOptions` can be correctly serialized to JSON
+        /// with all fields properly formatted. It tests the serde serialization implementation
+        /// and validates that all authentication option fields are included in the output.
         #[test]
         fn test_authentication_options_serialization() {
             // Create test data
@@ -417,6 +422,11 @@ mod tests {
     mod webauthn_client_data_tests {
         use super::*;
 
+        /// Test serialization of WebAuthnClientData struct
+        ///
+        /// This test verifies that `WebAuthnClientData` can be correctly serialized to JSON
+        /// with proper field mapping and formatting. It tests the serde serialization
+        /// implementation for WebAuthn client data structures.
         #[test]
         fn test_webauthn_client_data_serialization() {
             // Create a WebAuthnClientData instance
@@ -439,6 +449,11 @@ mod tests {
             assert_eq!(deserialized.origin, "https://example.com");
         }
 
+        /// Test field mapping of WebAuthnClientData struct
+        ///
+        /// This test verifies that `WebAuthnClientData` field names are correctly mapped
+        /// during serialization, including the proper handling of the "type" field name
+        /// conversion. It validates JSON field naming conventions for WebAuthn compliance.
         #[test]
         fn test_webauthn_client_data_field_mapping() {
             // Create JSON with "type" field (not "type_")
@@ -482,7 +497,11 @@ mod tests {
     mod parsed_client_data_tests {
         use super::*;
 
-        // Test successful parsing of client data JSON
+        /// Test successful parsing of client data JSON
+        ///
+        /// This test verifies that `WebAuthnClientData` can be correctly deserialized from
+        /// valid JSON with all required fields. It tests the parsing of WebAuthn client
+        /// data received from authenticator responses.
         #[test]
         fn test_from_base64_success() {
             let client_data = json!({
@@ -501,6 +520,11 @@ mod tests {
             assert_eq!(parsed.raw_data, client_data_str.as_bytes());
         }
 
+        /// Test ParsedClientData parsing with invalid base64 encoding
+        ///
+        /// This test verifies that `ParsedClientData::from_base64` properly handles
+        /// invalid base64 input data. It tests the error handling when provided
+        /// with malformed base64 strings that cannot be decoded.
         #[test]
         fn test_from_base64_invalid_base64() {
             let result = ParsedClientData::from_base64("invalid-base64!");
@@ -513,6 +537,11 @@ mod tests {
             }
         }
 
+        /// Test ParsedClientData parsing with invalid UTF-8 data
+        ///
+        /// This test verifies that `ParsedClientData::from_base64` properly handles
+        /// data that is valid base64 but contains invalid UTF-8 sequences. It tests
+        /// the error handling when the decoded data cannot be converted to a string.
         #[test]
         fn test_from_base64_invalid_utf8() {
             let invalid_utf8 = vec![0xFF, 0xFF, 0xFF];
@@ -527,6 +556,11 @@ mod tests {
             }
         }
 
+        /// Test ParsedClientData parsing with invalid JSON data
+        ///
+        /// This test verifies that `ParsedClientData::from_base64` properly handles
+        /// data that is valid base64 and UTF-8 but contains invalid JSON syntax.
+        /// It tests the error handling when the decoded string cannot be parsed as JSON.
         #[test]
         fn test_from_base64_invalid_json() {
             let invalid_json = "not valid json";
@@ -541,6 +575,11 @@ mod tests {
             }
         }
 
+        /// Test ParsedClientData parsing with missing challenge field
+        ///
+        /// This test verifies that `ParsedClientData::from_base64` properly validates
+        /// required fields in the client data JSON. It tests error handling when
+        /// the challenge field is missing from the client data structure.
         #[test]
         fn test_from_base64_missing_challenge() {
             let client_data = json!({
@@ -559,6 +598,11 @@ mod tests {
             }
         }
 
+        /// Test ParsedClientData parsing with missing origin field
+        ///
+        /// This test verifies that `ParsedClientData::from_base64` properly validates
+        /// required fields in the client data JSON. It tests error handling when
+        /// the origin field is missing from the client data structure.
         #[test]
         fn test_from_base64_missing_origin() {
             let client_data = json!({
@@ -577,6 +621,11 @@ mod tests {
             }
         }
 
+        /// Test ParsedClientData parsing with missing type field
+        ///
+        /// This test verifies that `ParsedClientData::from_base64` properly validates
+        /// required fields in the client data JSON. It tests error handling when
+        /// the type field is missing from the client data structure.
         #[test]
         fn test_from_base64_missing_type() {
             let client_data = json!({
@@ -595,6 +644,11 @@ mod tests {
             }
         }
 
+        /// Test successful ParsedClientData verification
+        ///
+        /// This test verifies that `ParsedClientData::verify` correctly validates
+        /// client data when all parameters match expected values. It tests successful
+        /// verification with matching challenge, origin, and type values.
         #[test]
         fn test_verify_success() {
             let original_origin = env::var("ORIGIN").ok();
@@ -616,6 +670,11 @@ mod tests {
             }
         }
 
+        /// Test ParsedClientData challenge verification with mismatched challenge
+        ///
+        /// This test verifies that `ParsedClientData::verify` properly validates
+        /// the challenge parameter. It tests error handling when the provided
+        /// challenge doesn't match the challenge stored in the client data.
         #[test]
         fn test_verify_challenge_mismatch() {
             let original_origin = env::var("ORIGIN").ok();
@@ -643,6 +702,11 @@ mod tests {
             }
         }
 
+        /// Test ParsedClientData origin verification with mismatched origin
+        ///
+        /// This test verifies that `ParsedClientData::verify` properly validates
+        /// the origin parameter against the configured ORIGIN environment variable.
+        /// It tests error handling when the client data origin doesn't match the expected origin.
         #[test]
         fn test_verify_origin_mismatch() {
             let original_origin = env::var("ORIGIN").ok();
@@ -672,6 +736,11 @@ mod tests {
             }
         }
 
+        /// Test ParsedClientData verification with invalid type
+        ///
+        /// This test verifies that `ParsedClientData::verify` properly validates
+        /// the type field against the expected "webauthn.get" value. It tests error
+        /// handling when the client data contains an incorrect authentication type.
         #[test]
         fn test_verify_invalid_type() {
             let original_origin = env::var("ORIGIN").ok();
@@ -722,6 +791,11 @@ mod tests {
             data
         }
 
+        /// Test successful parsing of authenticator data from base64
+        ///
+        /// This test verifies that `AuthenticatorData::from_base64` can correctly
+        /// parse valid authenticator data. It tests the parsing of RP ID hash,
+        /// flags, counter, and raw data preservation during the parsing process.
         #[test]
         fn test_from_base64_success() {
             let rp_id_hash = vec![0; 32];
@@ -738,6 +812,11 @@ mod tests {
             assert_eq!(parsed.raw_data, auth_data_vec);
         }
 
+        /// Test AuthenticatorData parsing with invalid base64 encoding
+        ///
+        /// This test verifies that `AuthenticatorData::from_base64` properly handles
+        /// invalid base64 input data. It tests error handling when provided with
+        /// malformed base64 strings that cannot be decoded.
         #[test]
         fn test_from_base64_invalid_base64() {
             let result = AuthenticatorData::from_base64("invalid-base64!");
@@ -750,6 +829,11 @@ mod tests {
             }
         }
 
+        /// Test AuthenticatorData parsing with insufficient data length
+        ///
+        /// This test verifies that `AuthenticatorData::from_base64` properly validates
+        /// the minimum required data length. It tests error handling when the decoded
+        /// data is too short to contain the required authenticator data fields.
         #[test]
         fn test_from_base64_too_short() {
             let short_data = vec![0; 36];
@@ -764,6 +848,11 @@ mod tests {
             }
         }
 
+        /// Test AuthenticatorData flag bit checking methods
+        ///
+        /// This test verifies that the individual flag checking methods (is_user_present,
+        /// is_user_verified, etc.) correctly interpret the flag bits in the authenticator
+        /// data. It tests various flag combinations and their corresponding method responses.
         #[test]
         fn test_individual_flag_methods() {
             // Create AuthenticatorData with various flags set
@@ -844,6 +933,11 @@ mod tests {
             assert!(!auth_data_multi.is_backed_up());
         }
 
+        /// Test comprehensive AuthenticatorData flag checking methods
+        ///
+        /// This test verifies that all flag checking methods correctly interpret flag bits
+        /// in the AuthenticatorData. It tests various flag combinations to ensure proper
+        /// detection of user presence, verification, backup state, and other attributes.
         #[test]
         fn test_flag_methods() {
             let all_flags = 0x01 | 0x04 | 0x08 | 0x10 | 0x40 | 0x80;
@@ -895,6 +989,11 @@ mod tests {
             assert!(auth_data_uv.is_user_verified());
         }
 
+        /// Test successful AuthenticatorData verification
+        ///
+        /// This test verifies that `AuthenticatorData::verify` correctly validates
+        /// the RP ID hash against the configured PASSKEY_RP_ID. It tests successful
+        /// verification when the hash matches the expected value.
         #[test]
         fn test_verify_success() {
             let original_rp_id = env::var("PASSKEY_RP_ID").ok();
@@ -927,6 +1026,11 @@ mod tests {
             }
         }
 
+        /// Test AuthenticatorData verification with invalid RP ID hash
+        ///
+        /// This test verifies that `AuthenticatorData::verify` properly validates
+        /// the RP ID hash against the expected hash. It tests error handling when
+        /// the authenticator data contains an incorrect RP ID hash.
         #[test]
         fn test_verify_invalid_rp_id_hash() {
             let original_rp_id = env::var("PASSKEY_RP_ID").ok();
@@ -964,6 +1068,11 @@ mod tests {
             }
         }
 
+        /// Test AuthenticatorData verification with user not present
+        ///
+        /// This test verifies that `AuthenticatorData::verify` properly validates
+        /// the user presence flag. It tests error handling when the authenticator
+        /// data indicates the user was not present during the authentication.
         #[test]
         fn test_verify_user_not_present() {
             let original_rp_id = env::var("PASSKEY_RP_ID").ok();
@@ -1002,6 +1111,11 @@ mod tests {
             }
         }
 
+        /// Test AuthenticatorData verification with missing user verification
+        ///
+        /// This test verifies that `AuthenticatorData::verify` properly enforces
+        /// user verification requirements. It tests error handling when user verification
+        /// is required but the authenticator data indicates the user was not verified.
         #[test]
         fn test_verify_user_verification_required_but_not_verified() {
             let original_rp_id = env::var("PASSKEY_RP_ID").ok();

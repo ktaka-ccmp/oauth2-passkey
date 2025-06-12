@@ -62,7 +62,11 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
-    // Test get_related_origin_json_with_core with additional origins
+    /// Test get_related_origin_json_with_core with additional origins
+    ///
+    /// This test verifies that `get_related_origin_json_with_core` correctly generates
+    /// JSON for related origins when additional origins are provided. It tests the
+    /// inclusion of core origin and additional origins in the proper JSON format.
     #[test]
     fn test_get_related_origin_json_with_core_with_additional() {
         let rp_id = "core.example.com".to_string();
@@ -86,7 +90,11 @@ mod tests {
         assert_eq!(origins_array[2], "https://app2.core.com");
     }
 
-    // Test get_related_origin_json_with_core with no additional origins
+    /// Test get_related_origin_json_with_core with no additional origins
+    ///
+    /// This test verifies that `get_related_origin_json_with_core` correctly generates
+    /// JSON for related origins when no additional origins are provided. It tests that
+    /// only the core origin is included in the generated JSON structure.
     #[test]
     fn test_get_related_origin_json_with_core_no_additional() {
         let rp_id = "core.example.com".to_string();
@@ -105,7 +113,11 @@ mod tests {
         assert_eq!(origins_array[0], "https://core.example.com");
     }
 
-    // Test get_related_origin_json_with_core with duplicate origins
+    /// Test get_related_origin_json_with_core with duplicate origins
+    ///
+    /// This test verifies that `get_related_origin_json_with_core` correctly handles
+    /// duplicate origins by deduplicating them in the generated JSON. It tests that
+    /// only unique origins are included in the final origins array.
     #[test]
     fn test_get_related_origin_json_with_core_duplicate_origins() {
         let rp_id = "example.com".to_string();
@@ -129,7 +141,11 @@ mod tests {
         assert_eq!(origins_array[2], "https://app.example.com");
     }
 
-    // Test get_related_origin_json_with_core with empty strings
+    /// Test get_related_origin_json_with_core with empty strings
+    ///
+    /// This test verifies that `get_related_origin_json_with_core` correctly handles
+    /// empty string inputs for RP ID and origins. It tests the function's behavior
+    /// with edge case inputs including empty string values.
     #[test]
     fn test_get_related_origin_json_with_core_empty_strings() {
         let rp_id = "".to_string();
@@ -148,7 +164,11 @@ mod tests {
         assert_eq!(origins_array[0], "");
     }
 
-    // Test get_related_origin_json_with_core with special characters
+    /// Test get_related_origin_json_with_core with special characters
+    ///
+    /// This test verifies that `get_related_origin_json_with_core` correctly handles
+    /// special characters in domain names and origins. It tests the function's ability
+    /// to process domains with hyphens and other valid special characters.
     #[test]
     fn test_get_related_origin_json_with_core_special_characters() {
         let rp_id = "test-domain.com".to_string();

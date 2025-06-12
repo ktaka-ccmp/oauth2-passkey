@@ -362,6 +362,11 @@ mod tests {
     #[cfg(test)]
     use serial_test::serial;
 
+    /// Test start authentication with no username
+    ///
+    /// This test verifies that `start_authentication` can handle requests without a username
+    /// by generating anonymous authentication options. It validates that the function creates
+    /// proper authentication options with empty credentials list and valid challenge data.
     #[tokio::test]
     async fn test_start_authentication_no_username() {
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
@@ -381,6 +386,11 @@ mod tests {
         );
     }
 
+    /// Test start authentication generates unique IDs
+    ///
+    /// This test verifies that `start_authentication` generates unique challenge and auth_id
+    /// values on each invocation to prevent replay attacks. It calls the function multiple
+    /// times and ensures all generated identifiers are unique.
     #[tokio::test]
     async fn test_start_authentication_generates_unique_ids() {
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
@@ -400,6 +410,11 @@ mod tests {
         assert_ne!(auth1.auth_id, auth2.auth_id);
     }
 
+    /// Test verify user handle real function matching handles
+    ///
+    /// This test verifies that `verify_user_handle` correctly validates user handles when
+    /// the authenticator response and stored credential have matching user handle values.
+    /// It creates test data with matching handles and validates successful verification.
     #[test]
     fn test_verify_user_handle_real_function_matching_handles() {
         let auth_response = create_test_authenticator_response(
@@ -422,6 +437,12 @@ mod tests {
         );
     }
 
+    /// Test verify user handle real function mismatched handles
+    ///
+    /// This test verifies that `verify_user_handle` correctly rejects authentication attempts
+    /// when the user handle in the authenticator response doesn't match the stored credential.
+    /// It tests both discoverable and non-discoverable credential scenarios with mismatched handles.
+    ///
     #[test]
     fn test_verify_user_handle_real_function_mismatched_handles() {
         let auth_response = create_test_authenticator_response(
@@ -470,6 +491,12 @@ mod tests {
         }
     }
 
+    /// Test verify user handle real function missing handle
+    ///
+    /// This test verifies that `verify_user_handle` correctly handles cases where the user handle
+    /// is missing from the authenticator response. It tests that discoverable credentials require
+    /// a user handle while non-discoverable credentials can work without one.
+    ///
     #[test]
     fn test_verify_user_handle_real_function_missing_handle() {
         let credential = create_test_passkey_credential("test_handle".to_string());
@@ -509,6 +536,11 @@ mod tests {
         );
     }
 
+    /// Test verify user handle edge cases
+    ///
+    /// This test verifies that `verify_user_handle` handles edge cases correctly, including
+    /// empty string user handles and mismatched empty vs non-empty handles. It tests various
+    /// boundary conditions to ensure robust handle validation.
     #[test]
     fn test_verify_user_handle_edge_cases() {
         // Test empty string user handle
@@ -531,6 +563,11 @@ mod tests {
         );
     }
 
+    /// Test verify counter authenticator no counter support
+    ///
+    /// This test verifies that `verify_counter` handles authenticators that don't support
+    /// signature counters (counter = 0). It validates that the function succeeds without
+    /// updating the counter when the authenticator doesn't provide counter functionality.
     #[tokio::test]
     async fn test_verify_counter_authenticator_no_counter_support() {
         // Test case: authenticator doesn't support counters (counter = 0)
@@ -542,6 +579,11 @@ mod tests {
         // Counter should not be updated when response counter is 0 (test passes if no DB error)
     }
 
+    /// Test verify counter replay attack detection
+    ///
+    /// This test verifies that `verify_counter` correctly detects replay attacks by rejecting
+    /// authentication attempts where the counter value is less than the stored counter.
+    /// It simulates a credential cloning attack scenario and validates proper error handling.
     #[tokio::test]
     async fn test_verify_counter_replay_attack_detection() {
         // Test case: counter is less than stored counter (replay attack)
@@ -559,6 +601,11 @@ mod tests {
         }
     }
 
+    /// Test verify counter equal counter replay attack
+    ///
+    /// This test verifies that `verify_counter` correctly detects replay attacks when the
+    /// counter value equals the stored counter. Equal counters indicate potential replay
+    /// attacks and should be rejected to maintain security.
     #[tokio::test]
     async fn test_verify_counter_equal_counter_replay_attack() {
         // Test case: counter equals stored counter (still a replay attack)
@@ -576,6 +623,11 @@ mod tests {
         }
     }
 
+    /// Test verify counter valid increment
+    ///
+    /// This test verifies that `verify_counter` accepts valid authentication attempts where
+    /// the counter value is greater than the stored counter. It validates that legitimate
+    /// counter increments are properly accepted and processed.
     #[tokio::test]
     async fn test_verify_counter_valid_increment() {
         // Test case: counter is greater than stored counter (valid)
@@ -589,6 +641,11 @@ mod tests {
         // Note: In real implementation, counter would be updated in database
     }
 
+    /// Test verify counter zero to positive
+    ///
+    /// This test verifies that `verify_counter` handles the transition from zero counter
+    /// to positive values, which occurs during the first use of a counter-supporting
+    /// authenticator. It validates this legitimate counter initialization scenario.
     #[tokio::test]
     async fn test_verify_counter_zero_to_positive() {
         // Test case: counter going from 0 to positive (first use of counter-supporting authenticator)
@@ -602,6 +659,11 @@ mod tests {
         // Note: In real implementation, counter would be updated in database
     }
 
+    /// Test verify counter large increment
+    ///
+    /// This test verifies that `verify_counter` accepts large but valid counter increments.
+    /// Large increments can occur with heavily used authenticators and should be accepted
+    /// as long as they're greater than the stored counter value.
     #[tokio::test]
     async fn test_verify_counter_large_increment() {
         // Test case: large counter increment (should still be valid)
@@ -683,6 +745,11 @@ mod tests {
         }
     }
 
+    /// Test verify signature invalid public key format
+    ///
+    /// This test verifies that `verify_signature` returns appropriate errors when given
+    /// invalid base64-encoded public key data. It tests the function's ability to handle
+    /// malformed public key inputs and return proper error messages.
     #[tokio::test]
     async fn test_verify_signature_invalid_public_key_format() {
         // Test case: invalid base64 public key
@@ -706,6 +773,11 @@ mod tests {
         }
     }
 
+    /// Test verify signature invalid signature format
+    ///
+    /// This test verifies that `verify_signature` returns appropriate errors when given
+    /// invalid base64-encoded signature data. It tests the function's ability to handle
+    /// malformed signature inputs and return proper error messages.
     #[tokio::test]
     async fn test_verify_signature_invalid_signature_format() {
         // Test case: invalid base64 signature
@@ -739,6 +811,11 @@ mod tests {
         }
     }
 
+    /// Test verify signature verification failure
+    ///
+    /// This test verifies that `verify_signature` correctly rejects authentication attempts
+    /// with valid format but incorrect signature data. It tests the cryptographic signature
+    /// verification process and ensures invalid signatures are properly rejected.
     #[tokio::test]
     async fn test_verify_signature_verification_failure() {
         // Test case: valid format but signature verification fails
@@ -763,6 +840,11 @@ mod tests {
         }
     }
 
+    /// Test verify signature empty signature
+    ///
+    /// This test verifies that `verify_signature` handles empty signature inputs correctly
+    /// by returning appropriate errors. It tests the function's validation of required
+    /// signature data and ensures empty signatures are properly rejected.
     #[tokio::test]
     async fn test_verify_signature_empty_signature() {
         // Test case: empty signature
@@ -797,6 +879,11 @@ mod tests {
         }
     }
 
+    /// Test verify signature empty public key
+    ///
+    /// This test verifies that `verify_signature` handles empty public key inputs correctly
+    /// by returning appropriate errors. It tests the function's validation of required
+    /// public key data and ensures empty keys are properly rejected.
     #[tokio::test]
     async fn test_verify_signature_empty_public_key() {
         // Test case: empty public key
@@ -828,6 +915,11 @@ mod tests {
         }
     }
 
+    /// Test verify signature malformed data structures
+    ///
+    /// This test verifies that `verify_signature` robustly handles various types of malformed
+    /// input data structures. It tests the function's error handling capabilities with
+    /// corrupted or invalid data to ensure proper validation and error reporting.
     #[tokio::test]
     async fn test_verify_signature_malformed_data_structures() {
         // Test case: test with various malformed data to ensure robust error handling
@@ -854,6 +946,11 @@ mod tests {
         }
     }
 
+    /// Test finish authentication integration
+    ///
+    /// This test verifies the complete authentication flow by testing the integration
+    /// between multiple authentication components. It validates the end-to-end process
+    /// of finishing authentication with proper credential verification and database updates.
     #[tokio::test]
     #[serial]
     async fn test_finish_authentication_integration_test() {
@@ -910,6 +1007,11 @@ mod tests {
         );
     }
 
+    /// Test start authentication integration
+    ///
+    /// This test verifies the complete authentication initialization flow by testing
+    /// the integration of authentication options generation, challenge storage, and
+    /// credential preparation. It validates the full authentication startup process.
     #[tokio::test]
     #[serial]
     async fn test_start_authentication_integration() {
@@ -971,6 +1073,11 @@ mod tests {
         assert!(remove_credential.is_ok(), "Failed to clean up credential");
     }
 
+    /// Test verify counter and update
+    ///
+    /// This test verifies the counter verification and database update functionality
+    /// in a complete integration scenario. It tests both the counter validation logic
+    /// and the database persistence of updated counter values.
     #[tokio::test]
     #[serial]
     async fn test_verify_counter_and_update() {
@@ -1037,6 +1144,11 @@ mod tests {
         assert!(cleanup.is_ok(), "Failed to clean up test credential");
     }
 
+    /// Test verify user handle
+    ///
+    /// This test verifies the user handle validation functionality for non-discoverable
+    /// credentials without user handles. It tests the authentication flow for credentials
+    /// that don't require user handle validation.
     #[tokio::test]
     async fn test_verify_user_handle() {
         // Test for non-discoverable credential without user handle

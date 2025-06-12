@@ -79,7 +79,12 @@ mod tests {
     use crate::passkey::types::StoredOptions;
     use crate::test_utils::init_test_environment;
 
-    // Test the CacheData conversion for StoredOptions
+    /// Test the CacheData conversion for StoredOptions
+    /// This test verifies that StoredOptions can be correctly converted to and from CacheData.
+    /// It performs the following steps:
+    /// 1. Creates test StoredOptions with challenge, user data, timestamp, and TTL
+    /// 2. Converts StoredOptions to CacheData and verifies serialization
+    /// 3. Converts back to StoredOptions and confirms round-trip conversion integrity
     #[test]
     fn test_stored_options_cache_data_conversion() {
         // Create a test StoredOptions
@@ -113,7 +118,12 @@ mod tests {
         assert_eq!(converted.ttl, options.ttl);
     }
 
-    // Test CacheData conversion with edge cases (empty strings, special characters)
+    /// Test CacheData conversion with edge cases (empty strings, special characters)
+    /// This test verifies that StoredOptions CacheData conversion handles edge cases correctly.
+    /// It performs the following steps:
+    /// 1. Creates StoredOptions with edge case values (empty strings, special characters, zero values)
+    /// 2. Converts to CacheData and back to verify serialization/deserialization
+    /// 3. Confirms that all edge case values are preserved correctly through the conversion
     #[test]
     fn test_stored_options_cache_data_conversion_edge_cases() {
         // Create StoredOptions with edge case values
@@ -144,7 +154,12 @@ mod tests {
         assert_eq!(converted.ttl, options.ttl);
     }
 
-    // Test cache operations
+    /// Test cache operations
+    /// This test verifies that cache storage and retrieval operations work correctly.
+    /// It performs the following steps:
+    /// 1. Creates test StoredOptions and stores them in cache with TTL
+    /// 2. Retrieves the stored data and verifies it matches original values
+    /// 3. Tests cache removal and confirms data is no longer accessible
     #[tokio::test]
     async fn test_cache_operations() {
         init_test_environment().await;
@@ -189,7 +204,12 @@ mod tests {
         assert!(after_remove.unwrap().is_none());
     }
 
-    // Test cache operations with different keys
+    /// Test cache operations with different keys
+    /// This test verifies that cache operations correctly isolate data between different keys.
+    /// It performs the following steps:
+    /// 1. Stores different StoredOptions data under two separate cache keys
+    /// 2. Retrieves data by each key and verifies correct data isolation
+    /// 3. Confirms that operations on one key don't affect data stored under other keys
     #[tokio::test]
     async fn test_cache_operations_different_keys() {
         init_test_environment().await;
@@ -239,7 +259,12 @@ mod tests {
         assert_eq!(data_from_key2.timestamp, 2222);
     }
 
-    // Test cache operations - comprehensive test (was EXISTING TEST)
+    /// Test cache operations - comprehensive test (was EXISTING TEST)
+    /// This test verifies comprehensive cache functionality including storage, retrieval, and cleanup.
+    /// It performs the following steps:
+    /// 1. Stores test StoredOptions in cache and verifies successful storage
+    /// 2. Retrieves and validates that stored data matches original values exactly
+    /// 3. Tests cache removal and confirms data is properly cleaned up
     #[tokio::test]
     async fn test_comprehensive_cache_operations() {
         init_test_environment().await;
