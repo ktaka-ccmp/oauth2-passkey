@@ -350,6 +350,12 @@ pub(super) async fn verify_idtoken(
 mod tests {
     use super::*;
 
+    /// Test finding an existing JWK in a JWK set
+    ///
+    /// This test verifies that `find_jwk` correctly finds a JWK when it exists in the set.
+    /// It creates a JWK set with two keys in memory, searches for an existing key ID,
+    /// and verifies that the correct JWK is returned with matching properties.
+    ///
     #[test]
     fn test_find_jwk_existing_key() {
         let jwks = Jwks {
@@ -385,6 +391,12 @@ mod tests {
         assert_eq!(result.unwrap().alg, "RS256");
     }
 
+    /// Test finding a non-existing JWK in a JWK set
+    ///
+    /// This test verifies that `find_jwk` correctly returns None when searching for a key ID
+    /// that doesn't exist in the JWK set. It creates a JWK set with one key in memory,
+    /// searches for a non-existing key ID, and verifies that None is returned.
+    ///
     #[test]
     fn test_find_jwk_non_existing_key() {
         let jwks = Jwks {
@@ -407,6 +419,12 @@ mod tests {
         assert!(result.is_none());
     }
 
+    /// Test finding a JWK in an empty JWK set
+    ///
+    /// This test verifies that `find_jwk` correctly returns None when searching in an empty
+    /// JWK set. It creates an empty JWK set in memory, searches for any key ID,
+    /// and verifies that None is returned.
+    ///
     #[test]
     fn test_find_jwk_empty_jwks() {
         let jwks = Jwks { keys: vec![] };
@@ -415,6 +433,12 @@ mod tests {
         assert!(result.is_none());
     }
 
+    /// Test decoding a valid base64 URL-safe string
+    ///
+    /// This test verifies that `decode_base64_url_safe` correctly decodes a valid base64
+    /// URL-safe encoded string. It tests with a known input/output pair and verifies
+    /// the decoded bytes match the expected result.
+    ///
     #[test]
     fn test_decode_base64_url_safe_valid() {
         // Test valid base64 URL-safe encoding
@@ -424,6 +448,11 @@ mod tests {
         assert_eq!(result.unwrap(), b"HelloWorld");
     }
 
+    /// Test decoding an empty base64 URL-safe string
+    ///
+    /// This test verifies that `decode_base64_url_safe` correctly handles an empty string
+    /// input, returning an empty Vec<u8> as expected.
+    ///
     #[test]
     fn test_decode_base64_url_safe_empty() {
         let result = decode_base64_url_safe("");
@@ -431,6 +460,12 @@ mod tests {
         assert_eq!(result.unwrap(), Vec::<u8>::new());
     }
 
+    /// Test decoding an invalid base64 URL-safe string
+    ///
+    /// This test verifies that `decode_base64_url_safe` correctly rejects invalid base64
+    /// input by returning a Base64Error. It tests with malformed input that contains
+    /// invalid characters for base64 encoding.
+    ///
     #[test]
     fn test_decode_base64_url_safe_invalid() {
         // Test invalid base64 input
@@ -443,6 +478,12 @@ mod tests {
         ));
     }
 
+    /// Test decoding a base64 URL-safe string with padding
+    ///
+    /// This test verifies that the URL_SAFE_NO_PAD decoder correctly handles base64
+    /// strings without padding. It tests with "Hello" encoded as base64 without
+    /// padding and verifies the correct decoding.
+    ///
     #[test]
     fn test_decode_base64_url_safe_padding() {
         // Test that URL_SAFE_NO_PAD works correctly
@@ -452,6 +493,11 @@ mod tests {
         assert_eq!(result.unwrap(), b"Hello");
     }
 
+    /// Test JWK to decoding key conversion with missing 'n' component
+    ///
+    /// This test verifies that `convert_jwk_to_decoding_key` returns a MissingKeyComponent
+    /// error when the required 'n' component is missing from an RSA JWK.
+    ///
     #[test]
     fn test_convert_jwk_to_decoding_key_missing_n_component() {
         let jwk = Jwk {
@@ -474,6 +520,11 @@ mod tests {
         }
     }
 
+    /// Test JWK to decoding key conversion with missing 'e' component
+    ///
+    /// This test verifies that `convert_jwk_to_decoding_key` returns a MissingKeyComponent
+    /// error when the required 'e' component is missing from an RSA JWK.
+    ///
     #[test]
     fn test_convert_jwk_to_decoding_key_missing_e_component() {
         let jwk = Jwk {
@@ -497,6 +548,11 @@ mod tests {
         }
     }
 
+    /// Test JWK to decoding key conversion with missing 'x' component for ES256
+    ///
+    /// This test verifies that `convert_jwk_to_decoding_key` returns a MissingKeyComponent
+    /// error when the required 'x' component is missing from an EC JWK using ES256.
+    ///
     #[test]
     fn test_convert_jwk_to_decoding_key_missing_x_component_es256() {
         let jwk = Jwk {
@@ -519,6 +575,11 @@ mod tests {
         }
     }
 
+    /// Test JWK to decoding key conversion with missing 'y' component for ES256
+    ///
+    /// This test verifies that `convert_jwk_to_decoding_key` returns a MissingKeyComponent
+    /// error when the required 'y' component is missing from an EC JWK using ES256.
+    ///
     #[test]
     fn test_convert_jwk_to_decoding_key_missing_y_component_es256() {
         let jwk = Jwk {
@@ -541,6 +602,11 @@ mod tests {
         }
     }
 
+    /// Test JWK to decoding key conversion with missing 'k' component for HS256
+    ///
+    /// This test verifies that `convert_jwk_to_decoding_key` returns a MissingKeyComponent
+    /// error when the required 'k' component is missing from an HMAC JWK using HS256.
+    ///
     #[test]
     fn test_convert_jwk_to_decoding_key_missing_k_component_hs256() {
         let jwk = Jwk {
@@ -563,6 +629,11 @@ mod tests {
         }
     }
 
+    /// Test JWK to decoding key conversion with unsupported algorithm
+    ///
+    /// This test verifies that `convert_jwk_to_decoding_key` returns an UnsupportedAlgorithm
+    /// error when given a JWK with an algorithm that is not supported.
+    ///
     #[test]
     fn test_convert_jwk_to_decoding_key_unsupported_algorithm() {
         let jwk = Jwk {
@@ -587,6 +658,11 @@ mod tests {
         }
     }
 
+    /// Test JWK to decoding key conversion with valid HS256 key
+    ///
+    /// This test verifies that `convert_jwk_to_decoding_key` successfully converts
+    /// a valid HMAC JWK with HS256 algorithm to a DecodingKey.
+    ///
     #[test]
     fn test_convert_jwk_to_decoding_key_hs256_valid() {
         let jwk = Jwk {
@@ -605,6 +681,11 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    /// Test token decoding with too few parts
+    ///
+    /// This test verifies that `decode_token` returns InvalidTokenFormat error
+    /// when given a token with only 2 parts instead of the required 3.
+    ///
     #[test]
     fn test_decode_token_invalid_format_too_few_parts() {
         let token = "header.payload"; // Only 2 parts instead of 3
@@ -616,6 +697,11 @@ mod tests {
         ));
     }
 
+    /// Test token decoding with too many parts
+    ///
+    /// This test verifies that `decode_token` returns InvalidTokenFormat error
+    /// when given a token with 4 parts instead of the required 3.
+    ///
     #[test]
     fn test_decode_token_invalid_format_too_many_parts() {
         let token = "header.payload.signature.extra"; // 4 parts instead of 3
@@ -627,6 +713,11 @@ mod tests {
         ));
     }
 
+    /// Test token decoding with invalid base64 payload
+    ///
+    /// This test verifies that `decode_token` returns a Base64Error when the payload
+    /// contains invalid base64 characters that cannot be decoded.
+    ///
     #[test]
     fn test_decode_token_invalid_base64_payload() {
         let token = "header.invalid@base64.signature";
@@ -638,6 +729,11 @@ mod tests {
         ));
     }
 
+    /// Test token decoding with invalid JSON payload
+    ///
+    /// This test verifies that `decode_token` returns a JsonError when the payload
+    /// contains valid base64 but invalid JSON that cannot be parsed.
+    ///
     #[test]
     fn test_decode_token_invalid_json_payload() {
         // Valid base64 but invalid JSON
@@ -651,6 +747,11 @@ mod tests {
         ));
     }
 
+    /// Test token decoding with valid payload
+    ///
+    /// This test verifies that `decode_token` successfully decodes a token with a valid
+    /// JSON payload, creating a proper IdInfo struct with the expected field values.
+    ///
     #[test]
     fn test_decode_token_valid_payload() {
         // Create a valid IdInfo JSON payload
@@ -682,6 +783,11 @@ mod tests {
         assert_eq!(id_info.name, "Test User");
     }
 
+    /// Test signature verification with invalid token format
+    ///
+    /// This test verifies that `verify_signature` returns InvalidTokenFormat error
+    /// when given a token with insufficient parts for signature verification.
+    ///
     #[test]
     fn test_verify_signature_invalid_token_format() {
         let token = "header.payload"; // Only 2 parts instead of 3
@@ -694,6 +800,11 @@ mod tests {
         ));
     }
 
+    /// Test signature verification with invalid base64 signature
+    ///
+    /// This test verifies that `verify_signature` returns a Base64Error when the signature
+    /// part contains invalid base64 characters that cannot be decoded.
+    ///
     #[test]
     fn test_verify_signature_invalid_base64_signature() {
         let token = "header.payload.invalid@base64";
@@ -706,6 +817,11 @@ mod tests {
         ));
     }
 
+    /// Test TokenVerificationError display formatting
+    ///
+    /// This test verifies that all TokenVerificationError variants produce the correct
+    /// error message strings when converted to string representation.
+    ///
     #[test]
     fn test_token_verification_error_display() {
         // Test various error message formats
@@ -764,6 +880,11 @@ mod tests {
         assert_eq!(error.to_string(), "JWKS fetch error: fetch error");
     }
 
+    /// Test JwksCache serialization and deserialization
+    ///
+    /// This test verifies that JwksCache can be properly converted to and from CacheData,
+    /// ensuring the serialization roundtrip maintains data integrity.
+    ///
     #[test]
     fn test_jwks_cache_conversion() {
         // Test JwksCache to CacheData conversion
@@ -801,6 +922,11 @@ mod tests {
         assert_eq!(restored.jwks.keys[0].kid, "key1");
     }
 
+    /// Test JwksCache conversion with invalid JSON
+    ///
+    /// This test verifies that attempting to convert invalid JSON to JwksCache
+    /// returns a JwksParsing error as expected.
+    ///
     #[test]
     fn test_jwks_cache_invalid_json() {
         let invalid_cache_data = CacheData {

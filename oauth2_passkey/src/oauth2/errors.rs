@@ -80,6 +80,12 @@ mod tests {
     use crate::utils::UtilError;
     use std::error::Error;
 
+    /// Test conversion from UtilError to OAuth2Error
+    ///
+    /// This test verifies that `UtilError` variants are correctly converted to
+    /// `OAuth2Error::Util` using the From trait implementation. It tests the
+    /// error conversion and source chain preservation.
+    ///
     #[test]
     fn test_from_util_error() {
         let util_err = UtilError::Format("format error".to_string());
@@ -96,6 +102,12 @@ mod tests {
         }
     }
 
+    /// Test conversion from SessionError to OAuth2Error
+    ///
+    /// This test verifies that `SessionError` variants are correctly converted to
+    /// `OAuth2Error::Session` using the From trait implementation. It tests the
+    /// error conversion and source chain preservation.
+    ///
     #[test]
     fn test_from_session_error() {
         let session_err = SessionError::Storage("session error".to_string());
@@ -112,6 +124,12 @@ mod tests {
         }
     }
 
+    /// Test error source chain preservation in From trait conversions
+    ///
+    /// This test verifies that when converting from UtilError and SessionError to OAuth2Error
+    /// using the From trait, the error source chain is properly preserved. It creates errors
+    /// in memory and tests that the original error can be accessed via the source() method.
+    ///
     #[test]
     fn test_error_source_chaining() {
         // Test that From conversions preserve error sources
@@ -138,6 +156,13 @@ mod tests {
         }
     }
 
+    /// Test error conversion for all UtilError and SessionError variants
+    ///
+    /// This test verifies that all variants of UtilError and SessionError can be correctly
+    /// converted to OAuth2Error using the From trait implementations. It creates various
+    /// error types in memory and validates that the conversion preserves the error type
+    /// and message content.
+    ///
     #[test]
     fn test_error_conversion_edge_cases() {
         // Test all UtilError variants conversion

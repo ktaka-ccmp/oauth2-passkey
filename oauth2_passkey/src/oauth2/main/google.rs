@@ -83,6 +83,12 @@ mod tests {
     use crate::oauth2::types::{GoogleUserInfo, OidcTokenResponse};
     use serde_json::json;
 
+    /// Test successful deserialization of Google user info JSON
+    ///
+    /// This test verifies that `GoogleUserInfo` can be correctly deserialized from
+    /// a JSON response containing all required fields. It creates a mock JSON response
+    /// in memory and tests the serde deserialization.
+    ///
     #[test]
     fn test_google_user_info_deserialization() {
         // Test successful deserialization of Google user info
@@ -110,6 +116,12 @@ mod tests {
         assert_eq!(user_info.name, "Test User");
     }
 
+    /// Test successful deserialization of OIDC token response with id_token
+    ///
+    /// This test verifies that `OidcTokenResponse` can be correctly deserialized from
+    /// a JSON response that includes an id_token field. It creates a mock JSON response
+    /// in memory and tests the serde deserialization of all fields.
+    ///
     #[test]
     fn test_oidc_token_response_deserialization() {
         // Test successful deserialization of OIDC token response with id_token
@@ -134,6 +146,12 @@ mod tests {
         assert!(token_response.id_token.is_some(), "Should have id_token");
     }
 
+    /// Test deserialization of OIDC token response without id_token
+    ///
+    /// This test verifies that `OidcTokenResponse` can be correctly deserialized from
+    /// a JSON response that omits the optional id_token field. It creates a mock JSON
+    /// response in memory and verifies the id_token field is None.
+    ///
     #[test]
     fn test_oidc_token_response_missing_id_token() {
         // Test deserialization of OIDC token response without id_token
@@ -161,6 +179,11 @@ mod tests {
         );
     }
 
+    /// Test Google user info deserialization with missing required fields
+    ///
+    /// This test verifies that deserializing Google user info JSON fails appropriately
+    /// when required fields are missing from the response.
+    ///
     #[test]
     fn test_google_user_info_deserialization_missing_required_fields() {
         // Test deserialization failure when required fields are missing
@@ -181,6 +204,11 @@ mod tests {
         );
     }
 
+    /// Test Google user info deserialization with malformed JSON
+    ///
+    /// This test verifies that attempting to deserialize malformed JSON to GoogleUserInfo
+    /// returns a JsonError as expected.
+    ///
     #[test]
     fn test_google_user_info_deserialization_invalid_json() {
         // Test deserialization failure with malformed JSON
@@ -194,6 +222,11 @@ mod tests {
         );
     }
 
+    /// Test OIDC token response deserialization with missing access_token
+    ///
+    /// This test verifies that attempting to deserialize an OIDC token response without
+    /// the required access_token field returns a deserialization error.
+    ///
     #[test]
     fn test_oidc_token_response_missing_access_token() {
         // Test deserialization failure when access_token is missing
@@ -215,6 +248,11 @@ mod tests {
         );
     }
 
+    /// Test OIDC token response deserialization with malformed JSON
+    ///
+    /// This test verifies that attempting to deserialize malformed JSON to OidcTokenResponse
+    /// returns a JsonError as expected.
+    ///
     #[test]
     fn test_oidc_token_response_invalid_json() {
         // Test deserialization failure with malformed JSON
@@ -228,7 +266,11 @@ mod tests {
         );
     }
 
-    // Tests for business logic validation in exchange_code_for_token function
+    /// Tests for business logic validation in exchange_code_for_token function
+    ///
+    /// This test validates the critical business logic for id_token validation
+    /// that is used in exchange_code_for_token()
+    ///
     #[test]
     fn test_id_token_validation_logic() {
         // This test validates the critical business logic for id_token validation

@@ -253,6 +253,13 @@ mod tests {
     use super::*;
     use http::HeaderValue;
 
+    /// Test state parameter encoding and decoding roundtrip
+    ///
+    /// This test verifies that StateParams can be encoded to base64url format and decoded back
+    /// to the original values, ensuring the serialization roundtrip maintains data integrity.
+    /// It creates a StateParams object in memory with all fields populated, encodes it,
+    /// validates the base64url format, then decodes and verifies all fields match.
+    ///
     #[test]
     fn test_encode_decode_state() {
         // Create a state params object with all fields populated
@@ -283,6 +290,13 @@ mod tests {
         assert_eq!(decoded.mode_id, Some("mode456".to_string()));
     }
 
+    /// Test state parameter encoding and decoding with minimal fields
+    ///
+    /// This test verifies that StateParams encoding and decoding works correctly when only
+    /// required fields are populated and optional fields are None. It creates a StateParams
+    /// object in memory with minimal data, encodes it to base64url, decodes it back, and
+    /// verifies all fields including the None values are preserved correctly.
+    ///
     #[test]
     fn test_encode_decode_state_minimal() {
         // Create a state params object with only required fields
@@ -308,6 +322,12 @@ mod tests {
         assert_eq!(decoded.mode_id, None);
     }
 
+    /// Test state decoding with invalid base64 input
+    ///
+    /// This test verifies that `decode_state` returns an appropriate OAuth2Error::DecodeState
+    /// when given a string that contains invalid base64 characters. It attempts to decode
+    /// an invalid base64 string and verifies that the correct error type is returned.
+    ///
     #[test]
     fn test_decode_state_invalid_base64() {
         // Try to decode an invalid base64 string
@@ -326,6 +346,12 @@ mod tests {
         }
     }
 
+    /// Test state decoding with invalid JSON payload
+    ///
+    /// This test verifies that `decode_state` returns an appropriate OAuth2Error::DecodeState
+    /// when given valid base64 that contains invalid JSON. It encodes invalid JSON as base64,
+    /// attempts to decode it as state, and verifies that the correct error type is returned.
+    ///
     #[test]
     fn test_decode_state_invalid_json() {
         // Encode some invalid JSON
@@ -348,6 +374,13 @@ mod tests {
         }
     }
 
+    /// Test successful origin validation with matching origin header
+    ///
+    /// This test verifies that `validate_origin` succeeds when the Origin header
+    /// in the request matches the expected origin derived from the callback URL.
+    /// It creates HTTP headers with a matching origin and validates against a
+    /// callback URL from the same origin.
+    ///
     #[tokio::test]
     async fn test_validate_origin_success() {
         // Create headers with matching origin
@@ -361,6 +394,13 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    /// Test origin validation fallback to Referer header
+    ///
+    /// This test verifies that `validate_origin` can successfully validate using the
+    /// Referer header when no Origin header is present. It creates HTTP headers with
+    /// only a Referer header and validates that the origin is correctly extracted
+    /// from the referer URL and matches the expected callback URL origin.
+    ///
     #[tokio::test]
     async fn test_validate_origin_with_referer() {
         // Create headers with matching referer but no origin
@@ -377,6 +417,15 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    /// Tests for validate_origin with mismatched origin
+    ///
+    /// This test verifies that `validate_origin` correctly validates an origin
+    /// when given a valid origin. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test origin directly in the database
+    /// 3. Calls `validate_origin` to validate the origin
+    /// 4. Verifies that the origin was successfully validated
+    ///
     #[tokio::test]
     async fn test_validate_origin_mismatch() {
         // Create headers with non-matching origin
@@ -399,6 +448,15 @@ mod tests {
         }
     }
 
+    /// Tests for validate_origin with missing origin
+    ///
+    /// This test verifies that `validate_origin` correctly validates an origin
+    /// when given a valid origin. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test origin directly in the database
+    /// 3. Calls `validate_origin` to validate the origin
+    /// 4. Verifies that the origin was successfully validated
+    ///
     #[tokio::test]
     async fn test_validate_origin_missing() {
         // Create headers with no origin or referer
@@ -420,6 +478,13 @@ mod tests {
         }
     }
 
+    /// Test token storage and retrieval roundtrip in cache
+    ///
+    /// This test verifies that tokens can be stored in the cache system and then successfully
+    /// retrieved with all metadata intact. It configures an in-memory cache, stores a token
+    /// with TTL and user agent information, retrieves it, and validates that all fields
+    /// including expiration time are preserved correctly.
+    ///
     #[tokio::test]
     async fn test_store_and_get_token_from_cache() {
         use chrono::{Duration, Utc};
@@ -469,6 +534,13 @@ mod tests {
         assert!(time_diff.abs() < 1, "Expiration time should be preserved");
     }
 
+    /// Test get_token_from_store behavior when token doesn't exist
+    ///
+    /// This test verifies that `get_token_from_store` returns the appropriate SecurityTokenNotFound
+    /// error when attempting to retrieve a token that doesn't exist in the cache. It configures
+    /// an in-memory cache, attempts to retrieve a non-existent token, and validates that the
+    /// correct error type and message are returned.
+    ///
     #[tokio::test]
     async fn test_get_token_from_store_not_found() {
         // Set up environment variables for cache configuration
@@ -495,6 +567,13 @@ mod tests {
         }
     }
 
+    /// Test token removal from cache store
+    ///
+    /// This test verifies that `remove_token_from_store` can successfully remove a token
+    /// from the cache. It configures an in-memory cache, stores a token, verifies it exists,
+    /// removes it, and then confirms the token is no longer retrievable, returning the
+    /// appropriate SecurityTokenNotFound error.
+    ///
     #[tokio::test]
     async fn test_remove_token_from_store() {
         // Set up environment variables for cache configuration
@@ -546,6 +625,13 @@ mod tests {
         }
     }
 
+    /// Test token generation and storage functionality
+    ///
+    /// This test verifies that `generate_store_token` can generate a secure random token,
+    /// store it in the cache with metadata, and return both the token and token ID.
+    /// It validates that both generated values have the expected length, are different
+    /// from each other, and that the stored token can be retrieved with correct metadata.
+    ///
     #[tokio::test]
     async fn test_generate_store_token() {
         // Set up environment variables for cache configuration
@@ -593,6 +679,13 @@ mod tests {
         assert!(time_diff.abs() < 1, "Expiration time should be preserved");
     }
 
+    /// Test token generation randomness and uniqueness
+    ///
+    /// This test verifies that `generate_store_token` generates unique, random tokens
+    /// on each invocation. It generates multiple tokens and validates that all generated
+    /// tokens and token IDs are unique, ensuring the cryptographic randomness is working
+    /// correctly and preventing token collisions.
+    ///
     #[tokio::test]
     async fn test_generate_store_token_randomness() {
         // Set up environment variables for cache configuration
@@ -635,6 +728,13 @@ mod tests {
         assert_eq!(stored_token2.token, token2);
     }
 
+    /// Test get_uid_from_stored_session behavior when misc_id is None
+    ///
+    /// This test verifies that `get_uid_from_stored_session_by_state_param` returns Ok(None)
+    /// when the StateParams has no misc_id field set. It creates StateParams without a misc_id
+    /// and validates that the function correctly handles this case by returning None rather
+    /// than attempting to retrieve a session.
+    ///
     #[tokio::test]
     async fn test_get_uid_from_stored_session_no_misc_id() {
         // Create state params without misc_id
@@ -654,6 +754,13 @@ mod tests {
         assert!(result.unwrap().is_none());
     }
 
+    /// Test get_uid_from_stored_session behavior when token is not found
+    ///
+    /// This test verifies that `get_uid_from_stored_session_by_state_param` returns Ok(None)
+    /// when the misc_id token doesn't exist in the cache. It configures an in-memory cache,
+    /// creates StateParams with a misc_id that doesn't correspond to any stored token,
+    /// and validates that the function handles the missing token gracefully.
+    ///
     #[tokio::test]
     async fn test_get_uid_from_stored_session_token_not_found() {
         // Set up environment variables for cache configuration
@@ -679,6 +786,13 @@ mod tests {
         assert!(result.unwrap().is_none());
     }
 
+    /// Test delete_session_and_misc_token behavior when misc_id is None
+    ///
+    /// This test verifies that `delete_session_and_misc_token_from_store` successfully returns
+    /// Ok(()) when the StateParams has no misc_id field set. It creates StateParams without
+    /// a misc_id and validates that the function handles this case gracefully without attempting
+    /// to delete a non-existent token.
+    ///
     #[tokio::test]
     async fn test_delete_session_and_misc_token_no_misc_id() {
         // Create state params without misc_id
@@ -697,6 +811,13 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    /// Test delete_session_and_misc_token behavior when token doesn't exist
+    ///
+    /// This test verifies that `delete_session_and_misc_token_from_store` successfully returns
+    /// Ok(()) even when the misc_id points to a non-existent token in the cache. It configures
+    /// an in-memory cache, creates StateParams with a misc_id that doesn't exist, and validates
+    /// that the function handles missing tokens gracefully.
+    ///
     #[tokio::test]
     async fn test_delete_session_and_misc_token_token_not_found() {
         // Set up environment variables for cache configuration
@@ -721,6 +842,15 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    /// Tests for get_mode_from_stored_session_not_found
+    ///
+    /// This test verifies that `get_mode_from_stored_session_not_found` correctly retrieves a mode
+    /// when given a valid mode. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test mode directly in the database
+    /// 3. Calls `get_mode_from_stored_session_not_found` to retrieve the mode
+    /// 4. Verifies that the mode was successfully retrieved
+    ///
     #[tokio::test]
     async fn test_get_mode_from_stored_session_not_found() {
         // Set up environment variables for cache configuration
@@ -737,6 +867,13 @@ mod tests {
         assert!(result.unwrap().is_none());
     }
 
+    /// Test successful mode retrieval from stored session
+    ///
+    /// This test verifies that `get_mode_from_stored_session` can successfully retrieve and
+    /// parse an OAuth2Mode from the cache when given a valid mode token ID. It stores a
+    /// mode token in the cache, retrieves it using the mode ID, and validates that the
+    /// correct OAuth2Mode value is returned.
+    ///
     #[tokio::test]
     async fn test_get_mode_from_stored_session_valid_mode() {
         // Set up environment variables for cache configuration
@@ -769,6 +906,13 @@ mod tests {
         assert_eq!(retrieved_mode.unwrap(), mode);
     }
 
+    /// Test mode retrieval with invalid mode value
+    ///
+    /// This test verifies that `get_mode_from_stored_session` returns Ok(None) when the
+    /// stored token contains an invalid OAuth2Mode value that cannot be parsed. It stores
+    /// an invalid mode string in the cache, attempts to retrieve and parse it, and validates
+    /// that the function handles the parsing failure gracefully.
+    ///
     #[tokio::test]
     async fn test_get_mode_from_stored_session_invalid_mode() {
         // Set up environment variables for cache configuration
@@ -797,8 +941,13 @@ mod tests {
         assert!(result.unwrap().is_none());
     }
 
-    // Additional comprehensive cache layer tests
-
+    /// Test token caching with zero TTL (immediate expiration)
+    ///
+    /// This test verifies that `store_token_in_cache` can handle tokens with zero TTL
+    /// and immediate expiration times. It stores a token with zero TTL, retrieves it,
+    /// and validates that the token is stored with the correct expiration metadata,
+    /// even when already expired at storage time.
+    ///
     #[tokio::test]
     async fn test_cache_token_with_zero_ttl() {
         unsafe {
@@ -834,6 +983,13 @@ mod tests {
         assert_eq!(token_data.token, token);
     }
 
+    /// Test token caching with maximum realistic TTL
+    ///
+    /// This test verifies that `store_token_in_cache` can handle tokens with very large
+    /// but realistic TTL values (1 year). It stores a token with maximum TTL, retrieves it,
+    /// and validates that the system handles large TTL values gracefully without overflow
+    /// or storage issues.
+    ///
     #[tokio::test]
     async fn test_cache_token_with_max_ttl() {
         unsafe {
@@ -859,6 +1015,13 @@ mod tests {
         assert_eq!(stored_token.unwrap().ttl, ttl);
     }
 
+    /// Test concurrent token operations and thread safety
+    ///
+    /// This test verifies that the cache token operations are thread-safe when multiple
+    /// concurrent operations are performed simultaneously. It spawns multiple tokio tasks
+    /// that generate and store tokens concurrently, then validates that all operations
+    /// complete successfully and all generated token IDs are unique.
+    ///
     #[tokio::test]
     async fn test_concurrent_token_operations() {
         unsafe {
@@ -918,6 +1081,13 @@ mod tests {
         assert_eq!(unique_count, 10, "All token IDs should be unique");
     }
 
+    /// Test token storage with different type prefixes
+    ///
+    /// This test verifies that tokens can be stored and retrieved using different type prefixes
+    /// (csrf, nonce, pkce, access, refresh) without conflicts. It stores the same token content
+    /// under different prefixes, then retrieves each one to ensure proper namespace isolation
+    /// and that all prefixes work correctly with the cache system.
+    ///
     #[tokio::test]
     async fn test_token_storage_with_different_prefixes() {
         unsafe {
@@ -980,6 +1150,13 @@ mod tests {
         }
     }
 
+    /// Test token storage with edge case inputs
+    ///
+    /// This test verifies that the token storage system handles edge cases gracefully,
+    /// including empty token content, very long token values, and special characters.
+    /// It tests the robustness of the storage and retrieval mechanisms with various
+    /// boundary conditions and unusual but valid inputs.
+    ///
     #[tokio::test]
     async fn test_token_storage_edge_cases() {
         unsafe {
@@ -1034,6 +1211,14 @@ mod tests {
         }
     }
 
+    /// Test token storage with independent token IDs
+    ///
+    /// This test verifies that storing multiple tokens of the same type generates
+    /// independent token IDs rather than overwriting existing tokens. It stores two
+    /// different tokens of the same type, validates that they receive different IDs,
+    /// and confirms that both tokens can be independently retrieved with their
+    /// respective content and metadata.
+    ///
     #[tokio::test]
     async fn test_token_overwrite_same_id() {
         unsafe {
@@ -1080,6 +1265,13 @@ mod tests {
         assert_eq!(retrieved2.user_agent, user_agent2);
     }
 
+    /// Test multiple remove operations on the same token
+    ///
+    /// This test verifies that the token removal system handles multiple removal attempts
+    /// gracefully, including repeated removals of the same token and concurrent removal
+    /// operations. It tests that the system doesn't fail when attempting to remove
+    /// already-removed tokens and handles race conditions properly.
+    ///
     #[tokio::test]
     async fn test_multiple_remove_operations() {
         unsafe {
@@ -1135,6 +1327,13 @@ mod tests {
         }
     }
 
+    /// Test cache operations with tokens that have past expiration times
+    ///
+    /// This test verifies that the cache system can handle tokens with expiration times
+    /// set in the past. It stores a token with a past expiration time and validates that
+    /// the token can still be stored and retrieved, while confirming that the expiration
+    /// metadata is preserved correctly for potential cleanup operations.
+    ///
     #[tokio::test]
     async fn test_cache_operations_with_past_expiration() {
         unsafe {
@@ -1162,6 +1361,13 @@ mod tests {
         assert!(token_data.expires_at < Utc::now());
     }
 
+    /// Test cache serialization and deserialization roundtrip
+    ///
+    /// This test verifies that StoredToken objects can be properly serialized to CacheData
+    /// and deserialized back while preserving all field values. It creates a complex token
+    /// with various data types, performs the conversion roundtrip, and validates that all
+    /// fields including timestamps and user agent strings are correctly preserved.
+    ///
     #[tokio::test]
     async fn test_cache_serialization_round_trip() {
         unsafe {
@@ -1199,6 +1405,13 @@ mod tests {
         assert_eq!(recovered.ttl, original_token.ttl);
     }
 
+    /// Test token generation consistency and behavior patterns
+    ///
+    /// This test verifies that `generate_store_token` produces consistent behavior across
+    /// multiple invocations. It generates multiple tokens and validates that each generation
+    /// produces tokens of consistent length, that all tokens are unique, and that the
+    /// storage and retrieval process works reliably for each generated token.
+    ///
     #[tokio::test]
     async fn test_generate_store_token_consistency() {
         unsafe {

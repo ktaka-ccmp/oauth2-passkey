@@ -207,6 +207,13 @@ mod tests {
     use chrono::{Duration, Utc};
     use serde_json::json;
 
+    /// Test conversion from GoogleUserInfo to OAuth2Account
+    ///
+    /// This test verifies that a GoogleUserInfo struct can be correctly converted into
+    /// an OAuth2Account using the From trait implementation. It creates a GoogleUserInfo
+    /// object in memory with sample data and validates that all fields are properly
+    /// mapped to the resulting OAuth2Account structure.
+    ///
     #[test]
     fn test_from_google_user_info() {
         let google_user = GoogleUserInfo {
@@ -240,6 +247,13 @@ mod tests {
         assert_eq!(metadata["verified_email"], json!(true));
     }
 
+    /// Test conversion from GoogleIdInfo to OAuth2Account
+    ///
+    /// This test verifies that a GoogleIdInfo struct can be correctly converted into
+    /// an OAuth2Account using the From trait implementation. It creates a GoogleIdInfo
+    /// object in memory with ID token claims and validates that all fields are properly
+    /// mapped to the resulting OAuth2Account structure.
+    ///
     #[test]
     fn test_from_google_id_info() {
         // Create a mock GoogleIdInfo
@@ -284,6 +298,13 @@ mod tests {
         assert_eq!(metadata["verified_email"], json!(true));
     }
 
+    /// Test StoredToken to CacheData conversion roundtrip
+    ///
+    /// This test verifies that StoredToken can be converted to CacheData and back while
+    /// preserving all field values. It creates a StoredToken in memory, converts it to
+    /// CacheData, then back to StoredToken, and validates that all fields including
+    /// timestamps are preserved correctly through the conversion process.
+    ///
     #[test]
     fn test_stored_token_cache_data_conversion() {
         // Create a StoredToken

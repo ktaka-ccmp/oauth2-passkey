@@ -230,8 +230,12 @@ mod tests {
     use super::*;
     use crate::test_utils::init_test_environment;
 
-    // Tests for OAuth2 request preparation logic
-
+    /// Test OAuth2 request preparation with an authenticated session
+    ///
+    /// This test verifies that `prepare_oauth2_auth_request` correctly prepares an OAuth2
+    /// authorization request when a user session exists, including proper state encoding
+    /// and URL construction.
+    ///
     #[tokio::test]
     async fn test_oauth2_request_preparation_with_session() {
         init_test_environment().await;
@@ -291,6 +295,11 @@ mod tests {
         );
     }
 
+    /// Test OAuth2 request preparation without an authenticated session
+    ///
+    /// This test verifies that `prepare_oauth2_auth_request` correctly prepares an OAuth2
+    /// authorization request when no user session exists, handling the anonymous case.
+    ///
     #[tokio::test]
     async fn test_oauth2_request_preparation_without_session() {
         init_test_environment().await;
@@ -311,8 +320,11 @@ mod tests {
         assert!(auth_url.contains("state="));
     }
 
-    // Tests for state encoding/decoding business logic
-
+    /// Test state encoding and decoding roundtrip
+    ///
+    /// This test verifies that StateParams can be encoded to base64 and decoded back
+    /// to the original values, ensuring the serialization roundtrip maintains data integrity.
+    ///
     #[tokio::test]
     async fn test_state_encoding_decoding_roundtrip() {
         let original_state = StateParams {
@@ -333,6 +345,11 @@ mod tests {
         assert_eq!(original_state.mode_id, decoded.mode_id);
     }
 
+    /// Test state decoding with invalid base64 input
+    ///
+    /// This test verifies that `decode_state` returns an appropriate error when given
+    /// invalid base64 input that cannot be decoded.
+    ///
     #[tokio::test]
     async fn test_state_decoding_invalid_base64() {
         let invalid_state = "invalid_base64_@#$%";
@@ -350,6 +367,11 @@ mod tests {
         }
     }
 
+    /// Test state decoding with invalid JSON payload
+    ///
+    /// This test verifies that `decode_state` returns an appropriate error when given
+    /// valid base64 that contains invalid JSON that cannot be parsed.
+    ///
     #[tokio::test]
     async fn test_state_decoding_invalid_json() {
         // Create invalid JSON by encoding invalid data
@@ -368,6 +390,11 @@ mod tests {
         }
     }
 
+    /// Test CSRF cookie SameSite attribute configuration
+    ///
+    /// This test verifies that CSRF cookies are configured with appropriate SameSite
+    /// attributes based on the OAuth2 response mode for security purposes.
+    ///
     #[tokio::test]
     async fn test_oauth2_csrf_cookie_samesite_based_on_response_mode() {
         init_test_environment().await;

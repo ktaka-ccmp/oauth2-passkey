@@ -85,6 +85,12 @@ pub(super) static OAUTH2_GOOGLE_CLIENT_SECRET: LazyLock<String> = LazyLock::new(
 #[cfg(test)]
 mod tests {
 
+    /// Test OAuth2 response mode validation logic
+    ///
+    /// This test verifies the business logic for validating and normalizing OAuth2 response mode
+    /// values. It tests case-insensitive validation and ensures valid modes are normalized
+    /// to lowercase as expected.
+    ///
     #[test]
     fn test_oauth2_response_mode_validation_logic() {
         // Test business logic: case insensitive validation
@@ -106,6 +112,12 @@ mod tests {
         assert_eq!(result, "query");
     }
 
+    /// Test OAuth2 response mode validation with invalid input
+    ///
+    /// This test verifies that the validation logic correctly panics when given an invalid
+    /// response mode. It tests the panic behavior for unsupported response modes that
+    /// should trigger application startup failures.
+    ///
     #[test]
     #[should_panic(expected = "Invalid OAUTH2_RESPONSE_MODE")]
     fn test_oauth2_response_mode_invalid_validation() {
@@ -121,6 +133,12 @@ mod tests {
         };
     }
 
+    /// Test OAuth2 query string construction logic
+    ///
+    /// This test verifies the business logic for constructing OAuth2 authorization URLs
+    /// with proper query parameters. It tests URL encoding and parameter formatting
+    /// for OAuth2 authorization requests.
+    ///
     #[test]
     fn test_oauth2_query_string_construction_logic() {
         // Test business logic: query string construction
@@ -141,6 +159,12 @@ mod tests {
         );
     }
 
+    /// Test OAuth2 redirect URI construction logic
+    ///
+    /// This test verifies the business logic for constructing OAuth2 redirect URIs
+    /// by combining origin and route prefix values. It tests the URI building
+    /// functionality used in OAuth2 flows.
+    ///
     #[test]
     fn test_oauth2_redirect_uri_construction_logic() {
         // Test business logic: URI construction
@@ -150,6 +174,12 @@ mod tests {
         assert_eq!(expected, "https://example.com/api/v1/oauth2/authorized");
     }
 
+    /// Test __Host- prefix cookie naming convention
+    ///
+    /// This test verifies that the CSRF cookie name follows the secure __Host- prefix
+    /// convention for enhanced security. It checks that the cookie name is properly
+    /// formatted according to web security best practices.
+    ///
     #[test]
     fn test_host_prefix_cookie_naming_convention() {
         // Test that our CSRF cookie name uses the "__Host-" prefix for security
@@ -160,6 +190,12 @@ mod tests {
         );
     }
 
+    /// Test CSRF cookie max age parsing logic
+    ///
+    /// This test verifies the string-to-u64 parsing logic used for CSRF cookie max age configuration.
+    /// It tests both successful parsing of valid numeric strings and fallback behavior when parsing
+    /// fails with invalid input, ensuring the default value (60 seconds) is used as expected.
+    ///
     #[test]
     fn test_oauth2_csrf_cookie_max_age_parsing_logic() {
         // Test business logic: parsing and fallback behavior

@@ -239,6 +239,12 @@ mod tests {
         format!("{}_{:?}_{}", base, thread_id, counter)
     }
 
+    /// Test unique account ID generation functionality
+    ///
+    /// This test verifies that the `gen_unique_account_id` function generates unique,
+    /// non-empty UUID strings. It calls the function multiple times and validates
+    /// that each generated ID is unique, non-empty, and parseable as a valid UUID.
+    ///
     #[tokio::test]
     async fn test_gen_unique_account_id() {
         init_test_environment().await;
@@ -256,6 +262,12 @@ mod tests {
         uuid::Uuid::parse_str(&id2).expect("ID should be a valid UUID");
     }
 
+    /// Test OAuth2Store initialization and database table creation
+    ///
+    /// This test verifies that the OAuth2Store::init() function succeeds without errors,
+    /// ensuring that the necessary database tables and structures are created properly
+    /// during the initialization process.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_init_creates_tables() {
@@ -266,6 +278,13 @@ mod tests {
         assert!(result.is_ok(), "OAuth2Store::init() should succeed");
     }
 
+    /// Test OAuth2 account creation through upsert operation
+    ///
+    /// This test verifies that `upsert_oauth2_account` can successfully create a new OAuth2
+    /// account record in the database. It creates a test user first to satisfy foreign key
+    /// constraints, then creates an OAuth2 account linked to that user, and validates that
+    /// all account fields are stored correctly with a generated ID.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_upsert_oauth2_account_create() {
@@ -312,6 +331,13 @@ mod tests {
             .unwrap();
     }
 
+    /// Test OAuth2 account upsert validation with empty user ID
+    ///
+    /// This test verifies that `upsert_oauth2_account` properly validates required fields
+    /// and returns an appropriate error when the user_id field is empty. It creates an
+    /// OAuth2 account with an empty user_id and validates that the storage operation
+    /// fails with a descriptive error message about the missing user_id requirement.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_upsert_oauth2_account_empty_user_id() {
@@ -334,6 +360,13 @@ mod tests {
         }
     }
 
+    /// Test OAuth2 account update through upsert operation
+    ///
+    /// This test verifies that `upsert_oauth2_account` can successfully update an existing
+    /// OAuth2 account record. It creates an account, modifies some fields (name and email),
+    /// performs an upsert operation, and validates that the account ID remains the same
+    /// while the updated fields are properly persisted in the database.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_upsert_oauth2_account_update() {
@@ -367,6 +400,13 @@ mod tests {
             .unwrap();
     }
 
+    /// Test retrieving OAuth2 accounts by user ID
+    ///
+    /// This test verifies that `get_oauth2_accounts` can successfully retrieve multiple OAuth2
+    /// accounts associated with a single user ID. It creates a user with two OAuth2 accounts
+    /// (Google and GitHub), then retrieves all accounts for that user and validates that both
+    /// accounts are returned with correct provider information.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_get_oauth2_accounts_by_user_id() {
@@ -419,6 +459,13 @@ mod tests {
             .unwrap();
     }
 
+    /// Test retrieving OAuth2 accounts by account ID
+    ///
+    /// This test verifies that `get_oauth2_accounts_by` can successfully retrieve an OAuth2
+    /// account when searching by account ID. It creates a test user and OAuth2 account,
+    /// searches for the account using its ID, and validates that exactly one matching
+    /// account is returned with the correct ID.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_get_oauth2_accounts_by_id() {
@@ -443,6 +490,13 @@ mod tests {
             .unwrap();
     }
 
+    /// Test retrieving OAuth2 accounts by provider name
+    ///
+    /// This test verifies that `get_oauth2_accounts_by` can successfully retrieve OAuth2
+    /// accounts when searching by provider name. It creates multiple accounts with different
+    /// providers, searches for accounts by a specific provider, and validates that only
+    /// accounts from that provider are returned.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_get_oauth2_accounts_by_provider() {
@@ -512,6 +566,13 @@ mod tests {
             .unwrap();
     }
 
+    /// Test retrieving specific OAuth2 account by provider and provider user ID
+    ///
+    /// This test verifies that `get_oauth2_account_by_provider` can successfully retrieve
+    /// a specific OAuth2 account using both the provider name and provider_user_id as
+    /// lookup criteria. It creates a test account, searches for it using this composite
+    /// key, and validates that the correct account is returned.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_get_oauth2_account_by_provider() {
@@ -542,6 +603,13 @@ mod tests {
             .unwrap();
     }
 
+    /// Test OAuth2 account deletion by account ID
+    ///
+    /// This test verifies that `delete_oauth2_accounts_by` can successfully delete an OAuth2
+    /// account when searching by account ID. It creates a test account, verifies it exists,
+    /// deletes it using the account ID, and confirms the account is no longer retrievable
+    /// from the database.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_delete_oauth2_accounts_by_id() {
@@ -577,6 +645,13 @@ mod tests {
         assert_eq!(accounts_after.len(), 0, "Account should be deleted");
     }
 
+    /// Test OAuth2 account deletion by user ID
+    ///
+    /// This test verifies that `delete_oauth2_accounts_by` can successfully delete all OAuth2
+    /// accounts associated with a specific user ID. It creates multiple accounts for the same
+    /// user, verifies they exist, deletes them all using the user ID, and confirms that no
+    /// accounts remain for that user.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_delete_oauth2_accounts_by_user_id() {
@@ -618,6 +693,13 @@ mod tests {
         assert_eq!(accounts_after.len(), 0, "All accounts should be deleted");
     }
 
+    /// Test OAuth2 account retrieval with non-existent user ID
+    ///
+    /// This test verifies that `get_oauth2_accounts` returns an empty result when querying
+    /// for OAuth2 accounts with a user ID that doesn't exist in the database. It attempts
+    /// to retrieve accounts for a non-existent user and validates that an empty list is
+    /// returned rather than an error.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_get_oauth2_accounts_empty_result() {
@@ -634,6 +716,13 @@ mod tests {
         );
     }
 
+    /// Test OAuth2 account search with different search field variants
+    ///
+    /// This test verifies that `get_oauth2_accounts_by` works correctly with all supported
+    /// AccountSearchField variants (ID, UserId, Provider, ProviderAndUserId). It creates
+    /// test accounts and validates that each search method returns the expected results
+    /// for the appropriate search criteria.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_account_search_field_variants() {
@@ -688,6 +777,13 @@ mod tests {
             .unwrap();
     }
 
+    /// Test concurrent OAuth2 account operations and thread safety
+    ///
+    /// This test verifies that OAuth2 account operations are thread-safe when multiple
+    /// concurrent upsert operations are performed simultaneously. It spawns multiple tokio
+    /// tasks that create and upsert accounts concurrently, then validates that all operations
+    /// complete successfully without data corruption or race conditions.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_concurrent_account_operations() {
