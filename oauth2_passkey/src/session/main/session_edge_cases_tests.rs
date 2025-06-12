@@ -13,7 +13,12 @@ mod edge_cases {
     use http::{HeaderMap, Method};
     use serial_test::serial;
 
-    // Test expired session with a direct manipulation of the expiration time
+    /// Test expired session with a direct manipulation of the expiration time
+    /// This test verifies that the system correctly handles sessions that are already expired.
+    /// It performs the following steps:
+    /// 1. Creates session with expiration time set to 1 hour in the past
+    /// 2. Stores the expired session directly in cache
+    /// 3. Verifies that authentication fails and expired session is detected and handled
     #[tokio::test]
     async fn test_expired_session_direct() {
         init_test_environment().await;
@@ -65,7 +70,12 @@ mod edge_cases {
         assert!(check_session.is_none());
     }
 
-    // Test malformed session data
+    /// Test malformed session data
+    /// This test verifies that the system correctly handles malformed session data in cache.
+    /// It performs the following steps:
+    /// 1. Stores invalid JSON data in cache (intentionally malformed session)
+    /// 2. Attempts to retrieve CSRF token from session with malformed data
+    /// 3. Verifies that the function returns appropriate Storage error for invalid JSON
     #[tokio::test]
     async fn test_malformed_session_data() {
         init_test_environment().await;
@@ -96,7 +106,12 @@ mod edge_cases {
         let _ = delete_test_session(session_id).await;
     }
 
-    // Test missing fields in session data
+    /// Test missing fields in session data
+    /// This test verifies that the system correctly handles session data with missing required fields.
+    /// It performs the following steps:
+    /// 1. Stores JSON session data missing required fields (csrf_token, expires_at, ttl)
+    /// 2. Attempts to retrieve CSRF token from incomplete session data
+    /// 3. Verifies that the function returns appropriate Storage error for missing fields
     #[tokio::test]
     async fn test_missing_fields_in_session() {
         init_test_environment().await;
@@ -128,7 +143,12 @@ mod edge_cases {
         let _ = delete_test_session(session_id).await;
     }
 
-    // Test is_authenticated with CSRF protection - POST with missing CSRF token
+    /// Test is_authenticated with CSRF protection - POST with missing CSRF token
+    /// This test verifies that POST requests without CSRF tokens are properly rejected.
+    /// It performs the following steps:
+    /// 1. Creates valid user and session with CSRF token
+    /// 2. Sends POST request with session cookie but missing CSRF token header
+    /// 3. Verifies that authentication fails with CsrfToken error due to missing CSRF protection
     #[tokio::test]
     async fn test_is_authenticated_post_missing_csrf_token() {
         init_test_environment().await;
@@ -171,7 +191,12 @@ mod edge_cases {
         let _ = cleanup_test_resources(user_id, session_id).await;
     }
 
-    // Test is_authenticated_strict_then_csrf
+    /// Test is_authenticated_strict_then_csrf
+    /// This test verifies that strict authentication with CSRF validation works correctly.
+    /// It performs the following steps:
+    /// 1. Creates valid user and session with CSRF token
+    /// 2. Tests POST request with correct CSRF token (should succeed)
+    /// 3. Tests POST request with wrong CSRF token (should fail with CsrfToken error)
     #[tokio::test]
     #[serial]
     async fn test_is_authenticated_strict_then_csrf() {
@@ -231,7 +256,12 @@ mod edge_cases {
         let _ = cleanup_test_resources(user_id, session_id).await;
     }
 
-    // Test is_authenticated_basic_then_user_and_csrf
+    /// Test is_authenticated_basic_then_user_and_csrf
+    /// This test verifies that basic authentication followed by user and CSRF retrieval works correctly.
+    /// It performs the following steps:
+    /// 1. Creates valid user in database and session with CSRF token
+    /// 2. Tests POST request with correct CSRF token and session
+    /// 3. Verifies that user data, CSRF token, and CSRF header verification all return correctly
     #[tokio::test]
     #[serial]
     async fn test_is_authenticated_basic_then_user_and_csrf() {

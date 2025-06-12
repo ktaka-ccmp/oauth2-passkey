@@ -75,6 +75,12 @@ pub async fn verify_page_session_token(
 mod tests {
     use super::*;
 
+    /// Test generating a page session token
+    /// This test verifies that page session token generation works correctly and consistently.
+    /// It performs the following steps:
+    /// 1. Generates page session token from a given CSRF token
+    /// 2. Verifies that the token is non-empty and deterministic (same input produces same output)
+    /// 3. Confirms that different CSRF tokens produce different page session tokens
     #[test]
     fn test_generate_page_session_token() {
         // Given a CSRF token
@@ -95,6 +101,12 @@ mod tests {
         assert_ne!(page_token, different_token);
     }
 
+    /// Test HMAC properties
+    /// This test verifies that page session token generation exhibits proper HMAC properties.
+    /// It performs the following steps:
+    /// 1. Generates page session tokens from similar but different CSRF tokens
+    /// 2. Verifies that different inputs produce different outputs (avalanche effect)
+    /// 3. Confirms that generated tokens are URL-safe (no +, /, or = characters)
     #[test]
     fn test_generate_page_session_token_hmac_properties() {
         // Given two similar CSRF tokens
@@ -117,6 +129,12 @@ mod tests {
         assert!(!page_token2.contains('='));
     }
 
+    /// Test generating a page session token with an empty string
+    /// This test verifies that page session token generation handles edge cases like empty inputs.
+    /// It performs the following steps:
+    /// 1. Generates page session token from empty CSRF token string
+    /// 2. Verifies that even with empty input, a non-empty token is generated
+    /// 3. Confirms that the function handles edge cases gracefully
     #[test]
     fn test_generate_page_session_token_with_empty_string() {
         // Given an empty CSRF token
@@ -147,6 +165,12 @@ mod tests {
         "__Host-SessionId" // Match the default in SESSION_COOKIE_NAME
     }
 
+    /// Test verifying a page session token
+    /// This test verifies that page session token verification works correctly with valid session data.
+    /// It performs the following steps:
+    /// 1. Stores valid session with CSRF token in cache
+    /// 2. Creates proper HTTP headers with session cookie and generates page token
+    /// 3. Calls verify_page_session_token and confirms successful verification
     #[tokio::test]
     async fn test_verify_page_session_token_success() {
         use crate::storage::CacheData;
@@ -193,6 +217,12 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    /// Test verifying a page session token with an invalid token
+    /// This test verifies that page session token verification correctly rejects invalid tokens.
+    /// It performs the following steps:
+    /// 1. Stores valid session with CSRF token in cache
+    /// 2. Creates HTTP headers with session cookie but provides wrong page session token
+    /// 3. Confirms that verification fails with "does not match" error for invalid tokens
     #[tokio::test]
     async fn test_verify_page_session_token_invalid_token() {
         use crate::storage::CacheData;
@@ -244,6 +274,12 @@ mod tests {
         }
     }
 
+    /// Test verifying a page session token with a missing token
+    /// This test verifies that page session token verification handles missing tokens correctly.
+    /// It performs the following steps:
+    /// 1. Stores valid session with CSRF token in cache
+    /// 2. Creates HTTP headers with session cookie but without page session token
+    /// 3. Calls verify_page_session_token and confirms it fails with appropriate error
     #[tokio::test]
     async fn test_verify_page_session_token_missing_token() {
         use crate::storage::CacheData;
@@ -292,6 +328,12 @@ mod tests {
         }
     }
 
+    /// Test verifying a page session token with a missing session
+    /// This test verifies that page session token verification handles missing sessions correctly.
+    /// It performs the following steps:
+    /// 1. Creates HTTP headers without any session cookie
+    /// 2. Attempts to verify page session token without valid session context
+    /// 3. Confirms that verification fails with "Session ID missing" error
     #[tokio::test]
     async fn test_verify_page_session_token_missing_session() {
         use crate::test_utils::init_test_environment;
