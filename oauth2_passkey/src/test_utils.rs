@@ -3,17 +3,23 @@
 //! This module provides centralized test setup functionality that can be used
 //! across all test modules in the crate to ensure consistent environment
 //! configuration and database initialization.
+//!
+//! ## Simplified Approach
+//! Since SQLite functions now ensure tables exist at the point of use,
+//! test utilities only need basic initialization without complex retry logic.
 
 use std::sync::Once;
-use tokio::sync::OnceCell;
 
-/// Centralized test initialization - runs once before all tests across the entire crate
+/// Centralized test initialization for all tests across the entire crate
 ///
 /// This function ensures that:
-/// 1. Test environment variables are loaded from .env_test (with fallback to .env)
-/// 2. All database schemas are initialized exactly once
+/// 1. Test environment variables are loaded from .env_test (with fallback to .env) - **ONCE**
+/// 2. All database stores are initialized - **SIMPLE**
 ///
-/// # Usage
+/// ## Simple Database Initialization
+/// SQLite functions now ensure tables exist when called, so we only need basic store setup.
+///
+/// ## Usage
 /// ```rust
 /// use crate::test_utils::init_test_environment;
 ///
@@ -33,24 +39,33 @@ pub async fn init_test_environment() {
         }
     });
 
-    // Database initialization (async, runs once)
-    static DB_INIT: OnceCell<()> = OnceCell::const_new();
-    DB_INIT
-        .get_or_init(|| async {
-            use crate::oauth2::OAuth2Store;
-            use crate::passkey::PasskeyStore;
-            use crate::userdb::UserStore;
-
-            // Initialize all database tables
-            UserStore::init()
-                .await
-                .expect("Failed to initialize UserStore");
-            OAuth2Store::init()
-                .await
-                .expect("Failed to initialize OAuth2Store");
-            PasskeyStore::init()
-                .await
-                .expect("Failed to initialize PasskeyStore");
-        })
-        .await;
+    // Simple database initialization
+    ensure_database_initialized().await;
 }
+
+/// Ensures database is properly initialized - simplified since SQLite functions handle table creation
+async fn ensure_database_initialized() {
+    use crate::oauth2::OAuth2Store;
+    use crate::passkey::PasskeyStore;
+    use crate::userdb::UserStore;
+
+    // Initialize stores - log errors but don't panic in tests
+    if let Err(e) = UserStore::init().await {
+        eprintln!("Warning: Failed to initialize UserStore: {}", e);
+    }
+    if let Err(e) = OAuth2Store::init().await {
+        eprintln!("Warning: Failed to initialize OAuth2Store: {}", e);
+    }
+    if let Err(e) = PasskeyStore::init().await {
+        eprintln!("Warning: Failed to initialize PasskeyStore: {}", e);
+    }
+}
+
+// /// Enhanced test initialization that ensures database tables exist for the current connection
+// ///
+// /// **Note**: This function is now identical to `init_test_environment()` since we simplified
+// /// the approach. SQLite functions handle table initialization directly.
+// /// This function is kept for backward compatibility and clarity of intent.
+// pub async fn init_test_environment_with_db() {
+//     init_test_environment().await;
+// }
