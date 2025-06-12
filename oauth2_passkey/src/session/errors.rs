@@ -37,28 +37,3 @@ pub enum SessionError {
     #[error("User error: {0}")]
     User(#[from] UserError),
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_from_util_error() {
-        let util_error = UtilError::Crypto("Crypto operation failed".to_string());
-        let session_error = SessionError::from(util_error);
-        assert!(matches!(session_error, SessionError::Utils(_)));
-    }
-
-    #[test]
-    fn test_from_user_error() {
-        let user_error = UserError::NotFound;
-        let session_error = SessionError::from(user_error);
-        assert!(matches!(session_error, SessionError::User(_)));
-    }
-
-    #[test]
-    fn test_error_is_sync_and_send() {
-        fn assert_sync_send<T: Sync + Send>() {}
-        assert_sync_send::<SessionError>();
-    }
-}

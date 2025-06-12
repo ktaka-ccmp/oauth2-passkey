@@ -11,6 +11,7 @@ mod edge_cases {
     use crate::test_utils::init_test_environment;
     use chrono::{Duration, Utc};
     use http::{HeaderMap, Method};
+    use serial_test::serial;
 
     // Test expired session with a direct manipulation of the expiration time
     #[tokio::test]
@@ -172,6 +173,7 @@ mod edge_cases {
 
     // Test is_authenticated_strict_then_csrf
     #[tokio::test]
+    #[serial]
     async fn test_is_authenticated_strict_then_csrf() {
         init_test_environment().await;
 
@@ -231,6 +233,7 @@ mod edge_cases {
 
     // Test is_authenticated_basic_then_user_and_csrf
     #[tokio::test]
+    #[serial]
     async fn test_is_authenticated_basic_then_user_and_csrf() {
         init_test_environment().await;
 
