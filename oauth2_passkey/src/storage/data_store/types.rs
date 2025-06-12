@@ -1,18 +1,40 @@
 use sqlx::{Pool, Postgres, Sqlite};
 
 // Types
+#[cfg(not(test))]
 #[derive(Clone, Debug)]
 pub(super) struct SqliteDataStore {
     pub(super) pool: sqlx::SqlitePool,
 }
 
+#[cfg(test)]
+#[derive(Clone, Debug)]
+pub struct SqliteDataStore {
+    pub pool: sqlx::SqlitePool,
+}
+
+#[cfg(not(test))]
 #[derive(Clone, Debug)]
 pub(super) struct PostgresDataStore {
     pub(super) pool: sqlx::PgPool,
 }
 
+#[cfg(test)]
+#[derive(Clone, Debug)]
+pub struct PostgresDataStore {
+    pub pool: sqlx::PgPool,
+}
+
 // Trait
+#[cfg(not(test))]
 pub(crate) trait DataStore: Send + Sync {
+    fn as_sqlite(&self) -> Option<&Pool<Sqlite>>;
+    fn as_postgres(&self) -> Option<&Pool<Postgres>>;
+}
+
+// Make DataStore public for tests
+#[cfg(test)]
+pub trait DataStore: Send + Sync {
     fn as_sqlite(&self) -> Option<&Pool<Sqlite>>;
     fn as_postgres(&self) -> Option<&Pool<Postgres>>;
 }
