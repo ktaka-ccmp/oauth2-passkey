@@ -368,7 +368,7 @@ mod tests {
     #[serial]
     async fn test_get_oauth2_field_mappings_defaults() -> Result<(), Box<dyn std::error::Error>> {
         // Setup test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Test default mappings - since .env_test doesn't set these variables,
         // they should use their default values
@@ -387,7 +387,7 @@ mod tests {
     async fn test_get_account_and_label_from_oauth2_account()
     -> Result<(), Box<dyn std::error::Error>> {
         // Setup test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create a test OAuth2Account
         let oauth2_account = OAuth2Account {
@@ -461,7 +461,7 @@ mod tests {
     #[serial]
     async fn test_list_accounts_core() -> Result<(), Box<dyn std::error::Error>> {
         // Setup test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test user and OAuth2 accounts
         let user_id = "test_user_list_accounts";
@@ -500,7 +500,7 @@ mod tests {
     #[serial]
     async fn test_delete_oauth2_account_core_success() -> Result<(), Box<dyn std::error::Error>> {
         // Setup test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test user and OAuth2 account
         let user_id = "test_user_delete_success";
@@ -534,7 +534,7 @@ mod tests {
     async fn test_delete_oauth2_account_core_unauthorized() -> Result<(), Box<dyn std::error::Error>>
     {
         // Setup test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test users and OAuth2 account
         let user_id = "test_user_delete_owner";

@@ -155,7 +155,7 @@ mod tests {
         use http::header::{COOKIE, HeaderValue};
 
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_123";
         let csrf_token = "test_csrf_token_456";
@@ -201,7 +201,7 @@ mod tests {
         use http::header::{COOKIE, HeaderValue};
 
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_789";
         let csrf_token = "actual_csrf_token";
@@ -252,7 +252,7 @@ mod tests {
         use http::header::{COOKIE, HeaderValue};
 
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_012";
         let csrf_token = "csrf_token_exists";
@@ -298,7 +298,7 @@ mod tests {
         use http::HeaderMap;
 
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create headers with no session cookie
         let headers = HeaderMap::new();

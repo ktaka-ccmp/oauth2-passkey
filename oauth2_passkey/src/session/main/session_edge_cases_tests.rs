@@ -16,7 +16,7 @@ mod edge_cases {
     // Test expired session with a direct manipulation of the expiration time
     #[tokio::test]
     async fn test_expired_session_direct() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_expired_session_direct";
         let user_id = "test_user_expired_direct";
@@ -68,7 +68,7 @@ mod edge_cases {
     // Test malformed session data
     #[tokio::test]
     async fn test_malformed_session_data() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "malformed_session_data";
 
@@ -99,7 +99,7 @@ mod edge_cases {
     // Test missing fields in session data
     #[tokio::test]
     async fn test_missing_fields_in_session() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "missing_fields_session";
 
@@ -131,7 +131,7 @@ mod edge_cases {
     // Test is_authenticated with CSRF protection - POST with missing CSRF token
     #[tokio::test]
     async fn test_is_authenticated_post_missing_csrf_token() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create user and session
         let user_id = "user_missing_csrf";
@@ -175,7 +175,7 @@ mod edge_cases {
     #[tokio::test]
     #[serial]
     async fn test_is_authenticated_strict_then_csrf() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create user and session
         let user_id = "user_strict_csrf_test";
@@ -235,7 +235,7 @@ mod edge_cases {
     #[tokio::test]
     #[serial]
     async fn test_is_authenticated_basic_then_user_and_csrf() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create user and session
         let user_id = "basic_user_and_csrf";

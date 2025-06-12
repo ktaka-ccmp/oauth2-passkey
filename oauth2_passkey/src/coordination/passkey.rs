@@ -385,7 +385,7 @@ mod tests {
     async fn test_delete_passkey_credential_core_success() -> Result<(), Box<dyn std::error::Error>>
     {
         // Setup test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test user and passkey credential
         let user_id = "test_user_1";
@@ -417,7 +417,7 @@ mod tests {
     async fn test_delete_passkey_credential_core_unauthorized()
     -> Result<(), Box<dyn std::error::Error>> {
         // Setup test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test users and passkey credential
         let user_id = "test_user_2";
@@ -444,7 +444,7 @@ mod tests {
     async fn test_delete_passkey_credential_core_not_found()
     -> Result<(), Box<dyn std::error::Error>> {
         // Setup test database
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test user
         let user_id = "test_user_4";
@@ -467,7 +467,7 @@ mod tests {
     #[serial]
     async fn test_list_credentials_core() -> Result<(), Box<dyn std::error::Error>> {
         // Setup test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test user and passkey credentials
         let user_id = "test_user_5";
@@ -495,7 +495,7 @@ mod tests {
     async fn test_update_passkey_credential_core_success() -> Result<(), Box<dyn std::error::Error>>
     {
         // Setup test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test user and passkey credential
         let user_id = "test_user_6";
@@ -551,7 +551,7 @@ mod tests {
     async fn test_update_passkey_credential_core_unauthorized()
     -> Result<(), Box<dyn std::error::Error>> {
         // Setup test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test users and passkey credential
         let user_id = "test_user_7";
@@ -596,7 +596,7 @@ mod tests {
     async fn test_update_passkey_credential_core_no_session()
     -> Result<(), Box<dyn std::error::Error>> {
         // Setup test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test user and passkey credential
         let user_id = "test_user_9";

@@ -365,7 +365,7 @@ mod tests {
     #[tokio::test]
     async fn test_start_authentication_no_username() {
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let result = start_authentication(None).await;
         assert!(result.is_ok());
@@ -384,7 +384,7 @@ mod tests {
     #[tokio::test]
     async fn test_start_authentication_generates_unique_ids() {
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let result1 = start_authentication(None).await;
         let result2 = start_authentication(None).await;
@@ -858,7 +858,7 @@ mod tests {
     #[serial]
     async fn test_finish_authentication_integration_test() {
         // Initialize test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Setup test credential
         let credential_id = "test_credential_id_123";
@@ -917,7 +917,7 @@ mod tests {
         use crate::storage::GENERIC_CACHE_STORE;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test credential in the store
         let credential_id = "auth_test_credential_id";
@@ -977,7 +977,7 @@ mod tests {
         use crate::passkey::main::test_utils as passkey_test_utils;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Setup test credential with initial counter
         let credential_id = "counter_test_credential_id";

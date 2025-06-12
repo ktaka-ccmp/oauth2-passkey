@@ -560,7 +560,7 @@ mod tests {
         use crate::storage::CacheData;
 
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_123";
         let csrf_token = "test_csrf_token_456";
@@ -592,7 +592,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_csrf_token_from_session_not_found() {
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "nonexistent_session";
 
@@ -613,7 +613,7 @@ mod tests {
         use crate::storage::CacheData;
 
         // Initialize test environment (env + database)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_123";
         let user_id = "test_user_456";
@@ -649,7 +649,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_from_session_session_not_found() {
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "nonexistent_session";
 
@@ -666,7 +666,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_new_session_with_uid() {
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let user_id = "test_user_123";
 
@@ -717,7 +717,7 @@ mod tests {
         use crate::storage::CacheData;
 
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_to_delete";
         let user_id = "test_user";
@@ -762,7 +762,7 @@ mod tests {
         use http::Method;
 
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_auth_success";
         let user_id = "test_user_auth";
@@ -805,7 +805,7 @@ mod tests {
     #[tokio::test]
     async fn test_is_authenticated_no_session_cookie() {
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create headers without session cookie
         let headers = HeaderMap::new();
@@ -825,7 +825,7 @@ mod tests {
     #[tokio::test]
     async fn test_is_authenticated_session_not_found() {
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let nonexistent_session_id = "nonexistent_session_id";
 
@@ -852,7 +852,7 @@ mod tests {
         use http::Method;
 
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_expired_session";
         let user_id = "test_user_expired";
@@ -910,7 +910,7 @@ mod tests {
         use http::{HeaderValue, Method};
 
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_csrf_valid";
         let user_id = "test_user_csrf";
@@ -957,7 +957,7 @@ mod tests {
         use http::{HeaderValue, Method};
 
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_csrf_invalid";
         let user_id = "test_user_csrf";
@@ -1005,8 +1005,8 @@ mod tests {
     async fn test_get_user_and_csrf_token_from_session_success() {
         use crate::storage::CacheData;
 
-        // Initialize test environment (env + database)
-        init_test_environment().await;
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_user_csrf";
         let user_id = "test_user_combined";
@@ -1053,7 +1053,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_and_csrf_token_from_session_session_not_found() {
         // Initialize test environment (configures global GENERIC_CACHE_STORE)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let nonexistent_session_id = "nonexistent_session_combined";
 
@@ -1074,7 +1074,7 @@ mod tests {
         use crate::storage::GENERIC_CACHE_STORE;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let session_id = "expired_session_123";
 
         // Create an expired session (1 second ago)
@@ -1128,7 +1128,7 @@ mod tests {
         use crate::storage::GENERIC_CACHE_STORE;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let session_id = "invalid_session_123";
 
         // We can't directly insert invalid JSON into the mock cache since it's type-safe
@@ -1181,7 +1181,7 @@ mod tests {
         use chrono::Utc;
 
         // Initialize test environment (uses in-memory stores)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let user_id = "test_user_session_creation";
 
@@ -1244,7 +1244,7 @@ mod tests {
         use chrono::{Duration, Utc};
 
         // Initialize test environment (uses in-memory stores)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_csrf_retrieval";
         let user_id = "test_user_csrf";
@@ -1296,7 +1296,7 @@ mod tests {
         use http::Method;
 
         // Initialize test environment (uses in-memory stores)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_auth_basic";
         let user_id = "test_user_auth_basic";
@@ -1360,7 +1360,7 @@ mod tests {
         use chrono::{Duration, Utc};
 
         // Initialize test environment (uses in-memory stores)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_deletion";
         let user_id = "test_user_deletion";
@@ -1420,7 +1420,7 @@ mod tests {
         use crate::test_utils::init_test_environment;
 
         // Initialize test environment (uses in-memory stores)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Test retrieving CSRF token from non-existent session
         let result = get_csrf_token_from_session("non_existent_session").await;
@@ -1442,7 +1442,7 @@ mod tests {
         use http::Method;
 
         // Initialize test environment (uses in-memory stores)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_expiration";
         let user_id = "test_user_expiration";
@@ -1504,7 +1504,7 @@ mod tests {
         use http::Method;
 
         // Initialize test environment (uses in-memory stores)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_csrf_auth";
         let user_id = "test_user_csrf_auth";
@@ -1572,7 +1572,7 @@ mod tests {
         use crate::test_utils::init_test_environment;
         use chrono::{Duration, Utc};
         // Initialize test environment (uses in-memory stores)
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_id = "test_session_logout";
         let user_id = "test_user_logout";
@@ -1649,7 +1649,7 @@ mod tests {
         };
 
         // Initialize test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create test user and session
         let user_id = "test_user_database";
@@ -1691,7 +1691,7 @@ mod tests {
         };
 
         // Initialize test environment
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Test case 1: User exists in database - should authenticate
         let user_id = "test_user_strict_auth";

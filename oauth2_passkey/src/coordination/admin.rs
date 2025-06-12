@@ -197,7 +197,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_get_all_users() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Get initial count of users in database
         let initial_users = get_all_users().await.expect("Failed to get initial users");
@@ -253,7 +253,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_get_user() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create a unique test user
         let timestamp = chrono::Utc::now().timestamp_millis();
@@ -303,7 +303,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_delete_user_account_admin() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create a unique test user to be deleted
         let timestamp = chrono::Utc::now().timestamp_millis();
@@ -356,7 +356,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_update_user_admin_status_success() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create unique users with timestamp
         let timestamp = chrono::Utc::now().timestamp_millis();
@@ -424,7 +424,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_update_user_admin_status_requires_admin() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create unique users with timestamp
         let timestamp = chrono::Utc::now().timestamp_millis();
@@ -473,7 +473,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_update_user_admin_status_protect_first_user() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create unique users with timestamp
         let timestamp = chrono::Utc::now().timestamp_millis();
@@ -550,7 +550,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_delete_passkey_credential_admin_requires_admin() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create unique user with timestamp
         let timestamp = chrono::Utc::now().timestamp_millis();
@@ -579,7 +579,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_delete_oauth2_account_admin_requires_admin() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create unique user with timestamp
         let timestamp = chrono::Utc::now().timestamp_millis();

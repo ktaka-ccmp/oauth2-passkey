@@ -9,8 +9,19 @@ use super::config::DB_TABLE_USERS;
 pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), UserError> {
     let table_name = DB_TABLE_USERS.as_str();
 
-    // Create users table
-    sqlx::query(&format!(
+    // Start a transaction
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            return Err(UserError::Storage(format!(
+                "Failed to begin transaction: {}",
+                e
+            )));
+        }
+    };
+
+    // Create users table with IF NOT EXISTS to handle concurrent creation
+    let create_table_result = sqlx::query(&format!(
         r#"
         CREATE TABLE IF NOT EXISTS {} (
             sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,9 +35,71 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), User
         "#,
         table_name
     ))
-    .execute(pool)
+    .execute(&mut *tx)
+    .await;
+
+    // Handle table creation result
+    match create_table_result {
+        Ok(_) => {}
+        Err(e) => {
+            // Rollback on error
+            if let Err(rollback_err) = tx.rollback().await {
+                return Err(UserError::Storage(format!(
+                    "Failed to rollback transaction: {}",
+                    rollback_err
+                )));
+            }
+            // Check if the error is because the table already exists (race condition)
+            if !e.to_string().contains("already exists") {
+                return Err(UserError::Storage(format!(
+                    "Failed to create users table: {}",
+                    e
+                )));
+            }
+            // If the table already exists, we can continue with the transaction
+            // Start a new transaction since we rolled back the previous one
+            tx = match pool.begin().await {
+                Ok(tx) => tx,
+                Err(e) => {
+                    return Err(UserError::Storage(format!(
+                        "Failed to begin new transaction: {}",
+                        e
+                    )));
+                }
+            };
+        }
+    }
+
+    // Create index for faster lookups by ID
+    match sqlx::query(&format!(
+        "CREATE INDEX IF NOT EXISTS idx_{}_id ON {}(id)",
+        table_name, table_name
+    ))
+    .execute(&mut *tx)
     .await
-    .map_err(|e| UserError::Storage(e.to_string()))?;
+    {
+        Ok(_) => {}
+        Err(e) => {
+            if let Err(rollback_err) = tx.rollback().await {
+                return Err(UserError::Storage(format!(
+                    "Failed to rollback transaction: {}",
+                    rollback_err
+                )));
+            }
+            return Err(UserError::Storage(format!(
+                "Failed to create index on users table: {}",
+                e
+            )));
+        }
+    }
+
+    // Commit the transaction
+    if let Err(e) = tx.commit().await {
+        return Err(UserError::Storage(format!(
+            "Failed to commit transaction: {}",
+            e
+        )));
+    }
 
     Ok(())
 }

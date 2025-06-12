@@ -102,7 +102,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_and_validate_options_success() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let challenge_type = "registration";
         let id = "test_id";
         let stored_options = create_valid_stored_options();
@@ -127,7 +127,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_and_validate_options_not_found() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let result = get_and_validate_options("registration", "nonexistent").await;
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -138,7 +138,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_and_validate_options_expired() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let challenge_type = "registration";
         let id = "expired_id";
         let expired_options = create_expired_stored_options();
@@ -166,7 +166,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_remove_options_success() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let challenge_type = "authentication";
         let id = "remove_test";
         let stored_options = create_valid_stored_options();
@@ -202,7 +202,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_remove_options_nonexistent() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         // Removing a non-existent entry should not fail
         let result = remove_options("authentication", "nonexistent").await;
         assert!(result.is_ok());
@@ -210,7 +210,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ttl_validation_with_passkey_timeout() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let challenge_type = "registration";
         let id = "ttl_test";
 
@@ -253,7 +253,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_options_cache_basics() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Instead of using complex types that depend on serde, test the basic cache functionality
         let test_key = "test_cache_key";
@@ -313,7 +313,7 @@ mod tests {
         use crate::passkey::main::test_utils as passkey_test_utils;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // 1. Create a test challenge
         let challenge_type = "test_challenge";
@@ -378,7 +378,7 @@ mod tests {
         use crate::passkey::main::test_utils as passkey_test_utils;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create a challenge with very short TTL
         let challenge_type = "test_challenge";

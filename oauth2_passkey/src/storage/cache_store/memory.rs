@@ -267,7 +267,7 @@ mod tests {
         #[tokio::test]
         async fn test_cache_store_integration() {
             // Initialize test environment with in-memory stores
-            init_test_environment().await;
+            let _ = init_test_environment().await;
 
             let prefix = "integration_test";
             let key = "test_key";
@@ -321,7 +321,7 @@ mod tests {
         #[tokio::test]
         async fn test_cache_store_concurrent_access() {
             // Initialize test environment
-            init_test_environment().await;
+            let _ = init_test_environment().await;
 
             let prefix = "concurrent_test";
 
@@ -363,7 +363,7 @@ mod tests {
         #[tokio::test]
         async fn test_cache_store_prefix_isolation() {
             // Initialize test environment
-            init_test_environment().await;
+            let _ = init_test_environment().await;
 
             let key = "shared_key";
             let value1 = CacheData {
@@ -419,7 +419,7 @@ mod tests {
         #[tokio::test]
         async fn test_cache_store_ttl_behavior() {
             // Initialize test environment
-            init_test_environment().await;
+            let _ = init_test_environment().await;
 
             let prefix = "ttl_test";
             let key = "ttl_key";
@@ -471,7 +471,7 @@ mod tests {
         #[tokio::test]
         async fn test_cache_store_large_data() {
             // Initialize test environment
-            init_test_environment().await;
+            let _ = init_test_environment().await;
 
             let prefix = "large_data_test";
             let key = "large_key";
@@ -511,7 +511,7 @@ mod tests {
         #[tokio::test]
         async fn test_cache_store_special_characters() {
             // Initialize test environment
-            init_test_environment().await;
+            let _ = init_test_environment().await;
 
             let prefix = "special_chars_test";
 

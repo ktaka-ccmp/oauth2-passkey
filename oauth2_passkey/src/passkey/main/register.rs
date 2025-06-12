@@ -1143,7 +1143,7 @@ mod tests {
         use crate::storage::GENERIC_CACHE_STORE;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create user info for registration
         let user_handle = "test_user_handle_456";
@@ -1198,7 +1198,7 @@ mod tests {
         use crate::session::User as SessionUser;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Test with no user (should generate a new handle)
         let no_user_result = super::get_or_create_user_handle(&None).await;
@@ -1264,7 +1264,7 @@ mod tests {
         use crate::session::User as SessionUser;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let user_id = "test_user_12345";
         let user_handle = "test_handle_12345";
@@ -1428,7 +1428,7 @@ mod tests {
         use crate::session::User as SessionUser;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let session_user = SessionUser {
             id: "test_user_missing_handle".to_string(),
@@ -1469,7 +1469,7 @@ mod tests {
         use crate::session::User as SessionUser;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let user_handle = "nonexistent_handle_12345";
 
@@ -1514,7 +1514,7 @@ mod tests {
         use crate::session::User as SessionUser;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let user_handle = "test_handle_mismatch";
 
@@ -1619,7 +1619,7 @@ mod tests {
         use crate::passkey::main::utils::store_in_cache;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let user_handle = "test_user_verify_client_data_success";
         let challenge = "test_challenge_verify_success";
@@ -1673,7 +1673,7 @@ mod tests {
     async fn test_verify_client_data_invalid_base64() {
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let reg_data = create_test_register_credential_for_verify_client_data(
             "invalid_base64!@#$%".to_string(),
@@ -1698,7 +1698,7 @@ mod tests {
     async fn test_verify_client_data_invalid_utf8() {
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create invalid UTF-8 bytes and encode as base64
         let invalid_utf8_bytes = vec![0xFF, 0xFE, 0xFD]; // Invalid UTF-8 sequence
@@ -1727,7 +1727,7 @@ mod tests {
     async fn test_verify_client_data_invalid_json() {
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create invalid JSON
         let invalid_json = "{ invalid json structure }";
@@ -1757,7 +1757,7 @@ mod tests {
     async fn test_verify_client_data_wrong_type() {
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create client data with wrong type (authentication instead of registration)
         let client_data_json = create_test_client_data_json(
@@ -1791,7 +1791,7 @@ mod tests {
     async fn test_verify_client_data_missing_user_handle() {
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let client_data_json = create_test_client_data_json(
             "webauthn.create",
@@ -1824,7 +1824,7 @@ mod tests {
     async fn test_verify_client_data_challenge_not_found() {
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let user_handle = "test_user_challenge_not_found";
 
@@ -1865,7 +1865,7 @@ mod tests {
         use crate::passkey::main::utils::store_in_cache;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let user_handle = "test_user_challenge_mismatch";
         let stored_challenge = "stored_challenge_123";
@@ -1926,7 +1926,7 @@ mod tests {
         use crate::passkey::main::utils::store_in_cache;
         use crate::test_utils::init_test_environment;
 
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let user_handle = "test_user_origin_mismatch";
         let challenge = "test_challenge_origin";
@@ -2122,7 +2122,7 @@ mod tests {
     #[tokio::test]
     async fn test_extract_credential_public_key_success() {
         // Initialize test environment properly
-        crate::test_utils::init_test_environment().await;
+        let _ = crate::test_utils::init_test_environment().await;
 
         let reg_data = create_test_register_credential_for_extract_credential_public_key();
 

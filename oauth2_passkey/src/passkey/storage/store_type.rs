@@ -1,35 +1,68 @@
+use std::any::Any;
+
 use chrono::{DateTime, Utc};
+use sqlx::{Database, Executor, Pool, Postgres, Sqlite};
 
 use crate::passkey::PasskeyCredential;
-use crate::storage::GENERIC_DATA_STORE;
-
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::CredentialSearchField;
+use crate::storage::GENERIC_DATA_STORE;
 
-use super::postgres::*;
-use super::sqlite::*;
+use super::postgres::{
+    create_tables_postgres, delete_credential_by_field_postgres, get_credential_postgres,
+    get_credentials_by_field_postgres, store_credential_postgres,
+    update_credential_counter_postgres, update_credential_last_used_at_postgres,
+    update_credential_user_details_postgres, validate_passkey_tables_postgres,
+};
+use super::sqlite::{
+    create_tables_sqlite, delete_credential_by_field_sqlite, get_credential_sqlite,
+    get_credentials_by_field_sqlite, store_credential_sqlite, update_credential_counter_sqlite,
+    update_credential_last_used_at_sqlite, update_credential_user_details_sqlite,
+    validate_passkey_tables_sqlite,
+};
 
+#[derive(Clone)]
 pub struct PasskeyStore;
 
 impl PasskeyStore {
+    /// Initialize the Passkey store using the global data store.
     pub(crate) async fn init() -> Result<(), PasskeyError> {
         let store = GENERIC_DATA_STORE.lock().await;
-
-        match (store.as_sqlite(), store.as_postgres()) {
-            (Some(pool), _) => {
-                create_tables_sqlite(pool).await?;
-                validate_passkey_tables_sqlite(pool).await?;
-                Ok(())
-            }
-            (_, Some(pool)) => {
-                create_tables_postgres(pool).await?;
-                validate_passkey_tables_postgres(pool).await?;
-                Ok(())
-            }
-            _ => Err(PasskeyError::Storage(
+        if let Some(pool) = store.as_sqlite() {
+            Self::init_with_pool(pool).await
+        } else if let Some(pool) = store.as_postgres() {
+            Self::init_with_pool(pool).await
+        } else {
+            Err(PasskeyError::Storage(
                 "Unsupported database type".to_string(),
-            )),
+            ))
         }
+    }
+
+    /// Initialize the Passkey store with an explicitly provided database pool.
+    /// This is useful for testing and other scenarios where you want to control the database connection.
+    pub(crate) async fn init_with_pool<DB>(pool: &Pool<DB>) -> Result<(), PasskeyError>
+    where
+        DB: Database + 'static,
+        for<'a> &'a Pool<DB>: Executor<'a, Database = DB>,
+        for<'a> &'a mut <DB as Database>::Connection: Executor<'a, Database = DB>,
+    {
+        // Check if the pool is a SQLite pool
+        if let Some(sqlite_pool) = (pool as &dyn Any).downcast_ref::<Pool<Sqlite>>() {
+            create_tables_sqlite(sqlite_pool).await?;
+            validate_passkey_tables_sqlite(sqlite_pool).await?;
+            return Ok(());
+        }
+        // Check if the pool is a Postgres pool
+        if let Some(pg_pool) = (pool as &dyn Any).downcast_ref::<Pool<Postgres>>() {
+            create_tables_postgres(pg_pool).await?;
+            validate_passkey_tables_postgres(pg_pool).await?;
+            return Ok(());
+        }
+
+        Err(PasskeyError::Storage(
+            "Unsupported database type".to_string(),
+        ))
     }
 
     pub(crate) async fn store_credential(
@@ -188,7 +221,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_passkey_store_init() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let result = PasskeyStore::init().await;
         assert!(result.is_ok(), "PasskeyStore initialization should succeed");
@@ -197,7 +230,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_store_and_get_credential() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
         let _ = UserStore::init().await;
 
@@ -250,7 +283,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_get_nonexistent_credential() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
 
         let result = PasskeyStore::get_credential("nonexistent_credential").await;
@@ -267,7 +300,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_get_credentials_by_user_id() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
         let _ = UserStore::init().await;
 
@@ -318,7 +351,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_get_credentials_by_user_handle() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
         let _ = UserStore::init().await;
 
@@ -365,7 +398,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_get_credentials_by_username() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
         let _ = UserStore::init().await;
 
@@ -414,7 +447,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_update_credential_counter() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
         let _ = UserStore::init().await;
 
@@ -461,7 +494,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_update_credential_user_details() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
         let _ = UserStore::init().await;
 
@@ -507,7 +540,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_update_credential_last_used_at() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
         let _ = UserStore::init().await;
 
@@ -561,7 +594,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_delete_credential_by_credential_id() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
         let _ = UserStore::init().await;
 
@@ -609,7 +642,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_delete_credentials_by_user_id() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
         let _ = UserStore::init().await;
 
@@ -665,7 +698,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_credential_isolation() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
         let _ = UserStore::init().await;
 
@@ -726,7 +759,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_concurrent_operations() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let _ = PasskeyStore::init().await;
         let _ = UserStore::init().await;
 

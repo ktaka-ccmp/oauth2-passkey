@@ -115,7 +115,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_not_found_error_in_context() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Try to get a user that doesn't exist
         let result = UserStore::get_user("nonexistent_user_id").await;
@@ -145,7 +145,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_database_error_handling() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Create a function that simulates a database error
         async fn simulate_db_error() -> Result<(), UserError> {

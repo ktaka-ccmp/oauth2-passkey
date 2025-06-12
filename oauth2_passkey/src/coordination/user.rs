@@ -166,7 +166,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_account_success() {
         use crate::test_utils::init_test_environment;
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // 1. Create initial user directly in the DB
         let initial_user = create_test_user("test-user", "old-account", "Old Label");
@@ -205,7 +205,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_update_user_account_not_found() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Call the actual function with a non-existent user
         let result = super::update_user_account(
@@ -232,7 +232,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_delete_user_account_success() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         // This is necessary for in-memory databases where each test may get a fresh instance
@@ -340,7 +340,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_delete_user_account_not_found() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let result = super::delete_user_account("nonexistent-user").await;
 
@@ -360,7 +360,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_gen_new_user_id_success() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         // This is necessary for in-memory databases where each test may get a fresh instance
@@ -392,7 +392,7 @@ mod tests {
     #[serial]
     #[tokio::test]
     async fn test_get_all_users() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         // This is necessary for in-memory databases where each test may get a fresh instance
@@ -469,7 +469,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_user() {
         // Set up the test database
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         // This is necessary for in-memory databases where each test may get a fresh instance
@@ -526,7 +526,7 @@ mod tests {
     #[tokio::test]
     async fn test_upsert_user() {
         // Set up the test database
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         // This is necessary for in-memory databases where each test may get a fresh instance
@@ -608,7 +608,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_user() {
         // Set up the test database
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         // This is necessary for in-memory databases where each test may get a fresh instance
@@ -669,7 +669,7 @@ mod tests {
     #[tokio::test]
     async fn test_gen_new_user_id_max_retries() {
         // Set up the test database
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         // This is necessary for in-memory databases where each test may get a fresh instance

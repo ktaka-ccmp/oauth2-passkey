@@ -1,3 +1,6 @@
+use sqlx::Database;
+use std::any::Any;
+
 use crate::oauth2::errors::OAuth2Error;
 use crate::oauth2::types::{AccountSearchField, OAuth2Account};
 use crate::storage::GENERIC_DATA_STORE;
@@ -36,24 +39,43 @@ impl OAuth2Store {
         ))
     }
 
-    /// Initialize the OAuth2 database tables
+    /// Initialize the OAuth2 database tables with the given pool
+    /// This is useful for testing with isolated database connections
+    pub(crate) async fn init_with_pool<DB>(pool: &sqlx::Pool<DB>) -> Result<(), OAuth2Error>
+    where
+        DB: Database + 'static,
+        for<'a> &'a sqlx::Pool<DB>: sqlx::Executor<'a>,
+        for<'a> &'a mut <DB as sqlx::Database>::Connection: sqlx::Executor<'a, Database = DB>,
+    {
+        // Check if the pool is a SQLite pool
+        if let Some(sqlite_pool) = (pool as &dyn Any).downcast_ref::<sqlx::Pool<sqlx::Sqlite>>() {
+            create_tables_sqlite(sqlite_pool).await?;
+            validate_oauth2_tables_sqlite(sqlite_pool).await?;
+            return Ok(());
+        }
+        // Check if the pool is a Postgres pool
+        if let Some(pg_pool) = (pool as &dyn Any).downcast_ref::<sqlx::Pool<sqlx::Postgres>>() {
+            create_tables_postgres(pg_pool).await?;
+            validate_oauth2_tables_postgres(pg_pool).await?;
+            return Ok(());
+        }
+
+        Err(OAuth2Error::Storage(
+            "Unsupported database type".to_string(),
+        ))
+    }
+
+    /// Initialize the OAuth2 database tables using the global data store
     pub(crate) async fn init() -> Result<(), OAuth2Error> {
         let store = GENERIC_DATA_STORE.lock().await;
-
-        match (store.as_sqlite(), store.as_postgres()) {
-            (Some(pool), _) => {
-                create_tables_sqlite(pool).await?;
-                validate_oauth2_tables_sqlite(pool).await?;
-                Ok(())
-            }
-            (_, Some(pool)) => {
-                create_tables_postgres(pool).await?;
-                validate_oauth2_tables_postgres(pool).await?;
-                Ok(())
-            }
-            _ => Err(OAuth2Error::Storage(
+        if let Some(pool) = store.as_sqlite() {
+            Self::init_with_pool(pool).await
+        } else if let Some(pool) = store.as_postgres() {
+            Self::init_with_pool(pool).await
+        } else {
+            Err(OAuth2Error::Storage(
                 "Unsupported database type".to_string(),
-            )),
+            ))
         }
     }
 
@@ -241,7 +263,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_gen_unique_account_id() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Test that we can generate unique IDs
         let id1 = OAuth2Store::gen_unique_account_id().await.unwrap();
@@ -259,7 +281,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_init_creates_tables() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // The init function should succeed without errors
         let result = OAuth2Store::init().await;
@@ -269,7 +291,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_upsert_oauth2_account_create() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // First create a user to satisfy foreign key constraints
         let user_id = generate_unique_test_id("user");
@@ -315,7 +337,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_upsert_oauth2_account_empty_user_id() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let mut test_account = create_test_account("", "google", "google123").await;
         test_account.user_id = String::new();
@@ -337,7 +359,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_upsert_oauth2_account_update() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let test_account = create_test_user_and_account("user123", "google", "google123").await;
 
@@ -370,7 +392,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_get_oauth2_accounts_by_user_id() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         UserStore::init()
@@ -422,7 +444,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_get_oauth2_accounts_by_id() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let inserted_account = create_test_user_and_account("user123", "google", "google123").await;
 
@@ -446,7 +468,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_get_oauth2_accounts_by_provider() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         UserStore::init()
@@ -515,7 +537,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_get_oauth2_account_by_provider() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let inserted_account = create_test_user_and_account("user123", "google", "google123").await;
 
@@ -545,7 +567,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_delete_oauth2_accounts_by_id() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let user_id = generate_unique_test_id("user");
         let provider_user_id = generate_unique_test_id("google");
@@ -580,7 +602,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_delete_oauth2_accounts_by_user_id() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         UserStore::init()
@@ -621,7 +643,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_get_oauth2_accounts_empty_result() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Try to get accounts for non-existent user
         let accounts = OAuth2Store::get_oauth2_accounts("nonexistent_user")
@@ -637,7 +659,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_account_search_field_variants() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         UserStore::init()
@@ -691,7 +713,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_concurrent_account_operations() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Explicitly ensure tables exist for this test's connection
         UserStore::init()

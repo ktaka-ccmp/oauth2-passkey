@@ -13,11 +13,23 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
     let users_table = DB_TABLE_USERS.as_str();
 
-    sqlx::query(&format!(
+    // Start a transaction
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            return Err(PasskeyError::Storage(format!(
+                "Failed to begin transaction: {}",
+                e
+            )));
+        }
+    };
+
+    // Create the passkey credentials table with IF NOT EXISTS
+    if let Err(e) = sqlx::query(&format!(
         r#"
         CREATE TABLE IF NOT EXISTS {} (
             credential_id TEXT PRIMARY KEY NOT NULL,
-            user_id TEXT NOT NULL REFERENCES {}(id),
+            user_id TEXT NOT NULL REFERENCES {}(id) ON DELETE CASCADE,
             public_key TEXT NOT NULL,
             counter INTEGER NOT NULL DEFAULT 0,
             user_handle TEXT NOT NULL,
@@ -27,30 +39,51 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES {}(id)
-        )
-        "#,
+            FOREIGN KEY (user_id) REFERENCES {}(id) ON DELETE CASCADE
+        )"#,
         passkey_table, users_table, users_table
     ))
-    .execute(pool)
+    .execute(&mut *tx)
     .await
-    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    {
+        if !e.to_string().contains("already exists") {
+            let _ = tx.rollback().await;
+            return Err(PasskeyError::Storage(format!(
+                "Failed to create passkey table: {}",
+                e
+            )));
+        }
+    }
 
-    sqlx::query(&format!(
-        r#"
-        CREATE INDEX IF NOT EXISTS idx_{}_user_name ON {}(user_name);
-        CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id);
-        "#,
-        passkey_table.replace(".", "_"),
-        passkey_table,
-        passkey_table.replace(".", "_"),
-        passkey_table
-    ))
-    .execute(pool)
-    .await
-    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    // Create indexes in separate statements to handle potential errors better
+    let index_queries = vec![
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_{}_user_name ON {}(user_name)",
+            passkey_table.replace(".", "_"),
+            passkey_table
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id)",
+            passkey_table.replace(".", "_"),
+            passkey_table
+        ),
+    ];
 
-    Ok(())
+    for query in index_queries {
+        if let Err(e) = sqlx::query(&query).execute(&mut *tx).await {
+            let _ = tx.rollback().await;
+            return Err(PasskeyError::Storage(format!(
+                "Failed to create index: {} - {}",
+                query, e
+            )));
+        }
+    }
+
+    // Commit the transaction
+    tx.commit()
+        .await
+        .map_err(|e| PasskeyError::Storage(format!("Failed to commit transaction: {}", e)))
+        .map(|_| ())
 }
 
 /// Validates that the Passkey credential table schema matches what we expect

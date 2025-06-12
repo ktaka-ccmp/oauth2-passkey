@@ -1,5 +1,7 @@
 use crate::storage::GENERIC_DATA_STORE;
 use crate::userdb::{errors::UserError, types::User};
+use sqlx::{Pool, Postgres, Sqlite};
+use std::any::Any;
 
 use super::postgres::*;
 use super::sqlite::*;
@@ -7,23 +9,38 @@ use super::sqlite::*;
 pub(crate) struct UserStore;
 
 impl UserStore {
-    /// Initialize the user database tables
+    /// Initialize the user database tables using the global data store
     pub(crate) async fn init() -> Result<(), UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         match (store.as_sqlite(), store.as_postgres()) {
-            (Some(pool), _) => {
-                create_tables_sqlite(pool).await?;
-                validate_user_tables_sqlite(pool).await?;
-                Ok(())
-            }
-            (_, Some(pool)) => {
-                create_tables_postgres(pool).await?;
-                validate_user_tables_postgres(pool).await?;
-                Ok(())
-            }
+            (Some(pool), _) => Self::init_with_pool(pool).await,
+            (_, Some(pool)) => Self::init_with_pool(pool).await,
             _ => Err(UserError::Storage("Unsupported database type".to_string())),
         }
+    }
+
+    /// Initialize the user database tables with the provided database pool
+    pub(crate) async fn init_with_pool<DB>(pool: &Pool<DB>) -> Result<(), UserError>
+    where
+        DB: sqlx::Database + 'static,
+        for<'a> &'a Pool<DB>: sqlx::Executor<'a>,
+        for<'a> &'a mut <DB as sqlx::Database>::Connection: sqlx::Executor<'a, Database = DB>,
+    {
+        // Check if the pool is a SQLite pool
+        if let Some(sqlite_pool) = (pool as &dyn Any).downcast_ref::<Pool<Sqlite>>() {
+            create_tables_sqlite(sqlite_pool).await?;
+            validate_user_tables_sqlite(sqlite_pool).await?;
+            return Ok(());
+        }
+        // Check if the pool is a Postgres pool
+        if let Some(pg_pool) = (pool as &dyn Any).downcast_ref::<Pool<Postgres>>() {
+            create_tables_postgres(pg_pool).await?;
+            validate_user_tables_postgres(pg_pool).await?;
+            return Ok(());
+        }
+
+        Err(UserError::Storage("Unsupported database type".to_string()))
     }
 
     pub(crate) async fn get_all_users() -> Result<Vec<User>, UserError> {
@@ -116,7 +133,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_userstore_init() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Test that UserStore can be initialized successfully
         let result = UserStore::init().await;
@@ -133,7 +150,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_userstore_upsert_user_create() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
@@ -161,7 +178,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_userstore_upsert_user_first_user_becomes_admin() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
@@ -204,7 +221,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_userstore_upsert_user_update() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
@@ -237,7 +254,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_userstore_get_user() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
@@ -278,7 +295,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_userstore_get_all_users() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
@@ -337,7 +354,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_userstore_delete_user() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
@@ -373,7 +390,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_userstore_edge_cases() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
@@ -403,7 +420,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_userstore_concurrent_operations() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
@@ -446,7 +463,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_userstore_error_handling_not_found() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
@@ -477,7 +494,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_userstore_transaction_behavior() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
@@ -522,7 +539,7 @@ mod tests {
     #[serial]
     async fn test_userstore_admin_user_operations() {
         // First, clear any existing users to ensure we're starting fresh
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");

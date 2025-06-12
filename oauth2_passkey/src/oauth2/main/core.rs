@@ -234,7 +234,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_oauth2_request_preparation_with_session() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -293,7 +293,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_oauth2_request_preparation_without_session() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -370,7 +370,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_oauth2_csrf_cookie_samesite_based_on_response_mode() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let mut headers = HeaderMap::new();
         headers.insert(

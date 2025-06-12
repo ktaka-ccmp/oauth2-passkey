@@ -147,7 +147,7 @@ mod tests {
     // Test cache operations
     #[tokio::test]
     async fn test_cache_operations() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let category = "test_category";
         let key = "test_key";
 
@@ -192,7 +192,7 @@ mod tests {
     // Test cache operations with different keys
     #[tokio::test]
     async fn test_cache_operations_different_keys() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let category = "isolation_test";
         let key1 = "key1";
         let key2 = "key2";
@@ -242,7 +242,7 @@ mod tests {
     // Test cache operations - comprehensive test (was EXISTING TEST)
     #[tokio::test]
     async fn test_comprehensive_cache_operations() {
-        init_test_environment().await;
+        let _ = init_test_environment().await;
         let category = "comprehensive_test";
         let key = "comprehensive_key";
 

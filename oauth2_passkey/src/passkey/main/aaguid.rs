@@ -122,7 +122,7 @@ mod tests {
     #[tokio::test]
     async fn test_store_aaguid_in_cache_success() {
         use crate::test_utils::init_test_environment;
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let json = r#"
         {
@@ -184,7 +184,7 @@ mod tests {
     #[tokio::test]
     async fn test_store_aaguid_in_cache_invalid_json() {
         use crate::test_utils::init_test_environment;
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let invalid_json = r#"
         {
@@ -288,7 +288,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_authenticator_info_not_found() {
         use crate::test_utils::init_test_environment;
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let non_existent_aaguid = "99999999-9999-9999-9999-999999999999";
         let result = get_authenticator_info(non_existent_aaguid).await;
@@ -308,7 +308,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_authenticator_info_batch_empty() {
         use crate::test_utils::init_test_environment;
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let empty_aaguids: Vec<String> = vec![];
         let result = get_authenticator_info_batch(&empty_aaguids).await;
@@ -322,7 +322,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_authenticator_info_success() {
         use crate::test_utils::init_test_environment;
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // First store some test data
         let json = r#"
@@ -362,7 +362,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_authenticator_info_batch_with_data() {
         use crate::test_utils::init_test_environment;
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Store multiple test AAGUIDs
         let json = r#"
@@ -443,7 +443,7 @@ mod tests {
     async fn test_get_authenticator_info_corrupted_cache() {
         use crate::storage::CacheData;
         use crate::test_utils::init_test_environment;
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let aaguid = "corrupt-data-test-aaguid";
 
@@ -479,7 +479,7 @@ mod tests {
     #[tokio::test]
     async fn test_store_aaguid_in_cache_empty_object() {
         use crate::test_utils::init_test_environment;
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         let empty_json = "{}";
         let result = store_aaguid_in_cache(empty_json.to_string()).await;
@@ -500,7 +500,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_authenticator_info_batch_duplicates() {
         use crate::test_utils::init_test_environment;
-        init_test_environment().await;
+        let _ = init_test_environment().await;
 
         // Store one test AAGUID
         let json = r#"

@@ -15,12 +15,23 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), OAut
     let oauth2_table = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
     let users_table = DB_TABLE_USERS.as_str();
 
-    // Create oauth2_accounts table
-    sqlx::query(&format!(
+    // Start a transaction
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            return Err(OAuth2Error::Storage(format!(
+                "Failed to begin transaction: {}",
+                e
+            )));
+        }
+    };
+
+    // Create oauth2_accounts table with IF NOT EXISTS
+    if let Err(e) = sqlx::query(&format!(
         r#"
         CREATE TABLE IF NOT EXISTS {} (
             id TEXT PRIMARY KEY NOT NULL,
-            user_id TEXT NOT NULL REFERENCES {}(id),
+            user_id TEXT NOT NULL REFERENCES {}(id) ON DELETE CASCADE,
             provider TEXT NOT NULL,
             provider_user_id TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -30,27 +41,42 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), OAut
             created_at TIMESTAMP NOT NULL,
             updated_at TIMESTAMP NOT NULL,
             UNIQUE(provider, provider_user_id)
-        )
-        "#,
+        )"#,
         oauth2_table, users_table
     ))
-    .execute(pool)
+    .execute(&mut *tx)
     .await
-    .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+    {
+        if !e.to_string().contains("already exists") {
+            let _ = tx.rollback().await;
+            return Err(OAuth2Error::Storage(format!(
+                "Failed to create OAuth2 table: {}",
+                e
+            )));
+        }
+    }
 
     // Create index on user_id for faster lookups
-    sqlx::query(&format!(
-        r#"
-        CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id)
-        "#,
+    if let Err(e) = sqlx::query(&format!(
+        "CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id)",
         oauth2_table.replace(".", "_"),
         oauth2_table
     ))
-    .execute(pool)
+    .execute(&mut *tx)
     .await
-    .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+    {
+        let _ = tx.rollback().await;
+        return Err(OAuth2Error::Storage(format!(
+            "Failed to create index: {}",
+            e
+        )));
+    }
 
-    Ok(())
+    // Commit the transaction
+    tx.commit()
+        .await
+        .map_err(|e| OAuth2Error::Storage(format!("Failed to commit transaction: {}", e)))
+        .map(|_| ())
 }
 
 /// Validates that the OAuth2 account table schema matches what we expect
