@@ -393,18 +393,3 @@ mod tests {
         assert_eq!(formatted, "2023-01-01 12:00 UNKNOWN");
     }
 }
-
-#[cfg(test)]
-mod router_tests {
-    use super::*;
-
-    #[test]
-    fn test_router_creation() {
-        // Simply test that the router can be created without errors
-        // This verifies that all the handler functions exist and have the correct signatures
-        let _router = router();
-
-        // The test passes if the router can be created without panicking
-        // This is a basic sanity check that all the route handlers exist and have compatible signatures
-    }
-}

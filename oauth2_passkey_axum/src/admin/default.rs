@@ -177,16 +177,6 @@ pub(super) async fn update_admin_status_handler(
 mod tests {
     use super::*;
 
-    /// Test the DeleteUserRequest struct and its usage in the delete_user_account_handler
-    #[test]
-    fn test_delete_user_request_struct() {
-        // Test the DeleteUserRequest struct
-        let request = DeleteUserRequest {
-            user_id: "user123".to_string(),
-        };
-        assert_eq!(request.user_id, "user123");
-    }
-
     /// Test that the delete_user_account_handler returns an error
     /// when a non-admin user tries to delete another user's account.
     /// This test checks:
@@ -223,46 +213,6 @@ mod tests {
         } else {
             panic!("Expected an error but got Ok");
         }
-    }
-}
-
-// Test the PageUserContext struct and its usage in the delete_passkey_credential and delete_oauth2_account handlers
-#[cfg(test)]
-mod page_user_context_tests {
-    use super::*;
-
-    #[test]
-    fn test_page_user_context_struct() {
-        // Test the PageUserContext struct
-        let context = PageUserContext {
-            user_id: "user123".to_string(),
-        };
-        assert_eq!(context.user_id, "user123");
-    }
-}
-
-/// Test the UpdateAdminStatusRequest struct and its usage in the update_admin_status_handler
-#[cfg(test)]
-mod update_admin_status_tests {
-    use super::*;
-
-    #[test]
-    fn test_update_admin_status_request_struct() {
-        // Test with admin status true
-        let request_admin_true = UpdateAdminStatusRequest {
-            user_id: "user123".to_string(),
-            is_admin: true,
-        };
-        assert_eq!(request_admin_true.user_id, "user123");
-        assert_eq!(request_admin_true.is_admin, true);
-
-        // Test with admin status false
-        let request_admin_false = UpdateAdminStatusRequest {
-            user_id: "user456".to_string(),
-            is_admin: false,
-        };
-        assert_eq!(request_admin_false.user_id, "user456");
-        assert_eq!(request_admin_false.is_admin, false);
     }
 
     /// Test that the update_admin_status_handler returns an error
@@ -304,56 +254,7 @@ mod update_admin_status_tests {
             panic!("Expected an error but got Ok");
         }
     }
-}
 
-#[cfg(test)]
-mod router_tests {
-    use super::*;
-
-    #[test]
-    fn test_router_creation() {
-        // Test that the router can be created without panicking
-        let _router = router();
-        // Just creating the router without panicking is considered a success
-    }
-}
-
-#[cfg(test)]
-mod user_list_template_tests {
-    use super::*;
-
-    /// Test the UserListTemplate struct and its rendering
-    #[test]
-    fn test_user_list_template_struct() {
-        // Create a test datetime
-        let now = chrono::Utc::now();
-
-        // Create a mock DbUser
-        let user = DbUser {
-            id: "user123".to_string(),
-            is_admin: true,
-            account: "test@example.com".to_string(),
-            label: "Test User".to_string(),
-            created_at: now,
-            updated_at: now,
-            // Note: sequence_number is now optional based on the memory about optimization
-            sequence_number: None,
-        };
-
-        // Create the template
-        let template = UserListTemplate {
-            users: vec![user],
-            o2p_route_prefix: "/auth".to_string(),
-            o2p_redirect_anon: "/login".to_string(),
-            csrf_token: "token123".to_string(),
-        };
-
-        // Verify the template fields
-        assert_eq!(template.users.len(), 1);
-        assert_eq!(template.users[0].id, "user123");
-        assert_eq!(template.users[0].is_admin, true);
-        assert_eq!(template.o2p_route_prefix, "/auth");
-        assert_eq!(template.o2p_redirect_anon, "/login");
-        assert_eq!(template.csrf_token, "token123");
-    }
+    // Note: Removed meaningless tests that only validated basic struct creation
+    // These provided no validation value beyond testing basic Rust language features
 }

@@ -173,13 +173,6 @@ mod tests {
     use super::*;
     use axum::http::StatusCode;
 
-    #[test]
-    fn test_router() {
-        // Test that the router can be created without panicking
-        let _router = router();
-        // No assertions needed, we just want to make sure it doesn't panic
-    }
-
     /// Test the `serve_oauth2_js` function to ensure it returns a valid JavaScript response
     ///
     /// This test checks:
