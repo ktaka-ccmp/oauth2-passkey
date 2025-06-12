@@ -168,10 +168,10 @@ mod tests {
     use super::*;
     use chrono::Utc;
 
-    // We'll test only the validation logic in the handlers without mocking the core functions
-    // This approach focuses on testing the handler's responsibility without trying to mock
-    // the external functions which can be difficult in Rust
-
+    /// Test that the update_user_account_handler returns an error
+    /// when a non-admin user tries to update another user's account.
+    /// /// This test simulates a scenario where the authenticated user
+    /// tries to update a different user's account, which should be forbidden.
     #[tokio::test]
     async fn test_update_user_account_handler_id_mismatch() {
         // Create a mock AuthUser
@@ -206,6 +206,10 @@ mod tests {
         }
     }
 
+    /// Test that the delete_user_account_handler returns an error
+    /// when a non-admin user tries to delete another user's account.
+    /// This test simulates a scenario where the authenticated user
+    /// tries to delete a different user's account, which should be forbidden.
     #[tokio::test]
     async fn test_delete_user_account_handler_id_mismatch() {
         // Create a mock AuthUser with a different ID
@@ -245,16 +249,7 @@ mod tests {
         // No assertions needed, we just want to make sure it doesn't panic
     }
 
-    #[test]
-    fn test_logout_signature() {
-        // Since we can't easily test the actual logout function without mocking
-        // the core library's session functions, we'll just test that the function
-        // has the correct signature
-
-        // This test is just a placeholder to ensure the function signature is correct
-        assert!(true);
-    }
-
+    /// Test the logout function with a redirect query parameter
     #[test]
     fn test_redirect_query_struct() {
         // Test with redirect
@@ -274,6 +269,10 @@ mod tests {
         assert!(query_without_redirect.redirect.is_none());
     }
 
+    /// Test the UpdateUserRequest struct
+    /// This test checks that the struct can be created with both account and label,
+    /// only account, or only label, and that the fields are set correctly.
+    /// It also verifies that the user_id field is always present.
     #[test]
     fn test_update_user_request_struct() {
         // Test with both account and label

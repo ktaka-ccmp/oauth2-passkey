@@ -177,6 +177,7 @@ pub(super) async fn update_admin_status_handler(
 mod tests {
     use super::*;
 
+    /// Test the DeleteUserRequest struct and its usage in the delete_user_account_handler
     #[test]
     fn test_delete_user_request_struct() {
         // Test the DeleteUserRequest struct
@@ -186,6 +187,11 @@ mod tests {
         assert_eq!(request.user_id, "user123");
     }
 
+    /// Test that the delete_user_account_handler returns an error
+    /// when a non-admin user tries to delete another user's account.
+    /// This test checks:
+    /// 1. The handler returns an error status code (UNAUTHORIZED).
+    /// 2. The error message is "Not authorized".
     #[tokio::test]
     async fn test_delete_user_account_handler_unauthorized() {
         // Create a non-admin user
@@ -220,6 +226,7 @@ mod tests {
     }
 }
 
+// Test the PageUserContext struct and its usage in the delete_passkey_credential and delete_oauth2_account handlers
 #[cfg(test)]
 mod page_user_context_tests {
     use super::*;
@@ -234,6 +241,7 @@ mod page_user_context_tests {
     }
 }
 
+/// Test the UpdateAdminStatusRequest struct and its usage in the update_admin_status_handler
 #[cfg(test)]
 mod update_admin_status_tests {
     use super::*;
@@ -257,6 +265,12 @@ mod update_admin_status_tests {
         assert_eq!(request_admin_false.is_admin, false);
     }
 
+    /// Test that the update_admin_status_handler returns an error
+    /// when a non-admin user tries to update another user's admin status.
+    /// This test checks:
+    /// 1. The handler returns an error status code (UNAUTHORIZED).
+    /// 2. The error message is "Not authorized".
+    /// 3. The handler does not panic or return Ok when it should return an error.
     #[tokio::test]
     async fn test_update_admin_status_handler_unauthorized() {
         // Create a non-admin user
@@ -308,6 +322,7 @@ mod router_tests {
 mod user_list_template_tests {
     use super::*;
 
+    /// Test the UserListTemplate struct and its rendering
     #[test]
     fn test_user_list_template_struct() {
         // Create a test datetime

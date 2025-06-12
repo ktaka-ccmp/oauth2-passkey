@@ -34,6 +34,10 @@ mod tests {
         assert!(true);
     }
 
+    /// Test the structure of the router to ensure it has the expected nested routes
+    /// This test checks that the router contains the expected paths
+    /// without validating the actual handlers or functionality.
+    /// This is a basic structural test that ensures the router is set up correctly.
     #[test]
     fn test_router_structure() {
         // This test verifies the basic structure of the router

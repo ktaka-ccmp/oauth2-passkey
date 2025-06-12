@@ -129,6 +129,10 @@ mod tests {
     use axum::body::Body;
     use axum::http::{Method, Response as HttpResponse};
 
+    /// Test that the CSRF header is added when enabled
+    /// This test checks:
+    /// 1. With a valid CSRF token, the X-CSRF-Token header is added correctly
+    /// 2. The header value matches the provided token
     #[test]
     fn test_add_csrf_header_when_enabled() {
         // Create a response
@@ -154,6 +158,10 @@ mod tests {
         );
     }
 
+    /// Test that the CSRF header is not added when token is invalid
+    /// This test checks:
+    /// 1. Invalid CSRF tokens (containing null characters) are handled gracefully
+    /// 2. No header is added when HeaderValue::from_str() fails
     #[test]
     fn test_add_csrf_header_with_invalid_token() {
         // Create a response
@@ -171,6 +179,10 @@ mod tests {
         assert!(!headers.contains_key("X-CSRF-Token"));
     }
 
+    /// Test that CSRF errors with redirect enabled return a redirect response
+    /// This test checks:
+    /// 1. A GET request with a CSRF error and redirect enabled
+    /// 2. Returns a 302 TEMPORARY_REDIRECT response (not 403 Forbidden)
     #[test]
     fn test_handle_auth_error_csrf_error_with_redirect() {
         // Create a GET request
@@ -189,6 +201,10 @@ mod tests {
         assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
     }
 
+    /// Test that the CSRF header is not added when disabled
+    /// This test checks:
+    /// 1. If O2P_RESPOND_WITH_X_CSRF_TOKEN is false, the header is not added.
+    /// 2. If a CSRF error occurs, it returns a 403 Forbidden response.
     #[test]
     fn test_handle_auth_error_csrf_error_without_redirect() {
         // Create a GET request
@@ -207,6 +223,10 @@ mod tests {
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 
+    /// Test that non-CSRF errors with redirect enabled return a redirect response
+    /// This test checks:
+    /// 1. A GET request with a non-CSRF error and redirect enabled
+    /// 2. Returns a 302 TEMPORARY_REDIRECT response
     #[test]
     fn test_handle_auth_error_other_error_with_redirect() {
         // Create a GET request
@@ -225,6 +245,10 @@ mod tests {
         assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
     }
 
+    /// Test that non-CSRF errors without redirect return a 401 Unauthorized response
+    /// This test checks:
+    /// 1. A GET request with a non-CSRF error and redirect disabled
+    /// 2. Returns a 401 UNAUTHORIZED response
     #[test]
     fn test_handle_auth_error_other_error_without_redirect() {
         // Create a GET request
@@ -243,6 +267,10 @@ mod tests {
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 
+    /// Test that POST requests with CSRF errors do not redirect
+    /// This test checks:
+    /// 1. A POST request with a CSRF error and redirect enabled
+    /// 2. Returns a 401 UNAUTHORIZED response (not a redirect)
     #[test]
     fn test_handle_auth_error_post_request_with_redirect() {
         // Create a POST request

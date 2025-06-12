@@ -282,6 +282,7 @@ mod tests {
     use super::*;
     use oauth2_passkey::DbUser;
 
+    /// Test the format_date_tz function with various timezones
     #[test]
     fn test_format_date_tz_jst() {
         // Create a fixed UTC datetime for testing
@@ -296,6 +297,7 @@ mod tests {
         assert_eq!(formatted, "2023-01-01 09:00 JST");
     }
 
+    /// Test the format_date_tz function with UTC timezone
     #[test]
     fn test_format_date_tz_utc() {
         // Create a fixed UTC datetime for testing
@@ -310,6 +312,8 @@ mod tests {
         assert_eq!(formatted, "2023-01-01 12:30 UTC");
     }
 
+    /// Test the format_date_tz function with an unknown timezone
+    /// This should default to UTC but still display the requested timezone name
     #[test]
     fn test_format_date_tz_unknown_timezone() {
         // Create a fixed UTC datetime for testing
@@ -324,6 +328,7 @@ mod tests {
         assert_eq!(formatted, "2023-01-01 12:00 UNKNOWN");
     }
 
+    /// Test the UserSummaryTemplate::new function to ensure it correctly initializes the template
     #[test]
     fn test_user_summary_template_new() {
         // Create a fixed UTC datetime for testing

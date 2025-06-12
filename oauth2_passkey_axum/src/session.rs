@@ -202,6 +202,8 @@ mod tests {
     use super::*;
     use chrono::Utc;
 
+    /// Test the conversion between SessionUser and AuthUser
+    /// This test verifies that all fields are correctly converted between the two types.
     #[test]
     fn test_from_session_user_to_auth_user() {
         // Create a SessionUser instance
@@ -233,6 +235,8 @@ mod tests {
         assert!(!auth_user.csrf_via_header_verified);
     }
 
+    /// Test the conversion from AuthUser to SessionUser
+    /// This test verifies that all fields are correctly converted from AuthUser to SessionUser.
     #[test]
     fn test_from_auth_user_to_session_user() {
         // Create an AuthUser instance
@@ -264,6 +268,8 @@ mod tests {
         // AuthUser-specific fields should not be present in SessionUser
     }
 
+    /// Test the AuthRedirect struct's new method
+    /// This test verifies that the AuthRedirect can be created with different HTTP methods
     #[test]
     fn test_auth_redirect_new() {
         // Test creating AuthRedirect with different HTTP methods
@@ -278,6 +284,8 @@ mod tests {
         assert!(true);
     }
 
+    /// Test the AuthRedirect's into_response_with_method method
+    /// This test verifies that the method returns the correct response based on the HTTP method.
     #[test]
     fn test_auth_redirect_into_response_with_method() {
         // Test with GET method

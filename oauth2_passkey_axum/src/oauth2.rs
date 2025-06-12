@@ -180,6 +180,13 @@ mod tests {
         // No assertions needed, we just want to make sure it doesn't panic
     }
 
+    /// Test the `serve_oauth2_js` function to ensure it returns a valid JavaScript response
+    ///
+    /// This test checks:
+    /// 1. The response is Ok
+    /// 2. The status code is 200 OK
+    /// 3. The Content-Type header is set to "application/javascript"
+    ///
     #[tokio::test]
     async fn test_serve_oauth2_js() {
         // Call the function

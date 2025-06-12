@@ -204,6 +204,11 @@ mod tests {
 
     use super::*;
 
+    /// Test the serve_passkey_js function to ensure it returns a valid JavaScript response
+    /// This test checks:
+    /// 1. The response status code is 200 OK
+    /// 2. The Content-Type header is set to "application/javascript"
+    /// 3. The response body is successfully created
     #[tokio::test]
     async fn test_serve_passkey_js() {
         // Call the function
@@ -223,6 +228,11 @@ mod tests {
         // We can't easily test the exact content in a unit test
     }
 
+    /// Test the serve_conditional_ui_js function to ensure it returns a valid JavaScript response
+    /// This test checks:
+    /// 1. The response status code is 200 OK
+    /// 2. The Content-Type header is set to "application/javascript"
+    /// 3. The response body is successfully created
     #[tokio::test]
     async fn test_serve_conditional_ui_js() {
         // Call the function
@@ -242,6 +252,11 @@ mod tests {
         // We can't easily test the exact content in a unit test
     }
 
+    /// Test the serve_related_origin function to ensure it returns WebAuthn configuration JSON
+    /// This test checks:
+    /// 1. The response status code is 200 OK
+    /// 2. The Content-Type header is set to "application/json"
+    /// 3. The response body is successfully created
     #[tokio::test]
     async fn test_serve_related_origin() {
         // Initialize test environment with required environment variables
@@ -268,6 +283,10 @@ mod tests {
         // The actual content is provided by the oauth2_passkey crate using our test environment variables
     }
 
+    /// Test the conditional_ui function to ensure it returns HTML template
+    /// This test checks:
+    /// 1. The response status code is 200 OK
+    /// 2. The response body is successfully created
     #[tokio::test]
     async fn test_conditional_ui() {
         // Call the function
@@ -302,6 +321,11 @@ mod tests {
         assert!(true);
     }
 
+    /// Test the list_passkey_credentials handler with mocked dependencies
+    /// This test checks:
+    /// 1. Handler returns credentials for authenticated user
+    /// 2. Returned credentials have correct user ID and fields
+    /// 3. Mock functions are called as expected
     #[tokio::test]
     async fn test_list_passkey_credentials_handler() {
         use crate::test_utils::{core_mocks, mocks};
@@ -361,6 +385,11 @@ mod tests {
         );
     }
 
+    /// Test the update_passkey_credential handler with mocked dependencies
+    /// This test checks:
+    /// 1. Handler updates credential details for authenticated user
+    /// 2. Returns updated credential data in JSON format
+    /// 3. Mock functions are called as expected
     #[tokio::test]
     async fn test_update_passkey_credential_handler() {
         use crate::test_utils::{core_mocks, mocks};
