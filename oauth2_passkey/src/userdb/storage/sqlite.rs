@@ -50,6 +50,9 @@ pub(super) async fn validate_user_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(
 }
 
 pub(super) async fn get_all_users_sqlite(pool: &Pool<Sqlite>) -> Result<Vec<User>, UserError> {
+    // Ensure tables exist before any operations - this is critical for in-memory databases
+    create_tables_sqlite(pool).await?;
+
     let table_name = DB_TABLE_USERS.as_str();
 
     sqlx::query_as::<_, User>(&format!(
@@ -67,6 +70,9 @@ pub(super) async fn get_user_sqlite(
     pool: &Pool<Sqlite>,
     id: &str,
 ) -> Result<Option<User>, UserError> {
+    // Ensure tables exist before any operations - this is critical for in-memory databases
+    create_tables_sqlite(pool).await?;
+
     let table_name = DB_TABLE_USERS.as_str();
 
     sqlx::query_as::<_, User>(&format!(
@@ -82,6 +88,9 @@ pub(super) async fn get_user_sqlite(
 }
 
 pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Result<User, UserError> {
+    // Ensure tables exist before any operations - this is critical for in-memory databases
+    create_tables_sqlite(pool).await?;
+
     let table_name = DB_TABLE_USERS.as_str();
     let now = chrono::Utc::now();
     let mut updated_user = user;
@@ -125,6 +134,9 @@ pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Resul
 }
 
 pub(super) async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<(), UserError> {
+    // Ensure tables exist before any operations - this is critical for in-memory databases
+    create_tables_sqlite(pool).await?;
+
     let table_name = DB_TABLE_USERS.as_str();
 
     sqlx::query(&format!(

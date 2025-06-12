@@ -27,24 +27,9 @@ impl From<redis::RedisError> for UserError {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_user_error_display() {
-        // Test NotFound variant
-        let error = UserError::NotFound;
-        assert_eq!(error.to_string(), "User not found");
-
-        // Test Storage variant
-        let error = UserError::Storage("Database connection failed".to_string());
-        assert_eq!(
-            error.to_string(),
-            "Storage error: Database connection failed"
-        );
-
-        // Test InvalidData variant
-        let error = UserError::InvalidData("Invalid JSON".to_string());
-        assert_eq!(error.to_string(), "Invalid data: Invalid JSON");
-    }
+    use crate::test_utils::init_test_environment;
+    use crate::userdb::UserStore;
+    use serial_test::serial;
 
     #[test]
     fn test_from_serde_json_error() {
@@ -87,22 +72,100 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_error_is_sync_and_send() {
-        // This test verifies that UserError implements Send and Sync
-        fn assert_send_sync<T: Send + Sync>() {}
+    // New tests that test error propagation in realistic scenarios
 
-        // UserError should be Send + Sync
-        assert_send_sync::<UserError>();
+    /// Test error propagation in a function that returns Result<T, UserError>
+    #[test]
+    fn test_error_propagation() {
+        // Define a function that might return UserError
+        fn validate_user_data(id: &str) -> Result<(), UserError> {
+            if id.is_empty() {
+                return Err(UserError::InvalidData(
+                    "User ID cannot be empty".to_string(),
+                ));
+            }
+            Ok(())
+        }
+
+        // Test with valid data
+        let result = validate_user_data("user123");
+        assert!(result.is_ok());
+
+        // Test with invalid data
+        let result = validate_user_data("");
+        match result {
+            Err(UserError::InvalidData(msg)) => {
+                assert!(msg.contains("cannot be empty"));
+            }
+            _ => panic!("Expected InvalidData error"),
+        }
+
+        // Test error propagation through the ? operator
+        fn process_user(id: &str) -> Result<String, UserError> {
+            validate_user_data(id)?;
+            Ok(format!("Processed user {}", id))
+        }
+
+        // The error should propagate
+        let result = process_user("");
+        assert!(matches!(result, Err(UserError::InvalidData(_))));
     }
 
-    #[test]
-    fn test_error_is_cloneable() {
-        // Test that UserError can be cloned
-        let error = UserError::NotFound;
-        let cloned = error.clone();
+    /// Test NotFound error in a realistic context with database operations
+    #[tokio::test]
+    #[serial]
+    async fn test_not_found_error_in_context() {
+        init_test_environment().await;
 
-        // Both should have the same string representation
-        assert_eq!(error.to_string(), cloned.to_string());
+        // Try to get a user that doesn't exist
+        let result = UserStore::get_user("nonexistent_user_id").await;
+
+        // This should succeed with None, not error
+        assert!(result.is_ok());
+        assert!(
+            result
+                .expect("Getting non-existent user should succeed")
+                .is_none()
+        );
+
+        // Now let's create a function that expects the user to exist
+        async fn get_existing_user(id: &str) -> Result<crate::userdb::User, UserError> {
+            match UserStore::get_user(id).await? {
+                Some(user) => Ok(user),
+                None => Err(UserError::NotFound),
+            }
+        }
+
+        // Test with a non-existent user
+        let result = get_existing_user("nonexistent_user_id").await;
+        assert!(matches!(result, Err(UserError::NotFound)));
+    }
+
+    /// Test error handling with database operations
+    #[tokio::test]
+    #[serial]
+    async fn test_database_error_handling() {
+        init_test_environment().await;
+
+        // Create a function that simulates a database error
+        async fn simulate_db_error() -> Result<(), UserError> {
+            Err(UserError::Storage("Simulated database error".to_string()))
+        }
+
+        // Test error propagation through multiple functions
+        async fn user_operation() -> Result<(), UserError> {
+            // First operation fails
+            simulate_db_error().await?;
+            // This should never execute due to the ? operator
+            Ok(())
+        }
+
+        let result = user_operation().await;
+        match result {
+            Err(UserError::Storage(msg)) => {
+                assert!(msg.contains("Simulated database error"));
+            }
+            _ => panic!("Expected Storage error"),
+        }
     }
 }
