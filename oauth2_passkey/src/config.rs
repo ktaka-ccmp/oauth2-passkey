@@ -13,6 +13,12 @@ pub static O2P_ROUTE_PREFIX: LazyLock<String> =
 mod tests {
     use super::*;
 
+    /// Test that O2P_ROUTE_PREFIX configuration works correctly
+    ///
+    /// This test verifies that the O2P_ROUTE_PREFIX static value is properly initialized
+    /// based on environment variables or defaults to "/o2p" when not set. It tests the
+    /// LazyLock initialization behavior.
+    ///
     #[test]
     fn test_route_prefix_default_value() {
         // Test that the default route prefix is correct when env var is not set
@@ -25,6 +31,12 @@ mod tests {
         }
     }
 
+    /// Test that O2P_ROUTE_PREFIX meets validation criteria
+    ///
+    /// This test verifies that the route prefix follows expected formatting rules:
+    /// starts with a forward slash, is not empty, and doesn't end with a slash
+    /// (unless it's just "/").
+    ///
     #[test]
     fn test_route_prefix_validation() {
         let prefix = &*O2P_ROUTE_PREFIX;
@@ -44,17 +56,6 @@ mod tests {
                 !prefix.ends_with('/'),
                 "Route prefix should not end with '/' unless it's root"
             );
-        }
-    }
-
-    #[test]
-    fn test_default_fallback_logic() {
-        // Test the fallback logic directly
-        let result = std::env::var("O2P_ROUTE_PREFIX").unwrap_or_else(|_| "/o2p".to_string());
-
-        match std::env::var("O2P_ROUTE_PREFIX") {
-            Ok(env_value) => assert_eq!(result, env_value),
-            Err(_) => assert_eq!(result, "/o2p"),
         }
     }
 }

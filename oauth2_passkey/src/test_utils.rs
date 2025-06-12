@@ -43,7 +43,7 @@ pub async fn init_test_environment() {
     ensure_database_initialized().await;
 }
 
-/// Ensures database is properly initialized - simplified since SQLite functions handle table creation
+/// Ensures database is properly initialized and creates a first user if none exists
 async fn ensure_database_initialized() {
     use crate::oauth2::OAuth2Store;
     use crate::passkey::PasskeyStore;
@@ -59,13 +59,34 @@ async fn ensure_database_initialized() {
     if let Err(e) = PasskeyStore::init().await {
         eprintln!("Warning: Failed to initialize PasskeyStore: {}", e);
     }
+
+    // Create a first user if no users exist
+    create_first_user_if_needed().await;
 }
 
-// /// Enhanced test initialization that ensures database tables exist for the current connection
-// ///
-// /// **Note**: This function is now identical to `init_test_environment()` since we simplified
-// /// the approach. SQLite functions handle table initialization directly.
-// /// This function is kept for backward compatibility and clarity of intent.
-// pub async fn init_test_environment_with_db() {
-//     init_test_environment().await;
-// }
+/// Creates a first test user if no users exist in the database
+async fn create_first_user_if_needed() {
+    use crate::userdb::{User, UserStore};
+
+    // Check if any users exist
+    match UserStore::get_all_users().await {
+        Ok(users) if users.is_empty() => {
+            // No users exist, create a first test user
+            let first_user = User::new(
+                "first-user".to_string(),
+                "first-user@example.com".to_string(),
+                "First User".to_string(),
+            );
+
+            if let Err(e) = UserStore::upsert_user(first_user).await {
+                eprintln!("Warning: Failed to create first test user: {}", e);
+            }
+        }
+        Ok(_) => {
+            // Users already exist, no need to create a first user
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to check existing users: {}", e);
+        }
+    }
+}

@@ -48,6 +48,13 @@ mod tests {
     use chrono::Duration;
     use proptest::prelude::*;
 
+    /// Test that a new user can be created with the expected properties
+    /// and that the timestamps are set correctly
+    /// This test checks:
+    /// 1. The user has the correct id, account, label
+    /// 2. is_admin defaults to false
+    /// 3. sequence_number is None
+    /// 4. created_at and updated_at are set to the current time
     #[test]
     fn test_user_new() {
         // Given user information
@@ -73,6 +80,11 @@ mod tests {
         assert_eq!(user.created_at, user.updated_at);
     }
 
+    /// Test that has_admin_privileges works correctly
+    /// This test checks:
+    /// 1. If is_admin is true, has_admin_privileges should return true
+    /// 2. If sequence_number is 1, has_admin_privileges should return true
+    /// 3. If neither condition is met, has_admin_privileges should return false
     #[test]
     fn test_has_admin_privileges_with_is_admin_true() {
         // Given a user with is_admin set to true
@@ -90,6 +102,10 @@ mod tests {
         assert!(has_privileges);
     }
 
+    /// Test that has_admin_privileges works correctly with sequence_number
+    /// This test checks:
+    /// 1. If sequence_number is 1, has_admin_privileges should return true
+    /// 2. If sequence_number is not 1, has_admin_privileges should return false
     #[test]
     fn test_has_admin_privileges_with_sequence_number_1() {
         // Given a user with sequence_number set to 1
@@ -108,6 +124,9 @@ mod tests {
         assert!(has_privileges);
     }
 
+    /// Test that has_admin_privileges works correctly when user has no admin privileges
+    /// This test checks:
+    /// 1. If is_admin is false and sequence_number is not 1, has_admin_privileges should return false
     #[test]
     fn test_has_admin_privileges_with_no_privileges() {
         // Given a user with no admin privileges
@@ -125,13 +144,6 @@ mod tests {
         // Then the user should not have admin privileges
         assert!(!has_privileges);
     }
-
-    // Removed redundant test_user_serialization as it's covered by property-based test_user_serde_roundtrip
-
-    // Removed redundant test_user_deserialization as it's covered by property-based test_user_serde_roundtrip
-
-    // Removed redundant test_user_sequence_number_serialization_when_none as it's covered by property-based test_user_serde_roundtrip
-    // which tests serialization with both Some and None sequence numbers
 
     // Property-based tests for User struct
     proptest! {

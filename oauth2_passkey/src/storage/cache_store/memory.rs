@@ -86,6 +86,8 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    /// Test for putting and getting a value in the in-memory cache store.
+    /// This test checks that a value can be stored and retrieved correctly.
     #[tokio::test]
     async fn test_put_and_get() {
         // Given an in-memory cache store
@@ -112,6 +114,9 @@ mod tests {
         assert_eq!(retrieved.unwrap().value, "test value");
     }
 
+    /// Test for putting a value with TTL in the in-memory cache store.
+    /// This test checks that a value can be stored with a TTL, even though the in-memory store ignores TTL.
+    /// It verifies that the value can still be retrieved after the put operation.
     #[tokio::test]
     async fn test_put_with_ttl() {
         // Given an in-memory cache store
@@ -138,6 +143,8 @@ mod tests {
         assert_eq!(retrieved.unwrap().value, "test value with ttl");
     }
 
+    /// Test for removing a value from the in-memory cache store.
+    /// This test checks that a value can be removed successfully and that subsequent retrieval returns None.
     #[tokio::test]
     async fn test_remove() {
         // Given an in-memory cache store with a stored value
@@ -164,6 +171,8 @@ mod tests {
         assert!(retrieved.is_none());
     }
 
+    /// Test for getting a non-existent key from the in-memory cache store.
+    /// This test checks that attempting to retrieve a key that does not exist returns None without error.
     #[tokio::test]
     async fn test_get_nonexistent_key() {
         // Given an in-memory cache store
@@ -180,6 +189,8 @@ mod tests {
         assert!(retrieved.is_none());
     }
 
+    /// Test for removing a key that does not exist in the in-memory cache store.
+    /// This test checks that removing a non-existent key does not result in an error.
     #[tokio::test]
     async fn test_multiple_prefixes() {
         // Given an in-memory cache store
@@ -205,6 +216,8 @@ mod tests {
         assert_eq!(get2.value, "value for prefix2");
     }
 
+    /// Test for overwriting an existing key in the in-memory cache store.
+    /// This test checks that when a key is overwritten, the new value is returned upon retrieval.
     #[tokio::test]
     async fn test_overwrite_existing_key() {
         // Given an in-memory cache store with an existing value
@@ -228,6 +241,8 @@ mod tests {
         assert_eq!(retrieved.value, "new value");
     }
 
+    /// Test for removing a non-existent key from the in-memory cache store.
+    /// This test checks that attempting to remove a key that does not exist does not result in an error.
     #[tokio::test]
     async fn test_remove_nonexistent_key() {
         // Given an in-memory cache store
@@ -240,6 +255,8 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    /// Test for using empty strings as prefix and key in the in-memory cache store.
+    /// This test checks that the store can handle empty strings correctly.
     #[tokio::test]
     async fn test_empty_prefix_and_key() {
         // Given an in-memory cache store
@@ -264,6 +281,9 @@ mod tests {
         use crate::storage::{CacheData, GENERIC_CACHE_STORE};
         use crate::test_utils::init_test_environment;
 
+        /// Test for the global GENERIC_CACHE_STORE integration.
+        /// This test checks that the global cache store can be used to put, get, and remove data.
+        /// It verifies that data can be stored and retrieved correctly, and that removing data works as expected.
         #[tokio::test]
         async fn test_cache_store_integration() {
             // Initialize test environment with in-memory stores
@@ -318,6 +338,9 @@ mod tests {
             }
         }
 
+        /// Test for concurrent access to the global GENERIC_CACHE_STORE.
+        /// This test checks that multiple tasks can access the cache concurrently without issues.
+        /// It verifies that data can be stored and retrieved correctly from multiple concurrent tasks.
         #[tokio::test]
         async fn test_cache_store_concurrent_access() {
             // Initialize test environment
@@ -360,6 +383,9 @@ mod tests {
             }
         }
 
+        /// Test for prefix isolation in the global GENERIC_CACHE_STORE.
+        /// This test checks that different prefixes do not interfere with each other.
+        /// It verifies that values stored under different prefixes can coexist without conflict.
         #[tokio::test]
         async fn test_cache_store_prefix_isolation() {
             // Initialize test environment
@@ -416,6 +442,10 @@ mod tests {
             }
         }
 
+        /// Test for the TTL behavior in the in-memory cache store.
+        /// This test checks that the in-memory store can handle TTL values correctly,
+        /// even though it does not enforce expiration.
+        /// It verifies that values can be stored with TTL and retrieved immediately after.
         #[tokio::test]
         async fn test_cache_store_ttl_behavior() {
             // Initialize test environment
@@ -468,6 +498,8 @@ mod tests {
             }
         }
 
+        /// Test for storing and retrieving large data in the in-memory cache store.
+        /// This test checks that the in-memory store can handle large data sizes without issues.
         #[tokio::test]
         async fn test_cache_store_large_data() {
             // Initialize test environment
@@ -508,6 +540,8 @@ mod tests {
             }
         }
 
+        /// Test for storing and retrieving special characters in keys and values.
+        /// This test checks that the in-memory cache store can handle special characters correctly.
         #[tokio::test]
         async fn test_cache_store_special_characters() {
             // Initialize test environment

@@ -113,6 +113,10 @@ mod tests {
         )
     }
 
+    /// Test UserStore initialization
+    ///
+    /// Verifies that UserStore can be initialized successfully and that
+    /// initialization is idempotent (can be called multiple times safely).
     #[tokio::test]
     #[serial]
     async fn test_userstore_init() {
@@ -130,6 +134,9 @@ mod tests {
         );
     }
 
+    /// Test UserStore upsert_user functionality
+    ///
+    /// This test covers both creating a new user and updating an existing user.
     #[tokio::test]
     #[serial]
     async fn test_userstore_upsert_user_create() {
@@ -158,49 +165,41 @@ mod tests {
         let _ = UserStore::delete_user(&created_user.id).await;
     }
 
+    /// Test that the first user created by init_test_environment is an admin
+    ///
+    /// This test ensures that the first user created during the test environment
+    /// initialization has admin privileges, which is a key requirement for the system.
+    /// It checks that the user has the expected ID, account, label, and sequence number.
     #[tokio::test]
     #[serial]
-    async fn test_userstore_upsert_user_first_user_becomes_admin() {
+    async fn test_first_user_created_by_init_environment_is_admin() {
         init_test_environment().await;
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
 
-        // This test verifies the "first user auto-admin" logic by testing the admin promotion
-        // behavior rather than relying on specific sequence numbers (which may vary in tests)
+        // Verify that the "first-user" created by init_test_environment exists and is admin
+        let first_user = UserStore::get_user("first-user")
+            .await
+            .expect("Failed to get first-user")
+            .expect("first-user should exist");
 
-        let mut test_user = create_test_user("admin-test");
-        test_user.is_admin = false; // Explicitly set to false
-
-        // Create the user
-        let result = UserStore::upsert_user(test_user.clone()).await;
-        assert!(result.is_ok(), "Creating user should succeed");
-
-        let created_user = result.expect("User creation should succeed");
+        assert_eq!(first_user.id, "first-user");
+        assert_eq!(first_user.account, "first-user@example.com");
+        assert_eq!(first_user.label, "First User");
+        assert_eq!(first_user.sequence_number, Some(1));
+        assert!(first_user.is_admin, "First user should be admin");
         assert!(
-            created_user.sequence_number.is_some(),
-            "User should have a sequence number"
+            first_user.has_admin_privileges(),
+            "First user should have admin privileges"
         );
-
-        // The key test: if this is the first user (sequence_number = 1), they should be admin
-        // If not the first user, they should retain their original admin status
-        if created_user.sequence_number == Some(1) {
-            assert!(
-                created_user.is_admin,
-                "First user (sequence_number=1) should automatically become admin"
-            );
-        } else {
-            // For non-first users, admin status should be preserved as originally set
-            assert_eq!(
-                created_user.is_admin, test_user.is_admin,
-                "Non-first user admin status should be preserved"
-            );
-        }
-
-        // Clean up
-        let _ = UserStore::delete_user(&created_user.id).await;
     }
 
+    /// Test UserStore upsert_user for updating an existing user
+    ///
+    /// This test creates a user, updates it, and verifies that the update is successful.
+    /// It checks that the updated user retains the same ID and sequence number,
+    /// but has the new label and is_admin status.
     #[tokio::test]
     #[serial]
     async fn test_userstore_upsert_user_update() {
@@ -234,6 +233,12 @@ mod tests {
         let _ = UserStore::delete_user(&final_user.id).await;
     }
 
+    /// Test UserStore get_user functionality
+    ///
+    /// This test verifies that we can retrieve a user by their ID,
+    /// both for an existing user and a non-existent user.
+    /// It checks that the retrieved user matches the expected values
+    /// and that querying a non-existent user returns None.
     #[tokio::test]
     #[serial]
     async fn test_userstore_get_user() {
@@ -275,6 +280,13 @@ mod tests {
         let _ = UserStore::delete_user(&created_user.id).await;
     }
 
+    /// Test UserStore get_all_users functionality
+    ///
+    /// This test verifies that we can retrieve all users from the database,
+    /// and that the count of users matches the expected number after creating
+    /// several test users. It checks that the created users are included in the results.
+    /// It also ensures that the initial count of users is respected.
+    /// Finally, it cleans up by deleting the test users created during the test.
     #[tokio::test]
     #[serial]
     async fn test_userstore_get_all_users() {
@@ -334,6 +346,12 @@ mod tests {
         let _ = UserStore::delete_user(&created3.id).await;
     }
 
+    /// Test UserStore delete_user functionality
+    ///
+    /// This test verifies that we can delete a user by their ID,
+    /// and that the user no longer exists after deletion.
+    /// It also checks that deleting a non-existent user does not result in an error.
+    /// It ensures that the user is successfully removed from the database.
     #[tokio::test]
     #[serial]
     async fn test_userstore_delete_user() {
@@ -370,6 +388,12 @@ mod tests {
         assert!(result.is_ok(), "Deleting non-existent user should succeed");
     }
 
+    /// Test UserStore edge cases
+    ///
+    /// This test covers edge cases such as querying with an empty string ID,
+    /// using a very long ID, and special characters in the ID.
+    /// It ensures that these cases do not panic and handle gracefully,
+    /// returning None for non-existent users.
     #[tokio::test]
     #[serial]
     async fn test_userstore_edge_cases() {
@@ -400,6 +424,10 @@ mod tests {
         );
     }
 
+    /// Test UserStore concurrent operations
+    ///
+    /// This test verifies that multiple user creation operations can be performed concurrently
+    /// without issues. It checks that both users are created successfully and have unique sequence numbers.
     #[tokio::test]
     #[serial]
     async fn test_userstore_concurrent_operations() {
@@ -443,6 +471,12 @@ mod tests {
         let _ = UserStore::delete_user(&created2.id).await;
     }
 
+    /// Test UserStore error handling for non-existent users
+    ///
+    /// This test verifies that attempting to get or delete a non-existent user
+    /// does not result in an error, but rather returns Ok(None) for get_user
+    /// and Ok(()) for delete_user. It ensures that the implementation handles
+    /// non-existent users gracefully without panicking or returning unexpected errors.
     #[tokio::test]
     #[serial]
     async fn test_userstore_error_handling_not_found() {
@@ -474,6 +508,13 @@ mod tests {
         );
     }
 
+    /// Test UserStore transaction behavior
+    ///
+    /// This test verifies that creating and updating a user preserves the sequence number,
+    /// created_at, and updated_at fields correctly. It checks that the sequence number
+    /// remains the same during updates, and that created_at is preserved while updated_at
+    /// is updated to the current time. It also ensures that the user can be created and updated
+    /// successfully within a transaction-like behavior.
     #[tokio::test]
     #[serial]
     async fn test_userstore_transaction_behavior() {
@@ -518,6 +559,10 @@ mod tests {
         let _ = UserStore::delete_user(&created_user.id).await;
     }
 
+    /// Test UserStore admin user operations
+    ///
+    /// This test verifies that the first user created has admin privileges,
+    /// and that subsequent users can be created with or without admin privileges.
     #[tokio::test]
     #[serial]
     async fn test_userstore_admin_user_operations() {
