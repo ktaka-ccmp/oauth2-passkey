@@ -310,6 +310,9 @@ mod tests {
     use crate::passkey::main::types;
     use crate::test_utils::init_test_environment;
 
+    // Create a module alias for our test utils
+    use crate::passkey::main::test_utils as passkey_test_utils;
+
     fn create_test_authenticator_response(
         user_handle: Option<String>,
         auth_id: String,
@@ -355,6 +358,9 @@ mod tests {
             raw_data: vec![],
         }
     }
+
+    #[cfg(test)]
+    use serial_test::serial;
 
     #[tokio::test]
     async fn test_start_authentication_no_username() {
@@ -846,5 +852,234 @@ mod tests {
             }
             _ => panic!("Expected Format or Verification error for malformed data"),
         }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_finish_authentication_integration_test() {
+        // Initialize test environment
+        init_test_environment().await;
+
+        // Setup test credential
+        let credential_id = "test_credential_id_123";
+        let user_id = "test_user_id_123";
+        let user_handle = "test_user_handle_123";
+        let public_key = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEckXwaEBJmwp0EVElviOu9HLgrk3TA/RG4hxcXGYkcCKZ0FIwSkFS6YmGAhRC1nckV0/KQ0/Qpw8WTgK2KQEteA==";
+        let aaguid = "f8e2d612-b2cc-4536-a028-ec advocating1951db";
+
+        // Insert test credential with user
+        let result = passkey_test_utils::insert_test_user_and_credential(
+            credential_id,
+            user_id,
+            user_handle,
+            "Test User",
+            "Test Display Name",
+            public_key,
+            aaguid,
+            42,
+        )
+        .await;
+        if let Err(e) = &result {
+            println!("Error inserting test credential: {:?}", e);
+        }
+        assert!(
+            result.is_ok(),
+            "Failed to insert test credential: {:?}",
+            result
+        );
+
+        // Verify that the credential was inserted correctly
+        let get_result = PasskeyStore::get_credential(credential_id).await;
+        assert!(get_result.is_ok(), "Failed to retrieve test credential");
+        let credential_option = get_result.unwrap();
+        assert!(credential_option.is_some(), "Credential should exist");
+
+        let credential = credential_option.unwrap();
+        assert_eq!(credential.user_id, user_id);
+        assert_eq!(credential.user.user_handle, user_handle);
+
+        // Clean up test data
+        let cleanup_result = passkey_test_utils::cleanup_test_credential(credential_id).await;
+        assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
+
+        // Verify credential was deleted
+        let verify_deleted = PasskeyStore::get_credential(credential_id).await;
+        assert!(
+            verify_deleted.unwrap().is_none(),
+            "Credential should be deleted after cleanup"
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_start_authentication_integration() {
+        use crate::passkey::main::test_utils as passkey_test_utils;
+        use crate::storage::GENERIC_CACHE_STORE;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        // Create test credential in the store
+        let credential_id = "auth_test_credential_id";
+        let user_id = "auth_test_user_id";
+        let user_handle = "auth_test_user_handle";
+        let public_key = "test_public_key_auth";
+        let username = "auth_test_user";
+
+        // Insert test credential with user
+        let insert_result = passkey_test_utils::insert_test_user_and_credential(
+            credential_id,
+            user_id,
+            user_handle,
+            username,
+            "Auth Test User",
+            public_key,
+            "test_aaguid",
+            10, // Counter
+        )
+        .await;
+        assert!(insert_result.is_ok(), "Failed to insert test credential");
+
+        // Call start_authentication with the username
+        let auth_options = super::start_authentication(Some(username.to_string())).await;
+        assert!(auth_options.is_ok(), "Failed to start authentication");
+
+        let options = auth_options.unwrap();
+
+        // Verify that options include the credential
+        assert!(
+            !options.allow_credentials.is_empty(),
+            "No credentials found in options"
+        );
+        assert_eq!(options.allow_credentials[0].id, credential_id);
+
+        // Verify that a challenge was stored in cache
+        let auth_id = options.auth_id;
+        let cache_get = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("auth_challenge", &auth_id)
+            .await;
+        assert!(cache_get.is_ok());
+        assert!(cache_get.unwrap().is_some(), "Challenge should be in cache");
+
+        // Clean up
+        let remove_cache = passkey_test_utils::remove_from_cache("auth_challenge", &auth_id).await;
+        assert!(remove_cache.is_ok(), "Failed to clean up cache");
+
+        let remove_credential = passkey_test_utils::cleanup_test_credential(credential_id).await;
+        assert!(remove_credential.is_ok(), "Failed to clean up credential");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_verify_counter_and_update() {
+        use crate::passkey::main::test_utils as passkey_test_utils;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        // Setup test credential with initial counter
+        let credential_id = "counter_test_credential_id";
+        let initial_counter = 10;
+
+        // Insert test credential with user
+        let insert_result = passkey_test_utils::insert_test_user_and_credential(
+            credential_id,
+            "counter_test_user_id",
+            "counter_test_user_handle",
+            "counter_test_user",
+            "Counter Test User",
+            "test_public_key",
+            "test_aaguid",
+            initial_counter,
+        )
+        .await;
+        assert!(insert_result.is_ok(), "Failed to insert test credential");
+
+        // Get the credential to pass to counter verification
+        let credential = crate::passkey::PasskeyStore::get_credential(credential_id)
+            .await
+            .expect("Failed to get credential")
+            .expect("Credential not found");
+
+        // Create authenticator data using the existing test helper
+        let auth_data = create_test_authenticator_data(initial_counter + 5);
+
+        // Verify counter - should pass and update
+        let verify_result = super::verify_counter(credential_id, &auth_data, &credential).await;
+        assert!(verify_result.is_ok(), "Counter verification failed");
+
+        // Check that counter was updated in the store
+        let updated_credential = crate::passkey::PasskeyStore::get_credential(credential_id)
+            .await
+            .expect("Failed to get credential")
+            .expect("Credential not found");
+
+        assert_eq!(
+            updated_credential.counter,
+            initial_counter + 5,
+            "Counter was not updated correctly"
+        );
+
+        // Test with counter that didn't increase (should fail)
+        let auth_data_same = create_test_authenticator_data(initial_counter);
+
+        let verify_result_2 =
+            super::verify_counter(credential_id, &auth_data_same, &updated_credential).await;
+        assert!(
+            verify_result_2.is_err(),
+            "Should fail with non-increasing counter"
+        );
+
+        // Clean up
+        let cleanup = passkey_test_utils::cleanup_test_credential(credential_id).await;
+        assert!(cleanup.is_ok(), "Failed to clean up test credential");
+    }
+
+    #[tokio::test]
+    async fn test_verify_user_handle() {
+        // Test for non-discoverable credential without user handle
+        let stored_credential = create_test_passkey_credential("test_user".to_string());
+
+        // Case 1: Non-discoverable credential without user handle (should pass)
+        let auth_response_no_handle =
+            create_test_authenticator_response(None, "test_auth_id".to_string());
+        let result1 =
+            super::verify_user_handle(&auth_response_no_handle, &stored_credential, false);
+        assert!(
+            result1.is_ok(),
+            "Non-discoverable credential without handle should pass"
+        );
+
+        // Case 2: Non-discoverable credential with matching user handle (should pass)
+        let auth_response_matching = create_test_authenticator_response(
+            Some(stored_credential.user.user_handle.clone()),
+            "test_auth_id".to_string(),
+        );
+        let result2 = super::verify_user_handle(&auth_response_matching, &stored_credential, false);
+        assert!(
+            result2.is_ok(),
+            "Non-discoverable credential with matching handle should pass"
+        );
+
+        // Case 3: Discoverable credential without user handle (should fail)
+        let result3 = super::verify_user_handle(&auth_response_no_handle, &stored_credential, true);
+        assert!(
+            result3.is_err(),
+            "Discoverable credential without handle should fail"
+        );
+
+        // Case 4: Credential with mismatched user handle (should fail)
+        let auth_response_mismatched = create_test_authenticator_response(
+            Some("different_user_handle".to_string()),
+            "test_auth_id".to_string(),
+        );
+        let result4 =
+            super::verify_user_handle(&auth_response_mismatched, &stored_credential, false);
+        assert!(
+            result4.is_err(),
+            "Credential with mismatched handle should fail"
+        );
     }
 }

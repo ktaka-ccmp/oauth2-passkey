@@ -56,8 +56,12 @@ pub(super) async fn remove_options(challenge_type: &str, id: &str) -> Result<(),
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::{CacheData, GENERIC_CACHE_STORE};
     use crate::test_utils::init_test_environment;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    // Create a module alias for our test utils
+    use crate::passkey::main::test_utils as passkey_test_utils;
 
     fn create_valid_stored_options() -> StoredOptions {
         let now = SystemTime::now()
@@ -244,6 +248,173 @@ mod tests {
                 assert!(msg.contains("Challenge has expired"));
             }
             _ => panic!("Expected Authentication error for timeout"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_options_cache_basics() {
+        init_test_environment().await;
+
+        // Instead of using complex types that depend on serde, test the basic cache functionality
+        let test_key = "test_cache_key";
+        let test_category = "test_category";
+        let test_value = "test_value_123".to_string();
+
+        // Put a simple string value in the cache
+        let cache_data = CacheData {
+            value: test_value.clone(),
+        };
+
+        // Store in cache
+        let result = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl(test_category, test_key, cache_data, 300)
+            .await;
+        assert!(result.is_ok(), "Failed to put test data in cache");
+
+        // Retrieve from cache
+        let get_result = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get(test_category, test_key)
+            .await;
+        assert!(get_result.is_ok(), "Failed to get test data from cache");
+
+        let retrieved_data = get_result.unwrap();
+        assert!(
+            retrieved_data.is_some(),
+            "Cache should contain our test data"
+        );
+        assert_eq!(retrieved_data.unwrap().value, test_value);
+
+        // Remove from cache
+        let remove_result = passkey_test_utils::remove_from_cache(test_category, test_key).await;
+        assert!(
+            remove_result.is_ok(),
+            "Failed to remove test data from cache"
+        );
+
+        // Verify it's removed
+        let final_result = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get(test_category, test_key)
+            .await
+            .unwrap();
+        assert!(
+            final_result.is_none(),
+            "Cache should be empty after removal"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_challenge_lifecycle_integration() {
+        use crate::passkey::main::test_utils as passkey_test_utils;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        // 1. Create a test challenge
+        let challenge_type = "test_challenge";
+        let id = "test_challenge_id_lifecycle";
+        let challenge_str = "test_challenge_123";
+        let user_handle = "test_user_handle_challenge";
+        let name = "Test User Challenge";
+        let display_name = "Test User Display Name";
+        let ttl = 300; // 5 minutes
+
+        let create_result = passkey_test_utils::create_test_challenge(
+            challenge_type,
+            id,
+            challenge_str,
+            user_handle,
+            name,
+            display_name,
+            ttl,
+        )
+        .await;
+        assert!(create_result.is_ok(), "Failed to create test challenge");
+
+        // 2. Verify the challenge exists in cache
+        let exists = passkey_test_utils::check_cache_exists(challenge_type, id).await;
+        assert!(exists, "Challenge should exist in cache");
+
+        // 3. Validate the challenge
+        let validate_result = super::get_and_validate_options(challenge_type, id).await;
+        assert!(validate_result.is_ok(), "Challenge validation failed");
+        let stored_options = validate_result.unwrap();
+
+        // 4. Verify challenge contents
+        assert_eq!(stored_options.challenge, challenge_str);
+        assert_eq!(stored_options.user.user_handle, user_handle);
+        assert_eq!(stored_options.user.name, name);
+        assert_eq!(stored_options.user.display_name, display_name);
+
+        // 5. Remove the challenge
+        let remove_result = super::remove_options(challenge_type, id).await;
+        assert!(remove_result.is_ok(), "Failed to remove challenge");
+
+        // 6. Verify it's gone
+        let exists_after = passkey_test_utils::check_cache_exists(challenge_type, id).await;
+        assert!(!exists_after, "Challenge should be removed from cache");
+
+        // 7. Try to validate again - should fail with NotFound
+        let validate_again = super::get_and_validate_options(challenge_type, id).await;
+        assert!(
+            validate_again.is_err(),
+            "Challenge should not exist anymore"
+        );
+        match validate_again.unwrap_err() {
+            crate::passkey::errors::PasskeyError::NotFound(_) => {
+                // Expected error, success
+            }
+            e => panic!("Expected NotFound error, got: {:?}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_challenge_expiration() {
+        use crate::passkey::main::test_utils as passkey_test_utils;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        // Create a challenge with very short TTL
+        let challenge_type = "test_challenge";
+        let id = "test_challenge_id_expiration";
+        let challenge_str = "test_challenge_expiry";
+        let user_handle = "test_user_handle_expiry";
+        let name = "Test User Expiry";
+        let display_name = "Test User Expiry";
+        let ttl = 1; // 1 second TTL
+
+        let create_result = passkey_test_utils::create_test_challenge(
+            challenge_type,
+            id,
+            challenge_str,
+            user_handle,
+            name,
+            display_name,
+            ttl,
+        )
+        .await;
+        assert!(create_result.is_ok(), "Failed to create test challenge");
+
+        // Wait for expiration (2 seconds)
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+        // Validate the challenge - should fail with expired error
+        let validate_result = super::get_and_validate_options(challenge_type, id).await;
+
+        match validate_result {
+            Err(crate::passkey::errors::PasskeyError::Authentication(msg)) => {
+                assert!(msg.contains("expired"), "Error should indicate expiration");
+            }
+            Err(crate::passkey::errors::PasskeyError::NotFound(_)) => {
+                // This is also acceptable - cache might have already cleaned it up
+            }
+            _ => panic!("Expected Authentication or NotFound error for expired challenge"),
         }
     }
 }

@@ -598,6 +598,7 @@ async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), Passkey
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::passkey::main::types::AuthenticatorAttestationResponse;
     use ciborium::value::Value as CborValue;
 
     #[test]
@@ -1134,5 +1135,1059 @@ mod tests {
                 e
             ),
         }
+    }
+
+    #[tokio::test]
+    async fn test_create_registration_options_integration() {
+        use crate::passkey::main::test_utils as passkey_test_utils;
+        use crate::storage::GENERIC_CACHE_STORE;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        // Create user info for registration
+        let user_handle = "test_user_handle_456";
+        let user_info = crate::passkey::types::PublicKeyCredentialUserEntity {
+            user_handle: user_handle.to_string(),
+            name: "test_user_456".to_string(),
+            display_name: "Test User 456".to_string(),
+        };
+
+        // Call the function under test
+        let options = super::create_registration_options(user_info.clone()).await;
+        assert!(options.is_ok(), "Failed to create registration options");
+
+        let registration_options = options.unwrap();
+
+        // Verify that the options contain the expected user information
+        assert_eq!(registration_options.user.user_handle, user_handle);
+        assert_eq!(registration_options.user.name, "test_user_456");
+        assert_eq!(registration_options.user.display_name, "Test User 456");
+
+        // Verify that a challenge was stored in the cache
+        let cache_result = super::get_and_validate_options("regi_challenge", user_handle).await;
+        assert!(
+            cache_result.is_ok(),
+            "Challenge was not stored in cache properly"
+        );
+
+        // Clean up cache
+        let cleanup_result =
+            passkey_test_utils::remove_from_cache("regi_challenge", user_handle).await;
+        assert!(
+            cleanup_result.is_ok(),
+            "Failed to clean up test data from cache"
+        );
+
+        // Verify removal
+        let cache_get = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("regi_challenge", user_handle)
+            .await;
+        assert!(cache_get.is_ok(), "Error checking cache");
+        assert!(
+            cache_get.unwrap().is_none(),
+            "Cache entry should be removed"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_or_create_user_handle() {
+        use crate::passkey::main::test_utils as passkey_test_utils;
+        use crate::session::User as SessionUser;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        // Test with no user (should generate a new handle)
+        let no_user_result = super::get_or_create_user_handle(&None).await;
+        assert!(
+            no_user_result.is_ok(),
+            "Failed to create user handle with no user"
+        );
+        let no_user_handle = no_user_result.unwrap();
+        assert!(
+            !no_user_handle.is_empty(),
+            "User handle should not be empty"
+        );
+
+        // Test with logged-in user
+        let session_user = Some(SessionUser {
+            id: "test_user_id_789".to_string(),
+            account: "test_account_789".to_string(),
+            label: "Test User 789".to_string(),
+            is_admin: false,
+            sequence_number: 1,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        });
+
+        // First call with this user should create a new handle
+        let first_handle_result = super::get_or_create_user_handle(&session_user).await;
+        assert!(
+            first_handle_result.is_ok(),
+            "Failed to create user handle for logged-in user"
+        );
+        let first_handle = first_handle_result.unwrap();
+
+        // Insert a test credential for this user to simulate existing credentials
+        let credential_id = "test_cred_id_for_user_handle";
+        let result = passkey_test_utils::insert_test_user_and_credential(
+            credential_id,
+            "test_user_id_789", // Same as session user ID
+            &first_handle,      // Use the generated handle
+            "Test User 789",
+            "Test Display Name 789",
+            "test_public_key",
+            "test_aaguid",
+            0,
+        )
+        .await;
+        assert!(result.is_ok(), "Failed to insert test user and credential");
+
+        // Second call with same user might reuse the handle depending on PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL
+        let second_handle_result = super::get_or_create_user_handle(&session_user).await;
+        assert!(second_handle_result.is_ok());
+
+        // Clean up
+        let cleanup_result = passkey_test_utils::cleanup_test_credential(credential_id).await;
+        assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
+    }
+
+    #[tokio::test]
+    async fn test_verify_session_then_finish_registration_success() {
+        use crate::passkey::main::test_utils as passkey_test_utils;
+        use crate::passkey::main::types::AuthenticatorAttestationResponse;
+        use crate::passkey::main::utils::{get_from_cache, remove_from_cache, store_in_cache};
+        use crate::passkey::types::{PublicKeyCredentialUserEntity, SessionInfo};
+        use crate::session::User as SessionUser;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        let user_id = "test_user_12345";
+        let user_handle = "test_handle_12345";
+
+        // Create session user
+        let session_user = SessionUser {
+            id: user_id.to_string(),
+            account: "test_account".to_string(),
+            label: "Test User".to_string(),
+            is_admin: false,
+            sequence_number: 1,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        // Store session info in cache
+        let session_info = SessionInfo {
+            user: session_user.clone(),
+        };
+        let store_result = store_in_cache("session_info", user_handle, session_info, 3600).await;
+        assert!(store_result.is_ok(), "Failed to store session info");
+
+        // Create registration challenge in cache
+        let user_entity = PublicKeyCredentialUserEntity {
+            user_handle: user_handle.to_string(),
+            name: "test_user".to_string(),
+            display_name: "Test User".to_string(),
+        };
+        let stored_options = crate::passkey::types::StoredOptions {
+            challenge: "test_challenge_12345".to_string(),
+            user: user_entity,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            ttl: 3600,
+        };
+        let challenge_store_result =
+            store_in_cache("regi_challenge", user_handle, stored_options, 3600).await;
+        assert!(challenge_store_result.is_ok(), "Failed to store challenge");
+
+        // Create test credential for storage
+        let credential_id = "test_cred_verify_session_success";
+        let user_creation_result = passkey_test_utils::insert_test_user_and_credential(
+            credential_id,
+            user_id,
+            user_handle,
+            "test_user",
+            "Test User",
+            "test_public_key",
+            "test_aaguid",
+            0,
+        )
+        .await;
+        assert!(
+            user_creation_result.is_ok(),
+            "Failed to create test user and credential"
+        );
+
+        // Create RegisterCredential with matching client data
+        let client_data = super::WebAuthnClientData {
+            type_: "webauthn.create".to_string(),
+            challenge: "test_challenge_12345".to_string(),
+            origin: crate::passkey::config::ORIGIN.to_string(),
+        };
+        let client_data_json = serde_json::to_string(&client_data).unwrap();
+        let client_data_b64 =
+            crate::utils::base64url_encode(client_data_json.as_bytes().to_vec()).unwrap();
+
+        // Create mock attestation object with proper structure
+        let mut cbor_map = Vec::new();
+        cbor_map.push((
+            CborValue::Text("fmt".to_string()),
+            CborValue::Text("none".to_string()),
+        ));
+        cbor_map.push((
+            CborValue::Text("attStmt".to_string()),
+            CborValue::Map(Vec::new()),
+        ));
+
+        // Create mock auth data with proper structure for registration
+        let mut auth_data = Vec::new();
+        // RP ID hash (32 bytes) - must match SHA-256 hash of PASSKEY_RP_ID
+        use ring::digest;
+        let rp_id_hash = digest::digest(
+            &digest::SHA256,
+            crate::passkey::config::PASSKEY_RP_ID.as_bytes(),
+        );
+        auth_data.extend_from_slice(rp_id_hash.as_ref());
+        // Flags (1 byte) - user present (0x01) + user verified (0x04) + attested credential data (0x40) = 0x45
+        auth_data.push(0x45);
+        // Counter (4 bytes)
+        auth_data.extend_from_slice(&[0u8; 4]);
+
+        // Attested credential data (required for registration)
+        // 16 bytes AAGUID
+        auth_data.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+        // 2 bytes credential ID length
+        let cred_id_bytes = credential_id.as_bytes();
+        let cred_id_len = cred_id_bytes.len() as u16;
+        auth_data.extend_from_slice(&cred_id_len.to_be_bytes());
+        // Credential ID bytes
+        auth_data.extend_from_slice(cred_id_bytes);
+        // Mock public key (COSE format) - simplified ES256 key
+        let mock_public_key = vec![
+            0xa5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 0x58, 0x20, 0x01, 0x02, 0x03, 0x04,
+            0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12,
+            0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+            0x22, 0x58, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b,
+            0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39,
+            0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40,
+        ];
+        auth_data.extend_from_slice(&mock_public_key);
+
+        cbor_map.push((
+            CborValue::Text("authData".to_string()),
+            CborValue::Bytes(auth_data),
+        ));
+
+        let cbor_value = CborValue::Map(cbor_map);
+        let mut cbor_bytes = Vec::new();
+        ciborium::ser::into_writer(&cbor_value, &mut cbor_bytes).unwrap();
+        let attestation_object_b64 = crate::utils::base64url_encode(cbor_bytes).unwrap();
+
+        let reg_data = super::RegisterCredential {
+            raw_id: credential_id.to_string(),
+            id: credential_id.to_string(),
+            type_: "public-key".to_string(),
+            user_handle: Some(user_handle.to_string()),
+            response: AuthenticatorAttestationResponse {
+                client_data_json: client_data_b64,
+                attestation_object: attestation_object_b64,
+            },
+        };
+
+        // Test the function
+        let result = super::verify_session_then_finish_registration(session_user, reg_data).await;
+        assert!(
+            result.is_ok(),
+            "verify_session_then_finish_registration should succeed: {:?}",
+            result.err()
+        );
+
+        // Verify session info was removed from cache
+        let session_check = get_from_cache::<SessionInfo>("session_info", user_handle).await;
+        assert!(session_check.is_ok());
+        assert!(
+            session_check.unwrap().is_none(),
+            "Session info should be removed from cache"
+        );
+
+        // Cleanup
+        let cleanup_result = passkey_test_utils::cleanup_test_credential(credential_id).await;
+        assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
+        let _ = remove_from_cache("regi_challenge", user_handle).await;
+    }
+
+    #[tokio::test]
+    async fn test_verify_session_then_finish_registration_missing_user_handle() {
+        use crate::passkey::main::types::AuthenticatorAttestationResponse;
+        use crate::session::User as SessionUser;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        let session_user = SessionUser {
+            id: "test_user_missing_handle".to_string(),
+            account: "test_account".to_string(),
+            label: "Test User".to_string(),
+            is_admin: false,
+            sequence_number: 1,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        // Create RegisterCredential with missing user_handle
+        let reg_data = super::RegisterCredential {
+            raw_id: "test_cred_id".to_string(),
+            id: "test_cred_id".to_string(),
+            type_: "public-key".to_string(),
+            user_handle: None, // Missing user handle
+            response: AuthenticatorAttestationResponse {
+                client_data_json: "dummy".to_string(),
+                attestation_object: "dummy".to_string(),
+            },
+        };
+
+        let result = super::verify_session_then_finish_registration(session_user, reg_data).await;
+        assert!(result.is_err(), "Should fail when user handle is missing");
+
+        match result.err().unwrap() {
+            PasskeyError::ClientData(msg) => {
+                assert_eq!(msg, "User handle is missing");
+            }
+            e => panic!("Expected PasskeyError::ClientData, got {:?}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_session_then_finish_registration_session_not_found() {
+        use crate::passkey::main::types::AuthenticatorAttestationResponse;
+        use crate::session::User as SessionUser;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        let user_handle = "nonexistent_handle_12345";
+
+        let session_user = SessionUser {
+            id: "test_user_no_session".to_string(),
+            account: "test_account".to_string(),
+            label: "Test User".to_string(),
+            is_admin: false,
+            sequence_number: 1,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        // Create RegisterCredential without storing session info in cache
+        let reg_data = super::RegisterCredential {
+            raw_id: "test_cred_id".to_string(),
+            id: "test_cred_id".to_string(),
+            type_: "public-key".to_string(),
+            user_handle: Some(user_handle.to_string()),
+            response: AuthenticatorAttestationResponse {
+                client_data_json: "dummy".to_string(),
+                attestation_object: "dummy".to_string(),
+            },
+        };
+
+        let result = super::verify_session_then_finish_registration(session_user, reg_data).await;
+        assert!(result.is_err(), "Should fail when session is not found");
+
+        match result.err().unwrap() {
+            PasskeyError::NotFound(msg) => {
+                assert_eq!(msg, "Session not found");
+            }
+            e => panic!("Expected PasskeyError::NotFound, got {:?}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_session_then_finish_registration_user_id_mismatch() {
+        use crate::passkey::main::types::AuthenticatorAttestationResponse;
+        use crate::passkey::main::utils::{get_from_cache, store_in_cache};
+        use crate::passkey::types::SessionInfo;
+        use crate::session::User as SessionUser;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        let user_handle = "test_handle_mismatch";
+
+        // Create session user with one ID
+        let stored_session_user = SessionUser {
+            id: "stored_user_id".to_string(),
+            account: "test_account".to_string(),
+            label: "Stored User".to_string(),
+            is_admin: false,
+            sequence_number: 1,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        // Create different session user with different ID
+        let current_session_user = SessionUser {
+            id: "current_user_id".to_string(), // Different ID - security breach attempt
+            account: "test_account".to_string(),
+            label: "Current User".to_string(),
+            is_admin: false,
+            sequence_number: 1,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        // Store session info with the first user
+        let session_info = SessionInfo {
+            user: stored_session_user,
+        };
+        let store_result = store_in_cache("session_info", user_handle, session_info, 3600).await;
+        assert!(store_result.is_ok(), "Failed to store session info");
+
+        let reg_data = super::RegisterCredential {
+            raw_id: "test_cred_id".to_string(),
+            id: "test_cred_id".to_string(),
+            type_: "public-key".to_string(),
+            user_handle: Some(user_handle.to_string()),
+            response: AuthenticatorAttestationResponse {
+                client_data_json: "dummy".to_string(),
+                attestation_object: "dummy".to_string(),
+            },
+        };
+
+        // Try to verify with different user - this should fail (security protection)
+        let result =
+            super::verify_session_then_finish_registration(current_session_user, reg_data).await;
+        assert!(
+            result.is_err(),
+            "Should fail when user IDs don't match - this prevents session hijacking"
+        );
+
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert_eq!(msg, "User ID mismatch");
+            }
+            e => panic!(
+                "Expected PasskeyError::Format for user ID mismatch, got {:?}",
+                e
+            ),
+        }
+
+        // Verify session info was still removed from cache (cleanup on security failure)
+        let session_check = get_from_cache::<SessionInfo>("session_info", user_handle).await;
+        assert!(session_check.is_ok());
+        assert!(
+            session_check.unwrap().is_none(),
+            "Session info should be removed even on security failure"
+        );
+    }
+
+    // Tests for verify_client_data function
+
+    // Helper function to create test RegisterCredential for verify_client_data tests
+    fn create_test_register_credential_for_verify_client_data(
+        client_data_json: String,
+        user_handle: Option<String>,
+    ) -> RegisterCredential {
+        RegisterCredential {
+            raw_id: "test_cred_id".to_string(),
+            id: "test_cred_id".to_string(),
+            type_: "public-key".to_string(),
+            user_handle,
+            response: AuthenticatorAttestationResponse {
+                client_data_json,
+                attestation_object: "test_attestation_object".to_string(),
+            },
+        }
+    }
+
+    // Helper function to create properly formatted client data JSON
+    fn create_test_client_data_json(type_: &str, challenge: &str, origin: &str) -> String {
+        let client_data = super::WebAuthnClientData {
+            type_: type_.to_string(),
+            challenge: challenge.to_string(),
+            origin: origin.to_string(),
+        };
+        serde_json::to_string(&client_data).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_verify_client_data_success() {
+        use crate::passkey::main::utils::store_in_cache;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        let user_handle = "test_user_verify_client_data_success";
+        let challenge = "test_challenge_verify_success";
+
+        // Store challenge in cache
+        let stored_options = StoredOptions {
+            challenge: challenge.to_string(),
+            user: PublicKeyCredentialUserEntity {
+                user_handle: user_handle.to_string(),
+                name: "test_user".to_string(),
+                display_name: "Test User".to_string(),
+            },
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            ttl: 3600,
+        };
+
+        let store_result =
+            store_in_cache("regi_challenge", user_handle, stored_options, 3600).await;
+        assert!(store_result.is_ok(), "Failed to store challenge in cache");
+
+        // Create valid client data
+        let client_data_json = create_test_client_data_json(
+            "webauthn.create",
+            challenge,
+            &crate::passkey::config::ORIGIN,
+        );
+        let client_data_b64 =
+            crate::utils::base64url_encode(client_data_json.as_bytes().to_vec()).unwrap();
+
+        let reg_data = create_test_register_credential_for_verify_client_data(
+            client_data_b64,
+            Some(user_handle.to_string()),
+        );
+
+        // Test the function
+        let result = super::verify_client_data(&reg_data).await;
+        assert!(
+            result.is_ok(),
+            "verify_client_data should succeed with valid data: {:?}",
+            result.err()
+        );
+
+        // Cleanup
+        let _ = remove_from_cache("regi_challenge", user_handle).await;
+    }
+
+    #[tokio::test]
+    async fn test_verify_client_data_invalid_base64() {
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        let reg_data = create_test_register_credential_for_verify_client_data(
+            "invalid_base64!@#$%".to_string(),
+            Some("test_user".to_string()),
+        );
+
+        let result = super::verify_client_data(&reg_data).await;
+        assert!(result.is_err(), "Should fail with invalid base64");
+
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert!(msg.contains("Failed to decode client data"));
+            }
+            e => panic!(
+                "Expected PasskeyError::Format for invalid base64, got {:?}",
+                e
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_client_data_invalid_utf8() {
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        // Create invalid UTF-8 bytes and encode as base64
+        let invalid_utf8_bytes = vec![0xFF, 0xFE, 0xFD]; // Invalid UTF-8 sequence
+        let invalid_utf8_b64 = crate::utils::base64url_encode(invalid_utf8_bytes).unwrap();
+
+        let reg_data = create_test_register_credential_for_verify_client_data(
+            invalid_utf8_b64,
+            Some("test_user".to_string()),
+        );
+
+        let result = super::verify_client_data(&reg_data).await;
+        assert!(result.is_err(), "Should fail with invalid UTF-8");
+
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert!(msg.contains("Client data is not valid UTF-8"));
+            }
+            e => panic!(
+                "Expected PasskeyError::Format for invalid UTF-8, got {:?}",
+                e
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_client_data_invalid_json() {
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        // Create invalid JSON
+        let invalid_json = "{ invalid json structure }";
+        let invalid_json_b64 =
+            crate::utils::base64url_encode(invalid_json.as_bytes().to_vec()).unwrap();
+
+        let reg_data = create_test_register_credential_for_verify_client_data(
+            invalid_json_b64,
+            Some("test_user".to_string()),
+        );
+
+        let result = super::verify_client_data(&reg_data).await;
+        assert!(result.is_err(), "Should fail with invalid JSON");
+
+        match result.err().unwrap() {
+            PasskeyError::Format(msg) => {
+                assert!(msg.contains("Failed to parse client data JSON"));
+            }
+            e => panic!(
+                "Expected PasskeyError::Format for invalid JSON, got {:?}",
+                e
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_client_data_wrong_type() {
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        // Create client data with wrong type (authentication instead of registration)
+        let client_data_json = create_test_client_data_json(
+            "webauthn.get", // Wrong type - should be "webauthn.create"
+            "test_challenge",
+            &crate::passkey::config::ORIGIN,
+        );
+        let client_data_b64 =
+            crate::utils::base64url_encode(client_data_json.as_bytes().to_vec()).unwrap();
+
+        let reg_data = create_test_register_credential_for_verify_client_data(
+            client_data_b64,
+            Some("test_user".to_string()),
+        );
+
+        let result = super::verify_client_data(&reg_data).await;
+        assert!(result.is_err(), "Should fail with wrong client data type");
+
+        match result.err().unwrap() {
+            PasskeyError::ClientData(msg) => {
+                assert_eq!(msg, "Invalid type");
+            }
+            e => panic!(
+                "Expected PasskeyError::ClientData for wrong type, got {:?}",
+                e
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_client_data_missing_user_handle() {
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        let client_data_json = create_test_client_data_json(
+            "webauthn.create",
+            "test_challenge",
+            &crate::passkey::config::ORIGIN,
+        );
+        let client_data_b64 =
+            crate::utils::base64url_encode(client_data_json.as_bytes().to_vec()).unwrap();
+
+        let reg_data = create_test_register_credential_for_verify_client_data(
+            client_data_b64,
+            None, // Missing user handle
+        );
+
+        let result = super::verify_client_data(&reg_data).await;
+        assert!(result.is_err(), "Should fail with missing user handle");
+
+        match result.err().unwrap() {
+            PasskeyError::ClientData(msg) => {
+                assert!(msg.contains("User handle is missing"));
+            }
+            e => panic!(
+                "Expected PasskeyError::ClientData for missing user handle, got {:?}",
+                e
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_client_data_challenge_not_found() {
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        let user_handle = "test_user_challenge_not_found";
+
+        // Don't store any challenge in cache
+        let client_data_json = create_test_client_data_json(
+            "webauthn.create",
+            "test_challenge",
+            &crate::passkey::config::ORIGIN,
+        );
+        let client_data_b64 =
+            crate::utils::base64url_encode(client_data_json.as_bytes().to_vec()).unwrap();
+
+        let reg_data = create_test_register_credential_for_verify_client_data(
+            client_data_b64,
+            Some(user_handle.to_string()),
+        );
+
+        let result = super::verify_client_data(&reg_data).await;
+        assert!(
+            result.is_err(),
+            "Should fail when challenge not found in cache"
+        );
+
+        // The error comes from get_and_validate_options which should return NotFound
+        match result.err().unwrap() {
+            PasskeyError::NotFound(_) => {
+                // Expected - challenge not found in cache
+            }
+            e => panic!(
+                "Expected PasskeyError::NotFound for missing challenge, got {:?}",
+                e
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_client_data_challenge_mismatch() {
+        use crate::passkey::main::utils::store_in_cache;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        let user_handle = "test_user_challenge_mismatch";
+        let stored_challenge = "stored_challenge_123";
+        let client_challenge = "different_challenge_456";
+
+        // Store one challenge in cache
+        let stored_options = StoredOptions {
+            challenge: stored_challenge.to_string(),
+            user: PublicKeyCredentialUserEntity {
+                user_handle: user_handle.to_string(),
+                name: "test_user".to_string(),
+                display_name: "Test User".to_string(),
+            },
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            ttl: 3600,
+        };
+
+        let store_result =
+            store_in_cache("regi_challenge", user_handle, stored_options, 3600).await;
+        assert!(store_result.is_ok(), "Failed to store challenge in cache");
+
+        // Create client data with different challenge
+        let client_data_json = create_test_client_data_json(
+            "webauthn.create",
+            client_challenge, // Different from stored challenge
+            &crate::passkey::config::ORIGIN,
+        );
+        let client_data_b64 =
+            crate::utils::base64url_encode(client_data_json.as_bytes().to_vec()).unwrap();
+
+        let reg_data = create_test_register_credential_for_verify_client_data(
+            client_data_b64,
+            Some(user_handle.to_string()),
+        );
+
+        let result = super::verify_client_data(&reg_data).await;
+        assert!(result.is_err(), "Should fail with challenge mismatch");
+
+        match result.err().unwrap() {
+            PasskeyError::Challenge(msg) => {
+                assert!(msg.contains("Challenge verification failed"));
+            }
+            e => panic!(
+                "Expected PasskeyError::Challenge for challenge mismatch, got {:?}",
+                e
+            ),
+        }
+
+        // Cleanup
+        let _ = remove_from_cache("regi_challenge", user_handle).await;
+    }
+
+    #[tokio::test]
+    async fn test_verify_client_data_origin_mismatch() {
+        use crate::passkey::main::utils::store_in_cache;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+
+        let user_handle = "test_user_origin_mismatch";
+        let challenge = "test_challenge_origin";
+
+        // Store challenge in cache
+        let stored_options = StoredOptions {
+            challenge: challenge.to_string(),
+            user: PublicKeyCredentialUserEntity {
+                user_handle: user_handle.to_string(),
+                name: "test_user".to_string(),
+                display_name: "Test User".to_string(),
+            },
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            ttl: 3600,
+        };
+
+        let store_result =
+            store_in_cache("regi_challenge", user_handle, stored_options, 3600).await;
+        assert!(store_result.is_ok(), "Failed to store challenge in cache");
+
+        // Create client data with wrong origin
+        let client_data_json = create_test_client_data_json(
+            "webauthn.create",
+            challenge,
+            "https://evil-site.com", // Different from configured ORIGIN
+        );
+        let client_data_b64 =
+            crate::utils::base64url_encode(client_data_json.as_bytes().to_vec()).unwrap();
+
+        let reg_data = create_test_register_credential_for_verify_client_data(
+            client_data_b64,
+            Some(user_handle.to_string()),
+        );
+
+        let result = super::verify_client_data(&reg_data).await;
+        assert!(result.is_err(), "Should fail with origin mismatch");
+
+        match result.err().unwrap() {
+            PasskeyError::ClientData(msg) => {
+                assert!(msg.contains("Invalid origin"));
+                assert!(msg.contains("https://evil-site.com"));
+            }
+            e => panic!(
+                "Expected PasskeyError::ClientData for origin mismatch, got {:?}",
+                e
+            ),
+        }
+
+        // Cleanup
+        let _ = remove_from_cache("regi_challenge", user_handle).await;
+    } // ========================================
+    // extract_credential_public_key tests
+    // ========================================
+
+    /// Helper function to create a test RegisterCredential for extract_credential_public_key tests
+    fn create_test_register_credential_for_extract_credential_public_key() -> RegisterCredential {
+        let client_data_json = create_test_client_data_json(
+            "webauthn.create",
+            "test-challenge",
+            "https://example.com",
+        );
+        let client_data_b64 =
+            crate::utils::base64url_encode(client_data_json.as_bytes().to_vec()).unwrap();
+
+        RegisterCredential {
+            id: "test-credential-id".to_string(),
+            raw_id: "dGVzdC1jcmVkZW50aWFsLWlk".to_string(),
+            type_: "public-key".to_string(),
+            user_handle: Some("test-user-handle".to_string()),
+            response: AuthenticatorAttestationResponse {
+                attestation_object: create_simple_test_attestation_object().unwrap(),
+                client_data_json: client_data_b64,
+            },
+        }
+    }
+
+    /// Helper function to create a simple test attestation object
+    fn create_simple_test_attestation_object() -> Result<String, String> {
+        // Create COSE key for EC2 P-256 public key
+        let mut cose_key = Vec::new();
+        let mut cbor_map = Vec::new();
+
+        // kty = 2 (EC2)
+        cbor_map.push((
+            CborValue::Integer(Integer::from(1)),
+            CborValue::Integer(Integer::from(2)),
+        ));
+        // alg = -7 (ES256)
+        cbor_map.push((
+            CborValue::Integer(Integer::from(3)),
+            CborValue::Integer(Integer::from(-7)),
+        ));
+        // crv = 1 (P-256)
+        cbor_map.push((
+            CborValue::Integer(Integer::from(-1)),
+            CborValue::Integer(Integer::from(1)),
+        ));
+        // x coordinate (32 bytes)
+        let x_coord = vec![
+            0x1f, 0x2f, 0x3f, 0x4f, 0x5f, 0x6f, 0x7f, 0x8f, 0x9f, 0xaf, 0xbf, 0xcf, 0xdf, 0xef,
+            0xff, 0x0f, 0x1f, 0x2f, 0x3f, 0x4f, 0x5f, 0x6f, 0x7f, 0x8f, 0x9f, 0xaf, 0xbf, 0xcf,
+            0xdf, 0xef, 0xff, 0x0f,
+        ];
+        cbor_map.push((
+            CborValue::Integer(Integer::from(-2)),
+            CborValue::Bytes(x_coord),
+        ));
+        // y coordinate (32 bytes)
+        let y_coord = vec![
+            0x0f, 0xff, 0xef, 0xdf, 0xcf, 0xbf, 0xaf, 0x9f, 0x8f, 0x7f, 0x6f, 0x5f, 0x4f, 0x3f,
+            0x2f, 0x1f, 0x0f, 0xff, 0xef, 0xdf, 0xcf, 0xbf, 0xaf, 0x9f, 0x8f, 0x7f, 0x6f, 0x5f,
+            0x4f, 0x3f, 0x2f, 0x1f,
+        ];
+        cbor_map.push((
+            CborValue::Integer(Integer::from(-3)),
+            CborValue::Bytes(y_coord),
+        ));
+
+        let cose_key_cbor = CborValue::Map(cbor_map);
+        ciborium::ser::into_writer(&cose_key_cbor, &mut cose_key)
+            .map_err(|e| format!("Failed to serialize COSE key: {}", e))?;
+
+        // Create credential ID (16 bytes)
+        let credential_id = vec![
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+            0x0f, 0x10,
+        ];
+
+        // Build authenticator data
+        let mut auth_data = Vec::new();
+
+        // RP ID hash (32 bytes) - SHA256("example.com")
+        auth_data.extend_from_slice(&[
+            0xa3, 0x79, 0xa6, 0xf6, 0xee, 0xaf, 0xb9, 0xa5, 0x5e, 0x37, 0x8c, 0x11, 0x80, 0x34,
+            0xe2, 0x75, 0x1e, 0x68, 0x2f, 0xab, 0x9f, 0x2d, 0x30, 0xab, 0x13, 0xd2, 0x12, 0x55,
+            0x86, 0xce, 0x19, 0x47,
+        ]);
+
+        // Flags (1 byte) - 0x45 = user present + user verified + attested credential data
+        auth_data.push(0x45);
+
+        // Counter (4 bytes)
+        auth_data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+
+        // AAGUID (16 bytes)
+        auth_data.extend_from_slice(&[
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ]);
+
+        // Credential ID length (2 bytes, big-endian)
+        let cred_id_len = credential_id.len() as u16;
+        auth_data.push((cred_id_len >> 8) as u8);
+        auth_data.push((cred_id_len & 0xff) as u8);
+
+        // Credential ID
+        auth_data.extend_from_slice(&credential_id);
+
+        // Public key (COSE key)
+        auth_data.extend_from_slice(&cose_key);
+
+        // Create the full attestation object
+        let attestation_cbor = vec![
+            0xa3, // map with 3 pairs
+            0x63, 0x66, 0x6d, 0x74, // "fmt"
+            0x64, 0x6e, 0x6f, 0x6e, 0x65, // "none"
+            0x67, 0x61, 0x74, 0x74, 0x53, 0x74, 0x6d, 0x74, // "attStmt"
+            0xa0, // empty map
+            0x68, 0x61, 0x75, 0x74, 0x68, 0x44, 0x61, 0x74, 0x61, // "authData"
+        ];
+
+        let mut full_attestation = attestation_cbor;
+        // Add byte string length for auth_data
+        if auth_data.len() < 24 {
+            full_attestation.push(0x58);
+            full_attestation.push(auth_data.len() as u8);
+        } else if auth_data.len() < 256 {
+            full_attestation.push(0x58);
+            full_attestation.push(auth_data.len() as u8);
+        } else {
+            full_attestation.push(0x59);
+            full_attestation.push((auth_data.len() >> 8) as u8);
+            full_attestation.push((auth_data.len() & 0xff) as u8);
+        }
+        full_attestation.extend_from_slice(&auth_data);
+
+        crate::utils::base64url_encode(full_attestation).map_err(|e| e.to_string())
+    }
+
+    #[tokio::test]
+    async fn test_extract_credential_public_key_success() {
+        // Initialize test environment properly
+        crate::test_utils::init_test_environment().await;
+
+        let reg_data = create_test_register_credential_for_extract_credential_public_key();
+
+        // Test the function (it's not async)
+        let result = extract_credential_public_key(&reg_data);
+
+        // Debug: Print the error if it failed
+        match &result {
+            Ok(key) => println!("Success: got public key of length {}", key.len()),
+            Err(e) => println!("Error: {}", e),
+        }
+
+        // Should succeed and return a public key string
+        assert!(result.is_ok());
+        let public_key = result.unwrap();
+        assert!(!public_key.is_empty());
+    }
+
+    #[test]
+    fn test_extract_credential_public_key_invalid_client_data() {
+        let mut reg_data = create_test_register_credential_for_extract_credential_public_key();
+        reg_data.response.client_data_json = "invalid-base64!@#".to_string();
+
+        let result = extract_credential_public_key(&reg_data);
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to decode client data")
+        );
+    }
+
+    #[test]
+    fn test_extract_credential_public_key_invalid_attestation_object() {
+        let mut reg_data = create_test_register_credential_for_extract_credential_public_key();
+        reg_data.response.attestation_object = "invalid-base64!@#".to_string();
+
+        let result = extract_credential_public_key(&reg_data);
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to decode attestation object")
+        );
+    }
+
+    #[test]
+    fn test_extract_credential_public_key_malformed_attestation_object() {
+        let mut reg_data = create_test_register_credential_for_extract_credential_public_key();
+        // Use valid base64 but invalid CBOR content
+        reg_data.response.attestation_object =
+            base64url_encode(b"not-valid-cbor".to_vec()).unwrap();
+
+        let result = extract_credential_public_key(&reg_data);
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid CBOR data")
+        );
     }
 }
