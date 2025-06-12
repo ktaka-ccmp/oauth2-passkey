@@ -30,14 +30,20 @@ mod tests {
         let prefix = &*O2P_ROUTE_PREFIX;
 
         // Route prefix should start with forward slash
-        assert!(prefix.starts_with('/'), "Route prefix should start with '/'");
-        
+        assert!(
+            prefix.starts_with('/'),
+            "Route prefix should start with '/'"
+        );
+
         // Route prefix should not be empty
         assert!(!prefix.is_empty(), "Route prefix should not be empty");
 
         // Route prefix should not end with slash (unless it's just "/")
         if prefix.len() > 1 {
-            assert!(!prefix.ends_with('/'), "Route prefix should not end with '/' unless it's root");
+            assert!(
+                !prefix.ends_with('/'),
+                "Route prefix should not end with '/' unless it's root"
+            );
         }
     }
 
@@ -45,7 +51,7 @@ mod tests {
     fn test_default_fallback_logic() {
         // Test the fallback logic directly
         let result = std::env::var("O2P_ROUTE_PREFIX").unwrap_or_else(|_| "/o2p".to_string());
-        
+
         match std::env::var("O2P_ROUTE_PREFIX") {
             Ok(env_value) => assert_eq!(result, env_value),
             Err(_) => assert_eq!(result, "/o2p"),
