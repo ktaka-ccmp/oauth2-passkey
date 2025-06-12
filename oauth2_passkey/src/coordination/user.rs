@@ -162,6 +162,13 @@ mod tests {
             updated_at: chrono::Utc::now(),
         }
     }
+
+    /// Test successful update of a user account
+    ///
+    /// This test verifies that `update_user_account` correctly updates a user account
+    /// when given valid input. It creates a test user in the database, calls the update
+    /// function, and verifies both the return value and the updated database state.
+    ///
     #[serial]
     #[tokio::test]
     async fn test_update_user_account_success() {
@@ -202,6 +209,11 @@ mod tests {
         assert_eq!(user_from_db.label, "New Label");
     }
 
+    /// Test update of a non-existent user account
+    ///
+    /// This test verifies that `update_user_account` returns a ResourceNotFound error
+    /// when called with a user ID that does not exist in the database.
+    ///
     #[serial]
     #[tokio::test]
     async fn test_update_user_account_not_found() {
@@ -229,6 +241,12 @@ mod tests {
         }
     }
 
+    /// Test successful deletion of a user account
+    ///
+    /// This test verifies that `delete_user_account` correctly deletes a user account
+    /// when given a valid user ID. It creates a test user in the database, deletes it,
+    /// and verifies the user no longer exists in the database.
+    ///
     #[serial]
     #[tokio::test]
     async fn test_delete_user_account_success() {
@@ -337,6 +355,14 @@ mod tests {
         );
     }
 
+    /// Test deletion of a user account that does not exist
+    ///
+    /// This test verifies that `delete_user_account` returns a ResourceNotFound error
+    /// when called with a non-existent user ID. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Calls `delete_user_account` with a non-existent user ID
+    /// 3. Verifies that the function returns a ResourceNotFound error
+    ///
     #[serial]
     #[tokio::test]
     async fn test_delete_user_account_not_found() {
@@ -357,6 +383,15 @@ mod tests {
         }
     }
 
+    /// Test successful generation of a new user ID
+    ///
+    /// This test verifies that `gen_new_user_id` correctly generates a new user ID
+    /// when called. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test user directly in the database
+    /// 3. Calls `gen_new_user_id` to generate a new user ID
+    /// 4. Verifies that the user ID was successfully generated
+    ///
     #[serial]
     #[tokio::test]
     async fn test_gen_new_user_id_success() {
@@ -389,9 +424,18 @@ mod tests {
         );
     }
 
+    /// Test successful retrieval of all users
+    ///
+    /// This test verifies that `get_all_users` correctly retrieves all users
+    /// when called. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test user directly in the database
+    /// 3. Calls `get_all_users` to retrieve all users
+    /// 4. Verifies that the users were successfully retrieved
+    ///
     #[serial]
     #[tokio::test]
-    #[ignore="Requires a fresh database state"]
+    #[ignore = "Requires a fresh database state"]
     async fn test_get_all_users() {
         init_test_environment().await;
 
@@ -466,6 +510,15 @@ mod tests {
         UserStore::delete_user(&user3.id).await.ok();
     }
 
+    /// Test successful retrieval of a specific user
+    ///
+    /// This test verifies that `get_user` correctly retrieves a specific user
+    /// when given a valid user ID. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test user directly in the database
+    /// 3. Calls `get_user` to retrieve the user
+    /// 4. Verifies that the user was successfully retrieved
+    ///
     #[serial]
     #[tokio::test]
     async fn test_get_user() {
@@ -523,6 +576,15 @@ mod tests {
         UserStore::delete_user(&user_id).await.ok();
     }
 
+    /// Test successful upsert of a user
+    ///
+    /// This test verifies that `upsert_user` correctly upserts a user
+    /// when given a valid user ID. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test user directly in the database
+    /// 3. Calls `upsert_user` to upsert the user
+    /// 4. Verifies that the user was successfully upserted
+    ///
     #[serial]
     #[tokio::test]
     async fn test_upsert_user() {
@@ -605,6 +667,15 @@ mod tests {
         UserStore::delete_user(&user_id).await.ok();
     }
 
+    /// Test successful deletion of a user
+    ///
+    /// This test verifies that `delete_user` correctly deletes a user
+    /// when given a valid user ID. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test user directly in the database
+    /// 3. Calls `delete_user` to delete the user
+    /// 4. Verifies that the user was successfully deleted
+    ///
     #[serial]
     #[tokio::test]
     async fn test_delete_user() {
@@ -666,6 +737,15 @@ mod tests {
         );
     }
 
+    /// Test generation of a new user ID with maximum retries
+    ///
+    /// This test verifies that `gen_new_user_id` correctly generates a new user ID
+    /// when called with maximum retries. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test user directly in the database
+    /// 3. Calls `gen_new_user_id` to generate a new user ID
+    /// 4. Verifies that the user ID was successfully generated
+    ///
     #[serial]
     #[tokio::test]
     async fn test_gen_new_user_id_max_retries() {

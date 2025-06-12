@@ -380,6 +380,15 @@ mod tests {
         Ok(())
     }
 
+    /// Test successful deletion of a passkey credential
+    ///
+    /// This test verifies that `delete_passkey_credential_core` correctly deletes
+    /// a passkey credential when given valid input. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test user and passkey credential in the database
+    /// 3. Calls `delete_passkey_credential_core` to delete the credential
+    /// 4. Verifies the credential was successfully deleted by checking it no longer exists
+    ///
     #[tokio::test]
     #[serial]
     #[ignore = "This test requires a valid session and cache setup"]
@@ -413,6 +422,16 @@ mod tests {
         Ok(())
     }
 
+    /// Test unauthorized deletion of a passkey credential
+    ///
+    /// This test verifies that `delete_passkey_credential_core` returns an error
+    /// when called with a different user ID than the one associated with the credential.
+    /// It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates test users and a passkey credential in the database
+    /// 3. Calls `delete_passkey_credential_core` with a different user ID
+    /// 4. Verifies that the function returns an Unauthorized error
+    ///
     #[tokio::test]
     #[serial]
     #[ignore = "This test requires a valid session and cache setup"]
@@ -441,6 +460,16 @@ mod tests {
         Ok(())
     }
 
+    /// Test deletion of a nonexistent passkey credential
+    ///
+    /// This test verifies that `delete_passkey_credential_core` returns a ResourceNotFound error
+    /// when called with a credential ID that does not exist in the database.
+    /// It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test user in the database
+    /// 3. Calls `delete_passkey_credential_core` with a nonexistent credential ID
+    /// 4. Verifies that the function returns a ResourceNotFound error
+    ///
     #[tokio::test]
     #[serial]
     async fn test_delete_passkey_credential_core_not_found()
@@ -465,6 +494,15 @@ mod tests {
         Ok(())
     }
 
+    /// Test listing passkey credentials for a user
+    ///
+    /// This test verifies that `list_credentials_core` correctly lists all passkey credentials
+    /// associated with a specific user. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test user and passkey credentials in the database
+    /// 3. Calls `list_credentials_core` to retrieve the credentials
+    /// 4. Verifies that the correct number of credentials are returned
+    ///
     #[tokio::test]
     #[serial]
     #[ignore = "This test requires a valid session and cache setup"]
@@ -493,6 +531,15 @@ mod tests {
         Ok(())
     }
 
+    /// Test successful update of a passkey credential
+    ///
+    /// This test verifies that `update_passkey_credential_core` correctly updates
+    /// a passkey credential when given valid input. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test user and passkey credential in the database
+    /// 3. Calls `update_passkey_credential_core` to update the credential
+    /// 4. Verifies that the credential was successfully updated
+    ///
     #[tokio::test]
     #[serial]
     async fn test_update_passkey_credential_core_success() -> Result<(), Box<dyn std::error::Error>>
@@ -549,6 +596,16 @@ mod tests {
         Ok(())
     }
 
+    /// Test unauthorized update of a passkey credential
+    ///
+    /// This test verifies that `update_passkey_credential_core` returns an Unauthorized error
+    /// when called with a different user ID than the one associated with the credential.
+    /// It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates test users and a passkey credential in the database
+    /// 3. Calls `update_passkey_credential_core` with a different user ID
+    /// 4. Verifies that the function returns an Unauthorized error
+    ///
     #[tokio::test]
     #[serial]
     async fn test_update_passkey_credential_core_unauthorized()
@@ -594,6 +651,15 @@ mod tests {
         Ok(())
     }
 
+    /// Test update of a passkey credential without a session user
+    ///
+    /// This test verifies that `update_passkey_credential_core` returns an Unauthorized error
+    /// when called without a session user. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Creates a test user and passkey credential in the database
+    /// 3. Calls `update_passkey_credential_core` without a session user
+    /// 4. Verifies that the function returns an Unauthorized error
+    ///
     #[tokio::test]
     #[serial]
     async fn test_update_passkey_credential_core_no_session()
@@ -626,6 +692,14 @@ mod tests {
         Ok(())
     }
 
+    /// Test default field mappings
+    ///
+    /// This test verifies that `get_passkey_field_mappings` returns the default field mappings
+    /// when called without any environment variables set. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Calls `get_passkey_field_mappings` to retrieve the field mappings
+    /// 3. Verifies that the returned values are the default values
+    ///
     #[test]
     fn test_get_passkey_field_mappings_defaults() {
         // Test default mappings - since .env_test doesn't set these variables,
@@ -641,6 +715,15 @@ mod tests {
         );
     }
 
+    /// Test logic of field mapping function
+    ///
+    /// This test verifies that `get_passkey_field_mappings` returns the correct field mappings
+    /// based on the environment variables set. It performs the following steps:
+    /// 1. Initializes a test environment
+    /// 2. Sets environment variables to simulate different scenarios
+    /// 3. Calls `get_passkey_field_mappings` to retrieve the field mappings
+    /// 4. Verifies that the returned values are the expected values
+    ///
     #[test]
     fn test_get_passkey_field_mappings_logic() {
         // Test the logic of the field mapping function by simulating different scenarios

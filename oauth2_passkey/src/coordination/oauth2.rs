@@ -364,6 +364,11 @@ mod tests {
     use chrono::Utc;
     use serial_test::serial;
 
+    /// Test OAuth2 field mappings return expected defaults
+    ///
+    /// This test verifies that OAuth2 field mappings return the correct default values
+    /// when environment variables are not defined.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_get_oauth2_field_mappings_defaults() -> Result<(), Box<dyn std::error::Error>> {
@@ -382,6 +387,11 @@ mod tests {
         Ok(())
     }
 
+    /// Test OAuth2 field mappings with environment variables
+    ///
+    /// This test verifies that OAuth2 field mappings work correctly when environment
+    /// variables are defined, testing the configuration system behavior.
+    ///
     #[tokio::test]
     #[serial]
     async fn test_get_account_and_label_from_oauth2_account()
@@ -457,6 +467,14 @@ mod tests {
         Ok(unique_provider_user_id)
     }
 
+    /// Test the core OAuth2 account listing functionality
+    ///
+    /// This test verifies that `list_accounts_core()` correctly retrieves all OAuth2 accounts
+    /// associated with a specific user. It creates a test user with multiple OAuth2 accounts
+    /// from different providers and verifies:
+    /// - The correct number of accounts are returned
+    /// - All returned accounts belong to the specified user
+    /// - The function handles multiple provider accounts correctly
     #[tokio::test]
     #[serial]
     async fn test_list_accounts_core() -> Result<(), Box<dyn std::error::Error>> {
@@ -496,6 +514,13 @@ mod tests {
         Ok(())
     }
 
+    /// Test the core OAuth2 account deletion functionality
+    /// This test verifies that `delete_oauth2_account_core()` correctly deletes an OAuth2 account
+    /// associated with a user. It creates a test user and OAuth2 account, then attempts to delete
+    /// the account, verifying:
+    /// - The account is successfully deleted
+    /// - The account cannot be found after deletion
+    /// - Unauthorized deletion attempts by other users are correctly handled
     #[tokio::test]
     #[serial]
     async fn test_delete_oauth2_account_core_success() -> Result<(), Box<dyn std::error::Error>> {
@@ -529,6 +554,12 @@ mod tests {
         Ok(())
     }
 
+    /// Test the core OAuth2 account deletion functionality for unauthorized access
+    /// This test verifies that `delete_oauth2_account_core()` correctly handles unauthorized deletion
+    /// attempts. It creates a test user and OAuth2 account, then tries to delete the account
+    /// as a different user, verifying:
+    /// - The deletion attempt fails with an Unauthorized error
+    /// - The account remains in the database after the unauthorized attempt
     #[tokio::test]
     #[serial]
     async fn test_delete_oauth2_account_core_unauthorized() -> Result<(), Box<dyn std::error::Error>>

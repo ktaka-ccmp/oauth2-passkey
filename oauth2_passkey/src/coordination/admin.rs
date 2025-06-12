@@ -194,6 +194,12 @@ mod tests {
         Ok(saved_user)
     }
 
+    /// Test retrieval of all users from the database
+    ///
+    /// This test verifies that `get_all_users` correctly retrieves all users and that newly
+    /// created users are included in the results. It creates test users in the database,
+    /// retrieves all users, and verifies the count and presence of created users.
+    ///
     #[serial]
     #[tokio::test]
     async fn test_get_all_users() {
@@ -250,6 +256,12 @@ mod tests {
         UserStore::delete_user(&user3_id).await.ok();
     }
 
+    /// Test retrieval of a specific user by ID
+    ///
+    /// This test verifies that `get_user` correctly retrieves a specific user by ID
+    /// and that the user has the expected properties. It also verifies that trying
+    /// to retrieve a non-existent user returns None.
+    ///
     #[serial]
     #[tokio::test]
     async fn test_get_user() {
@@ -300,6 +312,12 @@ mod tests {
         UserStore::delete_user(&user_id).await.ok();
     }
 
+    /// Test admin user account deletion functionality
+    ///
+    /// This test verifies that an admin can delete a user account and that the user
+    /// is removed from the database. It also verifies that trying to delete a
+    /// non-existent user returns a ResourceNotFound error.
+    ///
     #[serial]
     #[tokio::test]
     async fn test_delete_user_account_admin() {
@@ -353,6 +371,12 @@ mod tests {
         }
     }
 
+    /// Test to ensure that we can update a user's admin status
+    /// and that the changes are persisted in the database.
+    /// This test creates a unique admin user, updates a target user's admin status,
+    /// and verifies that the target user's admin status is updated correctly.
+    /// It also checks that a non-admin user cannot update another user's admin status.
+    /// Finally, it cleans up by deleting the test users created during the test.
     #[serial]
     #[tokio::test]
     async fn test_update_user_admin_status_success() {
@@ -421,6 +445,10 @@ mod tests {
         UserStore::delete_user(&target_user_id).await.ok();
     }
 
+    /// Test to ensure that updating a user's admin status requires admin privileges.
+    /// This test creates a non-admin user who attempts to update another user's admin status,
+    /// and verifies that the operation fails with an Unauthorized error.
+    /// It also checks that the target user's admin status remains unchanged after the failed update.
     #[serial]
     #[tokio::test]
     async fn test_update_user_admin_status_requires_admin() {
@@ -470,6 +498,14 @@ mod tests {
         UserStore::delete_user(&target_user_id).await.ok();
     }
 
+    /// Test to ensure that updating the admin status of the first user (sequence_number = 1)
+    /// is protected and cannot be changed by any user, even an admin.
+    /// This test creates an admin user, retrieves or creates the first user,
+    /// and attempts to change the first user's admin status.
+    /// It verifies that the operation fails with a Coordination error indicating
+    /// that the first user's admin status cannot be changed.
+    /// It also checks that the first user remains unchanged in the database.
+    /// Finally, it cleans up by deleting the admin user and the first user if it was created during the test.
     #[serial]
     #[tokio::test]
     async fn test_update_user_admin_status_protect_first_user() {
@@ -547,6 +583,11 @@ mod tests {
         }
     }
 
+    /// Test to ensure that deleting a passkey credential as an admin
+    /// requires admin privileges.
+    /// This test creates a non-admin user, attempts to delete a passkey credential,
+    /// and verifies that the operation fails with an Unauthorized error.
+    /// It also checks that the credential remains in the database after the failed deletion.
     #[serial]
     #[tokio::test]
     async fn test_delete_passkey_credential_admin_requires_admin() {
@@ -576,6 +617,8 @@ mod tests {
         UserStore::delete_user(&non_admin_user_id).await.ok();
     }
 
+    /// Test to ensure that deleting an OAuth2 account as an admin
+    /// requires admin privileges.
     #[serial]
     #[tokio::test]
     async fn test_delete_oauth2_account_admin_requires_admin() {
