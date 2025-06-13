@@ -18,6 +18,3 @@ pub fn oauth2_passkey_router() -> Router {
         .nest("/user", super::user::router())
         .nest("/admin", super::admin::router())
 }
-
-// Tests removed - these were no-op tests that only verified router creation
-// without testing any actual routing functionality or validation

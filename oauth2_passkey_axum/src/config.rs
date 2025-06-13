@@ -30,6 +30,3 @@ pub static O2P_RESPOND_WITH_X_CSRF_TOKEN: LazyLock<bool> = LazyLock::new(|| {
         .map(|val| val.to_lowercase() != "false")
         .unwrap_or(true)
 });
-
-// Tests removed - these were duplicating production logic with helper functions
-// providing no real validation value for a configuration module
