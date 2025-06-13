@@ -487,13 +487,9 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_store_and_get_token_from_cache() {
+        use crate::test_utils::init_test_environment;
         use chrono::{Duration, Utc};
-
-        // Set required environment variables for cache
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        init_test_environment().await;
 
         // Create test data
         let token_type = "test_token";
@@ -543,11 +539,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_get_token_from_store_not_found() {
-        // Set up environment variables for cache configuration
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         // Try to get a token that doesn't exist
         let result = get_token_from_store::<StoredToken>("test_type", "nonexistent_id").await;
@@ -576,11 +569,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_remove_token_from_store() {
-        // Set up environment variables for cache configuration
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let token_type = "test_remove";
         let token_value = "test_token_value";
@@ -634,11 +624,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_generate_store_token() {
-        // Set up environment variables for cache configuration
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let token_type = "test_generate";
         let ttl = 600; // 10 minutes
@@ -688,11 +675,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_generate_store_token_randomness() {
-        // Set up environment variables for cache configuration
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let token_type = "test_randomness";
         let ttl = 300;
@@ -737,6 +721,9 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_get_uid_from_stored_session_no_misc_id() {
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
+
         // Create state params without misc_id
         let state_params = StateParams {
             csrf_id: "csrf123".to_string(),
@@ -763,11 +750,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_get_uid_from_stored_session_token_not_found() {
-        // Set up environment variables for cache configuration
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         // Create state params with misc_id pointing to non-existent token
         let state_params = StateParams {
@@ -795,6 +779,9 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_delete_session_and_misc_token_no_misc_id() {
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
+
         // Create state params without misc_id
         let state_params = StateParams {
             csrf_id: "csrf123".to_string(),
@@ -820,11 +807,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_delete_session_and_misc_token_token_not_found() {
-        // Set up environment variables for cache configuration
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         // Create state params with misc_id pointing to non-existent token
         let state_params = StateParams {
@@ -853,11 +837,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_get_mode_from_stored_session_not_found() {
-        // Set up environment variables for cache configuration
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         // Call the function with a non-existent mode_id
         let result = get_mode_from_stored_session("nonexistent_mode_id").await;
@@ -876,11 +857,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_get_mode_from_stored_session_valid_mode() {
-        // Set up environment variables for cache configuration
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let mode_type = "mode";
         let mode = OAuth2Mode::Login;
@@ -915,11 +893,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_get_mode_from_stored_session_invalid_mode() {
-        // Set up environment variables for cache configuration
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let mode_type = "mode";
         let invalid_mode_value = "invalid_mode_value"; // Invalid OAuth2Mode value
@@ -950,10 +925,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_cache_token_with_zero_ttl() {
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let token_type = "test_zero_ttl";
         let token = "test_token_zero_ttl";
@@ -992,10 +965,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_cache_token_with_max_ttl() {
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let token_type = "test_max_ttl";
         let token = "test_token_max_ttl";
@@ -1024,10 +995,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_concurrent_token_operations() {
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let token_type = "test_concurrent";
         let ttl = 300;
@@ -1090,10 +1059,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_token_storage_with_different_prefixes() {
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let ttl = 300;
         let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
@@ -1159,10 +1126,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_token_storage_edge_cases() {
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let ttl = 300;
         let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
@@ -1221,10 +1186,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_token_overwrite_same_id() {
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let token_type = "test_overwrite";
         let ttl = 300;
@@ -1274,10 +1237,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_multiple_remove_operations() {
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let token_type = "test_multiple_remove";
         let ttl = 300;
@@ -1336,10 +1297,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_cache_operations_with_past_expiration() {
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let token_type = "test_past_expiration";
         let ttl = 300;
@@ -1370,10 +1329,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_cache_serialization_round_trip() {
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let _token_type = "test_serialization";
         let ttl = 3600;
@@ -1414,10 +1371,8 @@ mod tests {
     ///
     #[tokio::test]
     async fn test_generate_store_token_consistency() {
-        unsafe {
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://test");
-        }
+        use crate::test_utils::init_test_environment;
+        init_test_environment().await;
 
         let token_type = "test_consistency";
         let ttl = 600;
