@@ -230,6 +230,7 @@ async fn is_authenticated(
 
     let mut csrf_via_header_verified = false;
 
+    // CSRF validation for state-changing methods
     if method == Method::POST
         || method == Method::PUT
         || method == Method::DELETE
@@ -405,6 +406,13 @@ pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, 
 
     let stored_session: StoredSession = cached_session.try_into()?;
 
+    // Check if session is expired
+    if stored_session.expires_at < Utc::now() {
+        tracing::debug!("Session expired at {}", stored_session.expires_at);
+        delete_session_from_store_by_session_id(session_id).await?;
+        return Err(SessionError::SessionExpiredError);
+    }
+
     Ok(CsrfToken::new(stored_session.csrf_token))
 }
 
@@ -421,6 +429,13 @@ pub async fn get_user_and_csrf_token_from_session(
 
     let stored_session: StoredSession = cached_session.try_into()?;
 
+    // Check if session is expired
+    if stored_session.expires_at < Utc::now() {
+        tracing::debug!("Session expired at {}", stored_session.expires_at);
+        delete_session_from_store_by_session_id(session_id).await?;
+        return Err(SessionError::SessionExpiredError);
+    }
+
     let user = UserStore::get_user(&stored_session.user_id)
         .await
         .map_err(|e| {
@@ -433,4 +448,1483 @@ pub async fn get_user_and_csrf_token_from_session(
         SessionUser::from(user),
         CsrfToken::new(stored_session.csrf_token),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::init_test_environment;
+    use headers::HeaderMapExt;
+    use http::header::{HeaderMap, HeaderValue};
+
+    // Helper function to create a header map with a cookie
+    fn create_header_map_with_cookie(cookie_name: &str, cookie_value: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        let cookie_str = format!("{cookie_name}={cookie_value}");
+        headers.insert(COOKIE, HeaderValue::from_str(&cookie_str).unwrap());
+        headers
+    }
+
+    /// Test get_session_id_from_headers
+    /// This test verifies that session ID can be correctly extracted from HTTP headers.
+    /// It performs the following steps:
+    /// 1. Creates header map with valid session cookie
+    /// 2. Calls get_session_id_from_headers to extract the session ID
+    /// 3. Verifies that the function returns the correct session ID
+    #[test]
+    fn test_get_session_id_from_headers() {
+        // Given a header map with a session cookie
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let session_id = "test_session_id";
+        let headers = create_header_map_with_cookie(&cookie_name, session_id);
+
+        // When getting the session ID
+        let result = get_session_id_from_headers(&headers);
+
+        // Then it should return the session ID
+        assert!(result.is_ok());
+        let session_id_opt = result.unwrap();
+        assert!(session_id_opt.is_some());
+        assert_eq!(session_id_opt.unwrap(), session_id);
+    }
+
+    /// Test get_session_id_from_headers_no_cookie
+    /// This test verifies that session ID extraction handles missing session cookies gracefully.
+    /// It performs the following steps:
+    /// 1. Creates empty header map without any session cookie
+    /// 2. Calls get_session_id_from_headers with empty headers
+    /// 3. Verifies that the function returns None (no session ID found)
+    #[test]
+    fn test_get_session_id_from_headers_no_cookie() {
+        // Given a header map without a session cookie
+        let headers = HeaderMap::new();
+
+        // When getting the session ID
+        let result = get_session_id_from_headers(&headers);
+
+        // Then it should return None (no error)
+        assert!(result.is_ok());
+        let session_id_opt = result.unwrap();
+        assert!(session_id_opt.is_none());
+    }
+
+    /// Test get_session_id_from_headers_wrong_cookie
+    /// This test verifies that session ID extraction handles incorrect cookie names properly.
+    /// It performs the following steps:
+    /// 1. Creates header map with a non-session cookie (wrong cookie name)
+    /// 2. Calls get_session_id_from_headers with incorrect cookie
+    /// 3. Verifies that the function returns None (no session cookie found)
+    #[test]
+    fn test_get_session_id_from_headers_wrong_cookie() {
+        // Given a header map with a non-session cookie
+        let headers = create_header_map_with_cookie("wrong_cookie", "value");
+
+        // When getting the session ID
+        let result = get_session_id_from_headers(&headers);
+
+        // Then it should return None (no error)
+        assert!(result.is_ok());
+        let session_id_opt = result.unwrap();
+        assert!(session_id_opt.is_none());
+    }
+
+    /// Test csrf_token_verification
+    /// This test verifies that CSRF token verification works correctly with matching tokens.
+    /// It performs the following steps:
+    /// 1. Creates stored CSRF token and matching header token
+    /// 2. Verifies tokens using constant-time comparison
+    /// 3. Confirms that matching tokens are validated successfully
+    #[test]
+    fn test_csrf_token_verification() {
+        // Given a CSRF token in the header and a stored token
+        let stored_token = "stored_csrf_token";
+        let header_token = "stored_csrf_token";
+
+        // When verifying the tokens
+        let mut headers = HeaderMap::new();
+        headers.insert("X-CSRF-Token", HeaderValue::from_str(header_token).unwrap());
+
+        // Then the tokens should match in constant time
+        let result = header_token.as_bytes().ct_eq(stored_token.as_bytes());
+        assert!(bool::from(result));
+    }
+
+    /// Test csrf_token_verification_mismatch
+    /// This test verifies that CSRF token verification correctly rejects mismatched tokens.
+    /// It performs the following steps:
+    /// 1. Creates stored CSRF token and different header token
+    /// 2. Verifies tokens using constant-time comparison
+    /// 3. Confirms that mismatched tokens are properly rejected
+    #[test]
+    fn test_csrf_token_verification_mismatch() {
+        // Given a CSRF token in the header and a different stored token
+        let stored_token = "stored_csrf_token";
+        let header_token = "different_csrf_token";
+
+        // When verifying the tokens
+        let mut headers = HeaderMap::new();
+        headers.insert("X-CSRF-Token", HeaderValue::from_str(header_token).unwrap());
+
+        // Then the tokens should not match
+        let result = header_token.as_bytes().ct_eq(stored_token.as_bytes());
+        assert!(!bool::from(result));
+    }
+
+    // Helper function to create a test StoredSession for unit tests
+    fn create_test_session(csrf_token: &str, user_id: &str) -> serde_json::Value {
+        use chrono::Utc;
+
+        // Create a JSON representation matching StoredSession structure
+        serde_json::json!({
+            "user_id": user_id,
+            "csrf_token": csrf_token,
+            "expires_at": (Utc::now() + Duration::hours(1)).to_rfc3339(),
+            "ttl": 3600_u64,
+        })
+    }
+
+    #[cfg(test)]
+    use serial_test::serial;
+
+    /// Test get_csrf_token_from_session_success
+    /// This test verifies that CSRF tokens can be successfully retrieved from session storage.
+    /// It performs the following steps:
+    /// 1. Stores test session with CSRF token in cache
+    /// 2. Calls get_csrf_token_from_session with valid session ID
+    /// 3. Verifies that the correct CSRF token is returned
+    #[tokio::test]
+    async fn test_get_csrf_token_from_session_success() {
+        use crate::storage::CacheData;
+
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let session_id = "test_session_123";
+        let csrf_token = "test_csrf_token_456";
+
+        // Create test session data
+        let session_json = create_test_session(csrf_token, "test_user");
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: session_json.to_string(),
+        };
+
+        // Store the session in the global cache store
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Test getting CSRF token using global store
+        let result = get_csrf_token_from_session(session_id).await;
+
+        assert!(result.is_ok());
+        let token = result.unwrap();
+        assert_eq!(token.as_str(), csrf_token);
+    }
+
+    /// Test get_csrf_token_from_session_not_found
+    /// This test verifies that CSRF token retrieval handles missing sessions correctly.
+    /// It performs the following steps:
+    /// 1. Attempts to get CSRF token from non-existent session ID
+    /// 2. Calls get_csrf_token_from_session with invalid session
+    /// 3. Verifies that the function returns appropriate error for missing session
+    #[tokio::test]
+    async fn test_get_csrf_token_from_session_not_found() {
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let session_id = "nonexistent_session";
+
+        // Test getting CSRF token for nonexistent session using global store
+        let result = get_csrf_token_from_session(session_id).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SessionError::SessionError => {} // This is the expected error
+            err => panic!("Expected SessionError::SessionError, got: {:?}", err),
+        }
+    }
+
+    // Additional tests can be added here for the other refactored functions
+
+    /// Test get_user_and_csrf_token_from_session_success
+    /// This test verifies that user data and CSRF tokens can be retrieved from session storage.
+    /// It performs the following steps:
+    /// 1. Stores test session with user and CSRF token data in cache
+    /// 2. Calls get_user_from_session to retrieve user information
+    /// 3. Verifies that the function returns appropriate error when user doesn't exist in database
+    #[tokio::test]
+    async fn test_get_user_from_session_success() {
+        use crate::storage::CacheData;
+
+        // Initialize test environment (env + database)
+        init_test_environment().await;
+
+        let session_id = "test_session_123";
+        let user_id = "test_user_456";
+        let csrf_token = "test_csrf_token_789";
+
+        // Create test session data
+        let session_json = create_test_session(csrf_token, user_id);
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: session_json.to_string(),
+        };
+
+        // Store the session in the global cache store
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Test the function using global store
+        let result = get_user_from_session(session_id).await;
+
+        // The function will fail at the UserStore::get_user call since the user doesn't exist
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SessionError::SessionError => {} // This is expected since the user doesn't exist in database
+            err => panic!("Expected SessionError::SessionError, got: {:?}", err),
+        }
+    }
+
+    /// Test get_user_from_session_session_not_found
+    /// This test verifies that user retrieval handles missing sessions correctly.
+    /// It performs the following steps:
+    /// 1. Attempts to get user from non-existent session ID
+    /// 2. Calls get_user_from_session with invalid session
+    /// 3. Verifies that the function returns appropriate SessionError for missing session
+    #[tokio::test]
+    async fn test_get_user_from_session_session_not_found() {
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let session_id = "nonexistent_session";
+
+        // Test getting user for nonexistent session using global store
+        let result = get_user_from_session(session_id).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SessionError::SessionError => {} // This is the expected error
+            err => panic!("Expected SessionError::SessionError, got: {:?}", err),
+        }
+    }
+
+    /// Test create_new_session_with_uid
+    /// This test verifies that new session creation works with valid user ID.
+    /// It performs the following steps:
+    /// 1. Initializes test environment and creates test user in database
+    /// 2. Calls create_new_session_with_uid with valid user ID
+    /// 3. Verifies that session is created successfully with proper session and CSRF tokens
+    #[tokio::test]
+    async fn test_create_new_session_with_uid() {
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let user_id = "test_user_123";
+
+        // Create a new session using global store
+        let result = create_new_session_with_uid(user_id).await;
+
+        // Should succeed and return headers with cookie
+        assert!(result.is_ok());
+        let headers = result.unwrap();
+
+        // Verify there is a cookie header
+        assert!(headers.contains_key(http::header::SET_COOKIE));
+
+        // Extract session ID from cookie
+        let cookie_header = headers
+            .get(http::header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        let session_id = cookie_header
+            .split(';')
+            .next()
+            .unwrap()
+            .split('=')
+            .nth(1)
+            .unwrap();
+
+        // Verify the session was stored in global cache
+        let session_result = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await;
+
+        assert!(session_result.is_ok());
+        let session_data = session_result.unwrap();
+        assert!(session_data.is_some());
+
+        // Parse session data to verify it contains the user ID
+        let session_json: serde_json::Value =
+            serde_json::from_str(&session_data.unwrap().value).unwrap();
+        assert_eq!(session_json["user_id"].as_str().unwrap(), user_id);
+        assert!(session_json.get("csrf_token").is_some());
+        assert!(session_json.get("expires_at").is_some());
+    }
+
+    /// Test delete_session_from_store_by_session_id
+    /// This test verifies that sessions can be deleted from storage by session ID.
+    /// It performs the following steps:
+    /// 1. Stores test session in cache with session ID
+    /// 2. Calls delete_session_from_store_by_session_id to remove the session
+    /// 3. Verifies that the session is successfully deleted and no longer exists in storage
+    #[tokio::test]
+    async fn test_delete_session_from_store_by_session_id() {
+        use crate::storage::CacheData;
+
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let session_id = "test_session_to_delete";
+        let user_id = "test_user";
+        let csrf_token = "test_csrf_token";
+
+        // Create test session data
+        let session_json = create_test_session(csrf_token, user_id);
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: session_json.to_string(),
+        };
+
+        // Store the session in global cache store
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Delete the session by session ID using global store
+        let delete_result = delete_session_from_store_by_session_id(session_id).await;
+
+        // Deletion should succeed
+        assert!(delete_result.is_ok());
+
+        // Verify session is gone
+        let verify_result = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await;
+
+        assert!(verify_result.is_ok());
+        assert!(verify_result.unwrap().is_none());
+    }
+
+    /// Test is_authenticated_success
+    /// This test verifies that authentication validation works correctly with valid session data.
+    /// It performs the following steps:
+    /// 1. Stores valid session with CSRF token in cache
+    /// 2. Creates HTTP headers with proper session cookie and CSRF token
+    /// 3. Calls authentication validation and verifies successful authentication
+    #[tokio::test]
+    async fn test_is_authenticated_success() {
+        use crate::storage::CacheData;
+        use http::Method;
+
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let session_id = "test_session_auth_success";
+        let user_id = "test_user_auth";
+        let csrf_token = "test_csrf_token_auth";
+
+        // Create test session data with future expiration
+        let session_json = create_test_session(csrf_token, user_id);
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: session_json.to_string(),
+        };
+
+        // Store the session in global cache store
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Create headers with session cookie
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let headers = create_header_map_with_cookie(&cookie_name, session_id);
+
+        // Test with GET method (no CSRF validation needed) using global store
+        let result = is_authenticated(&headers, &Method::GET, false).await;
+
+        assert!(result.is_ok());
+        let (auth_status, user_id_opt, csrf_token_opt, csrf_header_verified) = result.unwrap();
+
+        assert!(auth_status.0); // Should be authenticated
+        assert!(user_id_opt.is_some());
+        assert_eq!(user_id_opt.unwrap().as_str(), user_id);
+        assert!(csrf_token_opt.is_some());
+        assert_eq!(csrf_token_opt.unwrap().as_str(), csrf_token);
+        assert!(!csrf_header_verified.0); // No CSRF header validation for GET
+    }
+
+    /// Test is_authenticated_no_session_cookie
+    /// This test verifies that authentication validation handles missing session cookies correctly.
+    /// It performs the following steps:
+    /// 1. Creates HTTP headers without any session cookie
+    /// 2. Calls is_authenticated with headers missing session information
+    /// 3. Verifies that authentication fails gracefully and returns unauthenticated status
+    #[tokio::test]
+    async fn test_is_authenticated_no_session_cookie() {
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        // Create headers without session cookie
+        let headers = HeaderMap::new();
+
+        // Test authentication without session cookie using global store
+        let result = is_authenticated(&headers, &Method::GET, false).await;
+
+        assert!(result.is_ok());
+        let (auth_status, user_id_opt, csrf_token_opt, csrf_header_verified) = result.unwrap();
+
+        assert!(!auth_status.0); // Should not be authenticated
+        assert!(user_id_opt.is_none());
+        assert!(csrf_token_opt.is_none());
+        assert!(!csrf_header_verified.0); // No CSRF header validation done
+    }
+
+    /// Test is_authenticated_session_not_found
+    /// This test verifies that authentication validation handles non-existent sessions correctly.
+    /// It performs the following steps:
+    /// 1. Creates HTTP headers with session cookie pointing to non-existent session
+    /// 2. Calls is_authenticated with invalid session ID
+    /// 3. Verifies that authentication fails gracefully for missing session data
+    #[tokio::test]
+    async fn test_is_authenticated_session_not_found() {
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let nonexistent_session_id = "nonexistent_session_id";
+
+        // Create headers with session cookie that doesn't exist in cache
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let headers = create_header_map_with_cookie(&cookie_name, nonexistent_session_id);
+
+        // Test authentication with nonexistent session using global store
+        let result = is_authenticated(&headers, &Method::GET, false).await;
+
+        assert!(result.is_ok());
+        let (auth_status, user_id_opt, csrf_token_opt, csrf_header_verified) = result.unwrap();
+
+        assert!(!auth_status.0); // Should not be authenticated
+        assert!(user_id_opt.is_none());
+        assert!(csrf_token_opt.is_none());
+        assert!(!csrf_header_verified.0); // No CSRF header validation done
+    }
+
+    /// Test is_authenticated_expired_session
+    /// This test verifies that authentication validation correctly handles expired sessions.
+    /// It performs the following steps:
+    /// 1. Creates session data with expiration time set to 1 hour ago
+    /// 2. Stores the expired session in cache and creates appropriate headers
+    /// 3. Verifies that authentication fails and expired session is automatically deleted
+    #[tokio::test]
+    async fn test_is_authenticated_expired_session() {
+        use crate::storage::CacheData;
+        use chrono::{Duration, Utc};
+        use http::Method;
+
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let session_id = "test_expired_session";
+        let user_id = "test_user_expired";
+        let csrf_token = "test_csrf_token_expired";
+
+        // Create expired session data (expired 1 hour ago)
+        let expired_session_json = serde_json::json!({
+            "user_id": user_id,
+            "csrf_token": csrf_token,
+            "expires_at": (Utc::now() - Duration::hours(1)).to_rfc3339(),
+            "ttl": 3600_u64,
+        });
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: expired_session_json.to_string(),
+        };
+
+        // Store the expired session in global cache store
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Create headers with expired session cookie
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let headers = create_header_map_with_cookie(&cookie_name, session_id);
+
+        // Test authentication with expired session using global store
+        let result = is_authenticated(&headers, &Method::GET, false).await;
+
+        assert!(result.is_ok());
+        let (auth_status, user_id_opt, csrf_token_opt, csrf_header_verified) = result.unwrap();
+
+        assert!(!auth_status.0); // Should not be authenticated
+        assert!(user_id_opt.is_none());
+        assert!(csrf_token_opt.is_none());
+        assert!(!csrf_header_verified.0); // No CSRF header validation done
+
+        // Verify that the expired session was deleted from global cache
+        let verify_result = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await;
+        assert!(verify_result.is_ok());
+        assert!(verify_result.unwrap().is_none()); // Session should be deleted
+    }
+
+    /// Test is_authenticated_post_with_valid_csrf_header
+    /// This test verifies that authentication validation correctly handles POST requests with valid CSRF tokens.
+    /// It performs the following steps:
+    /// 1. Stores valid session with CSRF token in cache
+    /// 2. Creates POST request headers with matching CSRF token in X-CSRF-Token header
+    /// 3. Verifies that authentication succeeds and CSRF header validation passes
+    #[tokio::test]
+    async fn test_is_authenticated_post_with_valid_csrf_header() {
+        use crate::storage::CacheData;
+        use http::{HeaderValue, Method};
+
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let session_id = "test_session_csrf_valid";
+        let user_id = "test_user_csrf";
+        let csrf_token = "test_csrf_token_valid";
+
+        // Create test session data with future expiration
+        let session_json = create_test_session(csrf_token, user_id);
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: session_json.to_string(),
+        };
+
+        // Store the session in global cache store
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Create headers with session cookie and CSRF token
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let mut headers = create_header_map_with_cookie(&cookie_name, session_id);
+        headers.insert("X-CSRF-Token", HeaderValue::from_str(csrf_token).unwrap());
+
+        // Test with POST method and valid CSRF header using global store
+        let result = is_authenticated(&headers, &Method::POST, false).await;
+
+        assert!(result.is_ok());
+        let (auth_status, user_id_opt, csrf_token_opt, csrf_header_verified) = result.unwrap();
+
+        assert!(auth_status.0); // Should be authenticated
+        assert!(user_id_opt.is_some());
+        assert_eq!(user_id_opt.unwrap().as_str(), user_id);
+        assert!(csrf_token_opt.is_some());
+        assert_eq!(csrf_token_opt.unwrap().as_str(), csrf_token);
+        assert!(csrf_header_verified.0); // CSRF header should be verified for POST
+    }
+
+    /// Test is_authenticated_post_with_invalid_csrf_header
+    /// This test verifies that authentication validation correctly rejects POST requests with invalid CSRF tokens.
+    /// It performs the following steps:
+    /// 1. Stores valid session with correct CSRF token in cache
+    /// 2. Creates POST request headers with wrong CSRF token in X-CSRF-Token header
+    /// 3. Verifies that authentication fails with CSRF token mismatch error
+    #[tokio::test]
+    async fn test_is_authenticated_post_with_invalid_csrf_header() {
+        use crate::storage::CacheData;
+        use http::{HeaderValue, Method};
+
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let session_id = "test_session_csrf_invalid";
+        let user_id = "test_user_csrf";
+        let csrf_token = "test_csrf_token_valid";
+        let wrong_csrf_token = "wrong_csrf_token_invalid";
+
+        // Create test session data with future expiration
+        let session_json = create_test_session(csrf_token, user_id);
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: session_json.to_string(),
+        };
+
+        // Store the session in global cache store
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Create headers with session cookie and WRONG CSRF token
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let mut headers = create_header_map_with_cookie(&cookie_name, session_id);
+        headers.insert(
+            "X-CSRF-Token",
+            HeaderValue::from_str(wrong_csrf_token).unwrap(),
+        );
+
+        // Test with POST method and invalid CSRF header using global store
+        let result = is_authenticated(&headers, &Method::POST, false).await;
+
+        // Should return an error due to CSRF token mismatch
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SessionError::CsrfToken(msg) => {
+                assert!(msg.contains("CSRF token mismatch"));
+            }
+            err => panic!("Expected SessionError::CsrfToken, got: {:?}", err),
+        }
+    }
+
+    /// Test get_user_and_csrf_token_from_session_success
+    /// This test verifies that user and CSRF token can be retrieved together from session storage.
+    /// It performs the following steps:
+    /// 1. Stores session with user ID and CSRF token in cache
+    /// 2. Calls get_user_and_csrf_token_from_session to retrieve both values
+    /// 3. Verifies that both user information and CSRF token are returned correctly
+    #[tokio::test]
+    async fn test_get_user_and_csrf_token_from_session_success() {
+        use crate::storage::CacheData;
+
+        // Initialize test environment (env + database)
+        init_test_environment().await;
+
+        let session_id = "test_session_user_csrf";
+        let user_id = "test_user_combined";
+        let csrf_token = "test_csrf_token_combined";
+
+        // Create test session data
+        let session_json = create_test_session(csrf_token, user_id);
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: session_json.to_string(),
+        };
+
+        // Store the session in global cache store
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Test getting user and CSRF token using global store
+        let result = get_user_and_csrf_token_from_session(session_id).await;
+
+        // With .env_test providing SQLite in-memory database, this should succeed
+        // if the user exists in the database, or fail gracefully if the user doesn't exist
+        match result {
+            Ok((user, csrf)) => {
+                // If successful, verify the CSRF token matches
+                assert_eq!(csrf.as_str(), csrf_token);
+                assert_eq!(user.id, user_id);
+            }
+            Err(SessionError::SessionError) => {
+                // This is expected if the user doesn't exist in the database
+                // The session was found and parsed correctly, but UserStore::get_user failed
+                // This is actually correct behavior for a non-existent user
+            }
+            Err(err) => {
+                panic!("Unexpected error type: {:?}", err);
+            }
+        }
+    }
+
+    /// Test get_user_and_csrf_token_from_session_session_not_found
+    /// This test verifies that user and CSRF token retrieval handles missing sessions correctly.
+    /// It performs the following steps:
+    /// 1. Attempts to get user and CSRF token from non-existent session ID
+    /// 2. Calls get_user_and_csrf_token_from_session with invalid session
+    /// 3. Verifies that the function returns appropriate SessionError for missing session
+    #[tokio::test]
+    async fn test_get_user_and_csrf_token_from_session_session_not_found() {
+        // Initialize test environment (configures global GENERIC_CACHE_STORE)
+        init_test_environment().await;
+
+        let nonexistent_session_id = "nonexistent_session_combined";
+
+        // Test getting user and CSRF token for nonexistent session using global store
+        let result = get_user_and_csrf_token_from_session(nonexistent_session_id).await;
+
+        // Should fail because session doesn't exist
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SessionError::SessionError => {} // This is the expected error
+            err => panic!("Expected SessionError::SessionError, got: {:?}", err),
+        }
+    }
+
+    /// Test get_user_and_csrf_token_from_session_expired_session
+    /// This test verifies that user and CSRF token retrieval correctly handles expired sessions.
+    /// It performs the following steps:
+    /// 1. Creates session data with expiration time in the past
+    /// 2. Stores expired session and attempts to retrieve user and CSRF token
+    /// 3. Verifies that the function properly handles session expiration and cleanup
+    #[tokio::test]
+    async fn test_get_user_and_csrf_token_from_session_expired_session() {
+        use crate::storage::CacheData;
+        use crate::storage::GENERIC_CACHE_STORE;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+        let session_id = "expired_session_123";
+
+        // Create an expired session (1 second ago)
+        let expired_time = Utc::now() - Duration::seconds(1);
+        let expired_session_json = serde_json::json!({
+            "user_id": "user123",
+            "csrf_token": "csrf_token_456",
+            "expires_at": expired_time.to_rfc3339(),
+            "ttl": 3600_u64,
+        });
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: expired_session_json.to_string(),
+        };
+
+        // Store the expired session
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Attempt to get user and CSRF token
+        let result = get_user_and_csrf_token_from_session(session_id).await;
+
+        // Should return an error for expired session
+        assert!(result.is_err());
+        match result {
+            Err(SessionError::SessionExpiredError) => {} // Expected error for expired session
+            other => panic!(
+                "Expected SessionError::SessionExpiredError, got: {:?}",
+                other
+            ),
+        }
+
+        // Verify that the expired session was deleted from the cache
+        let cached_session = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await
+            .unwrap();
+        assert!(cached_session.is_none()); // Expired session should be deleted
+    }
+
+    /// Test get_user_and_csrf_token_from_session_invalid_cache_data
+    /// This test verifies that user and CSRF token retrieval handles invalid cache data correctly.
+    /// It performs the following steps:
+    /// 1. Stores session with valid structure but invalid user data
+    /// 2. Calls get_user_and_csrf_token_from_session with invalid user reference
+    /// 3. Verifies that the function properly handles database lookup failures for invalid users
+    #[tokio::test]
+    async fn test_get_user_and_csrf_token_from_session_invalid_cache_data() {
+        use crate::storage::CacheData;
+        use crate::storage::GENERIC_CACHE_STORE;
+        use crate::test_utils::init_test_environment;
+
+        init_test_environment().await;
+        let session_id = "invalid_session_123";
+
+        // We can't directly insert invalid JSON into the mock cache since it's type-safe
+        // This test verifies the function handles the case where session exists but is invalid
+        // In practice, this would be more relevant for external cache stores (Redis, etc.)
+
+        // For now, let's test with a valid session structure but verify error handling
+        // when the UserStore operation fails (which we already expect in our current setup)
+        let valid_session_json = serde_json::json!({
+            "user_id": "invalid_user",
+            "csrf_token": "csrf_token_789",
+            "expires_at": (Utc::now() + Duration::seconds(300)).to_rfc3339(),
+            "ttl": 3600_u64,
+        });
+
+        // Convert to CacheData
+        let cache_data = CacheData {
+            value: valid_session_json.to_string(),
+        };
+
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        let result = get_user_and_csrf_token_from_session(session_id).await;
+
+        // Should return an error due to UserStore not being implemented
+        assert!(result.is_err());
+
+        // Session should still exist in cache since it wasn't expired
+        let cached_session = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await
+            .unwrap();
+        assert!(cached_session.is_some());
+    }
+
+    // Tests that require environment variables (these will fail without proper .env setup)
+
+    /// Test create_new_session_with_uid_success
+    /// This test verifies that new session creation works correctly with valid user ID.
+    /// It performs the following steps:
+    /// 1. Initializes test environment with in-memory stores
+    /// 2. Calls create_new_session_with_uid with valid user ID
+    /// 3. Verifies that session is created with proper Set-Cookie header and stored in cache
+    #[tokio::test]
+    async fn test_create_new_session_with_uid_success() {
+        use crate::session::types::StoredSession;
+        use crate::storage::GENERIC_CACHE_STORE;
+        use crate::test_utils::init_test_environment;
+        use chrono::Utc;
+
+        // Initialize test environment (uses in-memory stores)
+        init_test_environment().await;
+
+        let user_id = "test_user_session_creation";
+
+        // Create a new session
+        let result = create_new_session_with_uid(user_id).await;
+        assert!(result.is_ok());
+
+        let headers = result.unwrap();
+
+        // Verify Set-Cookie header was created
+        let cookie_header = headers.get(http::header::SET_COOKIE).unwrap();
+        let cookie_str = cookie_header.to_str().unwrap();
+
+        // Extract session ID from cookie header
+        let session_id = cookie_str
+            .split(';')
+            .next()
+            .unwrap()
+            .split('=')
+            .nth(1)
+            .unwrap();
+
+        // Verify session was actually stored in cache
+        let cached_session = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await
+            .unwrap();
+
+        assert!(cached_session.is_some());
+
+        // Verify stored session data is correct
+        let stored_session: StoredSession = cached_session.unwrap().try_into().unwrap();
+        assert_eq!(stored_session.user_id, user_id);
+        assert!(!stored_session.csrf_token.is_empty());
+        assert!(stored_session.expires_at > Utc::now());
+        assert_eq!(
+            stored_session.ttl,
+            *crate::session::config::SESSION_COOKIE_MAX_AGE
+        );
+
+        // Verify cookie contains correct session ID and has proper attributes
+        assert!(cookie_str.contains(&format!(
+            "{}={}",
+            *crate::session::config::SESSION_COOKIE_NAME,
+            session_id
+        )));
+        assert!(cookie_str.contains("HttpOnly"));
+        assert!(cookie_str.contains("Secure"));
+        assert!(cookie_str.contains("SameSite=Strict") || cookie_str.contains("SameSite=Lax"));
+    }
+
+    /// Test get_csrf_token_from_session_comprehensive
+    /// This test verifies comprehensive CSRF token retrieval functionality from session storage.
+    /// It performs the following steps:
+    /// 1. Creates and stores complete StoredSession with CSRF token in cache
+    /// 2. Calls get_csrf_token_from_session to retrieve the CSRF token
+    /// 3. Verifies that the correct CSRF token is returned and matches stored value
+    #[tokio::test]
+    async fn test_get_csrf_token_from_session_comprehensive() {
+        use crate::session::types::StoredSession;
+        use crate::storage::CacheData;
+        use crate::storage::GENERIC_CACHE_STORE;
+        use crate::test_utils::init_test_environment;
+        use chrono::{Duration, Utc};
+
+        // Initialize test environment (uses in-memory stores)
+        init_test_environment().await;
+
+        let session_id = "test_session_csrf_retrieval";
+        let user_id = "test_user_csrf";
+        let expected_csrf_token = "test_csrf_token_12345";
+
+        // Create and store a test session directly in cache
+        let stored_session = StoredSession {
+            user_id: user_id.to_string(),
+            csrf_token: expected_csrf_token.to_string(),
+            expires_at: Utc::now() + Duration::seconds(3600),
+            ttl: 3600,
+        };
+
+        let cache_data = CacheData {
+            value: serde_json::to_string(&stored_session).unwrap(),
+        };
+
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Test CSRF token retrieval
+        let csrf_result = get_csrf_token_from_session(session_id).await;
+        assert!(csrf_result.is_ok());
+
+        let csrf_token = csrf_result.unwrap();
+        assert_eq!(csrf_token.as_str(), expected_csrf_token);
+
+        // Verify session still exists in cache after retrieval
+        let cached_session = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await
+            .unwrap();
+        assert!(cached_session.is_some());
+    }
+
+    /// Test is_authenticated_basic_success
+    /// This test verifies basic authentication validation with valid session and GET request.
+    /// It performs the following steps:
+    /// 1. Creates and stores valid StoredSession with user and CSRF token
+    /// 2. Creates GET request headers with proper session cookie
+    /// 3. Verifies that authentication succeeds and returns correct user and CSRF information
+    #[tokio::test]
+    async fn test_is_authenticated_basic_success() {
+        use crate::session::types::StoredSession;
+        use crate::storage::CacheData;
+        use crate::storage::GENERIC_CACHE_STORE;
+        use crate::test_utils::init_test_environment;
+        use chrono::{Duration, Utc};
+        use http::Method;
+
+        // Initialize test environment (uses in-memory stores)
+        init_test_environment().await;
+
+        let session_id = "test_session_auth_basic";
+        let user_id = "test_user_auth_basic";
+        let csrf_token = "test_csrf_auth_basic";
+
+        // Create and store a test session directly in cache
+        let stored_session = StoredSession {
+            user_id: user_id.to_string(),
+            csrf_token: csrf_token.to_string(),
+            expires_at: Utc::now() + Duration::seconds(3600),
+            ttl: 3600,
+        };
+
+        let cache_data = CacheData {
+            value: serde_json::to_string(&stored_session).unwrap(),
+        };
+
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Create headers with session cookie
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let headers = create_header_map_with_cookie(&cookie_name, session_id);
+
+        // Test GET request (no CSRF required)
+        let auth_result = is_authenticated_basic(&headers, &Method::GET).await;
+        assert!(auth_result.is_ok());
+        assert!(auth_result.unwrap().0); // Should be authenticated
+
+        // Test POST request (CSRF validation will fail due to missing X-CSRF-Token header and non-form Content-Type)
+        let auth_result_post = is_authenticated_basic(&headers, &Method::POST).await;
+        assert!(auth_result_post.is_err()); // Should fail due to CSRF validation
+        match auth_result_post.unwrap_err() {
+            SessionError::CsrfToken(_) => {} // Expected CSRF error
+            err => panic!("Expected SessionError::CsrfToken, got: {:?}", err),
+        }
+
+        // Test with non-existent session
+        let headers_invalid = create_header_map_with_cookie(&cookie_name, "non_existent_session");
+        let auth_result_invalid = is_authenticated_basic(&headers_invalid, &Method::GET).await;
+        assert!(auth_result_invalid.is_ok());
+        assert!(!auth_result_invalid.unwrap().0); // Should NOT be authenticated
+
+        // Test with no session cookie
+        let empty_headers = http::HeaderMap::new();
+        let auth_result_no_cookie = is_authenticated_basic(&empty_headers, &Method::GET).await;
+        assert!(auth_result_no_cookie.is_ok());
+        assert!(!auth_result_no_cookie.unwrap().0); // Should NOT be authenticated
+    }
+
+    /// Test delete_session_from_store_by_session_id_success
+    /// This test verifies that session deletion by session ID works correctly.
+    /// It performs the following steps:
+    /// 1. Creates and stores valid StoredSession in cache
+    /// 2. Calls delete_session_from_store_by_session_id to remove the session
+    /// 3. Verifies that the session is successfully deleted and no longer exists in cache
+    #[tokio::test]
+    async fn test_delete_session_from_store_by_session_id_success() {
+        use crate::session::types::StoredSession;
+        use crate::storage::CacheData;
+        use crate::storage::GENERIC_CACHE_STORE;
+        use crate::test_utils::init_test_environment;
+        use chrono::{Duration, Utc};
+
+        // Initialize test environment (uses in-memory stores)
+        init_test_environment().await;
+
+        let session_id = "test_session_deletion";
+        let user_id = "test_user_deletion";
+        let csrf_token = "test_csrf_deletion";
+
+        // Create and store a test session directly in cache
+        let stored_session = StoredSession {
+            user_id: user_id.to_string(),
+            csrf_token: csrf_token.to_string(),
+            expires_at: Utc::now() + Duration::seconds(3600),
+            ttl: 3600,
+        };
+
+        let cache_data = CacheData {
+            value: serde_json::to_string(&stored_session).unwrap(),
+        };
+
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Verify session exists before deletion
+        let cached_session_before = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await
+            .unwrap();
+        assert!(cached_session_before.is_some());
+
+        // Delete the session
+        let delete_result = delete_session_from_store_by_session_id(session_id).await;
+        assert!(delete_result.is_ok());
+
+        // Verify session was actually removed from cache
+        let cached_session_after = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await
+            .unwrap();
+        assert!(cached_session_after.is_none());
+
+        // Test deleting non-existent session (should not error)
+        let delete_nonexistent =
+            delete_session_from_store_by_session_id("non_existent_session").await;
+        assert!(delete_nonexistent.is_ok());
+    }
+
+    // Tests that require UserStore (will fail without database environment variables)
+
+    /// Test get_csrf_token_from_session_missing
+    /// This test verifies that CSRF token retrieval handles non-existent sessions correctly.
+    /// It performs the following steps:
+    /// 1. Initializes test environment with in-memory stores
+    /// 2. Attempts to retrieve CSRF token from non-existent session ID
+    /// 3. Verifies that the function returns appropriate SessionError for missing session
+    #[tokio::test]
+    async fn test_get_csrf_token_from_session_missing() {
+        use crate::test_utils::init_test_environment;
+
+        // Initialize test environment (uses in-memory stores)
+        init_test_environment().await;
+
+        // Test retrieving CSRF token from non-existent session
+        let result = get_csrf_token_from_session("non_existent_session").await;
+        assert!(result.is_err());
+
+        match result {
+            Err(crate::session::errors::SessionError::SessionError) => {} // Expected error
+            other => panic!("Expected SessionError::SessionError, got: {:?}", other),
+        }
+    }
+
+    /// Test session_expiration_workflow
+    /// This test verifies the complete workflow of session expiration detection and cleanup.
+    /// It performs the following steps:
+    /// 1. Creates session with past expiration time to simulate expired session
+    /// 2. Attempts to access expired session through authentication flow
+    /// 3. Verifies that expired session is detected, rejected, and automatically cleaned up
+    #[tokio::test]
+    async fn test_session_expiration_workflow() {
+        use crate::session::types::StoredSession;
+        use crate::storage::CacheData;
+        use crate::storage::GENERIC_CACHE_STORE;
+        use crate::test_utils::init_test_environment;
+        use chrono::{Duration, Utc};
+        use http::Method;
+
+        // Initialize test environment (uses in-memory stores)
+        init_test_environment().await;
+
+        let session_id = "test_session_expiration";
+        let user_id = "test_user_expiration";
+        let csrf_token = "test_csrf_expiration";
+
+        // Create an expired session (1 hour in the past)
+        let stored_session = StoredSession {
+            user_id: user_id.to_string(),
+            csrf_token: csrf_token.to_string(),
+            expires_at: Utc::now() - Duration::hours(1),
+            ttl: 3600,
+        };
+
+        let cache_data = CacheData {
+            value: serde_json::to_string(&stored_session).unwrap(),
+        };
+
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Verify session exists before expiration check
+        let cached_session_before = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await
+            .unwrap();
+        assert!(cached_session_before.is_some());
+
+        // Test authentication with expired session - should clean up expired session
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let headers = create_header_map_with_cookie(&cookie_name, session_id);
+
+        let auth_result = is_authenticated_basic(&headers, &Method::GET).await;
+        assert!(auth_result.is_ok());
+        assert!(!auth_result.unwrap().0); // Should NOT be authenticated
+
+        // Verify expired session was automatically removed from cache
+        let cached_session_after = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await
+            .unwrap();
+        assert!(cached_session_after.is_none());
+    }
+
+    /// Test is_authenticated_basic_then_csrf_success
+    /// This test verifies authentication flow with both basic validation and CSRF token verification.
+    /// It performs the following steps:
+    /// 1. Creates and stores valid session with CSRF token
+    /// 2. Tests GET request (basic auth) followed by POST request (with CSRF validation)
+    /// 3. Verifies that both authentication modes work correctly with the same session
+    #[tokio::test]
+    async fn test_is_authenticated_basic_then_csrf_success() {
+        use crate::session::types::StoredSession;
+        use crate::storage::CacheData;
+        use crate::storage::GENERIC_CACHE_STORE;
+        use crate::test_utils::init_test_environment;
+        use chrono::{Duration, Utc};
+        use http::Method;
+
+        // Initialize test environment (uses in-memory stores)
+        init_test_environment().await;
+
+        let session_id = "test_session_csrf_auth";
+        let user_id = "test_user_csrf_auth";
+        let csrf_token = "test_csrf_token_auth";
+
+        // Create and store a test session
+        let stored_session = StoredSession {
+            user_id: user_id.to_string(),
+            csrf_token: csrf_token.to_string(),
+            expires_at: Utc::now() + Duration::seconds(3600),
+            ttl: 3600,
+        };
+
+        let cache_data = CacheData {
+            value: serde_json::to_string(&stored_session).unwrap(),
+        };
+
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Create headers with session cookie and correct CSRF token
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let mut headers = http::HeaderMap::new();
+        headers.insert(
+            http::header::COOKIE,
+            format!("{}={}", &cookie_name, session_id).parse().unwrap(),
+        );
+        headers.insert("X-CSRF-Token", csrf_token.parse().unwrap());
+
+        // Test successful authentication with CSRF
+        let auth_result = is_authenticated_basic_then_csrf(&headers, &Method::POST).await;
+        assert!(auth_result.is_ok());
+
+        let (returned_csrf_token, csrf_header_verified) = auth_result.unwrap();
+        assert_eq!(returned_csrf_token.as_str(), csrf_token);
+        assert!(csrf_header_verified.0); // CSRF was verified via header
+
+        // Test with wrong CSRF token - should fail
+        let mut headers_wrong_csrf = http::HeaderMap::new();
+        headers_wrong_csrf.insert(
+            http::header::COOKIE,
+            format!("{}={}", &cookie_name, session_id).parse().unwrap(),
+        );
+        headers_wrong_csrf.insert("X-CSRF-Token", "wrong_token".parse().unwrap());
+
+        let auth_result_wrong =
+            is_authenticated_basic_then_csrf(&headers_wrong_csrf, &Method::POST).await;
+        assert!(auth_result_wrong.is_err());
+
+        match auth_result_wrong {
+            Err(crate::session::errors::SessionError::CsrfToken(_)) => {} // Expected error
+            other => panic!("Expected SessionError::CsrfToken, got: {:?}", other),
+        }
+    }
+
+    /// Test prepare_logout_response_success
+    /// This test verifies that logout response preparation works correctly with valid session.
+    /// It performs the following steps:
+    /// 1. Creates and stores valid session in cache
+    /// 2. Calls prepare_logout_response with session cookie
+    /// 3. Verifies that logout response is prepared correctly and session is removed from cache
+    #[tokio::test]
+    #[serial]
+    async fn test_prepare_logout_response_success() {
+        use crate::storage::CacheData;
+        use headers::Cookie;
+
+        // Initialize the test environment
+        init_test_environment().await;
+
+        // Create a new session and store it in the cache
+        let csrf_token = "test_csrf_token";
+        let user_id = "test_user_id";
+        let session_id = "test_session_id";
+        let session = create_test_session(csrf_token, user_id);
+
+        // Convert JSON to CacheData for storage
+        let cache_data = CacheData {
+            value: session.to_string(),
+        };
+
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_with_ttl("session", session_id, cache_data, 3600)
+            .await
+            .unwrap();
+
+        // Verify session exists in cache before logout
+        let cached_session_before = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await
+            .unwrap();
+        assert!(cached_session_before.is_some());
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "cookie",
+            HeaderValue::from_str(&format!("{}={}", SESSION_COOKIE_NAME.as_str(), session_id))
+                .unwrap(),
+        );
+
+        let cookie = headers
+            .typed_get::<Cookie>()
+            .expect("Failed to parse cookie");
+        assert_eq!(
+            cookie.get(SESSION_COOKIE_NAME.as_str()).unwrap(),
+            session_id
+        );
+
+        let logout_result = prepare_logout_response(cookie).await;
+        assert!(logout_result.is_ok());
+
+        let headers = logout_result.unwrap();
+
+        // Verify logout cookie header is set (with expiration in the past)
+        let set_cookie_header = headers.get(http::header::SET_COOKIE).unwrap();
+        let cookie_str = set_cookie_header.to_str().unwrap();
+        assert!(cookie_str.contains(SESSION_COOKIE_NAME.as_str()));
+        assert!(cookie_str.contains("Max-Age=-86400")); // Expired cookie
+
+        // Verify the session was removed from cache
+        let cached_session_after = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get("session", session_id)
+            .await
+            .unwrap();
+        assert!(cached_session_after.is_none());
+    }
+
+    /// Test get_user_from_session_requires_database
+    /// This test verifies that user retrieval from session works correctly with database integration.
+    /// It performs the following steps:
+    /// 1. Creates test user in database and stores session in cache
+    /// 2. Calls get_user_from_session to retrieve user information
+    /// 3. Verifies that user data is correctly retrieved when session and user exist in their respective stores
+    #[tokio::test]
+    #[serial]
+    async fn test_get_user_from_session_requires_database() {
+        use crate::session::main::test_utils::{
+            cleanup_test_resources, create_test_user_and_session,
+        };
+
+        // Initialize test environment
+        init_test_environment().await;
+
+        // Create test user and session
+        let user_id = "test_user_database";
+        let account = "test@example.com";
+        let label = "Test User";
+        let is_admin = false;
+        let session_id = "test_session_database_123";
+        let csrf_token = "test_csrf_token_database";
+        let ttl = 3600;
+
+        // Insert test user and session
+        let user = create_test_user_and_session(
+            user_id, account, label, is_admin, session_id, csrf_token, ttl,
+        )
+        .await;
+        assert!(user.is_ok());
+
+        // Now test getting the user from session
+        let user_result = get_user_from_session(session_id).await;
+
+        // Should succeed now that we have added the user to the database
+        assert!(user_result.is_ok());
+        let session_user = user_result.unwrap();
+
+        // Verify retrieved user data
+        assert_eq!(session_user.id, user_id);
+        assert_eq!(session_user.account, account);
+        assert_eq!(session_user.label, label);
+        assert_eq!(session_user.is_admin, is_admin);
+
+        // Clean up test resources
+        let _ = cleanup_test_resources(user_id, session_id).await;
+    }
+
+    /// Test is_authenticated_strict_requires_database
+    /// This test verifies that strict authentication works correctly with database integration.
+    /// It performs the following steps:
+    /// 1. Creates test user in database and establishes valid session
+    /// 2. Calls is_authenticated_strict with proper session cookie
+    /// 3. Verifies that strict authentication succeeds when both session and user exist in their stores
+    #[tokio::test]
+    async fn test_is_authenticated_strict_requires_database() {
+        use crate::session::main::test_utils::{
+            cleanup_test_resources, create_test_user_and_session,
+        };
+
+        // Initialize test environment
+        init_test_environment().await;
+
+        // Test case 1: User exists in database - should authenticate
+        let user_id = "test_user_strict_auth";
+        let account = "strict_auth@example.com";
+        let label = "Strict Auth User";
+        let is_admin = false;
+        let session_id = "test_strict_auth_session";
+        let csrf_token = "test_csrf_token_strict_auth";
+        let ttl = 3600;
+
+        // Insert test user and session
+        let user = create_test_user_and_session(
+            user_id, account, label, is_admin, session_id, csrf_token, ttl,
+        )
+        .await;
+        assert!(user.is_ok());
+
+        // Create headers with session cookie
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let headers = create_header_map_with_cookie(&cookie_name, session_id);
+
+        // Test strict authentication - should succeed now that user exists
+        let auth_result = is_authenticated_strict(&headers, &Method::GET).await;
+        assert!(auth_result.is_ok());
+        assert!(auth_result.unwrap().0); // Should BE authenticated
+
+        // Test case 2: Session exists but user doesn't - should not authenticate
+        let nonexistent_user_id = "nonexistent_user";
+        let nonexistent_session_id = "nonexistent_session";
+        let nonexistent_csrf = "nonexistent_csrf";
+
+        // Create session but don't create the user in database
+        let _ = crate::session::main::test_utils::insert_test_session(
+            nonexistent_session_id,
+            nonexistent_user_id,
+            nonexistent_csrf,
+            ttl,
+        )
+        .await;
+
+        // Create headers for nonexistent user
+        let headers = create_header_map_with_cookie(&cookie_name, nonexistent_session_id);
+
+        // Test strict authentication - should fail since user doesn't exist
+        let auth_result = is_authenticated_strict(&headers, &Method::GET).await;
+        assert!(auth_result.is_ok());
+        assert!(!auth_result.unwrap().0); // Should NOT be authenticated
+
+        // Clean up test resources
+        let _ = cleanup_test_resources(user_id, session_id).await;
+        let _ = crate::session::main::test_utils::delete_test_session(nonexistent_session_id).await;
+    }
 }

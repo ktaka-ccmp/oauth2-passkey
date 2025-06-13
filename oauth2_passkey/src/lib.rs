@@ -12,6 +12,10 @@ mod storage;
 mod userdb;
 mod utils;
 
+// Test utilities module (only available in test builds)
+#[cfg(test)]
+mod test_utils;
+
 // Re-export the main coordination components
 // pub use coordinate::AuthError;
 pub use coordination::{

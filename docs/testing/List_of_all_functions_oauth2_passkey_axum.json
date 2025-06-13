@@ -1,0 +1,3313 @@
+{
+  "project_name": "oauth2_passkey_axum",
+  "functions": [
+    {
+      "name": "router",
+      "visibility": "pub(super)",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "super",
+          "type": "super"
+        }
+      ],
+      "return_type": "Router<()>",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::router",
+      "module_path": "crate::src::admin::default",
+      "file_path": "src/admin/default.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "list_users",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "AuthUser"
+        }
+      ],
+      "return_type": "Result<Html<String>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::list_users",
+      "module_path": "crate::src::admin::default",
+      "file_path": "src/admin/default.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "delete_user_account_handler",
+      "visibility": "pub(super)",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "super",
+          "type": "super"
+        }
+      ],
+      "return_type": "Result<StatusCode, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::delete_user_account_handler",
+      "module_path": "crate::src::admin::default",
+      "file_path": "src/admin/default.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "delete_passkey_credential",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "AuthUser"
+        },
+        {
+          "name": "Path(credential_id",
+          "type": "Path(credential_id"
+        }
+      ],
+      "return_type": "Result<StatusCode, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::delete_passkey_credential",
+      "module_path": "crate::src::admin::default",
+      "file_path": "src/admin/default.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "delete_oauth2_account",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "AuthUser"
+        },
+        {
+          "name": "Path((provider, provider_user_id",
+          "type": "Path((provider, provider_user_id"
+        }
+      ],
+      "return_type": "Result<StatusCode, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::delete_oauth2_account",
+      "module_path": "crate::src::admin::default",
+      "file_path": "src/admin/default.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "update_admin_status_handler",
+      "visibility": "pub(super)",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "super",
+          "type": "super"
+        }
+      ],
+      "return_type": "Result<StatusCode, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::update_admin_status_handler",
+      "module_path": "crate::src::admin::default",
+      "file_path": "src/admin/default.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_delete_user_request_struct",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::tests::test_delete_user_request_struct",
+      "module_path": "crate::src::admin::default::tests",
+      "file_path": "src/admin/default.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_delete_user_account_handler_unauthorized",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::tests::test_delete_user_account_handler_unauthorized",
+      "module_path": "crate::src::admin::default::tests",
+      "file_path": "src/admin/default.rs",
+      "attributes": [
+        "tokio::test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_page_user_context_struct",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::page_user_context_tests::test_page_user_context_struct",
+      "module_path": "crate::src::admin::default::page_user_context_tests",
+      "file_path": "src/admin/default.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_update_admin_status_request_struct",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::update_admin_status_tests::test_update_admin_status_request_struct",
+      "module_path": "crate::src::admin::default::update_admin_status_tests",
+      "file_path": "src/admin/default.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_update_admin_status_handler_unauthorized",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::update_admin_status_tests::test_update_admin_status_handler_unauthorized",
+      "module_path": "crate::src::admin::default::update_admin_status_tests",
+      "file_path": "src/admin/default.rs",
+      "attributes": [
+        "tokio::test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_router_creation",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::router_tests::test_router_creation",
+      "module_path": "crate::src::admin::default::router_tests",
+      "file_path": "src/admin/default.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_user_list_template_struct",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::default::user_list_template_tests::test_user_list_template_struct",
+      "module_path": "crate::src::admin::default::user_list_template_tests",
+      "file_path": "src/admin/default.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "router",
+      "visibility": "pub(super)",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "super",
+          "type": "super"
+        }
+      ],
+      "return_type": "Router",
+      "description": "",
+      "canonical_name": "crate::src::admin::router",
+      "module_path": "crate::src::admin",
+      "file_path": "src/admin/mod.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "router",
+      "visibility": "pub(crate)",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "crate",
+          "type": "crate"
+        }
+      ],
+      "return_type": "Router<()>",
+      "description": "",
+      "canonical_name": "crate::src::admin::optional::router",
+      "module_path": "crate::src::admin::optional",
+      "file_path": "src/admin/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "new",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "user",
+          "type": "DbUser"
+        },
+        {
+          "name": "csrf_token",
+          "type": "String"
+        },
+        {
+          "name": "passkey_credentials",
+          "type": "Vec<TemplateCredential>"
+        },
+        {
+          "name": "oauth2_accounts",
+          "type": "Vec<TemplateAccount>"
+        },
+        {
+          "name": "o2p_route_prefix",
+          "type": "String"
+        }
+      ],
+      "return_type": "Self",
+      "description": "",
+      "canonical_name": "crate::src::admin::optional::new",
+      "module_path": "crate::src::admin::optional",
+      "file_path": "src/admin/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "user_summary",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "AuthUser"
+        },
+        {
+          "name": "user_id",
+          "type": "Path<String>"
+        }
+      ],
+      "return_type": "impl IntoResponse",
+      "description": "",
+      "canonical_name": "crate::src::admin::optional::user_summary",
+      "module_path": "crate::src::admin::optional",
+      "file_path": "src/admin/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "serve_admin_user_js",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::admin::optional::serve_admin_user_js",
+      "module_path": "crate::src::admin::optional",
+      "file_path": "src/admin/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "serve_admin_user_css",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::admin::optional::serve_admin_user_css",
+      "module_path": "crate::src::admin::optional",
+      "file_path": "src/admin/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "format_date_tz",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "date",
+          "type": "&DateTime<Utc>"
+        },
+        {
+          "name": "timezone_name",
+          "type": "&str"
+        }
+      ],
+      "return_type": "String",
+      "description": "",
+      "canonical_name": "crate::src::admin::optional::format_date_tz",
+      "module_path": "crate::src::admin::optional",
+      "file_path": "src/admin/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_format_date_tz_jst",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::optional::tests::test_format_date_tz_jst",
+      "module_path": "crate::src::admin::optional::tests",
+      "file_path": "src/admin/optional.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_format_date_tz_utc",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::optional::tests::test_format_date_tz_utc",
+      "module_path": "crate::src::admin::optional::tests",
+      "file_path": "src/admin/optional.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_format_date_tz_unknown_timezone",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::optional::tests::test_format_date_tz_unknown_timezone",
+      "module_path": "crate::src::admin::optional::tests",
+      "file_path": "src/admin/optional.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_user_summary_template_new",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::optional::tests::test_user_summary_template_new",
+      "module_path": "crate::src::admin::optional::tests",
+      "file_path": "src/admin/optional.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_router_creation",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::admin::optional::router_tests::test_router_creation",
+      "module_path": "crate::src::admin::optional::router_tests",
+      "file_path": "src/admin/optional.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "get_login_url",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "route_prefix",
+          "type": "&str"
+        },
+        {
+          "name": "env_value",
+          "type": "Option<&str>"
+        }
+      ],
+      "return_type": "String",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::get_login_url",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "get_summary_url",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "route_prefix",
+          "type": "&str"
+        },
+        {
+          "name": "env_value",
+          "type": "Option<&str>"
+        }
+      ],
+      "return_type": "String",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::get_summary_url",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "get_admin_url",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "route_prefix",
+          "type": "&str"
+        },
+        {
+          "name": "env_value",
+          "type": "Option<&str>"
+        }
+      ],
+      "return_type": "String",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::get_admin_url",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "get_redirect_anon",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "env_value",
+          "type": "Option<&str>"
+        }
+      ],
+      "return_type": "String",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::get_redirect_anon",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "get_respond_with_x_csrf_token",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "env_value",
+          "type": "Option<&str>"
+        }
+      ],
+      "return_type": "bool",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::get_respond_with_x_csrf_token",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_login_url_default",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_login_url_default",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_login_url_custom",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_login_url_custom",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_summary_url_default",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_summary_url_default",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_summary_url_custom",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_summary_url_custom",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_admin_url_default",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_admin_url_default",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_admin_url_custom",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_admin_url_custom",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_redirect_anon_default",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_redirect_anon_default",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_redirect_anon_custom",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_redirect_anon_custom",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_respond_with_x_csrf_token_default",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_respond_with_x_csrf_token_default",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_respond_with_x_csrf_token_false",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_respond_with_x_csrf_token_false",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_respond_with_x_csrf_token_true",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_respond_with_x_csrf_token_true",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_respond_with_x_csrf_token_other_value",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::config::tests::test_respond_with_x_csrf_token_other_value",
+      "module_path": "crate::src::config::tests",
+      "file_path": "src/config.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "into_response_error",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "self",
+          "type": "self"
+        }
+      ],
+      "return_type": "Result<T, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::error::into_response_error",
+      "module_path": "crate::src::error",
+      "file_path": "src/error.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "into_response_error",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "self",
+          "type": "self"
+        }
+      ],
+      "return_type": "Result<T, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::error::into_response_error",
+      "module_path": "crate::src::error",
+      "file_path": "src/error.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "into_response_error",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "self",
+          "type": "self"
+        }
+      ],
+      "return_type": "Result<T, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::error::into_response_error",
+      "module_path": "crate::src::error",
+      "file_path": "src/error.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_coordination_error_unauthorized",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::error::tests::test_coordination_error_unauthorized",
+      "module_path": "crate::src::error::tests",
+      "file_path": "src/error.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_coordination_error_no_content",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::error::tests::test_coordination_error_no_content",
+      "module_path": "crate::src::error::tests",
+      "file_path": "src/error.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_coordination_error_bad_request",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::error::tests::test_coordination_error_bad_request",
+      "module_path": "crate::src::error::tests",
+      "file_path": "src/error.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_coordination_error_not_found",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::error::tests::test_coordination_error_not_found",
+      "module_path": "crate::src::error::tests",
+      "file_path": "src/error.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_coordination_error_invalid_response_mode",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::error::tests::test_coordination_error_invalid_response_mode",
+      "module_path": "crate::src::error::tests",
+      "file_path": "src/error.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_success_case",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::error::tests::test_success_case",
+      "module_path": "crate::src::error::tests",
+      "file_path": "src/error.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_http_error",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::error::tests::test_http_error",
+      "module_path": "crate::src::error::tests",
+      "file_path": "src/error.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "add_csrf_header",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "mut response",
+          "type": "Response"
+        },
+        {
+          "name": "csrf_token",
+          "type": "&str"
+        }
+      ],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::middleware::add_csrf_header",
+      "module_path": "crate::src::middleware",
+      "file_path": "src/middleware.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "handle_auth_error",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "err",
+          "type": "SessionError"
+        },
+        {
+          "name": "req",
+          "type": "&Request"
+        },
+        {
+          "name": "redirect_on_error",
+          "type": "bool"
+        }
+      ],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::middleware::handle_auth_error",
+      "module_path": "crate::src::middleware",
+      "file_path": "src/middleware.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "is_authenticated_401",
+      "visibility": "public",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "mut req",
+          "type": "Request"
+        },
+        {
+          "name": "next",
+          "type": "Next"
+        }
+      ],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::middleware::is_authenticated_401",
+      "module_path": "crate::src::middleware",
+      "file_path": "src/middleware.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "is_authenticated_redirect",
+      "visibility": "public",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "mut req",
+          "type": "Request"
+        },
+        {
+          "name": "next",
+          "type": "Next"
+        }
+      ],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::middleware::is_authenticated_redirect",
+      "module_path": "crate::src::middleware",
+      "file_path": "src/middleware.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "is_authenticated_user_401",
+      "visibility": "public",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "mut req",
+          "type": "Request"
+        },
+        {
+          "name": "next",
+          "type": "Next"
+        }
+      ],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::middleware::is_authenticated_user_401",
+      "module_path": "crate::src::middleware",
+      "file_path": "src/middleware.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "is_authenticated_user_redirect",
+      "visibility": "public",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "mut req",
+          "type": "Request"
+        },
+        {
+          "name": "next",
+          "type": "Next"
+        }
+      ],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::middleware::is_authenticated_user_redirect",
+      "module_path": "crate::src::middleware",
+      "file_path": "src/middleware.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_add_csrf_header_when_enabled",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::middleware::tests::test_add_csrf_header_when_enabled",
+      "module_path": "crate::src::middleware::tests",
+      "file_path": "src/middleware.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_add_csrf_header_with_invalid_token",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::middleware::tests::test_add_csrf_header_with_invalid_token",
+      "module_path": "crate::src::middleware::tests",
+      "file_path": "src/middleware.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_handle_auth_error_csrf_error_with_redirect",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::middleware::tests::test_handle_auth_error_csrf_error_with_redirect",
+      "module_path": "crate::src::middleware::tests",
+      "file_path": "src/middleware.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_handle_auth_error_csrf_error_without_redirect",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::middleware::tests::test_handle_auth_error_csrf_error_without_redirect",
+      "module_path": "crate::src::middleware::tests",
+      "file_path": "src/middleware.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_handle_auth_error_other_error_with_redirect",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::middleware::tests::test_handle_auth_error_other_error_with_redirect",
+      "module_path": "crate::src::middleware::tests",
+      "file_path": "src/middleware.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_handle_auth_error_other_error_without_redirect",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::middleware::tests::test_handle_auth_error_other_error_without_redirect",
+      "module_path": "crate::src::middleware::tests",
+      "file_path": "src/middleware.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_handle_auth_error_post_request_with_redirect",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::middleware::tests::test_handle_auth_error_post_request_with_redirect",
+      "module_path": "crate::src::middleware::tests",
+      "file_path": "src/middleware.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_middleware_signatures",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::middleware::tests::test_middleware_signatures",
+      "module_path": "crate::src::middleware::tests",
+      "file_path": "src/middleware.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "router",
+      "visibility": "pub(super)",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "super",
+          "type": "super"
+        }
+      ],
+      "return_type": "Router",
+      "description": "",
+      "canonical_name": "crate::src::oauth2::router",
+      "module_path": "crate::src::oauth2",
+      "file_path": "src/oauth2.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "popup_close",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "Query(params",
+          "type": "Query(params"
+        }
+      ],
+      "return_type": "Result<Html<String>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::oauth2::popup_close",
+      "module_path": "crate::src::oauth2",
+      "file_path": "src/oauth2.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "serve_oauth2_js",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Result<Response, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::oauth2::serve_oauth2_js",
+      "module_path": "crate::src::oauth2",
+      "file_path": "src/oauth2.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "google_auth",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "Option<AuthUser>"
+        },
+        {
+          "name": "headers",
+          "type": "HeaderMap"
+        },
+        {
+          "name": "Query(params",
+          "type": "Query(params"
+        }
+      ],
+      "return_type": "Result<(HeaderMap, Redirect), (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::oauth2::google_auth",
+      "module_path": "crate::src::oauth2",
+      "file_path": "src/oauth2.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "get_authorized",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "Query(query",
+          "type": "Query(query"
+        }
+      ],
+      "return_type": "Result<(HeaderMap, Redirect), (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::oauth2::get_authorized",
+      "module_path": "crate::src::oauth2",
+      "file_path": "src/oauth2.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "post_authorized",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "headers",
+          "type": "HeaderMap"
+        },
+        {
+          "name": "TypedHeader(cookies",
+          "type": "TypedHeader(cookies"
+        }
+      ],
+      "return_type": "Result<(HeaderMap, Redirect), (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::oauth2::post_authorized",
+      "module_path": "crate::src::oauth2",
+      "file_path": "src/oauth2.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "list_oauth2_accounts",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "AuthUser"
+        }
+      ],
+      "return_type": "Result<Json<Vec<OAuth2Account>>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::oauth2::list_oauth2_accounts",
+      "module_path": "crate::src::oauth2",
+      "file_path": "src/oauth2.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "delete_oauth2_account",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "AuthUser"
+        },
+        {
+          "name": "Path((provider, provider_user_id",
+          "type": "Path((provider, provider_user_id"
+        }
+      ],
+      "return_type": "Result<StatusCode, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::oauth2::delete_oauth2_account",
+      "module_path": "crate::src::oauth2",
+      "file_path": "src/oauth2.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_router",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::oauth2::tests::test_router",
+      "module_path": "crate::src::oauth2::tests",
+      "file_path": "src/oauth2.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_serve_oauth2_js",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::oauth2::tests::test_serve_oauth2_js",
+      "module_path": "crate::src::oauth2::tests",
+      "file_path": "src/oauth2.rs",
+      "attributes": [
+        "tokio::test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "router",
+      "visibility": "pub(super)",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "super",
+          "type": "super"
+        }
+      ],
+      "return_type": "Router",
+      "description": "",
+      "canonical_name": "crate::src::passkey::router",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "router_register",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Router",
+      "description": "",
+      "canonical_name": "crate::src::passkey::router_register",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "router_auth",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Router",
+      "description": "",
+      "canonical_name": "crate::src::passkey::router_auth",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "passkey_well_known_router",
+      "visibility": "public",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Router",
+      "description": "",
+      "canonical_name": "crate::src::passkey::passkey_well_known_router",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "handle_start_registration",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "Option<AuthUser>"
+        },
+        {
+          "name": "Json(request",
+          "type": "Json(request"
+        }
+      ],
+      "return_type": "Result<Json<RegistrationOptions>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::passkey::handle_start_registration",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "handle_finish_registration",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "Option<AuthUser>"
+        },
+        {
+          "name": "Json(reg_data",
+          "type": "Json(reg_data"
+        }
+      ],
+      "return_type": "Result<(HeaderMap, String), (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::passkey::handle_finish_registration",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "handle_start_authentication",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "Json(body",
+          "type": "Json(body"
+        }
+      ],
+      "return_type": "Result<Json<AuthenticationOptions>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::passkey::handle_start_authentication",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "handle_finish_authentication",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "Json(auth_response",
+          "type": "Json(auth_response"
+        }
+      ],
+      "return_type": "Result<(HeaderMap, String), (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::passkey::handle_finish_authentication",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "serve_passkey_js",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::passkey::serve_passkey_js",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "conditional_ui",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "impl IntoResponse",
+      "description": "",
+      "canonical_name": "crate::src::passkey::conditional_ui",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "serve_conditional_ui_js",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::passkey::serve_conditional_ui_js",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "list_passkey_credentials",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "AuthUser"
+        }
+      ],
+      "return_type": "Result<Json<Vec<PasskeyCredential>>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::passkey::list_passkey_credentials",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "delete_passkey_credential",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "AuthUser"
+        },
+        {
+          "name": "Path(credential_id",
+          "type": "Path(credential_id"
+        }
+      ],
+      "return_type": "Result<StatusCode, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::passkey::delete_passkey_credential",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "serve_related_origin",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::passkey::serve_related_origin",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "update_passkey_credential",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "AuthUser"
+        },
+        {
+          "name": "Json(payload",
+          "type": "Json(payload"
+        }
+      ],
+      "return_type": "Result<Json<serde_json::Value>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::passkey::update_passkey_credential",
+      "module_path": "crate::src::passkey",
+      "file_path": "src/passkey.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_serve_passkey_js",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::passkey::tests::test_serve_passkey_js",
+      "module_path": "crate::src::passkey::tests",
+      "file_path": "src/passkey.rs",
+      "attributes": [
+        "tokio::test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_serve_conditional_ui_js",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::passkey::tests::test_serve_conditional_ui_js",
+      "module_path": "crate::src::passkey::tests",
+      "file_path": "src/passkey.rs",
+      "attributes": [
+        "tokio::test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_serve_related_origin",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::passkey::tests::test_serve_related_origin",
+      "module_path": "crate::src::passkey::tests",
+      "file_path": "src/passkey.rs",
+      "attributes": [
+        "tokio::test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_conditional_ui",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::passkey::tests::test_conditional_ui",
+      "module_path": "crate::src::passkey::tests",
+      "file_path": "src/passkey.rs",
+      "attributes": [
+        "tokio::test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_router_configuration",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::passkey::tests::test_router_configuration",
+      "module_path": "crate::src::passkey::tests",
+      "file_path": "src/passkey.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_list_passkey_credentials_handler",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::passkey::tests::test_list_passkey_credentials_handler",
+      "module_path": "crate::src::passkey::tests",
+      "file_path": "src/passkey.rs",
+      "attributes": [
+        "tokio::test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_update_passkey_credential_handler",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::passkey::tests::test_update_passkey_credential_handler",
+      "module_path": "crate::src::passkey::tests",
+      "file_path": "src/passkey.rs",
+      "attributes": [
+        "tokio::test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "oauth2_passkey_router",
+      "visibility": "public",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Router",
+      "description": "",
+      "canonical_name": "crate::src::router::oauth2_passkey_router",
+      "module_path": "crate::src::router",
+      "file_path": "src/router.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_oauth2_passkey_router",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::router::tests::test_oauth2_passkey_router",
+      "module_path": "crate::src::router::tests",
+      "file_path": "src/router.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_router_structure",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::router::tests::test_router_structure",
+      "module_path": "crate::src::router::tests",
+      "file_path": "src/router.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "new",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "method",
+          "type": "Method"
+        }
+      ],
+      "return_type": "Self",
+      "description": "",
+      "canonical_name": "crate::src::session::new",
+      "module_path": "crate::src::session",
+      "file_path": "src/session.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "into_response_with_method",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "self",
+          "type": "self"
+        }
+      ],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::session::into_response_with_method",
+      "module_path": "crate::src::session",
+      "file_path": "src/session.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "into_response",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "self",
+          "type": "self"
+        }
+      ],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::session::into_response",
+      "module_path": "crate::src::session",
+      "file_path": "src/session.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "from",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "&AuthUser"
+        }
+      ],
+      "return_type": "Self",
+      "description": "",
+      "canonical_name": "crate::src::session::from",
+      "module_path": "crate::src::session",
+      "file_path": "src/session.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "from",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "session_user",
+          "type": "SessionUser"
+        }
+      ],
+      "return_type": "Self",
+      "description": "",
+      "canonical_name": "crate::src::session::from",
+      "module_path": "crate::src::session",
+      "file_path": "src/session.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "from_request_parts",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "parts",
+          "type": "&mut Parts"
+        },
+        {
+          "name": "_",
+          "type": "&B"
+        }
+      ],
+      "return_type": "Result<Self, Self::Rejection>",
+      "description": "",
+      "canonical_name": "crate::src::session::from_request_parts",
+      "module_path": "crate::src::session",
+      "file_path": "src/session.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "from_request_parts",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "parts",
+          "type": "&mut Parts"
+        },
+        {
+          "name": "state",
+          "type": "&B"
+        }
+      ],
+      "return_type": "Result<Option<Self>, Self::Rejection>",
+      "description": "",
+      "canonical_name": "crate::src::session::from_request_parts",
+      "module_path": "crate::src::session",
+      "file_path": "src/session.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_from_session_user_to_auth_user",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::session::tests::test_from_session_user_to_auth_user",
+      "module_path": "crate::src::session::tests",
+      "file_path": "src/session.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_from_auth_user_to_session_user",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::session::tests::test_from_auth_user_to_session_user",
+      "module_path": "crate::src::session::tests",
+      "file_path": "src/session.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_auth_redirect_new",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::session::tests::test_auth_redirect_new",
+      "module_path": "crate::src::session::tests",
+      "file_path": "src/session.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_auth_redirect_into_response_with_method",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::session::tests::test_auth_redirect_into_response_with_method",
+      "module_path": "crate::src::session::tests",
+      "file_path": "src/session.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "origin",
+      "visibility": "public",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "String",
+      "description": "",
+      "canonical_name": "crate::src::test_utils::env::origin",
+      "module_path": "crate::src::test_utils::env",
+      "file_path": "src/test_utils.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "rp_id",
+      "visibility": "public",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "String",
+      "description": "",
+      "canonical_name": "crate::src::test_utils::env::rp_id",
+      "module_path": "crate::src::test_utils::env",
+      "file_path": "src/test_utils.rs",
+      "attributes": [
+        "allow(dead_code)"
+      ],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "rp_name",
+      "visibility": "public",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "String",
+      "description": "",
+      "canonical_name": "crate::src::test_utils::env::rp_name",
+      "module_path": "crate::src::test_utils::env",
+      "file_path": "src/test_utils.rs",
+      "attributes": [
+        "allow(dead_code)"
+      ],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "mock_auth_user",
+      "visibility": "public",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "id",
+          "type": "&str"
+        },
+        {
+          "name": "account",
+          "type": "&str"
+        }
+      ],
+      "return_type": "AuthUser",
+      "description": "",
+      "canonical_name": "crate::src::test_utils::mocks::mock_auth_user",
+      "module_path": "crate::src::test_utils::mocks",
+      "file_path": "src/test_utils.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "mock_admin_user",
+      "visibility": "public",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "id",
+          "type": "&str"
+        },
+        {
+          "name": "account",
+          "type": "&str"
+        }
+      ],
+      "return_type": "AuthUser",
+      "description": "",
+      "canonical_name": "crate::src::test_utils::mocks::mock_admin_user",
+      "module_path": "crate::src::test_utils::mocks",
+      "file_path": "src/test_utils.rs",
+      "attributes": [
+        "allow(dead_code)"
+      ],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "mock_session_user",
+      "visibility": "public",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "id",
+          "type": "&str"
+        },
+        {
+          "name": "account",
+          "type": "&str"
+        }
+      ],
+      "return_type": "SessionUser",
+      "description": "",
+      "canonical_name": "crate::src::test_utils::mocks::mock_session_user",
+      "module_path": "crate::src::test_utils::mocks",
+      "file_path": "src/test_utils.rs",
+      "attributes": [
+        "allow(dead_code)"
+      ],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "create_mock_credential",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "user_id",
+          "type": "&str"
+        },
+        {
+          "name": "credential_id",
+          "type": "&str"
+        },
+        {
+          "name": "public_key",
+          "type": "&str"
+        }
+      ],
+      "return_type": "PasskeyCredential",
+      "description": "",
+      "canonical_name": "crate::src::test_utils::core_mocks::create_mock_credential",
+      "module_path": "crate::src::test_utils::core_mocks",
+      "file_path": "src/test_utils.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "mock_list_credentials_core",
+      "visibility": "public",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "user_id",
+          "type": "&str"
+        },
+        {
+          "name": "_include_transports",
+          "type": "bool"
+        }
+      ],
+      "return_type": "Result<Vec<PasskeyCredential>, oauth2_passkey::CoordinationError>",
+      "description": "",
+      "canonical_name": "crate::src::test_utils::mock_list_credentials_core",
+      "module_path": "crate::src::test_utils",
+      "file_path": "src/test_utils.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "mock_update_passkey_credential_core",
+      "visibility": "public",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "user_id",
+          "type": "&str"
+        },
+        {
+          "name": "credential_id",
+          "type": "&str"
+        },
+        {
+          "name": "_name",
+          "type": "&str"
+        },
+        {
+          "name": "_display_name",
+          "type": "&str"
+        }
+      ],
+      "return_type": "Result<serde_json::Value, oauth2_passkey::CoordinationError>",
+      "description": "",
+      "canonical_name": "crate::src::test_utils::mock_update_passkey_credential_core",
+      "module_path": "crate::src::test_utils",
+      "file_path": "src/test_utils.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "was_list_credentials_called",
+      "visibility": "public",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "bool",
+      "description": "",
+      "canonical_name": "crate::src::test_utils::was_list_credentials_called",
+      "module_path": "crate::src::test_utils",
+      "file_path": "src/test_utils.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "reset_mock_calls",
+      "visibility": "public",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::test_utils::reset_mock_calls",
+      "module_path": "crate::src::test_utils",
+      "file_path": "src/test_utils.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "router",
+      "visibility": "pub(crate)",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "crate",
+          "type": "crate"
+        }
+      ],
+      "return_type": "Router<()>",
+      "description": "",
+      "canonical_name": "crate::src::user::default::router",
+      "module_path": "crate::src::user::default",
+      "file_path": "src/user/default.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "logout",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "TypedHeader(cookies",
+          "type": "TypedHeader(cookies"
+        }
+      ],
+      "return_type": "impl IntoResponse",
+      "description": "",
+      "canonical_name": "crate::src::user::default::logout",
+      "module_path": "crate::src::user::default",
+      "file_path": "src/user/default.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "update_user_account_handler",
+      "visibility": "pub(super)",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "super",
+          "type": "super"
+        }
+      ],
+      "return_type": "Result<Json<Value>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::user::default::update_user_account_handler",
+      "module_path": "crate::src::user::default",
+      "file_path": "src/user/default.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "delete_user_account_handler",
+      "visibility": "pub(super)",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "super",
+          "type": "super"
+        }
+      ],
+      "return_type": "Result<Json<Value>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::user::default::delete_user_account_handler",
+      "module_path": "crate::src::user::default",
+      "file_path": "src/user/default.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_update_user_account_handler_id_mismatch",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::default::tests::test_update_user_account_handler_id_mismatch",
+      "module_path": "crate::src::user::default::tests",
+      "file_path": "src/user/default.rs",
+      "attributes": [
+        "tokio::test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_delete_user_account_handler_id_mismatch",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::default::tests::test_delete_user_account_handler_id_mismatch",
+      "module_path": "crate::src::user::default::tests",
+      "file_path": "src/user/default.rs",
+      "attributes": [
+        "tokio::test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_router",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::default::tests::test_router",
+      "module_path": "crate::src::user::default::tests",
+      "file_path": "src/user/default.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_logout_signature",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::default::tests::test_logout_signature",
+      "module_path": "crate::src::user::default::tests",
+      "file_path": "src/user/default.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_redirect_query_struct",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::default::tests::test_redirect_query_struct",
+      "module_path": "crate::src::user::default::tests",
+      "file_path": "src/user/default.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_update_user_request_struct",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::default::tests::test_update_user_request_struct",
+      "module_path": "crate::src::user::default::tests",
+      "file_path": "src/user/default.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_delete_user_request_struct",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::default::tests::test_delete_user_request_struct",
+      "module_path": "crate::src::user::default::tests",
+      "file_path": "src/user/default.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "router",
+      "visibility": "pub(super)",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "super",
+          "type": "super"
+        }
+      ],
+      "return_type": "Router",
+      "description": "",
+      "canonical_name": "crate::src::user::router",
+      "module_path": "crate::src::user",
+      "file_path": "src/user/mod.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "router",
+      "visibility": "pub(crate)",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "crate",
+          "type": "crate"
+        }
+      ],
+      "return_type": "Router<()>",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::router",
+      "module_path": "crate::src::user::optional",
+      "file_path": "src/user/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "login",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "user",
+          "type": "Option<AuthUser>"
+        }
+      ],
+      "return_type": "Result<Response, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::login",
+      "module_path": "crate::src::user::optional",
+      "file_path": "src/user/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "new",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "user",
+          "type": "AuthUser"
+        },
+        {
+          "name": "passkey_credentials",
+          "type": "Vec<TemplateCredential>"
+        },
+        {
+          "name": "oauth2_accounts",
+          "type": "Vec<TemplateAccount>"
+        },
+        {
+          "name": "o2p_route_prefix",
+          "type": "String"
+        },
+        {
+          "name": "o2p_redirect_anon",
+          "type": "String"
+        }
+      ],
+      "return_type": "Self",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::new",
+      "module_path": "crate::src::user::optional",
+      "file_path": "src/user/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "user_info",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "Option<AuthUser>"
+        }
+      ],
+      "return_type": "Result<Json<Value>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::user_info",
+      "module_path": "crate::src::user::optional",
+      "file_path": "src/user/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "csrf_token",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "AuthUser"
+        }
+      ],
+      "return_type": "Result<Json<Value>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::csrf_token",
+      "module_path": "crate::src::user::optional",
+      "file_path": "src/user/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "summary",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "auth_user",
+          "type": "AuthUser"
+        }
+      ],
+      "return_type": "Result<Html<String>, (StatusCode, String)>",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::summary",
+      "module_path": "crate::src::user::optional",
+      "file_path": "src/user/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "serve_summary_js",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::serve_summary_js",
+      "module_path": "crate::src::user::optional",
+      "file_path": "src/user/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "serve_summary_css",
+      "visibility": "private",
+      "is_async": true,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "Response",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::serve_summary_css",
+      "module_path": "crate::src::user::optional",
+      "file_path": "src/user/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "format_date_tz",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [
+        {
+          "name": "date",
+          "type": "&DateTime<Utc>"
+        },
+        {
+          "name": "timezone_name",
+          "type": "&str"
+        }
+      ],
+      "return_type": "String",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::format_date_tz",
+      "module_path": "crate::src::user::optional",
+      "file_path": "src/user/optional.rs",
+      "attributes": [],
+      "module_attributes": [],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_format_date_tz_jst",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::tests::test_format_date_tz_jst",
+      "module_path": "crate::src::user::optional::tests",
+      "file_path": "src/user/optional.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_format_date_tz_pst",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::tests::test_format_date_tz_pst",
+      "module_path": "crate::src::user::optional::tests",
+      "file_path": "src/user/optional.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_format_date_tz_utc",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::tests::test_format_date_tz_utc",
+      "module_path": "crate::src::user::optional::tests",
+      "file_path": "src/user/optional.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_format_date_tz_unknown_timezone",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::tests::test_format_date_tz_unknown_timezone",
+      "module_path": "crate::src::user::optional::tests",
+      "file_path": "src/user/optional.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    },
+    {
+      "name": "test_router_creation",
+      "visibility": "private",
+      "is_async": false,
+      "is_unsafe": false,
+      "is_const": false,
+      "is_extern": false,
+      "parameters": [],
+      "return_type": "",
+      "description": "",
+      "canonical_name": "crate::src::user::optional::router_tests::test_router_creation",
+      "module_path": "crate::src::user::optional::router_tests",
+      "file_path": "src/user/optional.rs",
+      "attributes": [
+        "test"
+      ],
+      "module_attributes": [
+        "cfg(test)"
+      ],
+      "crate_name": "oauth2_passkey_axum"
+    }
+  ]
+}

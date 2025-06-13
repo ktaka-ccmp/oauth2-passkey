@@ -261,7 +261,11 @@ pub(super) async fn update_credential_last_used_at_sqlite(
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
     sqlx::query(&format!(
-        r#"UPDATE {} SET last_used_at = $1 WHERE credential_id = $2"#,
+        r#"
+        UPDATE {}
+        SET last_used_at = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE credential_id = ?
+        "#,
         passkey_table
     ))
     .bind(last_used_at)

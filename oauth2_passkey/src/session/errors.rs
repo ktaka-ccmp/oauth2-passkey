@@ -23,6 +23,9 @@ pub enum SessionError {
     #[error("CSRF token error: {0}")]
     CsrfToken(String),
 
+    #[error("Session expired error")]
+    SessionExpiredError,
+
     /// Error from utils operations
     #[error("Utils error: {0}")]
     Utils(#[from] UtilError),
