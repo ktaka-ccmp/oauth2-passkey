@@ -26,7 +26,7 @@ A minimal-dependency, security-focused library for adding OAuth2 and passkey aut
 ## Getting Started
 
 1. **Add to your `Cargo.toml`:**
-   ```toml
+```toml
 oauth2_passkey_axum = "..."
    ```
 2. **Prepare your `.env` and database/cache (see below).**
