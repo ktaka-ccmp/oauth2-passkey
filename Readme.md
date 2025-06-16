@@ -1,9 +1,18 @@
-# oauth2_passkey
+# oauth2-passkey
 
-A minimal-dependency, security-focused library for adding OAuth2 and passkey authentication to Axum-based Rust web apps.
+A minimal-dependency, security-focused authentication library for Rust web applications supporting both OAuth2 and passkey authentication.
 
-[![Crates.io](https://img.shields.io/crates/v/oauth2_passkey_axum.svg)](https://crates.io/crates/oauth2_passkey_axum)
-[![Docs.rs](https://docs.rs/oauth2_passkey_axum/badge.svg)](https://docs.rs/oauth2_passkey_axum)
+## 📦 Crates
+
+This repository contains two published crates:
+
+- **[`oauth2-passkey`](https://crates.io/crates/oauth2-passkey)** - Core authentication library
+- **[`oauth2-passkey-axum`](https://crates.io/crates/oauth2-passkey-axum)** - Axum web framework integration
+
+[![Crates.io](https://img.shields.io/crates/v/oauth2-passkey.svg)](https://crates.io/crates/oauth2-passkey)
+[![Crates.io](https://img.shields.io/crates/v/oauth2-passkey-axum.svg)](https://crates.io/crates/oauth2-passkey-axum)
+[![Docs.rs](https://docs.rs/oauth2-passkey/badge.svg)](https://docs.rs/oauth2-passkey)
+[![Docs.rs](https://docs.rs/oauth2-passkey-axum/badge.svg)](https://docs.rs/oauth2-passkey-axum)
 
 ---
 
@@ -252,24 +261,25 @@ fetch('/some_end_point', {
 CSRF token verification for state-changing requests (POST, PUT, DELETE, PATCH) works as follows, whether using the Axum middleware or `AuthUser` extractor directly:
 
 **1. `X-CSRF-Token` Header Present:**
-    *   The header token is compared to the session token.
-    *   **Match:** `AuthUser.csrf_via_header_verified` becomes `true`. Request proceeds.
-    *   **Mismatch:** Request is rejected (FORBIDDEN).
+
+- The header token is compared to the session token.
+- **Match:** `AuthUser.csrf_via_header_verified` becomes `true`. Request proceeds.
+- **Mismatch:** Request is rejected (FORBIDDEN).
 
 **2. `X-CSRF-Token` Header Absent:**
-    *   `AuthUser.csrf_via_header_verified` is `false`.
-    *   The request's `Content-Type` is then checked:
-        *   **Form submissions** (`application/x-www-form-urlencoded`, `multipart/form-data`):
-            *   The request proceeds to your handler.
-            *   **Handler MUST manually verify** the CSRF token from the form body against `AuthUser.csrf_token`. Reject if mismatched.
-        *   **Other `Content-Type`s** (e.g., `application/json`) or if `Content-Type` is missing:
-            *   Request is rejected (FORBIDDEN). This protects AJAX/API endpoints that submit non-form data without the `X-CSRF-Token` header.
+- `AuthUser.csrf_via_header_verified` is `false`.
+- The request's `Content-Type` is then checked:
+- **Form submissions** (`application/x-www-form-urlencoded`, `multipart/form-data`):
+- The request proceeds to your handler.
+- **Handler MUST manually verify** the CSRF token from the form body against `AuthUser.csrf_token`. Reject if mismatched.
+- **Other `Content-Type`s** (e.g., `application/json`) or if `Content-Type` is missing:
+- Request is rejected (FORBIDDEN). This protects AJAX/API endpoints that submit non-form data without the `X-CSRF-Token` header.
 
 This dual approach ensures header-based CSRF (common for SPAs/AJAX) is handled automatically, while traditional forms require explicit verification in your handler.
 
 #### Manual Verification
 
-For traditional HTML form submissions (where the `X-CSRF-Token` header is typically absent), your request handler **must** manually verify the CSRF token that was submitted in the form body. 
+For traditional HTML form submissions (where the `X-CSRF-Token` header is typically absent), your request handler **must** manually verify the CSRF token that was submitted in the form body.
 
 ```rust
 // Ensure `use subtle::ConstantTimeEq;` is in scope

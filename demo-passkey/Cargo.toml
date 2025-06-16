@@ -15,5 +15,5 @@ rustls = { workspace = true }
 dotenv = { workspace = true }
 http = { workspace = true }
 
-oauth2_passkey_axum = { path = "../oauth2_passkey_axum", default-features = false, features = [] }
+oauth2-passkey-axum = { path = "../oauth2_passkey_axum", default-features = false, features = [] }
 #oauth2_passkey_axum = { workspace = true }

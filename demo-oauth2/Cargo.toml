@@ -15,4 +15,4 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 rustls = { workspace = true }
 
 # oauth2_passkey_axum = { workspace = true }
-oauth2_passkey_axum = { path = "../oauth2_passkey_axum", default-features = false, features = [] }
+oauth2-passkey-axum = { path = "../oauth2_passkey_axum", default-features = false, features = [] }
