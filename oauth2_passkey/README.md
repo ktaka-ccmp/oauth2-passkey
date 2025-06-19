@@ -126,7 +126,7 @@ async fn get_session_user(session_cookie: &str) -> Result<AuthUser, StatusCode> 
 }
 ```
 
-**Complete Example**: See the [`oauth2-passkey-axum`](https://github.com/ktaka/oauth2-passkey/tree/main/oauth2_passkey_axum) source code for a full framework integration implementation.
+**Complete Example**: See the [`oauth2-passkey-axum`](../oauth2_passkey_axum) source code for a full framework integration implementation.
 
 ## Security Features
 
@@ -159,3 +159,7 @@ at your option.
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.

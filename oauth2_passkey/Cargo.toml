@@ -5,8 +5,8 @@ edition = { workspace = true }
 description = "OAuth2 and Passkey authentication library for Rust web applications"
 license = "MIT OR Apache-2.0"
 authors = ["Kimitoshi Takahashi <ktaka@ccmp.jp>"]
-repository = "https://github.com/ktaka/oauth2-passkey"
-homepage = "https://github.com/ktaka/oauth2-passkey"
+repository = "https://github.com/ktaka-ccmp/oauth2-passkey"
+homepage = "https://github.com/ktaka-ccmp/oauth2-passkey"
 documentation = "https://docs.rs/oauth2-passkey"
 keywords = ["oauth2", "passkey", "webauthn", "authentication", "security"]
 categories = ["authentication", "web-programming", "cryptography"]
