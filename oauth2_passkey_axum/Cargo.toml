@@ -1,7 +1,16 @@
 [package]
-name = "oauth2_passkey_axum"
+name = "oauth2-passkey-axum"
 version = { workspace = true }
 edition = { workspace = true }
+description = "Axum integration for oauth2-passkey authentication library"
+license = "MIT OR Apache-2.0"
+authors = ["Kimitoshi Takahashi <ktaka@ccmp.jp>"]
+repository = "https://github.com/ktaka-ccmp/oauth2-passkey"
+homepage = "https://github.com/ktaka-ccmp/oauth2-passkey"
+documentation = "https://docs.rs/oauth2-passkey-axum"
+keywords = ["oauth2", "passkey", "axum", "authentication", "web"]
+categories = ["authentication", "web-programming"]
+readme = "README.md"
 
 [features]
 default = ["admin-ui", "user-ui"]
@@ -13,7 +22,8 @@ askama = { version = "0.13.0" }
 http = { workspace = true }
 tracing = { workspace = true }
 
-oauth2_passkey = { workspace = true }
+# Note: Change to "oauth2-passkey = '0.1.0'" when publishing
+oauth2-passkey = { workspace = true }
 
 axum = { workspace = true }
 axum-extra = { workspace = true }
