@@ -1,3 +1,16 @@
+//! Authentication coordination module
+//!
+//! This module provides high-level functions that coordinate between different 
+//! authentication mechanisms (OAuth2, Passkey) and user management.
+//! It serves as the main entry point for most authentication operations.
+//!
+//! The module is divided into several submodules:
+//! - `admin`: Admin-specific operations like user management and credential administration
+//! - `errors`: Error types specific to coordination operations
+//! - `oauth2`: OAuth2 authentication flow coordination
+//! - `passkey`: WebAuthn/Passkey authentication flow coordination
+//! - `user`: User account management operations
+
 mod admin;
 mod errors;
 mod oauth2;

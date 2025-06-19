@@ -17,14 +17,20 @@ pub static O2P_SUMMARY_URL: LazyLock<String> = LazyLock::new(|| {
         .unwrap_or_else(|_| format!("{}/user/summary", *O2P_ROUTE_PREFIX))
 });
 
+/// URL of the admin users list page
+/// Default: "/o2p/admin/list_users"
 pub static O2P_ADMIN_URL: LazyLock<String> = LazyLock::new(|| {
     std::env::var("O2P_ADMIN_URL")
         .unwrap_or_else(|_| format!("{}/admin/list_users", *O2P_ROUTE_PREFIX))
 });
 
+/// URL to redirect unauthenticated users to
+/// Default: "/"
 pub static O2P_REDIRECT_ANON: LazyLock<String> =
     LazyLock::new(|| std::env::var("O2P_REDIRECT_ANON").unwrap_or_else(|_| "/".to_string()));
 
+/// Whether to add X-CSRF-Token header to responses
+/// Default: true (can be disabled by setting O2P_RESPOND_WITH_X_CSRF_TOKEN=false)
 pub static O2P_RESPOND_WITH_X_CSRF_TOKEN: LazyLock<bool> = LazyLock::new(|| {
     std::env::var("O2P_RESPOND_WITH_X_CSRF_TOKEN")
         .map(|val| val.to_lowercase() != "false")

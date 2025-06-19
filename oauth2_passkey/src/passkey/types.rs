@@ -20,8 +20,15 @@ pub(super) struct StoredOptions {
     pub(super) ttl: u64,
 }
 
+/// Stored credential information for a WebAuthn/Passkey.
+///
+/// This struct represents a stored passkey credential that can be used for authentication.
+/// It contains all the necessary information to verify subsequent authentications using
+/// the same credential, including the public key, credential ID, and counter value.
+///
+/// The credential is associated with a specific user and includes metadata about when
+/// it was created, updated, and last used.
 #[derive(Clone, Serialize, Deserialize, Debug)]
-/// Stored credential information for a passkey
 pub struct PasskeyCredential {
     /// Raw credential ID bytes
     pub credential_id: String,
@@ -54,7 +61,11 @@ pub(super) struct SessionInfo {
     pub(super) user: crate::session::User,
 }
 
-/// Search field options for credential lookup
+/// Search field options for credential lookup.
+///
+/// This enum provides various ways to search for passkey credentials in storage,
+/// supporting different lookup strategies based on the available identifier.
+/// Each variant represents a different search parameter type.
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum CredentialSearchField {

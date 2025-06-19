@@ -58,7 +58,9 @@ pub enum CoordinationError {
     /// Resource not found with context
     #[error("Resource not found: {resource_type} {resource_id}")]
     ResourceNotFound {
+        /// The type of resource that wasn't found (e.g., "user", "credential", etc.)
         resource_type: String,
+        /// The identifier of the resource that wasn't found
         resource_id: String,
     },
 

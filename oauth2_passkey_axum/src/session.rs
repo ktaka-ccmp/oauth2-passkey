@@ -38,16 +38,57 @@ impl IntoResponse for AuthRedirect {
     }
 }
 
+/// Authenticated user information, available as an Axum extractor
+///
+/// This struct represents an authenticated user and can be used as an extractor
+/// in Axum route handlers. When used as an extractor, it checks for a valid
+/// session cookie and automatically verifies CSRF token requirements for state-changing
+/// methods (POST, PUT, DELETE, PATCH).
+///
+/// # Fields
+///
+/// * `id` - Unique user identifier
+/// * `account` - User's account name (email or username)
+/// * `label` - User's display name
+/// * `is_admin` - Whether the user has admin privileges
+/// * `sequence_number` - User version for tracking account changes
+/// * `created_at` - When the user account was created
+/// * `updated_at` - When the user account was last updated
+/// * `csrf_token` - CSRF token associated with the user's session
+/// * `csrf_via_header_verified` - Whether CSRF token was verified via header
+///
+/// # Example
+///
+/// ```no_run
+/// use axum::{routing::get, Router};
+/// use oauth2_passkey_axum::AuthUser;
+///
+/// async fn protected_handler(user: AuthUser) -> String {
+///     format!("Hello, {}!", user.label)
+/// }
+///
+/// let app = Router::new()
+///     .route("/protected", get(protected_handler));
+/// ```
 #[derive(Clone, Debug)]
 pub struct AuthUser {
+    /// Unique user identifier
     pub id: String,
+    /// User's account name (email or username)
     pub account: String,
+    /// User's display name
     pub label: String,
+    /// Whether the user has admin privileges
     pub is_admin: bool,
+    /// User version for tracking account changes
     pub sequence_number: i64,
+    /// When the user account was created
     pub created_at: DateTime<Utc>,
+    /// When the user account was last updated
     pub updated_at: DateTime<Utc>,
+    /// CSRF token associated with the user's session
     pub csrf_token: String,
+    /// Whether CSRF token was verified via header
     pub csrf_via_header_verified: bool,
 }
 

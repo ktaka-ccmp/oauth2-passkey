@@ -29,10 +29,30 @@ static ADDITIONAL_ORIGINS: LazyLock<Vec<String>> = LazyLock::new(|| {
         .unwrap_or_default()
 });
 
-/// Generate the WebAuthn configuration JSON
+/// Generates a JSON configuration for cross-origin WebAuthn credential use.
 ///
-/// This function returns the WebAuthn configuration as a JSON string.
-/// It includes the RP ID and all allowed origins (main origin + additional origins).
+/// This function returns a JSON string containing the WebAuthn Relying Party ID and
+/// all allowed origins where passkeys can be used (the main origin plus any additional
+/// origins specified in the WEBAUTHN_ADDITIONAL_ORIGINS environment variable).
+///
+/// This is particularly useful for enabling cross-origin authentication in multi-domain
+/// applications or when supporting different subdomains under the same RP ID.
+///
+/// # Returns
+///
+/// * `Ok(String)` - A JSON string containing the WebAuthn configuration
+/// * `Err(PasskeyError)` - If an error occurs during JSON serialization
+///
+/// # Example JSON Output
+/// ```json
+/// {
+///   "rp_id": "example.com",
+///   "origins": [
+///     "https://app.example.com",
+///     "https://login.example.com"
+///   ]
+/// }
+/// ```
 pub fn get_related_origin_json() -> Result<String, PasskeyError> {
     get_related_origin_json_with_core(
         PASSKEY_RP_ID.clone(),

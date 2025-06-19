@@ -1,4 +1,24 @@
-// mod common;
+/// Session management components for authentication and user state persistence.
+///
+/// This module provides session handling capabilities, including creation, validation,
+/// and management of user sessions for web applications. It implements secure session
+/// cookies with CSRF protection.
+///
+/// ## Key components:
+///
+/// - Session cookies: Secure, HTTP-only session cookies
+/// - CSRF protection: Token-based cross-site request forgery prevention
+/// - User session data: Storing authenticated user information
+/// - Session validation: Authentication status verification
+/// - Session expiration: Time-based session invalidation
+/// - Page session tokens: Additional protection for sensitive operations
+///
+/// ## Security features:
+///
+/// - Signed, HTTP-only, secure cookies
+/// - Required CSRF tokens for state-changing operations
+/// - Session timeouts for both inactivity and absolute duration
+/// - Protection against session fixation attacks
 mod config;
 mod errors;
 mod main;

@@ -1,3 +1,13 @@
+//! User database module for managing user accounts.
+//!
+//! This module provides functionality for storing, retrieving, updating, and
+//! deleting user accounts in the database. It handles the persistence of user
+//! account information, separate from authentication methods like OAuth2 or
+//! passkeys, which are linked to these user accounts.
+//!
+//! The module abstracts the database operations through a storage layer,
+//! allowing for different database backends.
+
 mod errors;
 mod storage;
 mod types;

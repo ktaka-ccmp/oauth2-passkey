@@ -30,51 +30,16 @@ pub mod env {
             eprintln!("Error: {}", e);
             panic!("Missing .env_test file required for testing");
         }
-
-        // Set required environment variables for tests if they're not already set
-        unsafe {
-            if std::env::var("ORIGIN").is_err() {
-                std::env::set_var("ORIGIN", "https://example.com");
-            }
-            if std::env::var("PASSKEY_RP_ID").is_err() {
-                std::env::set_var("PASSKEY_RP_ID", "example.com");
-            }
-            if std::env::var("PASSKEY_RP_NAME").is_err() {
-                std::env::set_var("PASSKEY_RP_NAME", "Example Test App");
-            }
-        }
     });
 
     /// Get the origin for tests
     pub fn origin() -> String {
         // This will trigger ENV_INIT if it hasn't been called yet
         let _ = *ENV_INIT;
-        std::env::var("ORIGIN").unwrap_or_else(|_| "https://example.com".to_string())
-    }
-
-    /// Get the RP ID for tests
-    ///
-    /// Note: Currently not used in tests but kept for future test expansion
-    #[allow(dead_code)]
-    pub fn rp_id() -> String {
-        // This will trigger ENV_INIT if it hasn't been called yet
-        let _ = *ENV_INIT;
-        std::env::var("PASSKEY_RP_ID").unwrap_or_else(|_| "example.com".to_string())
-    }
-
-    /// Get the RP name for tests
-    ///
-    /// Note: Currently not used in tests but kept for future test expansion
-    #[allow(dead_code)]
-    pub fn rp_name() -> String {
-        // This will trigger ENV_INIT if it hasn't been called yet
-        let _ = *ENV_INIT;
-        std::env::var("PASSKEY_RP_NAME").unwrap_or_else(|_| "Example Test App".to_string())
+        std::env::var("ORIGIN").unwrap()
     }
 }
 
-// Environment initialization is now handled automatically by the LazyLock pattern
-// and the getter functions in the env module
 
 /// Mock implementations for external dependencies
 pub mod mocks {

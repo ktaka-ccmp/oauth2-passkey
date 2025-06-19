@@ -106,6 +106,29 @@ pub(crate) async fn delete_session_from_store_by_session_id(
 ///
 /// # Returns
 /// * `Result<SessionUser, SessionError>` - The user information from the session, or an error
+/// Retrieves user information from a session cookie.
+///
+/// This function takes a session cookie value (not the whole cookie string, just the value)
+/// and returns the associated user information if the session is valid.
+///
+/// # Arguments
+/// * `session_cookie` - The session cookie value (session ID)
+///
+/// # Returns
+/// * `Ok(SessionUser)` - The user information associated with the session
+/// * `Err(SessionError)` - If the session is invalid or expired, or if the user doesn't exist
+///
+/// # Example
+/// ```no_run
+/// use oauth2_passkey::get_user_from_session;
+///
+/// async fn get_username(session_id: &str) -> Option<String> {
+///     match get_user_from_session(session_id).await {
+///         Ok(user) => Some(user.account),
+///         Err(_) => None
+///     }
+/// }
+/// ```
 pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, SessionError> {
     let cached_session = GENERIC_CACHE_STORE
         .lock()
@@ -326,7 +349,31 @@ async fn is_authenticated(
 /// * `headers` - The HTTP headers from the request
 ///
 /// # Returns
-/// * `Result<bool, SessionError>` - True if authenticated, false if not authenticated, or an error
+/// Performs basic session authentication without verifying the user exists in the database.
+///
+/// This function checks if a valid session exists in the request headers without performing
+/// additional database verification of the user. It offers a faster but less secure
+/// authentication check compared to `is_authenticated_strict`.
+///
+/// # Arguments
+/// * `headers` - The HTTP headers from the request, containing the session cookie
+/// * `method` - The HTTP method used for the request (relevant for CSRF protection)
+///
+/// # Returns
+/// * `Result<AuthenticationStatus, SessionError>` - The authentication status or an error
+///
+/// # Example
+/// ```no_run
+/// use http::{HeaderMap, Method};
+/// use oauth2_passkey::is_authenticated_basic;
+///
+/// async fn check_auth(headers: &HeaderMap) -> bool {
+///     match is_authenticated_basic(headers, &Method::GET).await {
+///         Ok(status) => status.0,
+///         Err(_) => false
+///     }
+/// }
+/// ```
 pub async fn is_authenticated_basic(
     headers: &HeaderMap,
     method: &Method,
@@ -335,6 +382,32 @@ pub async fn is_authenticated_basic(
     Ok(authenticated)
 }
 
+/// Performs basic authentication and returns the CSRF token if successful.
+///
+/// This function performs basic authentication (without database verification) and
+/// returns the CSRF token associated with the session along with information about
+/// whether the CSRF token was already verified via an HTTP header.
+///
+/// # Arguments
+/// * `headers` - The HTTP headers from the request, containing the session cookie
+/// * `method` - The HTTP method used for the request (relevant for CSRF protection)
+///
+/// # Returns
+/// * `Ok((CsrfToken, CsrfHeaderVerified))` - The CSRF token and verification status if authenticated
+/// * `Err(SessionError)` - If authentication fails or an error occurs
+///
+/// # Example
+/// ```no_run
+/// use http::{HeaderMap, Method};
+/// use oauth2_passkey::is_authenticated_basic_then_csrf;
+///
+/// async fn get_csrf(headers: &HeaderMap) -> Option<String> {
+///     match is_authenticated_basic_then_csrf(headers, &Method::GET).await {
+///         Ok((csrf_token, _)) => Some(csrf_token.as_str().to_string()),
+///         Err(_) => None
+///     }
+/// }
+/// ```
 pub async fn is_authenticated_basic_then_csrf(
     headers: &HeaderMap,
     method: &Method,
@@ -347,16 +420,32 @@ pub async fn is_authenticated_basic_then_csrf(
     }
 }
 
-/// Check if the request is authenticated by examining the session headers and verifying user existence
+/// Performs strict session authentication, verifying the user exists in the database.
 ///
-/// This function checks if valid session credentials exist in the request headers and verifies that
-/// the user exists in the database.
+/// This function checks if a valid session exists in the request headers and additionally
+/// verifies that the user referenced by the session still exists in the database. This
+/// provides stronger security guarantees than `is_authenticated_basic` but requires a 
+/// database query.
 ///
 /// # Arguments
-/// * `headers` - The HTTP headers from the request
+/// * `headers` - The HTTP headers from the request, containing the session cookie
+/// * `method` - The HTTP method used for the request (relevant for CSRF protection)
 ///
 /// # Returns
-/// * `Result<bool, SessionError>` - True if authenticated, false if not authenticated, or an error
+/// * `Result<AuthenticationStatus, SessionError>` - The authentication status or an error
+///
+/// # Example
+/// ```no_run
+/// use http::{HeaderMap, Method};
+/// use oauth2_passkey::is_authenticated_strict;
+///
+/// async fn check_auth_strict(headers: &HeaderMap) -> bool {
+///     match is_authenticated_strict(headers, &Method::GET).await {
+///         Ok(status) => status.0,
+///         Err(_) => false
+///     }
+/// }
+/// ```
 pub async fn is_authenticated_strict(
     headers: &HeaderMap,
     method: &Method,
@@ -365,6 +454,32 @@ pub async fn is_authenticated_strict(
     Ok(authenticated)
 }
 
+/// Performs strict authentication and returns the CSRF token if successful.
+///
+/// This function performs strict authentication (with database verification) and
+/// returns the CSRF token associated with the session along with information about
+/// whether the CSRF token was already verified via an HTTP header.
+///
+/// # Arguments
+/// * `headers` - The HTTP headers from the request, containing the session cookie
+/// * `method` - The HTTP method used for the request (relevant for CSRF protection)
+///
+/// # Returns
+/// * `Ok((CsrfToken, CsrfHeaderVerified))` - The CSRF token and verification status if authenticated
+/// * `Err(SessionError)` - If authentication fails or an error occurs
+///
+/// # Example
+/// ```no_run
+/// use http::{HeaderMap, Method};
+/// use oauth2_passkey::is_authenticated_strict_then_csrf;
+///
+/// async fn get_csrf_strict(headers: &HeaderMap) -> Option<String> {
+///     match is_authenticated_strict_then_csrf(headers, &Method::GET).await {
+///         Ok((csrf_token, _)) => Some(csrf_token.as_str().to_string()),
+///         Err(_) => None
+///     }
+/// }
+/// ```
 pub async fn is_authenticated_strict_then_csrf(
     headers: &HeaderMap,
     method: &Method,
@@ -377,6 +492,32 @@ pub async fn is_authenticated_strict_then_csrf(
     }
 }
 
+/// Performs authentication and returns the user data and CSRF token.
+///
+/// This comprehensive function performs authentication, retrieves the user information
+/// from the database, and returns the CSRF token - all in one operation. This is useful
+/// when you need the authenticated user's details along with the CSRF token.
+///
+/// # Arguments
+/// * `headers` - The HTTP headers from the request, containing the session cookie
+/// * `method` - The HTTP method used for the request (relevant for CSRF protection)
+///
+/// # Returns
+/// * `Ok((SessionUser, CsrfToken, CsrfHeaderVerified))` - The user data, CSRF token, and verification status
+/// * `Err(SessionError)` - If authentication fails or an error occurs
+///
+/// # Example
+/// ```no_run
+/// use http::{HeaderMap, Method};
+/// use oauth2_passkey::is_authenticated_basic_then_user_and_csrf;
+///
+/// async fn get_user_and_csrf(headers: &HeaderMap) -> Option<(String, String)> {
+///     match is_authenticated_basic_then_user_and_csrf(headers, &Method::GET).await {
+///         Ok((user, csrf_token, _)) => Some((user.account, csrf_token.as_str().to_string())),
+///         Err(_) => None
+///     }
+/// }
+/// ```
 pub async fn is_authenticated_basic_then_user_and_csrf(
     headers: &HeaderMap,
     method: &Method,
@@ -395,6 +536,29 @@ pub async fn is_authenticated_basic_then_user_and_csrf(
     }
 }
 
+/// Retrieves the CSRF token from a session.
+///
+/// This function takes a session ID and returns the CSRF token associated with the session
+/// if the session is valid and not expired.
+///
+/// # Arguments
+/// * `session_id` - The session ID (cookie value)
+///
+/// # Returns
+/// * `Ok(CsrfToken)` - The CSRF token associated with the session
+/// * `Err(SessionError)` - If the session is invalid or expired
+///
+/// # Example
+/// ```no_run
+/// use oauth2_passkey::get_csrf_token_from_session;
+///
+/// async fn get_token_for_form(session_id: &str) -> Option<String> {
+///     match get_csrf_token_from_session(session_id).await {
+///         Ok(csrf_token) => Some(csrf_token.as_str().to_string()),
+///         Err(_) => None
+///     }
+/// }
+/// ```
 pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, SessionError> {
     let cached_session = GENERIC_CACHE_STORE
         .lock()
@@ -416,6 +580,30 @@ pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, 
     Ok(CsrfToken::new(stored_session.csrf_token))
 }
 
+/// Retrieves both user information and CSRF token from a session.
+///
+/// This function is similar to `get_user_from_session`, but it also returns the
+/// CSRF token associated with the session. This is useful when you need both the
+/// user information and the CSRF token in a single operation.
+///
+/// # Arguments
+/// * `session_id` - The session ID (cookie value)
+///
+/// # Returns
+/// * `Ok((SessionUser, CsrfToken))` - The user information and CSRF token associated with the session
+/// * `Err(SessionError)` - If the session is invalid or expired, or if the user doesn't exist
+///
+/// # Example
+/// ```no_run
+/// use oauth2_passkey::get_user_and_csrf_token_from_session;
+///
+/// async fn get_user_and_token(session_id: &str) -> Option<(String, String)> {
+///     match get_user_and_csrf_token_from_session(session_id).await {
+///         Ok((user, csrf_token)) => Some((user.account, csrf_token.as_str().to_string())),
+///         Err(_) => None
+///     }
+/// }
+/// ```
 pub async fn get_user_and_csrf_token_from_session(
     session_id: &str,
 ) -> Result<(SessionUser, CsrfToken), SessionError> {

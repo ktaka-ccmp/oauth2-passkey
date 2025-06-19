@@ -1,3 +1,18 @@
+//! Utility functions for common operations across the library.
+//!
+//! This module provides various helper functions and utilities used throughout the
+//! library, including crypto operations, encoding/decoding, header manipulation,
+//! and other common tasks. These utilities help reduce code duplication and
+//! provide consistent implementations for frequently needed operations.
+//!
+//! ## Key features:
+//!
+//! - Secure random generation
+//! - Base64URL encoding/decoding
+//! - HTTP header manipulation
+//! - Cookie handling
+//! - Common error types for utility operations
+
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use http::header::{HeaderMap, SET_COOKIE};

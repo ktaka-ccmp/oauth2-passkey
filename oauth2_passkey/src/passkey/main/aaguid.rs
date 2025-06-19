@@ -3,10 +3,21 @@ use crate::storage::{CacheData, GENERIC_CACHE_STORE};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Information about a passkey authenticator device.
+///
+/// This struct contains metadata about an authenticator based on its AAGUID
+/// (Authenticator Attestation Globally Unique Identifier), which uniquely
+/// identifies the make and model of the authenticator.
+///
+/// The information includes the device name and optional icon URLs for
+/// light and dark themes.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AuthenticatorInfo {
+    /// Name of the authenticator device or manufacturer
     pub name: String,
+    /// URL to an icon suitable for dark mode/theme
     pub icon_dark: Option<String>,
+    /// URL to an icon suitable for light mode/theme
     pub icon_light: Option<String>,
 }
 
@@ -76,6 +87,21 @@ async fn store_aaguid_in_cache(json: String) -> Result<(), PasskeyError> {
     Ok(())
 }
 
+/// Retrieves information about an authenticator based on its AAGUID.
+///
+/// Given an AAGUID string (a UUID that identifies an authenticator make and model),
+/// this function returns metadata about the authenticator including its name and
+/// optional icon URLs.
+///
+/// # Arguments
+///
+/// * `aaguid` - The AAGUID string (e.g., "f8a011f3-8c0a-4d15-8006-17111f9edc7d")
+///
+/// # Returns
+///
+/// * `Ok(Some(AuthenticatorInfo))` - If information for the AAGUID exists in the cache
+/// * `Ok(None)` - If no information is found for the given AAGUID
+/// * `Err(PasskeyError)` - If an error occurs during the lookup
 pub async fn get_authenticator_info(
     aaguid: &str,
 ) -> Result<Option<AuthenticatorInfo>, PasskeyError> {
@@ -97,6 +123,20 @@ pub async fn get_authenticator_info(
     }
 }
 
+/// Retrieves information for multiple authenticators in a batch.
+///
+/// This function efficiently fetches metadata for multiple authenticators at once
+/// by their AAGUIDs, returning a map of AAGUID to authenticator information.
+///
+/// # Arguments
+///
+/// * `aaguids` - A slice of AAGUID strings to look up
+///
+/// # Returns
+///
+/// * `Ok(HashMap<String, AuthenticatorInfo>)` - A map containing all found authenticator
+///   information, with AAGUIDs as keys. AAGUIDs that weren't found will not be included.
+/// * `Err(PasskeyError)` - If an error occurs during lookup
 pub async fn get_authenticator_info_batch(
     aaguids: &[String],
 ) -> Result<HashMap<String, AuthenticatorInfo>, PasskeyError> {
