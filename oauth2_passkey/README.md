@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey.svg)](https://crates.io/crates/oauth2-passkey)
 [![Docs.rs](https://docs.rs/oauth2-passkey/badge.svg)](https://docs.rs/oauth2-passkey)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](https://opensource.org/licenses/MIT)
 
 A framework-agnostic core library for OAuth2 and WebAuthn/passkey authentication in Rust applications.
 
@@ -144,9 +144,18 @@ async fn get_session_user(session_cookie: &str) -> Result<AuthUser, StatusCode> 
 Complete working examples are available in the repository:
 
 - **[Basic Integration](../demo01)** - Simple authentication setup
-- **[OAuth2 Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-oauth2)** - Google OAuth2 integration
-- **[Passkey Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-passkey)** - WebAuthn/passkey authentication
+- **[OAuth2 Demo](../demo-oauth2)** - Google OAuth2 integration
+- **[Passkey Demo](../demo-passkey)** - WebAuthn/passkey authentication
 
 ## License
 
-Licensed under the MIT License. See [LICENSE](https://github.com/ktaka/oauth2-passkey/blob/main/LICENSE) for details.
+Licensed under either of
+
+- [Apache License, Version 2.0](../LICENSE-APACHE)
+- [MIT License](../LICENSE-MIT)
+
+at your option.
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.

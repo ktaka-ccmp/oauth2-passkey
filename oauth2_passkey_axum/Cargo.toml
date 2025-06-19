@@ -3,7 +3,7 @@ name = "oauth2-passkey-axum"
 version = { workspace = true }
 edition = { workspace = true }
 description = "Axum integration for oauth2-passkey authentication library"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 authors = ["Kimitoshi Takahashi <ktaka@ccmp.jp>"]
 repository = "https://github.com/ktaka/oauth2-passkey"
 homepage = "https://github.com/ktaka/oauth2-passkey"
