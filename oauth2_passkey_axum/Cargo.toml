@@ -22,8 +22,8 @@ askama = { version = "0.13.0" }
 http = { workspace = true }
 tracing = { workspace = true }
 
-# Note: Change to "oauth2-passkey = '0.1.0'" when publishing
-oauth2-passkey = { workspace = true }
+# Changed from workspace dependency to published crate version
+oauth2-passkey = "0.1.0"
 
 axum = { workspace = true }
 axum-extra = { workspace = true }

@@ -99,22 +99,17 @@ pub(crate) async fn delete_session_from_store_by_session_id(
     Ok(())
 }
 
-/// Retrieves the user information from the session
-///
-/// # Arguments
-/// * `session_cookie` - The session cookie from the request
-///
-/// # Returns
-/// * `Result<SessionUser, SessionError>` - The user information from the session, or an error
 /// Retrieves user information from a session cookie.
 ///
 /// This function takes a session cookie value (not the whole cookie string, just the value)
 /// and returns the associated user information if the session is valid.
 ///
 /// # Arguments
+///
 /// * `session_cookie` - The session cookie value (session ID)
 ///
 /// # Returns
+///
 /// * `Ok(SessionUser)` - The user information associated with the session
 /// * `Err(SessionError)` - If the session is invalid or expired, or if the user doesn't exist
 ///
@@ -424,7 +419,7 @@ pub async fn is_authenticated_basic_then_csrf(
 ///
 /// This function checks if a valid session exists in the request headers and additionally
 /// verifies that the user referenced by the session still exists in the database. This
-/// provides stronger security guarantees than `is_authenticated_basic` but requires a 
+/// provides stronger security guarantees than `is_authenticated_basic` but requires a
 /// database query.
 ///
 /// # Arguments

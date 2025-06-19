@@ -48,7 +48,7 @@ pub enum RegistrationMode {
     /// passkey to their account, such as registering a new device or
     /// security key as a backup.
     AddToUser,
-    
+
     /// Creating a new user with a passkey (no authentication required).
     ///
     /// This mode is used for new user registration, where the user doesn't

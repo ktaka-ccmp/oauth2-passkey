@@ -1,5 +1,5 @@
 //! OAuth2 authentication module
-//! 
+//!
 //! This module provides OAuth2 authentication functionality, specifically supporting
 //! Google OAuth2/OpenID Connect. It handles the authentication flow, token validation,
 //! and user profile retrieval.
