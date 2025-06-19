@@ -192,9 +192,9 @@ When you include the authentication router, these routes are available (default 
 
 See the complete working examples in the repository:
 
-- [Basic Integration](https://github.com/ktaka-ccmp/oauth2-passkey/tree/main/demo01)
-- [OAuth2 Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/main/demo-oauth2)
-- [Passkey Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/main/demo-passkey)
+- [Basic Integration](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo01)
+- [OAuth2 Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-oauth2)
+- [Passkey Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-passkey)
 
 ## Core Library
 
