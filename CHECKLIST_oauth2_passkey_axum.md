@@ -10,11 +10,11 @@
   - [x] Feature flags documentation ✅
   - [x] Available routes listing ✅
 
-- [ ] **API Documentation** ❌ **NEEDS WORK**
-  - [ ] Add `#![deny(missing_docs)]` to lib.rs ❌
-  - [ ] Rustdoc comments for all public items ❌
-  - [ ] Handler function documentation ❌
-  - [ ] Middleware documentation ❌
+- [x] **API Documentation** ✅ **DONE**
+  - [x] Add `#![deny(missing_docs)]` to lib.rs ✅
+  - [x] Rustdoc comments for all public items ✅
+  - [x] Handler function documentation ✅
+  - [x] Middleware documentation ✅
 
 ## 2. Crate Metadata
 

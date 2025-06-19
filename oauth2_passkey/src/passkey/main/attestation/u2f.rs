@@ -171,29 +171,13 @@ mod tests {
     use super::*;
     use ciborium::value::Value;
     use ring::digest;
-    use std::sync::Once;
-
-    // Initialize test environment once
-    static INIT: Once = Once::new();
-
-    unsafe fn setup() {
-        // Set up required environment variables for testing
-        unsafe {
-            std::env::set_var("ORIGIN", "https://example.com");
-            std::env::set_var("PASSKEY_RP_ID", "example.com");
-            std::env::set_var("PASSKEY_USER_VERIFICATION", "required");
-        }
-    }
+    use crate::test_utils;
 
     // Helper function to create basic auth_data for testing
-    fn create_test_auth_data() -> Vec<u8> {
-        // Ensure test environment is set up
-        INIT.call_once(|| {
-            // This is safe in the context of tests
-            unsafe {
-                setup();
-            }
-        });
+    async fn create_test_auth_data() -> Vec<u8> {
+        // Ensure test environment is set up with proper values
+        // This will load environment variables from .env_test or .env
+        test_utils::init_test_environment().await;
 
         // Create a valid auth_data with proper RP ID hash and flags
         let mut auth_data = Vec::new();
@@ -275,9 +259,9 @@ mod tests {
         att_stmt
     }
 
-    #[test]
-    fn test_verify_u2f_attestation_missing_sig() {
-        let auth_data = create_test_auth_data();
+    #[tokio::test]
+    async fn test_verify_u2f_attestation_missing_sig() {
+        let auth_data = create_test_auth_data().await;
         let client_data_hash = create_test_client_data_hash();
 
         // Create attestation statement missing the sig field
@@ -299,9 +283,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_verify_u2f_attestation_missing_x5c() {
-        let auth_data = create_test_auth_data();
+    #[tokio::test]
+    async fn test_verify_u2f_attestation_missing_x5c() {
+        let auth_data = create_test_auth_data().await;
         let client_data_hash = create_test_client_data_hash();
 
         // Create attestation statement missing the x5c field
@@ -323,9 +307,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_verify_u2f_attestation_empty_x5c() {
-        let auth_data = create_test_auth_data();
+    #[tokio::test]
+    async fn test_verify_u2f_attestation_empty_x5c() {
+        let auth_data = create_test_auth_data().await;
         let client_data_hash = create_test_client_data_hash();
 
         // Create attestation statement with x5c array that will result in empty cert_chain
@@ -348,9 +332,9 @@ mod tests {
     }
 
     // Test invalid certificate parsing
-    #[test]
-    fn test_verify_u2f_attestation_invalid_certificate() {
-        let auth_data = create_test_auth_data();
+    #[tokio::test]
+    async fn test_verify_u2f_attestation_invalid_certificate() {
+        let auth_data = create_test_auth_data().await;
         let client_data_hash = create_test_client_data_hash();
 
         // Create attestation statement with malformed certificate
@@ -530,9 +514,9 @@ mod tests {
     }
 
     // Test empty x5c array (actually empty, not with invalid elements)
-    #[test]
-    fn test_verify_u2f_attestation_truly_empty_x5c() {
-        let auth_data = create_test_auth_data();
+    #[tokio::test]
+    async fn test_verify_u2f_attestation_truly_empty_x5c() {
+        let auth_data = create_test_auth_data().await;
         let client_data_hash = create_test_client_data_hash();
 
         // Create attestation statement with truly empty x5c array

@@ -9,17 +9,31 @@ use super::main::IdInfo as GoogleIdInfo;
 use crate::storage::CacheData;
 
 /// Represents an OAuth2 account linked to a user
+///
+/// This struct contains information about an OAuth2 account that has been
+/// authenticated and linked to a user in the system. It stores both
+/// the provider-specific information and internal tracking data.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct OAuth2Account {
+    /// Unique identifier for this OAuth2 account in our system
     pub id: String,
+    /// Internal user ID this OAuth2 account is linked to
     pub user_id: String,
+    /// OAuth2 provider name (e.g., "google")
     pub provider: String,
+    /// User identifier from the OAuth2 provider
     pub provider_user_id: String,
+    /// User's display name from the OAuth2 provider
     pub name: String,
+    /// User's email address from the OAuth2 provider
     pub email: String,
+    /// Optional URL to user's profile picture
     pub picture: Option<String>,
+    /// Additional provider-specific metadata as JSON
     pub metadata: Value,
+    /// When this OAuth2 account was first linked
     pub created_at: DateTime<Utc>,
+    /// When this OAuth2 account was last updated
     pub updated_at: DateTime<Utc>,
 }
 
@@ -115,10 +129,18 @@ pub(crate) struct StoredToken {
     pub(crate) ttl: u64,
 }
 
+/// Response from an OAuth2 authorization request
+///
+/// This struct represents the data received from an OAuth2 provider's
+/// authorization endpoint. It contains the authorization code and state
+/// parameter needed to complete the OAuth2 flow.
 #[derive(Debug, Deserialize)]
 pub struct AuthResponse {
+    /// Authorization code from the OAuth2 provider
     pub(crate) code: String,
+    /// State parameter that was included in the original request
     pub state: String,
+    /// Optional ID token if provided directly by the authorization endpoint
     _id_token: Option<String>,
 }
 
@@ -166,17 +188,46 @@ pub(crate) enum AccountSearchField {
     Email(String),
 }
 
-/// Mode of OAuth2 operation to explicitly indicate user intent
+/// Mode of OAuth2 operation to explicitly indicate user intent.
+///
+/// This enum defines the available modes for OAuth2 authentication, determining
+/// the behavior when a user authenticates with an OAuth2 provider.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OAuth2Mode {
+    /// Add an OAuth2 account to an existing user.
+    ///
+    /// This mode is used when an authenticated user wants to link an additional
+    /// OAuth2 provider account to their existing account.
     AddToUser,
+    
+    /// Create a new user account from the OAuth2 provider data.
+    ///
+    /// This mode is used specifically for new user registration using OAuth2.
     CreateUser,
+    
+    /// Login with an existing OAuth2 account.
+    ///
+    /// This mode is used when a user wants to authenticate using a previously
+    /// linked OAuth2 provider account.
     Login,
+    
+    /// Create a new user if no matching account exists, otherwise login.
+    ///
+    /// This flexible mode attempts to login with an existing account if one matches
+    /// the OAuth2 provider data, or creates a new user account if none is found.
     CreateUserOrLogin,
 }
 
 impl OAuth2Mode {
+    /// Converts the OAuth2Mode enum variant to its string representation.
+    ///
+    /// This method returns a static string representing the mode, which can be
+    /// used in URLs, API responses, or for logging purposes.
+    ///
+    /// # Returns
+    ///
+    /// * A string representation of the OAuth2Mode
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::AddToUser => "add_to_user",

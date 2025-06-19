@@ -10,10 +10,15 @@ pub struct User {
     pub sequence_number: Option<i64>,
     /// Unique user identifier
     pub id: String,
+    /// User account name or login identifier
     pub account: String,
+    /// Display name or user-friendly label
     pub label: String,
+    /// Whether the user has administrator privileges
     pub is_admin: bool,
+    /// When the user account was created
     pub created_at: DateTime<Utc>,
+    /// When the user account was last updated
     pub updated_at: DateTime<Utc>,
 }
 

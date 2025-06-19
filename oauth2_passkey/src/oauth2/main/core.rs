@@ -20,6 +20,33 @@ use super::utils::{
     remove_token_from_store, store_token_in_cache,
 };
 
+/// Prepares an OAuth2 authentication request URL and necessary headers.
+///
+/// This function generates a secure OAuth2 authorization URL for redirecting users
+/// to the identity provider (e.g., Google). It also sets up CSRF protection by
+/// generating and storing a state parameter.
+///
+/// # Arguments
+///
+/// * `headers` - HTTP headers from the client request, used to extract user agent and other info
+/// * `mode` - Optional authentication mode (e.g., "login", "create_user", etc.)
+///
+/// # Returns
+///
+/// * `Ok((String, HeaderMap))` - The authorization URL and response headers
+/// * `Err(OAuth2Error)` - If an error occurs during preparation
+///
+/// # Examples
+///
+/// ```no_run
+/// use oauth2_passkey::prepare_oauth2_auth_request;
+/// use http::HeaderMap;
+///
+/// async fn start_oauth_flow(request_headers: HeaderMap) -> Result<(String, HeaderMap), Box<dyn std::error::Error>> {
+///     let (auth_url, response_headers) = prepare_oauth2_auth_request(request_headers, Some("login")).await?;
+///     Ok((auth_url, response_headers))
+/// }
+/// ```
 pub async fn prepare_oauth2_auth_request(
     headers: HeaderMap,
     mode: Option<&str>,

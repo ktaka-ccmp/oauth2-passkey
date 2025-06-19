@@ -5,15 +5,26 @@ use crate::session::errors::SessionError;
 use crate::storage::CacheData;
 use crate::userdb::User as DbUser;
 
-// User information from libuserdb
+/// User information stored in the session.
+///
+/// This struct represents authenticated user data that is stored in the session
+/// and retrieved during authentication checks. It contains essential user identity
+/// and permission information needed for the application.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
+    /// Unique identifier for the user
     pub id: String,
+    /// User account name or login identifier
     pub account: String,
+    /// Display name or label for the user
     pub label: String,
+    /// Whether the user has administrative privileges
     pub is_admin: bool,
+    /// Incremental number used for tracking user state changes
     pub sequence_number: i64,
+    /// When the user account was created
     pub created_at: DateTime<Utc>,
+    /// When the user account was last updated
     pub updated_at: DateTime<Utc>,
 }
 
@@ -55,14 +66,32 @@ impl TryFrom<CacheData> for StoredSession {
     }
 }
 
+/// CSRF (Cross-Site Request Forgery) token for request validation.
+///
+/// This struct represents a security token that must be included in forms
+/// and state-changing requests to prevent cross-site request forgery attacks.
+/// It's a newtype wrapper around a String to provide type safety and prevent
+/// confusion with other string types.
 #[derive(Debug, Clone)]
 pub struct CsrfToken(String);
 
-/// Indicates whether the CSRF token was verified via an HTTP header by a calling layer (e.g., middleware).
+/// Indicates whether the CSRF token was verified via an HTTP header.
+///
+/// This is typically set by middleware or other authentication layers that have
+/// already performed CSRF validation. It's used to avoid redundant validation
+/// when multiple layers of authentication checks are applied.
+///
+/// Contains a boolean where `true` means the CSRF token was already verified.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CsrfHeaderVerified(pub bool);
 
 /// Indicates the overall authentication status of a session.
+///
+/// This is a simple boolean wrapper that indicates whether a user is authenticated.
+/// It's used as a return type from authentication check functions to explicitly
+/// communicate the authentication state.
+///
+/// Contains a boolean where `true` means the user is authenticated.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AuthenticationStatus(pub bool);
 
@@ -79,9 +108,24 @@ impl std::fmt::Display for CsrfHeaderVerified {
 }
 
 impl CsrfToken {
+    /// Creates a new CSRF token from a string.
+    ///
+    /// # Arguments
+    /// * `token` - The token string
+    ///
+    /// # Returns
+    /// * A new CsrfToken instance
     pub fn new(token: String) -> Self {
         Self(token)
     }
+    
+    /// Returns the token as a string slice.
+    ///
+    /// This method is useful when you need to include the token in a 
+    /// response or use it for comparison.
+    ///
+    /// # Returns
+    /// * A string slice containing the token
     pub fn as_str(&self) -> &str {
         &self.0
     }

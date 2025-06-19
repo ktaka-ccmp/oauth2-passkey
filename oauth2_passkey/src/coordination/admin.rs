@@ -5,18 +5,95 @@ use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
 
+/// Retrieves a list of all users in the system.
+///
+/// This admin-level function fetches all user accounts from the database.
+/// It provides a comprehensive view of all registered users and their details.
+///
+/// # Returns
+///
+/// * `Ok(Vec<User>)` - A vector containing all user accounts
+/// * `Err(CoordinationError)` - If a database error occurs
+///
+/// # Examples
+///
+/// ```no_run
+/// use oauth2_passkey::get_all_users;
+///
+/// async fn list_all_users() -> Vec<String> {
+///     match get_all_users().await {
+///         Ok(users) => users.iter().map(|user| user.account.clone()).collect(),
+///         Err(_) => Vec::new()
+///     }
+/// }
+/// ```
 pub async fn get_all_users() -> Result<Vec<User>, CoordinationError> {
     UserStore::get_all_users()
         .await
         .map_err(|e| CoordinationError::Database(e.to_string()))
 }
 
+/// Retrieves a specific user by their ID.
+///
+/// This function fetches a user's account information from the database using their
+/// unique identifier. It's used for user profile viewing, account management, 
+/// and administrative tasks.
+///
+/// # Arguments
+///
+/// * `user_id` - The unique identifier of the user to retrieve
+///
+/// # Returns
+///
+/// * `Ok(Some(User))` - The user's account information if found
+/// * `Ok(None)` - If no user exists with the provided ID
+/// * `Err(CoordinationError)` - If a database error occurs
+///
+/// # Examples
+///
+/// ```no_run
+/// use oauth2_passkey::get_user;
+///
+/// async fn fetch_user_profile(id: &str) -> Option<String> {
+///     match get_user(id).await {
+///         Ok(Some(user)) => Some(user.account),
+///         _ => None
+///     }
+/// }
+/// ```
 pub async fn get_user(user_id: &str) -> Result<Option<User>, CoordinationError> {
     UserStore::get_user(user_id)
         .await
         .map_err(|e| CoordinationError::Database(e.to_string()))
 }
 
+/// Deletes a passkey credential as an administrator.
+///
+/// This administrative function allows a system administrator to delete any user's
+/// passkey credential. It requires the calling user to have administrative privileges.
+/// This is useful for managing compromised credentials or helping users who are
+/// locked out of their accounts.
+///
+/// # Arguments
+///
+/// * `user` - The administrator user performing the action (must have admin privileges)
+/// * `credential_id` - The ID of the passkey credential to delete
+///
+/// # Returns
+///
+/// * `Ok(())` - If the credential was successfully deleted
+/// * `Err(CoordinationError::Unauthorized)` - If the user doesn't have admin privileges
+/// * `Err(CoordinationError)` - If another error occurs during deletion
+///
+/// # Examples
+///
+/// ```no_run
+/// use oauth2_passkey::{delete_passkey_credential_admin, SessionUser};
+///
+/// async fn remove_credential(admin: &SessionUser, credential_id: &str) -> bool {
+///     delete_passkey_credential_admin(admin, credential_id).await.is_ok()
+/// }
+/// ```
 pub async fn delete_passkey_credential_admin(
     user: &SessionUser,
     credential_id: &str,
@@ -59,6 +136,33 @@ pub async fn delete_passkey_credential_admin(
     Ok(())
 }
 
+/// Deletes an OAuth2 account as an administrator.
+///
+/// This administrative function allows a system administrator to delete any user's
+/// OAuth2 account. It requires the calling user to have administrative privileges.
+/// This is useful for managing compromised accounts or removing unauthorized
+/// OAuth2 connections.
+///
+/// # Arguments
+///
+/// * `user` - The administrator user performing the action (must have admin privileges)
+/// * `provider_user_id` - The unique provider-specific user ID of the OAuth2 account to delete
+///
+/// # Returns
+///
+/// * `Ok(())` - If the OAuth2 account was successfully deleted
+/// * `Err(CoordinationError::Unauthorized)` - If the user doesn't have admin privileges
+/// * `Err(CoordinationError)` - If another error occurs during deletion
+///
+/// # Examples
+///
+/// ```no_run
+/// use oauth2_passkey::{delete_oauth2_account_admin, SessionUser};
+///
+/// async fn remove_oauth2_account(admin: &SessionUser, provider_id: &str) -> bool {
+///     delete_oauth2_account_admin(admin, provider_id).await.is_ok()
+/// }
+/// ```
 pub async fn delete_oauth2_account_admin(
     user: &SessionUser,
     provider_user_id: &str,
@@ -88,6 +192,31 @@ pub async fn delete_oauth2_account_admin(
     Ok(())
 }
 
+/// Completely deletes a user account as an administrator.
+///
+/// This administrative function permanently removes a user account and all associated
+/// data (including OAuth2 accounts and passkey credentials). This is a destructive
+/// operation that cannot be undone.
+///
+/// # Arguments
+///
+/// * `user_id` - The unique identifier of the user account to delete
+///
+/// # Returns
+///
+/// * `Ok(())` - If the user account was successfully deleted
+/// * `Err(CoordinationError::ResourceNotFound)` - If the user doesn't exist
+/// * `Err(CoordinationError)` - If another error occurs during deletion
+///
+/// # Examples
+///
+/// ```no_run
+/// use oauth2_passkey::delete_user_account_admin;
+///
+/// async fn purge_account(user_id: &str) -> Result<(), String> {
+///     delete_user_account_admin(user_id).await.map_err(|e| e.to_string())
+/// }
+/// ```
 pub async fn delete_user_account_admin(user_id: &str) -> Result<(), CoordinationError> {
     // Check if the user exists
     let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
@@ -112,6 +241,35 @@ pub async fn delete_user_account_admin(user_id: &str) -> Result<(), Coordination
     Ok(())
 }
 
+/// Updates a user's administrative status.
+///
+/// This function allows an administrator to grant or revoke administrative privileges
+/// for another user. For security reasons, the first user in the system (sequence number 1)
+/// cannot have their admin status changed.
+///
+/// # Arguments
+///
+/// * `admin_user` - The administrator performing the action (must have admin privileges)
+/// * `user_id` - The ID of the user whose admin status will be changed
+/// * `is_admin` - The new admin status (`true` = admin, `false` = regular user)
+///
+/// # Returns
+///
+/// * `Ok(User)` - The updated user account information
+/// * `Err(CoordinationError::Unauthorized)` - If the caller doesn't have admin privileges
+/// * `Err(CoordinationError::ResourceNotFound)` - If the target user doesn't exist
+/// * `Err(CoordinationError)` - If another error occurs, such as trying to change
+///   the first user's admin status
+///
+/// # Examples
+///
+/// ```no_run
+/// use oauth2_passkey::{update_user_admin_status, SessionUser};
+///
+/// async fn make_user_admin(admin: &SessionUser, user_id: &str) -> bool {
+///     update_user_admin_status(admin, user_id, true).await.is_ok()
+/// }
+/// ```
 pub async fn update_user_admin_status(
     admin_user: &SessionUser,
     user_id: &str,

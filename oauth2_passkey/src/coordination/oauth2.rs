@@ -72,6 +72,39 @@ pub async fn authorized_core(
     process_oauth2_authorization(auth_response).await
 }
 
+/// Processes an OAuth2 GET authorization request.
+///
+/// This function handles the core business logic for OAuth2 authentication via GET requests.
+/// It validates CSRF tokens, processes the authentication response from the provider,
+/// and establishes a user session.
+///
+/// # Arguments
+///
+/// * `auth_response` - The OAuth2 authentication response from the provider
+/// * `cookies` - Cookie headers from the client request
+/// * `headers` - All headers from the client request
+///
+/// # Returns
+///
+/// * `Ok((HeaderMap, String))` - Response headers (including session cookie) and response body
+/// * `Err(CoordinationError)` - If authentication fails for any reason
+///
+/// # Examples
+///
+/// ```no_run
+/// use oauth2_passkey::{get_authorized_core, AuthResponse};
+/// use headers::Cookie;
+/// use http::HeaderMap;
+///
+/// async fn process_oauth_callback(
+///     auth_response: &AuthResponse, 
+///     cookies: &Cookie,
+///     headers: &HeaderMap
+/// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {
+///     let (response_headers, body) = get_authorized_core(auth_response, cookies, headers).await?;
+///     Ok((response_headers, body))
+/// }
+/// ```
 pub async fn get_authorized_core(
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
@@ -80,6 +113,39 @@ pub async fn get_authorized_core(
     authorized_core(HttpMethod::Get, auth_response, cookies, headers).await
 }
 
+/// Processes an OAuth2 POST authorization request.
+///
+/// Similar to `get_authorized_core`, but processes OAuth2 authentication via POST requests.
+/// This function validates CSRF tokens, processes the authentication response, and
+/// establishes a user session.
+///
+/// # Arguments
+///
+/// * `auth_response` - The OAuth2 authentication response from the provider
+/// * `cookies` - Cookie headers from the client request
+/// * `headers` - All headers from the client request
+///
+/// # Returns
+///
+/// * `Ok((HeaderMap, String))` - Response headers (including session cookie) and response body
+/// * `Err(CoordinationError)` - If authentication fails for any reason
+///
+/// # Examples
+///
+/// ```no_run
+/// use oauth2_passkey::{post_authorized_core, AuthResponse};
+/// use headers::Cookie;
+/// use http::HeaderMap;
+///
+/// async fn process_oauth_form_submission(
+///     auth_response: &AuthResponse, 
+///     cookies: &Cookie,
+///     headers: &HeaderMap
+/// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {
+///     let (response_headers, body) = post_authorized_core(auth_response, cookies, headers).await?;
+///     Ok((response_headers, body))
+/// }
+/// ```
 pub async fn post_authorized_core(
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
@@ -351,6 +417,33 @@ async fn get_oauth2_accounts(user_id: &str) -> Result<Vec<OAuth2Account>, Coordi
     Ok(accounts)
 }
 
+/// Lists all OAuth2 accounts associated with a user.
+///
+/// This function retrieves all OAuth2 provider accounts (Google, etc.) that have been
+/// linked to a specific user account. This is useful for account management interfaces
+/// where users need to view and manage their connected services.
+///
+/// # Arguments
+///
+/// * `user_id` - The ID of the user whose OAuth2 accounts should be listed
+///
+/// # Returns
+///
+/// * `Ok(Vec<OAuth2Account>)` - A list of connected OAuth2 accounts
+/// * `Err(CoordinationError)` - If an error occurs while retrieving the accounts
+///
+/// # Examples
+///
+/// ```no_run
+/// use oauth2_passkey::list_accounts_core;
+///
+/// async fn get_connected_services(user_id: &str) -> Vec<String> {
+///     match list_accounts_core(user_id).await {
+///         Ok(accounts) => accounts.into_iter().map(|acc| acc.provider).collect(),
+///         Err(_) => Vec::new()
+///     }
+/// }
+/// ```
 pub async fn list_accounts_core(user_id: &str) -> Result<Vec<OAuth2Account>, CoordinationError> {
     get_oauth2_accounts(user_id).await
 }

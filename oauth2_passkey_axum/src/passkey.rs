@@ -47,7 +47,26 @@ fn router_auth() -> Router {
 }
 
 /// Creates a router for the WebAuthn well-known endpoint
-/// This should be mounted at the root level of the application
+/// Creates a router for WebAuthn/.well-known endpoints
+///
+/// This router should be mounted at the root level of your application to provide
+/// the WebAuthn well-known configuration endpoint as required by the WebAuthn standard.
+///
+/// # Example
+///
+/// ```no_run
+/// use axum::Router;
+/// use oauth2_passkey_axum::passkey_well_known_router;
+///
+/// let app = Router::new()
+///     // Mount the WebAuthn well-known endpoint at the root level
+///     .merge(passkey_well_known_router())
+///     // Your other routes...
+///     ;
+/// ```
+///
+/// This will create a `/.well-known/webauthn` endpoint that returns the WebAuthn
+/// relying party configuration, including related origins.
 pub fn passkey_well_known_router() -> Router {
     Router::new().route("/webauthn", get(serve_related_origin))
 }

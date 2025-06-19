@@ -1,6 +1,15 @@
 use std::env;
 use std::sync::LazyLock;
 
+/// Name of the session cookie used for authentication.
+///
+/// By default, uses the secure "__Host-" prefix to enforce additional security constraints.
+/// Can be configured via the SESSION_COOKIE_NAME environment variable.
+///
+/// The "__Host-" prefix ensures that cookies:
+/// 1. Cannot be set from a non-secure context
+/// 2. Must have the Path attribute set to "/"
+/// 3. Cannot include a Domain attribute (preventing subdomain access)
 pub static SESSION_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
     std::env::var("SESSION_COOKIE_NAME")
         .ok()

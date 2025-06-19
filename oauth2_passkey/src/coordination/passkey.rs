@@ -34,21 +34,41 @@ fn get_passkey_field_mappings() -> (String, String) {
     )
 }
 
-/// Mode of registration operation to explicitly indicate user intent
+/// Mode of registration operation to explicitly indicate user intent.
+///
+/// This enum defines the available modes for passkey registration, determining
+/// whether a new user account should be created or a passkey should be added to
+/// an existing authenticated user.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RegistrationMode {
-    /// Adding a passkey to an existing user (requires authentication)
+    /// Adding a passkey to an existing user (requires authentication).
+    ///
+    /// This mode is used when an authenticated user wants to add another
+    /// passkey to their account, such as registering a new device or
+    /// security key as a backup.
     AddToUser,
-    /// Creating a new user with a passkey (no authentication required)
+    
+    /// Creating a new user with a passkey (no authentication required).
+    ///
+    /// This mode is used for new user registration, where the user doesn't
+    /// have an existing account and wants to create one using a passkey
+    /// as their authentication method.
     CreateUser,
 }
 
-/// Request for starting passkey registration with explicit mode
+/// Request for starting passkey registration with explicit mode.
+///
+/// This struct represents the data needed to begin a passkey registration process.
+/// It specifies the user information and the registration mode (whether adding a
+/// new passkey to an existing user or creating a new user).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegistrationStartRequest {
+    /// Username for the passkey registration (login identifier)
     pub username: String,
+    /// Display name for the passkey registration (user-friendly name)
     pub displayname: String,
+    /// Mode of registration (add to existing user or create new user)
     pub mode: RegistrationMode,
 }
 
