@@ -143,7 +143,7 @@ async fn get_session_user(session_cookie: &str) -> Result<AuthUser, StatusCode> 
 
 Complete working examples are available in the repository:
 
-- **[Basic Integration](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo01)** - Simple authentication setup
+- **[Basic Integration](../demo01)** - Simple authentication setup
 - **[OAuth2 Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-oauth2)** - Google OAuth2 integration
 - **[Passkey Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-passkey)** - WebAuthn/passkey authentication
 
