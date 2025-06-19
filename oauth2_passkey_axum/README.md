@@ -30,20 +30,19 @@ oauth2-passkey-axum = "0.1"
 
 ```rust
 use axum::{Router, response::Html};
-use oauth2_passkey_axum::{oauth2_passkey_router, init, AuthConfig};
+use oauth2_passkey_axum::{oauth2_passkey_router, init, O2P_ROUTE_PREFIX};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize authentication
-    let config = AuthConfig::from_env()?;
-    let auth_context = init(config).await?;
+    // Initialize authentication (reads configuration from environment variables)
+    init().await?;
 
     // Create your application router
     let app = Router::new()
         .route("/", axum::routing::get(|| async { Html("Hello World!") }))
-        // Add authentication routes
-        .nest("/auth", oauth2_passkey_router(auth_context))
-        .layer(/* your middleware */);
+        // Add authentication routes (default: /o2p, configurable via O2P_ROUTE_PREFIX env var)
+        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
+        .merge(/* other routes */);
 
     // Start server
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
@@ -58,16 +57,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 Protect your routes with authentication middleware:
 
 ```rust
-use oauth2_passkey_axum::{is_authenticated_redirect, AuthUser};
-use axum::{routing::get, Router, response::Html};
+use oauth2_passkey_axum::{is_authenticated_user_redirect, AuthUser};
+use axum::{middleware::from_fn, routing::get, Router, response::Html, Extension};
 
-async fn protected_handler(user: AuthUser) -> Html<String> {
-    Html(format!("Hello, {}! You are authenticated.", user.email))
+async fn protected_handler(Extension(user): Extension<AuthUser>) -> Html<String> {
+    Html(format!("Hello, {}! You are authenticated.", user.account))
 }
 
 let app = Router::new()
-    .route("/protected", get(protected_handler))
-    .layer(axum::middleware::from_fn(is_authenticated_redirect));
+    .route("/protected", get(protected_handler).route_layer(from_fn(is_authenticated_user_redirect));
+```
+
+Alternatively, use the `AuthUser` extractor directly (no middleware needed):
+
+```rust
+use oauth2_passkey_axum::AuthUser;
+use axum::{routing::get, Router, response::Html};
+
+async fn protected_handler(user: AuthUser) -> Html<String> {
+    Html(format!("Hello, {}! You are authenticated.", user.account))
+}
+
+let app = Router::new()
+    .route("/protected", get(protected_handler));
 ```
 
 ## Feature Flags
@@ -88,52 +100,101 @@ oauth2-passkey-axum = { version = "0.1", default-features = false, features = ["
 Same as the core library. Create a `.env` file:
 
 ```env
-# Database
-DATABASE_URL=sqlite:data/auth.db
+# Required: Base URL of your application
+ORIGIN=https://yourdomain.com
 
-# Cache
-REDIS_URL=redis://localhost:6379
+# Database configuration
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL=sqlite:data/auth.db
+
+# Cache configuration  
+GENERIC_CACHE_STORE_TYPE=redis
+GENERIC_CACHE_STORE_URL=redis://localhost:6379
 
 # OAuth2 providers
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
+OAUTH2_GOOGLE_CLIENT_ID=your_google_client_id
+OAUTH2_GOOGLE_CLIENT_SECRET=your_google_client_secret
 
-# Session security
-SESSION_SECRET=your_32_character_secret_key_here
+# Optional: Server secret (for token signing)
+AUTH_SERVER_SECRET=your_32_character_secret_key_here
 
-# Application URLs
-BASE_URL=https://yourdomain.com
-REDIRECT_URL_ANON=https://yourdomain.com/
+# Optional: Route configuration
+O2P_ROUTE_PREFIX=/o2p
+O2P_REDIRECT_ANON=https://yourdomain.com/
 ```
 
 ## Available Routes
 
-When you include the authentication router, these routes are available:
+When you include the authentication router, these routes are available (default prefix `/o2p`, configurable via `O2P_ROUTE_PREFIX` environment variable):
 
-- `GET /auth/login` - Login page
-- `POST /auth/oauth2/{provider}` - OAuth2 authentication
-- `GET /auth/oauth2/callback` - OAuth2 callback
-- `GET /auth/passkey/register` - Passkey registration
-- `POST /auth/passkey/register` - Complete passkey registration
-- `GET /auth/passkey/authenticate` - Passkey authentication
-- `POST /auth/passkey/authenticate` - Complete passkey authentication
-- `POST /auth/logout` - User logout
-- `GET /auth/admin` - Admin interface (if `admin-ui` feature enabled)
+### OAuth2 Routes (`/o2p/oauth2/`)
+
+- `GET /o2p/oauth2/google` - Start Google OAuth2 authentication
+- `GET /o2p/oauth2/authorized` - OAuth2 callback (query mode)
+- `POST /o2p/oauth2/authorized` - OAuth2 callback (form_post mode)
+- `GET /o2p/oauth2/accounts` - List OAuth2 accounts for user
+- `DELETE /o2p/oauth2/accounts/{provider}/{provider_user_id}` - Delete OAuth2 account
+
+### Passkey Routes (`/o2p/passkey/`)
+
+- `POST /o2p/passkey/register/start` - Start passkey registration
+- `POST /o2p/passkey/register/finish` - Complete passkey registration
+- `POST /o2p/passkey/auth/start` - Start passkey authentication
+- `POST /o2p/passkey/auth/finish` - Complete passkey authentication
+- `GET /o2p/passkey/credentials` - List passkey credentials for user
+- `DELETE /o2p/passkey/credentials/{credential_id}` - Delete passkey credential
+- `POST /o2p/passkey/credential/update` - Update passkey credential
+
+### User Routes (`/o2p/user/`)
+
+- `GET /o2p/user/login` - Login page (if `user-ui` feature enabled)
+- `GET /o2p/user/summary` - User summary page (if `user-ui` feature enabled)
+- `GET /o2p/user/info` - User info JSON (if `user-ui` feature enabled)
+- `GET /o2p/user/csrf_token` - Get CSRF token (if `user-ui` feature enabled)
+- `GET /o2p/user/logout` - User logout
+- `DELETE /o2p/user/delete` - Delete user account
+- `PUT /o2p/user/update` - Update user account
+
+### Admin Routes (`/o2p/admin/`)
+
+- `GET /o2p/admin/list_users` - List all users (admin only)
+- `GET /o2p/admin/user/{user_id}` - User details page (admin only, if `admin-ui` feature enabled)
+- `DELETE /o2p/admin/delete_user` - Delete user account (admin only)
+- `DELETE /o2p/admin/delete_passkey_credential/{credential_id}` - Delete passkey credential (admin only)
+- `DELETE /o2p/admin/delete_oauth2_account/{provider}/{provider_user_id}` - Delete OAuth2 account (admin only)
+- `PUT /o2p/admin/update_admin_status` - Update user admin status (admin only)
+
+### Static Assets
+
+- `GET /o2p/oauth2/oauth2.js` - OAuth2 JavaScript
+- `GET /o2p/passkey/passkey.js` - Passkey JavaScript
+- `GET /o2p/passkey/conditional_ui.js` - Conditional UI JavaScript
+- `GET /o2p/user/summary.js` - User summary JavaScript
+- `GET /o2p/user/summary.css` - User summary CSS
+- `GET /o2p/admin/admin_user.js` - Admin user JavaScript
+- `GET /o2p/admin/admin_user.css` - Admin user CSS
 
 ## Middleware Functions
 
-- `is_authenticated_redirect` - Redirect to login if not authenticated
-- `is_authenticated_401` - Return 401 if not authenticated
-- `is_authenticated_user_redirect` - Redirect regular users (admin-only routes)
-- `is_authenticated_user_401` - Return 401 for regular users
+| Middleware | User Data | Error Response | Use Case |
+|------------|-----------|----------------|----------|
+| `is_authenticated_redirect` | ❌ | Redirect | Browser pages |
+| `is_authenticated_401` | ❌ | HTTP 401 | API endpoints |
+| `is_authenticated_user_redirect` | ✅ | Redirect | Browser pages with user info |
+| `is_authenticated_user_401` | ✅ | HTTP 401 | API endpoints with user info |
+
+**Quick Guide:**
+
+- Need user data in handler? → Use `*_user_*` variants
+- Browser app? → Use `*_redirect` | API? → Use `*_401`
 
 ## Examples
 
 See the complete working examples in the repository:
 
-- [Basic Integration](https://github.com/ktaka/oauth2-passkey/tree/main/demo01)
-- [OAuth2 Demo](https://github.com/ktaka/oauth2-passkey/tree/main/demo-oauth2)
-- [Passkey Demo](https://github.com/ktaka/oauth2-passkey/tree/main/demo-passkey)
+- [Basic Integration](https://github.com/ktaka-ccmp/oauth2-passkey/tree/main/demo01)
+- [OAuth2 Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/main/demo-oauth2)
+- [Passkey Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/main/demo-passkey)
 
 ## Core Library
 
