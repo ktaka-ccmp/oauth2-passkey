@@ -4,98 +4,149 @@
 [![Docs.rs](https://docs.rs/oauth2-passkey/badge.svg)](https://docs.rs/oauth2-passkey)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A minimal-dependency, security-focused core library for OAuth2 and passkey authentication in Rust web applications.
+A framework-agnostic core library for OAuth2 and WebAuthn/passkey authentication in Rust applications.
 
-This is the core library that provides the authentication logic and coordination between OAuth2 providers and WebAuthn/passkey authentication. For Axum web framework integration, see [`oauth2-passkey-axum`](https://crates.io/crates/oauth2-passkey-axum).
+This library provides the essential authentication logic and coordination functions that can be integrated into any Rust web framework. It handles complex authentication flows while leaving web framework integration to separate crates.
 
 ## Features
 
-- **OAuth2 Authentication**: Support for multiple OAuth2 providers
-- **Passkey/WebAuthn**: Modern passwordless authentication
-- **Session Management**: Secure session handling with Redis/in-memory cache
-- **User Database**: Flexible user storage with SQLite/PostgreSQL support
-- **Security-First**: Timing-attack resistant, minimal dependencies
-- **Async/Await**: Full async support with tokio
+- **Framework-Agnostic**: Core authentication logic independent of web frameworks
+- **OAuth2 Support**: Google OAuth2/OIDC authentication with extensible provider system
+- **WebAuthn/Passkey**: FIDO2-compliant passwordless authentication
+- **Secure Session Management**: Redis and in-memory session storage with secure cookies
+- **Flexible Storage**: SQLite and PostgreSQL database support
+- **CSRF Protection**: Built-in protection against cross-site request forgery
+- **Security-First Design**: Timing-attack resistant with cryptographically secure randomness
 
-## Quick Start
+## Web Framework Integrations
 
-Add to your `Cargo.toml`:
+This core library is designed to be used with framework-specific integration crates:
 
-```toml
-[dependencies]
-oauth2-passkey = "0.1"
-```
+- **[`oauth2-passkey-axum`](https://crates.io/crates/oauth2-passkey-axum)** - Axum web framework integration
+- **Other frameworks** - Additional integration crates can be built using this core library
 
-## Basic Usage
+**For most users**: Use the framework-specific integration crates rather than this core library directly.
+
+## Core API
+
+The library exposes coordination functions for authentication flows:
 
 ```rust
-use oauth2_passkey::{init, AuthConfig};
+use oauth2_passkey::{
+    init, 
+    handle_start_authentication_core,
+    handle_finish_authentication_core,
+    handle_start_registration_core, 
+    handle_finish_registration_core,
+    prepare_oauth2_auth_request,
+    is_authenticated_basic,
+    get_user_from_session,
+};
 
+// Initialize the authentication system
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize the authentication system
-    let config = AuthConfig::from_env()?;
-    let auth_context = init(config).await?;
-
-    // Use auth_context for authentication operations
+    init().await?;
+    
+    // Use authentication functions in your web framework handlers
+    // See "Building Framework Integrations" section below for examples
     Ok(())
 }
 ```
 
 ## Configuration
 
-The library uses environment variables for configuration. Create a `.env` file:
+Configure the library via environment variables:
 
 ```env
-# Database
-DATABASE_URL=sqlite:data/auth.db
-# Or: DATABASE_URL=postgresql://user:pass@localhost/auth_db
+# Required: Base URL of your application
+ORIGIN=https://yourdomain.com
 
-# Cache (Redis recommended for production)
-REDIS_URL=redis://localhost:6379
-# Or use in-memory cache for development
+# Database configuration
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL=sqlite:data/auth.db
+
+# Cache configuration  
+GENERIC_CACHE_STORE_TYPE=redis
+GENERIC_CACHE_STORE_URL=redis://localhost:6379
 
 # OAuth2 providers
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
+OAUTH2_GOOGLE_CLIENT_ID=your_google_client_id
+OAUTH2_GOOGLE_CLIENT_SECRET=your_google_client_secret
 
-# Session security
-SESSION_SECRET=your_32_character_secret_key_here
+# Optional: Server secret for token signing (32+ characters recommended)
+AUTH_SERVER_SECRET=your_32_character_secret_key_here
+
+# Optional: Session configuration
+SESSION_COOKIE_NAME=__Host-SessionId
+SESSION_COOKIE_MAX_AGE=600
 ```
 
 ## Architecture
 
-This library provides the core authentication logic and coordinates between:
+The library is organized into modular components that work together:
 
-- **OAuth2 Module**: Handles OAuth2 provider interactions
-- **Passkey Module**: WebAuthn/FIDO2 passkey authentication
-- **Session Module**: Secure session management
-- **User Database**: User account storage and management
-- **Storage Module**: Caching and temporary data storage
+- **`coordination`** - High-level authentication flow coordination functions
+- **`oauth2`** - OAuth2 provider interactions and token handling
+- **`passkey`** - WebAuthn/FIDO2 passkey operations and verification
+- **`session`** - Session management, validation, and security
+- **`userdb`** - User account storage and management
+- **`storage`** - Database and cache abstractions with multiple backend support
 
-## Web Framework Integration
+## Building Framework Integrations
 
-This core library is framework-agnostic. For web framework integration:
+To integrate with a web framework, implement HTTP handlers that call the coordination functions:
 
-- **Axum**: Use [`oauth2-passkey-axum`](https://crates.io/crates/oauth2-passkey-axum)
-- **Other frameworks**: Implement handlers using the core authentication functions
+```rust
+use oauth2_passkey::{prepare_oauth2_auth_request, get_user_and_csrf_token_from_session, AuthUser};
+use http::{HeaderMap, StatusCode};
+
+// Example: OAuth2 authentication endpoint
+async fn handle_oauth2_auth(headers: HeaderMap) -> Result<String, StatusCode> {
+    let (auth_url, response_headers) = prepare_oauth2_auth_request(headers, None)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    
+    // Framework integration should:
+    // 1. Set response_headers on the HTTP response
+    // 2. Redirect to auth_url
+    Ok(auth_url)
+}
+
+// Example: Extract user from session cookie
+async fn get_session_user(session_cookie: &str) -> Result<AuthUser, StatusCode> {
+    let (session_user, csrf_token) = get_user_and_csrf_token_from_session(session_cookie)
+        .await
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    
+    // Convert to framework-specific user type
+    let mut auth_user = AuthUser::from(session_user);
+    auth_user.csrf_token = csrf_token.as_str().to_string();
+    Ok(auth_user)
+}
+```
+
+**Complete Example**: See the [`oauth2-passkey-axum`](https://github.com/ktaka/oauth2-passkey/tree/main/oauth2_passkey_axum) source code for a full framework integration implementation.
 
 ## Security Features
 
-- **Constant-time operations** for sensitive comparisons
-- **CSRF protection** with secure token generation
-- **Session security** with secure random session IDs
-- **Timing attack resistance** in authentication flows
-- **Memory safety** with secure credential handling
+- **Secure cookie implementation** with `Secure`, `HttpOnly`, `SameSite=Lax` attributes and `__Host-` prefix
+- **Constant-time CSRF comparison** using `subtle::ConstantTimeEq` to prevent timing attacks
+- **Cryptographically secure randomness** via `ring::rand::SystemRandom` for session IDs and tokens
+- **CSRF protection** with secure token generation and validation
+- **Session timeout management** with configurable expiration
+- **Host-locked cookies** using `__Host-SessionId` prefix for enhanced security
+
+**Note**: For a comprehensive security analysis and verification status of all claims, see [Security Documentation](../docs/security.md).
 
 ## Examples
 
-See the [demo applications](https://github.com/ktaka/oauth2-passkey/tree/main/demo01) in the repository for complete working examples.
+Complete working examples are available in the repository:
+
+- **[Basic Integration](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo01)** - Simple authentication setup
+- **[OAuth2 Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-oauth2)** - Google OAuth2 integration
+- **[Passkey Demo](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-passkey)** - WebAuthn/passkey authentication
 
 ## License
 
 Licensed under the MIT License. See [LICENSE](https://github.com/ktaka/oauth2-passkey/blob/main/LICENSE) for details.
-
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](https://github.com/ktaka/oauth2-passkey/blob/main/CONTRIBUTING.md) for guidelines.
