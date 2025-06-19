@@ -312,8 +312,9 @@ This dual approach ensures header-based CSRF (common for SPAs/AJAX) is handled a
 For traditional HTML form submissions (where the `X-CSRF-Token` header is typically absent), your request handler **must** manually verify the CSRF token that was submitted in the form body.
 
 ```rust
-// Ensure `use subtle::ConstantTimeEq;` is in scope
+//if csrf verification in header failed
 if !auth_user.csrf_via_header_verified {
+    // compare csrf token in the form with the one in the session cache
     if !form_data.csrf_token.as_bytes().ct_eq(auth_user.csrf_token.as_bytes()).into() {
         tracing::error!(
             "CSRF token mismatch (form field). Submitted: {}, Expected: {}",
