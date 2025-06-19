@@ -60,7 +60,7 @@ mod user;
 #[cfg(test)]
 pub(crate) mod test_utils;
 
-/// URL constants for different authentication-related pages
+// URL constants for different authentication-related pages
 pub use config::{O2P_ADMIN_URL, O2P_LOGIN_URL, O2P_REDIRECT_ANON, O2P_SUMMARY_URL};
 
 // Authentication middleware for protecting routes
@@ -69,13 +69,13 @@ pub use middleware::{
     is_authenticated_user_redirect,
 };
 
-/// Router for WebAuthn/.well-known endpoints
+// Router for WebAuthn/.well-known endpoints
 pub use passkey::passkey_well_known_router;
 
-/// Main router that provides all authentication endpoints
+// Main router that provides all authentication endpoints
 pub use router::oauth2_passkey_router;
 
-/// Axum extractor for authenticated users
+// Axum extractor for authenticated users
 pub use session::AuthUser;
 
 // Re-export the route prefix and initialization function from oauth2_passkey crate
