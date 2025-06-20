@@ -71,7 +71,8 @@ fn handle_auth_error(err: SessionError, req: &Request, redirect_on_error: bool) 
 /// use axum::{Router, middleware::from_fn};
 /// use oauth2_passkey_axum::is_authenticated_401;
 ///
-/// let app = Router::new()
+/// # async fn handler() -> &'static str { "Hello" }
+/// let app: Router = Router::new()
 ///     .route("/api/data", axum::routing::get(handler))
 ///     .layer(from_fn(is_authenticated_401));
 /// ```
@@ -103,7 +104,8 @@ pub async fn is_authenticated_401(mut req: Request, next: Next) -> Response {
 /// use axum::{Router, middleware::from_fn};
 /// use oauth2_passkey_axum::is_authenticated_redirect;
 ///
-/// let app = Router::new()
+/// # async fn handler() -> &'static str { "Hello" }
+/// let app: Router = Router::new()
 ///     .route("/dashboard", axum::routing::get(handler))
 ///     .layer(from_fn(is_authenticated_redirect));
 /// ```
@@ -141,7 +143,7 @@ pub async fn is_authenticated_redirect(mut req: Request, next: Next) -> Response
 ///     format!("Hello, {}", user.account)
 /// }
 ///
-/// let app = Router::new()
+/// let app: Router = Router::new()
 ///     .route("/api/profile", axum::routing::get(handler))
 ///     .layer(from_fn(is_authenticated_user_401));
 /// ```
@@ -188,7 +190,7 @@ pub async fn is_authenticated_user_401(mut req: Request, next: Next) -> Response
 ///     format!("Hello, {}", user.account)
 /// }
 ///
-/// let app = Router::new()
+/// let app: Router = Router::new()
 ///     .route("/dashboard", axum::routing::get(handler))
 ///     .layer(from_fn(is_authenticated_user_redirect));
 /// ```
