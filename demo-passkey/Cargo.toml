@@ -4,7 +4,7 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-askama = "0.13.0"
+askama = "0.14.0"
 axum = { workspace = true }
 axum-core = { workspace = true }
 axum-server = { version = "0.7.2", features = ["tls-rustls"] }
