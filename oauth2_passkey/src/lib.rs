@@ -107,7 +107,7 @@ pub use userdb::User as DbUser;
 /// # Environment Variables
 ///
 /// Required environment variables:
-/// - `ORIGIN`: Base URL of your application (e.g., "https://example.com")
+/// - `ORIGIN`: Base URL of your application (e.g., `https://example.com`)
 ///
 /// Storage variables (choose one database and one cache):
 /// - `GENERIC_DATA_STORE_TYPE`: "sqlite" or "postgres"
