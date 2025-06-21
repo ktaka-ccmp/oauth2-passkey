@@ -200,18 +200,18 @@ pub enum OAuth2Mode {
     /// This mode is used when an authenticated user wants to link an additional
     /// OAuth2 provider account to their existing account.
     AddToUser,
-    
+
     /// Create a new user account from the OAuth2 provider data.
     ///
     /// This mode is used specifically for new user registration using OAuth2.
     CreateUser,
-    
+
     /// Login with an existing OAuth2 account.
     ///
     /// This mode is used when a user wants to authenticate using a previously
     /// linked OAuth2 provider account.
     Login,
-    
+
     /// Create a new user if no matching account exists, otherwise login.
     ///
     /// This flexible mode attempts to login with an existing account if one matches

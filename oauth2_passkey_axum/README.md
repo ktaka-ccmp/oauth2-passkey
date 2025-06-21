@@ -1,12 +1,27 @@
 # oauth2-passkey-axum
 
+[![CI](https://github.com/ktaka-ccmp/oauth2-passkey/workflows/CI/badge.svg)](https://github.com/ktaka-ccmp/oauth2-passkey/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/ktaka-ccmp/oauth2-passkey/branch/main/graph/badge.svg)](https://codecov.io/gh/ktaka-ccmp/oauth2-passkey)
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey-axum.svg)](https://crates.io/crates/oauth2-passkey-axum)
 [![Docs.rs](https://docs.rs/oauth2-passkey-axum/badge.svg)](https://docs.rs/oauth2-passkey-axum)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![MSRV](https://img.shields.io/badge/MSRV-1.85.1-blue)](https://blog.rust-lang.org/2024/11/21/Rust-1.85.0.html)
 
 Axum web framework integration for the [`oauth2-passkey`](https://crates.io/crates/oauth2-passkey) authentication library.
 
 This crate provides ready-to-use Axum handlers, middleware, and UI components for OAuth2 and passkey authentication in your Axum web applications.
+
+## Documentation
+
+- [API Documentation](https://docs.rs/oauth2-passkey-axum) - Complete API reference
+- [Contributing Guide](../CONTRIBUTING.md) - How to contribute to this project
+- [Security Best Practices](../docs/security-best-practices.md) - Security implementation guide
+
+## Requirements
+
+- **Minimum Supported Rust Version (MSRV)**: 1.85.1
+- **Supported Platforms**: Linux, macOS, Windows (x86_64, ARM64)
+- **Dependencies**: Built on stable Rust with minimal dependency tree
 
 ## Features
 

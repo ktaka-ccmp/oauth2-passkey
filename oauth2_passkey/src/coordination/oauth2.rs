@@ -97,7 +97,7 @@ pub async fn authorized_core(
 /// use http::HeaderMap;
 ///
 /// async fn process_oauth_callback(
-///     auth_response: &AuthResponse, 
+///     auth_response: &AuthResponse,
 ///     cookies: &Cookie,
 ///     headers: &HeaderMap
 /// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {
@@ -138,7 +138,7 @@ pub async fn get_authorized_core(
 /// use http::HeaderMap;
 ///
 /// async fn process_oauth_form_submission(
-///     auth_response: &AuthResponse, 
+///     auth_response: &AuthResponse,
 ///     cookies: &Cookie,
 ///     headers: &HeaderMap
 /// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {

@@ -1,8 +1,8 @@
-/// WebAuthn/Passkey authentication implementation for creating, managing, and authenticating 
+/// WebAuthn/Passkey authentication implementation for creating, managing, and authenticating
 /// with passkey credentials.
 ///
 /// This module provides WebAuthn (Web Authentication) capabilities, letting users create and use
-/// passkeys for authentication. It implements the WebAuthn protocol for creating and verifying 
+/// passkeys for authentication. It implements the WebAuthn protocol for creating and verifying
 /// cryptographic credentials using authenticators like hardware security keys, platform authenticators
 /// (Windows Hello, Apple Touch ID, Android fingerprint), or cross-device passkeys.
 ///

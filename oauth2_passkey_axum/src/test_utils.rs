@@ -40,7 +40,6 @@ pub mod env {
     }
 }
 
-
 /// Mock implementations for external dependencies
 pub mod mocks {
     use super::*;

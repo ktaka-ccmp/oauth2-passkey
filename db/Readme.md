@@ -1,117 +1,209 @@
-# Database Configuration
+# Database Configuration Guide
 
-The application supports multiple storage backends that can be configured through environment variables. Storage configuration is managed through `.env` file (copy `.env.example` to `.env` and modify as needed).
+This guide explains how to configure database storage for the `oauth2-passkey` authentication system. The library uses a unified storage architecture with two main components:
 
-## Storage Types
+- **Data Store**: Persistent storage for user accounts, OAuth2 accounts, and passkey credentials
+- **Cache Store**: Fast ephemeral storage for sessions, challenges, and temporary data
 
-### In-Memory Storage
+## Quick Start
 
-Uses HashMap for temporary storage. Data is lost when the application restarts.
+Copy the example environment file and configure your storage backends:
+
+```bash
+cp dot.env.example .env
+# Edit .env with your preferred storage configuration
+```
+
+## Storage Architecture
+
+### Data Store (Persistent Storage)
+
+Stores permanent data like user accounts and credentials. Choose one:
+
+**SQLite** (recommended for development/small deployments):
 
 ```env
-PASSKEY_CHALLENGE_STORE=memory
-PASSKEY_CREDENTIAL_STORE=memory
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL='sqlite:./db/sqlite/data/data.db'
 ```
 
-### SQLite Storage
-
-Persistent storage using SQLite database.
+**PostgreSQL** (recommended for production):
 
 ```env
-PASSKEY_CHALLENGE_STORE=sqlite
-PASSKEY_CREDENTIAL_STORE=sqlite
-PASSKEY_CHALLENGE_SQLITE_URL=sqlite:./db/sqlite/data/data.db
-PASSKEY_CREDENTIAL_SQLITE_URL=sqlite:./db/sqlite/data/data.db
+GENERIC_DATA_STORE_TYPE=postgres
+GENERIC_DATA_STORE_URL='postgresql://user:password@localhost:5432/database'
 ```
 
-Prepare database:
-```bash
-db=sqlite/data/data.db
-rm $db && sqlx database create --database-url sqlite:$db
-```
+### Cache Store (Session Storage)
 
-Monitor database:
-```bash
-db=sqlite/data/data.db
-watch -n 1 "echo 'select credential_id,counter,user_handle,user_name,user_display_name from credentials;select challenge_id,user_name,user_display_name,timestamp from challenges' | sqlite3 $db"
-```
+Stores temporary data like sessions and challenges. Choose one:
 
-### PostgreSQL Storage
-
-Persistent storage using PostgreSQL database.
+**Memory** (simple, but sessions lost on restart):
 
 ```env
-PASSKEY_CHALLENGE_STORE=postgres
-PASSKEY_CREDENTIAL_STORE=postgres
-PASSKEY_CHALLENGE_POSTGRES_URL=postgresql://passkey:passkey@localhost:5432/passkey
-PASSKEY_CREDENTIAL_POSTGRES_URL=postgresql://passkey:passkey@localhost:5432/passkey
+GENERIC_CACHE_STORE_TYPE=memory
+GENERIC_CACHE_STORE_URL=''
 ```
 
-Start PostgreSQL:
-```bash
-docker compose -f postgresql/docker-compose.yaml up -d
-docker compose -f postgresql/docker-compose.yaml ps
-```
-
-Monitor database:
-```bash
-watch -n 1 "echo 'select credential_id,counter,user_handle,user_name,user_display_name from credentials;select challenge_id,user_name,user_display_name,timestamp from challenges'|psql postgresql://passkey:passkey@localhost:5432/passkey"
-```
-
-### Redis Storage
-
-Persistent storage using Redis.
+**Redis** (recommended for production/scalability):
 
 ```env
-PASSKEY_CHALLENGE_STORE=redis
-PASSKEY_CREDENTIAL_STORE=redis
-PASSKEY_CHALLENGE_REDIS_URL=redis://localhost:6379
-PASSKEY_CREDENTIAL_REDIS_URL=redis://localhost:6379
+GENERIC_CACHE_STORE_TYPE=redis
+GENERIC_CACHE_STORE_URL='redis://localhost:6379'
 ```
 
-Start Redis:
+## Database Setup Instructions
+
+### SQLite Setup
+
+SQLite databases are created automatically. Ensure the directory exists:
+
 ```bash
-docker compose -f redis/docker-compose.yaml up -d
-docker compose -f redis/docker-compose.yaml ps
+mkdir -p db/sqlite/data
 ```
 
-Monitor database:
+Monitor SQLite database:
+
 ```bash
-watch -n 1 'redis-cli keys "*" | xargs redis-cli mget'
+# View user and credential data
+echo "SELECT * FROM users; SELECT * FROM oauth2_accounts; SELECT * FROM passkey_credentials;" | sqlite3 db/sqlite/data/data.db
 ```
 
-## Implementation Details
+### PostgreSQL Setup
 
-- Each storage type implements both `ChallengeStore` and `CredentialStore` traits
-- Storage type is selected at runtime based on environment variables
-- Default storage is in-memory if no environment variables are set
-- Connection status is logged when storage is initialized
+Start PostgreSQL using Docker Compose:
 
-The application supports multiple storage backends that can be configured through environment variables.
-Copy `.env.example` to `.env` and modify the values according to your needs.
+```bash
+cd db/postgresql
+docker compose up -d
+docker compose ps
+```
 
-## Environment Variables
+This creates a database with:
 
-- `PASSKEY_CHALLENGE_STORE`: Type of storage for challenges (memory, sqlite, postgres, or redis)
-- `PASSKEY_CREDENTIAL_STORE`: Type of storage for credentials (memory, sqlite, postgres, or redis)
+- Database: `passkey`
+- Username: `passkey`
+- Password: `passkey`
+- Port: `5432`
 
-Depending on the chosen storage type, additional configuration is required:
+Monitor PostgreSQL:
 
-### Memory Storage
-No additional configuration needed. This is the default if no environment variables are set.
+```bash
+# Connect and view data
+psql postgresql://passkey:passkey@localhost:5432/passkey
+# Then run: \dt to see tables, SELECT * FROM users; etc.
+```
 
-### SQLite Storage
-- `PASSKEY_CHALLENGE_SQLITE_URL`: SQLite database URL for challenges
-- `PASSKEY_CREDENTIAL_SQLITE_URL`: SQLite database URL for credentials
+### Redis Setup
 
-Default: `sqlite:./db/sqlite/data/data.db`
+Start Redis using Docker Compose:
 
-### PostgreSQL Storage
-Required when using PostgreSQL:
-- `PASSKEY_CHALLENGE_POSTGRES_URL`: PostgreSQL connection URL for challenges
-- `PASSKEY_CREDENTIAL_POSTGRES_URL`: PostgreSQL connection URL for credentials
+```bash
+cd db/redis
+docker compose up -d
+docker compose ps
+```
 
-### Redis Storage
-Required when using Redis:
-- `PASSKEY_CHALLENGE_REDIS_URL`: Redis connection URL for challenges
-- `PASSKEY_CREDENTIAL_REDIS_URL`: Redis connection URL for credentials
+Monitor Redis:
+
+```bash
+# View all keys and data
+redis-cli
+# Then run: KEYS *, GET key_name, etc.
+```
+
+## Configuration Examples
+
+### Development Configuration
+
+```env
+# SQLite + Memory (simple, no external dependencies)
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL='sqlite:./db/sqlite/data/data.db'
+GENERIC_CACHE_STORE_TYPE=memory
+GENERIC_CACHE_STORE_URL=''
+```
+
+### Production Configuration
+
+```env
+# PostgreSQL + Redis (scalable, persistent)
+GENERIC_DATA_STORE_TYPE=postgres
+GENERIC_DATA_STORE_URL='postgresql://user:password@db-host:5432/dbname'
+GENERIC_CACHE_STORE_TYPE=redis
+GENERIC_CACHE_STORE_URL='redis://redis-host:6379'
+```
+
+### Testing Configuration
+
+```env
+# In-memory SQLite (fast, isolated tests)
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL=':memory:'
+GENERIC_CACHE_STORE_TYPE=memory
+GENERIC_CACHE_STORE_URL=''
+```
+
+## Database Schema
+
+The library automatically manages database schemas for:
+
+- **`users`** - User account information
+- **`oauth2_accounts`** - OAuth2 account linkages
+- **`passkey_credentials`** - WebAuthn/passkey credentials
+- **Cache data** - Session tokens, challenges (Redis/memory only)
+
+All tables are prefixed with `o2p_` by default to avoid conflicts.
+
+## Monitoring and Debugging
+
+### SQLite Monitoring
+
+```bash
+# Real-time monitoring
+watch -n 2 "echo 'SELECT COUNT(*) as users FROM o2p_users; SELECT COUNT(*) as creds FROM o2p_passkey_credentials;' | sqlite3 db/sqlite/data/data.db"
+```
+
+### PostgreSQL Monitoring
+
+```bash
+# Real-time monitoring
+watch -n 2 "echo 'SELECT COUNT(*) as users FROM o2p_users; SELECT COUNT(*) as creds FROM o2p_passkey_credentials;' | psql postgresql://passkey:passkey@localhost:5432/passkey"
+```
+
+### Redis Monitoring
+
+```bash
+# View session data
+redis-cli --scan --pattern "session:*" | head -10
+redis-cli --scan --pattern "challenge:*" | head -10
+```
+
+## Troubleshooting
+
+**Database Connection Issues:**
+
+- Verify connection URLs are correct
+- Ensure database servers are running
+- Check firewall/network connectivity
+- Review application logs for specific error messages
+
+**Schema Issues:**
+
+- The library automatically creates required tables
+- For PostgreSQL, ensure the user has CREATE privileges
+- Check database logs for permission or constraint errors
+
+**Performance Issues:**
+
+- Use Redis for cache in production (not memory)
+- Use PostgreSQL for data in production (not SQLite)
+- Connection pooling is automatically handled by the library
+
+## Security Considerations
+
+- Use strong database passwords
+- Restrict database network access
+- Use SSL/TLS for database connections in production
+- Regularly backup persistent data stores
+- Consider encrypting sensitive data at rest
