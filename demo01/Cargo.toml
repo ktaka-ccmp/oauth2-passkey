@@ -4,7 +4,7 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-askama = { version = "0.13.0" }
+askama = { version = "0.14.0" }
 axum-server = { version = "0.7.2", features = ["tls-rustls"] }
 dotenv = { workspace = true }
 http = { workspace = true }
@@ -15,5 +15,5 @@ tokio = { workspace = true }
 rustls = { workspace = true }
 
 oauth2-passkey-axum = { workspace = true }
-subtle = "2.5"
+subtle = "2.6"
 serde = { version = "1.0", features = ["derive"] }
