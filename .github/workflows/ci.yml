@@ -80,13 +80,13 @@ jobs:
       if: matrix.rust == 'stable'
 
     - name: Build core library
-      run: cargo build --verbose --manifest-path oauth2-passkey/Cargo.toml
+      run: cargo build --verbose --manifest-path oauth2_passkey/Cargo.toml
 
     - name: Build axum integration
-      run: cargo build --verbose --manifest-path oauth2-passkey-axum/Cargo.toml --all-features
+      run: cargo build --verbose --manifest-path oauth2_passkey_axum/Cargo.toml --all-features
 
     - name: Test core library
-      run: cargo test --verbose --manifest-path oauth2-passkey/Cargo.toml
+      run: cargo test --verbose --manifest-path oauth2_passkey/Cargo.toml
       env:
         ORIGIN: "http://localhost:3000"
         GENERIC_DATA_STORE_TYPE: "sqlite"
@@ -97,7 +97,7 @@ jobs:
         GOOGLE_CLIENT_SECRET: "test-client-secret"
 
     - name: Test axum integration (all features)
-      run: cargo test --verbose --manifest-path oauth2-passkey-axum/Cargo.toml --all-features
+      run: cargo test --verbose --manifest-path oauth2_passkey_axum/Cargo.toml --all-features
       env:
         ORIGIN: "http://localhost:3000"
         GENERIC_DATA_STORE_TYPE: "sqlite"
@@ -108,7 +108,7 @@ jobs:
         GOOGLE_CLIENT_SECRET: "test-client-secret"
 
     - name: Test axum integration (no default features)
-      run: cargo test --verbose --manifest-path oauth2-passkey-axum/Cargo.toml --no-default-features
+      run: cargo test --verbose --manifest-path oauth2_passkey_axum/Cargo.toml --no-default-features
       env:
         ORIGIN: "http://localhost:3000"
         GENERIC_DATA_STORE_TYPE: "sqlite"
@@ -165,7 +165,7 @@ jobs:
           ${{ runner.os }}-cargo-
 
     - name: Test with PostgreSQL
-      run: cargo test --verbose --manifest-path oauth2-passkey/Cargo.toml
+      run: cargo test --verbose --manifest-path oauth2_passkey/Cargo.toml
       env:
         ORIGIN: "http://localhost:3000"
         GENERIC_DATA_STORE_TYPE: "postgres"
@@ -213,8 +213,8 @@ jobs:
 
     - name: Build documentation
       run: |
-        cargo doc --no-deps --manifest-path oauth2-passkey/Cargo.toml
-        cargo doc --no-deps --manifest-path oauth2-passkey-axum/Cargo.toml --all-features
+        cargo doc --no-deps --manifest-path oauth2_passkey/Cargo.toml
+        cargo doc --no-deps --manifest-path oauth2_passkey_axum/Cargo.toml --all-features
       env:
         RUSTDOCFLAGS: "-D warnings"
 
@@ -231,5 +231,5 @@ jobs:
 
     - name: Check MSRV compatibility
       run: |
-        cargo check --manifest-path oauth2-passkey/Cargo.toml
-        cargo check --manifest-path oauth2-passkey-axum/Cargo.toml --all-features
+        cargo check --manifest-path oauth2_passkey/Cargo.toml
+        cargo check --manifest-path oauth2_passkey_axum/Cargo.toml --all-features

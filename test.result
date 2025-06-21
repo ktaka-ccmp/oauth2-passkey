@@ -1,0 +1,177 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 450 tests
+.......ii..i........i.................................................................. 87/450
+....................................................................................... 174/450
+....................................................................................... 261/450
+................i.......................i.............................................. 348/450
+....................................................................................... 435/450
+...............
+test result: ok. 444 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 2.26s
+
+
+running 33 tests
+.................................
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 22 tests
+......................
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+. 1/7
+oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_401 (line 70) --- FAILED
+oauth2_passkey_axum/src/lib.rs - (line 23) --- FAILED
+oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_redirect (line 102) --- FAILED
+oauth2_passkey_axum/src/session.rs - session::AuthUser (line 62) --- FAILED
+oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_user_redirect (line 183) --- FAILED
+oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_user_401 (line 136) --- FAILED
+
+failures:
+
+---- oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_401 (line 70) stdout ----
+[0m[1m[38;5;9merror[E0425][0m[0m[1m: cannot find value `handler` in this scope[0m
+[0m [0m[0m[1m[38;5;12m--> [0m[0moauth2_passkey_axum/src/middleware.rs:76:44[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m9[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    .route("/api/data", axum::routing::get(handler))[0m
+[0m  [0m[0m[1m[38;5;12m|[0m[0m                                            [0m[0m[1m[38;5;9m^^^^^^^[0m[0m [0m[0m[1m[38;5;9mnot found in this scope[0m
+
+[0m[1m[38;5;9merror[0m[0m[1m: aborting due to 1 previous error[0m
+
+[0m[1mFor more information about this error, try `rustc --explain E0425`.[0m
+Couldn't compile the test.
+---- oauth2_passkey_axum/src/lib.rs - (line 23) stdout ----
+[0m[1m[38;5;9merror[E0061][0m[0m[1m: this method takes 1 argument but 0 arguments were supplied[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0moauth2_passkey_axum/src/lib.rs:38:10[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m17[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        .merge(/* other routes */);[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m          [0m[0m[1m[38;5;9m^^^^^[0m[0m[1m[38;5;12m--------------------[0m[0m [0m[0m[1m[38;5;12margument #1 is missing[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;10mnote[0m[0m: method defined here[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0m/home/ktaka/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/axum-0.8.4/src/routing/mod.rs:252:12[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m252[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn merge<R>(self, other: R) -> Self[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;10m^^^^^[0m
+[0m[1m[38;5;14mhelp[0m[0m: provide the argument[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m17[0m[0m  [0m[0m[38;5;9m- [0m[0m        .merge[0m[0m[38;5;9m(/* other routes */)[0m[0m;[0m
+[0m[1m[38;5;12m17[0m[0m  [0m[0m[38;5;10m+ [0m[0m        .merge[0m[0m[38;5;10m(/* other */)[0m[0m;[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+
+[0m[1m[38;5;9merror[0m[0m[1m: aborting due to 1 previous error[0m
+
+[0m[1mFor more information about this error, try `rustc --explain E0061`.[0m
+Couldn't compile the test.
+---- oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_redirect (line 102) stdout ----
+[0m[1m[38;5;9merror[E0425][0m[0m[1m: cannot find value `handler` in this scope[0m
+[0m [0m[0m[1m[38;5;12m--> [0m[0moauth2_passkey_axum/src/middleware.rs:108:45[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m9[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    .route("/dashboard", axum::routing::get(handler))[0m
+[0m  [0m[0m[1m[38;5;12m|[0m[0m                                             [0m[0m[1m[38;5;9m^^^^^^^[0m[0m [0m[0m[1m[38;5;9mnot found in this scope[0m
+
+[0m[1m[38;5;9merror[0m[0m[1m: aborting due to 1 previous error[0m
+
+[0m[1mFor more information about this error, try `rustc --explain E0425`.[0m
+Couldn't compile the test.
+---- oauth2_passkey_axum/src/session.rs - session::AuthUser (line 62) stdout ----
+[0m[1m[38;5;9merror[E0283][0m[0m[1m: type annotations needed for `Router<_>`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0moauth2_passkey_axum/src/session.rs:71:5[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m12[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mlet app = Router::new()[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[38;5;9m^^^[0m[0m   [0m[0m[1m[38;5;12m-------------[0m[0m [0m[0m[1m[38;5;12mtype must be known at this point[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: cannot satisfy `_: Clone`[0m
+[0m[1m[38;5;10mnote[0m[0m: required by a bound in `Router::<S>::new`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0m/home/ktaka/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/axum-0.8.4/src/routing/mod.rs:140:8[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m140[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    S: Clone + Send + Sync + 'static,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[1m[38;5;10m^^^^^[0m[0m [0m[0m[1m[38;5;10mrequired by this bound in `Router::<S>::new`[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m146[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn new() -> Self {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m---[0m[0m [0m[0m[1m[38;5;12mrequired by a bound in this associated function[0m
+[0m[1m[38;5;14mhelp[0m[0m: consider giving `app` an explicit type, where the type for type parameter `S` is specified[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m12[0m[0m  [0m[0m[1m[38;5;12m| [0m[0mlet app[0m[0m[38;5;10m: Router<S>[0m[0m = Router::new()[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[38;5;10m+++++++++++[0m
+
+[0m[1m[38;5;9merror[0m[0m[1m: aborting due to 1 previous error[0m
+
+[0m[1mFor more information about this error, try `rustc --explain E0283`.[0m
+Couldn't compile the test.
+---- oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_user_redirect (line 183) stdout ----
+[0m[1m[38;5;9merror[E0283][0m[0m[1m: type annotations needed for `Router<_>`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0moauth2_passkey_axum/src/middleware.rs:192:5[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m12[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mlet app = Router::new()[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[38;5;9m^^^[0m[0m   [0m[0m[1m[38;5;12m-------------[0m[0m [0m[0m[1m[38;5;12mtype must be known at this point[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: cannot satisfy `_: Clone`[0m
+[0m[1m[38;5;10mnote[0m[0m: required by a bound in `Router::<S>::new`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0m/home/ktaka/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/axum-0.8.4/src/routing/mod.rs:140:8[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m140[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    S: Clone + Send + Sync + 'static,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[1m[38;5;10m^^^^^[0m[0m [0m[0m[1m[38;5;10mrequired by this bound in `Router::<S>::new`[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m146[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn new() -> Self {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m---[0m[0m [0m[0m[1m[38;5;12mrequired by a bound in this associated function[0m
+[0m[1m[38;5;14mhelp[0m[0m: consider giving `app` an explicit type, where the type for type parameter `S` is specified[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m12[0m[0m  [0m[0m[1m[38;5;12m| [0m[0mlet app[0m[0m[38;5;10m: Router<S>[0m[0m = Router::new()[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[38;5;10m+++++++++++[0m
+
+[0m[1m[38;5;9merror[0m[0m[1m: aborting due to 1 previous error[0m
+
+[0m[1mFor more information about this error, try `rustc --explain E0283`.[0m
+Couldn't compile the test.
+---- oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_user_401 (line 136) stdout ----
+[0m[1m[38;5;9merror[E0283][0m[0m[1m: type annotations needed for `Router<_>`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0moauth2_passkey_axum/src/middleware.rs:145:5[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m12[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mlet app = Router::new()[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[38;5;9m^^^[0m[0m   [0m[0m[1m[38;5;12m-------------[0m[0m [0m[0m[1m[38;5;12mtype must be known at this point[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: cannot satisfy `_: Clone`[0m
+[0m[1m[38;5;10mnote[0m[0m: required by a bound in `Router::<S>::new`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0m/home/ktaka/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/axum-0.8.4/src/routing/mod.rs:140:8[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m140[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    S: Clone + Send + Sync + 'static,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[1m[38;5;10m^^^^^[0m[0m [0m[0m[1m[38;5;10mrequired by this bound in `Router::<S>::new`[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m146[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn new() -> Self {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m---[0m[0m [0m[0m[1m[38;5;12mrequired by a bound in this associated function[0m
+[0m[1m[38;5;14mhelp[0m[0m: consider giving `app` an explicit type, where the type for type parameter `S` is specified[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m12[0m[0m  [0m[0m[1m[38;5;12m| [0m[0mlet app[0m[0m[38;5;10m: Router<S>[0m[0m = Router::new()[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[38;5;10m+++++++++++[0m
+
+[0m[1m[38;5;9merror[0m[0m[1m: aborting due to 1 previous error[0m
+
+[0m[1mFor more information about this error, try `rustc --explain E0283`.[0m
+Couldn't compile the test.
+
+failures:
+    oauth2_passkey_axum/src/lib.rs - (line 23)
+    oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_401 (line 70)
+    oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_redirect (line 102)
+    oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_user_401 (line 136)
+    oauth2_passkey_axum/src/middleware.rs - middleware::is_authenticated_user_redirect (line 183)
+    oauth2_passkey_axum/src/session.rs - session::AuthUser (line 62)
+
+test result: FAILED. 1 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+

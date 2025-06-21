@@ -1,0 +1,74 @@
+diff --git a/oauth2_passkey_axum/src/lib.rs b/oauth2_passkey_axum/src/lib.rs
+index 6789081..5de6fcc 100644
+--- a/oauth2_passkey_axum/src/lib.rs
++++ b/oauth2_passkey_axum/src/lib.rs
+@@ -30,11 +30,11 @@
+ //!     init().await?;
+ //!
+ //!     // Create your application router
+-//!     let app = Router::new()
++//!     let app: Router = Router::new()
+ //!         .route("/", axum::routing::get(|| async { Html("Hello World!") }))
+ //!         // Add authentication routes (default: /o2p, configurable via O2P_ROUTE_PREFIX env var)
+-//!         .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
+-//!         .merge(/* other routes */);
++//!         .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
++//!         // .merge(other_routes) // Add your other routes here
+ //!
+ //!     // Start server
+ //!     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
+diff --git a/oauth2_passkey_axum/src/middleware.rs b/oauth2_passkey_axum/src/middleware.rs
+index 37d12c6..eb8f1a9 100644
+--- a/oauth2_passkey_axum/src/middleware.rs
++++ b/oauth2_passkey_axum/src/middleware.rs
+@@ -71,7 +71,8 @@ fn handle_auth_error(err: SessionError, req: &Request, redirect_on_error: bool)
+ /// use axum::{Router, middleware::from_fn};
+ /// use oauth2_passkey_axum::is_authenticated_401;
+ ///
+-/// let app = Router::new()
++/// # async fn handler() -> &'static str { "Hello" }
++/// let app: Router = Router::new()
+ ///     .route("/api/data", axum::routing::get(handler))
+ ///     .layer(from_fn(is_authenticated_401));
+ /// ```
+@@ -103,7 +104,8 @@ pub async fn is_authenticated_401(mut req: Request, next: Next) -> Response {
+ /// use axum::{Router, middleware::from_fn};
+ /// use oauth2_passkey_axum::is_authenticated_redirect;
+ ///
+-/// let app = Router::new()
++/// # async fn handler() -> &'static str { "Hello" }
++/// let app: Router = Router::new()
+ ///     .route("/dashboard", axum::routing::get(handler))
+ ///     .layer(from_fn(is_authenticated_redirect));
+ /// ```
+@@ -141,7 +143,7 @@ pub async fn is_authenticated_redirect(mut req: Request, next: Next) -> Response
+ ///     format!("Hello, {}", user.account)
+ /// }
+ ///
+-/// let app = Router::new()
++/// let app: Router = Router::new()
+ ///     .route("/api/profile", axum::routing::get(handler))
+ ///     .layer(from_fn(is_authenticated_user_401));
+ /// ```
+@@ -188,7 +190,7 @@ pub async fn is_authenticated_user_401(mut req: Request, next: Next) -> Response
+ ///     format!("Hello, {}", user.account)
+ /// }
+ ///
+-/// let app = Router::new()
++/// let app: Router = Router::new()
+ ///     .route("/dashboard", axum::routing::get(handler))
+ ///     .layer(from_fn(is_authenticated_user_redirect));
+ /// ```
+diff --git a/oauth2_passkey_axum/src/session.rs b/oauth2_passkey_axum/src/session.rs
+index 204142d..1c594f2 100644
+--- a/oauth2_passkey_axum/src/session.rs
++++ b/oauth2_passkey_axum/src/session.rs
+@@ -67,7 +67,7 @@ impl IntoResponse for AuthRedirect {
+ ///     format!("Hello, {}!", user.label)
+ /// }
+ ///
+-/// let app = Router::new()
++/// let app: Router = Router::new()
+ ///     .route("/protected", get(protected_handler));
+ /// ```
+ #[derive(Clone, Debug)]
