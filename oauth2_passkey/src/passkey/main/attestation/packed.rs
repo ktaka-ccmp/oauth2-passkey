@@ -685,7 +685,7 @@ mod tests {
         // 3. Certificates with AAGUID extensions for AAGUID validation
         // 4. Test certificate chains for expiration testing
 
-        assert!(true); // Placeholder - tested via integration tests
+        // Placeholder - tested via integration tests
     }
 
     // Additional edge case tests

@@ -136,8 +136,8 @@ mod tests {
                 "{\"user_handle\":\"test\",\"name\":\"test\",\"displayName\":\"Test\"}",
             )
             .unwrap(),
-            created_at: now.clone(),
-            updated_at: now.clone(),
+            created_at: now,
+            updated_at: now,
             last_used_at: now,
         }
     }
@@ -840,20 +840,21 @@ mod tests {
         let mut uuid_index = 0;
 
         // Try up to 3 times to generate a unique ID
-        for _ in 0..3 {
-            if uuid_index >= uuids.len() {
-                return Err(CoordinationError::Coordination(
-                    "Mock UUID list exhausted".to_string(),
-                ));
+        for (iteration, _) in (0..3).enumerate() {
+            let current_index = uuid_index + iteration;
+            if current_index >= uuids.len() {
+                break; // Exit loop instead of returning immediately
             }
 
-            let id = uuids[uuid_index].to_string();
-            uuid_index += 1;
+            let id = uuids[current_index].to_string();
 
             // Check if a user with this ID already exists
             match UserStore::get_user(&id).await {
                 Ok(None) => return Ok(id), // ID is unique, return it
-                Ok(Some(_)) => continue,   // ID exists, try again
+                Ok(Some(_)) => {
+                    uuid_index += 1; // Move to next UUID for next iteration
+                    continue;
+                }
                 Err(e) => {
                     return Err(CoordinationError::Database(format!(
                         "Failed to check user ID: {}",

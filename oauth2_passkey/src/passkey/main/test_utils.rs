@@ -36,66 +36,78 @@ pub async fn insert_test_user(
         .map_err(|e| PasskeyError::Storage(e.to_string()))
 }
 
-/// Insert a test passkey credential in the database
-pub async fn insert_test_credential(
-    credential_id: &str,
-    user_id: &str,
-    user_handle: &str,
-    name: &str,
-    display_name: &str,
-    public_key: &str,
-    aaguid: &str,
-    counter: u32,
-) -> Result<(), PasskeyError> {
-    let now = Utc::now();
+/// Parameters for inserting a test credential
+pub struct TestCredentialParams {
+    pub credential_id: String,
+    pub user_id: String,
+    pub user_handle: String,
+    pub name: String,
+    pub display_name: String,
+    pub public_key: String,
+    pub aaguid: String,
+    pub counter: u32,
+}
 
-    let credential = PasskeyCredential {
-        credential_id: credential_id.to_string(),
-        user_id: user_id.to_string(),
-        public_key: public_key.to_string(),
-        aaguid: aaguid.to_string(),
-        counter,
-        user: PublicKeyCredentialUserEntity {
+impl TestCredentialParams {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        credential_id: &str,
+        user_id: &str,
+        user_handle: &str,
+        name: &str,
+        display_name: &str,
+        public_key: &str,
+        aaguid: &str,
+        counter: u32,
+    ) -> Self {
+        Self {
+            credential_id: credential_id.to_string(),
+            user_id: user_id.to_string(),
             user_handle: user_handle.to_string(),
             name: name.to_string(),
             display_name: display_name.to_string(),
+            public_key: public_key.to_string(),
+            aaguid: aaguid.to_string(),
+            counter,
+        }
+    }
+}
+
+/// Insert a test passkey credential in the database
+pub async fn insert_test_credential(params: TestCredentialParams) -> Result<(), PasskeyError> {
+    let now = Utc::now();
+
+    let credential = PasskeyCredential {
+        credential_id: params.credential_id.clone(),
+        user_id: params.user_id.clone(),
+        public_key: params.public_key.clone(),
+        aaguid: params.aaguid.clone(),
+        counter: params.counter,
+        user: PublicKeyCredentialUserEntity {
+            user_handle: params.user_handle.clone(),
+            name: params.name.clone(),
+            display_name: params.display_name.clone(),
         },
         created_at: now,
         updated_at: now,
         last_used_at: now,
     };
 
-    PasskeyStore::store_credential(credential_id.to_string(), credential).await
+    PasskeyStore::store_credential(params.credential_id, credential).await
 }
 
 /// Insert a test user and then a test passkey credential
 /// This ensures the foreign key constraint is satisfied
 pub async fn insert_test_user_and_credential(
-    credential_id: &str,
-    user_id: &str,
-    user_handle: &str,
-    name: &str,
-    display_name: &str,
-    public_key: &str,
-    aaguid: &str,
-    counter: u32,
+    params: TestCredentialParams,
 ) -> Result<(), PasskeyError> {
     // First create the user
-    insert_test_user(user_id, name, display_name, false)
+    insert_test_user(&params.user_id, &params.name, &params.display_name, false)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     // Then create the credential
-    insert_test_credential(
-        credential_id,
-        user_id,
-        user_handle,
-        name,
-        display_name,
-        public_key,
-        aaguid,
-        counter,
-    )
+    insert_test_credential(params)
     .await
 }
 
@@ -163,8 +175,5 @@ pub async fn create_test_challenge(
 
 /// Check cache store for a specific key
 pub async fn check_cache_exists(category: &str, key: &str) -> bool {
-    match GENERIC_CACHE_STORE.lock().await.get(category, key).await {
-        Ok(Some(_)) => true,
-        _ => false,
-    }
+    matches!(GENERIC_CACHE_STORE.lock().await.get(category, key).await, Ok(Some(_)))
 }

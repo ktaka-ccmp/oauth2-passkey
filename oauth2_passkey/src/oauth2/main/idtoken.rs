@@ -779,7 +779,7 @@ mod tests {
         assert_eq!(id_info.iss, "https://accounts.google.com");
         assert_eq!(id_info.sub, "123456789");
         assert_eq!(id_info.email, "test@example.com");
-        assert_eq!(id_info.email_verified, true);
+        assert!(id_info.email_verified);
         assert_eq!(id_info.name, "Test User");
     }
 

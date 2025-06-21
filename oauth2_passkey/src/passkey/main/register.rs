@@ -616,19 +616,20 @@ mod tests {
         let expected_att_stmt_map = Vec::<(CborValue, CborValue)>::new(); // Empty map
 
         // Create the CBOR structure programmatically
-        let mut cbor_map = Vec::new();
-        cbor_map.push((
-            CborValue::Text("fmt".to_string()),
-            CborValue::Text(expected_fmt.clone()),
-        ));
-        cbor_map.push((
-            CborValue::Text("attStmt".to_string()),
-            CborValue::Map(expected_att_stmt_map.clone()),
-        ));
-        cbor_map.push((
-            CborValue::Text("authData".to_string()),
-            CborValue::Bytes(expected_auth_data.clone()),
-        ));
+        let cbor_map = vec![
+            (
+                CborValue::Text("fmt".to_string()),
+                CborValue::Text(expected_fmt.clone()),
+            ),
+            (
+                CborValue::Text("attStmt".to_string()),
+                CborValue::Map(expected_att_stmt_map.clone()),
+            ),
+            (
+                CborValue::Text("authData".to_string()),
+                CborValue::Bytes(expected_auth_data.clone()),
+            ),
+        ];
         let cbor_value = CborValue::Map(cbor_map);
 
         // Serialize CBOR to bytes
@@ -710,15 +711,16 @@ mod tests {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 
         // CBOR: { "attStmt": {}, "authData": b"authdata" } (missing "fmt")
-        let mut cbor_map = Vec::new();
-        cbor_map.push((
-            CborValue::Text("attStmt".to_string()),
-            CborValue::Map(Vec::new()),
-        ));
-        cbor_map.push((
-            CborValue::Text("authData".to_string()),
-            CborValue::Bytes(b"authdata".to_vec()),
-        ));
+        let cbor_map = vec![
+            (
+                CborValue::Text("attStmt".to_string()),
+                CborValue::Map(Vec::new()),
+            ),
+            (
+                CborValue::Text("authData".to_string()),
+                CborValue::Bytes(b"authdata".to_vec()),
+            ),
+        ];
         let cbor_value = CborValue::Map(cbor_map);
 
         let mut cbor_bytes = Vec::new();
@@ -748,15 +750,16 @@ mod tests {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 
         // CBOR: { "fmt": "none", "attStmt": {} } (missing "authData")
-        let mut cbor_map = Vec::new();
-        cbor_map.push((
-            CborValue::Text("fmt".to_string()),
-            CborValue::Text("none".to_string()),
-        ));
-        cbor_map.push((
-            CborValue::Text("attStmt".to_string()),
-            CborValue::Map(Vec::new()),
-        ));
+        let cbor_map = vec![
+            (
+                CborValue::Text("fmt".to_string()),
+                CborValue::Text("none".to_string()),
+            ),
+            (
+                CborValue::Text("attStmt".to_string()),
+                CborValue::Map(Vec::new()),
+            ),
+        ];
         let cbor_value = CborValue::Map(cbor_map);
 
         let mut cbor_bytes = Vec::new();
@@ -786,15 +789,16 @@ mod tests {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 
         // CBOR: { "fmt": "none", "authData": b"authdata" } (missing "attStmt")
-        let mut cbor_map = Vec::new();
-        cbor_map.push((
-            CborValue::Text("fmt".to_string()),
-            CborValue::Text("none".to_string()),
-        ));
-        cbor_map.push((
-            CborValue::Text("authData".to_string()),
-            CborValue::Bytes(b"authdata".to_vec()),
-        ));
+        let cbor_map = vec![
+            (
+                CborValue::Text("fmt".to_string()),
+                CborValue::Text("none".to_string()),
+            ),
+            (
+                CborValue::Text("authData".to_string()),
+                CborValue::Bytes(b"authdata".to_vec()),
+            ),
+        ];
         let cbor_value = CborValue::Map(cbor_map);
 
         let mut cbor_bytes = Vec::new();
@@ -860,15 +864,16 @@ mod tests {
             17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
         ]; // 16 bytes for Y
 
-        let mut cbor_map = Vec::new();
-        cbor_map.push((
-            CborValue::Integer(Integer::from(-2)),
-            CborValue::Bytes(x_coord.clone()),
-        ));
-        cbor_map.push((
-            CborValue::Integer(Integer::from(-3)),
-            CborValue::Bytes(y_coord.clone()),
-        ));
+        let cbor_map = vec![
+            (
+                CborValue::Integer(Integer::from(-2)),
+                CborValue::Bytes(x_coord.clone()),
+            ),
+            (
+                CborValue::Integer(Integer::from(-3)),
+                CborValue::Bytes(y_coord.clone()),
+            ),
+        ];
         let cbor_value = CborValue::Map(cbor_map);
 
         let mut cbor_bytes = Vec::new();
@@ -891,12 +896,13 @@ mod tests {
         // Create a CBOR map with only Y coordinate, missing X
         let y_coord = vec![16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 
-        let mut cbor_map = Vec::new();
-        // Only add Y coordinate (-3)
-        cbor_map.push((
-            CborValue::Integer(Integer::from(-3)),
-            CborValue::Bytes(y_coord),
-        ));
+        let cbor_map = vec![
+            // Only add Y coordinate (-3)
+            (
+                CborValue::Integer(Integer::from(-3)),
+                CborValue::Bytes(y_coord),
+            ),
+        ];
         let cbor_value = CborValue::Map(cbor_map);
 
         // Serialize CBOR to bytes
@@ -933,12 +939,13 @@ mod tests {
         // Create a CBOR map with only X coordinate, missing Y
         let x_coord = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
-        let mut cbor_map = Vec::new();
-        // Only add X coordinate (-2)
-        cbor_map.push((
-            CborValue::Integer(Integer::from(-2)),
-            CborValue::Bytes(x_coord),
-        ));
+        let cbor_map = vec![
+            // Only add X coordinate (-2)
+            (
+                CborValue::Integer(Integer::from(-2)),
+                CborValue::Bytes(x_coord),
+            ),
+        ];
         let cbor_value = CborValue::Map(cbor_map);
 
         // Serialize CBOR to bytes
@@ -1329,14 +1336,16 @@ mod tests {
         // Insert a test credential for this user to simulate existing credentials
         let credential_id = "test_cred_id_for_user_handle";
         let result = passkey_test_utils::insert_test_user_and_credential(
-            credential_id,
-            "test_user_id_789", // Same as session user ID
-            &first_handle,      // Use the generated handle
-            "Test User 789",
-            "Test Display Name 789",
-            "test_public_key",
-            "test_aaguid",
-            0,
+            passkey_test_utils::TestCredentialParams::new(
+                credential_id,
+                "test_user_id_789", // Same as session user ID
+                &first_handle,      // Use the generated handle
+                "Test User 789",
+                "Test Display Name 789",
+                "test_public_key",
+                "test_aaguid",
+                0,
+            )
         )
         .await;
         assert!(result.is_ok(), "Failed to insert test user and credential");
@@ -1412,14 +1421,16 @@ mod tests {
         // Create test credential for storage
         let credential_id = "test_cred_verify_session_success";
         let user_creation_result = passkey_test_utils::insert_test_user_and_credential(
-            credential_id,
-            user_id,
-            user_handle,
-            "test_user",
-            "Test User",
-            "test_public_key",
-            "test_aaguid",
-            0,
+            passkey_test_utils::TestCredentialParams::new(
+                credential_id,
+                user_id,
+                user_handle,
+                "test_user",
+                "Test User",
+                "test_public_key",
+                "test_aaguid",
+                0,
+            )
         )
         .await;
         assert!(
@@ -2290,10 +2301,7 @@ mod tests {
 
         let mut full_attestation = attestation_cbor;
         // Add byte string length for auth_data
-        if auth_data.len() < 24 {
-            full_attestation.push(0x58);
-            full_attestation.push(auth_data.len() as u8);
-        } else if auth_data.len() < 256 {
+        if auth_data.len() < 256 {
             full_attestation.push(0x58);
             full_attestation.push(auth_data.len() as u8);
         } else {

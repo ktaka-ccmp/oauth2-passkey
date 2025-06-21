@@ -132,7 +132,9 @@ mod tests {
                 len
             );
             let s = result.unwrap();
-            assert_eq!(s.len(), if len == 0 { 0 } else { (len * 4 + 2) / 3 });
+            #[allow(clippy::manual_div_ceil)] // MSRV 1.70 doesn't have div_ceil
+            let expected_len = if len == 0 { 0 } else { (len * 4 + 2) / 3 };
+            assert_eq!(s.len(), expected_len);
         }
 
         // Verify strings are different

@@ -966,14 +966,16 @@ mod tests {
 
         // Insert test credential with user
         let result = passkey_test_utils::insert_test_user_and_credential(
-            credential_id,
-            user_id,
-            user_handle,
-            "Test User",
-            "Test Display Name",
-            public_key,
-            aaguid,
-            42,
+            passkey_test_utils::TestCredentialParams::new(
+                credential_id,
+                user_id,
+                user_handle,
+                "Test User",
+                "Test Display Name",
+                public_key,
+                aaguid,
+                42,
+            )
         )
         .await;
         if let Err(e) = &result {
@@ -1030,14 +1032,16 @@ mod tests {
 
         // Insert test credential with user
         let insert_result = passkey_test_utils::insert_test_user_and_credential(
-            credential_id,
-            user_id,
-            user_handle,
-            username,
-            "Auth Test User",
-            public_key,
-            "test_aaguid",
-            10, // Counter
+            passkey_test_utils::TestCredentialParams::new(
+                credential_id,
+                user_id,
+                user_handle,
+                username,
+                "Auth Test User",
+                public_key,
+                "test_aaguid",
+                10, // Counter
+            )
         )
         .await;
         assert!(insert_result.is_ok(), "Failed to insert test credential");
@@ -1092,14 +1096,16 @@ mod tests {
 
         // Insert test credential with user
         let insert_result = passkey_test_utils::insert_test_user_and_credential(
-            credential_id,
-            "counter_test_user_id",
-            "counter_test_user_handle",
-            "counter_test_user",
-            "Counter Test User",
-            "test_public_key",
-            "test_aaguid",
-            initial_counter,
+            passkey_test_utils::TestCredentialParams::new(
+                credential_id,
+                "counter_test_user_id",
+                "counter_test_user_handle",
+                "counter_test_user",
+                "Counter Test User",
+                "test_public_key",
+                "test_aaguid",
+                initial_counter,
+            )
         )
         .await;
         assert!(insert_result.is_ok(), "Failed to insert test credential");

@@ -380,19 +380,4 @@ mod tests {
         // Verify it's an unauthorized response (not a redirect)
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
-
-    // The following tests verify the function signatures and basic behavior of the middleware functions
-    // They are marked as ignored because they depend on the core library's authentication functions
-    // which are difficult to mock in a unit test context
-
-    // Note: These tests are marked as ignored because they require the core library's
-    // authentication functions and we can't easily mock Next in unit tests.
-    // In a real integration test, we would use the actual Next middleware.
-
-    #[test]
-    fn test_middleware_signatures() {
-        // This test just verifies that the middleware functions have the correct signatures
-        // We can't easily test the actual behavior in a unit test
-        assert!(true);
-    }
 }

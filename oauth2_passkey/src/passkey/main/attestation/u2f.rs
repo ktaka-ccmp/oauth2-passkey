@@ -520,15 +520,16 @@ mod tests {
         let client_data_hash = create_test_client_data_hash();
 
         // Create attestation statement with truly empty x5c array
-        let mut att_stmt = Vec::new();
-        att_stmt.push((
-            Value::Text("sig".to_string()),
-            Value::Bytes(vec![0x01, 0x02, 0x03, 0x04]),
-        ));
-        att_stmt.push((
-            Value::Text("x5c".to_string()),
-            Value::Array(vec![]), // Actually empty array
-        ));
+        let att_stmt = vec![
+            (
+                Value::Text("sig".to_string()),
+                Value::Bytes(vec![0x01, 0x02, 0x03, 0x04]),
+            ),
+            (
+                Value::Text("x5c".to_string()),
+                Value::Array(vec![]), // Actually empty array
+            ),
+        ];
 
         let result = verify_u2f_attestation(&auth_data, &client_data_hash, &att_stmt);
 
