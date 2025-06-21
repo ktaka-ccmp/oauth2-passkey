@@ -30,11 +30,11 @@
 //!     init().await?;
 //!
 //!     // Create your application router
-//!     let app = Router::new()
+//!     let app: Router = Router::new()
 //!         .route("/", axum::routing::get(|| async { Html("Hello World!") }))
 //!         // Add authentication routes (default: /o2p, configurable via O2P_ROUTE_PREFIX env var)
-//!         .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
-//!         .merge(/* other routes */);
+//!         .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+//!         // .merge(other_routes) // Add your other routes here
 //!
 //!     // Start server
 //!     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;

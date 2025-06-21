@@ -169,9 +169,9 @@ pub(super) fn verify_u2f_attestation(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils;
     use ciborium::value::Value;
     use ring::digest;
-    use crate::test_utils;
 
     // Helper function to create basic auth_data for testing
     async fn create_test_auth_data() -> Vec<u8> {

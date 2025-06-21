@@ -384,8 +384,8 @@ pub(super) struct WebAuthnClientData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::base64url_encode;
     use crate::test_utils;
+    use crate::utils::base64url_encode;
     use ring::digest;
     use serde_json::json;
 
@@ -684,7 +684,7 @@ mod tests {
         async fn test_verify_success() {
             // Use test_utils to set up environment variables safely
             test_utils::init_test_environment().await;
-            
+
             let parsed_data = create_parsed_client_data(
                 "sample-challenge",
                 "https://example.com",
@@ -704,7 +704,7 @@ mod tests {
         async fn test_verify_challenge_mismatch() {
             // Use test_utils to set up environment variables safely
             test_utils::init_test_environment().await;
-            
+
             let parsed_data = create_parsed_client_data(
                 "sample-challenge",
                 "https://example.com",
@@ -729,7 +729,7 @@ mod tests {
         async fn test_verify_origin_mismatch() {
             // Use test_utils to set up environment variables safely
             test_utils::init_test_environment().await;
-            
+
             let parsed_data = create_parsed_client_data(
                 "sample-challenge",
                 "https://attacker.com",
@@ -756,7 +756,7 @@ mod tests {
         async fn test_verify_invalid_type() {
             // Use test_utils to set up environment variables safely
             test_utils::init_test_environment().await;
-            
+
             let parsed_data = create_parsed_client_data(
                 "sample-challenge",
                 "https://example.com",
@@ -1002,9 +1002,10 @@ mod tests {
         async fn test_verify_success() {
             // Use test_utils to set up environment variables safely
             test_utils::init_test_environment().await;
-            
+
             // Get the current RP_ID from environment (should be set by init_test_environment)
-            let rp_id = std::env::var("PASSKEY_RP_ID").unwrap_or_else(|_| "example.com".to_string());
+            let rp_id =
+                std::env::var("PASSKEY_RP_ID").unwrap_or_else(|_| "example.com".to_string());
 
             let expected_hash = digest::digest(&digest::SHA256, rp_id.as_bytes());
             let auth_data = AuthenticatorData {
@@ -1068,7 +1069,7 @@ mod tests {
                 }
                 _ => panic!("Expected Authentication error"),
             }
-            
+
             // No need to restore environment variables when using test_utils
         }
 
@@ -1077,20 +1078,23 @@ mod tests {
         /// This test verifies that `AuthenticatorData::verify` properly enforces
         /// user verification requirements. It tests error handling when user verification
         /// is required but the authenticator data indicates the user was not verified.
-        /// 
+        ///
         /// NOTE: This test requires .env_test to have PASSKEY_USER_VERIFICATION=required
         #[tokio::test]
         async fn test_verify_user_verification_required_but_not_verified() {
             // Use test_utils to set up environment variables safely
             test_utils::init_test_environment().await;
-            
+
             // Get the current RP_ID from environment (should be set by init_test_environment)
-            let rp_id = std::env::var("PASSKEY_RP_ID").unwrap_or_else(|_| "example.com".to_string());
-            
+            let rp_id =
+                std::env::var("PASSKEY_RP_ID").unwrap_or_else(|_| "example.com".to_string());
+
             // Ensure test passes regardless of environment setting
             // We're testing the validation logic, not the specific setting
             if std::env::var("PASSKEY_USER_VERIFICATION").unwrap_or_default() != "required" {
-                println!("Skipping test_verify_user_verification_required_but_not_verified because PASSKEY_USER_VERIFICATION is not set to 'required'");
+                println!(
+                    "Skipping test_verify_user_verification_required_but_not_verified because PASSKEY_USER_VERIFICATION is not set to 'required'"
+                );
                 return;
             }
 

@@ -1,8 +1,11 @@
 # oauth2-passkey
 
+[![CI](https://github.com/ktaka-ccmp/oauth2-passkey/workflows/CI/badge.svg)](https://github.com/ktaka-ccmp/oauth2-passkey/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/ktaka-ccmp/oauth2-passkey/branch/master/graph/badge.svg)](https://codecov.io/gh/ktaka-ccmp/oauth2-passkey)
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey.svg)](https://crates.io/crates/oauth2-passkey)
 [![Docs.rs](https://docs.rs/oauth2-passkey/badge.svg)](https://docs.rs/oauth2-passkey)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![MSRV](https://img.shields.io/badge/MSRV-1.85.1-blue)](https://blog.rust-lang.org/2024/11/21/Rust-1.85.0.html)
 
 A framework-agnostic core library for OAuth2 and WebAuthn/passkey authentication in Rust applications.
 

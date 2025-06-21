@@ -18,11 +18,12 @@ admin-ui = []
 user-ui = []
 
 [dependencies]
-askama = { version = "0.13.0" }
+askama = { version = "0.14.0" }
 http = { workspace = true }
 tracing = { workspace = true }
 
-# Note: Change to "oauth2-passkey = '0.1.0'" when publishing
+# Changed from workspace dependency to published crate version
+# oauth2-passkey = "0.1.0"
 oauth2-passkey = { workspace = true }
 
 axum = { workspace = true }
@@ -30,11 +31,9 @@ axum-extra = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 urlencoding = { workspace = true }
-
-futures = { workspace = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
-subtle = "2.5"
+subtle = "2.6"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }

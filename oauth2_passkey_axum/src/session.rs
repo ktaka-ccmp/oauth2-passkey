@@ -67,7 +67,7 @@ impl IntoResponse for AuthRedirect {
 ///     format!("Hello, {}!", user.label)
 /// }
 ///
-/// let app = Router::new()
+/// let app: Router = Router::new()
 ///     .route("/protected", get(protected_handler));
 /// ```
 #[derive(Clone, Debug)]

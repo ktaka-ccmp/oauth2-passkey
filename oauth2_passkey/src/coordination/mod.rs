@@ -1,6 +1,6 @@
 //! Authentication coordination module
 //!
-//! This module provides high-level functions that coordinate between different 
+//! This module provides high-level functions that coordinate between different
 //! authentication mechanisms (OAuth2, Passkey) and user management.
 //! It serves as the main entry point for most authentication operations.
 //!

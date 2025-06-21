@@ -36,7 +36,7 @@ pub async fn get_all_users() -> Result<Vec<User>, CoordinationError> {
 /// Retrieves a specific user by their ID.
 ///
 /// This function fetches a user's account information from the database using their
-/// unique identifier. It's used for user profile viewing, account management, 
+/// unique identifier. It's used for user profile viewing, account management,
 /// and administrative tasks.
 ///
 /// # Arguments

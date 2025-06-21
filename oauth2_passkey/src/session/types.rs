@@ -118,10 +118,10 @@ impl CsrfToken {
     pub fn new(token: String) -> Self {
         Self(token)
     }
-    
+
     /// Returns the token as a string slice.
     ///
-    /// This method is useful when you need to include the token in a 
+    /// This method is useful when you need to include the token in a
     /// response or use it for comparison.
     ///
     /// # Returns

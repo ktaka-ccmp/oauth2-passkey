@@ -4,10 +4,10 @@
 
 //! # oauth2-passkey
 //!
-//! A minimal-dependency, security-focused authentication library for Rust web applications 
+//! A minimal-dependency, security-focused authentication library for Rust web applications
 //! supporting both OAuth2 and WebAuthn/Passkey authentication.
 //!
-//! This framework-agnostic core library provides authentication coordination between 
+//! This framework-agnostic core library provides authentication coordination between
 //! OAuth2, WebAuthn/Passkey, and session management, with flexible storage backends.
 //!
 //! ## Key Features
@@ -105,9 +105,9 @@ pub use userdb::User as DbUser;
 /// - `Err` with details if initialization failed
 ///
 /// # Environment Variables
-/// 
+///
 /// Required environment variables:
-/// - `ORIGIN`: Base URL of your application (e.g., "https://example.com")
+/// - `ORIGIN`: Base URL of your application (e.g., `https://example.com`)
 ///
 /// Storage variables (choose one database and one cache):
 /// - `GENERIC_DATA_STORE_TYPE`: "sqlite" or "postgres"
