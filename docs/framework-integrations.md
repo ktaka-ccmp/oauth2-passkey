@@ -47,9 +47,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 For complete examples, see:
+
 - [OAuth2 Demo](../demo-oauth2/)
 - [Passkey Demo](../demo-passkey/)
-- [Combined Demo](../demo01/)
+- [Combined Demo](../demo-both/)
 
 ## Relationship Between Core and Framework Integration
 

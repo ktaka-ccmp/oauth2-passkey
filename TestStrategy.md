@@ -209,15 +209,15 @@ Last Updated: 2025-06-04
 
 ### Manual Testing Approach
 
-Configuration can be tested manually using the demo01 example:
+Configuration can be tested manually using the demo-both example:
 
 ```bash
 # Test with default prefix
-cargo run --example demo01
+cargo run --example demo-both
 # Then verify http://localhost:8080/o2p/auth works
 
 # Test with custom prefix
-O2P_ROUTE_PREFIX=/custom cargo run --example demo01
+O2P_ROUTE_PREFIX=/custom cargo run --example demo-both
 # Then verify http://localhost:8080/custom/auth works
 ```
 
@@ -226,7 +226,7 @@ O2P_ROUTE_PREFIX=/custom cargo run --example demo01
 In the future, a dedicated test application could be created to automate testing of configuration options:
 
 1. **Minimal Test Application**
-   - Similar to demo01 but focused specifically on testing configuration
+   - Similar to demo-both but focused specifically on testing configuration
    - Include endpoints that don't require complex authentication flows
    - Designed for automated testing with clear success/failure criteria
 

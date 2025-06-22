@@ -16,12 +16,14 @@ The OAuth2 Demo showcases Google OAuth2 authentication integration with the foll
 * Session management with logout capability
 
 **Key files:**
+
 * `src/main.rs` - Server setup and initialization
 * `src/handlers.rs` - Route handlers for authentication flows
 * `src/server.rs` - Server configuration and route setup
 * `templates/` - HTML templates for the UI
 
 **Running the demo:**
+
 ```bash
 cd demo-oauth2
 # Set up environment variables (see .env.example)
@@ -41,6 +43,7 @@ The Passkey Demo demonstrates WebAuthn/Passkey authentication with the following
 * User profile management
 
 **Key files:**
+
 * `src/main.rs` - Server setup and Passkey initialization
 * `src/server.rs` - Server configuration and route setup
 * `templates/` - HTML templates with WebAuthn JavaScript
@@ -55,7 +58,7 @@ cargo run
 
 ### 3. Combined Authentication Demo
 
-**Location:** [`/demo01`](../demo01/)
+**Location:** [`/demo-both`](../demo-both/)
 
 The Combined Demo showcases both OAuth2 and Passkey authentication in a single application:
 
@@ -65,14 +68,16 @@ The Combined Demo showcases both OAuth2 and Passkey authentication in a single a
 * Session management and CSRF protection
 
 **Key files:**
+
 * `src/main.rs` - Combined authentication setup
 * `src/protected.rs` - Protected route implementations
 * `src/server.rs` - Server configuration with all routes
 * `templates/` - Templates for both authentication methods
 
 **Running the demo:**
+
 ```bash
-cd demo01
+cd demo-both
 # Set up environment variables (see .env.example)
 cargo run
 # Visit http://localhost:3000 in your browser

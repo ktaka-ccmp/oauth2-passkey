@@ -207,7 +207,7 @@ When you include the authentication router, these routes are available (default 
 
 See the complete working examples in the repository:
 
-- [Basic Integration](../demo01)
+- [Complete Integration](../demo-both)
 - [OAuth2 Demo](../demo-oauth2)
 - [Passkey Demo](../demo-passkey)
 

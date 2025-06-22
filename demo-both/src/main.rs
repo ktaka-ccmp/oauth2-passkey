@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .install_default()
         .expect("Failed to install default CryptoProvider");
 
-    init_tracing("demo01");
+    init_tracing("demo-both");
 
     dotenv().ok();
     oauth2_passkey_axum::init().await?;

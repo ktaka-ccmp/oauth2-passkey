@@ -146,7 +146,7 @@ async fn get_session_user(session_cookie: &str) -> Result<AuthUser, StatusCode> 
 
 Complete working examples are available in the repository:
 
-- **[Basic Integration](../demo01)** - Simple authentication setup
+- **[Complete Integration](../demo-both)** - Full authentication setup
 - **[OAuth2 Demo](../demo-oauth2)** - Google OAuth2 integration
 - **[Passkey Demo](../demo-passkey)** - WebAuthn/passkey authentication
 

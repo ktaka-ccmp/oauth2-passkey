@@ -72,7 +72,7 @@
 ## 7. Integration Testing
 
 - [x] **Demo Applications** ✅ **WORKING**
-  - [x] demo01 compiles and runs ✅
+  - [x] demo-both compiles and runs ✅
   - [x] demo-oauth2 compiles and runs ✅
   - [x] demo-passkey compiles and runs ✅
 
@@ -83,25 +83,25 @@
 
 ## 8. Publishing Preparation
 
-- [ ] **Pre-publish Checks** ⚠️ **READY PENDING CORE PUBLICATION**
+- [x] **Pre-publish Checks** ✅ **COMPLETED**
   - [x] `cargo check` passes ✅
   - [x] `cargo test` passes ✅
   - [x] `cargo clippy` clean ✅
   - [x] `cargo fmt` applied ✅
   - [x] All feature combinations compile ✅
   - [x] Update dependency to published oauth2-passkey ✅
-  - [ ] `cargo package --list` reviewed ⚠️ (Will work after core publication)
-  - [ ] `cargo publish --dry-run` succeeds ⚠️ (Will work after core publication)
+  - [x] `cargo package --list` reviewed ✅
+  - [x] `cargo publish --dry-run` succeeds ✅
 
 ## 9. Dependencies on Core Library
 
-- [ ] **Publishing Order** ⚠️ **READY FOR SEQUENCE**
-  - [ ] oauth2-passkey must be published first ⚠️ (Pending)
+- [x] **Publishing Order** ✅ **COMPLETED**
+  - [x] oauth2-passkey must be published first ✅
   - [x] Update Cargo.toml dependency before publishing ✅
-  - [ ] Verify integration works with published version ⚠️ (Will verify after core publication)
+  - [x] Verify integration works with published version ✅
 
 ---
 
-**Status**: Axum integration is fully prepared for publication. All code quality checks are complete and dependency updated.
-**Next Priority**: Publish the core oauth2-passkey crate first, then verify and publish this integration.
-**Critical**: All pre-publishing tasks complete! Ready to publish as soon as the core library is published.
+**Status**: ✅ **READY FOR PUBLICATION** - All checklist items completed successfully.
+**Next Priority**: Publish the oauth2-passkey-axum crate to crates.io.
+**Critical**: All pre-publishing tasks complete! Core library published and integration verified.
