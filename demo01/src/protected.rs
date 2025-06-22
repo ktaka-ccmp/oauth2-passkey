@@ -66,7 +66,7 @@ pub(crate) async fn p1(user: AuthUser) -> impl IntoResponse {
     // 1. Embed in page content (like showing token in HTML - see line above)
     // 2. X-CSRF-Token response header (demonstrated here)
     // 3. Dedicated endpoint /o2p/user/csrf_token (for SPAs)
-    // 
+    //
     // Middleware-protected routes (p3-p6) get automatic X-CSRF-Token headers,
     // but extractor-protected routes (p1, p2) require manual token delivery.
     let mut headers = HeaderMap::new();

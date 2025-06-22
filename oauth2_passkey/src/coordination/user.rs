@@ -136,8 +136,8 @@ mod tests {
                 "{\"user_handle\":\"test\",\"name\":\"test\",\"displayName\":\"Test\"}",
             )
             .unwrap(),
-            created_at: now.clone(),
-            updated_at: now.clone(),
+            created_at: now,
+            updated_at: now,
             last_used_at: now,
         }
     }
@@ -837,10 +837,8 @@ mod tests {
 
     // Helper function to mock UUID generation with fixed values
     async fn gen_new_user_id_with_mock(uuids: &[&str]) -> Result<String, CoordinationError> {
-        let mut uuid_index = 0;
-
         // Try up to 3 times to generate a unique ID
-        for _ in 0..3 {
+        for uuid_index in 0..3 {
             if uuid_index >= uuids.len() {
                 return Err(CoordinationError::Coordination(
                     "Mock UUID list exhausted".to_string(),
@@ -848,7 +846,6 @@ mod tests {
             }
 
             let id = uuids[uuid_index].to_string();
-            uuid_index += 1;
 
             // Check if a user with this ID already exists
             match UserStore::get_user(&id).await {

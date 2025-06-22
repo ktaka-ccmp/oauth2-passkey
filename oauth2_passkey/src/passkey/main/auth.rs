@@ -965,7 +965,7 @@ mod tests {
         let aaguid = "f8e2d612-b2cc-4536-a028-ec advocating1951db";
 
         // Insert test credential with user
-        let result = passkey_test_utils::insert_test_user_and_credential(
+        let credential_data = passkey_test_utils::TestCredentialData::new(
             credential_id,
             user_id,
             user_handle,
@@ -974,8 +974,8 @@ mod tests {
             public_key,
             aaguid,
             42,
-        )
-        .await;
+        );
+        let result = passkey_test_utils::insert_test_user_and_credential(credential_data).await;
         if let Err(e) = &result {
             println!("Error inserting test credential: {:?}", e);
         }
@@ -1029,7 +1029,7 @@ mod tests {
         let username = "auth_test_user";
 
         // Insert test credential with user
-        let insert_result = passkey_test_utils::insert_test_user_and_credential(
+        let credential_data = passkey_test_utils::TestCredentialData::new(
             credential_id,
             user_id,
             user_handle,
@@ -1038,8 +1038,9 @@ mod tests {
             public_key,
             "test_aaguid",
             10, // Counter
-        )
-        .await;
+        );
+        let insert_result =
+            passkey_test_utils::insert_test_user_and_credential(credential_data).await;
         assert!(insert_result.is_ok(), "Failed to insert test credential");
 
         // Call start_authentication with the username
@@ -1091,7 +1092,7 @@ mod tests {
         let initial_counter = 10;
 
         // Insert test credential with user
-        let insert_result = passkey_test_utils::insert_test_user_and_credential(
+        let credential_data = passkey_test_utils::TestCredentialData::new(
             credential_id,
             "counter_test_user_id",
             "counter_test_user_handle",
@@ -1100,8 +1101,9 @@ mod tests {
             "test_public_key",
             "test_aaguid",
             initial_counter,
-        )
-        .await;
+        );
+        let insert_result =
+            passkey_test_utils::insert_test_user_and_credential(credential_data).await;
         assert!(insert_result.is_ok(), "Failed to insert test credential");
 
         // Get the credential to pass to counter verification

@@ -132,7 +132,7 @@ mod tests {
                 len
             );
             let s = result.unwrap();
-            assert_eq!(s.len(), if len == 0 { 0 } else { (len * 4 + 2) / 3 });
+            assert_eq!(s.len(), if len == 0 { 0 } else { (len * 4).div_ceil(3) });
         }
 
         // Verify strings are different

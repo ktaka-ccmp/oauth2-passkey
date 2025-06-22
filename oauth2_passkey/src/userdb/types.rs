@@ -74,7 +74,7 @@ mod tests {
         assert_eq!(user.id, id);
         assert_eq!(user.account, account);
         assert_eq!(user.label, label);
-        assert_eq!(user.is_admin, false);
+        assert!(!user.is_admin);
         assert_eq!(user.sequence_number, None);
 
         // And created_at and updated_at should be within the last second

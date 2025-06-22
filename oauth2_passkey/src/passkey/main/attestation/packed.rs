@@ -684,8 +684,6 @@ mod tests {
         // 2. Certificates with CA bit set for testing CA rejection
         // 3. Certificates with AAGUID extensions for AAGUID validation
         // 4. Test certificate chains for expiration testing
-
-        assert!(true); // Placeholder - tested via integration tests
     }
 
     // Additional edge case tests
