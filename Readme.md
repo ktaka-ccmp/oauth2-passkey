@@ -47,15 +47,15 @@ This repository contains two published crates:
     - [Middleware](#middleware)
   - [CSRF Protection](#csrf-protection)
     - [Getting CSRF Tokens](#getting-csrf-tokens)
-      - [✅ Server-Side Templates (Most Common)](#-server-side-templates-most-common)
-      - [🔄 API Endpoint (For SPAs)](#-api-endpoint-for-spas)
-      - [⚡ Response Headers (Advanced)](#-response-headers-advanced)
+      - [Server-Side Templates (Most Common)](#server-side-templates-most-common)
+      - [API Endpoint (For SPAs)](#api-endpoint-for-spas)
+      - [Response Headers (Advanced)](#response-headers-advanced)
     - [Making Requests with CSRF Tokens](#making-requests-with-csrf-tokens)
-      - [✅ Using Headers (Recommended - Automatic Verification)](#-using-headers-recommended---automatic-verification)
-      - [⚠️ Using Form Fields (Manual Verification Required)](#️-using-form-fields-manual-verification-required)
+      - [Using Headers (Recommended - Automatic Verification)](#using-headers-recommended---automatic-verification)
+      - [Using Form Fields (Manual Verification Required)](#using-form-fields-manual-verification-required)
     - [Verification](#verification)
-      - [✅ Header Tokens: Automatic Verification](#-header-tokens-automatic-verification)
-      - [⚠️ Form Tokens: Manual Verification Required](#️-form-tokens-manual-verification-required)
+      - [Header Tokens: Automatic Verification](#header-tokens-automatic-verification)
+      - [Form Tokens: Manual Verification Required](#form-tokens-manual-verification-required)
   - [Feature Flags](#feature-flags)
   - [Admin Privileges](#admin-privileges)
   - [License](#license)
@@ -192,8 +192,8 @@ router.route("/protected", get(protected_handler).layer(is_authenticated()));
 
 This crate provides automatic CSRF protection with two usage patterns:
 
-1. **✅ Headers (Recommended)**: Get token → include in `X-CSRF-Token` header → automatic verification
-2. **⚠️ Forms**: Get token → include in form field → manual verification required
+1. **Headers (Recommended)**: Get token → include in `X-CSRF-Token` header → automatic verification ✅
+2. **Forms**: Get token → include in form field → manual verification required ⚠️
 
 **Your responsibility:** Get tokens to your frontend and include them in requests.
 
@@ -201,7 +201,7 @@ This crate provides automatic CSRF protection with two usage patterns:
 
 Choose the method that best fits your application:
 
-#### ✅ Server-Side Templates (Most Common)
+#### Server-Side Templates (Most Common)
 
 **Best for:** Traditional web apps, server-side rendering
 
@@ -224,7 +224,7 @@ async fn page_handler(user: AuthUser) -> impl IntoResponse {
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 ```
 
-#### 🔄 API Endpoint (For SPAs)
+#### API Endpoint (For SPAs)
 
 **Best for:** Single-page applications, dynamic token refresh
 
@@ -236,7 +236,7 @@ const response = await fetch('/o2p/user/csrf_token', {
 const { csrf_token } = await response.json();
 ```
 
-#### ⚡ Response Headers (Advanced)
+#### Response Headers (Advanced)
 
 **Best for:** Existing authenticated requests (token included automatically)
 
@@ -251,7 +251,7 @@ const csrfToken = response.headers.get('X-CSRF-Token');
 
 ### Making Requests with CSRF Tokens
 
-#### ✅ Using Headers (Recommended - Automatic Verification)
+#### Using Headers (Recommended - Automatic Verification)
 
 **Best for:** AJAX, fetch requests, SPAs
 
@@ -268,9 +268,9 @@ fetch('/api/update-profile', {
 });
 ```
 
-**✅ Verification is automatic** - no additional code needed in your handlers.
+**Verification is automatic** - no additional code needed in your handlers.
 
-#### ⚠️ Using Form Fields (Manual Verification Required)
+#### Using Form Fields (Manual Verification Required)
 
 **Best for:** Traditional HTML form submissions
 
@@ -282,13 +282,13 @@ fetch('/api/update-profile', {
 </form>
 ```
 
-**⚠️ Manual verification required** - see verification code below.
+**Manual verification required** - see verification code below.
 
 ---
 
 ### Verification
 
-#### ✅ Header Tokens: Automatic Verification
+#### Header Tokens: Automatic Verification
 
 When using `X-CSRF-Token` header:
 - **Works with both** `AuthUser` extractor and `is_authenticated()` middleware
@@ -298,7 +298,7 @@ When using `X-CSRF-Token` header:
 
 **No code needed** - verification happens automatically.
 
-#### ⚠️ Form Tokens: Manual Verification Required
+#### Form Tokens: Manual Verification Required
 
 HTML forms cannot include custom headers, so the `X-CSRF-Token` header won't be present. **You must verify the form token manually:**
 
