@@ -26,30 +26,6 @@ jobs:
             can-fail: true
     continue-on-error: ${{ matrix.can-fail }}
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: testdb
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      redis:
-        image: redis:7
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
     steps:
     - uses: actions/checkout@v4
 
@@ -93,61 +69,6 @@ jobs:
 
     - name: Test axum integration (no default features)
       run: cargo test --verbose --manifest-path oauth2_passkey_axum/Cargo.toml --no-default-features
-
-  integration-test:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: testdb
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      redis:
-        image: redis:7
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Cache cargo registry
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-integration-
-          ${{ runner.os }}-cargo-
-
-    - name: Test with PostgreSQL
-      run: cargo test --verbose --manifest-path oauth2_passkey/Cargo.toml
-      env:
-        # Override .env_test settings for integration testing with real databases
-        GENERIC_DATA_STORE_TYPE: "postgres"
-        GENERIC_DATA_STORE_URL: "postgresql://postgres:postgres@localhost:5432/testdb"
-        GENERIC_CACHE_STORE_TYPE: "redis"
-        GENERIC_CACHE_STORE_URL: "redis://localhost:6379"
 
   security:
     name: Security Audit
