@@ -45,7 +45,7 @@
   - [x] Demo applications serve as comprehensive examples ✅
     - [x] OAuth2 Demo ✅ **demo-oauth2**
     - [x] Passkey Demo ✅ **demo-passkey**
-    - [x] Combined Demo ✅ **demo01**
+    - [x] Combined Demo ✅ **demo-both**
   - [x] Referenced in README and detailed in documentation ✅ **docs/demo-applications.md**
 
 ## 3. Crate Metadata

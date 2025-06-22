@@ -23,6 +23,10 @@
 - MySQL, MariaDB support
 - Add Support for other OAuth2 providers like Apple and GitHub etc.
 
+- Rate limiting?
+- Integration test
+- E2E test
+
 ## ChatGPT's assessment
 
 After reviewing the changes more carefully, I've identified a few areas that could be improved:
