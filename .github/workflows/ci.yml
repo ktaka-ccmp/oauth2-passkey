@@ -87,36 +87,12 @@ jobs:
 
     - name: Test core library
       run: cargo test --verbose --manifest-path oauth2_passkey/Cargo.toml
-      env:
-        ORIGIN: "http://localhost:3000"
-        GENERIC_DATA_STORE_TYPE: "sqlite"
-        GENERIC_DATA_STORE_URL: ":memory:"
-        GENERIC_CACHE_STORE_TYPE: "memory"
-        GENERIC_CACHE_STORE_URL: ""
-        GOOGLE_CLIENT_ID: "test-client-id"
-        GOOGLE_CLIENT_SECRET: "test-client-secret"
 
     - name: Test axum integration (all features)
       run: cargo test --verbose --manifest-path oauth2_passkey_axum/Cargo.toml --all-features
-      env:
-        ORIGIN: "http://localhost:3000"
-        GENERIC_DATA_STORE_TYPE: "sqlite"
-        GENERIC_DATA_STORE_URL: ":memory:"
-        GENERIC_CACHE_STORE_TYPE: "memory"
-        GENERIC_CACHE_STORE_URL: ""
-        GOOGLE_CLIENT_ID: "test-client-id"
-        GOOGLE_CLIENT_SECRET: "test-client-secret"
 
     - name: Test axum integration (no default features)
       run: cargo test --verbose --manifest-path oauth2_passkey_axum/Cargo.toml --no-default-features
-      env:
-        ORIGIN: "http://localhost:3000"
-        GENERIC_DATA_STORE_TYPE: "sqlite"
-        GENERIC_DATA_STORE_URL: ":memory:"
-        GENERIC_CACHE_STORE_TYPE: "memory"
-        GENERIC_CACHE_STORE_URL: ""
-        GOOGLE_CLIENT_ID: "test-client-id"
-        GOOGLE_CLIENT_SECRET: "test-client-secret"
 
   integration-test:
     name: Integration Tests
@@ -167,13 +143,11 @@ jobs:
     - name: Test with PostgreSQL
       run: cargo test --verbose --manifest-path oauth2_passkey/Cargo.toml
       env:
-        ORIGIN: "http://localhost:3000"
+        # Override .env_test settings for integration testing with real databases
         GENERIC_DATA_STORE_TYPE: "postgres"
         GENERIC_DATA_STORE_URL: "postgresql://postgres:postgres@localhost:5432/testdb"
         GENERIC_CACHE_STORE_TYPE: "redis"
         GENERIC_CACHE_STORE_URL: "redis://localhost:6379"
-        GOOGLE_CLIENT_ID: "test-client-id"
-        GOOGLE_CLIENT_SECRET: "test-client-secret"
 
   security:
     name: Security Audit

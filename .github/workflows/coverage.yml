@@ -61,14 +61,6 @@ jobs:
     - name: Generate coverage report
       run: |
         cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
-      env:
-        ORIGIN: "http://localhost:3000"
-        GENERIC_DATA_STORE_TYPE: "sqlite"
-        GENERIC_DATA_STORE_URL: ":memory:"
-        GENERIC_CACHE_STORE_TYPE: "memory"
-        GENERIC_CACHE_STORE_URL: ""
-        GOOGLE_CLIENT_ID: "test-client-id"
-        GOOGLE_CLIENT_SECRET: "test-client-secret"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
