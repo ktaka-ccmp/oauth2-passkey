@@ -28,6 +28,7 @@ pub struct TestCredentialData {
 
 impl TestCredentialData {
     /// Create new test credential data from string slices
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         credential_id: &str,
         user_id: &str,
