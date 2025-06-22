@@ -23,8 +23,8 @@ http = { workspace = true }
 tracing = { workspace = true }
 
 # Changed from workspace dependency to published crate version
-# oauth2-passkey = "0.1.0"
-oauth2-passkey = { workspace = true }
+oauth2-passkey = "0.1.0"
+# oauth2-passkey = { workspace = true }
 
 axum = { workspace = true }
 axum-extra = { workspace = true }
