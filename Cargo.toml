@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "demo01",
+    "demo-both",
     "demo-oauth2",
     "demo-passkey",
     "oauth2_passkey_axum",
