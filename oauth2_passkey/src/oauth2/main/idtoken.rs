@@ -199,10 +199,12 @@ fn decode_base64_url_safe(input: &str) -> Result<Vec<u8>, TokenVerificationError
 fn convert_jwk_to_decoding_key(jwk: &Jwk) -> Result<DecodingKey, TokenVerificationError> {
     match jwk.alg.as_str() {
         "RS256" | "RS384" | "RS512" => {
-            let n = jwk.n
+            let n = jwk
+                .n
                 .as_ref()
                 .ok_or(TokenVerificationError::MissingKeyComponent("n".to_string()))?;
-            let e = jwk.e
+            let e = jwk
+                .e
                 .as_ref()
                 .ok_or(TokenVerificationError::MissingKeyComponent("e".to_string()))?;
             Ok(DecodingKey::from_rsa_components(n, e)?)
