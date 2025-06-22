@@ -46,16 +46,16 @@ This repository contains two published crates:
     - [Axum Extractor](#axum-extractor)
     - [Middleware](#middleware)
   - [CSRF Protection](#csrf-protection)
-    - [Delivering CSRF Token to the Client](#delivering-csrf-token-to-the-client)
-      - [Via Extension](#via-extension)
-      - [Via Dedicated Endpoint](#via-dedicated-endpoint)
-      - [Via Header (automatic)](#via-header-automatic)
-    - [Making a Request with CSRF Token](#making-a-request-with-csrf-token)
-      - [JavaScript fetch (SPA/AJAX)](#javascript-fetch-spaajax)
-      - [Traditional HTML form POST](#traditional-html-form-post)
+    - [Getting CSRF Tokens](#getting-csrf-tokens)
+      - [✅ Server-Side Templates (Most Common)](#-server-side-templates-most-common)
+      - [🔄 API Endpoint (For SPAs)](#-api-endpoint-for-spas)
+      - [⚡ Response Headers (Advanced)](#-response-headers-advanced)
+    - [Making Requests with CSRF Tokens](#making-requests-with-csrf-tokens)
+      - [✅ Using Headers (Recommended - Automatic Verification)](#-using-headers-recommended---automatic-verification)
+      - [⚠️ Using Form Fields (Manual Verification Required)](#️-using-form-fields-manual-verification-required)
     - [Verification](#verification)
-      - [Automatic Verification via Header](#automatic-verification-via-header)
-      - [Manual Verification](#manual-verification)
+      - [✅ Header Tokens: Automatic Verification](#-header-tokens-automatic-verification)
+      - [⚠️ Form Tokens: Manual Verification Required](#️-form-tokens-manual-verification-required)
   - [Feature Flags](#feature-flags)
   - [Admin Privileges](#admin-privileges)
   - [License](#license)
@@ -190,146 +190,130 @@ router.route("/protected", get(protected_handler).layer(is_authenticated()));
 
 ## CSRF Protection
 
-To protect against CSRF attacks, all state-changing endpoints must include CSRF token verification. This crate automatically generates CSRF tokens for this purpose.
+This crate provides automatic CSRF protection with two usage patterns:
 
-- All state-changing endpoints must verify the CSRF token.
-- The CSRF token is generated per session and must be included in state-changing requests, typically as an `X-CSRF-Token` header.
-- Verification of the CSRF token is automatically handled by the extractor and middleware for state-changing requests.
+1. **✅ Headers (Recommended)**: Get token → include in `X-CSRF-Token` header → automatic verification
+2. **⚠️ Forms**: Get token → include in form field → manual verification required
 
-### Delivering CSRF Token to the Client
+**Your responsibility:** Get tokens to your frontend and include them in requests.
 
-#### Via Extension
+### Getting CSRF Tokens
 
-Include the CSRF token in the page using a template engine after extracting it from the `AuthUser`.
+Choose the method that best fits your application:
+
+#### ✅ Server-Side Templates (Most Common)
+
+**Best for:** Traditional web apps, server-side rendering
 
 ```rust
-// Handler: extract csrf_token and pass to template context
-async fn handler(Extension(user): Extension<AuthUser>) -> impl IntoResponse {
-    let csrf_token = user.csrf_token.clone();
-    HtmlTemplate::render("my_template.j2", json!({
-        "csrf_token": csrf_token,
-        // ... other context ...
+// Pass token to your template
+async fn page_handler(user: AuthUser) -> impl IntoResponse {
+    HtmlTemplate::render("page.j2", json!({
+        "csrf_token": user.csrf_token,
+        // ... other data
     }))
 }
 ```
 
+**In your template:**
 ```html
-<!-- In your template -->
-<script>
-    // Embed CSRF token as a JS variable
-    const csrfToken = "{{ csrf_token }}";
-</script>
-<!-- Or as a hidden field in a form -->
+<!-- For JavaScript/AJAX -->
+<script>window.csrfToken = "{{ csrf_token }}";</script>
+
+<!-- For forms -->
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 ```
 
----
+#### 🔄 API Endpoint (For SPAs)
 
-#### Via Dedicated Endpoint
-
-We also provide a dedicated endpoint `/o2p/user/csrf_token` that returns the CSRF token as JSON for the authenticated user.
+**Best for:** Single-page applications, dynamic token refresh
 
 ```javascript
-// JS: Fetch CSRF token from the dedicated endpoint (make sure to include credentials)
-fetch('/o2p/user/csrf_token', { credentials: 'include' })
-  .then(response => response.json())
-  .then(data => {
-    const csrfToken = data.csrf_token;
-    // Use csrfToken in subsequent requests
-  });
+// Fetch fresh token when needed
+const response = await fetch('/o2p/user/csrf_token', { 
+    credentials: 'include' 
+});
+const { csrf_token } = await response.json();
+```
+
+#### ⚡ Response Headers (Advanced)
+
+**Best for:** Existing authenticated requests (token included automatically)
+
+```javascript
+// Token available in any authenticated response
+const response = await fetch('/api/user-data', { credentials: 'include' });
+const csrfToken = response.headers.get('X-CSRF-Token');
+// Use token for subsequent requests
 ```
 
 ---
 
-#### Via Header (automatic)
+### Making Requests with CSRF Tokens
 
-The middleware automatically adds the CSRF token to the response header as `X-CSRF-Token`.
-The client can fetch the CSRF token from the response header by sending a HEAD request to the current URL.
+#### ✅ Using Headers (Recommended - Automatic Verification)
 
-```javascript
-fetch(window.location.href, { method: 'HEAD', credentials: 'include' })
-    .then(response => {
-        const csrfToken = response.headers.get('X-CSRF-Token') || null;
-        // Use csrfToken in subsequent requests
-    });
-```
-
----
-
-### Making a Request with CSRF Token
-
-All state-changing endpoints must verify the CSRF token.
-
-The CSRF token is generated per session and must be included in state-changing requests, typically as an `X-CSRF-Token` header.
-
-#### JavaScript fetch (SPA/AJAX)
+**Best for:** AJAX, fetch requests, SPAs
 
 ```javascript
-fetch('/some_end_point', {
+// Get token from any method above, then include in header
+fetch('/api/update-profile', {
     method: 'POST',
     headers: {
-        'X-CSRF-Token': 'your-csrf-token',
-        // ...
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
     },
-    // ...
+    credentials: 'include',
+    body: JSON.stringify({ name: 'New Name' })
 });
 ```
 
-#### Traditional HTML form POST
+**✅ Verification is automatic** - no additional code needed in your handlers.
+
+#### ⚠️ Using Form Fields (Manual Verification Required)
+
+**Best for:** Traditional HTML form submissions
 
 ```html
-<form method="POST" action="/some_end_point">
+<form method="POST" action="/update-profile">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <!-- other fields -->
-    <button type="submit">Submit</button>
+    <input type="text" name="name" placeholder="Your name">
+    <button type="submit">Update Profile</button>
 </form>
 ```
+
+**⚠️ Manual verification required** - see verification code below.
 
 ---
 
 ### Verification
 
-#### Automatic Verification via Header
+#### ✅ Header Tokens: Automatic Verification
 
-CSRF token verification for state-changing requests (POST, PUT, DELETE, PATCH) works as follows, whether using the Axum middleware or `AuthUser` extractor directly:
+When using `X-CSRF-Token` header:
+- **Works with both** `AuthUser` extractor and `is_authenticated()` middleware
+- **Automatic comparison** - token verified against session automatically  
+- **Success:** Request proceeds (`AuthUser.csrf_via_header_verified` = `true`)
+- **Failure:** Request rejected with 403 FORBIDDEN
 
-**1. `X-CSRF-Token` Header Present:**
+**No code needed** - verification happens automatically.
 
-- The header token is compared to the session token.
-- **Match:** `AuthUser.csrf_via_header_verified` becomes `true`. Request proceeds.
-- **Mismatch:** Request is rejected (FORBIDDEN).
+#### ⚠️ Form Tokens: Manual Verification Required
 
-**2. `X-CSRF-Token` Header Absent:**
-
-- `AuthUser.csrf_via_header_verified` is `false`.
-- The request's `Content-Type` is then checked:
-- **Form submissions** (`application/x-www-form-urlencoded`, `multipart/form-data`):
-- The request proceeds to your handler.
-- **Handler MUST manually verify** the CSRF token from the form body against `AuthUser.csrf_token`. Reject if mismatched.
-- **Other `Content-Type`s** (e.g., `application/json`) or if `Content-Type` is missing:
-- Request is rejected (FORBIDDEN). This protects AJAX/API endpoints that submit non-form data without the `X-CSRF-Token` header.
-
-This dual approach ensures header-based CSRF (common for SPAs/AJAX) is handled automatically, while traditional forms require explicit verification in your handler.
-
-#### Manual Verification
-
-For traditional HTML form submissions (where the `X-CSRF-Token` header is typically absent), your request handler **must** manually verify the CSRF token that was submitted in the form body.
+HTML forms cannot include custom headers, so the `X-CSRF-Token` header won't be present. **You must verify the form token manually:**
 
 ```rust
-//if csrf verification in header failed
+// In your handler - check if manual verification is needed
 if !auth_user.csrf_via_header_verified {
-    // compare csrf token in the form with the one in the session cache
+    // Verify form token manually
     if !form_data.csrf_token.as_bytes().ct_eq(auth_user.csrf_token.as_bytes()).into() {
-        tracing::error!(
-            "CSRF token mismatch (form field). Submitted: {}, Expected: {}",
-            form_data.csrf_token,
-            auth_user.csrf_token
-        );
-        return Err((StatusCode::FORBIDDEN, "Invalid CSRF token.".to_string()));
+        return Err((StatusCode::FORBIDDEN, "Invalid CSRF token"));
     }
-    tracing::trace!("CSRF token via form field verified.");
 }
+// Token verified - proceed with handler logic
 ```
+
+---
 
 ## Feature Flags
 
