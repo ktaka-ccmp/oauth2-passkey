@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
-// #![warn(clippy::all)]
+#![warn(clippy::all)]
 
 //! # oauth2-passkey-axum
 //!
