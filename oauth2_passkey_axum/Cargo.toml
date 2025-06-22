@@ -37,4 +37,4 @@ subtle = "2.6"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
-dotenv = "0.15.0"
+dotenvy = "0.15.7"

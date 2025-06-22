@@ -123,7 +123,7 @@ pub use userdb::User as DbUser;
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     // Load environment variables from .env file
-///     dotenv::dotenv().ok();
+///     dotenvy::dotenv().ok();
 ///
 ///     // Initialize authentication
 ///     oauth2_passkey::init().await?;

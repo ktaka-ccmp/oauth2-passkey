@@ -24,7 +24,7 @@ pub mod env {
     static ENV_INIT: LazyLock<()> = LazyLock::new(|| {
         // Load environment variables from .env_test (required for testing)
         // We explicitly don't fall back to .env to ensure test isolation
-        if let Err(e) = dotenv::from_filename(".env_test") {
+        if let Err(e) = dotenvy::from_filename(".env_test") {
             eprintln!("ERROR: .env_test file not found. This file is required for testing.");
             eprintln!("Please create a .env_test file with test-specific environment variables.");
             eprintln!("Error: {}", e);

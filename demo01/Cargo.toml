@@ -6,7 +6,7 @@ edition = { workspace = true }
 [dependencies]
 askama = { version = "0.14.0" }
 axum-server = { version = "0.7.2", features = ["tls-rustls"] }
-dotenv = { workspace = true }
+dotenvy = { workspace = true }
 http = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
