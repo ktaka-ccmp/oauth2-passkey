@@ -1,8 +1,6 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey};
-use pkcs1::{EncodeRsaPublicKey, LineEnding};
-use rsa::RsaPublicKey;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
@@ -58,8 +56,6 @@ pub enum TokenVerificationError {
     JsonError(#[from] serde_json::Error),
     #[error("Base64 decoding failed: {0}")]
     Base64Error(#[from] base64::DecodeError),
-    #[error("RSA error: {0}")]
-    RsaError(#[from] rsa::Error),
     #[error("JWT error: {0}")]
     JwtError(#[from] jsonwebtoken::errors::Error),
     #[error("Invalid token format")]
@@ -86,8 +82,6 @@ pub enum TokenVerificationError {
     Utf8Error(#[from] std::str::Utf8Error),
     #[error("System time error: {0}")]
     SystemTimeError(#[from] std::time::SystemTimeError),
-    #[error("PKCS1 error: {0}")]
-    Pkcs1Error(#[from] pkcs1::Error),
     #[error("JWKS parsing error: {0}")]
     JwksParsing(String),
     #[error("JWKS fetch error: {0}")]
@@ -205,22 +199,13 @@ fn decode_base64_url_safe(input: &str) -> Result<Vec<u8>, TokenVerificationError
 fn convert_jwk_to_decoding_key(jwk: &Jwk) -> Result<DecodingKey, TokenVerificationError> {
     match jwk.alg.as_str() {
         "RS256" | "RS384" | "RS512" => {
-            let n = decode_base64_url_safe(
-                jwk.n
-                    .as_ref()
-                    .ok_or(TokenVerificationError::MissingKeyComponent("n".to_string()))?,
-            )?;
-            let e = decode_base64_url_safe(
-                jwk.e
-                    .as_ref()
-                    .ok_or(TokenVerificationError::MissingKeyComponent("e".to_string()))?,
-            )?;
-            let rsa_public_key = RsaPublicKey::new(
-                rsa::BigUint::from_bytes_be(&n),
-                rsa::BigUint::from_bytes_be(&e),
-            )?;
-            let pem = rsa_public_key.to_pkcs1_pem(LineEnding::default())?;
-            Ok(DecodingKey::from_rsa_pem(pem.as_bytes())?)
+            let n = jwk.n
+                .as_ref()
+                .ok_or(TokenVerificationError::MissingKeyComponent("n".to_string()))?;
+            let e = jwk.e
+                .as_ref()
+                .ok_or(TokenVerificationError::MissingKeyComponent("e".to_string()))?;
+            Ok(DecodingKey::from_rsa_components(n, e)?)
         }
         "ES256" | "ES384" | "ES512" => {
             let x = jwk
