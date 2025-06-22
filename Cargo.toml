@@ -19,7 +19,7 @@ oauth2-passkey = { path = "./oauth2_passkey" }
 
 async-trait = "0.1.88"
 axum = { version = "0.8", features = ["http2", "macros", "multipart"] }
-dotenv = "0.15.0"
+dotenvy = "0.15.7"
 
 http = "1.3.1"
 headers = "0.4.1"

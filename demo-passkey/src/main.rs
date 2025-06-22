@@ -5,7 +5,7 @@ use axum::{
     routing::{Router, get},
 };
 use axum_core::response::IntoResponse;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 
 use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_router};
 

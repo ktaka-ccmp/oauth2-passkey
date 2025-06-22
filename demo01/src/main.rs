@@ -5,7 +5,7 @@ use axum::{
     routing::get,
 };
 
-use dotenv::dotenv;
+use dotenvy::dotenv;
 
 use oauth2_passkey_axum::{AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, oauth2_passkey_router};
 
