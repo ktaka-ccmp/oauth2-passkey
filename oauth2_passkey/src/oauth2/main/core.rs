@@ -386,10 +386,10 @@ mod tests {
         match result {
             Err(OAuth2Error::DecodeState(_)) => {}
             Ok(_) => {
-                assert!(false, "Expected DecodeState error but got Ok");
+                unreachable!("Unexpectedly got Ok");
             }
             Err(err) => {
-                assert!(false, "Expected DecodeState error, got {:?}", err);
+                unreachable!("Expected DecodeState error, got {:?}", err);
             }
         }
     }
@@ -409,10 +409,10 @@ mod tests {
         match result {
             Err(OAuth2Error::Serde(_)) => {}
             Ok(_) => {
-                assert!(false, "Expected Serde error but got Ok");
+                unreachable!("Unexpectedly got Ok");
             }
             Err(err) => {
-                assert!(false, "Expected Serde error, got {:?}", err);
+                unreachable!("Expected Serde error, got {:?}", err);
             }
         }
     }

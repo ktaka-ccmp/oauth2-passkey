@@ -2,7 +2,7 @@ use askama::Template;
 use axum::extract::Form;
 use axum::{
     Extension, Router,
-    http::StatusCode,
+    http::{HeaderMap, HeaderValue, StatusCode},
     middleware::from_fn,
     response::{Html, IntoResponse},
     routing::get,
@@ -56,10 +56,31 @@ pub(super) fn nested_router() -> Router<()> {
 
 // Having user as an argument causes redirect to O2P_LOGIN_URL for anonymous users by axum extractor
 pub(crate) async fn p1(user: AuthUser) -> impl IntoResponse {
-    Html(format!(
+    let html_content = format!(
         "Hey {}!<br/>Your CSRF Token is: {}",
         user.account, user.csrf_token
-    ))
+    );
+
+    // DEMO: Manually adding CSRF token to response headers
+    // When using AuthUser extractor (not middleware), you must deliver CSRF tokens via one of:
+    // 1. Embed in page content (like showing token in HTML - see line above)
+    // 2. X-CSRF-Token response header (demonstrated here)
+    // 3. Dedicated endpoint /o2p/user/csrf_token (for SPAs)
+    //
+    // Middleware-protected routes (p3-p6) get automatic X-CSRF-Token headers,
+    // but extractor-protected routes (p1, p2) require manual token delivery.
+    let mut headers = HeaderMap::new();
+    match HeaderValue::from_str(&user.csrf_token) {
+        Ok(header_value) => {
+            headers.insert("X-CSRF-Token", header_value);
+        }
+        Err(e) => {
+            tracing::warn!("Failed to create CSRF header value: {}", e);
+            // Continue without the header - client will need to use the token from page content
+        }
+    }
+
+    (headers, Html(html_content))
 }
 
 // Having user as an optional argument prevents redirect by axum extractor

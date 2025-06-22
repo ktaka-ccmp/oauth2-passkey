@@ -338,10 +338,10 @@ mod tests {
         match result {
             Err(OAuth2Error::DecodeState(_)) => {}
             Ok(_) => {
-                assert!(false, "Expected DecodeState error but got Ok");
+                unreachable!("Expected DecodeState error but got Ok");
             }
             Err(err) => {
-                assert!(false, "Expected DecodeState error, got {:?}", err);
+                unreachable!("Expected DecodeState error, got {:?}", err);
             }
         }
     }
@@ -366,10 +366,10 @@ mod tests {
         match result {
             Err(OAuth2Error::Serde(_)) => {}
             Ok(_) => {
-                assert!(false, "Expected Serde error but got Ok");
+                unreachable!("Expected Serde error but got Ok");
             }
             Err(err) => {
-                assert!(false, "Expected Serde error, got {:?}", err);
+                unreachable!("Expected Serde error, got {:?}", err);
             }
         }
     }
@@ -440,10 +440,10 @@ mod tests {
         match result {
             Err(OAuth2Error::InvalidOrigin(_)) => {}
             Ok(_) => {
-                assert!(false, "Expected InvalidOrigin error but got Ok");
+                unreachable!("Expected InvalidOrigin error but got Ok");
             }
             Err(err) => {
-                assert!(false, "Expected InvalidOrigin error, got {:?}", err);
+                unreachable!("Expected InvalidOrigin error, got {:?}", err);
             }
         }
     }
@@ -470,10 +470,10 @@ mod tests {
         match result {
             Err(OAuth2Error::InvalidOrigin(_)) => {}
             Ok(_) => {
-                assert!(false, "Expected InvalidOrigin error but got Ok");
+                unreachable!("Expected InvalidOrigin error but got Ok");
             }
             Err(err) => {
-                assert!(false, "Expected InvalidOrigin error, got {:?}", err);
+                unreachable!("Expected InvalidOrigin error, got {:?}", err);
             }
         }
     }
@@ -552,10 +552,10 @@ mod tests {
                 assert!(msg.contains("test_type-session not found"));
             }
             Ok(_) => {
-                assert!(false, "Expected SecurityTokenNotFound error but got Ok");
+                unreachable!("Expected SecurityTokenNotFound error but got Ok");
             }
             Err(err) => {
-                assert!(false, "Expected SecurityTokenNotFound error, got {:?}", err);
+                unreachable!("Expected SecurityTokenNotFound error, got {:?}", err);
             }
         }
     }
@@ -600,14 +600,10 @@ mod tests {
         match get_result {
             Err(OAuth2Error::SecurityTokenNotFound(_)) => {}
             Ok(_) => {
-                assert!(
-                    false,
-                    "Expected SecurityTokenNotFound error after removal but got Ok"
-                );
+                unreachable!("Expected SecurityTokenNotFound error after removal but got Ok");
             }
             Err(err) => {
-                assert!(
-                    false,
+                unreachable!(
                     "Expected SecurityTokenNotFound error after removal, got {:?}",
                     err
                 );

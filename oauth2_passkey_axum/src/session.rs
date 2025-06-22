@@ -322,7 +322,7 @@ mod tests {
         let _delete_redirect = AuthRedirect::new(Method::DELETE);
 
         // If we get here without panicking, the test passes
-        assert!(true);
+        // assert!(true);
     }
 
     /// Test the AuthRedirect's into_response_with_method method
