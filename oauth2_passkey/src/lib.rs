@@ -21,7 +21,7 @@
 //! ## Usage
 //!
 //! This crate provides the core authentication functionality that can be used directly
-//! or through framework-specific integration crates like `oauth2-passkey-axum`.
+//! or through framework-specific integration crates like [`oauth2-passkey-axum`](https://crates.io/crates/oauth2-passkey-axum).
 //!
 //! ```rust,no_run
 //! use oauth2_passkey::{init, SessionUser};

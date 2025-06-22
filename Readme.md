@@ -66,14 +66,26 @@ This repository contains two published crates:
 
 ## Getting Started
 
+**Quick Start:** Explore the demo applications to see the library in action:
+
+- **[Complete Integration](demo-both/)** - Full authentication setup with both OAuth2 and Passkeys
+- **[OAuth2 Focus](demo-oauth2/)** - OAuth2/Google authentication with minimal UI
+- **[Passkey Focus](demo-passkey/)** - WebAuthn/Passkey authentication with minimal UI
+
 1. **Add to your `Cargo.toml`:**
 
    ```toml
-   oauth2_passkey_axum = "..."
+   [dependencies]
+   oauth2-passkey-axum = "0.1.0"
    ```
 
-2. **Prepare your `.env` and database/cache (see below).**
-3. **Integrate the router and middleware into your Axum app.**
+2. **Set up your environment:**
+   - Create a `.env` file with your configuration (see example below)
+   - Prepare your database and cache (SQLite/PostgreSQL + Memory/Redis)
+
+3. **Integrate into your Axum app:**
+   - Call `oauth2_passkey_axum::init().await` on startup
+   - Add the authentication router to your app
 
 ---
 
@@ -216,6 +228,7 @@ async fn page_handler(user: AuthUser) -> impl IntoResponse {
 ```
 
 **In your template:**
+
 ```html
 <!-- For JavaScript/AJAX -->
 <script>window.csrfToken = "{{ csrf_token }}";</script>
@@ -291,6 +304,7 @@ fetch('/api/update-profile', {
 #### Header Tokens: Automatic Verification
 
 When using `X-CSRF-Token` header:
+
 - **Works with both** `AuthUser` extractor and `is_authenticated()` middleware
 - **Automatic comparison** - token verified against session automatically  
 - **Success:** Request proceeds (`AuthUser.csrf_via_header_verified` = `true`)

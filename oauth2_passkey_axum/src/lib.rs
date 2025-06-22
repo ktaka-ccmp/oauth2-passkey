@@ -6,8 +6,16 @@
 //!
 //! Axum web framework integration for the [`oauth2-passkey`] authentication library.
 //!
+//! [`oauth2-passkey`]: https://crates.io/crates/oauth2-passkey
+//!
 //! This crate provides ready-to-use Axum handlers, middleware, and UI components for OAuth2 and passkey authentication
 //! in your Axum web applications.
+//!
+//! ## Quick Start
+//!
+//! For a complete working example, see the [demo-both application](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-both)
+//! which demonstrates both OAuth2 and passkey authentication in a single application.
+//!
 //!
 //! ## Features
 //!
