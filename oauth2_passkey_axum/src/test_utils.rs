@@ -10,7 +10,6 @@
 use crate::AuthUser;
 use chrono::Utc;
 use oauth2_passkey::{PasskeyCredential, SessionUser};
-use serde_json;
 
 /// Centralized test environment setup
 ///
@@ -35,7 +34,7 @@ pub mod env {
     /// Get the origin for tests
     pub fn origin() -> String {
         // This will trigger ENV_INIT if it hasn't been called yet
-        let _ = *ENV_INIT;
+        *ENV_INIT;
         std::env::var("ORIGIN").unwrap()
     }
 }
