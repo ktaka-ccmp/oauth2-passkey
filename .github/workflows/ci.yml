@@ -16,12 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [stable]
+        rust: [stable, beta, nightly]
         include:
           - rust: stable
             can-fail: false
           - rust: beta
-            can-fail: false
+            can-fail: true
           - rust: nightly
             can-fail: true
     continue-on-error: ${{ matrix.can-fail }}
