@@ -146,32 +146,55 @@ pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, 
 pub(crate) fn get_session_id_from_headers(
     headers: &HeaderMap,
 ) -> Result<Option<&str>, SessionError> {
-    let Some(cookie_header) = headers.get(COOKIE) else {
-        tracing::debug!("No cookie header found");
-        return Ok(None);
-    };
-
-    let cookie_str = cookie_header.to_str().map_err(|e| {
-        tracing::error!("Invalid cookie header: {}", e);
-        SessionError::HeaderError("Invalid cookie header".to_string())
-    })?;
+    tracing::debug!("Headers: {:#?}", headers);
 
     let cookie_name = SESSION_COOKIE_NAME.as_str();
     tracing::debug!("Looking for cookie: {}", cookie_name);
 
-    let session_id = cookie_str.split(';').map(|s| s.trim()).find_map(|s| {
-        let mut parts = s.splitn(2, '=');
-        match (parts.next(), parts.next()) {
-            (Some(k), Some(v)) if k == cookie_name => Some(v),
-            _ => None,
-        }
-    });
+    // Get all cookie headers (there might be multiple)
+    let cookie_headers: Vec<_> = headers.get_all(COOKIE).iter().collect();
 
-    if session_id.is_none() {
-        tracing::debug!("No session cookie '{}' found in cookies", cookie_name);
+    if cookie_headers.is_empty() {
+        tracing::debug!("No cookie header found");
+        return Ok(None);
     }
 
-    Ok(session_id)
+    tracing::debug!("Found {} cookie header(s)", cookie_headers.len());
+
+    // Search through all cookie headers
+    for cookie_header in cookie_headers {
+        tracing::debug!("Processing cookie header: {:?}", cookie_header);
+
+        let cookie_str = cookie_header.to_str().map_err(|e| {
+            tracing::error!("Invalid cookie header: {}", e);
+            SessionError::HeaderError("Invalid cookie header".to_string())
+        })?;
+
+        // Check if this header contains our target cookie
+        // Handle both single cookie and semicolon-separated cookies
+        let session_id = cookie_str.split(';').map(|s| s.trim()).find_map(|s| {
+            let mut parts = s.splitn(2, '=');
+            match (parts.next(), parts.next()) {
+                (Some(k), Some(v)) if k == cookie_name => Some(v),
+                _ => None,
+            }
+        });
+
+        if let Some(session_id) = session_id {
+            tracing::debug!(
+                "Found session cookie '{}' with value: {}",
+                cookie_name,
+                session_id
+            );
+            return Ok(Some(session_id));
+        }
+    }
+
+    tracing::debug!(
+        "No session cookie '{}' found in any cookie headers",
+        cookie_name
+    );
+    Ok(None)
 }
 
 /// Core internal function to check session authentication and perform flexible CSRF validation.
@@ -2109,5 +2132,80 @@ mod tests {
         // Clean up test resources
         let _ = cleanup_test_resources(user_id, session_id).await;
         let _ = crate::session::main::test_utils::delete_test_session(nonexistent_session_id).await;
+    }
+
+    /// Test get_session_id_from_headers_multiple_cookie_headers
+    /// This test verifies that session ID extraction works with multiple cookie headers (case A).
+    /// It performs the following steps:
+    /// 1. Creates header map with multiple cookie headers, one containing session cookie
+    /// 2. Calls get_session_id_from_headers to extract the session ID
+    /// 3. Verifies that the function returns the correct session ID from the appropriate header
+    #[test]
+    fn test_get_session_id_from_headers_multiple_cookie_headers() {
+        // Given a header map with multiple cookie headers
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let session_id = "test_session_id_multiple";
+        let mut headers = HeaderMap::new();
+
+        // Add multiple cookie headers like in case A
+        headers.append(
+            COOKIE,
+            HeaderValue::from_str("_ga=GA1.1.233748741.1749009840").unwrap(),
+        );
+        headers.append(
+            COOKIE,
+            HeaderValue::from_str("_ga_ZN78TEJMRW=GS2.1.s1749072867").unwrap(),
+        );
+        headers.append(
+            COOKIE,
+            HeaderValue::from_str(&format!("{}={}", cookie_name, session_id)).unwrap(),
+        );
+        headers.append(
+            COOKIE,
+            HeaderValue::from_str("other_cookie=other_value").unwrap(),
+        );
+
+        // When getting the session ID
+        let result = get_session_id_from_headers(&headers);
+
+        // Then it should return the session ID from the correct header
+        assert!(result.is_ok());
+        let session_id_opt = result.unwrap();
+        assert!(session_id_opt.is_some());
+        assert_eq!(session_id_opt.unwrap(), session_id);
+    }
+
+    /// Test get_session_id_from_headers_semicolon_separated
+    /// This test verifies that session ID extraction works with semicolon-separated cookies (case B).
+    /// It performs the following steps:
+    /// 1. Creates header map with single cookie header containing multiple semicolon-separated cookies
+    /// 2. Calls get_session_id_from_headers to extract the session ID
+    /// 3. Verifies that the function returns the correct session ID from the combined header
+    #[test]
+    fn test_get_session_id_from_headers_semicolon_separated() {
+        // Given a header map with semicolon-separated cookies like in case B
+        let cookie_name = SESSION_COOKIE_NAME.to_string();
+        let session_id = "test_session_id_semicolon";
+        let cookie_str = format!(
+            "_ga=GA1.1.2096617346; other_cookie=value; {}={}; final_cookie=final_value",
+            cookie_name, session_id
+        );
+        let headers = create_header_map_with_cookie_string(&cookie_str);
+
+        // When getting the session ID
+        let result = get_session_id_from_headers(&headers);
+
+        // Then it should return the session ID from the semicolon-separated string
+        assert!(result.is_ok());
+        let session_id_opt = result.unwrap();
+        assert!(session_id_opt.is_some());
+        assert_eq!(session_id_opt.unwrap(), session_id);
+    }
+
+    // Helper function to create a header map with a complete cookie string
+    fn create_header_map_with_cookie_string(cookie_str: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(COOKIE, HeaderValue::from_str(cookie_str).unwrap());
+        headers
     }
 }
