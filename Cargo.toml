@@ -10,12 +10,15 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [workspace.dependencies]
 oauth2-passkey-axum = { path = "./oauth2_passkey_axum" }
 oauth2-passkey = { path = "./oauth2_passkey" }
+
+#oauth2-passkey-axum = "0.1.0"
+#oauth2-passkey =  "0.1.0"
 
 async-trait = "0.1.88"
 axum = { version = "0.8", features = ["http2", "macros", "multipart"] }

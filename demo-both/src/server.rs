@@ -7,7 +7,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub(crate) fn spawn_http_server(port: u16, app: Router) -> JoinHandle<()> {
     tokio::spawn(async move {
         let addr = SocketAddr::from(([0, 0, 0, 0], port));
-        tracing::debug!("HTTP server listening on {}:{}", addr, port);
+        tracing::info!("HTTP server listening on {}", addr);
         axum_server::bind(addr)
             .serve(app.into_make_service())
             .await
@@ -24,7 +24,7 @@ pub(crate) async fn spawn_https_server(port: u16, app: Router) -> JoinHandle<()>
     .expect("Failed to load TLS certificates");
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    tracing::debug!("HTTPS server listening on {}:{}", addr, port);
+    tracing::info!("HTTPS server listening on {}", addr);
     tokio::spawn(async move {
         axum_server::bind_rustls(addr, config)
             .serve(app.into_make_service())
@@ -38,7 +38,7 @@ pub(crate) fn init_tracing(app_name: &str) {
         #[cfg(debug_assertions)]
         {
             format!(
-                "oauth2_passkey_axum=trace,oauth2_passkey=trace,{}=trace",
+                "oauth2_passkey_axum=trace,oauth2_passkey=trace,{}=trace,info",
                 app_name
             )
             .into()
@@ -56,7 +56,7 @@ pub(crate) fn init_tracing(app_name: &str) {
         .init();
 
     #[cfg(debug_assertions)]
-    tracing::debug!("Debug mode enabled - showing detailed logs by default");
+    tracing::info!("Debug mode enabled - showing detailed logs by default");
     tracing::info!("You can increase verbosity by setting the RUST_LOG environment variable.");
     tracing::info!("Log levels from least to most verbose: error < warn < info < debug < trace");
     tracing::info!("Example: RUST_LOG=debug ./demo-xxxxx");
