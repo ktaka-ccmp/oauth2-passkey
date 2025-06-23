@@ -2,11 +2,20 @@
 
 This document provides an overview of the demo applications available in the repository that showcase the usage of `oauth2-passkey` and `oauth2-passkey-axum`.
 
+## Quick Access
+
+Each demo application includes a comprehensive README.md with detailed setup instructions:
+
+- **[demo-both](../demo-both/README.md)** - Complete integration with both authentication methods
+- **[demo-oauth2](../demo-oauth2/README.md)** - Google OAuth2/OIDC authentication
+- **[demo-passkey](../demo-passkey/README.md)** - WebAuthn/Passkey authentication
+
 ## Available Demos
 
 ### 1. OAuth2 Demo
 
-**Location:** [`/demo-oauth2`](../demo-oauth2/)
+**Location:** [`/demo-oauth2`](../demo-oauth2/)  
+**Documentation:** [README.md](../demo-oauth2/README.md)
 
 The OAuth2 Demo showcases Google OAuth2 authentication integration with the following features:
 
@@ -33,7 +42,8 @@ cargo run
 
 ### 2. Passkey Demo
 
-**Location:** [`/demo-passkey`](../demo-passkey/)
+**Location:** [`/demo-passkey`](../demo-passkey/)  
+**Documentation:** [README.md](../demo-passkey/README.md)
 
 The Passkey Demo demonstrates WebAuthn/Passkey authentication with the following features:
 
@@ -49,6 +59,7 @@ The Passkey Demo demonstrates WebAuthn/Passkey authentication with the following
 * `templates/` - HTML templates with WebAuthn JavaScript
 
 **Running the demo:**
+
 ```bash
 cd demo-passkey
 # Set up environment variables (see .env.example)
@@ -58,7 +69,8 @@ cargo run
 
 ### 3. Combined Authentication Demo
 
-**Location:** [`/demo-both`](../demo-both/)
+**Location:** [`/demo-both`](../demo-both/)  
+**Documentation:** [README.md](../demo-both/README.md)
 
 The Combined Demo showcases both OAuth2 and Passkey authentication in a single application:
 
@@ -96,7 +108,7 @@ All demos require:
 
 Each demo requires at minimum:
 
-```
+```bash
 ORIGIN=https://localhost:3000
 GENERIC_DATA_STORE_TYPE=sqlite
 GENERIC_DATA_STORE_URL=sqlite:auth.db
