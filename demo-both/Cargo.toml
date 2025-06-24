@@ -14,6 +14,8 @@ axum = { workspace = true }
 tokio = { workspace = true }
 rustls = { workspace = true }
 
-oauth2-passkey-axum = { workspace = true }
+#oauth2-passkey-axum = { workspace = true }
+oauth2-passkey-axum = "0.1"
+
 subtle = "2.6"
 serde = { version = "1.0", features = ["derive"] }
