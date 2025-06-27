@@ -22,7 +22,7 @@ This demo application showcases both OAuth2 (Google) and WebAuthn/Passkey authen
 Copy the environment template and configure:
 
 ```bash
-cp ./dot.env.simple .env
+cp ../dot.env.simple .env
 ```
 
 Edit `.env` with your configuration:
