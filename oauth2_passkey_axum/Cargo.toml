@@ -18,7 +18,7 @@ admin-ui = []
 user-ui = []
 
 [dependencies]
-askama = { version = "0.14.0" }
+askama = { version = "0.14.0", default-features = false }
 http = { workspace = true }
 tracing = { workspace = true }
 
@@ -32,10 +32,10 @@ serde_json = { workspace = true }
 urlencoding = { workspace = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
-subtle = "2.6"
+subtle = { version = "2.6", default-features = false }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt"] }
+tokio = "1"
 dotenvy = "0.15.7"
 
 # Cargo-release configuration for oauth2-passkey-axum

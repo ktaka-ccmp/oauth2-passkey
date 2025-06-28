@@ -4,13 +4,13 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-askama = "0.14.0"
+askama = { version = "0.14.0", default-features = false }
 axum = { workspace = true }
 axum-core = { workspace = true }
-axum-server = { version = "0.7.2", features = ["tls-rustls"] }
+axum-server = "0.7.2"
 tokio = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.19", default-features = false, features = ["env-filter", "fmt"] }
 rustls = { workspace = true }
 dotenvy = { workspace = true }
 http = { workspace = true }
