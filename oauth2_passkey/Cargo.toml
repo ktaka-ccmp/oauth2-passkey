@@ -44,3 +44,11 @@ subtle = "2.6"
 [dev-dependencies]
 serial_test = "3.2.0"
 proptest = "1.7.0"
+
+# Cargo-release configuration for oauth2-passkey
+[package.metadata.release]
+publish = true
+tag = true
+sign-tag = false
+sign-commit = false
+push = false  # Push manually after verification

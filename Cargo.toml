@@ -14,11 +14,13 @@ version = "0.1.1"
 edition = "2024"
 
 [workspace.dependencies]
-#oauth2-passkey-axum = { path = "./oauth2_passkey_axum" }
-#oauth2-passkey = { path = "./oauth2_passkey" }
+# For development: use local paths
+oauth2-passkey-axum = { path = "./oauth2_passkey_axum" }
+oauth2-passkey = { path = "./oauth2_passkey" }
 
-oauth2-passkey-axum = "0.1"
-oauth2-passkey =  "0.1"
+# For publishing: uncomment these and comment out the path versions above
+#oauth2-passkey-axum = "0.1"
+#oauth2-passkey = "0.1"
 
 async-trait = "0.1.88"
 axum = { version = "0.8", features = ["http2", "macros", "multipart"] }
@@ -42,3 +44,22 @@ uuid = { version = "1.17", features = ["v4"] }
 urlencoding = "2.1.3"
 
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "chrono", "json", "uuid"] }
+
+# Cargo-release configuration for sequential publishing
+[workspace.metadata.release]
+# Shared configuration for all crates
+sign-commit = false
+sign-tag = false
+push = false
+publish = false  # We'll control publishing manually or per-crate
+tag = false  # Don't tag at workspace level
+
+# Define publishing order: oauth2-passkey first, then oauth2-passkey-axum
+[[workspace.metadata.release.dependencies]]
+name = "oauth2-passkey"
+version = "workspace"
+
+[[workspace.metadata.release.dependencies]]
+name = "oauth2-passkey-axum"
+version = "workspace"
+depends = ["oauth2-passkey"]

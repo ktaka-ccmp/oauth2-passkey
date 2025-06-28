@@ -37,3 +37,16 @@ subtle = "2.6"
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
 dotenvy = "0.15.7"
+
+# Cargo-release configuration for oauth2-passkey-axum
+[package.metadata.release]
+publish = true
+tag = true
+sign-tag = false
+sign-commit = false
+push = false  # Push manually after verification
+# Automatically update dependency version when releasing
+[[package.metadata.release.pre-release-replacements]]
+file = "Cargo.toml"
+search = 'oauth2-passkey = { workspace = true }'
+replace = 'oauth2-passkey = "{{version}}"'
