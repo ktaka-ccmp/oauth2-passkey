@@ -37,18 +37,24 @@ OAUTH2_GOOGLE_CLIENT_SECRET='your-google-secret'
 **3. Add to your Axum app:**
 
 ```rust
+use axum::{Router, routing::get, response::IntoResponse};
 use oauth2_passkey_axum::{AuthUser, oauth2_passkey_router, O2P_ROUTE_PREFIX};
 
 #[tokio::main]
-async fn main() {
-    oauth2_passkey_axum::init().await.expect("Failed to initialize");
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    oauth2_passkey_axum::init().await?;
 
     let app = Router::new()
         .route("/", get(home))
-        .route("/protected", get(protected).layer(is_authenticated()))
+        .route("/protected", get(protected))
         .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
 
     // Your app is now ready with login/logout at /o2p/*
+    Ok(())
+}
+
+async fn home() -> &'static str {
+    "Welcome! Visit /o2p/user/login to sign in"
 }
 
 async fn protected(user: AuthUser) -> impl IntoResponse {
@@ -56,7 +62,7 @@ async fn protected(user: AuthUser) -> impl IntoResponse {
 }
 ```
 
-**That's it!** Your users can now sign in with Google or register with Passkeys.
+**That's it!** Your users can now sign-in/register with Google or Passkeys.
 
 ## 🏗️ How It Works
 
