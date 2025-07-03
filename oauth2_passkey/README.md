@@ -13,7 +13,6 @@ This library provides the essential authentication logic and coordination functi
 
 ## Features
 
-- **Framework-Agnostic**: Core authentication logic independent of web frameworks
 - **OAuth2 Support**: Google OAuth2/OIDC authentication with extensible provider system
 - **WebAuthn/Passkey**: FIDO2-compliant passwordless authentication
 - **Secure Session Management**: Redis and in-memory session storage with secure cookies
@@ -141,14 +140,6 @@ async fn get_session_user(session_cookie: &str) -> Result<AuthUser, StatusCode> 
 - **Host-locked cookies** using `__Host-SessionId` prefix for enhanced security
 
 **Note**: For a comprehensive security analysis and verification status of all claims, see [Security Documentation](../docs/security.md).
-
-## Examples
-
-Complete working examples are available in the repository:
-
-- **[Complete Integration](../demo-both)** - Full authentication setup
-- **[OAuth2 Demo](../demo-oauth2)** - Google OAuth2 integration
-- **[Passkey Demo](../demo-passkey)** - WebAuthn/passkey authentication
 
 ## License
 

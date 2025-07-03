@@ -1,387 +1,164 @@
 # oauth2-passkey
 
-A minimal-dependency, security-focused authentication library for Rust web applications supporting both OAuth2 and WebAuthn/Passkey authentication.
-
-**Key Features:**
-
-- 🔐 Secure session management with automatic cookie handling
-- 🌐 OAuth2 authentication (Google OAuth2/OIDC support)
-- 🔑 WebAuthn/Passkey authentication (FIDO2 compliant)
-- 🛡️ Built-in CSRF protection and secure session handling
-- 📦 Minimal dependencies for reduced attack surface
-
-## 📦 Crates
-
-This repository contains two published crates:
-
-- **[`oauth2-passkey`](https://crates.io/crates/oauth2-passkey)** - Core authentication library
-- **[`oauth2-passkey-axum`](https://crates.io/crates/oauth2-passkey-axum)** - Axum web framework integration
+🔐 **Drop-in authentication for Rust web apps** - Add secure login with Google OAuth2 and/or Passkeys in minutes.
 
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey.svg)](https://crates.io/crates/oauth2-passkey)
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey-axum.svg)](https://crates.io/crates/oauth2-passkey-axum)
 [![Docs.rs](https://docs.rs/oauth2-passkey/badge.svg)](https://docs.rs/oauth2-passkey)
-[![Docs.rs](https://docs.rs/oauth2-passkey-axum/badge.svg)](https://docs.rs/oauth2-passkey-axum)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
----
+## ✨ What You Get
 
-## Table of Contents
+🌐 **"Sign in with Google"** - OAuth2/OIDC authentication that just works
+🔑 **Passwordless login** - WebAuthn/Passkey support for modern devices
+🔗 **Account linking** - Users can add multiple login methods to one account
+🛡️ **Security built-in** - Sessions, CSRF protection, secure cookies
+📦 **Minimal setup** - Works with SQLite out of the box, scales to PostgreSQL + Redis
 
-- [oauth2-passkey](#oauth2-passkey)
-  - [📦 Crates](#-crates)
-  - [Table of Contents](#table-of-contents)
-  - [Getting Started](#getting-started)
-  - [Basic Usage](#basic-usage)
-    - [Prepare database and cache](#prepare-database-and-cache)
-      - [Database](#database)
-        - [SQLite](#sqlite)
-        - [PostgreSQL](#postgresql)
-      - [Cache](#cache)
-        - [Memory](#memory)
-        - [Redis](#redis)
-    - [.env file](#env-file)
-      - [Important Notes](#important-notes)
-    - [Rust Code Example](#rust-code-example)
-  - [Route Protection](#route-protection)
-    - [Axum Extractor](#axum-extractor)
-    - [Middleware](#middleware)
-  - [CSRF Protection](#csrf-protection)
-    - [Getting CSRF Tokens](#getting-csrf-tokens)
-      - [Server-Side Templates (Most Common)](#server-side-templates-most-common)
-      - [API Endpoint (For SPAs)](#api-endpoint-for-spas)
-      - [Response Headers (Advanced)](#response-headers-advanced)
-    - [Making Requests with CSRF Tokens](#making-requests-with-csrf-tokens)
-      - [Using Headers (Recommended - Automatic Verification)](#using-headers-recommended---automatic-verification)
-      - [Using Form Fields (Manual Verification Required)](#using-form-fields-manual-verification-required)
-    - [Verification](#verification)
-      - [Header Tokens: Automatic Verification](#header-tokens-automatic-verification)
-      - [Form Tokens: Manual Verification Required](#form-tokens-manual-verification-required)
-  - [Feature Flags](#feature-flags)
-  - [Admin Privileges](#admin-privileges)
-  - [License](#license)
-    - [Contribution](#contribution)
-  - [Contributing](#contributing)
+## 🚀 5-Minute Setup
 
----
-
-## Getting Started
-
-**Quick Start:** Explore the demo applications to see the library in action:
-
-- **[Complete Integration](demo-both/)** - Full authentication setup with both OAuth2 and Passkeys
-- **[OAuth2 Focus](demo-oauth2/)** - OAuth2/Google authentication with minimal UI
-- **[Passkey Focus](demo-passkey/)** - WebAuthn/Passkey authentication with minimal UI
-
-1. **Add to your `Cargo.toml`:**
-
-   ```toml
-   [dependencies]
-   oauth2-passkey-axum = "0.1.0"
-   ```
-
-2. **Set up your environment:**
-   - Create a `.env` file with your configuration (see example below)
-   - Prepare your database and cache (SQLite/PostgreSQL + Memory/Redis)
-
-3. **Integrate into your Axum app:**
-   - Call `oauth2_passkey_axum::init().await` on startup
-   - Add the authentication router to your app
-
----
-
-## Basic Usage
-
-### Prepare database and cache
-
-**Supported Storage Options:**
-
-- **Database:** SQLite and PostgreSQL
-- **Cache:** In-memory HashMap and Redis
-
-#### Database
-
-##### SQLite
-
-Make sure the database URL you specified is writable.
-
-##### PostgreSQL
-
-```bash
-docker compose -f db/postgresql/docker-compose.yaml up -d
-```
-
-#### Cache
-
-##### Memory
-
-No preparation needed.
-
-##### Redis
-
-```bash
-docker compose -f db/redis/docker-compose.yaml up -d
-```
-
-### .env file
+**1. Add to your `Cargo.toml`:**
 
 ```toml
-ORIGIN='https://your-domain.example.com'
-
-OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
-OAUTH2_GOOGLE_CLIENT_SECRET='your-client-secret'
-
-GENERIC_CACHE_STORE_TYPE=redis
-GENERIC_CACHE_STORE_URL='redis://localhost:6379'
-
-GENERIC_DATA_STORE_TYPE=sqlite
-GENERIC_DATA_STORE_URL='sqlite:///tmp/sqlite.db'
+[dependencies]
+oauth2-passkey-axum = "0.1"
 ```
 
-#### Important Notes
+**2. Set your environment variables:**
 
-**ORIGIN Configuration:**
+```bash
+ORIGIN='https://your-domain.com'
+OAUTH2_GOOGLE_CLIENT_ID='your-google-client-id'
+OAUTH2_GOOGLE_CLIENT_SECRET='your-google-secret'
+```
 
-- Must not have a trailing slash
-- Must use `https://` (OAuth2 and WebAuthn require HTTPS)
-- Should be the externally accessible URL (even if using an SSL proxy)
-
-**Google OAuth2 Setup:**
-
-1. Get your client credentials from the [Google API Console](https://console.cloud.google.com/auth/clients)
-2. Add the authorized redirect URI: `$ORIGIN/o2p/oauth2/authorized`
-   - Example: If `ORIGIN='https://example.com'`, add `https://example.com/o2p/oauth2/authorized`
-
-### Rust Code Example
+**3. Add to your Axum app:**
 
 ```rust
-use oauth2_passkey_axum::{
-    AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, O2P_SUMMARY_URL, oauth2_passkey_router,
-};
+use oauth2_passkey_axum::{AuthUser, oauth2_passkey_router, O2P_ROUTE_PREFIX};
 
 #[tokio::main]
 async fn main() {
-    dotenv::dotenv().ok();
-    oauth2_passkey_axum::init().await.expect("init failed");
+    oauth2_passkey_axum::init().await.expect("Failed to initialize");
 
     let app = Router::new()
-        .route("/", get(index))
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
-        .merge(protected::router());
+        .route("/", get(home))
+        .route("/protected", get(protected).layer(is_authenticated()))
+        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+
+    // Your app is now ready with login/logout at /o2p/*
+}
+
+async fn protected(user: AuthUser) -> impl IntoResponse {
+    format!("Hello, {}! 👋", user.account)
 }
 ```
 
-The `init()` call initializes database storage and cache connections. The `oauth2_passkey_router()` provides all authentication endpoints for OAuth2/OIDC and WebAuthn/Passkey flows.
+**That's it!** Your users can now sign in with Google or register with Passkeys.
 
----
+## 🏗️ How It Works
 
-## Route Protection
+**Simple Architecture:**
 
-Authenticated user pages are protected using either the Axum extractor or middleware approach.
-
-### Axum Extractor
-
-- Protect routes by requiring `AuthUser` as an argument.
-- The extractor validates the session.
-- The extractor also validates the CSRF token for state-changing requests.
-
-```rust
-async fn protected_handler(user: AuthUser) {
-    let csrf_token = user.csrf_token;
-}
+```text
+Your Web App
+     ↓
+oauth2-passkey-axum  ← Handles login/logout routes
+     ↓
+oauth2-passkey       ← Core session & auth logic
+     ↓
+Database + Cache     ← SQLite/PostgreSQL + Memory/Redis
 ```
 
-### Middleware
+**User Experience:**
 
-- Use `is_authenticated` middleware to protect routes.
-- The middleware validates the session.
-- The middleware also validates the CSRF token for state-changing requests.
+1. **First-time users** can register with Google OAuth2 OR create a Passkey
+2. **Existing users** can add additional login methods to their account
+3. **Authentication** works with any linked method (OAuth2 or Passkey)
+4. **Admin users** (first user auto-promoted) can manage other accounts
 
-```rust
-router.route("/protected", get(protected_handler).layer(is_authenticated()));
+## 📱 Try the Demos
+
+See it in action before integrating:
+
+- **[Complete Demo](demo-both/)** - Both OAuth2 and Passkey authentication
+- **[OAuth2 Only](demo-oauth2/)** - "Sign in with Google" focus
+- **[Passkey Only](demo-passkey/)** - Passwordless authentication focus
+
+```bash
+# Copy demo configuration
+cp dot.env.simple demo-both/.env
+
+# Run the demo (includes both OAuth2 and Passkeys)
+cd demo-both && cargo run
+
+# Open in your browser:
+# Visit https://localhost:3443
 ```
 
-## CSRF Protection
+## 📦 Repository Structure
 
-This crate provides automatic CSRF protection with two usage patterns:
+This repository contains:
 
-1. **Headers (Recommended)**: Get token → include in `X-CSRF-Token` header → automatic verification ✅
-2. **Forms**: Get token → include in form field → manual verification required ⚠️
+- **[`oauth2_passkey/`](oauth2_passkey/)** - Core authentication library
+- **[`oauth2_passkey_axum/`](oauth2_passkey_axum/)** - Axum web framework integration
+- **[`demo-both/`](demo-both/)** - Complete integration example
+- **[`demo-oauth2/`](demo-oauth2/)** - OAuth2-focused example
+- **[`demo-passkey/`](demo-passkey/)** - Passkey-focused example
 
-**Your responsibility:** Get tokens to your frontend and include them in requests.
+## 🔧 Configuration
 
-### Getting CSRF Tokens
+**Environment Variables** (create a `.env` file):
 
-Choose the method that best fits your application:
+```env
+ORIGIN='https://your-domain.com'
+OAUTH2_GOOGLE_CLIENT_ID='your-google-client-id'
+OAUTH2_GOOGLE_CLIENT_SECRET='your-google-secret'
 
-#### Server-Side Templates (Most Common)
+# Database (SQLite by default, PostgreSQL for production)
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL='sqlite:data/auth.db'
 
-**Best for:** Traditional web apps, server-side rendering
-
-```rust
-// Pass token to your template
-async fn page_handler(user: AuthUser) -> impl IntoResponse {
-    HtmlTemplate::render("page.j2", json!({
-        "csrf_token": user.csrf_token,
-        // ... other data
-    }))
-}
+# Cache (Memory by default, Redis for production)
+GENERIC_CACHE_STORE_TYPE=memory
 ```
 
-**In your template:**
+**OAuth2 Setup:** Get credentials from [Google API Console](https://console.cloud.google.com/auth/clients) and add redirect URI: `https://your-domain.com/o2p/oauth2/authorized`
 
-```html
-<!-- For JavaScript/AJAX -->
-<script>window.csrfToken = "{{ csrf_token }}";</script>
+## 📚 Documentation & Examples
 
-<!-- For forms -->
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-```
+**Getting Started:**
 
-#### API Endpoint (For SPAs)
+- **[Axum Integration Guide](oauth2_passkey_axum/README.md)** - Detailed setup for Axum apps
+- **[Core Library Docs](oauth2_passkey/README.md)** - Framework-agnostic usage
 
-**Best for:** Single-page applications, dynamic token refresh
+**Examples:**
 
-```javascript
-// Fetch fresh token when needed
-const response = await fetch('/o2p/user/csrf_token', { 
-    credentials: 'include' 
-});
-const { csrf_token } = await response.json();
-```
+- **[Complete Integration Demo](demo-both/README.md)** - Full-featured example app
+- **[Database Setup Guide](db/README.md)** - PostgreSQL & Redis configuration
 
-#### Response Headers (Advanced)
+**Advanced:**
 
-**Best for:** Existing authenticated requests (token included automatically)
+- **[Security Best Practices](docs/security-best-practices.md)** - Production deployment guide
+- **[Architecture Deep Dive](docs/architecture.md)** - Internal implementation details
 
-```javascript
-// Token available in any authenticated response
-const response = await fetch('/api/user-data', { credentials: 'include' });
-const csrfToken = response.headers.get('X-CSRF-Token');
-// Use token for subsequent requests
-```
+## 🎯 Why Choose This Library?
 
----
+✅ **Beginner-friendly** - Works out of the box with SQLite
+✅ **Production-ready** - Scales to PostgreSQL + Redis
+✅ **Modern auth methods** - OAuth2 + Passkeys in one package
+✅ **Security built-in** - CSRF, secure sessions, minimal dependencies
+✅ **Flexible** - Users can mix and match auth methods
 
-### Making Requests with CSRF Tokens
+## 📄 License
 
-#### Using Headers (Recommended - Automatic Verification)
-
-**Best for:** AJAX, fetch requests, SPAs
-
-```javascript
-// Get token from any method above, then include in header
-fetch('/api/update-profile', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken,
-    },
-    credentials: 'include',
-    body: JSON.stringify({ name: 'New Name' })
-});
-```
-
-**Verification is automatic** - no additional code needed in your handlers.
-
-#### Using Form Fields (Manual Verification Required)
-
-**Best for:** Traditional HTML form submissions
-
-```html
-<form method="POST" action="/update-profile">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <input type="text" name="name" placeholder="Your name">
-    <button type="submit">Update Profile</button>
-</form>
-```
-
-**Manual verification required** - see verification code below.
-
----
-
-### Verification
-
-#### Header Tokens: Automatic Verification
-
-When using `X-CSRF-Token` header:
-
-- **Works with both** `AuthUser` extractor and `is_authenticated()` middleware
-- **Automatic comparison** - token verified against session automatically  
-- **Success:** Request proceeds (`AuthUser.csrf_via_header_verified` = `true`)
-- **Failure:** Request rejected with 403 FORBIDDEN
-
-**No code needed** - verification happens automatically.
-
-#### Form Tokens: Manual Verification Required
-
-HTML forms cannot include custom headers, so the `X-CSRF-Token` header won't be present. **You must verify the form token manually:**
-
-```rust
-// In your handler - check if manual verification is needed
-if !auth_user.csrf_via_header_verified {
-    // Verify form token manually
-    if !form_data.csrf_token.as_bytes().ct_eq(auth_user.csrf_token.as_bytes()).into() {
-        return Err((StatusCode::FORBIDDEN, "Invalid CSRF token"));
-    }
-}
-// Token verified - proceed with handler logic
-```
-
----
-
-## Feature Flags
-
-The `oauth2_passkey_axum` crate provides supplemental UI components for both admin and regular users.
-
-- **Default features:**  
-  Both admin and user UIs are enabled by default.
-
-- **To disable all UIs:**
-
-```toml
-oauth2_passkey_axum = { default-features = false, features = [] }
-```
-
-- **To enable only user UI:**
-
-```toml
-oauth2_passkey_axum = { default-features = false, features = ["user-ui"] }
-```
-
----
-
-## Admin Privileges
-
-The library includes a built-in admin system for user management and system administration.
-
-**Admin Initialization:**
-
-- The first user to register is automatically granted admin privileges
-- This ensures there's always at least one admin to manage the system
-
-**Admin Capabilities:**
-
-- Grant admin privileges to other users
-- Access admin-only UI components (when enabled)
-- Manage user accounts and permissions
-
-**Admin UI Access:**
-
-Admin users can access additional management interfaces at `/o2p/admin/` when the admin UI feature is enabled.
-
-## License
-
-Licensed under either of
+Licensed under either of:
 
 - [Apache License, Version 2.0](LICENSE-APACHE)
 - [MIT License](LICENSE-MIT)
 
 at your option.
 
-### Contribution
+## 🤝 Contributing
 
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
-
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
