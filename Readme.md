@@ -2,6 +2,8 @@
 
 🔐 **Drop-in authentication for Rust web apps** - Add secure login with Google OAuth2 and/or Passkeys in minutes.
 
+Users authenticate with OAuth2 or Passkey, then receive a secure session cookie to maintain their login status.
+
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey.svg)](https://crates.io/crates/oauth2-passkey)
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey-axum.svg)](https://crates.io/crates/oauth2-passkey-axum)
 [![Docs.rs](https://docs.rs/oauth2-passkey/badge.svg)](https://docs.rs/oauth2-passkey)
@@ -9,11 +11,11 @@
 
 ## ✨ What You Get
 
-🌐 **"Sign in with Google"** - OAuth2/OIDC authentication that just works
-🔑 **Passwordless login** - WebAuthn/Passkey support for modern devices
-🔗 **Account linking** - Users can add multiple login methods to one account
-🛡️ **Security built-in** - Sessions, CSRF protection, secure cookies
-📦 **Minimal setup** - Works with SQLite out of the box, scales to PostgreSQL + Redis
+- 🌐 **"Sign in with Google"** OAuth2/OIDC authentication that just works
+- 🔑 **Passwordless login** WebAuthn/Passkey support for modern devices
+- 🔗 **Account linking** Users can add multiple login methods to one account
+- 🛡️ **Security built-in** Sessions, CSRF protection, secure cookies
+- 📦 **Minimal setup** Works with SQLite out of the box, scales to PostgreSQL + Redis
 
 ## 🚀 5-Minute Setup
 
@@ -105,6 +107,7 @@ This repository contains:
 - **[`demo-both/`](demo-both/)** - Complete integration example
 - **[`demo-oauth2/`](demo-oauth2/)** - OAuth2-focused example
 - **[`demo-passkey/`](demo-passkey/)** - Passkey-focused example
+- **[`db`](db/)** - Database configuration example
 
 ## 🔧 Configuration
 
@@ -125,30 +128,13 @@ GENERIC_CACHE_STORE_TYPE=memory
 
 **OAuth2 Setup:** Get credentials from [Google API Console](https://console.cloud.google.com/auth/clients) and add redirect URI: `https://your-domain.com/o2p/oauth2/authorized`
 
-## 📚 Documentation & Examples
-
-**Getting Started:**
-
-- **[Axum Integration Guide](oauth2_passkey_axum/README.md)** - Detailed setup for Axum apps
-- **[Core Library Docs](oauth2_passkey/README.md)** - Framework-agnostic usage
-
-**Examples:**
-
-- **[Complete Integration Demo](demo-both/README.md)** - Full-featured example app
-- **[Database Setup Guide](db/README.md)** - PostgreSQL & Redis configuration
-
-**Advanced:**
-
-- **[Security Best Practices](docs/security-best-practices.md)** - Production deployment guide
-- **[Architecture Deep Dive](docs/architecture.md)** - Internal implementation details
-
 ## 🎯 Why Choose This Library?
 
-✅ **Beginner-friendly** - Works out of the box with SQLite
-✅ **Production-ready** - Scales to PostgreSQL + Redis
-✅ **Modern auth methods** - OAuth2 + Passkeys in one package
-✅ **Security built-in** - CSRF, secure sessions, minimal dependencies
-✅ **Flexible** - Users can mix and match auth methods
+- ✅ **Beginner-friendly** - Works out of the box with SQLite
+- ✅ **Production-ready** - Scales to PostgreSQL + Redis
+- ✅ **Modern auth methods** - OAuth2 + Passkeys in one package
+- ✅ **Security built-in** - CSRF, secure sessions, minimal dependencies
+- ✅ **Flexible** - Users can mix and match auth methods
 
 ## 📄 License
 
