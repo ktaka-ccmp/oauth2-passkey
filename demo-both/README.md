@@ -88,7 +88,7 @@ $ cargo run
 
 1. **Visit**: <https://localhost:3443>
 2. **Create User** with Google OAuth2 or Passkey
-3. **Navigate to** [User](https://localhost:3443/o2p/user/summary)
+3. **Navigate to** the user summary page: <https://localhost:3443/o2p/user/summary>
 4. **Add New Passkey** or **Add New OAuth2 Account**
 5. **Logout**
 6. **Sign in** with Google OAuth2 or Passkey
@@ -143,14 +143,13 @@ demo-both/
    - The SQLite database will be created automatically  
    - Delete the database file to reset it (path depends on your configuration)
    - Use `touch` to recreate the database file if needed
-   - Make sure to use the path from your `.env` file
+   - Make sure the path specified by `GENERIC_DATA_STORE_URL` in your `.env` is writable (e.g., the directory for your SQLite file)
+   - Make sure to the path from your `.env` file is writable
 
 ### Development Tips
 
 - **Logs**: Check console output for detailed error messages
-- **Database**: SQLite file will be created automatically if it does not exist. Make sure the path is writable.
 - **Self-signed certificates**: Browser will show security warning, click "Advanced" → "Proceed"
-- **Reset state**: Delete the database file (check your `.env` for the correct path) and restart to reset all users and sessions
 
 ## Configuration Options
 
