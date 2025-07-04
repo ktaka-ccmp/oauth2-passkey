@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- List latest changes here.
+
+## [0.1.2] - 2025-07-04
+
 ### Changed
 
-- Initial release preparation
+- Minor modifications and clarifications in README.md files across the workspace for improved documentation and accuracy.
 
 ## [0.1.1] - 2025-06-23
 
@@ -44,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full WebAuthn specification compliance
 - Comprehensive security documentation and best practices guide
 
-[Unreleased]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ktaka-ccmp/oauth2-passkey/releases/tag/v0.1.0
