@@ -53,13 +53,3 @@ sign-tag = false
 push = false
 publish = false  # We'll control publishing manually or per-crate
 tag = false  # Don't tag at workspace level
-
-# Define publishing order: oauth2-passkey first, then oauth2-passkey-axum
-[[workspace.metadata.release.dependencies]]
-name = "oauth2-passkey"
-version = "workspace"
-
-[[workspace.metadata.release.dependencies]]
-name = "oauth2-passkey-axum"
-version = "workspace"
-depends = ["oauth2-passkey"]
