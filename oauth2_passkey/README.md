@@ -56,6 +56,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+For a complete list of all public functions, structs, and types, see the [full API documentation on docs.rs](https://docs.rs/oauth2-passkey).
+
 ## Configuration
 
 Configure the library via environment variables:
