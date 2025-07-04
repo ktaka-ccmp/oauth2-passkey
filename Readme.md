@@ -2,14 +2,14 @@
 
 🔐 **Drop-in authentication for Rust web apps** - Add secure login with Google OAuth2 and/or Passkeys in minutes.
 
-Users authenticate with OAuth2 or Passkey, then receive a secure session cookie to maintain their login status.
-
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey.svg)](https://crates.io/crates/oauth2-passkey)
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey-axum.svg)](https://crates.io/crates/oauth2-passkey-axum)
 [![Docs.rs](https://docs.rs/oauth2-passkey/badge.svg)](https://docs.rs/oauth2-passkey)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
 ## ✨ What You Get
+
+Users authenticate with OAuth2 or Passkey, then receive a secure session cookie to maintain their login status.
 
 - 🌐 **"Sign in with Google"** OAuth2/OIDC authentication that just works
 - 🔑 **Passwordless login** WebAuthn/Passkey support for modern devices
