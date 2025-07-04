@@ -96,12 +96,25 @@ fi
 
 cd ..
 
-# Commit the version updates
+# Create a release branch
+RELEASE_BRANCH="release/v$VERSION"
+git checkout -b "$RELEASE_BRANCH"
+
+# Add and commit changes
 git add .
 git commit -m "chore: release oauth2-passkey and oauth2-passkey-axum $VERSION"
 
-echo "🎉 Release process completed successfully!"
+echo "🎉 Release branch '$RELEASE_BRANCH' created and committed."
 echo "📌 Next steps:"
-echo "   1. Review the changes: git log --oneline -5"
-echo "   2. Push to remote: git push origin main --tags"
-echo "   3. Check crates.io for both packages"
+echo "   1. Push the branch: git push origin $RELEASE_BRANCH"
+echo "   2. Open a pull request on GitHub to merge '$RELEASE_BRANCH' into 'main'"
+echo "   3. After merge, push tags if needed: git push origin --tags"
+
+git push origin "$RELEASE_BRANCH"
+
+if command -v gh >/dev/null 2>&1; then
+    gh pr create --base main --head "$RELEASE_BRANCH" --title "Release $VERSION" --body "Automated release PR for version $VERSION"
+    echo "✅ Pull request created via GitHub CLI."
+else
+    echo "⚠️ GitHub CLI (gh) not found. Please create a pull request manually."
+fi
