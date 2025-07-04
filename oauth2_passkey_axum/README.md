@@ -140,7 +140,8 @@ oauth2-passkey-axum = { version = "0.1", default-features = false, features = ["
 
 ## Available Routes
 
-When you include `oauth2_passkey_router()`, these endpoints are available under `/o2p`:
+When you include `oauth2_passkey_router()`, all authentication endpoints are available under `/o2p` by default.
+You can change this prefix by setting the `O2P_ROUTE_PREFIX` environment variable.
 
 ### Core Authentication
 
@@ -181,8 +182,6 @@ When you include `oauth2_passkey_router()`, these endpoints are available under 
 - `DELETE /o2p/passkey/credentials/{id}` - Remove passkey
 - `DELETE /o2p/oauth2/accounts/{provider}/{id}` - Remove OAuth2 account
 
-For a complete API reference, see the [API documentation](https://docs.rs/oauth2-passkey-axum).
-
 ## Middleware Functions
 
 | Middleware | User Data | Error Response | Use Case |
@@ -196,6 +195,24 @@ For a complete API reference, see the [API documentation](https://docs.rs/oauth2
 
 - Need user data in handler? → Use `*_user_*` variants
 - Browser app? → Use `*_redirect` | API? → Use `*_401`
+
+`*_user_*` variants example:
+
+When you use a `*_user_*` middleware, the authenticated user is injected as an `Extension<AuthUser>`. You can then access user info in your handler like this:
+
+```rust
+use axum::{
+    Extension,
+    response::{Html, IntoResponse},
+};
+use oauth2_passkey_axum::AuthUser;
+
+async fn protected(Extension(user): Extension<AuthUser>) -> impl IntoResponse {
+    Html(format!("<h1>Hello, {}!</h1>", user.account))
+}
+```
+
+This pattern is useful when you want both authentication enforcement and access to user data in your handler—such as for rendering templates or personalized responses.
 
 ## CSRF Protection
 

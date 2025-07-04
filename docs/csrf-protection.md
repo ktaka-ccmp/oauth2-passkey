@@ -187,9 +187,9 @@ If CSRF tokens are not available in your templates or responses:
 
 ### Performance Considerations
 
-- **Cache tokens**: Don't fetch new tokens for every request
-- **Reuse tokens**: CSRF tokens are valid for the entire session
-- **Header preference**: Use header-based CSRF for better performance (no manual verification)
+- **Session-based tokens**: CSRF tokens are tied to session lifetime - when you create a session, a CSRF token is generated and cached until session expires
+- **Header-based automatic verification**: Use header-based CSRF (`X-CSRF-Token`) for better performance as verification happens automatically during request extraction
+- **Avoid manual verification**: Form-based CSRF requires additional verification code in your handlers, while header-based CSRF is verified automatically
 
 ## Related Documentation
 
