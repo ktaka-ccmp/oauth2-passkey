@@ -135,18 +135,26 @@ if [ "$DRY_RUN" = false ]; then
     }
 
     echo "🎯 Step 1: Releasing oauth2-passkey $VERSION"
-    cargo publish -p oauth2-passkey || {
-        echo "❌ Failed to publish oauth2-passkey"
-        exit 1
-    }
+    if cargo search "oauth2-passkey" | grep -q "^oauth2-passkey.*$VERSION"; then
+        echo "✅ oauth2-passkey $VERSION is already published. Skipping."
+    else
+        cargo publish -p oauth2-passkey || {
+            echo "❌ Failed to publish oauth2-passkey"
+            exit 1
+        }
+    fi
 
     wait_for_crates_io "oauth2-passkey" "$VERSION"
 
     echo "🎯 Step 3: Releasing oauth2-passkey-axum $VERSION"
-    cargo publish -p oauth2-passkey-axum || {
-        echo "❌ Failed to publish oauth2-passkey-axum"
-        exit 1
-    }
+    if cargo search "oauth2-passkey-axum" | grep -q "^oauth2-passkey-axum.*$VERSION"; then
+        echo "✅ oauth2-passkey-axum $VERSION is already published. Skipping."
+    else
+        cargo publish -p oauth2-passkey-axum || {
+            echo "❌ Failed to publish oauth2-passkey-axum"
+            exit 1
+        }
+    fi
 
     update_tag "$VERSION"
 else
