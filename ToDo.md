@@ -27,6 +27,8 @@
 - Integration test
 - E2E test
 
+- add at_hash verification for oidc access token
+
 ## ChatGPT's assessment
 
 After reviewing the changes more carefully, I've identified a few areas that could be improved:
