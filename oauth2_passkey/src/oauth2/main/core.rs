@@ -278,8 +278,7 @@ fn calculate_at_hash(access_token: &str, algorithm: Algorithm) -> Result<String,
         Algorithm::RS512 | Algorithm::HS512 => half_hash::<Sha512>(access_token.as_bytes()),
         _ => {
             return Err(OAuth2Error::UnsupportedAlgorithm(format!(
-                "Unsupported algorithm for at_hash calculation: {:?}",
-                algorithm
+                "Unsupported algorithm for at_hash calculation: {algorithm:?}"
             )));
         }
     };
@@ -387,7 +386,7 @@ mod tests {
             .expect("CSRF cookie should be set");
 
         // Debug: print the actual cookie to see its format
-        println!("Actual cookie: {}", csrf_cookie);
+        println!("Actual cookie: {csrf_cookie}");
 
         assert!(csrf_cookie.contains("HttpOnly"));
 
@@ -400,9 +399,7 @@ mod tests {
         };
         assert!(
             csrf_cookie.contains(expected_samesite),
-            "Expected {} in cookie: {}",
-            expected_samesite,
-            csrf_cookie
+            "Expected {expected_samesite} in cookie: {csrf_cookie}"
         );
     }
 
@@ -548,22 +545,19 @@ mod tests {
             "form_post" => {
                 assert!(
                     csrf_cookie.contains("SameSite=None"),
-                    "form_post mode should use SameSite=None for cross-origin POST requests. Cookie: {}",
-                    csrf_cookie
+                    "form_post mode should use SameSite=None for cross-origin POST requests. Cookie: {csrf_cookie}"
                 );
             }
             "query" => {
                 assert!(
                     csrf_cookie.contains("SameSite=Lax"),
-                    "query mode should use SameSite=Lax for redirect-based flows. Cookie: {}",
-                    csrf_cookie
+                    "query mode should use SameSite=Lax for redirect-based flows. Cookie: {csrf_cookie}"
                 );
             }
             _ => {
                 assert!(
                     csrf_cookie.contains("SameSite=Lax"),
-                    "Unknown response mode should default to SameSite=Lax. Cookie: {}",
-                    csrf_cookie
+                    "Unknown response mode should default to SameSite=Lax. Cookie: {csrf_cookie}"
                 );
             }
         }

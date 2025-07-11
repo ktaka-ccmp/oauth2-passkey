@@ -330,17 +330,16 @@ pub(crate) async fn finish_registration(
 
 fn extract_credential_public_key(reg_data: &RegisterCredential) -> Result<String, PasskeyError> {
     let decoded_client_data = base64url_decode(&reg_data.response.client_data_json)
-        .map_err(|e| PasskeyError::Format(format!("Failed to decode client data: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Failed to decode client data: {e}")))?;
 
     let decoded_client_data_json = String::from_utf8(decoded_client_data.clone())
-        .map_err(|e| PasskeyError::Format(format!("Client data is not valid UTF-8: {}", e)))
+        .map_err(|e| PasskeyError::Format(format!("Client data is not valid UTF-8: {e}")))
         .and_then(|s: String| {
-            serde_json::from_str::<serde_json::Value>(&s).map_err(|e| {
-                PasskeyError::Format(format!("Failed to parse client data JSON: {}", e))
-            })
+            serde_json::from_str::<serde_json::Value>(&s)
+                .map_err(|e| PasskeyError::Format(format!("Failed to parse client data JSON: {e}")))
         })?;
 
-    println!("Client data json: {:?}", decoded_client_data_json);
+    println!("Client data json: {decoded_client_data_json:?}");
 
     let attestation_obj = parse_attestation_object(&reg_data.response.attestation_object)?;
 
@@ -355,10 +354,10 @@ fn extract_credential_public_key(reg_data: &RegisterCredential) -> Result<String
 
 fn parse_attestation_object(attestation_base64: &str) -> Result<AttestationObject, PasskeyError> {
     let attestation_bytes = base64url_decode(attestation_base64)
-        .map_err(|e| PasskeyError::Format(format!("Failed to decode attestation object: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Failed to decode attestation object: {e}")))?;
 
     let attestation_cbor: CborValue = ciborium::de::from_reader(&attestation_bytes[..])
-        .map_err(|e| PasskeyError::Format(format!("Invalid CBOR data: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Invalid CBOR data: {e}")))?;
 
     if let CborValue::Map(map) = attestation_cbor {
         let mut fmt = None;
@@ -478,7 +477,7 @@ fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], PasskeyError> {
 fn extract_key_coordinates(credential_data: &[u8]) -> Result<(Vec<u8>, Vec<u8>), PasskeyError> {
     let public_key_cbor: CborValue = ciborium::de::from_reader(credential_data).map_err(|e| {
         tracing::error!("Invalid public key CBOR: {}", e);
-        PasskeyError::Format(format!("Invalid public key CBOR: {}", e))
+        PasskeyError::Format(format!("Invalid public key CBOR: {e}"))
     })?;
 
     if let CborValue::Map(map) = public_key_cbor {
@@ -535,18 +534,18 @@ async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), Passkey
     let decoded_client_data =
         base64url_decode(&reg_data.response.client_data_json).map_err(|e| {
             tracing::error!("Failed to decode client data: {}", e);
-            PasskeyError::Format(format!("Failed to decode client data: {}", e))
+            PasskeyError::Format(format!("Failed to decode client data: {e}"))
         })?;
 
     let client_data_str = String::from_utf8(decoded_client_data).map_err(|e| {
         tracing::error!("Client data is not valid UTF-8: {}", e);
-        PasskeyError::Format(format!("Client data is not valid UTF-8: {}", e))
+        PasskeyError::Format(format!("Client data is not valid UTF-8: {e}"))
     })?;
 
     // Step 6: Parse JSON
     let client_data: WebAuthnClientData = serde_json::from_str(&client_data_str).map_err(|e| {
         tracing::error!("Failed to parse client data JSON: {}", e);
-        PasskeyError::Format(format!("Failed to parse client data JSON: {}", e))
+        PasskeyError::Format(format!("Failed to parse client data JSON: {e}"))
     })?;
 
     tracing::debug!("Client data: {:#?}", client_data);
@@ -672,7 +671,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert!(msg.contains("Failed to decode attestation object"));
             }
-            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+            e => panic!("Expected PasskeyError::Format, got {e:?}"),
         }
     }
 
@@ -693,11 +692,10 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert!(
                     msg.contains("Invalid CBOR data"),
-                    "Error message was: {}",
-                    msg
+                    "Error message was: {msg}"
                 );
             }
-            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+            e => panic!("Expected PasskeyError::Format, got {e:?}"),
         }
     }
 
@@ -733,10 +731,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert_eq!(msg, "Missing required attestation data");
             }
-            e => panic!(
-                "Expected PasskeyError::Format with specific message, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::Format with specific message, got {e:?}"),
         }
     }
 
@@ -772,10 +767,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert_eq!(msg, "Missing required attestation data");
             }
-            e => panic!(
-                "Expected PasskeyError::Format with specific message, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::Format with specific message, got {e:?}"),
         }
     }
 
@@ -811,10 +803,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert_eq!(msg, "Missing required attestation data");
             }
-            e => panic!(
-                "Expected PasskeyError::Format with specific message, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::Format with specific message, got {e:?}"),
         }
     }
 
@@ -844,7 +833,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert_eq!(msg, "Invalid attestation format");
             }
-            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+            e => panic!("Expected PasskeyError::Format, got {e:?}"),
         }
     }
 
@@ -923,7 +912,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert_eq!(msg, "Missing or invalid key coordinates");
             }
-            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+            e => panic!("Expected PasskeyError::Format, got {e:?}"),
         }
     }
 
@@ -964,7 +953,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert_eq!(msg, "Missing or invalid key coordinates");
             }
-            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+            e => panic!("Expected PasskeyError::Format, got {e:?}"),
         }
     }
 
@@ -1055,7 +1044,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert_eq!(msg, "Authenticator data too short");
             }
-            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+            e => panic!("Expected PasskeyError::Format, got {e:?}"),
         }
     }
 
@@ -1099,7 +1088,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert_eq!(msg, "Invalid credential ID length");
             }
-            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+            e => panic!("Expected PasskeyError::Format, got {e:?}"),
         }
     }
 
@@ -1148,7 +1137,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert_eq!(msg, "Authenticator data too short for credential ID");
             }
-            e => panic!("Expected PasskeyError::Format, got {:?}", e),
+            e => panic!("Expected PasskeyError::Format, got {e:?}"),
         }
     }
 
@@ -1190,8 +1179,7 @@ mod tests {
                 assert_eq!(msg, "Invalid credential ID length");
             }
             e => panic!(
-                "Expected PasskeyError::Format with 'Invalid credential ID length', got {:?}",
-                e
+                "Expected PasskeyError::Format with 'Invalid credential ID length', got {e:?}"
             ),
         }
     }
@@ -1213,14 +1201,10 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert!(
                     msg.contains("Invalid public key format"),
-                    "Error message was: {}",
-                    msg
+                    "Error message was: {msg}"
                 );
             }
-            e => panic!(
-                "Expected PasskeyError::Format with public key format error, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::Format with public key format error, got {e:?}"),
         }
     }
 
@@ -1573,7 +1557,7 @@ mod tests {
             PasskeyError::ClientData(msg) => {
                 assert_eq!(msg, "User handle is missing");
             }
-            e => panic!("Expected PasskeyError::ClientData, got {:?}", e),
+            e => panic!("Expected PasskeyError::ClientData, got {e:?}"),
         }
     }
 
@@ -1623,7 +1607,7 @@ mod tests {
             PasskeyError::NotFound(msg) => {
                 assert_eq!(msg, "Session not found");
             }
-            e => panic!("Expected PasskeyError::NotFound, got {:?}", e),
+            e => panic!("Expected PasskeyError::NotFound, got {e:?}"),
         }
     }
 
@@ -1698,10 +1682,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert_eq!(msg, "User ID mismatch");
             }
-            e => panic!(
-                "Expected PasskeyError::Format for user ID mismatch, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::Format for user ID mismatch, got {e:?}"),
         }
 
         // Verify session info was still removed from cache (cleanup on security failure)
@@ -1829,10 +1810,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert!(msg.contains("Failed to decode client data"));
             }
-            e => panic!(
-                "Expected PasskeyError::Format for invalid base64, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::Format for invalid base64, got {e:?}"),
         }
     }
 
@@ -1865,10 +1843,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert!(msg.contains("Client data is not valid UTF-8"));
             }
-            e => panic!(
-                "Expected PasskeyError::Format for invalid UTF-8, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::Format for invalid UTF-8, got {e:?}"),
         }
     }
 
@@ -1902,10 +1877,7 @@ mod tests {
             PasskeyError::Format(msg) => {
                 assert!(msg.contains("Failed to parse client data JSON"));
             }
-            e => panic!(
-                "Expected PasskeyError::Format for invalid JSON, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::Format for invalid JSON, got {e:?}"),
         }
     }
 
@@ -1943,10 +1915,7 @@ mod tests {
             PasskeyError::ClientData(msg) => {
                 assert_eq!(msg, "Invalid type");
             }
-            e => panic!(
-                "Expected PasskeyError::ClientData for wrong type, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::ClientData for wrong type, got {e:?}"),
         }
     }
 
@@ -1983,10 +1952,7 @@ mod tests {
             PasskeyError::ClientData(msg) => {
                 assert!(msg.contains("User handle is missing"));
             }
-            e => panic!(
-                "Expected PasskeyError::ClientData for missing user handle, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::ClientData for missing user handle, got {e:?}"),
         }
     }
 
@@ -2030,10 +1996,7 @@ mod tests {
             PasskeyError::NotFound(_) => {
                 // Expected - challenge not found in cache
             }
-            e => panic!(
-                "Expected PasskeyError::NotFound for missing challenge, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::NotFound for missing challenge, got {e:?}"),
         }
     }
 
@@ -2095,10 +2058,7 @@ mod tests {
             PasskeyError::Challenge(msg) => {
                 assert!(msg.contains("Challenge verification failed"));
             }
-            e => panic!(
-                "Expected PasskeyError::Challenge for challenge mismatch, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::Challenge for challenge mismatch, got {e:?}"),
         }
 
         // Cleanup
@@ -2163,10 +2123,7 @@ mod tests {
                 assert!(msg.contains("Invalid origin"));
                 assert!(msg.contains("https://evil-site.com"));
             }
-            e => panic!(
-                "Expected PasskeyError::ClientData for origin mismatch, got {:?}",
-                e
-            ),
+            e => panic!("Expected PasskeyError::ClientData for origin mismatch, got {e:?}"),
         }
 
         // Cleanup
@@ -2241,7 +2198,7 @@ mod tests {
 
         let cose_key_cbor = CborValue::Map(cbor_map);
         ciborium::ser::into_writer(&cose_key_cbor, &mut cose_key)
-            .map_err(|e| format!("Failed to serialize COSE key: {}", e))?;
+            .map_err(|e| format!("Failed to serialize COSE key: {e}"))?;
 
         // Create credential ID (16 bytes)
         let credential_id = vec![
@@ -2332,7 +2289,7 @@ mod tests {
         // Debug: Print the error if it failed
         match &result {
             Ok(key) => println!("Success: got public key of length {}", key.len()),
-            Err(e) => println!("Error: {}", e),
+            Err(e) => println!("Error: {e}"),
         }
 
         // Should succeed and return a public key string

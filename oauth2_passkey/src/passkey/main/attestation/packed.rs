@@ -42,8 +42,7 @@ pub(super) fn verify_packed_attestation(
     // 3) Make sure it's an ECDSA P-256 / SHA256 attestation
     if alg != ES256_ALG {
         return Err(PasskeyError::Verification(format!(
-            "Unsupported or unrecognized algorithm: {}",
-            alg
+            "Unsupported or unrecognized algorithm: {alg}"
         )));
     }
 
@@ -81,14 +80,13 @@ pub(super) fn verify_packed_attestation(
             let attestn_cert =
                 EndEntityCert::try_from(attestn_cert_bytes.as_ref()).map_err(|e| {
                     PasskeyError::Verification(format!(
-                        "Failed to parse attestation certificate: {:?}",
-                        e
+                        "Failed to parse attestation certificate: {e:?}"
                     ))
                 })?;
 
             // Parse with x509-parser for additional verifications
             let (_, x509_cert) = X509Certificate::from_der(attestn_cert_bytes).map_err(|e| {
-                PasskeyError::Verification(format!("Failed to parse X509 certificate: {}", e))
+                PasskeyError::Verification(format!("Failed to parse X509 certificate: {e}"))
             })?;
 
             // Verify certificate attributes according to FIDO standard
@@ -158,13 +156,13 @@ fn verify_packed_attestation_cert(
         // println!("auth_data_aaguid: {:?}, cert_aaguid: {:?}", auth_data_aaguid, &cert_aaguid[2..]);
 
         let auth_data_uuid = Uuid::from_slice(auth_data_aaguid)
-            .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {}", e)))?
+            .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {e}")))?
             .hyphenated()
             .to_string();
         tracing::debug!("Authenticator AAGUID: {:?}", auth_data_uuid);
 
         let cert_uuid = Uuid::from_slice(&cert_aaguid[2..18])
-            .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {}", e)))?
+            .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {e}")))?
             .hyphenated()
             .to_string();
         tracing::debug!("Certificate AAGUID: {:?}", cert_uuid);
@@ -186,16 +184,16 @@ fn verify_certificate_chain(x5c: &[Vec<u8>]) -> Result<(), PasskeyError> {
 
     for cert_bytes in x5c {
         let (_, cert) = X509Certificate::from_der(cert_bytes).map_err(|e| {
-            PasskeyError::Verification(format!("Failed to parse certificate in chain: {}", e))
+            PasskeyError::Verification(format!("Failed to parse certificate in chain: {e}"))
         })?;
 
         // Convert SystemTime to ASN1Time
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
-            .map_err(|e| PasskeyError::Verification(format!("System time error: {}", e)))?;
+            .map_err(|e| PasskeyError::Verification(format!("System time error: {e}")))?;
 
         let timestamp = ASN1Time::from_timestamp(now.as_secs() as i64)
-            .map_err(|e| PasskeyError::Verification(format!("Failed to convert time: {}", e)))?;
+            .map_err(|e| PasskeyError::Verification(format!("Failed to convert time: {e}")))?;
 
         if !cert.validity().is_valid_at(timestamp) {
             return Err(PasskeyError::Verification(
@@ -264,10 +262,7 @@ fn verify_self_attestation(
     }
 
     let public_key_cbor: CborValue = ciborium::de::from_reader(&auth_data[pos..]).map_err(|e| {
-        PasskeyError::Verification(format!(
-            "Invalid public key CBOR in self attestation: {}",
-            e
-        ))
+        PasskeyError::Verification(format!("Invalid public key CBOR in self attestation: {e}"))
     })?;
 
     let (x_coord, y_coord) = extract_public_key_coords(&public_key_cbor)?;

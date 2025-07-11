@@ -270,13 +270,13 @@ async fn verify_signature(
     let verification_algorithm = &ring::signature::ECDSA_P256_SHA256_ASN1;
 
     let public_key = base64url_decode(&stored_credential.public_key)
-        .map_err(|e| PasskeyError::Format(format!("Invalid public key: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Invalid public key: {e}")))?;
 
     let unparsed_public_key = UnparsedPublicKey::new(verification_algorithm, &public_key);
 
     // Signature
     let signature = base64url_decode(&auth_response.response.signature)
-        .map_err(|e| PasskeyError::Format(format!("Invalid signature: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Invalid signature: {e}")))?;
 
     tracing::debug!("Decoded signature length: {}", signature.len());
 
@@ -463,14 +463,10 @@ mod tests {
         if let Err(PasskeyError::Authentication(msg)) = &result1 {
             assert!(
                 msg.contains("User handle mismatch"),
-                "Expected 'User handle mismatch' error but got: {}",
-                msg
+                "Expected 'User handle mismatch' error but got: {msg}"
             );
         } else {
-            panic!(
-                "Expected PasskeyError::Authentication but got: {:?}",
-                result1
-            );
+            panic!("Expected PasskeyError::Authentication but got: {result1:?}");
         }
 
         assert!(
@@ -480,14 +476,10 @@ mod tests {
         if let Err(PasskeyError::Authentication(msg)) = &result2 {
             assert!(
                 msg.contains("User handle mismatch"),
-                "Expected 'User handle mismatch' error but got: {}",
-                msg
+                "Expected 'User handle mismatch' error but got: {msg}"
             );
         } else {
-            panic!(
-                "Expected PasskeyError::Authentication but got: {:?}",
-                result2
-            );
+            panic!("Expected PasskeyError::Authentication but got: {result2:?}");
         }
     }
 
@@ -514,14 +506,10 @@ mod tests {
         if let Err(PasskeyError::Authentication(msg)) = &result_discoverable {
             assert!(
                 msg.contains("Missing required user handle"),
-                "Expected 'Missing required user handle' error but got: {}",
-                msg
+                "Expected 'Missing required user handle' error but got: {msg}"
             );
         } else {
-            panic!(
-                "Expected PasskeyError::Authentication but got: {:?}",
-                result_discoverable
-            );
+            panic!("Expected PasskeyError::Authentication but got: {result_discoverable:?}");
         }
 
         // Test non-discoverable case (should succeed)
@@ -801,10 +789,7 @@ mod tests {
                 if let PasskeyError::Format(ref msg) = error {
                     assert!(msg.contains("Invalid signature"));
                 } else {
-                    panic!(
-                        "Expected Format error for invalid signature format, got: {:?}",
-                        error
-                    );
+                    panic!("Expected Format error for invalid signature format, got: {error:?}");
                 }
             }
             Ok(_) => panic!("Expected error but got success"),
@@ -869,10 +854,7 @@ mod tests {
                 if let PasskeyError::Verification(ref msg) = error {
                     assert!(msg.contains("Signature verification failed"));
                 } else {
-                    panic!(
-                        "Expected Verification error for empty signature, got: {:?}",
-                        error
-                    );
+                    panic!("Expected Verification error for empty signature, got: {error:?}");
                 }
             }
             Ok(_) => panic!("Expected error but got success"),
@@ -905,10 +887,7 @@ mod tests {
                 if let PasskeyError::Verification(ref msg) = error {
                     assert!(msg.contains("Signature verification failed"));
                 } else {
-                    panic!(
-                        "Expected Verification error for empty public key, got: {:?}",
-                        error
-                    );
+                    panic!("Expected Verification error for empty public key, got: {error:?}");
                 }
             }
             Ok(_) => panic!("Expected error but got success"),
@@ -977,12 +956,11 @@ mod tests {
         );
         let result = passkey_test_utils::insert_test_user_and_credential(credential_data).await;
         if let Err(e) = &result {
-            println!("Error inserting test credential: {:?}", e);
+            println!("Error inserting test credential: {e:?}");
         }
         assert!(
             result.is_ok(),
-            "Failed to insert test credential: {:?}",
-            result
+            "Failed to insert test credential: {result:?}"
         );
 
         // Verify that the credential was inserted correctly

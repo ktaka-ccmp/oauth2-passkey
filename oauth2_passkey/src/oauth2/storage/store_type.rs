@@ -22,8 +22,7 @@ impl OAuth2Store {
                 Ok(_) => continue,                                    // ID exists, try again
                 Err(e) => {
                     return Err(OAuth2Error::Database(format!(
-                        "Failed to check account ID: {}",
-                        e
+                        "Failed to check account ID: {e}"
                     )));
                 }
             }
@@ -181,8 +180,8 @@ mod tests {
             user_id: user_id.to_string(),
             provider: provider.to_string(),
             provider_user_id: provider_user_id.to_string(),
-            name: format!("Test User {}", provider_user_id),
-            email: format!("{}@example.com", provider_user_id),
+            name: format!("Test User {provider_user_id}"),
+            email: format!("{provider_user_id}@example.com"),
             picture: Some("https://example.com/avatar.png".to_string()),
             metadata: serde_json::json!({
                 "test": true,
@@ -213,8 +212,8 @@ mod tests {
         let user = User {
             sequence_number: None,
             id: user_id.to_string(),
-            account: format!("{}@example.com", user_id),
-            label: format!("Test User {}", user_id),
+            account: format!("{user_id}@example.com"),
+            label: format!("Test User {user_id}"),
             is_admin: false,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
@@ -236,7 +235,7 @@ mod tests {
         static COUNTER: AtomicU64 = AtomicU64::new(1);
         let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
         let thread_id = std::thread::current().id();
-        format!("{}_{:?}_{}", base, thread_id, counter)
+        format!("{base}_{thread_id:?}_{counter}")
     }
 
     /// Test unique account ID generation functionality
@@ -295,8 +294,8 @@ mod tests {
         let user = User {
             sequence_number: None,
             id: user_id.clone(),
-            account: format!("{}@example.com", user_id),
-            label: format!("Test User {}", user_id),
+            account: format!("{user_id}@example.com"),
+            label: format!("Test User {user_id}"),
             is_admin: false,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),

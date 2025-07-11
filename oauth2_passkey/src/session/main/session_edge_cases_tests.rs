@@ -54,10 +54,7 @@ mod edge_cases {
         assert!(result.is_err());
         match result {
             Err(SessionError::SessionExpiredError) => {} // Expected error
-            other => panic!(
-                "Expected SessionError::SessionExpiredError, got: {:?}",
-                other
-            ),
+            other => panic!("Expected SessionError::SessionExpiredError, got: {other:?}"),
         }
 
         // Verify the expired session was removed
@@ -99,7 +96,7 @@ mod edge_cases {
         assert!(result.is_err());
         match result {
             Err(SessionError::Storage(_)) => {} // Expected error
-            other => panic!("Expected SessionError::Storage, got: {:?}", other),
+            other => panic!("Expected SessionError::Storage, got: {other:?}"),
         }
 
         // Clean up
@@ -136,7 +133,7 @@ mod edge_cases {
         assert!(result.is_err());
         match result {
             Err(SessionError::Storage(_)) => {} // Expected error for missing fields
-            other => panic!("Expected SessionError::Storage, got: {:?}", other),
+            other => panic!("Expected SessionError::Storage, got: {other:?}"),
         }
 
         // Clean up
@@ -184,7 +181,7 @@ mod edge_cases {
         assert!(result.is_err());
         match result {
             Err(SessionError::CsrfToken(_)) => {} // Expected error - session exists but CSRF fails
-            other => panic!("Expected SessionError::CsrfToken, got: {:?}", other),
+            other => panic!("Expected SessionError::CsrfToken, got: {other:?}"),
         }
 
         // Clean up
@@ -249,7 +246,7 @@ mod edge_cases {
         assert!(result.is_err());
         match result {
             Err(SessionError::CsrfToken(_)) => {} // Expected error
-            other => panic!("Expected SessionError::CsrfToken, got: {:?}", other),
+            other => panic!("Expected SessionError::CsrfToken, got: {other:?}"),
         }
 
         // Clean up

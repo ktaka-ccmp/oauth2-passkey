@@ -120,7 +120,7 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
             tracing::error!("Failed to fetch user: {:?}", e);
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch user: {:?}", e),
+                format!("Failed to fetch user: {e:?}"),
             ));
         }
     };
@@ -138,7 +138,7 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
     let stored_credentials = list_credentials_core(&user_id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch credentials: {:?}", e),
+            format!("Failed to fetch credentials: {e:?}"),
         )
     })?;
 
@@ -152,7 +152,7 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
             .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to fetch authenticator info: {:?}", e),
+                    format!("Failed to fetch authenticator info: {e:?}"),
                 )
             })?;
 
@@ -185,7 +185,7 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
     let oauth2_accounts = list_accounts_core(&user_id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch accounts: {:?}", e),
+            format!("Failed to fetch accounts: {e:?}"),
         )
     })?;
 
@@ -223,7 +223,7 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
     let html = template.render().map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Template rendering error: {:?}", e),
+            format!("Template rendering error: {e:?}"),
         )
     })?;
 

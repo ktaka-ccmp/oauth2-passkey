@@ -125,7 +125,7 @@ impl TryFrom<CacheData> for JwksCache {
 
     fn try_from(cache_data: CacheData) -> Result<Self, Self::Error> {
         serde_json::from_str(&cache_data.value)
-            .map_err(|e| TokenVerificationError::JwksParsing(format!("{}", e)))
+            .map_err(|e| TokenVerificationError::JwksParsing(format!("{e}")))
     }
 }
 
@@ -181,7 +181,7 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
             CACHE_EXPIRATION.as_secs() as usize,
         )
         .await
-        .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {}", e)))?;
+        .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?;
 
     Ok(jwks)
 }
@@ -538,7 +538,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(TokenVerificationError::MissingKeyComponent(ref s)) => assert_eq!(s, "e"),
-            Err(ref e) => panic!("Expected MissingKeyComponent error for 'e', got: {:?}", e),
+            Err(ref e) => panic!("Expected MissingKeyComponent error for 'e', got: {e:?}"),
             _ => panic!("Expected error"),
         }
     }
@@ -733,7 +733,7 @@ mod tests {
     fn test_decode_token_invalid_json_payload() {
         // Valid base64 but invalid JSON
         let invalid_json_b64 = "aW52YWxpZGpzb24"; // "invalidjson" in base64
-        let token = format!("header.{}.signature", invalid_json_b64);
+        let token = format!("header.{invalid_json_b64}.signature");
         let result = decode_token(&token);
         assert!(result.is_err());
         assert!(matches!(
@@ -766,7 +766,7 @@ mod tests {
 
         // Encode to base64 URL-safe
         let payload_b64 = URL_SAFE_NO_PAD.encode(id_info_json.as_bytes());
-        let token = format!("header.{}.signature", payload_b64);
+        let token = format!("header.{payload_b64}.signature");
 
         let result = decode_token(&token);
         assert!(result.is_ok());

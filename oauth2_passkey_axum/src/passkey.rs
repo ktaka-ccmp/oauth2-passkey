@@ -179,7 +179,7 @@ async fn serve_related_origin() -> Response {
             .unwrap_or_default(),
         Err(e) => Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(format!("Failed to generate WebAuthn config: {}", e).into())
+            .body(format!("Failed to generate WebAuthn config: {e}").into())
             .unwrap_or_default(),
     }
 }
@@ -274,8 +274,7 @@ mod tests {
             }
             Err((status, message)) => {
                 panic!(
-                    "Expected successful result with credentials, got error: {} - {}",
-                    status, message
+                    "Expected successful result with credentials, got error: {status} - {message}"
                 );
             }
         }
@@ -328,8 +327,7 @@ mod tests {
         // Now we expect this to succeed with our mock
         assert!(
             result.is_ok(),
-            "Expected successful result, got: {:?}",
-            result
+            "Expected successful result, got: {result:?}"
         );
 
         // Check that the response contains the expected data

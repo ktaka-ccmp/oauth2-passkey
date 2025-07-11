@@ -107,9 +107,9 @@ mod tests {
     fn create_test_user(suffix: &str) -> User {
         let timestamp = Utc::now().timestamp_millis();
         User::new(
-            format!("test-user-{}-{}", suffix, timestamp),
-            format!("user-{}-{}@example.com", suffix, timestamp),
-            format!("Test User {}", suffix),
+            format!("test-user-{suffix}-{timestamp}"),
+            format!("user-{suffix}-{timestamp}@example.com"),
+            format!("Test User {suffix}"),
         )
     }
 
@@ -439,13 +439,13 @@ mod tests {
         // Test concurrent user creation
         let timestamp = Utc::now().timestamp_millis();
         let user1 = User::new(
-            format!("concurrent-1-{}", timestamp),
-            format!("user1-{}@example.com", timestamp),
+            format!("concurrent-1-{timestamp}"),
+            format!("user1-{timestamp}@example.com"),
             "Concurrent User 1".to_string(),
         );
         let user2 = User::new(
-            format!("concurrent-2-{}", timestamp),
-            format!("user2-{}@example.com", timestamp),
+            format!("concurrent-2-{timestamp}"),
+            format!("user2-{timestamp}@example.com"),
             "Concurrent User 2".to_string(),
         );
 

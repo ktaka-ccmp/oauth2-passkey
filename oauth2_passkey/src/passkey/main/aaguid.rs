@@ -188,7 +188,7 @@ mod tests {
 
         // Store the data
         let result = store_aaguid_in_cache(json.to_string()).await;
-        assert!(result.is_ok(), "Failed to store valid JSON: {:?}", result);
+        assert!(result.is_ok(), "Failed to store valid JSON: {result:?}");
 
         // Verify both AAGUIDs were stored in the cache
         let cache = GENERIC_CACHE_STORE.lock().await;
@@ -255,8 +255,7 @@ mod tests {
         if let Err(PasskeyError::Storage(msg)) = result {
             assert!(
                 msg.contains("expected") || msg.contains("trailing comma"),
-                "Error message should indicate JSON parsing issue: {}",
-                msg
+                "Error message should indicate JSON parsing issue: {msg}"
             );
         } else {
             panic!("Expected PasskeyError::Storage");
@@ -554,8 +553,7 @@ mod tests {
         if let Err(PasskeyError::Storage(msg)) = result {
             assert!(
                 msg.contains("expected") || msg.contains("EOF") || msg.contains("invalid"),
-                "Error should indicate JSON parsing issue: {}",
-                msg
+                "Error should indicate JSON parsing issue: {msg}"
             );
         } else {
             panic!("Expected PasskeyError::Storage for corrupted data");

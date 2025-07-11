@@ -428,8 +428,7 @@ mod tests {
         let result = delete_passkey_credential_core(user_id, credential_id).await;
         assert!(
             result.is_ok(),
-            "Failed to delete passkey credential: {:?}",
-            result
+            "Failed to delete passkey credential: {result:?}"
         );
 
         // Verify the credential was deleted
@@ -473,8 +472,7 @@ mod tests {
         let result = delete_passkey_credential_core(other_user_id, credential_id).await;
         assert!(
             matches!(result, Err(CoordinationError::Unauthorized)),
-            "Expected Unauthorized error, got: {:?}",
-            result
+            "Expected Unauthorized error, got: {result:?}"
         );
 
         Ok(())
@@ -507,8 +505,7 @@ mod tests {
         let result = delete_passkey_credential_core(user_id, credential_id).await;
         assert!(
             matches!(result, Err(CoordinationError::ResourceNotFound { .. })),
-            "Expected ResourceNotFound error, got: {:?}",
-            result
+            "Expected ResourceNotFound error, got: {result:?}"
         );
 
         Ok(())
@@ -598,8 +595,7 @@ mod tests {
 
         assert!(
             result.is_ok(),
-            "Failed to update passkey credential: {:?}",
-            result
+            "Failed to update passkey credential: {result:?}"
         );
 
         // Verify the credential was updated
@@ -664,8 +660,7 @@ mod tests {
 
         assert!(
             matches!(result, Err(CoordinationError::Unauthorized)),
-            "Expected Unauthorized error, got: {:?}",
-            result
+            "Expected Unauthorized error, got: {result:?}"
         );
 
         Ok(())
@@ -705,8 +700,7 @@ mod tests {
 
         assert!(
             matches!(result, Err(CoordinationError::Unauthorized)),
-            "Expected Unauthorized error, got: {:?}",
-            result
+            "Expected Unauthorized error, got: {result:?}"
         );
 
         Ok(())

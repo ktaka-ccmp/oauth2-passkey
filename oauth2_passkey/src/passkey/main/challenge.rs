@@ -409,7 +409,7 @@ mod tests {
             crate::passkey::errors::PasskeyError::NotFound(_) => {
                 // Expected error, success
             }
-            e => panic!("Expected NotFound error, got: {:?}", e),
+            e => panic!("Expected NotFound error, got: {e:?}"),
         }
     }
 

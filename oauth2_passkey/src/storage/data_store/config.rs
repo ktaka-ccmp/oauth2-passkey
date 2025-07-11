@@ -37,10 +37,7 @@ pub(crate) static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = Lazy
         "postgres" => Box::new(PostgresDataStore {
             pool: sqlx::PgPool::connect_lazy(store_url).expect("Failed to create Postgres pool"),
         }) as Box<dyn DataStore>,
-        t => panic!(
-            "Unsupported store type: {}. Supported types are 'sqlite' and 'postgres'",
-            t
-        ),
+        t => panic!("Unsupported store type: {t}. Supported types are 'sqlite' and 'postgres'"),
     };
 
     tracing::info!(

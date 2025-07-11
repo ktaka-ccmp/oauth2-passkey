@@ -22,9 +22,9 @@ pub(super) fn encode_state(state_params: StateParams) -> Result<String, OAuth2Er
 pub(crate) fn decode_state(state: &str) -> Result<StateParams, OAuth2Error> {
     let decoded_bytes = URL_SAFE_NO_PAD
         .decode(state)
-        .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode base64: {}", e)))?;
+        .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode base64: {e}")))?;
     let decoded_state_string = String::from_utf8(decoded_bytes)
-        .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode UTF-8: {}", e)))?;
+        .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode UTF-8: {e}")))?;
     let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)
         .map_err(|e| OAuth2Error::Serde(e.to_string()))?;
     Ok(state_in_response)
@@ -107,7 +107,7 @@ where
         .await
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?
         .ok_or_else(|| {
-            OAuth2Error::SecurityTokenNotFound(format!("{}-session not found", token_type))
+            OAuth2Error::SecurityTokenNotFound(format!("{token_type}-session not found"))
         })?
         .try_into()
 }
@@ -133,8 +133,8 @@ pub(crate) async fn validate_origin(
     let host = parsed_url.host_str().unwrap_or_default();
     let port = parsed_url
         .port()
-        .map_or("".to_string(), |p| format!(":{}", p));
-    let expected_origin = format!("{}://{}{}", scheme, host, port);
+        .map_or("".to_string(), |p| format!(":{p}"));
+    let expected_origin = format!("{scheme}://{host}{port}");
 
     let origin = headers
         .get("Origin")
@@ -147,8 +147,7 @@ pub(crate) async fn validate_origin(
             tracing::error!("Expected Origin: {:#?}", expected_origin);
             tracing::error!("Actual Origin: {:#?}", origin);
             Err(OAuth2Error::InvalidOrigin(format!(
-                "Expected Origin: {:#?}, Actual Origin: {:#?}",
-                expected_origin, origin
+                "Expected Origin: {expected_origin:#?}, Actual Origin: {origin:#?}"
             )))
         }
     }
@@ -1001,11 +1000,11 @@ mod tests {
         // Perform concurrent token storage operations
         let handles = (0..10)
             .map(|i| {
-                let user_agent = Some(format!("agent-{}", i));
+                let user_agent = Some(format!("agent-{i}"));
                 tokio::spawn(async move {
                     store_token_in_cache(
                         token_type,
-                        &format!("token-{}", i),
+                        &format!("token-{i}"),
                         ttl,
                         expires_at,
                         user_agent,
@@ -1034,8 +1033,8 @@ mod tests {
             assert!(stored_token.is_ok());
 
             let token_data = stored_token.unwrap();
-            assert_eq!(token_data.token, format!("token-{}", i));
-            assert_eq!(token_data.user_agent, Some(format!("agent-{}", i)));
+            assert_eq!(token_data.token, format!("token-{i}"));
+            assert_eq!(token_data.user_agent, Some(format!("agent-{i}")));
         }
 
         // Verify all token IDs are unique
@@ -1086,8 +1085,7 @@ mod tests {
             let retrieved = get_token_from_store::<StoredToken>(prefix, token_id).await;
             assert!(
                 retrieved.is_ok(),
-                "Should retrieve token for prefix: {}",
-                prefix
+                "Should retrieve token for prefix: {prefix}"
             );
 
             let token_data = retrieved.unwrap();
@@ -1104,9 +1102,7 @@ mod tests {
                         get_token_from_store::<StoredToken>(prefix2, token_id1).await;
                     assert!(
                         wrong_retrieval.is_err(),
-                        "Should not retrieve token for {} with {}'s token_id",
-                        prefix2,
-                        prefix1
+                        "Should not retrieve token for {prefix2} with {prefix1}'s token_id"
                     );
                 }
             }
@@ -1378,7 +1374,7 @@ mod tests {
         // Generate multiple tokens and verify consistency
         for i in 0..10 {
             let (token, token_id) = generate_store_token(
-                &format!("{}-{}", token_type, i),
+                &format!("{token_type}-{i}"),
                 ttl,
                 expires_at,
                 user_agent.clone(),
@@ -1397,7 +1393,7 @@ mod tests {
 
             // Verify storage and retrieval
             let retrieved =
-                get_token_from_store::<StoredToken>(&format!("{}-{}", token_type, i), &token_id)
+                get_token_from_store::<StoredToken>(&format!("{token_type}-{i}"), &token_id)
                     .await
                     .unwrap();
 

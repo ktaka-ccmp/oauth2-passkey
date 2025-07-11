@@ -25,7 +25,7 @@ pub(super) async fn fetch_user_data_from_google(
 
     tracing::debug!("Response Body: {:#?}", response_body);
     let user_data: GoogleUserInfo = serde_json::from_str(&response_body)
-        .map_err(|e| OAuth2Error::Serde(format!("Failed to deserialize response body: {}", e)))?;
+        .map_err(|e| OAuth2Error::Serde(format!("Failed to deserialize response body: {e}")))?;
 
     tracing::debug!("User data: {:#?}", user_data);
     Ok(user_data)

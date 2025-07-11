@@ -23,10 +23,7 @@ pub(crate) static OAUTH2_RESPONSE_MODE: LazyLock<String> = LazyLock::new(|| {
         "form_post" => "form_post".to_string(),
         "query" => "query".to_string(),
         _ => {
-            panic!(
-                "Invalid OAUTH2_RESPONSE_MODE '{}'. Must be 'form_post' or 'query'.",
-                mode
-            );
+            panic!("Invalid OAUTH2_RESPONSE_MODE '{mode}'. Must be 'form_post' or 'query'.");
         }
     }
 });

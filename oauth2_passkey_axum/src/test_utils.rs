@@ -26,7 +26,7 @@ pub mod env {
         if let Err(e) = dotenvy::from_filename(".env_test") {
             eprintln!("ERROR: .env_test file not found. This file is required for testing.");
             eprintln!("Please create a .env_test file with test-specific environment variables.");
-            eprintln!("Error: {}", e);
+            eprintln!("Error: {e}");
             panic!("Missing .env_test file required for testing");
         }
     });
@@ -49,7 +49,7 @@ pub mod mocks {
         AuthUser {
             id: id.to_string(),
             account: account.to_string(),
-            label: format!("Test User {}", id),
+            label: format!("Test User {id}"),
             is_admin: false,
             sequence_number: 1,
             created_at: now,
@@ -77,7 +77,7 @@ pub mod mocks {
         SessionUser {
             id: id.to_string(),
             account: account.to_string(),
-            label: format!("Test User {}", id),
+            label: format!("Test User {id}"),
             is_admin: false,
             sequence_number: 1,
             created_at: Utc::now(),

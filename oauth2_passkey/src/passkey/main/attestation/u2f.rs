@@ -84,14 +84,13 @@ pub(super) fn verify_u2f_attestation(
     let attestn_cert_bytes = &x5c[0];
     let attestn_cert = EndEntityCert::try_from(attestn_cert_bytes.as_ref()).map_err(|e| {
         PasskeyError::Verification(format!(
-            "Failed to parse U2F attestation certificate: {:?}",
-            e
+            "Failed to parse U2F attestation certificate: {e:?}"
         ))
     })?;
 
     // Parse with x509-parser for additional verifications
     let (_, x509_cert) = X509Certificate::from_der(attestn_cert_bytes).map_err(|e| {
-        PasskeyError::Verification(format!("Failed to parse X509 certificate: {}", e))
+        PasskeyError::Verification(format!("Failed to parse X509 certificate: {e}"))
     })?;
 
     // Verify certificate is not a CA certificate
@@ -148,7 +147,7 @@ pub(super) fn verify_u2f_attestation(
 
     // Add the public key
     let public_key_cbor = ciborium::from_reader(&auth_data[credential_id_end..])
-        .map_err(|e| PasskeyError::Format(format!("Failed to parse public key CBOR: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Failed to parse public key CBOR: {e}")))?;
 
     let (x_coord, y_coord) = extract_public_key_coords(&public_key_cbor)?;
 
@@ -397,10 +396,7 @@ mod tests {
                 assert!(msg.contains("Failed to parse U2F attestation certificate"));
             }
             Err(other_error) => {
-                panic!(
-                    "Expected PasskeyError::Verification but got: {:?}",
-                    other_error
-                );
+                panic!("Expected PasskeyError::Verification but got: {other_error:?}");
             }
             Ok(_) => panic!("Expected an error but got Ok"),
         }
