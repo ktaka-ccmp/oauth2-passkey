@@ -113,7 +113,10 @@ check_branch
 
 git checkout -b "release-$VERSION" || {
     echo "❌ Failed to create and switch to release branch release-$VERSION"
-    exit 1
+    git checkout "release-$VERSION" && git rebase master } || {
+        echo "❌ Failed to rebase release branch on master"
+        exit 1
+    }
 }
 
 prep_version "$VERSION"
