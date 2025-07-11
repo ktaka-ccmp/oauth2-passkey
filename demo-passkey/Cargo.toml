@@ -16,6 +16,6 @@ dotenvy = { workspace = true }
 http = { workspace = true }
 
 #oauth2-passkey-axum = { path = "../oauth2_passkey_axum", default-features = false, features = [] }
-#oauth2_passkey_axum = { workspace = true }
+oauth2-passkey-axum = { workspace = true }
 
-oauth2-passkey-axum = { version = "0.1", default-features = false, features = [] }
+#oauth2-passkey-axum = { version = "0.1", default-features = false, features = [] }
