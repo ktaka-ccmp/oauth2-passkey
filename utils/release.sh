@@ -128,7 +128,6 @@ git add Cargo.toml oauth2_passkey_axum/Cargo.toml || {
 
 git commit -m "Prepare for release $VERSION" || {
     echo "❌ Failed to commit changes"
-    exit 1
 }
 
 if [ "$DRY_RUN" = false ]; then
