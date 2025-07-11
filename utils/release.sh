@@ -199,19 +199,23 @@ git rebase master || {
     exit 1
 }
 
-set_workspace_version "$VERSION"
-
 if [ "$DRY_RUN" = true ]; then
     echo "🧪 Dry run:"
 
-    echo "cargo publish -p oauth2-passkey -n"
-    cargo publish -p oauth2-passkey -n
+    set_workspace_version "$VERSION"
 
-    if cargo search "oauth2-passkey" | grep -q "^oauth2-passkey.*$VERSION"; then
-        echo "cargo publish -p oauth2-passkey-axum -n"
-        cargo publish -p oauth2-passkey-axum -n
-    fi
+    echo "cargo publish -p oauth2-passkey -n"
+    cargo publish -p oauth2-passkey -n --allow-dirty
+
+    set_crate_version "$VERSION"
+    echo "cargo publish -p oauth2-passkey-axum -n"
+    cargo publish -p oauth2-passkey-axum -n --allow-dirty
+
+    set_workspace_version "$release"-dev
+    revert_crate_version
 else
+    set_workspace_version "$VERSION"
+
     git add Cargo.toml && git commit -m "Set workspace version for release $VERSION" || {
         echo "❌ Failed to stage or commit workspace version changes"
         exit 1
