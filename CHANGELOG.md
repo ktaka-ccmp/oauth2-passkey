@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- List latest changes here.
+### Security
+
+- OpenID Connect compliant `at_hash` verification
+- Support for multiple JWT signing algorithms (RS256/384/512, HS256/384/512, ES256/384)
 
 ## [0.1.2] - 2025-07-04
 
