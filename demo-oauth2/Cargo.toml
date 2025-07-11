@@ -4,17 +4,15 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-askama = { version = "0.14.0" }
-axum = { version = "0.8", features = ["macros"] }
-axum-server = { version = "0.7.2", features = ["tls-rustls"] }
+oauth2-passkey-axum = { path = "../oauth2_passkey_axum", default-features = false, features = [] }
+#oauth2-passkey-axum = { version = "0.1", default-features = false, features = [] }
+
+askama = { workspace = true }
+axum = { workspace = true }
+axum-server = { workspace = true }
 dotenvy = { workspace = true }
 http = { workspace = true }
-tokio = { version = "1.46.1", features = ["full"] }
-tracing = { workspace = true }
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 rustls = { workspace = true }
-
-oauth2-passkey-axum = { workspace = true }
-#oauth2-passkey-axum = { path = "../oauth2_passkey_axum", default-features = false, features = [] }
-
-#oauth2-passkey-axum = { version = "0.1", default-features = false, features = [] }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

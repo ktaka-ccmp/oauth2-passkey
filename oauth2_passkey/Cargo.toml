@@ -14,33 +14,31 @@ readme = "README.md"
 
 [dependencies]
 async-trait = { workspace = true }
-chrono.workspace = true
-headers.workspace = true
-http.workspace = true
-serde_json.workspace = true
-serde.workspace = true
-sqlx.workspace = true
-thiserror.workspace = true
-tokio.workspace = true
-tracing.workspace = true
-uuid.workspace = true
-
-dotenvy = "0.15.7"
-hmac = "0.12.1"
-sha2 = "0.10.9"
-base64 = "0.22.1"
-
-ciborium = { version = "0.2.2", features = ["std"] }
-oid-registry = "0.8.1"
-redis = { version = "0.32.3", features = ["tokio-comp"] }
-ring = { version = "0.17.14", features = ["std"] }
-webpki = { version = "0.22.4", features = ["std"] }
-x509-parser = { version = "0.17.0", features = ["validate", "verify"] }
-jsonwebtoken = "9.3.1"
-reqwest = { version = "0.12.22", features = ["json"] }
-url = "2.5.4"
-subtle = "2.6"
+base64 = { workspace = true }
+chrono = { workspace = true }
+ciborium = { workspace = true }
+dotenvy = { workspace = true }
+headers = { workspace = true }
+hmac = { workspace = true }
+http = { workspace = true }
+jsonwebtoken = { workspace = true }
+oid-registry = { workspace = true }
+redis = { workspace = true }
+reqwest = { workspace = true }
+ring = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+sqlx = { workspace = true }
+subtle = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+webpki = { workspace = true }
+x509-parser = { workspace = true }
 
 [dev-dependencies]
-serial_test = "3.2.0"
-proptest = "1.7.0"
+serial_test = { workspace = true }
+proptest = { workspace = true }
