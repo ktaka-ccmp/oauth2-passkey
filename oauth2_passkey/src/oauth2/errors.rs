@@ -55,6 +55,12 @@ pub enum OAuth2Error {
     #[error("Token exchange error: {0}")]
     TokenExchange(String),
 
+    #[error("At_hash mismatch")]
+    AtHashMismatch,
+
+    #[error("Unsupported algorithm: {0}")]
+    UnsupportedAlgorithm(String),
+
     #[error("Database error: {0}")]
     Database(String),
 

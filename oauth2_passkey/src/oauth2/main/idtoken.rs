@@ -265,10 +265,18 @@ fn verify_signature(
     }
 }
 
-pub(super) async fn verify_idtoken(
+pub(super) async fn _verify_idtoken(
     token: String,
     audience: String,
 ) -> Result<IdInfo, TokenVerificationError> {
+    let (idinfo, _algorithm) = verify_idtoken_with_algorithm(token, audience).await?;
+    Ok(idinfo)
+}
+
+pub(super) async fn verify_idtoken_with_algorithm(
+    token: String,
+    audience: String,
+) -> Result<(IdInfo, Algorithm), TokenVerificationError> {
     let header = jsonwebtoken::decode_header(&token)?;
 
     let kid = header
@@ -330,7 +338,7 @@ pub(super) async fn verify_idtoken(
         return Err(TokenVerificationError::TokenExpired);
     }
 
-    Ok(idinfo)
+    Ok((idinfo, alg))
 }
 
 #[cfg(test)]

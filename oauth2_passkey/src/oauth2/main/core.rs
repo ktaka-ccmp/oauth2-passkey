@@ -2,7 +2,8 @@ use headers::Cookie;
 use http::header::{HeaderMap, SET_COOKIE};
 
 use chrono::{Duration, Utc};
-use sha2::{Digest, Sha256};
+use jsonwebtoken::Algorithm;
+use sha2::{Digest, Sha256, Sha384, Sha512};
 
 use crate::oauth2::config::{
     OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_GOOGLE_CLIENT_ID,
@@ -14,7 +15,7 @@ use crate::session::get_session_id_from_headers;
 use crate::utils::base64url_encode;
 
 use super::google::{exchange_code_for_token, fetch_user_data_from_google};
-use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken};
+use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken_with_algorithm};
 use super::utils::{
     decode_state, encode_state, generate_store_token, get_token_from_store,
     remove_token_from_store, store_token_in_cache,
@@ -142,9 +143,12 @@ pub(crate) async fn get_idinfo_userinfo(
     let (access_token, id_token) =
         exchange_code_for_token(auth_response.code.clone(), pkce_verifier).await?;
 
-    let idinfo = verify_idtoken(id_token, OAUTH2_GOOGLE_CLIENT_ID.to_string())
-        .await
-        .map_err(|e| OAuth2Error::IdToken(e.to_string()))?;
+    let (idinfo, algorithm) =
+        verify_idtoken_with_algorithm(id_token, OAUTH2_GOOGLE_CLIENT_ID.to_string())
+            .await
+            .map_err(|e| OAuth2Error::IdToken(e.to_string()))?;
+
+    verify_at_hash(&idinfo, &access_token, algorithm)?;
 
     verify_nonce(auth_response, idinfo.clone()).await?;
 
@@ -247,6 +251,86 @@ pub(crate) async fn csrf_checks(
             csrf_session.user_agent.unwrap_or_default()
         );
         return Err(OAuth2Error::UserAgentMismatch);
+    }
+
+    Ok(())
+}
+
+/// Calculate at_hash according to OpenID Connect specification
+///
+/// The at_hash is calculated by:
+/// 1. Hashing the access token using the same algorithm as the ID token's JOSE header
+/// 2. Taking the left-most half of the hash
+/// 3. Base64url encoding the result
+fn calculate_at_hash(access_token: &str, algorithm: Algorithm) -> Result<String, OAuth2Error> {
+    fn half_hash<D: Digest>(data: &[u8]) -> Vec<u8> {
+        let hash = D::digest(data);
+        hash[..hash.len() / 2].to_vec() // Take left-most half
+    }
+
+    let hash_bytes = match algorithm {
+        Algorithm::RS256 | Algorithm::HS256 | Algorithm::ES256 => {
+            half_hash::<Sha256>(access_token.as_bytes())
+        }
+        Algorithm::RS384 | Algorithm::HS384 | Algorithm::ES384 => {
+            half_hash::<Sha384>(access_token.as_bytes())
+        }
+        Algorithm::RS512 | Algorithm::HS512 => half_hash::<Sha512>(access_token.as_bytes()),
+        _ => {
+            return Err(OAuth2Error::UnsupportedAlgorithm(format!(
+                "Unsupported algorithm for at_hash calculation: {:?}",
+                algorithm
+            )));
+        }
+    };
+
+    Ok(base64url_encode(hash_bytes)?)
+}
+
+/// Verify at_hash according to OpenID Connect specification
+///
+/// This function verifies that the at_hash in the ID token matches the calculated
+/// hash of the access token using the algorithm specified in the ID token's JOSE header.
+///
+/// # Arguments
+///
+/// * `idinfo` - The ID token information containing the at_hash claim
+/// * `access_token` - The access token to verify against
+/// * `algorithm` - The algorithm from the ID token's JOSE header
+///
+/// # Returns
+///
+/// * `Ok(())` - If verification succeeds or at_hash is not present
+/// * `Err(OAuth2Error)` - If verification fails or calculation error occurs
+fn verify_at_hash(
+    idinfo: &GoogleIdInfo,
+    access_token: &str,
+    algorithm: Algorithm,
+) -> Result<(), OAuth2Error> {
+    if idinfo.at_hash.is_none() {
+        tracing::warn!("at_hash is None in ID Token: {:#?}", idinfo);
+        return Ok(());
+    }
+
+    // Calculate at_hash according to OpenID Connect specification:
+    // 1. Hash the access token using the same algorithm as the ID token's JOSE header
+    // 2. Take the left-most half of the hash (first 16 bytes for SHA256)
+    // 3. Base64url encode the result
+    let calculated_at_hash = calculate_at_hash(access_token, algorithm)?;
+
+    tracing::debug!(
+        "ID Token at_hash: {:?}, Access Token Hash: {:?}",
+        idinfo.at_hash,
+        calculated_at_hash
+    );
+
+    if idinfo.at_hash.as_ref().unwrap() != &calculated_at_hash {
+        tracing::error!(
+            "at_hash mismatch: ID Token at_hash: {:?}, Access Token Hash: {:?}",
+            idinfo.at_hash,
+            calculated_at_hash
+        );
+        return Err(OAuth2Error::AtHashMismatch);
     }
 
     Ok(())
