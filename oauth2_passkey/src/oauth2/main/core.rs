@@ -263,18 +263,20 @@ pub(crate) async fn csrf_checks(
 /// 2. Taking the left-most half of the hash
 /// 3. Base64url encoding the result
 fn calculate_at_hash(access_token: &str, algorithm: Algorithm) -> Result<String, OAuth2Error> {
+    fn half_hash<D: Digest>(data: &[u8]) -> Vec<u8> {
+        let hash = D::digest(data);
+        hash[..hash.len() / 2].to_vec() // Take left-most half
+    }
+
     let hash_bytes = match algorithm {
         Algorithm::RS256 | Algorithm::HS256 | Algorithm::ES256 => {
-            let hash = Sha256::digest(access_token.as_bytes());
-            hash[..hash.len() / 2].to_vec() // Take left-most half
+            half_hash::<Sha256>(access_token.as_bytes())
         }
         Algorithm::RS384 | Algorithm::HS384 | Algorithm::ES384 => {
-            let hash = Sha384::digest(access_token.as_bytes());
-            hash[..hash.len() / 2].to_vec() // Take left-most half
+            half_hash::<Sha384>(access_token.as_bytes())
         }
         Algorithm::RS512 | Algorithm::HS512 => {
-            let hash = Sha512::digest(access_token.as_bytes());
-            hash[..hash.len() / 2].to_vec() // Take left-most half
+            half_hash::<Sha512>(access_token.as_bytes())
         }
         _ => {
             return Err(OAuth2Error::UnsupportedAlgorithm(format!(
