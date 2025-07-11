@@ -207,7 +207,7 @@ if [ "$DRY_RUN" = true ]; then
     echo "cargo publish -p oauth2-passkey -n"
     cargo publish -p oauth2-passkey -n --allow-dirty
 
-    set_crate_version "$VERSION"
+    set_crate_version "$latest"
     echo "cargo publish -p oauth2-passkey-axum -n"
     cargo publish -p oauth2-passkey-axum -n --allow-dirty
 
