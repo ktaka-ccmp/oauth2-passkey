@@ -56,19 +56,85 @@ wait_for_crates_io() {
     return 1
 }
 
-prep_version() {
+get_latest_version() {
+    local crate_name=$1
+#   echo "🔍 Fetching latest version of $crate_name from crates.io"
+
+    latest_version=$(cargo search "$crate_name" | grep "^$crate_name " | awk '{print $3}' | tr -d '"')
+
+    if [ -z "$latest_version" ]; then
+        echo "❌ Failed to fetch latest version for $crate_name"
+        exit 1
+    fi
+
+#    echo "✅ Latest version of $crate_name is $latest_version"
+    echo "$latest_version"
+}
+
+increment_version() {
+    local latest_version=$1
+
+    if [[ "$latest_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+        major=${BASH_REMATCH[1]}
+        minor=${BASH_REMATCH[2]}
+        patch=${BASH_REMATCH[3]}
+
+        new_patch=$((patch + 1))
+        new_version="$major.$minor.$new_patch"
+
+        echo "$new_version"
+    else
+        echo "❌ Invalid version format: $latest_version"
+        exit 1
+    fi
+}
+
+set_workspace_version() {
     local version=$1
-    echo "📦 Preparing version $version"
+    echo "📦 Setting workspace version $version"
 
     sed -i "s/^version = \".*\"/version = \"$version\"/" Cargo.toml || {
         echo "❌ Failed to update workspace version in Cargo.toml"
         exit 1
     }
 
-    sed -i "s/oauth2-passkey = { workspace = true }/oauth2-passkey = \"$version\"/" oauth2_passkey_axum/Cargo.toml || {
+    egrep "^version = ${version}" Cargo.toml || {
+        echo "❌ Failed to update workspace version in Cargo.toml"
+        exit 1
+    }
+}
+
+set_crate_version() {
+    local version=$1
+    echo "📦 Setting crate version to $version"
+
+    # Set oauth2-passkey dependency to specific version for publishing
+    sed -i "s/^oauth2-passkey = .*/oauth2-passkey = \"$version\"/" oauth2_passkey_axum/Cargo.toml || {
         echo "❌ Failed to update oauth2-passkey dependency in oauth2_passkey_axum/Cargo.toml"
         exit 1
     }
+
+    # Verify the version was set correctly
+    if ! grep -q "oauth2-passkey = \"$version\"" oauth2_passkey_axum/Cargo.toml; then
+        echo "❌ Failed to update oauth2-passkey dependency in oauth2_passkey_axum/Cargo.toml"
+        exit 1
+    fi
+}
+
+revert_crate_version() {
+    echo "📦 Reverting crate to path dependency for development"
+
+    # Revert oauth2-passkey dependency back to path for development
+    sed -i 's/^oauth2-passkey = .*/oauth2-passkey = { path = "..\/oauth2_passkey" }/' oauth2_passkey_axum/Cargo.toml || {
+        echo "❌ Failed to revert oauth2-passkey dependency in oauth2_passkey_axum/Cargo.toml"
+        exit 1
+    }
+
+    # Verify the path dependency was set correctly
+    if ! grep -q 'oauth2-passkey = { path = "../oauth2_passkey" }' oauth2_passkey_axum/Cargo.toml; then
+        echo "❌ Failed to revert oauth2-passkey dependency in oauth2_passkey_axum/Cargo.toml"
+        exit 1
+    fi
 }
 
 update_tag() {
@@ -94,16 +160,26 @@ update_tag() {
 
 # Check if version is provided
 if [ -z "$1" ]; then
-    echo "Usage: $0 <version> [--dry-run]"
-    echo "Example: $0 0.1.2"
+    echo "Usage: $0 [--exec|-e|--dry-run|-d|-n]"
+    echo "Example: $0 -e
     exit 1
 fi
 
-VERSION=$1
+latest=$(get_latest_version oauth2-passkey-axum)
+release=$(increment_version $latest)
+next=$(increment_version $release)-dev
+
+VERSION=$release
 DRY_RUN=false
-if [[ "$2" == "--dry-run" ]]; then
+if [[ "$1" == "--dry-run" || "$1" == "-d" || "$1" == "-n" ]]; then
     DRY_RUN=true
     echo "🧪 Dry run mode enabled. No changes will be pushed or published."
+else if [[ "$1" == "--exec" || "$1" == "-e" ]]; then
+    DRY_RUN=false
+    echo "🚀 Execution mode enabled. Changes will be pushed and published."
+else
+    echo "❌ Invalid option. Use --dry-run or --exec."
+    exit 1
 fi
 
 echo "📋 Releasing version: $VERSION"
@@ -111,26 +187,36 @@ echo "📋 Releasing version: $VERSION"
 check_git_clean
 check_branch
 
-git checkout -b "release-$VERSION" || {
-    echo "❌ Failed to create and switch to release branch release-$VERSION"
-    git checkout "release-$VERSION" && git rebase master || {
-        echo "❌ Failed to rebase release branch on master"
+git checkout "release-$VERSION" || {
+    echo "Creating new branch release-$VERSION"
+    git checkout -b "release-$VERSION" || {
+        echo "❌ Failed to create and switch to release branch release-$VERSION"
         exit 1
     }
 }
-
-prep_version "$VERSION"
-
-git add Cargo.toml oauth2_passkey_axum/Cargo.toml || {
-    echo "❌ Failed to stage changes"
+git rebase master || {
+    echo "❌ Failed to rebase release branch on master"
     exit 1
 }
 
-git commit -m "Prepare for release $VERSION" || {
-    echo "❌ Failed to commit changes"
-}
+set_workspace_version "$VERSION"
 
-if [ "$DRY_RUN" = false ]; then
+if [ "$DRY_RUN" = true ]; then
+    echo "🧪 Dry run:"
+
+    echo "cargo publish -p oauth2-passkey -n"
+    cargo publish -p oauth2-passkey -n
+
+    if cargo search "oauth2-passkey" | grep -q "^oauth2-passkey.*$VERSION"; then
+        echo "cargo publish -p oauth2-passkey-axum -n"
+        cargo publish -p oauth2-passkey-axum -n
+    fi
+else
+    git add Cargo.toml && git commit -m "Set workspace version for release $VERSION" || {
+        echo "❌ Failed to stage or commit workspace version changes"
+        exit 1
+    }
+
     git push origin "release-$VERSION" || {
         echo "❌ Failed to push release branch release-$VERSION"
         exit 1
@@ -148,6 +234,20 @@ if [ "$DRY_RUN" = false ]; then
 
     wait_for_crates_io "oauth2-passkey" "$VERSION"
 
+    echo "🎯 Step 2: Preparing oauth2-passkey-axum release"
+
+    set_crate_version "$VERSION"
+
+    git add oauth2_passkey_axum/Cargo.toml && git commit -m "Set workspace version for release $VERSION" || {
+        echo "❌ Failed to stage or commit workspace version changes"
+        exit 1
+    }
+
+    git push origin "release-$VERSION" || {
+        echo "❌ Failed to push release branch release-$VERSION"
+        exit 1
+    }
+
     echo "🎯 Step 3: Releasing oauth2-passkey-axum $VERSION"
     if cargo search "oauth2-passkey-axum" | grep -q "^oauth2-passkey-axum.*$VERSION"; then
         echo "✅ oauth2-passkey-axum $VERSION is already published. Skipping."
@@ -159,8 +259,24 @@ if [ "$DRY_RUN" = false ]; then
     fi
 
     update_tag "$VERSION"
-else
-    echo "🧪 Dry run: Skipping push and publish steps."
+
+    set_workspace_version "$next"
+    revert_crate_version
+
+    git add Cargo.toml oauth2_passkey_axum/Cargo.toml && git commit -m "Prepare for next development version $next" || {
+        echo "❌ Failed to stage or commit next development version changes"
+        exit 1
+    }
+    git push origin "release-$VERSION" || {
+        echo "❌ Failed to push release branch release-$VERSION"
+        exit 1
+    }
+
+    gh pr create --base master --head "release-$VERSION" --title "Release $VERSION" --body "Release $VERSION of oauth2-passkey workspace" || {
+        echo "❌ Failed to create pull request for release branch"
+        exit 1
+    }
+    echo "🎉 Pull request created for release branch release-$VERSION"
 fi
 
 git checkout master || {
