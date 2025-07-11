@@ -98,10 +98,10 @@ set_workspace_version() {
         exit 1
     }
 
-    egrep "^version = ${version}" Cargo.toml || {
+    if ! grep -q "^version = \"$version\"" Cargo.toml; then
         echo "❌ Failed to update workspace version in Cargo.toml"
         exit 1
-    }
+    fi
 }
 
 set_crate_version() {
