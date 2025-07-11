@@ -12,7 +12,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     // Create users table
     sqlx::query(&format!(
         r#"
-        CREATE TABLE IF NOT EXISTS {} (
+        CREATE TABLE IF NOT EXISTS {table_name} (
             sequence_number BIGSERIAL PRIMARY KEY,
             id TEXT NOT NULL UNIQUE,
             account TEXT NOT NULL,
@@ -21,8 +21,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             created_at TIMESTAMPTZ NOT NULL,
             updated_at TIMESTAMPTZ NOT NULL
         )
-        "#,
-        table_name
+        "#
     ))
     .execute(pool)
     .await
@@ -54,9 +53,8 @@ pub(super) async fn get_all_users_postgres(pool: &Pool<Postgres>) -> Result<Vec<
 
     sqlx::query_as::<_, User>(&format!(
         r#"
-        SELECT * FROM {} ORDER BY sequence_number ASC
-        "#,
-        table_name
+        SELECT * FROM {table_name} ORDER BY sequence_number ASC
+        "#
     ))
     .fetch_all(pool)
     .await
@@ -71,9 +69,8 @@ pub(super) async fn get_user_postgres(
 
     sqlx::query_as::<_, User>(&format!(
         r#"
-        SELECT * FROM {} WHERE id = $1
-        "#,
-        table_name
+        SELECT * FROM {table_name} WHERE id = $1
+        "#
     ))
     .bind(id)
     .fetch_optional(pool)
@@ -93,7 +90,7 @@ pub(super) async fn upsert_user_postgres(
     // Upsert user with a single query and RETURNING to get the sequence_number
     let result = sqlx::query_as::<_, User>(&format!(
         r#"
-        INSERT INTO {} (id, account, label, is_admin, created_at, updated_at)
+        INSERT INTO {table_name} (id, account, label, is_admin, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (id) DO UPDATE SET
             account = EXCLUDED.account,
@@ -101,8 +98,7 @@ pub(super) async fn upsert_user_postgres(
             is_admin = EXCLUDED.is_admin,
             updated_at = $7
         RETURNING *
-        "#,
-        table_name
+        "#
     ))
     .bind(&updated_user.id)
     .bind(&updated_user.account)
@@ -123,9 +119,8 @@ pub(super) async fn delete_user_postgres(pool: &Pool<Postgres>, id: &str) -> Res
 
     sqlx::query(&format!(
         r#"
-        DELETE FROM {} WHERE id = $1
-        "#,
-        table_name
+        DELETE FROM {table_name} WHERE id = $1
+        "#
     ))
     .bind(id)
     .execute(pool)

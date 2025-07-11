@@ -51,13 +51,13 @@ async fn ensure_database_initialized() {
 
     // Initialize stores - log errors but don't panic in tests
     if let Err(e) = UserStore::init().await {
-        eprintln!("Warning: Failed to initialize UserStore: {}", e);
+        eprintln!("Warning: Failed to initialize UserStore: {e}");
     }
     if let Err(e) = OAuth2Store::init().await {
-        eprintln!("Warning: Failed to initialize OAuth2Store: {}", e);
+        eprintln!("Warning: Failed to initialize OAuth2Store: {e}");
     }
     if let Err(e) = PasskeyStore::init().await {
-        eprintln!("Warning: Failed to initialize PasskeyStore: {}", e);
+        eprintln!("Warning: Failed to initialize PasskeyStore: {e}");
     }
 
     // Create a first user if no users exist
@@ -79,14 +79,14 @@ async fn create_first_user_if_needed() {
             );
 
             if let Err(e) = UserStore::upsert_user(first_user).await {
-                eprintln!("Warning: Failed to create first test user: {}", e);
+                eprintln!("Warning: Failed to create first test user: {e}");
             }
         }
         Ok(_) => {
             // Users already exist, no need to create a first user
         }
         Err(e) => {
-            eprintln!("Warning: Failed to check existing users: {}", e);
+            eprintln!("Warning: Failed to check existing users: {e}");
         }
     }
 }

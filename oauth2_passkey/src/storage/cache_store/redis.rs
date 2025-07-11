@@ -10,7 +10,7 @@ const CACHE_PREFIX: &str = "cache";
 
 impl RedisCacheStore {
     fn make_key(prefix: &str, key: &str) -> String {
-        format!("{}:{}:{}", CACHE_PREFIX, prefix, key)
+        format!("{CACHE_PREFIX}:{prefix}:{key}")
     }
 }
 

@@ -182,13 +182,13 @@ pub(super) struct ParsedClientData {
 impl ParsedClientData {
     pub(super) fn from_base64(client_data_json: &str) -> Result<Self, PasskeyError> {
         let raw_data = base64url_decode(client_data_json)
-            .map_err(|e| PasskeyError::Format(format!("Failed to decode: {}", e)))?;
+            .map_err(|e| PasskeyError::Format(format!("Failed to decode: {e}")))?;
 
         let data_str = String::from_utf8(raw_data.clone())
-            .map_err(|e| PasskeyError::Format(format!("Invalid UTF-8: {}", e)))?;
+            .map_err(|e| PasskeyError::Format(format!("Invalid UTF-8: {e}")))?;
 
         let data: serde_json::Value = serde_json::from_str(&data_str)
-            .map_err(|e| PasskeyError::Format(format!("Invalid JSON: {}", e)))?;
+            .map_err(|e| PasskeyError::Format(format!("Invalid JSON: {e}")))?;
 
         let challenge_str = data["challenge"]
             .as_str()
@@ -285,7 +285,7 @@ impl AuthenticatorData {
     /// - Optional: Extensions
     pub(super) fn from_base64(auth_data: &str) -> Result<Self, PasskeyError> {
         let data = base64url_decode(auth_data)
-            .map_err(|e| PasskeyError::Format(format!("Failed to decode: {}", e)))?;
+            .map_err(|e| PasskeyError::Format(format!("Failed to decode: {e}")))?;
 
         if data.len() < 37 {
             return Err(PasskeyError::AuthenticatorData(
@@ -543,7 +543,7 @@ mod tests {
             let client_data_str = client_data.to_string();
             let client_data_b64 = base64url_encode(client_data_str.as_bytes().to_vec()).unwrap();
             let result = ParsedClientData::from_base64(&client_data_b64);
-            assert!(result.is_ok(), "Expected Ok result, got {:?}", result);
+            assert!(result.is_ok(), "Expected Ok result, got {result:?}");
             let parsed = result.unwrap();
             assert_eq!(parsed.challenge, "sample-challenge");
             assert_eq!(parsed.origin, "https://example.com");
@@ -691,7 +691,7 @@ mod tests {
                 "webauthn.get",
             );
             let result = parsed_data.verify("sample-challenge");
-            assert!(result.is_ok(), "Expected Ok result, got {:?}", result);
+            assert!(result.is_ok(), "Expected Ok result, got {result:?}");
             // No need to restore environment variables as they're now managed by test_utils
         }
 
@@ -808,7 +808,7 @@ mod tests {
             let auth_data_vec = create_test_auth_data(rp_id_hash.clone(), flags, counter, None);
             let auth_data_b64 = base64url_encode(auth_data_vec.clone()).unwrap();
             let result = AuthenticatorData::from_base64(&auth_data_b64);
-            assert!(result.is_ok(), "Expected Ok result, got {:?}", result);
+            assert!(result.is_ok(), "Expected Ok result, got {result:?}");
             let parsed = result.unwrap();
             assert_eq!(parsed.rp_id_hash, rp_id_hash);
             assert_eq!(parsed.flags, flags);
@@ -1015,7 +1015,7 @@ mod tests {
                 raw_data: vec![],
             };
             let result = auth_data.verify();
-            assert!(result.is_ok(), "Expected Ok result, got {:?}", result);
+            assert!(result.is_ok(), "Expected Ok result, got {result:?}");
         }
 
         /// Test AuthenticatorData verification with invalid RP ID hash
@@ -1111,7 +1111,7 @@ mod tests {
                 Err(PasskeyError::AuthenticatorData(msg)) => {
                     assert!(msg.contains("User verification required but flag not set"));
                 }
-                _ => panic!("Expected AuthenticatorData error: {:?}", result),
+                _ => panic!("Expected AuthenticatorData error: {result:?}"),
             }
         }
     }

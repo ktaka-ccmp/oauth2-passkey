@@ -128,8 +128,7 @@ mod tests {
             let result = gen_random_string(len);
             assert!(
                 result.is_ok(),
-                "Failed to generate random string of length {}",
-                len
+                "Failed to generate random string of length {len}"
             );
             let s = result.unwrap();
             assert_eq!(s.len(), if len == 0 { 0 } else { (len * 4).div_ceil(3) });

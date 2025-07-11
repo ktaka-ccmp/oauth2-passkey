@@ -699,17 +699,13 @@ mod tests {
             let result = extract_public_key_coords(&public_key);
             assert!(
                 result.is_err(),
-                "Should fail for {} coordinate length",
-                description
+                "Should fail for {description} coordinate length"
             );
 
             if let Err(PasskeyError::Verification(msg)) = result {
                 assert!(msg.contains("Invalid coordinate length"));
             } else {
-                panic!(
-                    "Expected PasskeyError::Verification for {} length",
-                    description
-                );
+                panic!("Expected PasskeyError::Verification for {description} length");
             }
         }
     }

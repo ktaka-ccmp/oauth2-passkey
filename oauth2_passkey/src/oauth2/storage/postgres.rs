@@ -18,9 +18,9 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     // Create oauth2_accounts table
     sqlx::query(&format!(
         r#"
-        CREATE TABLE IF NOT EXISTS {} (
+        CREATE TABLE IF NOT EXISTS {oauth2_table} (
             id TEXT PRIMARY KEY NOT NULL,
-            user_id TEXT NOT NULL REFERENCES {}(id),
+            user_id TEXT NOT NULL REFERENCES {users_table}(id),
             provider TEXT NOT NULL,
             provider_user_id TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -31,8 +31,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             updated_at TIMESTAMPTZ NOT NULL,
             UNIQUE(provider, provider_user_id)
         )
-        "#,
-        oauth2_table, users_table
+        "#
     ))
     .execute(pool)
     .await
@@ -84,27 +83,27 @@ pub(super) async fn get_oauth2_accounts_by_field_postgres(
     let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
     let (query, value) = match field {
         AccountSearchField::Id(id) => (
-            &format!("SELECT * FROM {} WHERE id = $1", table_name),
+            &format!("SELECT * FROM {table_name} WHERE id = $1"),
             id.as_str(),
         ),
         AccountSearchField::UserId(user_id) => (
-            &format!("SELECT * FROM {} WHERE user_id = $1", table_name),
+            &format!("SELECT * FROM {table_name} WHERE user_id = $1"),
             user_id.as_str(),
         ),
         AccountSearchField::Provider(provider) => (
-            &format!("SELECT * FROM {} WHERE provider = $1", table_name),
+            &format!("SELECT * FROM {table_name} WHERE provider = $1"),
             provider.as_str(),
         ),
         AccountSearchField::ProviderUserId(provider_user_id) => (
-            &format!("SELECT * FROM {} WHERE provider_user_id = $1", table_name),
+            &format!("SELECT * FROM {table_name} WHERE provider_user_id = $1"),
             provider_user_id.as_str(),
         ),
         AccountSearchField::Name(name) => (
-            &format!("SELECT * FROM {} WHERE name = $1", table_name),
+            &format!("SELECT * FROM {table_name} WHERE name = $1"),
             name.as_str(),
         ),
         AccountSearchField::Email(email) => (
-            &format!("SELECT * FROM {} WHERE email = $1", table_name),
+            &format!("SELECT * FROM {table_name} WHERE email = $1"),
             email.as_str(),
         ),
     };
@@ -125,10 +124,9 @@ pub(super) async fn get_oauth2_account_by_provider_postgres(
 
     sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
-        SELECT * FROM {}
+        SELECT * FROM {table_name}
         WHERE provider = $1 AND provider_user_id = $2
-        "#,
-        table_name
+        "#
     ))
     .bind(provider)
     .bind(provider_user_id)
@@ -152,10 +150,9 @@ pub(super) async fn upsert_oauth2_account_postgres(
     // Check if the account already exists
     let existing = sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
-        SELECT * FROM {}
+        SELECT * FROM {table_name}
         WHERE provider = $1 AND provider_user_id = $2
-        "#,
-        table_name
+        "#
     ))
     .bind(&account.provider)
     .bind(&account.provider_user_id)
@@ -167,15 +164,14 @@ pub(super) async fn upsert_oauth2_account_postgres(
         // Update existing account
         sqlx::query(&format!(
             r#"
-            UPDATE {} SET
+            UPDATE {table_name} SET
                 name = $1,
                 email = $2,
                 picture = $3,
                 metadata = $4,
                 updated_at = $5
             WHERE id = $6
-            "#,
-            table_name
+            "#
         ))
         .bind(&account.name)
         .bind(&account.email)
@@ -197,11 +193,10 @@ pub(super) async fn upsert_oauth2_account_postgres(
         sqlx::query(
             &format!(
             r#"
-            INSERT INTO {}
+            INSERT INTO {table_name}
             (id, user_id, provider, provider_user_id, name, email, picture, metadata, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            "#,
-            table_name
+            "#
             )
         )
         .bind(&id)
@@ -229,9 +224,8 @@ pub(super) async fn upsert_oauth2_account_postgres(
     // Return the updated account
     let updated_account = sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
-        SELECT * FROM {} WHERE id = $1
-        "#,
-        table_name
+        SELECT * FROM {table_name} WHERE id = $1
+        "#
     ))
     .bind(account_id)
     .fetch_one(pool)
@@ -248,27 +242,27 @@ pub(super) async fn delete_oauth2_accounts_by_field_postgres(
     let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
     let (query, value) = match field {
         AccountSearchField::Id(id) => (
-            &format!("DELETE FROM {} WHERE id = $1", table_name),
+            &format!("DELETE FROM {table_name} WHERE id = $1"),
             id.as_str(),
         ),
         AccountSearchField::UserId(user_id) => (
-            &format!("DELETE FROM {} WHERE user_id = $1", table_name),
+            &format!("DELETE FROM {table_name} WHERE user_id = $1"),
             user_id.as_str(),
         ),
         AccountSearchField::Provider(provider) => (
-            &format!("DELETE FROM {} WHERE provider = $1", table_name),
+            &format!("DELETE FROM {table_name} WHERE provider = $1"),
             provider.as_str(),
         ),
         AccountSearchField::ProviderUserId(provider_user_id) => (
-            &format!("DELETE FROM {} WHERE provider_user_id = $1", table_name),
+            &format!("DELETE FROM {table_name} WHERE provider_user_id = $1"),
             provider_user_id.as_str(),
         ),
         AccountSearchField::Name(name) => (
-            &format!("DELETE FROM {} WHERE name = $1", table_name),
+            &format!("DELETE FROM {table_name} WHERE name = $1"),
             name.as_str(),
         ),
         AccountSearchField::Email(email) => (
-            &format!("DELETE FROM {} WHERE email = $1", table_name),
+            &format!("DELETE FROM {table_name} WHERE email = $1"),
             email.as_str(),
         ),
     };

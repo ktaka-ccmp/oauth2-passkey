@@ -254,7 +254,7 @@ async fn process_oauth2_authorization(
         (Some(OAuth2Mode::CreateUser), None, None) => {
             let name = oauth2_account.name.clone();
             let user_id = create_user_and_oauth2account(oauth2_account).await?;
-            let message = format!("Created new user {}", name);
+            let message = format!("Created new user {name}");
             tracing::debug!("{}", message);
             (user_id.clone(), message)
         }
@@ -268,7 +268,7 @@ async fn process_oauth2_authorization(
         (Some(OAuth2Mode::CreateUserOrLogin), None, None) => {
             let name = oauth2_account.name.clone();
             let user_id = create_user_and_oauth2account(oauth2_account).await?;
-            let message = format!("Created new user {}", name);
+            let message = format!("Created new user {name}");
             tracing::debug!("{}", message);
             (user_id.clone(), message)
         }
@@ -291,8 +291,7 @@ async fn process_oauth2_authorization(
         _ => {
             tracing::error!("Invalid combination of mode {:?} and user state", mode);
             return Err(CoordinationError::InvalidState(format!(
-                "Invalid combination of mode {:?} and user state",
-                mode
+                "Invalid combination of mode {mode:?} and user state"
             )));
         }
     };
@@ -386,7 +385,7 @@ pub async fn delete_oauth2_account_core(
         .ok_or(
             CoordinationError::ResourceNotFound {
                 resource_type: "OAuth2Account".to_string(),
-                resource_id: format!("{}/{}", provider, provider_user_id),
+                resource_id: format!("{provider}/{provider_user_id}"),
             }
             .log(),
         )?;
@@ -541,8 +540,8 @@ mod tests {
         provider_user_id: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
         let timestamp = Utc::now().timestamp_nanos_opt().unwrap_or(0);
-        let unique_provider_user_id = format!("{}-{}", provider_user_id, timestamp);
-        let account_id = format!("test-id-{}", timestamp);
+        let unique_provider_user_id = format!("{provider_user_id}-{timestamp}");
+        let account_id = format!("test-id-{timestamp}");
 
         let oauth2_account = OAuth2Account {
             id: account_id.clone(),
@@ -633,8 +632,7 @@ mod tests {
         let result = delete_oauth2_account_core(user_id, provider, &unique_provider_user_id).await;
         assert!(
             result.is_ok(),
-            "Failed to delete OAuth2 account: {:?}",
-            result
+            "Failed to delete OAuth2 account: {result:?}"
         );
 
         // Verify the account was deleted
@@ -676,8 +674,7 @@ mod tests {
             delete_oauth2_account_core(other_user_id, provider, &unique_provider_user_id).await;
         assert!(
             matches!(result, Err(CoordinationError::Unauthorized)),
-            "Expected Unauthorized error, got: {:?}",
-            result
+            "Expected Unauthorized error, got: {result:?}"
         );
 
         Ok(())

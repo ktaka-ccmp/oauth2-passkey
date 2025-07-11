@@ -103,7 +103,7 @@ mod tests {
         // Test error propagation through the ? operator
         fn process_user(id: &str) -> Result<String, UserError> {
             validate_user_data(id)?;
-            Ok(format!("Processed user {}", id))
+            Ok(format!("Processed user {id}"))
         }
 
         // The error should propagate

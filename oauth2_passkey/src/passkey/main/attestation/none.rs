@@ -58,11 +58,10 @@ pub(super) fn verify_none_attestation(attestation: &AttestationObject) -> Result
 
     // Verify COSE key format
     let public_key_cbor: CborValue = ciborium::de::from_reader(&attestation.auth_data[pos..])
-        .map_err(|e| PasskeyError::Format(format!("Invalid public key CBOR: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Invalid public key CBOR: {e}")))?;
 
-    extract_public_key_coords(&public_key_cbor).map_err(|e| {
-        PasskeyError::Verification(format!("Invalid public key coordinates: {}", e))
-    })?;
+    extract_public_key_coords(&public_key_cbor)
+        .map_err(|e| PasskeyError::Verification(format!("Invalid public key coordinates: {e}")))?;
 
     Ok(())
 }
@@ -142,11 +141,10 @@ fn verify_none_attestation_with_config(
 
     // Verify COSE key format
     let public_key_cbor: CborValue = ciborium::de::from_reader(&attestation.auth_data[pos..])
-        .map_err(|e| PasskeyError::Format(format!("Invalid public key CBOR: {}", e)))?;
+        .map_err(|e| PasskeyError::Format(format!("Invalid public key CBOR: {e}")))?;
 
-    extract_public_key_coords(&public_key_cbor).map_err(|e| {
-        PasskeyError::Verification(format!("Invalid public key coordinates: {}", e))
-    })?;
+    extract_public_key_coords(&public_key_cbor)
+        .map_err(|e| PasskeyError::Verification(format!("Invalid public key coordinates: {e}")))?;
 
     Ok(())
 }
@@ -511,13 +509,12 @@ mod tests {
 
             // All should succeed if properly constructed
             if result.is_err() {
-                println!("Failed for credential ID length: {}", len);
-                println!("Error: {:?}", result);
+                println!("Failed for credential ID length: {len}");
+                println!("Error: {result:?}");
             }
             assert!(
                 result.is_ok(),
-                "Should succeed for credential ID length: {}",
-                len
+                "Should succeed for credential ID length: {len}"
             );
         }
     }

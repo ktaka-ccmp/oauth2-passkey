@@ -352,9 +352,9 @@ mod tests {
             let mut handles = vec![];
 
             for i in 0..5 {
-                let task_key = format!("key_{}", i);
+                let task_key = format!("key_{i}");
                 let task_value = CacheData {
-                    value: format!("concurrent_value_{}", i),
+                    value: format!("concurrent_value_{i}"),
                 };
 
                 let handle = tokio::spawn(async move {
@@ -379,7 +379,7 @@ mod tests {
             // Wait for all tasks to complete and verify results
             for (i, handle) in handles.into_iter().enumerate() {
                 let result = handle.await.unwrap();
-                assert_eq!(result, format!("concurrent_value_{}", i));
+                assert_eq!(result, format!("concurrent_value_{i}"));
             }
         }
 
@@ -570,8 +570,7 @@ mod tests {
                     let put_result = cache.put(prefix, test_key, cache_data).await;
                     assert!(
                         put_result.is_ok(),
-                        "Should handle special characters in key: {}",
-                        test_key
+                        "Should handle special characters in key: {test_key}"
                     );
                 }
             }
@@ -583,15 +582,13 @@ mod tests {
                     let get_result = cache.get(prefix, test_key).await.unwrap();
                     assert!(
                         get_result.is_some(),
-                        "Should retrieve value for key: {}",
-                        test_key
+                        "Should retrieve value for key: {test_key}"
                     );
 
                     let retrieved = get_result.unwrap();
                     assert_eq!(
                         &retrieved.value, expected_value,
-                        "Value should match for key: {}",
-                        test_key
+                        "Value should match for key: {test_key}"
                     );
                 }
             }

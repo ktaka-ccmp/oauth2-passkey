@@ -18,8 +18,7 @@ pub(crate) async fn validate_postgres_table_schema<E>(
 
     if !table_exists {
         return Err(error_mapper(format!(
-            "Schema validation failed: Table '{}' does not exist",
-            table_name
+            "Schema validation failed: Table '{table_name}' does not exist"
         )));
     }
 
@@ -55,15 +54,13 @@ pub(crate) async fn validate_postgres_table_schema<E>(
             Some((_, actual_type)) => {
                 // Column exists but with wrong type
                 return Err(error_mapper(format!(
-                    "Schema validation failed: Column '{}' has type '{}' but expected '{}'",
-                    expected_name, actual_type, expected_type
+                    "Schema validation failed: Column '{expected_name}' has type '{actual_type}' but expected '{expected_type}'"
                 )));
             }
             None => {
                 // Column doesn't exist
                 return Err(error_mapper(format!(
-                    "Schema validation failed: Missing column '{}'",
-                    expected_name
+                    "Schema validation failed: Missing column '{expected_name}'"
                 )));
             }
         }
@@ -104,13 +101,12 @@ pub(crate) async fn validate_sqlite_table_schema<E>(
 
     if !table_exists {
         return Err(error_mapper(format!(
-            "Schema validation failed: Table '{}' does not exist",
-            table_name
+            "Schema validation failed: Table '{table_name}' does not exist"
         )));
     }
 
     // Query actual schema from database
-    let pragma_sql = format!("PRAGMA table_info('{}');", table_name);
+    let pragma_sql = format!("PRAGMA table_info('{table_name}');");
 
     let rows = sqlx::query(pragma_sql.as_str())
         .fetch_all(pool)
@@ -139,15 +135,13 @@ pub(crate) async fn validate_sqlite_table_schema<E>(
             Some((_, actual_type)) => {
                 // Column exists but with wrong type
                 return Err(error_mapper(format!(
-                    "Schema validation failed: Column '{}' has type '{}' but expected '{}'",
-                    expected_name, actual_type, expected_type
+                    "Schema validation failed: Column '{expected_name}' has type '{actual_type}' but expected '{expected_type}'"
                 )));
             }
             None => {
                 // Column doesn't exist
                 return Err(error_mapper(format!(
-                    "Schema validation failed: Missing column '{}'.",
-                    expected_name
+                    "Schema validation failed: Missing column '{expected_name}'."
                 )));
             }
         }

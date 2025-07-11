@@ -320,8 +320,8 @@ mod tests {
     fn create_test_session_user(id: &str, is_admin: bool) -> SessionUser {
         SessionUser {
             id: id.to_string(),
-            account: format!("{}@example.com", id),
-            label: format!("Test User {}", id),
+            account: format!("{id}@example.com"),
+            label: format!("Test User {id}"),
             is_admin,
             sequence_number: 1,
             created_at: Utc::now(),
@@ -338,8 +338,8 @@ mod tests {
         let user = User {
             sequence_number: None,
             id: id.to_string(),
-            account: format!("{}@example.com", id),
-            label: format!("Test User {}", id),
+            account: format!("{id}@example.com"),
+            label: format!("Test User {id}"),
             is_admin,
             created_at: now,
             updated_at: now,
@@ -369,9 +369,9 @@ mod tests {
 
         // Create unique test users with timestamp to avoid conflicts
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let user1_id = format!("test-admin-user-1-{}", timestamp);
-        let user2_id = format!("test-admin-user-2-{}", timestamp);
-        let user3_id = format!("test-admin-user-3-{}", timestamp);
+        let user1_id = format!("test-admin-user-1-{timestamp}");
+        let user2_id = format!("test-admin-user-2-{timestamp}");
+        let user3_id = format!("test-admin-user-3-{timestamp}");
 
         create_test_user_in_db(&user1_id, false)
             .await
@@ -427,7 +427,7 @@ mod tests {
 
         // Create a unique test user
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let user_id = format!("test-get-user-{}", timestamp);
+        let user_id = format!("test-get-user-{timestamp}");
         let is_admin = true;
         let _created_user = create_test_user_in_db(&user_id, is_admin)
             .await
@@ -444,18 +444,18 @@ mod tests {
         assert_eq!(user.id, user_id, "User ID should match");
         assert_eq!(
             user.account,
-            format!("{}@example.com", user_id),
+            format!("{user_id}@example.com"),
             "User account should match"
         );
         assert_eq!(
             user.label,
-            format!("Test User {}", user_id),
+            format!("Test User {user_id}"),
             "User label should match"
         );
         assert_eq!(user.is_admin, is_admin, "User admin status should match");
 
         // Try to get a non-existent user
-        let non_existent_user_id = format!("non-existent-user-{}", timestamp);
+        let non_existent_user_id = format!("non-existent-user-{timestamp}");
         let non_existent_user_option = get_user(&non_existent_user_id)
             .await
             .expect("Failed to get non-existent user");
@@ -483,7 +483,7 @@ mod tests {
 
         // Create a unique test user to be deleted
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let user_id = format!("test-user-to-delete-{}", timestamp);
+        let user_id = format!("test-user-to-delete-{timestamp}");
         create_test_user_in_db(&user_id, false)
             .await
             .expect("Failed to create test user");
@@ -503,7 +503,7 @@ mod tests {
         assert!(user_after.is_none(), "User should not exist after deletion");
 
         // Try to delete a non-existent user
-        let non_existent_user_id = format!("non-existent-user-{}", timestamp);
+        let non_existent_user_id = format!("non-existent-user-{timestamp}");
         let result = delete_user_account_admin(&non_existent_user_id).await;
 
         // This should return a ResourceNotFound error
@@ -525,7 +525,7 @@ mod tests {
                     "Error should include the correct user ID"
                 );
             }
-            _ => panic!("Expected ResourceNotFound error, got {:?}", result),
+            _ => panic!("Expected ResourceNotFound error, got {result:?}"),
         }
     }
 
@@ -542,8 +542,8 @@ mod tests {
 
         // Create unique users with timestamp
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let admin_user_id = format!("admin-user-{}", timestamp);
-        let target_user_id = format!("target-user-{}", timestamp);
+        let admin_user_id = format!("admin-user-{timestamp}");
+        let target_user_id = format!("target-user-{timestamp}");
 
         // Create an admin user who will perform the update
         create_test_user_in_db(&admin_user_id, true)
@@ -614,8 +614,8 @@ mod tests {
 
         // Create unique users with timestamp
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let non_admin_user_id = format!("non-admin-user-{}", timestamp);
-        let target_user_id = format!("target-user-2-{}", timestamp);
+        let non_admin_user_id = format!("non-admin-user-{timestamp}");
+        let target_user_id = format!("target-user-2-{timestamp}");
 
         // Create a non-admin user who will attempt the update
         create_test_user_in_db(&non_admin_user_id, false)
@@ -638,7 +638,7 @@ mod tests {
         );
         match result {
             Err(CoordinationError::Unauthorized) => {}
-            _ => panic!("Expected Unauthorized error, got {:?}", result),
+            _ => panic!("Expected Unauthorized error, got {result:?}"),
         }
 
         // Verify the target user's admin status was not changed
@@ -671,7 +671,7 @@ mod tests {
 
         // Create unique users with timestamp
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let admin_user_id = format!("admin-user-protect-{}", timestamp);
+        let admin_user_id = format!("admin-user-protect-{timestamp}");
 
         // Create an admin user
         create_test_user_in_db(&admin_user_id, true)
@@ -694,8 +694,8 @@ mod tests {
             // If no user with sequence_number = 1 exists, create a new user
             // which should get sequence_number = 1 if it's the first user
             let new_user = User::new(
-                format!("first-user-{}", timestamp),
-                format!("first-user-{}@example.com", timestamp),
+                format!("first-user-{timestamp}"),
+                format!("first-user-{timestamp}@example.com"),
                 "First User".to_string(),
             );
 
@@ -727,10 +727,7 @@ mod tests {
             Err(CoordinationError::Coordination(msg)) => {
                 assert!(msg.contains("Cannot change admin status of the first user"));
             }
-            _ => panic!(
-                "Expected Coordination error about first user, got {:?}",
-                result
-            ),
+            _ => panic!("Expected Coordination error about first user, got {result:?}"),
         }
 
         // Clean up
@@ -753,7 +750,7 @@ mod tests {
 
         // Create unique user with timestamp
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let non_admin_user_id = format!("non-admin-user-passkey-{}", timestamp);
+        let non_admin_user_id = format!("non-admin-user-passkey-{timestamp}");
 
         // Create a non-admin user
         create_test_user_in_db(&non_admin_user_id, false)
@@ -768,7 +765,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(CoordinationError::Unauthorized) => {}
-            _ => panic!("Expected Unauthorized error, got: {:?}", result),
+            _ => panic!("Expected Unauthorized error, got: {result:?}"),
         }
 
         // Clean up
@@ -784,7 +781,7 @@ mod tests {
 
         // Create unique user with timestamp
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let non_admin_user_id = format!("non-admin-user-oauth2-{}", timestamp);
+        let non_admin_user_id = format!("non-admin-user-oauth2-{timestamp}");
 
         // Create a non-admin user
         create_test_user_in_db(&non_admin_user_id, false)
@@ -799,7 +796,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(CoordinationError::Unauthorized) => {}
-            _ => panic!("Expected Unauthorized error, got: {:?}", result),
+            _ => panic!("Expected Unauthorized error, got: {result:?}"),
         }
 
         // Clean up

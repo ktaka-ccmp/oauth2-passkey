@@ -155,13 +155,13 @@ mod tests {
         PasskeyCredential {
             credential_id: credential_id.to_string(),
             user_id: user_id.to_string(),
-            public_key: format!("test_public_key_for_{}", credential_id),
+            public_key: format!("test_public_key_for_{credential_id}"),
             aaguid: "test-aaguid-1234-5678".to_string(),
             counter: 1,
             user: PublicKeyCredentialUserEntity {
                 user_handle: user_handle.to_string(),
-                name: format!("test_user_{}", user_id),
-                display_name: format!("Test User {}", user_id),
+                name: format!("test_user_{user_id}"),
+                display_name: format!("Test User {user_id}"),
             },
             created_at: now,
             updated_at: now,
@@ -174,8 +174,8 @@ mod tests {
         let user = User {
             sequence_number: None,
             id: user_id.to_string(),
-            account: format!("{}@example.com", user_id),
-            label: format!("Test User {}", user_id),
+            account: format!("{user_id}@example.com"),
+            label: format!("Test User {user_id}"),
             is_admin: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -803,9 +803,9 @@ mod tests {
         // Test concurrent credential operations
         let handles = (0..5)
             .map(|i| {
-                let credential_id = format!("cred_concurrent_{}", i);
-                let user_id = format!("user_concurrent_{}", i);
-                let user_handle = format!("handle_concurrent_{}", i);
+                let credential_id = format!("cred_concurrent_{i}");
+                let user_id = format!("user_concurrent_{i}");
+                let user_handle = format!("handle_concurrent_{i}");
 
                 tokio::spawn(async move {
                     // Create user first

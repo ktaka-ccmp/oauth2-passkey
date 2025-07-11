@@ -81,7 +81,7 @@ pub(super) async fn gen_new_user_id() -> Result<String, CoordinationError> {
             Ok(Some(_)) => continue,   // ID exists, try again
             Err(e) => {
                 return Err(
-                    CoordinationError::Database(format!("Failed to check user ID: {}", e)).log(),
+                    CoordinationError::Database(format!("Failed to check user ID: {e}")).log(),
                 );
             }
         }
@@ -237,7 +237,7 @@ mod tests {
                 assert_eq!(resource_type, "User");
                 assert_eq!(resource_id, "nonexistent-user");
             }
-            _ => panic!("Expected ResourceNotFound error, got {:?}", result),
+            _ => panic!("Expected ResourceNotFound error, got {result:?}"),
         }
     }
 
@@ -266,12 +266,12 @@ mod tests {
 
         // Use unique timestamp to avoid conflicts with other tests
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let user_id_to_delete = format!("user-to-delete-{}", timestamp);
+        let user_id_to_delete = format!("user-to-delete-{timestamp}");
 
         // 1. Create user
         let test_user = create_test_user(
             &user_id_to_delete,
-            &format!("test-account-{}", timestamp),
+            &format!("test-account-{timestamp}"),
             "Test User",
         );
         UserStore::upsert_user(test_user.clone())
@@ -280,9 +280,9 @@ mod tests {
 
         // 2. Create passkey credentials
         let cred1 =
-            create_test_credential(&format!("credential-1-{}", timestamp), &user_id_to_delete);
+            create_test_credential(&format!("credential-1-{timestamp}"), &user_id_to_delete);
         let cred2 =
-            create_test_credential(&format!("credential-2-{}", timestamp), &user_id_to_delete);
+            create_test_credential(&format!("credential-2-{timestamp}"), &user_id_to_delete);
         PasskeyStore::store_credential(cred1.credential_id.clone(), cred1.clone())
             .await
             .expect("Failed to store cred1");
@@ -292,16 +292,16 @@ mod tests {
 
         // 3. Create OAuth2 accounts
         let oauth_acc1 = create_test_oauth2_account(
-            &format!("oauth-acc-1-{}", timestamp),
+            &format!("oauth-acc-1-{timestamp}"),
             &user_id_to_delete,
             "google",
-            &format!("google-id-1-{}", timestamp),
+            &format!("google-id-1-{timestamp}"),
         );
         let oauth_acc2 = create_test_oauth2_account(
-            &format!("oauth-acc-2-{}", timestamp),
+            &format!("oauth-acc-2-{timestamp}"),
             &user_id_to_delete,
             "github",
-            &format!("github-id-1-{}", timestamp),
+            &format!("github-id-1-{timestamp}"),
         );
         OAuth2Store::upsert_oauth2_account(oauth_acc1)
             .await
@@ -379,7 +379,7 @@ mod tests {
                 assert_eq!(resource_type, "User");
                 assert_eq!(resource_id, "nonexistent-user");
             }
-            _ => panic!("Expected ResourceNotFound error, got {:?}", result),
+            _ => panic!("Expected ResourceNotFound error, got {result:?}"),
         }
     }
 
@@ -460,18 +460,18 @@ mod tests {
         // Create unique test users with timestamp to avoid conflicts
         let timestamp = chrono::Utc::now().timestamp_millis();
         let user1 = create_test_user(
-            &format!("test-user-1-{}", timestamp),
-            &format!("user1-{}@example.com", timestamp),
+            &format!("test-user-1-{timestamp}"),
+            &format!("user1-{timestamp}@example.com"),
             "User One",
         );
         let user2 = create_test_user(
-            &format!("test-user-2-{}", timestamp),
-            &format!("user2-{}@example.com", timestamp),
+            &format!("test-user-2-{timestamp}"),
+            &format!("user2-{timestamp}@example.com"),
             "User Two",
         );
         let user3 = create_test_user(
-            &format!("test-user-3-{}", timestamp),
-            &format!("user3-{}@example.com", timestamp),
+            &format!("test-user-3-{timestamp}"),
+            &format!("user3-{timestamp}@example.com"),
             "User Three",
         );
 
@@ -539,10 +539,10 @@ mod tests {
 
         // Create and insert a test user with timestamp to avoid conflicts
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let user_id = format!("test-user-id-{}", timestamp);
+        let user_id = format!("test-user-id-{timestamp}");
         let test_user = create_test_user(
             &user_id,
-            &format!("user-{}@example.com", timestamp),
+            &format!("user-{timestamp}@example.com"),
             "Test User",
         );
         UserStore::upsert_user(test_user.clone())
@@ -559,7 +559,7 @@ mod tests {
         assert_eq!(retrieved_user.id, user_id);
         assert_eq!(
             retrieved_user.account,
-            format!("user-{}@example.com", timestamp)
+            format!("user-{timestamp}@example.com")
         );
         assert_eq!(retrieved_user.label, "Test User");
 
@@ -605,10 +605,10 @@ mod tests {
 
         // Test creating a new user with unique timestamp to avoid conflicts
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let user_id = format!("new-user-id-{}", timestamp);
+        let user_id = format!("new-user-id-{timestamp}");
         let new_user = create_test_user(
             &user_id,
-            &format!("new-{}@example.com", timestamp),
+            &format!("new-{timestamp}@example.com"),
             "New User",
         );
         let created_user = UserStore::upsert_user(new_user.clone())
@@ -617,10 +617,7 @@ mod tests {
 
         // Verify the created user matches what we provided
         assert_eq!(created_user.id, user_id);
-        assert_eq!(
-            created_user.account,
-            format!("new-{}@example.com", timestamp)
-        );
+        assert_eq!(created_user.account, format!("new-{timestamp}@example.com"));
         assert_eq!(created_user.label, "New User");
 
         // Verify the user was actually stored in the database
@@ -630,15 +627,12 @@ mod tests {
             .expect("User not found in database");
 
         assert_eq!(stored_user.id, user_id);
-        assert_eq!(
-            stored_user.account,
-            format!("new-{}@example.com", timestamp)
-        );
+        assert_eq!(stored_user.account, format!("new-{timestamp}@example.com"));
         assert_eq!(stored_user.label, "New User");
 
         // Test updating an existing user
         let mut updated_user = stored_user;
-        updated_user.account = format!("updated-{}@example.com", timestamp);
+        updated_user.account = format!("updated-{timestamp}@example.com");
         updated_user.label = "Updated User".to_string();
 
         let result = UserStore::upsert_user(updated_user)
@@ -647,7 +641,7 @@ mod tests {
 
         // Verify the update was returned correctly
         assert_eq!(result.id, user_id);
-        assert_eq!(result.account, format!("updated-{}@example.com", timestamp));
+        assert_eq!(result.account, format!("updated-{timestamp}@example.com"));
         assert_eq!(result.label, "Updated User");
 
         // Verify the update was stored in the database
@@ -659,7 +653,7 @@ mod tests {
         assert_eq!(stored_updated_user.id, user_id);
         assert_eq!(
             stored_updated_user.account,
-            format!("updated-{}@example.com", timestamp)
+            format!("updated-{timestamp}@example.com")
         );
         assert_eq!(stored_updated_user.label, "Updated User");
 
@@ -696,10 +690,10 @@ mod tests {
 
         // Create a test user with unique timestamp to avoid conflicts
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let user_id = format!("delete-user-id-{}", timestamp);
+        let user_id = format!("delete-user-id-{timestamp}");
         let test_user = create_test_user(
             &user_id,
-            &format!("delete-{}@example.com", timestamp),
+            &format!("delete-{timestamp}@example.com"),
             "Delete User",
         );
         UserStore::upsert_user(test_user.clone())
@@ -767,18 +761,18 @@ mod tests {
         // Create test users with known IDs that will collide using unique timestamp
         let timestamp = chrono::Utc::now().timestamp_millis();
         let test_user1 = create_test_user(
-            &format!("fixed-uuid-1-{}", timestamp),
-            &format!("user1-{}@example.com", timestamp),
+            &format!("fixed-uuid-1-{timestamp}"),
+            &format!("user1-{timestamp}@example.com"),
             "Test User 1",
         );
         let test_user2 = create_test_user(
-            &format!("fixed-uuid-2-{}", timestamp),
-            &format!("user2-{}@example.com", timestamp),
+            &format!("fixed-uuid-2-{timestamp}"),
+            &format!("user2-{timestamp}@example.com"),
             "Test User 2",
         );
         let test_user3 = create_test_user(
-            &format!("fixed-uuid-3-{}", timestamp),
-            &format!("user3-{}@example.com", timestamp),
+            &format!("fixed-uuid-3-{timestamp}"),
+            &format!("user3-{timestamp}@example.com"),
             "Test User 3",
         );
 
@@ -796,9 +790,9 @@ mod tests {
         {
             // Mock implementation with 3 colliding IDs
             let result = gen_new_user_id_with_mock(&[
-                &format!("fixed-uuid-1-{}", timestamp),
-                &format!("fixed-uuid-2-{}", timestamp),
-                &format!("fixed-uuid-3-{}", timestamp),
+                &format!("fixed-uuid-1-{timestamp}"),
+                &format!("fixed-uuid-2-{timestamp}"),
+                &format!("fixed-uuid-3-{timestamp}"),
             ])
             .await;
 
@@ -810,7 +804,7 @@ mod tests {
                     "Failed to generate a unique user ID after multiple attempts"
                 );
             } else {
-                panic!("Expected CoordinationError::Coordination, got {:?}", result);
+                panic!("Expected CoordinationError::Coordination, got {result:?}");
             }
         }
 
@@ -818,15 +812,15 @@ mod tests {
         {
             // Mock implementation where the third ID is unique
             let result = gen_new_user_id_with_mock(&[
-                &format!("fixed-uuid-1-{}", timestamp),
-                &format!("fixed-uuid-2-{}", timestamp),
-                &format!("fixed-uuid-4-{}", timestamp),
+                &format!("fixed-uuid-1-{timestamp}"),
+                &format!("fixed-uuid-2-{timestamp}"),
+                &format!("fixed-uuid-4-{timestamp}"),
             ])
             .await;
 
             // Verify it succeeds with the expected ID
             assert!(result.is_ok());
-            assert_eq!(result.unwrap(), format!("fixed-uuid-4-{}", timestamp));
+            assert_eq!(result.unwrap(), format!("fixed-uuid-4-{timestamp}"));
         }
 
         // Clean up
@@ -853,8 +847,7 @@ mod tests {
                 Ok(Some(_)) => continue,   // ID exists, try again
                 Err(e) => {
                     return Err(CoordinationError::Database(format!(
-                        "Failed to check user ID: {}",
-                        e
+                        "Failed to check user ID: {e}"
                     ))
                     .log());
                 }

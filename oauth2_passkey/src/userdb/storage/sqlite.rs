@@ -12,7 +12,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), User
     // Create users table
     sqlx::query(&format!(
         r#"
-        CREATE TABLE IF NOT EXISTS {} (
+        CREATE TABLE IF NOT EXISTS {table_name} (
             sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
             id TEXT NOT NULL UNIQUE,
             account TEXT NOT NULL,
@@ -21,8 +21,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), User
             created_at TIMESTAMP NOT NULL,
             updated_at TIMESTAMP NOT NULL
         )
-        "#,
-        table_name
+        "#
     ))
     .execute(pool)
     .await
@@ -57,9 +56,8 @@ pub(super) async fn get_all_users_sqlite(pool: &Pool<Sqlite>) -> Result<Vec<User
 
     sqlx::query_as::<_, User>(&format!(
         r#"
-        SELECT * FROM {} ORDER BY sequence_number ASC
-        "#,
-        table_name
+        SELECT * FROM {table_name} ORDER BY sequence_number ASC
+        "#
     ))
     .fetch_all(pool)
     .await
@@ -77,9 +75,8 @@ pub(super) async fn get_user_sqlite(
 
     sqlx::query_as::<_, User>(&format!(
         r#"
-        SELECT * FROM {} WHERE id = ?
-        "#,
-        table_name
+        SELECT * FROM {table_name} WHERE id = ?
+        "#
     ))
     .bind(id)
     .fetch_optional(pool)
@@ -99,15 +96,14 @@ pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Resul
     // Upsert user with a single query
     sqlx::query(&format!(
         r#"
-        INSERT INTO {} (id, account, label, is_admin, created_at, updated_at)
+        INSERT INTO {table_name} (id, account, label, is_admin, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET
             account = excluded.account,
             label = excluded.label,
             is_admin = excluded.is_admin,
             updated_at = ?
-        "#,
-        table_name
+        "#
     ))
     .bind(&updated_user.id)
     .bind(&updated_user.account)
@@ -123,9 +119,8 @@ pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Resul
     // Fetch the user to get the sequence_number
     sqlx::query_as::<_, User>(&format!(
         r#"
-        SELECT * FROM {} WHERE id = ?
-        "#,
-        table_name
+        SELECT * FROM {table_name} WHERE id = ?
+        "#
     ))
     .bind(&updated_user.id)
     .fetch_one(pool)
@@ -141,9 +136,8 @@ pub(super) async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<
 
     sqlx::query(&format!(
         r#"
-        DELETE FROM {} WHERE id = ?
-        "#,
-        table_name
+        DELETE FROM {table_name} WHERE id = ?
+        "#
     ))
     .bind(id)
     .execute(pool)

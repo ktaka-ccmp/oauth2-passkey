@@ -151,7 +151,7 @@ async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCo
             let stored_credentials = list_credentials_core(&user.id).await.map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to fetch credentials: {:?}", e),
+                    format!("Failed to fetch credentials: {e:?}"),
                 )
             })?;
 
@@ -192,7 +192,7 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
     let stored_credentials = list_credentials_core(user_id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch credentials: {:?}", e),
+            format!("Failed to fetch credentials: {e:?}"),
         )
     })?;
 
@@ -206,7 +206,7 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
             .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to fetch authenticator info: {:?}", e),
+                    format!("Failed to fetch authenticator info: {e:?}"),
                 )
             })?;
 
@@ -240,7 +240,7 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
     let oauth2_accounts = list_accounts_core(user_id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch accounts: {:?}", e),
+            format!("Failed to fetch accounts: {e:?}"),
         )
     })?;
 
@@ -279,7 +279,7 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
     let html = template.render().map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Template rendering error: {:?}", e),
+            format!("Template rendering error: {e:?}"),
         )
     })?;
 

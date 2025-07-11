@@ -851,7 +851,7 @@ mod tests {
         assert!(result.is_err());
         match result.unwrap_err() {
             SessionError::SessionError => {} // This is the expected error
-            err => panic!("Expected SessionError::SessionError, got: {:?}", err),
+            err => panic!("Expected SessionError::SessionError, got: {err:?}"),
         }
     }
 
@@ -897,7 +897,7 @@ mod tests {
         assert!(result.is_err());
         match result.unwrap_err() {
             SessionError::SessionError => {} // This is expected since the user doesn't exist in database
-            err => panic!("Expected SessionError::SessionError, got: {:?}", err),
+            err => panic!("Expected SessionError::SessionError, got: {err:?}"),
         }
     }
 
@@ -920,7 +920,7 @@ mod tests {
         assert!(result.is_err());
         match result.unwrap_err() {
             SessionError::SessionError => {} // This is the expected error
-            err => panic!("Expected SessionError::SessionError, got: {:?}", err),
+            err => panic!("Expected SessionError::SessionError, got: {err:?}"),
         }
     }
 
@@ -1307,7 +1307,7 @@ mod tests {
             SessionError::CsrfToken(msg) => {
                 assert!(msg.contains("CSRF token mismatch"));
             }
-            err => panic!("Expected SessionError::CsrfToken, got: {:?}", err),
+            err => panic!("Expected SessionError::CsrfToken, got: {err:?}"),
         }
     }
 
@@ -1361,7 +1361,7 @@ mod tests {
                 // This is actually correct behavior for a non-existent user
             }
             Err(err) => {
-                panic!("Unexpected error type: {:?}", err);
+                panic!("Unexpected error type: {err:?}");
             }
         }
     }
@@ -1386,7 +1386,7 @@ mod tests {
         assert!(result.is_err());
         match result.unwrap_err() {
             SessionError::SessionError => {} // This is the expected error
-            err => panic!("Expected SessionError::SessionError, got: {:?}", err),
+            err => panic!("Expected SessionError::SessionError, got: {err:?}"),
         }
     }
 
@@ -1434,10 +1434,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(SessionError::SessionExpiredError) => {} // Expected error for expired session
-            other => panic!(
-                "Expected SessionError::SessionExpiredError, got: {:?}",
-                other
-            ),
+            other => panic!("Expected SessionError::SessionExpiredError, got: {other:?}"),
         }
 
         // Verify that the expired session was deleted from the cache
@@ -1687,7 +1684,7 @@ mod tests {
         assert!(auth_result_post.is_err()); // Should fail due to CSRF validation
         match auth_result_post.unwrap_err() {
             SessionError::CsrfToken(_) => {} // Expected CSRF error
-            err => panic!("Expected SessionError::CsrfToken, got: {:?}", err),
+            err => panic!("Expected SessionError::CsrfToken, got: {err:?}"),
         }
 
         // Test with non-existent session
@@ -1792,7 +1789,7 @@ mod tests {
 
         match result {
             Err(crate::session::errors::SessionError::SessionError) => {} // Expected error
-            other => panic!("Expected SessionError::SessionError, got: {:?}", other),
+            other => panic!("Expected SessionError::SessionError, got: {other:?}"),
         }
     }
 
@@ -1936,7 +1933,7 @@ mod tests {
 
         match auth_result_wrong {
             Err(crate::session::errors::SessionError::CsrfToken(_)) => {} // Expected error
-            other => panic!("Expected SessionError::CsrfToken, got: {:?}", other),
+            other => panic!("Expected SessionError::CsrfToken, got: {other:?}"),
         }
     }
 
@@ -2158,7 +2155,7 @@ mod tests {
         );
         headers.append(
             COOKIE,
-            HeaderValue::from_str(&format!("{}={}", cookie_name, session_id)).unwrap(),
+            HeaderValue::from_str(&format!("{cookie_name}={session_id}")).unwrap(),
         );
         headers.append(
             COOKIE,
@@ -2187,8 +2184,7 @@ mod tests {
         let cookie_name = SESSION_COOKIE_NAME.to_string();
         let session_id = "test_session_id_semicolon";
         let cookie_str = format!(
-            "_ga=GA1.1.2096617346; other_cookie=value; {}={}; final_cookie=final_value",
-            cookie_name, session_id
+            "_ga=GA1.1.2096617346; other_cookie=value; {cookie_name}={session_id}; final_cookie=final_value"
         );
         let headers = create_header_map_with_cookie_string(&cookie_str);
 

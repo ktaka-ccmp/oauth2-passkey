@@ -116,8 +116,7 @@ pub(super) fn verify_tpm_attestation(
     // Verify the version
     if ver != "2.0" {
         return Err(PasskeyError::Verification(format!(
-            "Unsupported TPM version: {}",
-            ver
+            "Unsupported TPM version: {ver}"
         )));
     }
 
@@ -127,8 +126,7 @@ pub(super) fn verify_tpm_attestation(
         -7 => &webpki::ECDSA_P256_SHA256,
         _ => {
             return Err(PasskeyError::Verification(format!(
-                "Unsupported algorithm for TPM attestation: {}",
-                alg
+                "Unsupported algorithm for TPM attestation: {alg}"
             )));
         }
     };
@@ -152,8 +150,7 @@ pub(super) fn verify_tpm_attestation(
             }
             Err(e) => {
                 return Err(PasskeyError::Verification(format!(
-                    "Failed to verify TPM signature: {:?}",
-                    e
+                    "Failed to verify TPM signature: {e:?}"
                 )));
             }
         }
@@ -189,9 +186,8 @@ fn verify_aik_certificate_fallback(
     cert_bytes: &[u8],
     auth_data: &[u8],
 ) -> Result<(), PasskeyError> {
-    let (_, cert) = X509Certificate::from_der(cert_bytes).map_err(|e| {
-        PasskeyError::Verification(format!("Failed to parse AIK certificate: {}", e))
-    })?;
+    let (_, cert) = X509Certificate::from_der(cert_bytes)
+        .map_err(|e| PasskeyError::Verification(format!("Failed to parse AIK certificate: {e}")))?;
 
     // 1. Verify that the certificate is version 3
     if cert.version != x509_parser::prelude::X509Version(2) {
@@ -488,8 +484,7 @@ fn verify_public_key_match(auth_data: &[u8], pub_area: &[u8]) -> Result<(), Pass
         }
         (Some(k), _) => {
             return Err(PasskeyError::Verification(format!(
-                "Key type mismatch or unsupported key type: {}",
-                k
+                "Key type mismatch or unsupported key type: {k}"
             )));
         }
         (None, _) => {
@@ -715,8 +710,7 @@ fn extract_public_key_from_pub_area(pub_area: &[u8]) -> Result<KeyDetails, Passk
             Ok(KeyDetails::Ecc { x, y })
         }
         _ => Err(PasskeyError::Verification(format!(
-            "Unsupported TPM algorithm type: {:04x}",
-            alg_type
+            "Unsupported TPM algorithm type: {alg_type:04x}"
         ))),
     }
 }
@@ -741,8 +735,7 @@ fn verify_cert_info(
     let magic = u32::from_be_bytes([cert_info[0], cert_info[1], cert_info[2], cert_info[3]]);
     if magic != TPM_GENERATED_VALUE {
         return Err(PasskeyError::Verification(format!(
-            "Invalid magic value: {:x}, expected: {:x}",
-            magic, TPM_GENERATED_VALUE
+            "Invalid magic value: {magic:x}, expected: {TPM_GENERATED_VALUE:x}"
         )));
     }
 
@@ -750,8 +743,7 @@ fn verify_cert_info(
     let attest_type = u16::from_be_bytes([cert_info[4], cert_info[5]]);
     if attest_type != TPM_ST_ATTEST_CERTIFY {
         return Err(PasskeyError::Verification(format!(
-            "Invalid attestation type: {:x}, expected: {:x}",
-            attest_type, TPM_ST_ATTEST_CERTIFY
+            "Invalid attestation type: {attest_type:x}, expected: {TPM_ST_ATTEST_CERTIFY:x}"
         )));
     }
 
@@ -760,8 +752,7 @@ fn verify_cert_info(
         TPM_ST_ATTEST_CERTIFY => "SHA256",
         _ => {
             return Err(PasskeyError::Verification(format!(
-                "Unsupported attestation type: {:x}",
-                attest_type
+                "Unsupported attestation type: {attest_type:x}"
             )));
         }
     };
@@ -976,7 +967,7 @@ fn extract_credential_public_key(auth_data: &[u8]) -> Result<CborValue, PasskeyE
     // Parse the CBOR-encoded credential public key
     let cred_pub_key_bytes = &auth_data[offset..cred_pub_key_end];
     let cred_pub_key = ciborium::de::from_reader(cred_pub_key_bytes).map_err(|e| {
-        PasskeyError::Format(format!("Failed to parse credential public key CBOR: {}", e))
+        PasskeyError::Format(format!("Failed to parse credential public key CBOR: {e}"))
     })?;
 
     Ok(cred_pub_key)
@@ -1462,15 +1453,12 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(PasskeyError::Verification(msg)) => {
-                println!("Actual error message: '{}'", msg);
+                println!("Actual error message: '{msg}'");
                 assert!(msg.contains("Unsupported algorithm for TPM attestation: 999"));
             }
             Err(other_error) => {
-                println!("Got different error type: {:?}", other_error);
-                panic!(
-                    "Expected PasskeyError::Verification, got: {:?}",
-                    other_error
-                );
+                println!("Got different error type: {other_error:?}");
+                panic!("Expected PasskeyError::Verification, got: {other_error:?}");
             }
             Ok(_) => panic!("Expected error but got success"),
         }

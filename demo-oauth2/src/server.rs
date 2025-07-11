@@ -37,11 +37,7 @@ pub(crate) fn init_tracing(app_name: &str) {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         #[cfg(debug_assertions)]
         {
-            format!(
-                "oauth2_passkey_axum=trace,oauth2_passkey=trace,{}=trace",
-                app_name
-            )
-            .into()
+            format!("oauth2_passkey_axum=trace,oauth2_passkey=trace,{app_name}=trace").into()
         }
 
         #[cfg(not(debug_assertions))]

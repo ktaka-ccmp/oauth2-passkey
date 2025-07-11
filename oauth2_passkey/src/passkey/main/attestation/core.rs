@@ -30,7 +30,7 @@ pub(crate) fn verify_attestation(
                 &attestation.att_stmt,
             )
             .map_err(|e| {
-                PasskeyError::Verification(format!("Attestation verification failed: {:?}", e))
+                PasskeyError::Verification(format!("Attestation verification failed: {e:?}"))
             })
         }
         "tpm" => {
@@ -42,7 +42,7 @@ pub(crate) fn verify_attestation(
                 &attestation.att_stmt,
             )
             .map_err(|e| {
-                PasskeyError::Verification(format!("Attestation verification failed: {:?}", e))
+                PasskeyError::Verification(format!("Attestation verification failed: {e:?}"))
             })
         }
         "fido-u2f" => {
@@ -54,7 +54,7 @@ pub(crate) fn verify_attestation(
                 &attestation.att_stmt,
             )
             .map_err(|e| {
-                PasskeyError::Verification(format!("Attestation verification failed: {:?}", e))
+                PasskeyError::Verification(format!("Attestation verification failed: {e:?}"))
             })
         }
         _ => Err(PasskeyError::Format(
@@ -73,7 +73,7 @@ pub(crate) fn extract_aaguid(attestation: &AttestationObject) -> Result<String, 
 
     let aaguid_bytes = &attestation.auth_data[37..53];
     let aaguid = Uuid::from_slice(aaguid_bytes)
-        .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {}", e)))?
+        .map_err(|e| PasskeyError::Verification(format!("Failed to parse AAGUID: {e}")))?
         .hyphenated()
         .to_string();
     Ok(aaguid)
@@ -171,8 +171,7 @@ mod tests {
             // Should get format error for unrecognized formats
             assert!(
                 matches!(result, Err(PasskeyError::Format(_))),
-                "Expected format error for format: '{}'",
-                format
+                "Expected format error for format: '{format}'"
             );
 
             // Verify the error message
@@ -257,8 +256,7 @@ mod tests {
             // Should get format error for unrecognized formats
             assert!(
                 matches!(result, Err(PasskeyError::Format(_))),
-                "Expected format error for format: '{}'",
-                format
+                "Expected format error for format: '{format}'"
             );
         }
     }

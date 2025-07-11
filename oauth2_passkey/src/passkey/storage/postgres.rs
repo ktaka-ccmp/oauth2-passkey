@@ -17,9 +17,9 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
 
     sqlx::query(&format!(
         r#"
-        CREATE TABLE IF NOT EXISTS {} (
+        CREATE TABLE IF NOT EXISTS {passkey_table} (
             credential_id TEXT PRIMARY KEY NOT NULL,
-            user_id TEXT NOT NULL REFERENCES {}(id),
+            user_id TEXT NOT NULL REFERENCES {users_table}(id),
             public_key TEXT NOT NULL,
             counter INTEGER NOT NULL DEFAULT 0,
             user_handle TEXT NOT NULL,
@@ -29,10 +29,9 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_used_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES {}(id)
+            FOREIGN KEY (user_id) REFERENCES {users_table}(id)
         )
-        "#,
-        passkey_table, users_table, users_table
+        "#
     ))
     .execute(pool)
     .await
@@ -112,14 +111,13 @@ pub(super) async fn store_credential_postgres(
 
     sqlx::query_as::<_, (i32,)>(&format!(
         r#"
-        INSERT INTO {}
+        INSERT INTO {passkey_table}
         (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, created_at, updated_at, last_used_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         ON CONFLICT (credential_id) DO UPDATE
         SET user_id = $2, public_key = $3, counter = $4, user_handle = $5, user_name = $6, user_display_name = $7, aaguid = $8, updated_at = CURRENT_TIMESTAMP, last_used_at = CURRENT_TIMESTAMP
         RETURNING 1
-        "#,
-        passkey_table
+        "#
     ))
     .bind(credential_id)
     .bind(user_id)
@@ -146,8 +144,7 @@ pub(super) async fn get_credential_postgres(
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
     sqlx::query_as::<_, PasskeyCredential>(&format!(
-        r#"SELECT * FROM {} WHERE credential_id = $1"#,
-        passkey_table
+        r#"SELECT * FROM {passkey_table} WHERE credential_id = $1"#
     ))
     .bind(credential_id)
     .fetch_optional(pool)
@@ -162,22 +159,19 @@ pub(super) async fn get_credentials_by_field_postgres(
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
     let (query, value) = match field {
         CredentialSearchField::CredentialId(credential_id) => (
-            &format!(
-                r#"SELECT * FROM {} WHERE credential_id = $1"#,
-                passkey_table
-            ),
+            &format!(r#"SELECT * FROM {passkey_table} WHERE credential_id = $1"#),
             credential_id.as_str(),
         ),
         CredentialSearchField::UserId(id) => (
-            &format!(r#"SELECT * FROM {} WHERE user_id = $1"#, passkey_table),
+            &format!(r#"SELECT * FROM {passkey_table} WHERE user_id = $1"#),
             id.as_str(),
         ),
         CredentialSearchField::UserHandle(handle) => (
-            &format!(r#"SELECT * FROM {} WHERE user_handle = $1"#, passkey_table),
+            &format!(r#"SELECT * FROM {passkey_table} WHERE user_handle = $1"#),
             handle.as_str(),
         ),
         CredentialSearchField::UserName(name) => (
-            &format!(r#"SELECT * FROM {} WHERE user_name = $1"#, passkey_table),
+            &format!(r#"SELECT * FROM {passkey_table} WHERE user_name = $1"#),
             name.as_str(),
         ),
     };
@@ -199,12 +193,11 @@ pub(super) async fn update_credential_counter_postgres(
 
     sqlx::query_as::<_, (i32,)>(&format!(
         r#"
-        UPDATE {}
+        UPDATE {passkey_table}
         SET counter = $1, updated_at = CURRENT_TIMESTAMP
         WHERE credential_id = $2
         RETURNING 1
-        "#,
-        passkey_table
+        "#
     ))
     .bind(counter_i32)
     .bind(credential_id)
@@ -222,19 +215,19 @@ pub(super) async fn delete_credential_by_field_postgres(
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
     let (query, value) = match field {
         CredentialSearchField::CredentialId(credential_id) => (
-            &format!(r#"DELETE FROM {} WHERE credential_id = $1"#, passkey_table),
+            &format!(r#"DELETE FROM {passkey_table} WHERE credential_id = $1"#),
             credential_id.as_str(),
         ),
         CredentialSearchField::UserId(id) => (
-            &format!(r#"DELETE FROM {} WHERE user_id = $1"#, passkey_table),
+            &format!(r#"DELETE FROM {passkey_table} WHERE user_id = $1"#),
             id.as_str(),
         ),
         CredentialSearchField::UserHandle(handle) => (
-            &format!(r#"DELETE FROM {} WHERE user_handle = $1"#, passkey_table),
+            &format!(r#"DELETE FROM {passkey_table} WHERE user_handle = $1"#),
             handle.as_str(),
         ),
         CredentialSearchField::UserName(name) => (
-            &format!(r#"DELETE FROM {} WHERE user_name = $1"#, passkey_table),
+            &format!(r#"DELETE FROM {passkey_table} WHERE user_name = $1"#),
             name.as_str(),
         ),
     };
@@ -257,8 +250,7 @@ pub(super) async fn update_credential_user_details_postgres(
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
     sqlx::query(&format!(
-        r#"UPDATE {} SET user_name = $1, user_display_name = $2 WHERE credential_id = $3"#,
-        passkey_table
+        r#"UPDATE {passkey_table} SET user_name = $1, user_display_name = $2 WHERE credential_id = $3"#
     ))
     .bind(name)
     .bind(display_name)
@@ -346,8 +338,7 @@ pub(super) async fn update_credential_last_used_at_postgres(
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
     sqlx::query(&format!(
-        r#"UPDATE {} SET last_used_at = $1 WHERE credential_id = $2"#,
-        passkey_table
+        r#"UPDATE {passkey_table} SET last_used_at = $1 WHERE credential_id = $2"#
     ))
     .bind(last_used_at)
     .bind(credential_id)
