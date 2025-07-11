@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2025-07-12
+
 ### Security
 
 - OpenID Connect compliant `at_hash` verification
