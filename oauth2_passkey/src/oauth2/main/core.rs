@@ -275,9 +275,7 @@ fn calculate_at_hash(access_token: &str, algorithm: Algorithm) -> Result<String,
         Algorithm::RS384 | Algorithm::HS384 | Algorithm::ES384 => {
             half_hash::<Sha384>(access_token.as_bytes())
         }
-        Algorithm::RS512 | Algorithm::HS512 => {
-            half_hash::<Sha512>(access_token.as_bytes())
-        }
+        Algorithm::RS512 | Algorithm::HS512 => half_hash::<Sha512>(access_token.as_bytes()),
         _ => {
             return Err(OAuth2Error::UnsupportedAlgorithm(format!(
                 "Unsupported algorithm for at_hash calculation: {:?}",
