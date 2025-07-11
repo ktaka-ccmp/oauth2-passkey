@@ -161,7 +161,7 @@ update_tag() {
 # Check if version is provided
 if [ -z "$1" ]; then
     echo "Usage: $0 [--exec|-e|--dry-run|-d|-n]"
-    echo "Example: $0 -e
+    echo "Example: $0 -e"
     exit 1
 fi
 
@@ -174,7 +174,7 @@ DRY_RUN=false
 if [[ "$1" == "--dry-run" || "$1" == "-d" || "$1" == "-n" ]]; then
     DRY_RUN=true
     echo "🧪 Dry run mode enabled. No changes will be pushed or published."
-else if [[ "$1" == "--exec" || "$1" == "-e" ]]; then
+elif [[ "$1" == "--exec" || "$1" == "-e" ]]; then
     DRY_RUN=false
     echo "🚀 Execution mode enabled. Changes will be pushed and published."
 else
