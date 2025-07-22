@@ -39,12 +39,14 @@ pub(crate) enum HttpMethod {
 /// 2. Validates the state parameter is not empty
 /// 3. Performs CSRF checks
 /// 4. Processes the OAuth2 authorization
+#[tracing::instrument(skip(auth_response, cookies, headers), fields(user_id, provider = "google", state = %auth_response.state))]
 pub async fn authorized_core(
     method: HttpMethod,
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
+    tracing::info!(?method, "Processing OAuth2 authorization callback");
     // Verify this is the correct response mode for the HTTP method
     match (method, OAUTH2_RESPONSE_MODE.to_lowercase().as_str()) {
         (HttpMethod::Get, "form_post") => {
@@ -154,9 +156,11 @@ pub async fn post_authorized_core(
     authorized_core(HttpMethod::Post, auth_response, cookies, headers).await
 }
 
+#[tracing::instrument(skip(auth_response), fields(user_id, provider = "google", state = %auth_response.state))]
 async fn process_oauth2_authorization(
     auth_response: &AuthResponse,
 ) -> Result<(HeaderMap, String), CoordinationError> {
+    tracing::info!("Processing OAuth2 authorization core logic");
     let (idinfo, userinfo) = get_idinfo_userinfo(auth_response).await?;
 
     // Convert GoogleUserInfo to DbUser and store it
@@ -296,6 +300,10 @@ async fn process_oauth2_authorization(
         }
     };
 
+    // Record user_id in the tracing span
+    tracing::Span::current().record("user_id", &user_id);
+    tracing::info!(user_id = %user_id, "OAuth2 authorization completed successfully");
+
     let mut headers = new_session_header(user_id).await?;
 
     let _ = header_set_cookie(
@@ -362,11 +370,13 @@ fn get_oauth2_field_mappings() -> (String, String) {
 ///
 /// This function checks that the OAuth2 account belongs to the authenticated user
 /// before deleting it to prevent unauthorized deletions.
+#[tracing::instrument(fields(user_id, provider, provider_user_id))]
 pub async fn delete_oauth2_account_core(
     user_id: &str,
     provider: &str,
     provider_user_id: &str,
 ) -> Result<(), CoordinationError> {
+    tracing::info!("Attempting to delete OAuth2 account");
     // Ensure user is authenticated
     // let user = user.ok_or_else(|| CoordinationError::Unauthorized.log())?;
 
@@ -443,8 +453,12 @@ async fn get_oauth2_accounts(user_id: &str) -> Result<Vec<OAuth2Account>, Coordi
 ///     }
 /// }
 /// ```
+#[tracing::instrument(fields(user_id))]
 pub async fn list_accounts_core(user_id: &str) -> Result<Vec<OAuth2Account>, CoordinationError> {
-    get_oauth2_accounts(user_id).await
+    tracing::debug!("Listing OAuth2 accounts for user");
+    let accounts = get_oauth2_accounts(user_id).await?;
+    tracing::info!(account_count = accounts.len(), "Retrieved OAuth2 accounts");
+    Ok(accounts)
 }
 
 #[cfg(test)]

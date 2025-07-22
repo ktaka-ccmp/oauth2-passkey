@@ -21,7 +21,9 @@ use crate::storage::GENERIC_CACHE_STORE;
 ///
 /// # Returns
 /// * `Result<HeaderMap, SessionError>` - The headers with the logout response, or an error
+#[tracing::instrument(skip(cookies))]
 pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderMap, SessionError> {
+    tracing::info!("Preparing logout response and clearing session");
     let mut headers = HeaderMap::new();
     header_set_cookie(
         &mut headers,
@@ -34,8 +36,13 @@ pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderM
     Ok(headers)
 }
 
+#[tracing::instrument(fields(user_id, session_id))]
 pub(super) async fn create_new_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {
+    tracing::info!("Creating new session for user");
     let session_id = gen_random_string(32)?;
+
+    // Record session_id in the tracing span
+    tracing::Span::current().record("session_id", &session_id);
     let expires_at = Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64);
 
     let csrf_token = gen_random_string(32)?;
@@ -124,7 +131,9 @@ pub(crate) async fn delete_session_from_store_by_session_id(
 ///     }
 /// }
 /// ```
+#[tracing::instrument(fields(session_cookie = %session_cookie, user_id))]
 pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, SessionError> {
+    tracing::debug!("Retrieving user from session");
     let cached_session = GENERIC_CACHE_STORE
         .lock()
         .await
@@ -139,6 +148,10 @@ pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, 
         .await
         .map_err(|_| SessionError::SessionError)?
         .ok_or(SessionError::SessionError)?;
+
+    // Record user_id in the tracing span
+    tracing::Span::current().record("user_id", &user.id);
+    tracing::debug!(user_id = %user.id, "Successfully retrieved user from session");
 
     Ok(SessionUser::from(user))
 }
@@ -577,7 +590,9 @@ pub async fn is_authenticated_basic_then_user_and_csrf(
 ///     }
 /// }
 /// ```
+#[tracing::instrument(fields(session_id = %session_id))]
 pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, SessionError> {
+    tracing::debug!("Retrieving CSRF token from session");
     let cached_session = GENERIC_CACHE_STORE
         .lock()
         .await

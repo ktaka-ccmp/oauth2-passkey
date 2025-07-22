@@ -81,7 +81,7 @@ pub use middleware::{
 pub use passkey::passkey_well_known_router;
 
 // Main router that provides all authentication endpoints
-pub use router::oauth2_passkey_router;
+pub use router::{oauth2_passkey_router, oauth2_passkey_router_no_trace};
 
 // Axum extractor for authenticated users
 pub use session::AuthUser;

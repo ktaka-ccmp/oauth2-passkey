@@ -39,20 +39,46 @@ impl UserStore {
     }
 
     /// Get a user by their ID
+    #[tracing::instrument(fields(user_id = %id, operation = "get_user"))]
     pub(crate) async fn get_user(id: &str) -> Result<Option<User>, UserError> {
+        let start_time = std::time::Instant::now();
         let store = GENERIC_DATA_STORE.lock().await;
 
-        if let Some(pool) = store.as_sqlite() {
+        let result = if let Some(pool) = store.as_sqlite() {
+            tracing::debug!("Using SQLite for user lookup");
             get_user_sqlite(pool, id).await
         } else if let Some(pool) = store.as_postgres() {
+            tracing::debug!("Using PostgreSQL for user lookup");
             get_user_postgres(pool, id).await
         } else {
             Err(UserError::Storage("Unsupported database type".to_string()))
+        };
+
+        let duration_ms = start_time.elapsed().as_millis() as u64;
+        match &result {
+            Ok(Some(_)) => {
+                tracing::info!(duration_ms, found = true, "User lookup completed");
+            }
+            Ok(None) => {
+                tracing::info!(
+                    duration_ms,
+                    found = false,
+                    "User lookup completed - not found"
+                );
+            }
+            Err(e) => {
+                tracing::error!(duration_ms, error = %e, "User lookup failed");
+            }
         }
+
+        result
     }
 
     /// Create or update a user
+    #[tracing::instrument(skip(user), fields(user_id = %user.id, operation = "upsert_user"))]
     pub(crate) async fn upsert_user(user: User) -> Result<User, UserError> {
+        let start_time = std::time::Instant::now();
+        tracing::debug!(user_account = %user.account, "Upserting user");
         let store = GENERIC_DATA_STORE.lock().await;
 
         // Perform the upsert operation
@@ -66,7 +92,7 @@ impl UserStore {
 
         // Check if this is the first user (sequence_number = 1)
         // If so, make them an admin if they aren't already
-        if result.sequence_number == Some(1) && !result.is_admin {
+        let final_result = if result.sequence_number == Some(1) && !result.is_admin {
             let mut admin_user = result.clone();
             admin_user.is_admin = true;
 
@@ -80,7 +106,25 @@ impl UserStore {
             }
         } else {
             Ok(result)
+        };
+
+        let duration_ms = start_time.elapsed().as_millis() as u64;
+        match &final_result {
+            Ok(user) => {
+                tracing::info!(
+                    duration_ms,
+                    user_id = %user.id,
+                    is_admin = user.is_admin,
+                    sequence_number = user.sequence_number,
+                    "User upsert completed successfully"
+                );
+            }
+            Err(e) => {
+                tracing::error!(duration_ms, error = %e, "User upsert failed");
+            }
         }
+
+        final_result
     }
 
     pub(crate) async fn delete_user(id: &str) -> Result<(), UserError> {
