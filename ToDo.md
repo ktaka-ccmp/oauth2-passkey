@@ -7,7 +7,7 @@
 - ~~**Fix CI/CD**: Update `.github/workflows/ci.yml` branch references (master → main or actual branch names)~~ ✅ **DONE** - CI is already properly configured for master/develop branches with comprehensive testing, security audits, and documentation checks
 - ~~**Add Tracing**: Implement structured logging with `tracing` crate for production observability~~ ✅ **DONE** - Comprehensive tracing implementation completed
   - ✅ Enhanced error context using standard tracing (tracing-error not needed)
-  - ✅ Implemented tower-http trace middleware for HTTP request/response logging
+  - ✅ Documented how to add HTTP tracing middleware (user's choice)
   - ✅ Instrumented all coordination layer functions (OAuth2 & Passkey)
   - ✅ Added session management tracing with performance timing
   - ✅ Enhanced error logging with structured context and span correlation

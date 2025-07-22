@@ -9,7 +9,7 @@ The library now has **full tracing implementation**:
 - ✅ 155+ `tracing::` macro calls throughout the codebase
 - ✅ Basic tracing setup in demo applications
 - ✅ **IMPLEMENTED**: `#[instrument]` attributes for structured spans on all key functions
-- ✅ **IMPLEMENTED**: HTTP request tracing middleware with tower-http
+- ✅ **DOCUMENTED**: How to add HTTP request tracing middleware (optional)
 - ✅ **IMPLEMENTED**: Enhanced error context propagation with standard tracing
 - ✅ **IMPLEMENTED**: Performance timing for all storage operations
 - ✅ **IMPLEMENTED**: Session management tracing with span correlation
@@ -41,11 +41,10 @@ The library now has **full tracing implementation**:
 - `upsert_user()` - User creation/update with admin promotion tracking
 - All operations include database type (SQLite/PostgreSQL) and performance metrics
 
-### HTTP Middleware
-- **Request/Response Tracing**: Complete HTTP lifecycle logging
-- **Performance Metrics**: Request duration and latency measurement
-- **Header Capture**: Security-relevant header logging
-- **Flexible Integration**: Both traced and non-traced router options
+### HTTP Middleware (Optional)
+- **Documentation Provided**: Clear example of how to add tower-http TraceLayer
+- **User's Choice**: Library doesn't force HTTP tracing on users
+- **Flexible Integration**: Users can add their own HTTP middleware as needed
 
 ### Enhanced Error Context
 - **Structured Error Logging**: Rich error context with field extraction using standard tracing
@@ -65,7 +64,7 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
 ```
 
-Add to `oauth2_passkey_axum/Cargo.toml`:
+If you want HTTP request/response tracing, add to your application's `Cargo.toml`:
 
 ```toml
 [dependencies]
@@ -447,9 +446,10 @@ RUST_LOG="oauth2_passkey::userdb::storage=debug,oauth2_passkey::coordination=inf
 The OAuth2-Passkey library now provides **production-grade observability** with:
 
 - **Complete request correlation** across OAuth2 and Passkey authentication flows
-- **Comprehensive performance monitoring** with database query timing and HTTP metrics
+- **Comprehensive performance monitoring** with database query timing and storage metrics
 - **Enhanced security auditing** with structured authentication attempt logging
 - **Rich debugging context** with span correlation and error tracking
 - **Flexible logging levels** for development and production environments
+- **Optional HTTP tracing** - add tower-http TraceLayer if you want HTTP request/response logging
 
 The structured tracing provides comprehensive visibility into your authentication flows while maintaining performance and security. All instrumentation follows Rust and tracing best practices with minimal overhead.
