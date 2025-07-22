@@ -2,14 +2,120 @@
 
 ## Todo
 
-- Tests
-- GitHub Actions
-- Decide on Public API
+### High Priority
 
-- Tracing
+- **Fix CI/CD**: Update `.github/workflows/ci.yml` branch references (master → main or actual branch names)
+- **Add Tracing**: Implement structured logging with `tracing` crate for production observability
   - Use tracing-error crate https://crates.io/crates/tracing-error
   - Use https://docs.rs/tower-http/latest/tower_http/trace/index.html
   - https://docs.rs/tracing/latest/tracing/
+- **Clean Error Handling**: Replace 30+ `.unwrap()` calls in session module with proper error handling
+- **Integration Tests**: Add end-to-end tests for complete authentication flows
+- **Finalize Public API**: Review and document all public interfaces for 1.0 release
+
+### Medium Priority
+
+- **Expand OAuth2 Provider Support**: Add GitHub, Apple, Microsoft providers
+- **Add Database Support**: MySQL/MariaDB support for more deployment options
+- **Improve Demo Applications**: Custom login UI and user attribute extension examples
+
+### New Feature Enhancements
+
+#### Authentication Method Tracking ✅ **Recommended - Low Risk**
+**Goal**: Record how a user authenticated (OAuth2 vs Passkey) in session storage
+- **Implementation**: 
+  - Add `auth_method: AuthenticationMethod` enum to `StoredSession` struct
+  - Update session creation in oauth2.rs and passkey.rs coordination modules
+  - Handle backwards compatibility during deserialization
+- **Benefits**: 
+  - Conditional UI/UX based on auth method
+  - Security audit trails and logging
+  - Support for different user flows per auth method
+- **Complexity**: Low-Medium
+- **Security Impact**: Minimal
+
+#### OAuth2 Token Storage ⚠️ **High Value, High Security Risk**
+**Goal**: Store OAuth2 tokens (access, refresh, ID) with metadata for later API calls
+- **Current Gap**: Tokens are discarded after authentication - backend can't make Google API calls later
+- **Implementation Requirements**:
+  ```sql
+  -- New table needed
+  CREATE TABLE oauth2_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      provider TEXT NOT NULL,
+      access_token TEXT NOT NULL,        -- Must be encrypted
+      refresh_token TEXT,                -- Must be encrypted  
+      id_token TEXT,
+      token_type TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      scope TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+  );
+  ```
+- **Critical Security Measures Required**:
+  - **Field-level encryption** for all tokens at rest
+  - **Secure key management** with proper rotation
+  - **Automatic token refresh** background jobs
+  - **Comprehensive audit logging** of all token access
+  - **Secure token deletion** on user request
+  - **Minimal scope principle** - only store tokens with required permissions
+- **Alternative Approaches** (Lower Risk):
+  - Session-scoped tokens (discard on logout)
+  - On-demand re-authentication when API access needed
+  - API proxy pattern (backend makes calls without storing user tokens)
+- **Complexity**: Medium-High
+- **Security Impact**: High - stored tokens = access to user's external accounts
+
+### UI Improvements
+
+#### Critical (Affecting User Trust & Accessibility)
+- **Replace alert() dialogs** with proper toast/snackbar notification system
+- **Add accessibility features**: ARIA labels, keyboard navigation, focus management
+- **Implement proper error states** with inline form validation instead of just alerts
+- **Add loading indicators** (spinners/progress bars) for all async operations
+
+#### High Priority (Modern UX Standards)
+- **Improve responsive design**: Add tablet breakpoints, fix mobile modal handling
+- **Create confirmation dialogs** for destructive actions (replace browser confirm())
+- **Fix duplicate CSS files**: Consolidate admin_user.css and summary.css
+- **Add dark mode support** (already mentioned in TODOs)
+
+#### Medium Priority (Polish & Consistency)
+- **Design system**: Define consistent spacing, colors, typography, button styles
+- **Smooth transitions**: Add CSS transitions for modals, state changes
+- **Better mobile experience**: Larger tap targets, optimized forms
+- **User-friendly error messages**: Replace technical errors with helpful guidance
+
+#### Implementation Approach
+**Keep it simple and dependency-free:**
+- **No heavy JS frameworks** (React/Vue/Svelte/HTMX) - they complicate the library and force build tools on users
+- **Use modern CSS** for most improvements:
+  - CSS custom properties for theming (easy dark mode support)
+  - CSS Grid/Flexbox for responsive layouts
+  - CSS animations for smooth transitions
+  - Consider lightweight classless CSS like Pico.css or Water.css (~10KB)
+- **Minimal JS enhancements**:
+  - Alpine.js (15KB) for declarative interactivity if needed
+  - Tiny toast library like Notyf (4KB) for notifications
+  - Keep vanilla JS for critical auth flows
+- **Example approach**:
+  ```css
+  /* Modern CSS variables for theming */
+  :root {
+    --primary: #4285f4;
+    --radius: 8px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  [data-theme="dark"] {
+    --primary: #5a9fd4;
+    --bg: #1a1a1a;
+  }
+  ```
+
+### Existing Items
+
 - Use #[tracing::instrument]
   - async-backtrace
   - tokio-console https://zenn.dev/tfutada/articles/4dbb9659bb8102
@@ -26,8 +132,6 @@
 - Rate limiting?
 - Integration test
 - E2E test
-
-- add at_hash verification for oidc access token
 
 ## ChatGPT's assessment
 
@@ -210,6 +314,8 @@ Performance:
   - ✅ All session-related tests now pass (406 total tests passing)
   - **Location**: `oauth2_passkey/src/session/main/session.rs`
   - **Previously**: Memory leaks in cache store, inconsistent session validation behavior
+
+- add at_hash verification for oidc access token
 
 ## Memo
 
