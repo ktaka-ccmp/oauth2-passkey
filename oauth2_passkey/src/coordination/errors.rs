@@ -198,11 +198,18 @@ impl CoordinationError {
     /// error backtrace information for comprehensive error debugging.
     pub fn with_span_context(self) -> Self {
         // If tracing-error is properly configured, this will include span context
-        tracing::error!(
-            error = %self,
-            span_context = tracing::Span::current().metadata().map(|m| m.name()),
-            "Error with full span context captured"
-        );
+        if tracing::log::log_enabled!(tracing::Level::ERROR) {
+            tracing::error!(
+                error = %self,
+                span_context = tracing::Span::current().metadata().map(|m| m.name()),
+                "Error with full span context captured"
+            );
+        } else {
+            tracing::error!(
+                error = %self,
+                "Error captured without span context"
+            );
+        }
         self
     }
 }
