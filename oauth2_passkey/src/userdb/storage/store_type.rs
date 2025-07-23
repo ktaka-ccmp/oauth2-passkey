@@ -39,9 +39,8 @@ impl UserStore {
     }
 
     /// Get a user by their ID
-    #[tracing::instrument(fields(user_id = %id, operation = "get_user"))]
+    #[tracing::instrument(fields(user_id = %id))]
     pub(crate) async fn get_user(id: &str) -> Result<Option<User>, UserError> {
-        let start_time = std::time::Instant::now();
         let store = GENERIC_DATA_STORE.lock().await;
 
         let result = if let Some(pool) = store.as_sqlite() {
@@ -54,20 +53,15 @@ impl UserStore {
             Err(UserError::Storage("Unsupported database type".to_string()))
         };
 
-        let duration_ms = start_time.elapsed().as_millis() as u64;
         match &result {
             Ok(Some(_)) => {
-                tracing::info!(duration_ms, found = true, "User lookup completed");
+                tracing::info!(found = true, "User lookup completed");
             }
             Ok(None) => {
-                tracing::info!(
-                    duration_ms,
-                    found = false,
-                    "User lookup completed - not found"
-                );
+                tracing::info!(found = false, "User lookup completed - not found");
             }
             Err(e) => {
-                tracing::error!(duration_ms, error = %e, "User lookup failed");
+                tracing::error!(error = %e, "User lookup failed");
             }
         }
 
@@ -75,9 +69,8 @@ impl UserStore {
     }
 
     /// Create or update a user
-    #[tracing::instrument(skip(user), fields(user_id = %user.id, operation = "upsert_user"))]
+    #[tracing::instrument(skip(user), fields(user_id = %user.id))]
     pub(crate) async fn upsert_user(user: User) -> Result<User, UserError> {
-        let start_time = std::time::Instant::now();
         tracing::debug!(user_account = %user.account, "Upserting user");
         let store = GENERIC_DATA_STORE.lock().await;
 
@@ -108,11 +101,9 @@ impl UserStore {
             Ok(result)
         };
 
-        let duration_ms = start_time.elapsed().as_millis() as u64;
         match &final_result {
             Ok(user) => {
                 tracing::info!(
-                    duration_ms,
                     user_id = %user.id,
                     is_admin = user.is_admin,
                     sequence_number = user.sequence_number,
@@ -120,7 +111,7 @@ impl UserStore {
                 );
             }
             Err(e) => {
-                tracing::error!(duration_ms, error = %e, "User upsert failed");
+                tracing::error!(error = %e, "User upsert failed");
             }
         }
 

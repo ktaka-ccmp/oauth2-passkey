@@ -113,7 +113,7 @@ pub async fn handle_start_registration_core(
 /// This function takes an optional reference to a SessionUser and registration data,
 /// and either registers a new credential for an existing user or creates a new user
 /// with the credential.
-#[tracing::instrument(skip(auth_user, reg_data), fields(user_id = auth_user.as_ref().map(|u| u.id.as_str()), credential_id))]
+#[tracing::instrument(skip(auth_user, reg_data), fields(user_id = auth_user.as_ref().map(|u| u.id.as_str())))]
 pub async fn handle_finish_registration_core(
     auth_user: Option<&SessionUser>,
     reg_data: RegisterCredential,
@@ -222,7 +222,7 @@ pub async fn handle_start_authentication_core(
 ///
 /// This function verifies the authentication response, creates a session for the
 /// authenticated user, and returns the user ID, name, and session headers.
-#[tracing::instrument(skip(auth_response), fields(user_id, credential_id))]
+#[tracing::instrument(skip(auth_response), fields(user_id))]
 pub async fn handle_finish_authentication_core(
     auth_response: AuthenticatorResponse,
 ) -> Result<(String, String, HeaderMap), CoordinationError> {

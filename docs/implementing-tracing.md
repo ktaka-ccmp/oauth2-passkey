@@ -37,9 +37,9 @@ The library now has **full tracing implementation**:
 - `get_csrf_token_from_session()` - CSRF token operations
 
 **Storage Operations:**
-- `get_user()` - User lookup with database timing and result logging
+- `get_user()` - User lookup with automatic span timing and result logging
 - `upsert_user()` - User creation/update with admin promotion tracking
-- All operations include database type (SQLite/PostgreSQL) and performance metrics
+- All operations include database type (SQLite/PostgreSQL) with automatic performance metrics via span timing
 
 ### HTTP Middleware (Optional)
 - **Documentation Provided**: Clear example of how to add tower-http TraceLayer
@@ -282,43 +282,40 @@ impl CoordinationError {
 return Err(CoordinationError::InvalidState.log());
 ```
 
-### 5. Add Performance Timing for Critical Operations
+### 5. Leverage Automatic Span Timing
+
+Tracing automatically measures span duration, so manual timing is unnecessary:
 
 ```rust
-// oauth2_passkey/src/storage/
-impl<T: DatabaseStore, U: CacheStore> Storage<T, U> {
-    #[tracing::instrument(skip(self), fields(operation = "store_user"))]
-    pub async fn store_user(&self, user: &User) -> Result<(), StorageError> {
-        let start = std::time::Instant::now();
+// oauth2_passkey/src/userdb/storage/store_type.rs
+impl UserStore {
+    #[tracing::instrument(fields(user_id = %id))]
+    pub async fn get_user(id: &str) -> Result<Option<User>, UserError> {
+        // No manual timing needed - tracing measures the span automatically!
+        let store = GENERIC_DATA_STORE.lock().await;
         
-        let result = self.db.store_user(user).await;
+        let result = if let Some(pool) = store.as_sqlite() {
+            tracing::debug!("Using SQLite for user lookup");
+            get_user_sqlite(pool, id).await
+        } else if let Some(pool) = store.as_postgres() {
+            tracing::debug!("Using PostgreSQL for user lookup");
+            get_user_postgres(pool, id).await
+        } else {
+            Err(UserError::Storage("Unsupported database type".to_string()))
+        };
         
-        tracing::info!(
-            duration_ms = start.elapsed().as_millis() as u64,
-            user_id = %user.id,
-            "User storage operation completed"
-        );
-        
-        result
-    }
-
-    #[tracing::instrument(skip(self), fields(operation = "get_user"))]
-    pub async fn get_user(&self, user_id: &str) -> Result<Option<User>, StorageError> {
-        let start = std::time::Instant::now();
-        
-        let result = self.db.get_user(user_id).await;
-        
-        tracing::debug!(
-            duration_ms = start.elapsed().as_millis() as u64,
-            user_id,
-            found = result.as_ref().map(|u| u.is_some()).unwrap_or(false),
-            "User lookup completed"
-        );
+        match &result {
+            Ok(Some(_)) => tracing::info!(found = true, "User lookup completed"),
+            Ok(None) => tracing::info!(found = false, "User lookup completed - not found"),
+            Err(e) => tracing::error!(error = %e, "User lookup failed"),
+        }
         
         result
     }
 }
 ```
+
+The span duration is automatically included in structured logs as `time.busy` and `time.idle` fields.
 
 ### 6. Enhanced Demo Application Setup
 
