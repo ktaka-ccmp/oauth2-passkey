@@ -76,10 +76,12 @@ pub struct RegistrationStartRequest {
 ///
 /// This function takes an optional reference to a SessionUser, extracts username and displayname
 /// from the request body, and returns registration options.
+#[tracing::instrument(skip(auth_user), fields(user_id = auth_user.as_ref().map(|u| u.id.as_str()), username = %body.username, display_name = %body.displayname, mode = ?body.mode))]
 pub async fn handle_start_registration_core(
     auth_user: Option<&SessionUser>,
     body: RegistrationStartRequest,
 ) -> Result<RegistrationOptions, CoordinationError> {
+    tracing::info!("Starting passkey registration flow");
     match body.mode {
         RegistrationMode::AddToUser => {
             let auth_user = match auth_user {
@@ -111,10 +113,12 @@ pub async fn handle_start_registration_core(
 /// This function takes an optional reference to a SessionUser and registration data,
 /// and either registers a new credential for an existing user or creates a new user
 /// with the credential.
+#[tracing::instrument(skip(auth_user, reg_data), fields(user_id = auth_user.as_ref().map(|u| u.id.as_str())))]
 pub async fn handle_finish_registration_core(
     auth_user: Option<&SessionUser>,
     reg_data: RegisterCredential,
 ) -> Result<(HeaderMap, String), CoordinationError> {
+    tracing::info!("Finishing passkey registration flow");
     match auth_user {
         Some(session_user) => {
             tracing::debug!("handle_finish_registration_core: User: {:#?}", session_user);
@@ -189,9 +193,11 @@ async fn get_account_and_label_from_passkey(reg_data: &RegisterCredential) -> (S
 ///
 /// This function extracts the username from the request body and starts the
 /// authentication process.
+#[tracing::instrument(skip(body), fields(username))]
 pub async fn handle_start_authentication_core(
     body: &Value,
 ) -> Result<AuthenticationOptions, CoordinationError> {
+    tracing::info!("Starting passkey authentication flow");
     // Extract username from the request body
     let username = if body.is_object() {
         body.get("username")
@@ -203,6 +209,11 @@ pub async fn handle_start_authentication_core(
         None
     };
 
+    // Record username in the tracing span
+    if let Some(ref username) = username {
+        tracing::Span::current().record("username", username);
+    }
+
     // Start the authentication process
     Ok(start_authentication(username).await?)
 }
@@ -211,14 +222,19 @@ pub async fn handle_start_authentication_core(
 ///
 /// This function verifies the authentication response, creates a session for the
 /// authenticated user, and returns the user ID, name, and session headers.
+#[tracing::instrument(skip(auth_response), fields(user_id))]
 pub async fn handle_finish_authentication_core(
     auth_response: AuthenticatorResponse,
 ) -> Result<(String, String, HeaderMap), CoordinationError> {
+    tracing::info!("Finishing passkey authentication flow");
     tracing::debug!("Auth response: {:#?}", auth_response);
 
     // Verify the authentication and get the user ID and name
     let (uid, name) = finish_authentication(auth_response).await?;
 
+    // Record user_id in the tracing span
+    tracing::Span::current().record("user_id", &uid);
+    tracing::info!(user_id = %uid, user_name = %name, "Passkey authentication successful");
     tracing::debug!("User ID: {:#?}", uid);
 
     // Create a session for the authenticated user
@@ -231,12 +247,17 @@ pub async fn handle_finish_authentication_core(
 ///
 /// This function takes a user ID and returns the list of stored credentials
 /// associated with that user, or an error if the user is not logged in.
+#[tracing::instrument(fields(user_id))]
 pub async fn list_credentials_core(
     user_id: &str,
 ) -> Result<Vec<PasskeyCredential>, CoordinationError> {
-    tracing::trace!("list_credentials_core: User ID: {:#?}", user_id);
+    tracing::debug!("Listing passkey credentials for user");
     let credentials =
         PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_owned())).await?;
+    tracing::info!(
+        credential_count = credentials.len(),
+        "Retrieved passkey credentials"
+    );
     Ok(credentials)
 }
 
@@ -244,11 +265,12 @@ pub async fn list_credentials_core(
 ///
 /// This function checks that the credential belongs to the authenticated user
 /// before deleting it to prevent unauthorized deletions.
+#[tracing::instrument(fields(user_id, credential_id))]
 pub async fn delete_passkey_credential_core(
     user_id: &str,
     credential_id: &str,
 ) -> Result<(), CoordinationError> {
-    tracing::debug!("Attempting to delete credential with ID: {}", credential_id);
+    tracing::info!("Attempting to delete passkey credential");
 
     let credential = PasskeyStore::get_credentials_by(CredentialSearchField::CredentialId(
         credential_id.to_owned(),
@@ -293,12 +315,14 @@ pub async fn delete_passkey_credential_core(
 ///
 /// # Returns
 /// * The updated credential information in a Result
+#[tracing::instrument(skip(session_user), fields(user_id = session_user.as_ref().map(|u| u.id.as_str()), credential_id, name, display_name))]
 pub async fn update_passkey_credential_core(
     credential_id: &str,
     name: &str,
     display_name: &str,
     session_user: Option<SessionUser>,
 ) -> Result<serde_json::Value, CoordinationError> {
+    tracing::info!("Updating passkey credential details");
     // Ensure the user is authenticated
     let user_id = match session_user {
         Some(user) => user.id,

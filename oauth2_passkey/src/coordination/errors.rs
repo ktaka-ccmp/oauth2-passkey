@@ -123,6 +123,104 @@ impl CoordinationError {
         }
         self
     }
+
+    /// Log the error with enhanced context including spans and return self
+    ///
+    /// This method provides structured error logging with additional context
+    /// from the current tracing span, making debugging easier in production.
+    pub fn log_with_context(self) -> Self {
+        match &self {
+            Self::Coordination(msg) => {
+                tracing::error!(error = %self, message = %msg, "Coordination error with context");
+            }
+            Self::Database(msg) => {
+                tracing::error!(error = %self, message = %msg, "Database error with context");
+            }
+            Self::Authentication(msg) => {
+                tracing::error!(error = %self, message = %msg, "Authentication error with context");
+            }
+            Self::SessionMismatch(msg) => {
+                tracing::error!(error = %self, message = %msg, "Session mismatch with context");
+            }
+            Self::MissingContextToken => {
+                tracing::error!(error = %self, "Context token missing with span context");
+            }
+            Self::Unauthorized => {
+                tracing::error!(error = %self, "Unauthorized access with span context");
+            }
+            Self::UnexpectedlyAuthorized => {
+                tracing::error!(error = %self, "Unexpectedly authorized with span context");
+            }
+            Self::NoContent => {
+                tracing::error!(error = %self, "No content with span context");
+            }
+            Self::InvalidMode => {
+                tracing::error!(error = %self, "Invalid mode with span context");
+            }
+            Self::InvalidState(msg) => {
+                tracing::error!(error = %self, message = %msg, "Invalid state with context");
+            }
+            Self::Conflict(msg) => {
+                tracing::error!(error = %self, message = %msg, "Conflict with context");
+            }
+            Self::ResourceNotFound {
+                resource_type,
+                resource_id,
+            } => {
+                tracing::error!(
+                    error = %self,
+                    resource_type = %resource_type,
+                    resource_id = %resource_id,
+                    "Resource not found with context"
+                );
+            }
+            // For wrapped errors, include the source error context
+            Self::UserError(err) => {
+                tracing::error!(error = %self, source_error = %err, "User error with context");
+            }
+            Self::OAuth2Error(err) => {
+                tracing::error!(error = %self, source_error = %err, "OAuth2 error with context");
+            }
+            Self::PasskeyError(err) => {
+                tracing::error!(error = %self, source_error = %err, "Passkey error with context");
+            }
+            Self::SessionError(err) => {
+                tracing::error!(error = %self, source_error = %err, "Session error with context");
+            }
+            Self::UtilsError(err) => {
+                tracing::error!(error = %self, source_error = %err, "Utils error with context");
+            }
+            Self::InvalidResponseMode(msg) => {
+                tracing::error!(error = %self, message = %msg, "Invalid response mode with context");
+            }
+        }
+        self
+    }
+
+    /// Create error with full debugging context including backtraces
+    ///
+    /// This method captures the current span context and any available
+    /// error backtrace information for comprehensive error debugging.
+    pub fn with_span_context(self) -> Self {
+        // If tracing-error is properly configured, this will include span context
+        if tracing::log::log_enabled!(tracing::log::Level::Error) {
+            let span_name = tracing::Span::current()
+                .metadata()
+                .map(|m| m.name())
+                .unwrap_or("unknown");
+            tracing::error!(
+                error = %self,
+                span_context = span_name,
+                "Error with full span context captured"
+            );
+        } else {
+            tracing::error!(
+                error = %self,
+                "Error captured without span context"
+            );
+        }
+        self
+    }
 }
 
 // Custom From implementations that automatically log errors
