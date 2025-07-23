@@ -420,12 +420,6 @@ pub async fn delete_oauth2_account_core(
     Ok(())
 }
 
-/// Get all OAuth2 accounts for a user
-async fn get_oauth2_accounts(user_id: &str) -> Result<Vec<OAuth2Account>, CoordinationError> {
-    let accounts = OAuth2Store::get_oauth2_accounts(user_id).await?;
-    Ok(accounts)
-}
-
 /// Lists all OAuth2 accounts associated with a user.
 ///
 /// This function retrieves all OAuth2 provider accounts (Google, etc.) that have been
@@ -456,7 +450,7 @@ async fn get_oauth2_accounts(user_id: &str) -> Result<Vec<OAuth2Account>, Coordi
 #[tracing::instrument(fields(user_id))]
 pub async fn list_accounts_core(user_id: &str) -> Result<Vec<OAuth2Account>, CoordinationError> {
     tracing::debug!("Listing OAuth2 accounts for user");
-    let accounts = get_oauth2_accounts(user_id).await?;
+    let accounts = OAuth2Store::get_oauth2_accounts(user_id).await?;
     tracing::info!(account_count = accounts.len(), "Retrieved OAuth2 accounts");
     Ok(accounts)
 }

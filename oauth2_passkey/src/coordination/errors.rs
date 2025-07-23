@@ -87,10 +87,6 @@ pub enum CoordinationError {
     /// Invalid response mode
     #[error("Invalid response mode: {0}")]
     InvalidResponseMode(String),
-
-    /// Unknown variant encountered
-    #[error("Unknown variant encountered")]
-    UnknownVariant,
 }
 
 impl CoordinationError {
@@ -124,7 +120,6 @@ impl CoordinationError {
             Self::InvalidResponseMode(message) => {
                 tracing::error!("Invalid response mode: {}", message)
             }
-            Self::UnknownVariant => tracing::error!("Unknown variant encountered"),
         }
         self
     }
@@ -198,10 +193,6 @@ impl CoordinationError {
             Self::InvalidResponseMode(msg) => {
                 tracing::error!(error = %self, message = %msg, "Invalid response mode with context");
             }
-            // Handle other variants explicitly to ensure all cases are covered
-            Self::UnknownVariant => {
-                tracing::error!(error = %self, "Unknown variant encountered with context");
-            }
         }
         self
     }
@@ -213,9 +204,13 @@ impl CoordinationError {
     pub fn with_span_context(self) -> Self {
         // If tracing-error is properly configured, this will include span context
         if tracing::log::log_enabled!(tracing::log::Level::Error) {
+            let span_name = tracing::Span::current()
+                .metadata()
+                .map(|m| m.name())
+                .unwrap_or("unknown");
             tracing::error!(
                 error = %self,
-                span_context = tracing::Span::current().metadata().map(|m| m.name()),
+                span_context = span_name,
                 "Error with full span context captured"
             );
         } else {
