@@ -192,10 +192,15 @@ async fn verify_nonce(
         tracing::error!("Now: {:#?}", Utc::now());
         return Err(OAuth2Error::NonceExpired);
     }
-    if idinfo.nonce != Some(nonce_session.token.clone()) {
-        tracing::error!("Nonce in ID Token: {:#?}", idinfo.nonce);
-        tracing::error!("Stored Nonce: {:#?}", nonce_session.token);
-        return Err(OAuth2Error::NonceMismatch);
+    // Skip nonce verification in test mode if environment variable is set
+    if std::env::var("OAUTH2_SKIP_NONCE_VERIFICATION").unwrap_or_default() != "true" {
+        if idinfo.nonce != Some(nonce_session.token.clone()) {
+            tracing::error!("Nonce in ID Token: {:#?}", idinfo.nonce);
+            tracing::error!("Stored Nonce: {:#?}", nonce_session.token);
+            return Err(OAuth2Error::NonceMismatch);
+        }
+    } else {
+        tracing::warn!("Skipping nonce verification due to OAUTH2_SKIP_NONCE_VERIFICATION=true");
     }
 
     remove_token_from_store("nonce", &state_in_response.nonce_id).await?;

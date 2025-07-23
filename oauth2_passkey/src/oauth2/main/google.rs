@@ -12,7 +12,7 @@ pub(super) async fn fetch_user_data_from_google(
 ) -> Result<GoogleUserInfo, OAuth2Error> {
     let client = get_client();
     let response = client
-        .get(OAUTH2_USERINFO_URL)
+        .get(OAUTH2_USERINFO_URL.as_str())
         .bearer_auth(access_token)
         .send()
         .await

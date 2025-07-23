@@ -290,8 +290,10 @@ pub(super) async fn verify_idtoken_with_algorithm(
     tracing::debug!("Algorithm from JWT header: {:?}", alg);
     tracing::debug!("Decoded id_token payload: {:#?}", idinfo);
 
-    let jwks_url = "https://www.googleapis.com/oauth2/v3/certs";
-    let jwks = fetch_jwks(jwks_url).await?;
+    // Allow overriding JWKS URL for testing
+    let jwks_url = std::env::var("GOOGLE_JWKS_URL")
+        .unwrap_or_else(|_| "https://www.googleapis.com/oauth2/v3/certs".to_string());
+    let jwks = fetch_jwks(&jwks_url).await?;
     let jwk = find_jwk(&jwks, &kid).ok_or(TokenVerificationError::NoMatchingKey)?;
 
     let decoding_key = convert_jwk_to_decoding_key(jwk)?;

@@ -46,13 +46,20 @@ jsonwebtoken = "9.3.1"
 oid-registry = "0.8.1"
 proptest = "1.7.0"
 redis = { version = "0.32.4", features = ["tokio-comp"] }
-reqwest = { version = "0.12.22", features = ["json"] }
+reqwest = { version = "0.12.22", features = ["json", "cookies"] }
 ring = { version = "0.17.14", features = ["std"] }
 serial_test = "3.2.0"
 sha2 = "0.10.9"
 url = "2.5.4"
 webpki = { version = "0.22.4", features = ["std"] }
 x509-parser = { version = "0.17.0", features = ["validate", "verify"] }
+
+### For integration tests
+tower = "0.5"
+tower-service = "0.3"
+hyper = "1.0"
+httpmock = "0.7"
+tempfile = "3.12"
 
 ### For demo-apps
 axum-server = { version = "0.7.2", features = ["tls-rustls"] }

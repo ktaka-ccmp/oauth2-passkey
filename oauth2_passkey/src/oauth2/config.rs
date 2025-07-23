@@ -1,7 +1,15 @@
 use crate::config::O2P_ROUTE_PREFIX;
 use std::{env, sync::LazyLock};
 
-pub(crate) static OAUTH2_USERINFO_URL: &str = "https://www.googleapis.com/userinfo/v2/me";
+/// The application origin URL for OAuth2 flows
+pub(crate) static OAUTH2_ORIGIN: LazyLock<String> =
+    LazyLock::new(|| env::var("ORIGIN").expect("ORIGIN must be set for OAuth2 flows"));
+
+pub(crate) static OAUTH2_USERINFO_URL: LazyLock<String> = LazyLock::new(|| {
+    env::var("OAUTH2_USERINFO_URL")
+        .ok()
+        .unwrap_or("https://www.googleapis.com/userinfo/v2/me".to_string())
+});
 
 pub static OAUTH2_AUTH_URL: LazyLock<String> = LazyLock::new(|| {
     env::var("OAUTH2_AUTH_URL")

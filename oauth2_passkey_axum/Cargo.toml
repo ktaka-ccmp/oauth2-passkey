@@ -37,3 +37,10 @@ urlencoding = { workspace = true }
 [dev-dependencies]
 dotenvy = { workspace = true }
 tokio = { version = "1", features = ["macros", "rt"] }
+# Integration test dependencies
+tower = { workspace = true }
+tower-service = { workspace = true }
+hyper = { workspace = true }
+httpmock = { workspace = true }
+tempfile = { workspace = true }
+serial_test = { workspace = true }

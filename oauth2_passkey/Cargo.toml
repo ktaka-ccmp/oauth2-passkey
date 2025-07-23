@@ -42,3 +42,14 @@ x509-parser = { workspace = true }
 [dev-dependencies]
 serial_test = { workspace = true }
 proptest = { workspace = true }
+# Integration test dependencies
+tower = { workspace = true }
+tower-service = { workspace = true }
+hyper = { workspace = true }
+httpmock = { workspace = true }
+tempfile = { workspace = true }
+axum = { workspace = true }
+reqwest = { workspace = true } 
+base64 = { workspace = true }
+chrono = { workspace = true }
+oauth2-passkey-axum = { path = "../oauth2_passkey_axum" }
