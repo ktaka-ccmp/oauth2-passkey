@@ -87,6 +87,10 @@ pub enum CoordinationError {
     /// Invalid response mode
     #[error("Invalid response mode: {0}")]
     InvalidResponseMode(String),
+
+    /// Unknown variant encountered
+    #[error("Unknown variant encountered")]
+    UnknownVariant,
 }
 
 impl CoordinationError {
@@ -120,6 +124,7 @@ impl CoordinationError {
             Self::InvalidResponseMode(message) => {
                 tracing::error!("Invalid response mode: {}", message)
             }
+            Self::UnknownVariant => tracing::error!("Unknown variant encountered"),
         }
         self
     }
@@ -150,6 +155,12 @@ impl CoordinationError {
             }
             Self::UnexpectedlyAuthorized => {
                 tracing::error!(error = %self, "Unexpectedly authorized with span context");
+            }
+            Self::NoContent => {
+                tracing::error!(error = %self, "No content with span context");
+            }
+            Self::InvalidMode => {
+                tracing::error!(error = %self, "Invalid mode with span context");
             }
             Self::InvalidState(msg) => {
                 tracing::error!(error = %self, message = %msg, "Invalid state with context");
@@ -184,6 +195,9 @@ impl CoordinationError {
             Self::UtilsError(err) => {
                 tracing::error!(error = %self, source_error = %err, "Utils error with context");
             }
+            Self::InvalidResponseMode(msg) => {
+                tracing::error!(error = %self, message = %msg, "Invalid response mode with context");
+            }
             // Handle other variants explicitly to ensure all cases are covered
             Self::UnknownVariant => {
                 tracing::error!(error = %self, "Unknown variant encountered with context");
@@ -198,7 +212,7 @@ impl CoordinationError {
     /// error backtrace information for comprehensive error debugging.
     pub fn with_span_context(self) -> Self {
         // If tracing-error is properly configured, this will include span context
-        if tracing::log::log_enabled!(tracing::Level::ERROR) {
+        if tracing::log::log_enabled!(tracing::log::Level::Error) {
             tracing::error!(
                 error = %self,
                 span_context = tracing::Span::current().metadata().map(|m| m.name()),
