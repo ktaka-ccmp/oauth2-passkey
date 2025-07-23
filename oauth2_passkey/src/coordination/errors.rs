@@ -184,9 +184,9 @@ impl CoordinationError {
             Self::UtilsError(err) => {
                 tracing::error!(error = %self, source_error = %err, "Utils error with context");
             }
-            // Handle other variants
-            _ => {
-                tracing::error!(error = %self, "Coordination error with context");
+            // Handle other variants explicitly to ensure all cases are covered
+            Self::UnknownVariant => {
+                tracing::error!(error = %self, "Unknown variant encountered with context");
             }
         }
         self
