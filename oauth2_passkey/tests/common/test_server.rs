@@ -7,90 +7,46 @@ use uuid::Uuid;
 static OAUTH2_PASSKEY_INITIALIZED: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
-/// Global storage for the test origin URL
-static TEST_ORIGIN: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
-
 /// Get the current test origin URL (always consistent across all tests)
 pub fn get_test_origin() -> String {
     "http://127.0.0.1:3000".to_string()
 }
 
-/// Set up test environment variables for integration testing with dynamic origin
-fn setup_test_environment_with_origin(_origin_url: &str) -> bool {
-    // Since LazyLock values are set once and never change, we need to avoid re-initializing
-    // oauth2_passkey if it's already been initialized with a different ORIGIN.
+/// Check if oauth2_passkey library has been initialized
+fn should_initialize_oauth2_passkey() -> bool {
+    // Since LazyLock values are set once and never change, we only initialize once
     let was_already_initialized =
         OAUTH2_PASSKEY_INITIALIZED.load(std::sync::atomic::Ordering::Acquire);
 
     if !was_already_initialized {
-        unsafe {
-            // Use consistent ORIGIN for all tests to avoid LazyLock race conditions
-            let consistent_origin = "http://127.0.0.1:3000";
-            println!("🔧 Setting consistent ORIGIN environment variable to: {consistent_origin}");
-            std::env::set_var("ORIGIN", consistent_origin);
-
-            // Store the consistent origin for mock credentials
-            {
-                let mut test_origin = TEST_ORIGIN.lock().unwrap();
-                *test_origin = Some(consistent_origin.to_string());
-            }
-
-            // Verify it was set correctly
-            let verify_origin = std::env::var("ORIGIN").unwrap_or_else(|_| "NOT_SET".to_string());
-            println!("🔍 Verified ORIGIN environment variable: {verify_origin}");
-        }
-        setup_test_environment();
-        true // Indicates this call should initialize oauth2_passkey
+        println!("🔧 First test run - will initialize oauth2_passkey library");
+        true
     } else {
-        false // oauth2_passkey already initialized, skip re-initialization
+        println!("⏭️  oauth2_passkey already initialized - skipping re-initialization");
+        false
     }
 }
 
-/// Set up test environment variables for integration testing
-fn setup_test_environment() {
-    // Use unique table prefix to isolate test data (LazyLock prevents unique database URLs)
-    unsafe {
-        let unique_id = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let unique_prefix = format!("test_{unique_id}_");
-        std::env::set_var("DB_TABLE_PREFIX", &unique_prefix);
-        println!("🗄️  Using unique table prefix: {unique_prefix}");
-    }
-
-    // Load .env_test file (this will set other vars but not override GENERIC_DATA_STORE_URL)
+/// Load test environment configuration
+fn load_test_environment() {
+    // Load .env_test file - this sets all configuration before LazyLock initialization
     if let Err(e) = dotenvy::from_filename(".env_test") {
         println!("Warning: Could not load .env_test file: {e}");
-        println!("Falling back to manual environment setup");
-
-        unsafe {
-            // Fallback environment setup if .env_test fails to load
-            std::env::set_var("ORIGIN", "http://localhost:3000");
-            std::env::set_var("OAUTH2_GOOGLE_CLIENT_ID", "test_client_id");
-            std::env::set_var("OAUTH2_GOOGLE_CLIENT_SECRET", "test_client_secret");
-            // Use unique table prefix for each test to avoid conflicts (LazyLock prevents unique DB URLs)
-            let unique_id = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos();
-            let unique_prefix = format!("test_{unique_id}_");
-            std::env::set_var("DB_TABLE_PREFIX", &unique_prefix);
-            std::env::set_var("GENERIC_DATA_STORE_TYPE", "sqlite");
-            std::env::set_var(
-                "GENERIC_DATA_STORE_URL",
-                "sqlite:file:test_integrated?mode=memory&cache=shared",
-            );
-            std::env::set_var("GENERIC_CACHE_STORE_TYPE", "memory");
-            std::env::set_var("GENERIC_CACHE_STORE_URL", "memory://");
-            std::env::set_var("PASSKEY_RP_ID", "127.0.0.1");
-            std::env::set_var("PASSKEY_RP_NAME", "OAuth2-Passkey Test");
-            std::env::set_var("SESSION_COOKIE_NAME", "test_session");
-            std::env::set_var("SESSION_COOKIE_MAX_AGE", "3600");
-            std::env::set_var("O2P_ROUTE_PREFIX", "/auth");
-            std::env::set_var("OAUTH2_SKIP_NONCE_VERIFICATION", "true");
-        }
+        println!("This may cause test failures due to missing configuration");
+    } else {
+        println!("✅ Loaded test configuration from .env_test");
     }
+
+    // Use unique table prefix to isolate test data (the only runtime setting that works)
+    let unique_id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let unique_prefix = format!("test_{unique_id}_");
+    unsafe {
+        std::env::set_var("DB_TABLE_PREFIX", &unique_prefix);
+    }
+    println!("🗄️  Using unique table prefix: {unique_prefix}");
 }
 
 /// Test server for integration testing
@@ -148,8 +104,9 @@ impl TestServer {
         let addr = listener.local_addr()?;
         let base_url = format!("http://127.0.0.1:{}", addr.port());
 
-        // Set up test environment variables first - only initialize oauth2_passkey once
-        let should_initialize = setup_test_environment_with_origin(&base_url);
+        // Load test environment configuration and check if we should initialize
+        load_test_environment();
+        let should_initialize = should_initialize_oauth2_passkey();
 
         // Set up nonce-aware mock OAuth2 server BEFORE library initialization
         let (mock_oauth2, nonce_storage) = create_nonce_aware_mock_oauth2(&base_url);
@@ -167,14 +124,11 @@ impl TestServer {
         let unique_user_id = format!("mock_user_{unique_id}");
         println!("🆔 Using unique test user: {unique_email} (ID: {unique_user_id})");
 
-        // Store the user data for JWT token generation
+        // Store test user data for mock JWT token generation
         unsafe {
             std::env::set_var("TEST_USER_EMAIL", &unique_email);
             std::env::set_var("TEST_USER_ID", &unique_user_id);
         }
-
-        // Configure OAuth2 URLs BEFORE library initialization
-        setup_oauth2_urls(&mock_oauth2.base_url()).await;
 
         // Initialize test environment with in-memory stores (only once per test process)
         if should_initialize {
@@ -182,10 +136,7 @@ impl TestServer {
             oauth2_passkey::init().await?;
             OAUTH2_PASSKEY_INITIALIZED.store(true, std::sync::atomic::Ordering::Release);
 
-            // Debug: Check ORIGIN after initialization
-            let post_init_origin =
-                std::env::var("ORIGIN").unwrap_or_else(|_| "NOT_SET".to_string());
-            println!("🔍 ORIGIN after oauth2_passkey::init(): {post_init_origin}");
+            println!("✅ oauth2_passkey library initialized successfully");
         } else {
             println!("⏭️  Skipping oauth2_passkey::init() - already initialized");
         }
@@ -216,32 +167,9 @@ impl TestServer {
     }
 }
 
-/// Set up OAuth2 URLs for mock server (must be called before oauth2_passkey::init())
-async fn setup_oauth2_urls(oauth2_base_url: &str) {
-    unsafe {
-        let auth_url = format!("{oauth2_base_url}/oauth2/auth");
-        let token_url = format!("{oauth2_base_url}/oauth2/token");
-        let userinfo_url = format!("{oauth2_base_url}/oauth2/userinfo");
-
-        println!("Setting OAuth2 URLs BEFORE library initialization:");
-        println!("  OAUTH2_AUTH_URL: {auth_url}");
-        println!("  OAUTH2_TOKEN_URL: {token_url}");
-        println!("  OAUTH2_USERINFO_URL: {userinfo_url}");
-
-        std::env::set_var("OAUTH2_AUTH_URL", auth_url);
-        std::env::set_var("OAUTH2_TOKEN_URL", token_url);
-        std::env::set_var("OAUTH2_USERINFO_URL", userinfo_url);
-
-        // Override the Google JWKS URL to point to our mock server
-        let jwks_url = format!("{oauth2_base_url}/oauth2/v3/certs");
-        println!("  GOOGLE_JWKS_URL: {jwks_url}");
-        std::env::set_var("GOOGLE_JWKS_URL", jwks_url);
-
-        // Debug: Verify ORIGIN is consistent
-        let current_origin = std::env::var("ORIGIN").unwrap_or_else(|_| "NOT_SET".to_string());
-        println!("🔍 ORIGIN during OAuth2 URL setup: {current_origin}");
-    }
-}
+// Note: OAuth2 URL configuration is now handled by httpmock interception.
+// Setting environment variables at runtime has no effect due to LazyLock initialization.
+// The oauth2_passkey library uses URLs from .env_test loaded before initialization.
 
 /// Create a minimal test application with oauth2-passkey integration  
 async fn create_test_app(_oauth2_base_url: &str) -> axum::Router {

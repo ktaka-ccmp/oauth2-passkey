@@ -21,13 +21,8 @@ async fn test_oauth2_enhanced_nonce_verification() -> Result<(), Box<dyn std::er
     let server = TestServer::start().await?;
     let browser = MockBrowser::new(&server.base_url, true);
 
-    // Save original settings
-    let original_skip_nonce = std::env::var("OAUTH2_SKIP_NONCE_VERIFICATION").unwrap_or_default();
-
-    // Step 1: Test with nonce verification enabled
-    unsafe {
-        std::env::set_var("OAUTH2_SKIP_NONCE_VERIFICATION", "false");
-    }
+    // Note: Environment variable changes have no effect due to LazyLock initialization.
+    // This test works with the configuration set in .env_test before library startup.
 
     // Step 2: Start OAuth2 flow and extract the nonce parameter
     let response = browser
@@ -124,14 +119,7 @@ async fn test_oauth2_enhanced_nonce_verification() -> Result<(), Box<dyn std::er
         );
     }
 
-    // Restore original setting
-    unsafe {
-        if original_skip_nonce.is_empty() {
-            std::env::remove_var("OAUTH2_SKIP_NONCE_VERIFICATION");
-        } else {
-            std::env::set_var("OAUTH2_SKIP_NONCE_VERIFICATION", original_skip_nonce);
-        }
-    }
+    // No need to restore environment variables - LazyLock ignores runtime changes
 
     server.shutdown().await;
     println!("✅ Enhanced nonce verification test completed successfully");
@@ -259,14 +247,10 @@ async fn test_oauth2_nonce_security_demonstration() -> Result<(), Box<dyn std::e
     let server = TestServer::start().await?;
     let browser = MockBrowser::new(&server.base_url, true);
 
-    let original_skip_nonce = std::env::var("OAUTH2_SKIP_NONCE_VERIFICATION").unwrap_or_default();
+    // Note: Environment variable changes have no effect due to LazyLock initialization.
 
     // Test 1: Show that different nonces should be rejected
     println!("   Testing with intentionally mismatched nonces...");
-
-    unsafe {
-        std::env::set_var("OAUTH2_SKIP_NONCE_VERIFICATION", "false");
-    }
 
     // Get an authorization URL with one nonce
     let response1 = browser
@@ -396,14 +380,7 @@ async fn test_oauth2_nonce_security_demonstration() -> Result<(), Box<dyn std::e
         );
     }
 
-    // Restore original setting
-    unsafe {
-        if original_skip_nonce.is_empty() {
-            std::env::remove_var("OAUTH2_SKIP_NONCE_VERIFICATION");
-        } else {
-            std::env::set_var("OAUTH2_SKIP_NONCE_VERIFICATION", original_skip_nonce);
-        }
-    }
+    // No need to restore environment variables - LazyLock ignores runtime changes
 
     server.shutdown().await;
     println!("✅ OAuth2 nonce security demonstration completed");
