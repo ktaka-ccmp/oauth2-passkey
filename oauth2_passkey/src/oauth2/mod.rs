@@ -19,7 +19,7 @@ mod types;
 pub use main::prepare_oauth2_auth_request;
 pub use types::{AuthResponse, OAuth2Account, OAuth2Mode};
 
-pub(crate) use config::{OAUTH2_CSRF_COOKIE_NAME, OAUTH2_ORIGIN, OAUTH2_RESPONSE_MODE};
+pub(crate) use config::{OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_RESPONSE_MODE};
 pub(crate) use errors::OAuth2Error;
 pub(crate) use types::{StateParams, StoredToken};
 
