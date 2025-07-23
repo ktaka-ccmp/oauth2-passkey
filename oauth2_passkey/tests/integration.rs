@@ -13,7 +13,6 @@ mod integration {
     pub mod api_client_flows;
     pub mod combined_flows;
     pub mod enhanced_nonce_tests;
-    pub mod nonce_verification_tests;
     pub mod oauth2_flows;
     pub mod passkey_flows;
     pub mod sophisticated_nonce_tests;

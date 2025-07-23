@@ -6,7 +6,7 @@ This document describes the comprehensive integration test suite that validates 
 ## Current State
 - ✅ **Strong unit test coverage**: 446+ unit tests with 6 ignored
 - ✅ **Complete integration test suite**: 34 integration tests covering all authentication flows
-- ✅ **Production nonce verification**: All OAuth2 tests validate security with `OAUTH2_SKIP_NONCE_VERIFICATION=false`
+- ✅ **OIDC security compliance**: All OAuth2 tests validate nonce verification according to OpenID Connect standards
 - ✅ **Robust test infrastructure**: In-memory stores with proper isolation and nonce-aware mock OIDC provider
 - ✅ **Mock services**: OAuth2 provider and WebAuthn credential simulation with full security validation
 - ✅ **Demo applications**: 3 working demos (oauth2, passkey, both)
@@ -173,8 +173,8 @@ GENERIC_DATA_STORE_URL='sqlite:file:test_integrated?mode=memory&cache=shared'
 PASSKEY_RP_ID='example.com'
 PASSKEY_RP_NAME='OAuth2-Passkey Test'
 
-# ✅ OAuth2 production behavior testing
-# OAUTH2_SKIP_NONCE_VERIFICATION=false  # Default production behavior (nonce verification enabled)
+# ✅ OAuth2 OIDC security compliance testing
+# Nonce verification is always enabled for OpenID Connect security
 ```
 
 ### 6.2 Current Test Execution Strategy - ✅ WORKING
@@ -358,8 +358,8 @@ impl MockBrowser {
 ### 11.3 OAuth2 Nonce Verification Integration - ✅ PRODUCTION-READY
 **All OAuth2 integration tests now validate production nonce verification behavior:**
 
-#### Nonce Verification Implementation (Production Behavior)
-- ✅ **`OAUTH2_SKIP_NONCE_VERIFICATION=false`** by default in `.env_test`
+#### Nonce Verification Implementation (OIDC Security Compliance)
+- ✅ **Nonce verification always enabled** for OpenID Connect security standards
 - ✅ **All OAuth2 integration tests** properly handle nonce verification
 - ✅ **Mock OIDC provider** correctly captures nonces from authorization requests
 - ✅ **Integration test success criteria** recognize nonce verification as working security

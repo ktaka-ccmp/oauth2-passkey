@@ -114,8 +114,8 @@ async fn test_oauth2_new_user_registration() -> Result<(), Box<dyn std::error::E
     let response_body = callback_response.text().await?;
     println!("Callback response body: {response_body}");
 
-    // For integration testing with OAUTH2_SKIP_NONCE_VERIFICATION=false (production behavior),
-    // we expect the OAuth2 flow to properly enforce nonce verification and detect mismatches.
+    // For integration testing, we expect the OAuth2 flow to properly enforce
+    // nonce verification and detect mismatches according to OIDC security standards.
 
     // SUCCESS CASE 1: Nonce verification correctly detects mismatch
     if response_body.contains("Nonce mismatch") {
@@ -534,11 +534,11 @@ async fn test_oauth2_error_scenarios() -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-/// Test OAuth2 nonce verification when OAUTH2_SKIP_NONCE_VERIFICATION=false
+/// Test OAuth2 nonce verification security enforcement
 ///
 /// This test validates that the OAuth2 system properly enforces nonce verification
-/// according to the OpenID Connect specification when nonce verification is enabled.
-/// This is the default production behavior.
+/// according to the OpenID Connect specification. Nonce verification is always enabled
+/// to prevent replay attacks and ensure OIDC security compliance.
 #[tokio::test]
 #[serial]
 async fn test_oauth2_nonce_verification_enabled() -> Result<(), Box<dyn std::error::Error>> {
@@ -559,8 +559,8 @@ async fn test_oauth2_nonce_verification_enabled() -> Result<(), Box<dyn std::err
     // Attempt OAuth2 flow - behavior depends on .env_test configuration
     let oauth2_result = browser.complete_oauth2_flow("create_user_or_login").await;
 
-    // With OAUTH2_SKIP_NONCE_VERIFICATION=false (production default),
-    // the flow should demonstrate nonce verification working correctly
+    // With nonce verification always enabled for security,
+    // the flow should demonstrate proper OIDC nonce validation
     match oauth2_result {
         Ok(response) => {
             println!("✅ OAuth2 flow completed successfully");

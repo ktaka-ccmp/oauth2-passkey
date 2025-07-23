@@ -2,7 +2,7 @@
 ///
 /// These tests implement a more advanced mock OAuth2 server that can extract nonce
 /// parameters from authorization requests and include them in ID tokens, enabling
-/// proper testing of nonce verification when OAUTH2_SKIP_NONCE_VERIFICATION=false.
+/// proper testing of OIDC nonce verification security mechanisms.
 use crate::common::{mock_browser::MockBrowser, test_server::TestServer};
 use base64::Engine as _;
 use httpmock::prelude::*;
@@ -203,7 +203,7 @@ async fn test_oauth2_nonce_verification_with_sophisticated_mock()
     // The test works with httpmock interception instead of runtime configuration changes.
 
     println!("🔬 Testing OAuth2 nonce verification with sophisticated mock server");
-    println!("   OAUTH2_SKIP_NONCE_VERIFICATION: false");
+    println!("   Nonce verification: Always enabled for security");
     println!("   Mock server: {}", mock_oauth2.base_url());
 
     // Step 1: Start OAuth2 flow and extract nonce from authorization URL
