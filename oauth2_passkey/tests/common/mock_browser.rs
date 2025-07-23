@@ -282,10 +282,11 @@ impl MockBrowser {
             .ok_or("No state parameter found in auth URL")?;
 
         // Step 3: Complete OAuth2 callback
+        // Use the authorization code that the nonce-aware mock server expects
         let callback_response = self
             .post_form_with_headers_old(
                 "/auth/oauth2/authorized",
-                &[("code", "mock_authorization_code"), ("state", &state_param)],
+                &[("code", "nonce_aware_auth_code"), ("state", &state_param)],
                 &[
                     ("Origin", &self.base_url),
                     ("Referer", "https://accounts.google.com/oauth2/authorize"),

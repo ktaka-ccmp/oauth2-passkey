@@ -195,6 +195,9 @@ async fn verify_nonce(
     // Skip nonce verification in test mode if environment variable is set
     if std::env::var("OAUTH2_SKIP_NONCE_VERIFICATION").unwrap_or_default() != "true" {
         if idinfo.nonce != Some(nonce_session.token.clone()) {
+            eprintln!("NONCE MISMATCH DEBUG:");
+            eprintln!("  ID Token nonce: {:?}", idinfo.nonce);
+            eprintln!("  Expected nonce: {:?}", nonce_session.token);
             tracing::error!("Nonce in ID Token: {:#?}", idinfo.nonce);
             tracing::error!("Stored Nonce: {:#?}", nonce_session.token);
             return Err(OAuth2Error::NonceMismatch);

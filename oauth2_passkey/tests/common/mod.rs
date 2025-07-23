@@ -1,5 +1,7 @@
 pub mod fixtures;
 pub mod mock_browser;
+pub mod mock_browser_nonce;
+pub mod nonce_aware_mock;
 pub mod test_server;
 
 pub use fixtures::*;

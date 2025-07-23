@@ -1,3 +1,4 @@
+use crate::common::nonce_aware_mock::{NonceStorage, create_nonce_aware_mock_oauth2};
 use httpmock::MockServer;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
@@ -103,6 +104,8 @@ pub struct TestServer {
     pub base_url: String,
     /// Mock OAuth2 server for simulating external providers
     pub mock_oauth2: MockServer,
+    /// Storage for nonces to enable proper testing
+    pub nonce_storage: NonceStorage,
 }
 
 impl TestServer {
@@ -148,8 +151,27 @@ impl TestServer {
         // Set up test environment variables first - only initialize oauth2_passkey once
         let should_initialize = setup_test_environment_with_origin(&base_url);
 
-        // Set up mock OAuth2 server BEFORE library initialization
-        let mock_oauth2 = setup_mock_google_oauth2(&base_url).await;
+        // Set up nonce-aware mock OAuth2 server BEFORE library initialization
+        let (mock_oauth2, nonce_storage) = create_nonce_aware_mock_oauth2(&base_url);
+
+        // Generate and set unique user data for this test
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let process_id = std::process::id();
+        let thread_id = format!("{:?}", std::thread::current().id());
+        let uuid = Uuid::new_v4().to_string().replace("-", "");
+        let unique_id = format!("{}_{}_{}_{}", timestamp, process_id, thread_id, &uuid[..8]);
+        let unique_email = format!("test_{unique_id}@example.com");
+        let unique_user_id = format!("mock_user_{unique_id}");
+        println!("🆔 Using unique test user: {unique_email} (ID: {unique_user_id})");
+
+        // Store the user data for JWT token generation
+        unsafe {
+            std::env::set_var("TEST_USER_EMAIL", &unique_email);
+            std::env::set_var("TEST_USER_ID", &unique_user_id);
+        }
 
         // Configure OAuth2 URLs BEFORE library initialization
         setup_oauth2_urls(&mock_oauth2.base_url()).await;
@@ -183,6 +205,7 @@ impl TestServer {
             server_handle,
             base_url,
             mock_oauth2,
+            nonce_storage,
         })
     }
 
@@ -233,6 +256,7 @@ async fn create_test_app(_oauth2_base_url: &str) -> axum::Router {
 }
 
 /// Set up mock Google OAuth2 server
+#[allow(dead_code)]
 async fn setup_mock_google_oauth2(_test_server_base_url: &str) -> MockServer {
     use httpmock::prelude::*;
     use serde_json::json;
@@ -355,6 +379,7 @@ async fn setup_mock_google_oauth2(_test_server_base_url: &str) -> MockServer {
 }
 
 /// Create a mock JWKS response for JWT verification
+#[allow(dead_code)]
 fn create_mock_jwks() -> serde_json::Value {
     use serde_json::json;
 
@@ -374,6 +399,7 @@ fn create_mock_jwks() -> serde_json::Value {
 }
 
 /// Create a mock JWT ID token for testing
+#[allow(dead_code)]
 fn create_mock_id_token(nonce: Option<String>) -> String {
     use jsonwebtoken::{EncodingKey, Header, encode};
     use serde_json::json;
@@ -456,6 +482,7 @@ mod tests {
                 ("client_id", "test_client"),
                 ("redirect_uri", &format!("{}/callback", server.base_url)),
                 ("state", "test_state"),
+                ("nonce", "test_nonce"), // Required by nonce-aware mock server
             ])
             .send()
             .await
