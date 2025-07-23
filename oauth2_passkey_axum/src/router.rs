@@ -16,7 +16,7 @@ use axum::Router;
 ///
 /// If you want HTTP request/response tracing, you can add tower-http's TraceLayer yourself:
 ///
-/// ```rust,no_run
+/// ```text
 /// use axum::Router;
 /// use tower_http::trace::TraceLayer;
 /// use oauth2_passkey_axum::oauth2_passkey_router;
