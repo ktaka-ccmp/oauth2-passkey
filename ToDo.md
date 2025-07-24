@@ -15,6 +15,7 @@
   - ✅ Created detailed implementation guide in docs/implementing-tracing.md
 - ~~**Clean Error Handling**: Replace 30+ `.unwrap()` calls in session module with proper error handling~~ ✅ **DONE** - Session module already uses proper error handling in production code; `.unwrap()` calls are appropriately isolated to test code only
 - **Integration Tests**: Add end-to-end tests for complete authentication flows
+- **Implement OIDC Discovery**: Replace hardcoded JWKS URL with dynamic discovery from `/.well-known/openid-configuration` (idtoken.rs:294)
 - **Finalize Public API**: Review and document all public interfaces for 1.0 release
 
 ### Medium Priority
