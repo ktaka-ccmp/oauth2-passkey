@@ -61,7 +61,7 @@ impl From<serde_json::Error> for OidcDiscoveryError {
 ///
 /// According to the OIDC Discovery specification, the discovery document
 /// is available at: {issuer}/.well-known/openid-configuration
-pub async fn fetch_oidc_discovery(
+pub(crate) async fn fetch_oidc_discovery(
     issuer_url: &str,
 ) -> Result<OidcDiscoveryDocument, OidcDiscoveryError> {
     let issuer_url = issuer_url.trim_end_matches('/');
