@@ -57,14 +57,14 @@ impl Default for OAuth2Account {
 // The user data we'll get back from Google
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct GoogleUserInfo {
-    pub(crate) id: String,
+    pub(crate) sub: String,
     pub(crate) family_name: String,
     pub name: String,
     pub picture: Option<String>,
     pub(crate) email: String,
     pub(crate) given_name: String,
     pub(crate) hd: Option<String>,
-    pub(crate) verified_email: bool,
+    pub(crate) email_verified: bool,
 }
 
 // Add these implementations
@@ -77,12 +77,12 @@ impl From<GoogleUserInfo> for OAuth2Account {
             email: google_user.email,
             picture: google_user.picture,
             provider: "google".to_string(),
-            provider_user_id: format!("google_{}", google_user.id),
+            provider_user_id: format!("google_{}", google_user.sub),
             metadata: json!({
                 "family_name": google_user.family_name,
                 "given_name": google_user.given_name,
                 "hd": google_user.hd,
-                "verified_email": google_user.verified_email,
+                "email_verified": google_user.email_verified,
             }),
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -268,14 +268,14 @@ mod tests {
     #[test]
     fn test_from_google_user_info() {
         let google_user = GoogleUserInfo {
-            id: "12345".to_string(),
+            sub: "12345".to_string(),
             family_name: "Doe".to_string(),
             name: "John Doe".to_string(),
             picture: Some("https://example.com/pic.jpg".to_string()),
             email: "john@example.com".to_string(),
             given_name: "John".to_string(),
             hd: Some("example.com".to_string()),
-            verified_email: true,
+            email_verified: true,
         };
 
         let account = OAuth2Account::from(google_user.clone());
@@ -295,7 +295,7 @@ mod tests {
         assert_eq!(metadata["family_name"], json!("Doe"));
         assert_eq!(metadata["given_name"], json!("John"));
         assert_eq!(metadata["hd"], json!("example.com"));
-        assert_eq!(metadata["verified_email"], json!(true));
+        assert_eq!(metadata["email_verified"], json!(true));
     }
 
     /// Test conversion from GoogleIdInfo to OAuth2Account

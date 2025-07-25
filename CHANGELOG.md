@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **OIDC Discovery**: Automatic endpoint discovery from `/.well-known/openid-configuration`
+- **OAuth2 endpoint configuration**: Replaced hardcoded Google URLs with dynamic discovery
+
 ## [0.1.3] - 2025-07-12
 
 ### Security

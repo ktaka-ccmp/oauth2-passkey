@@ -339,7 +339,7 @@ fn extract_credential_public_key(reg_data: &RegisterCredential) -> Result<String
                 .map_err(|e| PasskeyError::Format(format!("Failed to parse client data JSON: {e}")))
         })?;
 
-    println!("Client data json: {decoded_client_data_json:?}");
+    tracing::debug!("Client data json: {decoded_client_data_json:?}");
 
     let attestation_obj = parse_attestation_object(&reg_data.response.attestation_object)?;
 
