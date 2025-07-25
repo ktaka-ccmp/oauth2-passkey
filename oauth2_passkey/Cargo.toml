@@ -47,6 +47,3 @@ reqwest = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
 oauth2-passkey-axum = { path = "../oauth2_passkey_axum" }
-
-# Integration test dependencies
-httpmock = { workspace = true }

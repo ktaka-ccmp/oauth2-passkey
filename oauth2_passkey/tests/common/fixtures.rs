@@ -371,6 +371,7 @@ pub struct TestConstants;
 impl TestConstants {
     #[allow(dead_code)]
     pub const MOCK_STATE: &'static str = "test_state_12345";
+    #[allow(dead_code)]
     pub const MOCK_AUTH_CODE: &'static str = "mock_authorization_code";
     #[allow(dead_code)]
     pub const MOCK_CLIENT_ID: &'static str = "mock_client_id";

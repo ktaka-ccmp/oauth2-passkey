@@ -54,8 +54,7 @@ url = "2.5.4"
 webpki = { version = "0.22.4", features = ["std"] }
 x509-parser = { version = "0.17.0", features = ["validate", "verify"] }
 
-### For integration tests
-httpmock = "0.7"
+# Note: httpmock removed - using Axum mock server instead
 
 ### For demo-apps
 axum-server = { version = "0.7.2", features = ["tls-rustls"] }

@@ -33,7 +33,8 @@ pub async fn init_test_environment() {
     // Environment setup (synchronous, runs once)
     static ENV_INIT: Once = Once::new();
     ENV_INIT.call_once(|| {
-        // Try to load .env_test first, fallback to .env if it doesn't exist
+        // All tests now use .env_test - unit tests inject URLs directly to avoid HTTP requests
+        println!("🧪 Loading test environment (.env_test)");
         if dotenvy::from_filename(".env_test").is_err() {
             dotenvy::dotenv().ok();
         }
