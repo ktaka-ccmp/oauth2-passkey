@@ -295,7 +295,7 @@ mod tests {
         assert_eq!(metadata["family_name"], json!("Doe"));
         assert_eq!(metadata["given_name"], json!("John"));
         assert_eq!(metadata["hd"], json!("example.com"));
-        assert_eq!(metadata["verified_email"], json!(true));
+        assert_eq!(metadata["email_verified"], json!(true));
     }
 
     /// Test conversion from GoogleIdInfo to OAuth2Account

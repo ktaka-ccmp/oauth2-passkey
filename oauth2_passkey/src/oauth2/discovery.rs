@@ -41,6 +41,8 @@ pub enum OidcDiscoveryError {
     IssuerMismatch(String, String),
     #[error("Invalid discovery URL: {0}")]
     InvalidUrl(String),
+    #[error("Cache error: {0}")]
+    CacheError(String),
 }
 
 impl From<reqwest::Error> for OidcDiscoveryError {

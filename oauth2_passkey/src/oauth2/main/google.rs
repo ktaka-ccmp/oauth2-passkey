@@ -94,9 +94,9 @@ mod tests {
     fn test_google_user_info_deserialization() {
         // Test successful deserialization of Google user info
         let json_data = json!({
-            "id": "123456789",
+            "sub": "123456789",
             "email": "test@example.com",
-            "verified_email": true,
+            "email_verified": true,
             "name": "Test User",
             "given_name": "Test",
             "family_name": "User",

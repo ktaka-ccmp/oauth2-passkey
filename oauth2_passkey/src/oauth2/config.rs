@@ -32,8 +32,11 @@ pub(crate) async fn get_discovered_endpoints()
     // Store in cache (first write wins in case of concurrent access)
     let _ = OIDC_DISCOVERY_CACHE.set(document);
 
-    // Return the cached version
-    Ok(OIDC_DISCOVERY_CACHE.get().unwrap())
+    // Return the cached version - this should always succeed since either we just set it
+    // or another thread set it between our check and now
+    OIDC_DISCOVERY_CACHE.get().ok_or_else(|| {
+        OidcDiscoveryError::CacheError("Failed to cache discovery document".to_string())
+    })
 }
 
 /// Get authorization URL, using discovery if no environment override is set
@@ -117,21 +120,6 @@ pub(crate) async fn get_expected_issuer() -> Result<String, OidcDiscoveryError> 
     tracing::debug!("Using issuer from discovery: {}", endpoints.issuer);
     Ok(endpoints.issuer.clone())
 }
-
-// Legacy static URLs for backward compatibility
-// These are kept for existing code that may still reference them directly
-// pub(crate) static OAUTH2_USERINFO_URL: &str = "https://www.googleapis.com/userinfo/v2/me";
-
-// pub static OAUTH2_AUTH_URL: LazyLock<String> = LazyLock::new(|| {
-//     env::var("OAUTH2_AUTH_URL")
-//         .ok()
-//         .unwrap_or("https://accounts.google.com/o/oauth2/v2/auth".to_string())
-// });
-// pub(crate) static OAUTH2_TOKEN_URL: LazyLock<String> = LazyLock::new(|| {
-//     env::var("OAUTH2_TOKEN_URL")
-//         .ok()
-//         .unwrap_or("https://oauth2.googleapis.com/token".to_string())
-// });
 
 static OAUTH2_SCOPE: LazyLock<String> =
     LazyLock::new(|| std::env::var("OAUTH2_SCOPE").unwrap_or("openid+email+profile".to_string()));
