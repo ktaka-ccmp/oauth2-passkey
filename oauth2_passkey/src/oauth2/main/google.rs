@@ -1,6 +1,5 @@
 use crate::oauth2::config::{
-    OAUTH2_GOOGLE_CLIENT_ID, OAUTH2_GOOGLE_CLIENT_SECRET, OAUTH2_REDIRECT_URI, OAUTH2_TOKEN_URL,
-    OAUTH2_USERINFO_URL,
+    OAUTH2_GOOGLE_CLIENT_ID, OAUTH2_GOOGLE_CLIENT_SECRET, OAUTH2_REDIRECT_URI, get_userinfo_url,
 };
 use crate::oauth2::errors::OAuth2Error;
 use crate::oauth2::types::{GoogleUserInfo, OidcTokenResponse};
@@ -11,8 +10,9 @@ pub(super) async fn fetch_user_data_from_google(
     access_token: String,
 ) -> Result<GoogleUserInfo, OAuth2Error> {
     let client = get_client();
+    let userinfo_url = get_userinfo_url().await?;
     let response = client
-        .get(OAUTH2_USERINFO_URL)
+        .get(&userinfo_url)
         .bearer_auth(access_token)
         .send()
         .await
@@ -36,8 +36,9 @@ pub(super) async fn exchange_code_for_token(
     code_verifier: String,
 ) -> Result<(String, String), OAuth2Error> {
     let client = get_client();
+    let token_url = crate::oauth2::config::get_token_url().await?;
     let response = client
-        .post(OAUTH2_TOKEN_URL.as_str())
+        .post(&token_url)
         .form(&[
             ("code", code),
             ("client_id", OAUTH2_GOOGLE_CLIENT_ID.to_string()),
