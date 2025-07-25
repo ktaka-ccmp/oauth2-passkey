@@ -1,22 +1,125 @@
+use super::discovery::{OidcDiscoveryDocument, OidcDiscoveryError, fetch_oidc_discovery};
 use crate::config::O2P_ROUTE_PREFIX;
-use std::{env, sync::LazyLock};
+use std::{
+    env,
+    sync::{LazyLock, OnceLock},
+};
 
-pub(crate) static OAUTH2_USERINFO_URL: LazyLock<String> = LazyLock::new(|| {
-    env::var("OAUTH2_USERINFO_URL")
+/// Base issuer URL for OIDC discovery
+/// Set this to enable automatic discovery of OAuth2 endpoints
+pub(crate) static OAUTH2_ISSUER_URL: LazyLock<String> = LazyLock::new(|| {
+    env::var("OAUTH2_ISSUER_URL")
         .ok()
-        .unwrap_or("https://www.googleapis.com/userinfo/v2/me".to_string())
+        .unwrap_or("https://accounts.google.com".to_string())
 });
 
-pub static OAUTH2_AUTH_URL: LazyLock<String> = LazyLock::new(|| {
-    env::var("OAUTH2_AUTH_URL")
-        .ok()
-        .unwrap_or("https://accounts.google.com/o/oauth2/v2/auth".to_string())
-});
-pub(crate) static OAUTH2_TOKEN_URL: LazyLock<String> = LazyLock::new(|| {
-    env::var("OAUTH2_TOKEN_URL")
-        .ok()
-        .unwrap_or("https://oauth2.googleapis.com/token".to_string())
-});
+/// Cache for discovered OIDC endpoints
+/// This is populated on first use and cached for the lifetime of the application
+static OIDC_DISCOVERY_CACHE: OnceLock<OidcDiscoveryDocument> = OnceLock::new();
+
+/// Get discovered OIDC endpoints, fetching from the issuer's well-known endpoint if not cached
+pub(crate) async fn get_discovered_endpoints()
+-> Result<&'static OidcDiscoveryDocument, OidcDiscoveryError> {
+    // Return cached version if available
+    if let Some(cached) = OIDC_DISCOVERY_CACHE.get() {
+        return Ok(cached);
+    }
+
+    // Fetch discovery document
+    tracing::debug!("Fetching OIDC discovery for issuer: {}", *OAUTH2_ISSUER_URL);
+    let document = fetch_oidc_discovery(&OAUTH2_ISSUER_URL).await?;
+
+    // Store in cache (first write wins in case of concurrent access)
+    let _ = OIDC_DISCOVERY_CACHE.set(document);
+
+    // Return the cached version - this should always succeed since either we just set it
+    // or another thread set it between our check and now
+    OIDC_DISCOVERY_CACHE.get().ok_or_else(|| {
+        OidcDiscoveryError::CacheError("Failed to cache discovery document".to_string())
+    })
+}
+
+/// Get authorization URL, using discovery if no environment override is set
+pub(crate) async fn get_auth_url() -> Result<String, OidcDiscoveryError> {
+    // Check for environment variable override first
+    if let Ok(env_url) = env::var("OAUTH2_AUTH_URL") {
+        tracing::debug!("Using OAUTH2_AUTH_URL from environment: {}", env_url);
+        return Ok(env_url);
+    }
+
+    // Use discovery
+    let endpoints = get_discovered_endpoints().await?;
+    tracing::debug!(
+        "Using authorization endpoint from discovery: {}",
+        endpoints.authorization_endpoint
+    );
+    Ok(endpoints.authorization_endpoint.clone())
+}
+
+/// Get token URL, using discovery if no environment override is set
+pub(crate) async fn get_token_url() -> Result<String, OidcDiscoveryError> {
+    // Check for environment variable override first
+    if let Ok(env_url) = env::var("OAUTH2_TOKEN_URL") {
+        tracing::debug!("Using OAUTH2_TOKEN_URL from environment: {}", env_url);
+        return Ok(env_url);
+    }
+
+    // Use discovery
+    let endpoints = get_discovered_endpoints().await?;
+    tracing::debug!(
+        "Using token endpoint from discovery: {}",
+        endpoints.token_endpoint
+    );
+    Ok(endpoints.token_endpoint.clone())
+}
+
+/// Get userinfo URL, using discovery if no environment override is set
+pub(crate) async fn get_userinfo_url() -> Result<String, OidcDiscoveryError> {
+    // Check for environment variable override first
+    if let Ok(env_url) = env::var("OAUTH2_USERINFO_URL") {
+        tracing::debug!("Using OAUTH2_USERINFO_URL from environment: {}", env_url);
+        return Ok(env_url);
+    }
+
+    // Use discovery
+    let endpoints = get_discovered_endpoints().await?;
+    tracing::debug!(
+        "Using userinfo endpoint from discovery: {}",
+        endpoints.userinfo_endpoint
+    );
+    Ok(endpoints.userinfo_endpoint.clone())
+}
+
+/// Get JWKS URL, using discovery if no environment override is set
+pub(crate) async fn get_jwks_url() -> Result<String, OidcDiscoveryError> {
+    // Check for environment variable override first
+    if let Ok(env_url) = env::var("OAUTH2_JWKS_URL") {
+        tracing::debug!("Using OAUTH2_JWKS_URL from environment: {}", env_url);
+        return Ok(env_url);
+    }
+
+    // Use discovery
+    let endpoints = get_discovered_endpoints().await?;
+    tracing::debug!("Using JWKS URI from discovery: {}", endpoints.jwks_uri);
+    Ok(endpoints.jwks_uri.clone())
+}
+
+/// Get expected issuer, using discovery if no environment override is set
+pub(crate) async fn get_expected_issuer() -> Result<String, OidcDiscoveryError> {
+    // Check for environment variable override first
+    if let Ok(env_issuer) = env::var("OAUTH2_EXPECTED_ISSUER") {
+        tracing::debug!(
+            "Using OAUTH2_EXPECTED_ISSUER from environment: {}",
+            env_issuer
+        );
+        return Ok(env_issuer);
+    }
+
+    // Use discovery
+    let endpoints = get_discovered_endpoints().await?;
+    tracing::debug!("Using issuer from discovery: {}", endpoints.issuer);
+    Ok(endpoints.issuer.clone())
+}
 
 static OAUTH2_SCOPE: LazyLock<String> =
     LazyLock::new(|| std::env::var("OAUTH2_SCOPE").unwrap_or("openid+email+profile".to_string()));

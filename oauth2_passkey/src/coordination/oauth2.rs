@@ -3,9 +3,9 @@ use http::HeaderMap;
 use std::{env, sync::LazyLock};
 
 use crate::oauth2::{
-    AccountSearchField, AuthResponse, OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_NAME,
-    OAUTH2_RESPONSE_MODE, OAuth2Account, OAuth2Mode, OAuth2Store, csrf_checks, decode_state,
-    delete_session_and_misc_token_from_store, get_idinfo_userinfo, get_mode_from_stored_session,
+    AccountSearchField, AuthResponse, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_RESPONSE_MODE, OAuth2Account,
+    OAuth2Mode, OAuth2Store, csrf_checks, decode_state, delete_session_and_misc_token_from_store,
+    get_auth_url, get_idinfo_userinfo, get_mode_from_stored_session,
     get_uid_from_stored_session_by_state_param, validate_origin,
 };
 
@@ -62,7 +62,10 @@ pub async fn authorized_core(
         _ => {} // Valid combination, continue processing
     }
 
-    validate_origin(headers, OAUTH2_AUTH_URL.as_str()).await?;
+    let auth_url = get_auth_url()
+        .await
+        .map_err(|e| CoordinationError::InvalidState(format!("Failed to get auth url: {e}")))?;
+    validate_origin(headers, &auth_url).await?;
 
     if auth_response.state.is_empty() {
         return Err(CoordinationError::InvalidState(

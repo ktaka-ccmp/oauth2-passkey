@@ -6,8 +6,8 @@ use jsonwebtoken::Algorithm;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 
 use crate::oauth2::config::{
-    OAUTH2_AUTH_URL, OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_GOOGLE_CLIENT_ID,
-    OAUTH2_QUERY_STRING, OAUTH2_REDIRECT_URI, OAUTH2_RESPONSE_MODE,
+    OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_GOOGLE_CLIENT_ID,
+    OAUTH2_QUERY_STRING, OAUTH2_REDIRECT_URI, OAUTH2_RESPONSE_MODE, get_auth_url,
 };
 use crate::oauth2::errors::OAuth2Error;
 use crate::oauth2::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken};
@@ -93,10 +93,11 @@ pub async fn prepare_oauth2_auth_request(
 
     let encoded_state = encode_state(state_params)?;
 
+    let auth_base_url = get_auth_url().await?;
     let auth_url = format!(
         "{}?{}&client_id={}&redirect_uri={}&state={}&nonce={}\
         &code_challenge={}&code_challenge_method={}",
-        OAUTH2_AUTH_URL.as_str(),
+        auth_base_url,
         OAUTH2_QUERY_STRING.as_str(),
         OAUTH2_GOOGLE_CLIENT_ID.as_str(),
         OAUTH2_REDIRECT_URI.as_str(),
@@ -154,7 +155,7 @@ pub(crate) async fn get_idinfo_userinfo(
 
     let userinfo = fetch_user_data_from_google(access_token).await?;
 
-    if idinfo.sub != userinfo.id {
+    if idinfo.sub != userinfo.sub {
         tracing::error!(
             "Id mismatch in IdInfo and Userinfo: \nIdInfo: {:#?}\nUserInfo: {:#?}",
             idinfo,

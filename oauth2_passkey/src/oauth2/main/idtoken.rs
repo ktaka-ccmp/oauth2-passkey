@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
+use crate::oauth2::config::get_jwks_url;
 use crate::storage::{CacheData, GENERIC_CACHE_STORE};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -86,6 +87,8 @@ pub enum TokenVerificationError {
     JwksParsing(String),
     #[error("JWKS fetch error: {0}")]
     JwksFetch(String),
+    #[error("OIDC Discovery error: {0}")]
+    OidcDiscovery(#[from] crate::oauth2::discovery::OidcDiscoveryError),
 }
 
 const CACHE_MODE: &str = "cached";
@@ -290,9 +293,8 @@ pub(super) async fn verify_idtoken_with_algorithm(
     tracing::debug!("Algorithm from JWT header: {:?}", alg);
     tracing::debug!("Decoded id_token payload: {:#?}", idinfo);
 
-    // TODO: Replace with OIDC discovery from https://accounts.google.com/.well-known/openid-configuration
-    let jwks_url = "https://www.googleapis.com/oauth2/v3/certs";
-    let jwks = fetch_jwks(jwks_url).await?;
+    let jwks_url = get_jwks_url().await?;
+    let jwks = fetch_jwks(&jwks_url).await?;
     let jwk = find_jwk(&jwks, &kid).ok_or(TokenVerificationError::NoMatchingKey)?;
 
     let decoding_key = convert_jwk_to_decoding_key(jwk)?;
@@ -309,11 +311,11 @@ pub(super) async fn verify_idtoken_with_algorithm(
         ));
     }
 
-    let supplied_issuer = "https://accounts.google.com";
-    if idinfo.iss != supplied_issuer {
+    let expected_issuer = crate::oauth2::config::get_expected_issuer().await?;
+    if idinfo.iss != expected_issuer {
         return Err(TokenVerificationError::InvalidTokenIssuer(
             idinfo.iss.to_string(),
-            supplied_issuer.to_string(),
+            expected_issuer,
         ));
     }
 
