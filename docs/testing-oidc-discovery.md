@@ -1,55 +1,58 @@
-# Testing OIDC Discovery
+# Testing OIDC Discovery with Axum Mock Server
 
 ## Overview
 
-This document explains how to test OIDC Discovery functionality in the oauth2-passkey library.
+This document explains how OIDC Discovery testing works with the new persistent Axum mock server architecture in the oauth2-passkey library.
 
-## The LazyLock Constraint
+## Architecture Changes
 
-The OAuth2 configuration uses Rust's `LazyLock` for performance and thread safety. However, this creates a testing constraint:
+The testing infrastructure has been completely refactored:
 
-- **LazyLock values are set once** when first accessed
-- **Cannot be changed** after initialization 
-- **All subsequent tests** use the same configuration
+- **Persistent Axum Mock Server**: Runs on fixed port 9876 throughout all tests
+- **Thread-based Lifecycle**: Uses `std::thread::spawn` with dedicated tokio runtime
+- **OIDC Discovery Support**: Full `.well-known/openid-configuration` endpoint implementation
+- **Eliminated httpmock Dependency**: Replaced with native Axum-based mock OIDC provider
 
 ## Testing OIDC Discovery
 
-### Method 1: Run the OIDC Discovery Test in Isolation
+### Current Test Architecture
+
+All integration tests now work seamlessly with OIDC Discovery:
 
 ```bash
-# Test OIDC Discovery functionality
+# Run all integration tests (includes OIDC Discovery)
+cargo test --manifest-path oauth2_passkey/Cargo.toml --test integration
+```
+
+**Key improvements:**
+- ✅ **Fixed port 9876**: No more random port conflicts or LazyLock issues
+- ✅ **Persistent server**: Runs throughout entire test suite for consistency
+- ✅ **OIDC Discovery endpoint**: Always available at `http://127.0.0.1:9876/.well-known/openid-configuration`
+- ✅ **Nonce-aware JWT generation**: Proper OpenID Connect compliance
+
+### Specific OIDC Discovery Tests
+
+```bash
+# Test OIDC Discovery endpoint specifically
+cargo test test_oidc_discovery_endpoint -- --nocapture
+
+# Test OAuth2 flow with OIDC Discovery
 cargo test a_test_oauth2_uses_oidc_discovery -- --nocapture
 ```
 
-This ensures the test runs first and initializes oauth2_passkey with OIDC Discovery enabled.
-
-**Expected Output:**
-```
-✅ OAuth2 configuration is using OIDC Discovery correctly
-  - Authorization endpoint discovered and used: ✓
-  - Dynamic URL configuration: ✓
-  - OIDC compliance (nonce parameter): ✓
-```
-
-### Method 2: Test OIDC Discovery Endpoint Separately
-
-```bash
-# Test the OIDC Discovery endpoint itself
-cargo test test_oidc_discovery_endpoint -- --nocapture
-```
-
-This tests that the mock server properly provides OIDC Discovery documents.
-
 ## Integration with Full Test Suite
 
-When running the full test suite:
+The new architecture eliminates previous LazyLock issues:
 
 ```bash
-# All tests with serial execution (required due to LazyLock)
-cargo test -- --test-threads=1
+# All tests run reliably with serial execution
+cargo test --manifest-path oauth2_passkey/Cargo.toml --test integration -- --test-threads=1
 ```
 
-**Note:** The OIDC Discovery integration test may fail in the full suite due to initialization order. This is a known limitation of the LazyLock architecture, not a functional issue.
+**Benefits:**
+- ✅ **No initialization order issues**: Persistent server is always ready
+- ✅ **Consistent OIDC Discovery**: Same endpoints used across all tests  
+- ✅ **Reliable test execution**: No flaky failures due to port conflicts
 
 ## Production Verification
 
@@ -61,51 +64,73 @@ In production, OIDC Discovery works correctly because:
 
 ## Implementation Details
 
-### Unit Tests
-- Use `.env_unit_test` with hardcoded URLs
-- Bypass OIDC Discovery to avoid HTTP requests
-- Test individual functions and components
+### Unified Test Configuration
 
-### Integration Tests  
-- Use `.env_test` with OIDC Discovery enabled
-- Create mock servers with proper `.well-known/openid-configuration` endpoints
-- Test complete OAuth2 flows with dynamic endpoint discovery
+The new architecture uses a single `.env_test` file for all test types:
 
-### Environment Separation
 ```bash
-# Unit tests use static URLs
-OAUTH2_AUTH_URL='https://accounts.google.com/o/oauth2/v2/auth'
-OAUTH2_TOKEN_URL='https://oauth2.googleapis.com/token'
-
-# Integration tests use discovery
-OAUTH2_ISSUER_URL='http://127.0.0.1:9999'  # Mock server
-# Individual URLs discovered dynamically
+# Unified test configuration in .env_test
+OAUTH2_ISSUER_URL='http://127.0.0.1:9876'  # Persistent Axum mock server
+# Individual URLs discovered dynamically from OIDC Discovery
 ```
+
+### Test Infrastructure Components
+
+1. **Persistent Mock Server** (`tests/common/axum_mock_server.rs`):
+   - Runs on fixed port 9876 throughout all tests
+   - Provides OIDC Discovery endpoint
+   - Generates nonce-aware JWT tokens
+   - Thread-based lifecycle with dedicated tokio runtime
+
+2. **Unit Tests**:
+   - Use dependency injection to avoid HTTP requests
+   - Test behavior rather than hardcoded URLs
+   - Maintain fast execution without external dependencies
+
+3. **Integration Tests**:
+   - Use OIDC Discovery for dynamic endpoint resolution
+   - Test complete OAuth2 flows with mock server
+   - Validate nonce verification and security compliance
 
 ## Troubleshooting
 
-### "Authorization URL should use discovered endpoint from mock server"
+### Mock Server Connection Issues
 
-This error occurs when:
-- Another test initialized oauth2_passkey first
-- LazyLock locked the configuration to different URLs
+If you see connection refused errors:
 
-**Solution:** Run the OIDC Discovery test in isolation:
 ```bash
-cargo test a_test_oauth2_uses_oidc_discovery -- --nocapture
+# Check if the mock server is running on the expected port
+netstat -an | grep 9876
 ```
 
-### "oauth2_passkey already initialized - skipping re-initialization"
+**Solutions:**
+- The persistent mock server starts automatically during test execution
+- Server initialization includes a readiness check with 50 retry attempts
+- Thread-based architecture ensures server persistence across tests
 
-This indicates a test ran after library initialization. This is expected behavior in the full test suite due to LazyLock constraints.
+### Port Already in Use
+
+If port 9876 is occupied:
+
+```bash
+# Find what's using the port
+lsof -i :9876
+
+# Kill the process if needed
+kill $(lsof -t -i :9876)
+```
+
+The test server will handle port conflicts gracefully and report initialization status.
 
 ## Conclusion
 
-OIDC Discovery functionality is fully implemented and works correctly:
+The new Axum mock server architecture provides robust OIDC Discovery testing:
 
-- ✅ **Discovery Document**: Proper `.well-known/openid-configuration` endpoint
-- ✅ **Dynamic URLs**: Authorization, token, userinfo, JWKS endpoints discovered
-- ✅ **Production Ready**: Works with real Google OAuth2 endpoints
-- ✅ **Security Compliant**: Follows OpenID Connect Discovery 1.0 specification
+- ✅ **Persistent Mock Server**: Fixed port 9876 eliminates LazyLock conflicts
+- ✅ **Complete OIDC Discovery**: Full `.well-known/openid-configuration` endpoint
+- ✅ **Dynamic URLs**: Authorization, token, userinfo, JWKS endpoints discovered automatically
+- ✅ **Production Ready**: Seamlessly works with real Google OAuth2 endpoints
+- ✅ **Security Compliant**: Follows OpenID Connect Discovery 1.0 specification with nonce verification
+- ✅ **Test Reliability**: Thread-based persistence eliminates flaky test failures
 
-The testing constraint is architectural (LazyLock design) and does not affect production functionality.
+The architecture changes have resolved previous LazyLock testing constraints while maintaining full production functionality.

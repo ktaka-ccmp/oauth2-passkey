@@ -7,7 +7,7 @@ This document describes the comprehensive integration test suite that validates 
 - ✅ **Strong unit test coverage**: 446+ unit tests with 6 ignored
 - ✅ **Complete integration test suite**: 34 integration tests covering all authentication flows
 - ✅ **OIDC security compliance**: All OAuth2 tests validate nonce verification according to OpenID Connect standards
-- ✅ **Robust test infrastructure**: In-memory stores with proper isolation and nonce-aware mock OIDC provider
+- ✅ **Persistent Axum mock server**: Replaced httpmock with Axum-based mock OIDC provider on fixed port 9876
 - ✅ **Mock services**: OAuth2 provider and WebAuthn credential simulation with full security validation
 - ✅ **Demo applications**: 3 working demos (oauth2, passkey, both)
 - ✅ **CI/CD ready**: All tests pass with proper cleanup and isolation
@@ -26,11 +26,11 @@ oauth2_passkey/
 │   │   ├── combined_flows.rs          # ✅ Cross-method authentication (4 tests)
 │   │   ├── api_client_flows.rs        # ✅ API/JavaScript client flows (4 tests)
 │   │   ├── nonce_verification_tests.rs # ✅ OAuth2 nonce verification (3 tests)
-│   │   ├── enhanced_nonce_tests.rs     # ✅ Enhanced nonce verification (3 tests)
-│   │   └── sophisticated_nonce_tests.rs # ✅ Sophisticated nonce mock (3 tests)
+│   │   └── oidc_discovery_test.rs      # ✅ OIDC Discovery endpoint tests (2 tests)
 │   └── common/
-│       ├── mod.rs                     # Common module exports
-│       ├── test_server.rs             # ✅ Test server with mock OAuth2
+│       ├── mod.rs                     # Common module exports  
+│       ├── test_server.rs             # ✅ Test server infrastructure
+│       ├── axum_mock_server.rs        # ✅ Persistent Axum mock OIDC provider
 │       ├── mock_browser.rs            # ✅ HTTP client with cookie handling
 │       └── fixtures.rs                # ✅ Test data and mock responses
 
@@ -45,18 +45,25 @@ oauth2_passkey_axum/
 ### 2.1 Test Server Infrastructure (`tests/common/test_server.rs`)
 - ✅ **Minimal Axum test server** with oauth2-passkey integration
 - ✅ **In-memory databases** (SQLite + Memory cache) for isolation and speed
-- ✅ **Mock OAuth2 server** using httpmock with JWT token generation
+- ✅ **Persistent Axum mock OIDC provider** on fixed port 9876 with thread-based lifecycle
 - ✅ **Consistent test origins** to avoid LazyLock initialization issues
 - ✅ **Automatic cleanup** and resource management
 
-### 2.2 Mock Browser Client (`tests/common/mock_browser.rs`)
+### 2.2 Persistent Mock OIDC Provider (`tests/common/axum_mock_server.rs`)
+- ✅ **Fixed port architecture** (9876) prevents LazyLock initialization conflicts
+- ✅ **Thread-based persistence** using `std::thread::spawn` with dedicated tokio runtime
+- ✅ **OIDC Discovery endpoint** (`.well-known/openid-configuration`) for dynamic URL resolution
+- ✅ **Complete OAuth2 endpoints** (auth, token, userinfo, JWKS) with nonce-aware JWT generation
+- ✅ **Shared state management** for per-test configuration and nonce storage
+
+### 2.3 Mock Browser Client (`tests/common/mock_browser.rs`)
 - ✅ **HTTP client** with automatic cookie store for session handling
 - ✅ **Form submission** helpers for OAuth2 callbacks with proper headers
 - ✅ **OAuth2 flow simulation** including state parameter extraction
 - ✅ **Passkey credential** mock request/response handling
 - ✅ **Session validation** and user info retrieval
 
-### 2.3 Test Fixtures (`tests/common/fixtures.rs`)
+### 2.4 Test Fixtures (`tests/common/fixtures.rs`)
 - ✅ **Test user fixtures** (OAuth2, Passkey, Admin users)
 - ✅ **Mock OAuth2 responses** with proper JWT ID tokens
 - ✅ **Mock WebAuthn credentials** for registration and authentication
@@ -120,9 +127,9 @@ oauth2_passkey_axum/
 
 ### 4.1 Current Test Performance - ✅ EXCELLENT
 - ✅ **In-memory databases** (SQLite + Memory cache) for maximum speed
-- ✅ **Mock external services** (Google OAuth2 with httpmock)
+- ✅ **Persistent Axum mock server** eliminates startup overhead between tests
 - ✅ **Sequential execution** using `#[serial]` for proper isolation
-- ✅ **Actual runtime**: ~4 seconds for all 20 integration tests
+- ✅ **Actual runtime**: ~4 seconds for all integration tests
 - ✅ **Individual tests**: < 1 second each on average
 
 ### 4.2 Test Isolation Strategy - ✅ ROBUST
@@ -140,17 +147,19 @@ oauth2_passkey_axum/
 tokio = { version = "1.0", features = ["full"] }
 serde_json = "1.0"
 serial_test = "3.0"      # ✅ Used for test isolation
-httpmock = "0.7"         # ✅ Mock OAuth2 provider
+axum = "0.7"             # ✅ Persistent mock OIDC provider  
 reqwest = "0.12"         # ✅ HTTP client in MockBrowser
 url = "2.5"              # ✅ URL parsing for OAuth2 flows
 base64 = "0.22"          # ✅ WebAuthn credential encoding
 jsonwebtoken = "9.0"     # ✅ JWT ID token generation
 uuid = "1.0"             # ✅ Unique test data generation
 chrono = "0.4"           # ✅ Time handling for tokens
+# Note: httpmock removed - using Axum mock server instead
 ```
 
 ### 5.2 Mock Services - ✅ FULLY IMPLEMENTED
-- ✅ **Google OAuth2 mock server** with proper JWT token generation
+- ✅ **Persistent Axum OIDC provider** with proper JWT token generation and nonce awareness
+- ✅ **OIDC Discovery endpoint** for dynamic OAuth2 URL resolution
 - ✅ **WebAuthn credential simulator** with attestation objects
 - ✅ **Unique test user generation** to prevent conflicts
 - ✅ **CSRF token handling** via cookie store
@@ -173,14 +182,16 @@ GENERIC_DATA_STORE_URL='sqlite:file:test_integrated?mode=memory&cache=shared'
 PASSKEY_RP_ID='example.com'
 PASSKEY_RP_NAME='OAuth2-Passkey Test'
 
-# ✅ OAuth2 OIDC security compliance testing
+# ✅ OAuth2 OIDC Discovery configuration
+OAUTH2_ISSUER_URL='http://127.0.0.1:9876'
+# Individual URLs discovered dynamically from the issuer
 # Nonce verification is always enabled for OpenID Connect security
 ```
 
 ### 6.2 Current Test Execution Strategy - ✅ WORKING
 - ✅ **Parallel unit tests** (446 tests, ~2.5 seconds)
-- ✅ **Sequential integration tests** (20 tests, ~4 seconds, using `#[serial]`)
-- ✅ **Zero test flakiness** with proper isolation
+- ✅ **Sequential integration tests** (34 tests, ~4 seconds, using `#[serial]`)
+- ✅ **Zero test flakiness** with persistent mock server architecture
 - ✅ **CI/CD ready** with automatic cleanup
 
 ## 7. Achievement Summary - ✅ GOALS EXCEEDED
@@ -330,8 +341,8 @@ impl MockBrowser {
 ### 11.1 What's Complete - ✅ COMPREHENSIVE
 - ✅ **34 integration tests** covering all authentication flows with production nonce verification
 - ✅ **446+ unit tests** with perfect isolation
-- ✅ **Zero test flakiness** with robust error handling and proper httpmock implementation
-- ✅ **Production-quality mock OIDC provider** with nonce-aware token generation
+- ✅ **Zero test flakiness** with persistent Axum mock server architecture
+- ✅ **Production-quality mock OIDC provider** with OIDC Discovery and nonce-aware token generation
 - ✅ **Complete OAuth2 security validation** proving nonce verification works correctly
 - ✅ **CI/CD ready** with no special configuration needed
 - ✅ **Developer-friendly** with clear test output and debugging support
@@ -364,14 +375,14 @@ impl MockBrowser {
 - ✅ **Mock OIDC provider** correctly captures nonces from authorization requests
 - ✅ **Integration test success criteria** recognize nonce verification as working security
 
-#### Key Technical Achievement - httpmock Root Cause Resolution
-**Problem Identified**: Using `move` keyword in httpmock closures caused immediate execution during mock setup instead of deferred execution during HTTP requests.
+#### Key Technical Achievement - Axum Mock Server Migration
+**Problem Solved**: httpmock dependency caused LazyLock initialization conflicts and test reliability issues.
 
 **Solution Implemented**:
-1. ✅ **Removed `move` closures** from httpmock server setup
-2. ✅ **Fixed authorization code matching** between MockBrowser and nonce-aware mock server
-3. ✅ **Updated test expectations** to recognize "Nonce mismatch" as success (proves security works)
-4. ✅ **Added missing nonce parameters** where required by mock server endpoints
+1. ✅ **Replaced httpmock with persistent Axum server** on fixed port 9876
+2. ✅ **Thread-based server lifecycle** using `std::thread::spawn` with dedicated tokio runtime
+3. ✅ **OIDC Discovery endpoint** for dynamic OAuth2 URL resolution
+4. ✅ **Eliminated test infrastructure redundancy** by consolidating multiple mock implementations
 
 #### Integration Test Coverage for Nonce Verification
 - ✅ **`test_oauth2_new_user_registration`** - Validates nonce extraction and verification
