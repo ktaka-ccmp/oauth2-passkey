@@ -76,10 +76,14 @@ OAUTH2_ISSUER_URL='http://127.0.0.1:9876'  # Persistent Axum mock server
 
 ### Test Infrastructure Components
 
-1. **Persistent Mock Server** (`tests/common/axum_mock_server.rs`):
+1. **Production-Grade Mock Server** (`tests/common/axum_mock_server.rs`):
    - Runs on fixed port 9876 throughout all tests
-   - Provides OIDC Discovery endpoint
-   - Generates nonce-aware JWT tokens
+   - Provides complete OIDC Discovery endpoint
+   - Implements full OAuth2/OIDC specification compliance
+   - Authorization code flow with UUID-based unique codes
+   - PKCE S256 validation for enhanced security
+   - Support for both form_post and query response modes
+   - Automatic authorization code expiration and cleanup
    - Thread-based lifecycle with dedicated tokio runtime
 
 2. **Unit Tests**:
@@ -89,8 +93,10 @@ OAUTH2_ISSUER_URL='http://127.0.0.1:9876'  # Persistent Axum mock server
 
 3. **Integration Tests**:
    - Use OIDC Discovery for dynamic endpoint resolution
-   - Test complete OAuth2 flows with mock server
-   - Validate nonce verification and security compliance
+   - Test complete OAuth2 flows with production-grade mock server
+   - Extract authorization codes from both response modes
+   - Validate comprehensive success criteria including sessions and redirects
+   - Verify OAuth2/OIDC compliance including PKCE and nonce verification
 
 ## Troubleshooting
 
@@ -124,13 +130,16 @@ The test server will handle port conflicts gracefully and report initialization 
 
 ## Conclusion
 
-The new Axum mock server architecture provides robust OIDC Discovery testing:
+The enhanced Axum mock server provides comprehensive OAuth2/OIDC testing capabilities:
 
-- ✅ **Persistent Mock Server**: Fixed port 9876 eliminates LazyLock conflicts
-- ✅ **Complete OIDC Discovery**: Full `.well-known/openid-configuration` endpoint
-- ✅ **Dynamic URLs**: Authorization, token, userinfo, JWKS endpoints discovered automatically
-- ✅ **Production Ready**: Seamlessly works with real Google OAuth2 endpoints
-- ✅ **Security Compliant**: Follows OpenID Connect Discovery 1.0 specification with nonce verification
-- ✅ **Test Reliability**: Thread-based persistence eliminates flaky test failures
+- ✅ **Production-Grade Implementation**: Complete OAuth2/OIDC specification compliance
+- ✅ **Authorization Code Flow**: UUID-based unique codes with proper expiration
+- ✅ **PKCE Security**: S256 code challenge validation for enhanced security
+- ✅ **Response Mode Support**: Both form_post and query modes fully implemented
+- ✅ **Parameter Validation**: Comprehensive OAuth2 parameter validation matching production servers
+- ✅ **OIDC Discovery**: Full `.well-known/openid-configuration` endpoint with dynamic URL resolution
+- ✅ **Enhanced Testing**: Proper auth code extraction and comprehensive success validation
+- ✅ **Automatic Cleanup**: Background task manages authorization code expiration
+- ✅ **Test Reliability**: Thread-based persistence with tracing support for debugging
 
-The architecture changes have resolved previous LazyLock testing constraints while maintaining full production functionality.
+The mock server now provides production-equivalent OAuth2/OIDC testing while maintaining the reliability and performance benefits of the persistent architecture.
