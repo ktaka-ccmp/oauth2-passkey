@@ -67,13 +67,76 @@ async fn test_oauth2_new_user_registration() -> Result<(), Box<dyn std::error::E
         auth_response.status()
     );
 
-    // The authorization endpoint should redirect back with auth code
-    if let Some(location) = auth_response.headers().get("location") {
+    println!("Authorization endpoint response headers:");
+    for (key, value) in auth_response.headers() {
         println!(
-            "Authorization redirect location: {}",
-            location.to_str().unwrap_or("invalid")
+            "  {}: {}",
+            key,
+            value.to_str().unwrap_or("invalid header value")
         );
     }
+
+    // Extract location header before consuming response
+    let location_header = auth_response
+        .headers()
+        .get("location")
+        .map(|v| v.to_str().unwrap_or("invalid").to_string());
+    let status = auth_response.status();
+
+    let body = auth_response.text().await?;
+    println!(
+        "Authorization endpoint response body preview: {}",
+        &body.chars().take(300).collect::<String>()
+    );
+
+    // Extract auth code and state based on response mode
+    let (auth_code, received_state) = if status.is_redirection() {
+        // Query mode: extract from location header
+        if let Some(location) = &location_header {
+            println!("Authorization redirect location: {location}");
+            let url =
+                reqwest::Url::parse(location).map_err(|e| format!("Invalid redirect URL: {e}"))?;
+            let mut code = None;
+            let mut state = None;
+            for (key, value) in url.query_pairs() {
+                match key.as_ref() {
+                    "code" => code = Some(value.to_string()),
+                    "state" => state = Some(value.to_string()),
+                    _ => {}
+                }
+            }
+            (
+                code.ok_or("No auth code in redirect URL")?,
+                state.unwrap_or_default(),
+            )
+        } else {
+            return Err("Expected location header for redirect response".into());
+        }
+    } else {
+        // Form_post mode: extract from form body
+        println!("Form post response received");
+        // Parse the HTML form to extract hidden input values
+        let code_regex =
+            regex::Regex::new(r#"<input[^>]*name=['"]code['"][^>]*value=['"]([^'"]*)"#).unwrap();
+        let state_regex =
+            regex::Regex::new(r#"<input[^>]*name=['"]state['"][^>]*value=['"]([^'"]*)"#).unwrap();
+
+        let code = code_regex
+            .captures(&body)
+            .and_then(|cap| cap.get(1))
+            .map(|m| m.as_str().to_string())
+            .ok_or("No auth code found in form body")?;
+
+        let state = state_regex
+            .captures(&body)
+            .and_then(|cap| cap.get(1))
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default();
+
+        (code, state)
+    };
+
+    println!("🔍 Extracted auth code: {auth_code} (state: {received_state})");
 
     // Step 3: Complete OAuth2 callback with auth code (simulating OAuth2 provider redirect)
     println!("🔧 Simulating OAuth2 provider callback...");
@@ -81,8 +144,8 @@ async fn test_oauth2_new_user_registration() -> Result<(), Box<dyn std::error::E
         .post_form_with_headers_old(
             "/auth/oauth2/authorized",
             &[
-                ("code", "mock_auth_code"), // The Axum mock server expects this code
-                ("state", &state_param),
+                ("code", &auth_code), // Use the actual extracted code
+                ("state", &received_state),
             ],
             &[
                 ("Origin", "http://127.0.0.1:9876"), // Axum mock server origin
@@ -94,32 +157,103 @@ async fn test_oauth2_new_user_registration() -> Result<(), Box<dyn std::error::E
     // Check the callback response
     let status = callback_response.status();
     println!("OAuth2 callback response status: {status}");
+
+    // Show callback response headers (session cookies, CSRF tokens, etc.)
+    println!("OAuth2 callback response headers:");
+    for (key, value) in callback_response.headers() {
+        println!(
+            "  {}: {}",
+            key,
+            value.to_str().unwrap_or("invalid header value")
+        );
+    }
+
+    // Extract data before consuming response
+    let headers = callback_response.headers().clone();
     let response_body = callback_response.text().await?;
     println!(
         "OAuth2 callback response preview: {}",
         &response_body[..std::cmp::min(200, response_body.len())]
     );
 
-    // With the Axum mock server, we expect successful OAuth2 flow
-    // The nonce verification is handled automatically by the server
-    if status.is_success() {
-        println!("✅ OAuth2 new user registration test SUCCESS:");
-        println!("  - OAuth2 authorization redirect: PASSED");
-        println!("  - State parameter management: PASSED");
-        println!("  - Authorization code exchange: PASSED");
-        println!("  - OIDC Discovery with Axum mock server: PASSED");
-        println!("  - Nonce verification (automated): PASSED");
-        return Ok(());
+    // Assert OAuth2 success characteristics
+    let mut success_checks = Vec::new();
+
+    // 1. Check for 303 redirect (successful OAuth2 completion)
+    if status == reqwest::StatusCode::SEE_OTHER {
+        success_checks.push("✅ 303 See Other redirect: PASSED".to_string());
+    } else {
+        success_checks.push(format!("❌ Expected 303 See Other, got: {status}"));
     }
 
-    // If we reach here, the OAuth2 flow didn't succeed as expected
-    println!("⚠️  OAuth2 flow did not complete successfully");
-    println!("Response body: {response_body}");
+    // 2. Check for session cookie with correct characteristics
+    let session_cookie = headers
+        .get_all("set-cookie")
+        .iter()
+        .find(|cookie| cookie.to_str().unwrap_or("").contains("__Host-SessionId"));
 
-    // For now, we'll consider this a TODO to be fixed once all infrastructure is updated
-    println!("🔧 TODO: Complete OAuth2 flow integration with Axum mock server");
+    if let Some(cookie) = session_cookie {
+        let cookie_str = cookie.to_str().unwrap_or("");
+        if cookie_str.contains("SameSite=Lax")
+            && cookie_str.contains("Secure")
+            && cookie_str.contains("HttpOnly")
+            && cookie_str.contains("Path=/")
+        {
+            success_checks.push("✅ Session cookie with security flags: PASSED".to_string());
+        } else {
+            success_checks.push("❌ Session cookie missing security flags".to_string());
+        }
+    } else {
+        success_checks.push("❌ No __Host-SessionId cookie found".to_string());
+    }
 
-    Ok(())
+    // 3. Check for location header with success message
+    let location = headers.get("location").and_then(|h| h.to_str().ok());
+
+    if let Some(loc) = location {
+        if loc.contains("/auth/oauth2/popup_close") && loc.contains("Created%20new%20user") {
+            success_checks
+                .push("✅ Success redirect with user creation message: PASSED".to_string());
+        } else {
+            success_checks.push(format!("❌ Unexpected redirect location: {loc}"));
+        }
+    } else {
+        success_checks.push("❌ No location header found".to_string());
+    }
+
+    // 4. Check for CSRF cookie management
+    let csrf_cookie = headers
+        .get_all("set-cookie")
+        .iter()
+        .find(|cookie| cookie.to_str().unwrap_or("").contains("__Host-CsrfId"));
+
+    if csrf_cookie.is_some() {
+        success_checks.push("✅ CSRF token management: PASSED".to_string());
+    } else {
+        success_checks.push("❌ No CSRF cookie management found".to_string());
+    }
+
+    // Determine overall success
+    let all_passed = success_checks.iter().all(|check| check.starts_with("✅"));
+
+    if all_passed {
+        println!("🎉 OAuth2 new user registration test SUCCESS:");
+        for check in &success_checks {
+            println!("  {check}");
+        }
+        println!("  - OAuth2 authorization with unique codes: PASSED");
+        println!("  - PKCE validation (S256): PASSED");
+        println!("  - Nonce verification: PASSED");
+        println!("  - Token exchange: PASSED");
+        println!("  - Session establishment: PASSED");
+        return Ok(());
+    } else {
+        println!("❌ OAuth2 flow failed - missing required characteristics:");
+        for check in &success_checks {
+            println!("  {check}");
+        }
+        panic!("OAuth2 integration test failed due to missing success characteristics");
+    }
 }
 
 /// Test OAuth2 existing user login flow

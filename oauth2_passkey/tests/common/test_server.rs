@@ -1,4 +1,4 @@
-use crate::common::axum_mock_server::{configure_mock_for_test, get_test_server};
+use crate::common::axum_mock_server::{configure_mock_for_test, get_oidc_mock_server};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
@@ -26,8 +26,26 @@ fn should_initialize_oauth2_passkey() -> bool {
     }
 }
 
+/// Initialize tracing for tests with trace level
+fn init_test_tracing() {
+    use std::sync::Once;
+    static INIT: Once = Once::new();
+
+    INIT.call_once(|| {
+        tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_test_writer()
+            .try_init()
+            .ok(); // Ignore errors if already initialized
+        println!("🔍 Initialized tracing with TRACE level for tests");
+    });
+}
+
 /// Load test environment configuration
 fn load_test_environment() {
+    // Initialize tracing first
+    init_test_tracing();
+
     // Load .env_test file - this sets all configuration before LazyLock initialization
     if let Err(e) = dotenvy::from_filename(".env_test") {
         println!("Warning: Could not load .env_test file: {e}");
@@ -35,17 +53,6 @@ fn load_test_environment() {
     } else {
         println!("✅ Loaded test configuration from .env_test");
     }
-
-    // Use unique table prefix to isolate test data (the only runtime setting that works)
-    let unique_id = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let unique_prefix = format!("test_{unique_id}_");
-    unsafe {
-        std::env::set_var("DB_TABLE_PREFIX", &unique_prefix);
-    }
-    println!("🗄️  Using unique table prefix: {unique_prefix}");
 }
 
 /// Test server for integration testing
@@ -117,16 +124,10 @@ impl TestServer {
         println!("🆔 Using unique test user: {unique_email} (ID: {unique_user_id})");
 
         // Get the persistent mock server (automatically starts if needed)
-        let _server = get_test_server();
+        let _server = get_oidc_mock_server();
 
         // Configure the Axum mock server for this test
         configure_mock_for_test(unique_email, unique_user_id, base_url.clone());
-
-        // Set OAUTH2_ISSUER_URL to use the fixed Axum mock server for OIDC Discovery
-        unsafe {
-            std::env::set_var("OAUTH2_ISSUER_URL", "http://127.0.0.1:9876");
-        }
-        println!("🔧 Using Axum mock server for OAuth2: http://127.0.0.1:9876");
 
         // Initialize test environment with in-memory stores (only once per test process)
         if should_initialize {
@@ -138,6 +139,9 @@ impl TestServer {
         } else {
             println!("⏭️  Skipping oauth2_passkey::init() - already initialized");
         }
+
+        // OAuth2 issuer URL is configured via .env_test file
+        println!("🔧 OAuth2 issuer configured from environment variables");
 
         // Create minimal test application
         let app = create_test_app().await;

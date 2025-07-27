@@ -5,8 +5,8 @@
 
 use axum::{
     Router,
-    extract::{Query, State},
-    http::{HeaderMap, StatusCode},
+    extract::{Form, Query, State},
+    http::StatusCode,
     response::Json,
     routing::{get, post},
 };
@@ -18,6 +18,7 @@ use std::{
     thread,
     time::{SystemTime, UNIX_EPOCH},
 };
+use uuid::Uuid;
 
 /// Fixed port for the mock OAuth2 server
 pub const MOCK_OAUTH2_PORT: u16 = 9876;
@@ -43,6 +44,15 @@ impl TestServerContext {
         let state_clone = state.clone();
 
         println!("🔧 Starting persistent mock OAuth2 server on port {MOCK_OAUTH2_PORT}...");
+
+        // Start cleanup task for expired codes
+        let cleanup_state = state.clone();
+        thread::spawn(move || {
+            loop {
+                thread::sleep(std::time::Duration::from_secs(60)); // Clean every minute
+                cleanup_expired_codes(&cleanup_state);
+            }
+        });
 
         // Start server in background thread (persistent across all tests)
         let thread_handle = thread::spawn(move || {
@@ -70,14 +80,32 @@ impl TestServerContext {
 // Global test server context (initialized once, lives for entire test run)
 static TEST_SERVER: LazyLock<TestServerContext> = LazyLock::new(TestServerContext::new);
 
+/// Authorization request data stored during OAuth2 flow
+#[derive(Clone, Debug)]
+pub struct AuthorizationRequest {
+    pub nonce: Option<String>,
+    pub code_challenge: Option<String>,
+    pub code_challenge_method: Option<String>,
+    pub redirect_uri: String,
+    /// OAuth2 state parameter - returned to client but not validated during token exchange
+    #[allow(dead_code)]
+    pub state: String,
+    pub scope: Option<String>,
+    pub response_type: String,
+    #[allow(dead_code)]
+    pub response_mode: String,
+    pub client_id: String,
+    pub created_at: u64,
+}
+
 /// Shared state for the mock server
 #[derive(Clone, Default)]
 pub struct MockServerState {
     /// Current test user data
     pub test_user_email: Arc<Mutex<String>>,
     pub test_user_id: Arc<Mutex<String>>,
-    /// Nonce storage for current test
-    pub nonces: Arc<Mutex<HashMap<String, String>>>,
+    /// Authorization codes with their associated request data
+    pub authorization_codes: Arc<Mutex<HashMap<String, AuthorizationRequest>>>,
     /// Current test configuration
     pub test_config: Arc<Mutex<TestConfig>>,
 }
@@ -90,7 +118,7 @@ pub struct TestConfig {
 }
 
 /// Get the global test server context
-pub fn get_test_server() -> &'static TestServerContext {
+pub fn get_oidc_mock_server() -> &'static TestServerContext {
     &TEST_SERVER
 }
 
@@ -192,43 +220,185 @@ async fn oidc_discovery(State(state): State<MockServerState>) -> Json<Value> {
 async fn oauth2_auth(
     Query(params): Query<HashMap<String, String>>,
     State(state): State<MockServerState>,
-) -> Result<(StatusCode, HeaderMap), StatusCode> {
+) -> Result<axum::response::Response, StatusCode> {
     let config = state.test_config.lock().unwrap();
     let redirect_uri = params.get("redirect_uri").unwrap_or(&config.origin_url);
     let state_param = params.get("state").map_or("mock_state", |s| s.as_str());
     let nonce = params.get("nonce");
+    let code_challenge = params.get("code_challenge");
+    let code_challenge_method = params.get("code_challenge_method");
+    let scope = params.get("scope");
+    let response_type = params.get("response_type").map_or("code", |v| v);
+    let client_id = params.get("client_id").unwrap_or(&config.client_id);
+    let response_mode = params
+        .get("response_mode")
+        .map_or("form_post", |v| v.as_str());
 
-    // Store nonce if provided
-    if let Some(nonce_value) = nonce {
-        let mut nonces = state.nonces.lock().unwrap();
-        nonces.insert("current_nonce".to_string(), nonce_value.clone());
-        println!("🔧 Mock server stored nonce: {nonce_value}");
+    // Generate unique authorization code
+    let auth_code = Uuid::new_v4().to_string();
+
+    // Get current timestamp
+    let created_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // Create authorization request record
+    let auth_request = AuthorizationRequest {
+        nonce: nonce.cloned(),
+        code_challenge: code_challenge.cloned(),
+        code_challenge_method: code_challenge_method.cloned(),
+        redirect_uri: redirect_uri.clone(),
+        state: state_param.to_string(),
+        scope: scope.cloned(),
+        response_type: response_type.to_string(),
+        response_mode: response_mode.to_string(),
+        client_id: client_id.clone(),
+        created_at,
+    };
+
+    // Store the authorization code and its associated data
+    {
+        let mut auth_codes = state.authorization_codes.lock().unwrap();
+        auth_codes.insert(auth_code.clone(), auth_request.clone());
+        println!(
+            "🔧 Mock server generated auth code: {} with PKCE: {:?}, nonce: {:?}",
+            auth_code,
+            code_challenge.is_some(),
+            nonce.is_some()
+        );
     }
 
-    let mut headers = HeaderMap::new();
-    let redirect_url = format!("{redirect_uri}?code=mock_auth_code&state={state_param}");
-    headers.insert("location", redirect_url.parse().unwrap());
-
-    Ok((StatusCode::FOUND, headers))
+    match response_mode {
+        "form_post" => {
+            // For form_post, we return a 200 OK with a form that will auto-submit
+            let form = format!(
+                "<html><body><form id='auth_form' action='{redirect_uri}' method='POST'>\
+                 <input type='hidden' name='code' value='{auth_code}'>\
+                 <input type='hidden' name='state' value='{state_param}'>\
+                 </form><script>document.getElementById('auth_form').submit();</script></body></html>"
+            );
+            use axum::response::{Html, IntoResponse};
+            Ok(Html(form).into_response())
+        }
+        "query" => {
+            // For query, we redirect with code and state in the URL
+            let redirect_url = format!("{redirect_uri}?code={auth_code}&state={state_param}");
+            use axum::response::{IntoResponse, Redirect};
+            Ok(Redirect::to(&redirect_url).into_response())
+        }
+        _ => {
+            // Default to query mode
+            let redirect_url = format!("{redirect_uri}?code={auth_code}&state={state_param}");
+            use axum::response::{IntoResponse, Redirect};
+            Ok(Redirect::to(&redirect_url).into_response())
+        }
+    }
 }
 
 /// OAuth2 token endpoint
-async fn oauth2_token(State(state): State<MockServerState>) -> Json<Value> {
+async fn oauth2_token(
+    State(state): State<MockServerState>,
+    Form(params): Form<HashMap<String, String>>,
+) -> Result<Json<Value>, StatusCode> {
+    let code = params.get("code").ok_or(StatusCode::BAD_REQUEST)?;
+    let grant_type = params.get("grant_type").map_or("authorization_code", |v| v);
+    let code_verifier = params.get("code_verifier");
+    let redirect_uri = params.get("redirect_uri");
+    let client_id = params.get("client_id");
+
+    // Validate grant type
+    if grant_type != "authorization_code" {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Look up the authorization code
+    let auth_request = {
+        let mut auth_codes = state.authorization_codes.lock().unwrap();
+        auth_codes.remove(code).ok_or(StatusCode::BAD_REQUEST)?
+    };
+
+    // Validate redirect_uri matches original request
+    if let Some(provided_redirect_uri) = redirect_uri {
+        if provided_redirect_uri != &auth_request.redirect_uri {
+            println!(
+                "❌ Redirect URI mismatch: expected {}, got {}",
+                auth_request.redirect_uri, provided_redirect_uri
+            );
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+
+    // Validate client_id matches original request
+    if let Some(provided_client_id) = client_id {
+        if provided_client_id != &auth_request.client_id {
+            println!(
+                "❌ Client ID mismatch: expected {}, got {}",
+                auth_request.client_id, provided_client_id
+            );
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+
+    // Validate response_type was "code" (OAuth2 security requirement)
+    if auth_request.response_type != "code" {
+        println!("❌ Invalid response_type: {}", auth_request.response_type);
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Validate PKCE if code_challenge was provided in the original request
+    if let Some(challenge) = &auth_request.code_challenge {
+        let verifier = code_verifier.ok_or(StatusCode::BAD_REQUEST)?;
+
+        // Validate PKCE challenge
+        let method = auth_request
+            .code_challenge_method
+            .as_deref()
+            .unwrap_or("plain");
+        let computed_challenge = match method {
+            "S256" => {
+                use base64::Engine as _;
+                use sha2::{Digest, Sha256};
+                let hash = Sha256::digest(verifier.as_bytes());
+                base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(hash)
+            }
+            "plain" => verifier.clone(),
+            _ => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        if computed_challenge != *challenge {
+            println!("❌ PKCE validation failed: expected {challenge}, got {computed_challenge}");
+            return Err(StatusCode::BAD_REQUEST);
+        }
+
+        println!("✅ PKCE validation successful for method: {method}");
+    }
+
+    // Check code expiration (10 minutes)
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    if now - auth_request.created_at > 600 {
+        println!("❌ Authorization code expired");
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let user_email = state.test_user_email.lock().unwrap().clone();
     let user_id = state.test_user_id.lock().unwrap().clone();
-    let nonces = state.nonces.lock().unwrap();
-    let current_nonce = nonces.get("current_nonce").cloned();
 
-    // Create mock ID token with nonce
-    let id_token = create_mock_id_token(&user_email, &user_id, current_nonce.as_deref());
+    // Create mock ID token with the stored nonce
+    let id_token = create_mock_id_token(&user_email, &user_id, auth_request.nonce.as_deref());
 
-    Json(json!({
+    println!("✅ Token exchange successful for code: {code}");
+
+    Ok(Json(json!({
         "access_token": "mock_access_token",
         "id_token": id_token,
         "token_type": "Bearer",
         "expires_in": 3600,
-        "scope": "openid email profile"
-    }))
+        "scope": auth_request.scope.unwrap_or_else(|| "openid email profile".to_string())
+    })))
 }
 
 /// OAuth2 userinfo endpoint
@@ -298,9 +468,34 @@ fn create_mock_id_token(email: &str, user_id: &str, nonce: Option<&str>) -> Stri
     encode(&header, &claims, &key).unwrap_or_else(|_| "mock.jwt.token".to_string())
 }
 
+/// Clean up expired authorization codes
+fn cleanup_expired_codes(state: &MockServerState) {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let mut auth_codes = state.authorization_codes.lock().unwrap();
+    let initial_count = auth_codes.len();
+
+    // Remove codes older than 10 minutes
+    auth_codes.retain(|code, request| {
+        let is_valid = now - request.created_at <= 600;
+        if !is_valid {
+            println!("🗑️ Cleaned up expired auth code: {code}");
+        }
+        is_valid
+    });
+
+    let cleaned_count = initial_count - auth_codes.len();
+    if cleaned_count > 0 {
+        println!("🗑️ Cleaned up {cleaned_count} expired authorization codes");
+    }
+}
+
 /// Configure the mock server for a specific test
 pub fn configure_mock_for_test(user_email: String, user_id: String, origin_url: String) {
-    let server = get_test_server();
+    let server = get_oidc_mock_server();
 
     // The server is guaranteed to be running (persistent thread approach)
     println!("✅ Using persistent mock server at {}", server.base_url);
