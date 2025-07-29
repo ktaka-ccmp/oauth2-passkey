@@ -8,7 +8,7 @@ static OAUTH2_PASSKEY_INITIALIZED: std::sync::atomic::AtomicBool =
 
 /// Get the current test origin URL (always consistent across all tests)
 pub fn get_test_origin() -> String {
-    "http://127.0.0.1:3000".to_string()
+    std::env::var("ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string())
 }
 
 /// Check if oauth2_passkey library has been initialized
@@ -70,44 +70,61 @@ impl TestServer {
     /// Start a new test server instance
     ///
     /// Creates a test server with:
-    /// - Random available port
+    /// - Port specified by ORIGIN environment variable (default: http://127.0.0.1:3000)
     /// - In-memory database and cache
     /// - Global Axum mock server for external provider simulation
     /// - Clean state for each test
     pub async fn start() -> Result<Self, Box<dyn std::error::Error>> {
-        // Try to bind to the consistent test port (3000) with retries
+        // Load test environment first to get ORIGIN
+        load_test_environment();
+
+        // Parse ORIGIN to get host and port
+        let origin =
+            std::env::var("ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
+
+        let url = url::Url::parse(&origin).map_err(|e| format!("Invalid ORIGIN URL: {e}"))?;
+
+        let host = url.host_str().ok_or("ORIGIN must have a host")?;
+        let port = url
+            .port()
+            .unwrap_or(if url.scheme() == "https" { 443 } else { 80 });
+
+        let bind_addr = format!("{host}:{port}");
+        println!("🔧 Binding test server to {bind_addr} (from ORIGIN={origin})");
+
+        // Bind to the exact address specified in ORIGIN with retry logic
         let listener = {
             let mut attempts = 0;
-            let max_attempts = 20;
+            const MAX_RETRIES: u8 = 100;
+            const RETRY_DELAY_MS: u64 = 100;
 
             loop {
-                match tokio::net::TcpListener::bind("127.0.0.1:3000").await {
-                    Ok(listener) => {
-                        println!("✅ Test server bound to preferred port 3000");
-                        break listener;
-                    }
-                    Err(_) if attempts < max_attempts => {
+                match tokio::net::TcpListener::bind(&bind_addr).await {
+                    Ok(listener) => break listener,
+                    Err(e) => {
                         attempts += 1;
+                        if attempts >= MAX_RETRIES {
+                            return Err(format!(
+                                "Failed to bind to {bind_addr} after {MAX_RETRIES} attempts: {e}. Make sure the port is available."
+                            ).into());
+                        }
                         println!(
-                            "⏳ Port 3000 unavailable, waiting... (attempt {attempts}/{max_attempts})"
+                            "⚠️  Failed to bind to {bind_addr} (attempt {}/{}): {e}. Retrying in {}ms...",
+                            attempts, MAX_RETRIES, RETRY_DELAY_MS
                         );
-                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                    }
-                    Err(_) => {
-                        println!(
-                            "⚠️  Port 3000 unavailable after {max_attempts} attempts, using random port"
-                        );
-                        break tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+                        tokio::time::sleep(tokio::time::Duration::from_millis(RETRY_DELAY_MS))
+                            .await;
                     }
                 }
             }
         };
 
-        let addr = listener.local_addr()?;
-        let base_url = format!("http://127.0.0.1:{}", addr.port());
+        println!("✅ Test server bound to {bind_addr}");
 
-        // Load test environment configuration and check if we should initialize
-        load_test_environment();
+        let addr = listener.local_addr()?;
+        let base_url = origin.clone();
+
+        // Check if we should initialize
         let should_initialize = should_initialize_oauth2_passkey();
 
         // Generate unique user data for this test
@@ -167,7 +184,7 @@ impl TestServer {
     }
 }
 
-/// Create a minimal test application with oauth2-passkey integration  
+/// Create a minimal test application with oauth2-passkey integration
 /// OAuth2 configuration is handled by the global Axum mock server on fixed port 9876
 async fn create_test_app() -> axum::Router {
     use axum::{Router, response::Json, routing::get};
@@ -212,13 +229,19 @@ mod tests {
             .await
             .expect("Failed to start test server");
 
-        // Test OAuth2 OIDC Discovery endpoint using the global Axum mock server
+        // Get OAuth2 issuer URL from environment
+        let oauth2_issuer_url = std::env::var("OAUTH2_ISSUER_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:9876".to_string());
+
+        // Test OAuth2 OIDC Discovery endpoint
         let client = reqwest::Client::new();
         let discovery_response = client
-            .get("http://127.0.0.1:9876/.well-known/openid-configuration")
+            .get(format!(
+                "{oauth2_issuer_url}/.well-known/openid-configuration"
+            ))
             .send()
             .await
-            .expect("Failed to call Axum mock OIDC Discovery endpoint");
+            .expect("Failed to call OAuth2 OIDC Discovery endpoint");
 
         assert!(discovery_response.status().is_success());
 
@@ -228,10 +251,10 @@ mod tests {
             .expect("Failed to parse OIDC Discovery response");
 
         // Verify it's properly configured
-        assert_eq!(discovery_doc["issuer"], "http://127.0.0.1:9876");
+        assert_eq!(discovery_doc["issuer"], oauth2_issuer_url);
         assert_eq!(
             discovery_doc["authorization_endpoint"],
-            "http://127.0.0.1:9876/oauth2/auth"
+            format!("{oauth2_issuer_url}/oauth2/auth")
         );
 
         server.shutdown().await;

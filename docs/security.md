@@ -1,7 +1,7 @@
 # Security Analysis and Assessment
 
-**Document Version**: 1.0  
-**Last Updated**: June 19, 2025  
+**Document Version**: 1.0
+**Last Updated**: June 19, 2025
 **Status**: DRAFT - Requires verification and testing
 
 ## Overview
@@ -14,7 +14,7 @@ This document provides a security analysis of the `oauth2-passkey` core library.
 
 #### 1. Constant-time CSRF Token Comparison
 - **Claim**: Uses constant-time comparison to prevent timing attacks on CSRF tokens
-- **Implementation**: 
+- **Implementation**:
   - File: `src/session/main/session.rs`
   - Uses: `subtle::ConstantTimeEq::ct_eq()`
   - Lines: 245, 548, 569
@@ -69,12 +69,14 @@ This document provides a security analysis of the `oauth2-passkey` core library.
 - **Verification Status**: ✅ VERIFIED
 - **Details**: All cookies set with secure attributes (Secure, HttpOnly, SameSite=Lax) and uses __Host- prefix for additional security
 
+📖 **For comprehensive details about `__Host-` cookie behavior, browser compatibility, HTTPS requirements, and localhost development considerations, see [Session Cookies and __Host- Prefix](session-cookies-and-host-prefix.md).**
+
 #### 5. PKCE Implementation (OAuth2)
 - **Claim**: Implements PKCE (Proof Key for Code Exchange) for OAuth2 authorization code flow
 - **Implementation**:
   - File: `src/oauth2/main/core.rs` (line 70, 137-145)
   - Method: S256 (SHA256 code challenge method)
-  - Code verifier generation: `gen_random_string(32)` 
+  - Code verifier generation: `gen_random_string(32)`
   - Code challenge: SHA256 hash of verifier, base64url-encoded
 - **Verification Status**: ✅ VERIFIED
 - **Details**: Full PKCE flow with secure verifier generation, challenge creation, and validation during token exchange
@@ -165,7 +167,7 @@ This document provides a security analysis of the `oauth2-passkey` core library.
 - **Cookie Clearing**: Logout response includes expired cookie to clear client-side session
 - **Function**: `delete_session_from_store()` and `delete_session_from_store_by_session_id()`
 
-**Session Expiration and Cleanup**: ✅ VERIFIED  
+**Session Expiration and Cleanup**: ✅ VERIFIED
 - **Implementation**: Automatic detection and cleanup of expired sessions
 - **Testing**: `test_is_authenticated_expired_session()` and `test_session_expiration_workflow()` verify behavior
 - **Verification**: Expired sessions are automatically deleted from cache when accessed
@@ -179,7 +181,7 @@ This document provides a security analysis of the `oauth2-passkey` core library.
 - **Testing**: Session creation functions tested and verified
 - **Flow**: Fresh session generated for user after successful OAuth2 authentication
 
-**Concurrent Session Handling**: ⚠️ NOT IMPLEMENTED  
+**Concurrent Session Handling**: ⚠️ NOT IMPLEMENTED
 - **Current Behavior**: Multiple sessions per user are allowed by design
 - **Implementation Status**: No session limits or concurrent session controls
 - **Verification**: Code review confirms no mechanisms to limit or track concurrent sessions
@@ -224,7 +226,7 @@ This document provides a security analysis of the `oauth2-passkey` core library.
 ## Known Limitations
 
 1. **Framework Dependency**: Core security depends on proper framework integration
-2. **HTTPS Enforcement**: Must be handled at deployment level  
+2. **HTTPS Enforcement**: Must be handled at deployment level
 3. **Rate Limiting**: Not implemented in core library
 
 ## Recommendations

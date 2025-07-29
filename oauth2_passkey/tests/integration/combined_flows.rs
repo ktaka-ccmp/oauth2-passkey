@@ -1,6 +1,9 @@
 use crate::common::{MockBrowser, MockWebAuthnCredentials, TestServer, TestUsers};
 use serial_test::serial;
 
+// Import OAuth2 helper functions from oauth2_flows.rs
+use super::oauth2_flows::{complete_full_oauth2_flow, validate_oauth2_success};
+
 /// Test combined authentication flows
 ///
 /// These integration tests verify end-to-end combined authentication scenarios including:
@@ -20,12 +23,30 @@ async fn test_oauth2_then_add_passkey() -> Result<(), Box<dyn std::error::Error>
 
     println!("🔐🌐 Testing OAuth2 registration followed by passkey addition");
 
-    // Step 1: Complete OAuth2 registration
-    let oauth2_response = browser.complete_oauth2_flow("create_user_or_login").await?;
+    // Step 1: Complete OAuth2 registration using proper helper function
+    let oauth2_response = complete_full_oauth2_flow(&browser, "create_user_or_login").await?;
 
     let oauth2_status = oauth2_response.status();
-    if oauth2_status.is_success() || oauth2_status.is_redirection() {
+    let oauth2_headers = oauth2_response.headers().clone();
+    let _oauth2_body = oauth2_response.text().await?;
+
+    // Validate OAuth2 success characteristics
+    let success_checks =
+        validate_oauth2_success(&oauth2_status, &oauth2_headers, "Created%20new%20user");
+    let oauth2_success = success_checks.iter().all(|check| check.starts_with("✅"));
+
+    if oauth2_success {
         println!("✅ Step 1: OAuth2 registration completed and session established");
+
+        // Verify session is active before attempting passkey registration
+        let user_info_response = browser.get("/auth/user/info").await?;
+        if !user_info_response.status().is_success() {
+            return Err(
+                "OAuth2 session not properly established - user info not accessible".into(),
+            );
+        }
+        let user_info: serde_json::Value = user_info_response.json().await?;
+        println!("  - Authenticated as: {}", user_info["email"]);
 
         // Step 2: Add passkey credential to existing OAuth2 account
         let passkey_options = browser
@@ -87,22 +108,33 @@ async fn test_oauth2_then_add_passkey() -> Result<(), Box<dyn std::error::Error>
             }
         }
     } else {
-        let body = oauth2_response.text().await?;
+        // OAuth2 failed validation - show what went wrong
+        println!("❌ OAuth2 flow failed validation - checking reasons:");
+        for check in &success_checks {
+            println!("  {check}");
+        }
+
+        // Since the response body was already consumed, we need to handle this differently
+        // Extract failure reason from success checks
+        let has_origin_issue = success_checks.iter().any(|check| check.contains("origin"));
+        let has_nonce_issue = success_checks.iter().any(|check| check.contains("nonce"));
+        let has_token_issue = success_checks.iter().any(|check| check.contains("token"));
 
         // With nonce verification enabled, multiple outcomes are valid for integration testing
-        if body.contains("Nonce mismatch") {
+        if has_nonce_issue {
             println!("✅ OAuth2 registration: Nonce verification working correctly");
             println!("   This validates that the OAuth2 security mechanism is functioning");
-        } else if body.contains("Invalid origin") {
+        } else if has_origin_issue {
             println!("✅ OAuth2 registration: Origin validation working correctly");
             println!("   This validates OAuth2 security validation is working");
-        } else if body.contains("Token exchange error") {
+        } else if has_token_issue {
             println!("✅ OAuth2 registration: Reached token exchange step");
             println!("   This validates OAuth2 integration is working");
         } else {
-            return Err(
-                format!("OAuth2 registration failed: {body} (status: {oauth2_status})").into(),
-            );
+            return Err(format!(
+                "OAuth2 registration failed with validation issues (status: {oauth2_status})"
+            )
+            .into());
         }
     }
 

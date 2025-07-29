@@ -36,6 +36,22 @@ impl MockBrowser {
         self.client.get(&url).send().await
     }
 
+    /// Make a GET request with custom headers
+    pub async fn get_with_headers(
+        &self,
+        path: &str,
+        headers: &[(&str, &str)],
+    ) -> Result<Response, reqwest::Error> {
+        let url = format!("{}{}", self.base_url, path);
+        let mut request = self.client.get(&url);
+
+        for (key, value) in headers {
+            request = request.header(*key, *value);
+        }
+
+        request.send().await
+    }
+
     /// Make a POST request with form data
     #[allow(dead_code)]
     pub async fn post_form(
@@ -250,51 +266,6 @@ impl MockBrowser {
         } else {
             Err(format!("Unexpected response status: {}", response.status()).into())
         }
-    }
-
-    /// Complete a full OAuth2 flow (initiate -> callback)
-    pub async fn complete_oauth2_flow(
-        &self,
-        mode: &str,
-    ) -> Result<Response, Box<dyn std::error::Error>> {
-        // Step 1: Initiate OAuth2 flow
-        let init_response = self
-            .get(&format!("/auth/oauth2/google?mode={mode}"))
-            .await?;
-
-        if !init_response.status().is_redirection() {
-            return Ok(init_response);
-        }
-
-        // Step 2: Extract state from redirect
-        let auth_url = init_response
-            .headers()
-            .get("location")
-            .ok_or("No location header in OAuth2 redirect")?
-            .to_str()?
-            .to_string();
-
-        let url = url::Url::parse(&auth_url)?;
-        let state_param = url
-            .query_pairs()
-            .find(|(key, _)| key == "state")
-            .map(|(_, value)| value.to_string())
-            .ok_or("No state parameter found in auth URL")?;
-
-        // Step 3: Complete OAuth2 callback
-        // Use the authorization code that the nonce-aware mock server expects
-        let callback_response = self
-            .post_form_with_headers_old(
-                "/auth/oauth2/authorized",
-                &[("code", "nonce_aware_auth_code"), ("state", &state_param)],
-                &[
-                    ("Origin", &self.base_url),
-                    ("Referer", "https://accounts.google.com/oauth2/authorize"),
-                ],
-            )
-            .await?;
-
-        Ok(callback_response)
     }
 
     /// Logout the current user

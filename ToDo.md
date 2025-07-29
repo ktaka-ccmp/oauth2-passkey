@@ -14,6 +14,7 @@
   - ✅ Storage operations instrumented with database query timing
   - ✅ Created detailed implementation guide in docs/implementing-tracing.md
 - ~~**Clean Error Handling**: Replace 30+ `.unwrap()` calls in session module with proper error handling~~ ✅ **DONE** - Session module already uses proper error handling in production code; `.unwrap()` calls are appropriately isolated to test code only
+- **Simplify OAuth2 Account Linking API**: Current implementation requires understanding CSRF tokens, page session tokens, and coordinating multiple API calls (50+ lines of code). Need simpler, more intuitive API. See detailed analysis and proposed solutions in `docs/oauth2-account-linking-api-simplification.md`.
 - **Integration Tests**: Add end-to-end tests for complete authentication flows
 - **Implement OIDC Discovery**: Replace hardcoded JWKS URL with dynamic discovery from `/.well-known/openid-configuration` (idtoken.rs:294)
 - **Finalize Public API**: Review and document all public interfaces for 1.0 release

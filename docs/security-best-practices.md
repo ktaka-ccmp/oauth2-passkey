@@ -56,6 +56,8 @@ This guide provides best practices for securely implementing authentication in y
 
    These are enabled by default and should not be disabled.
 
+   📖 **For detailed information about `__Host-` cookies, browser compatibility, and localhost development considerations, see [Session Cookies and __Host- Prefix](session-cookies-and-host-prefix.md).**
+
 3. **Session Invalidation**
 
    Implement proper session cleanup:

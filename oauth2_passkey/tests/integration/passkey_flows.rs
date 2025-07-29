@@ -226,51 +226,22 @@ async fn test_passkey_existing_user_authentication() -> Result<(), Box<dyn std::
     Ok(())
 }
 
-/// Test passkey registration after OAuth2 user creation (separate passkey user)
+/// Test passkey registration for new user (without OAuth2 dependency)
 ///
-/// Flow: OAuth2 user created → Create separate passkey user → WebAuthn challenge → Passkey registration
+/// Flow: Define user → WebAuthn challenge → Passkey registration
 #[tokio::test]
 #[serial]
 async fn test_passkey_credential_addition() -> Result<(), Box<dyn std::error::Error>> {
     let server = TestServer::start().await?;
     let browser = MockBrowser::new(&server.base_url, true);
 
-    println!("🔐 Testing passkey credential addition to existing account");
+    println!("🔐 Testing passkey credential registration for new user");
 
-    // Step 1: First create a user by completing an OAuth2 flow
-    let initial_oauth2_response = browser.complete_oauth2_flow("create_user_or_login").await?;
-
-    let status = initial_oauth2_response.status();
-    if !status.is_success() && !status.is_redirection() {
-        let body = initial_oauth2_response.text().await?;
-
-        // With nonce verification enabled, multiple outcomes are valid for integration testing
-        if body.contains("Nonce mismatch") {
-            println!("✅ Initial OAuth2 flow: Nonce verification working correctly");
-            println!("   This validates that the OAuth2 security mechanism is functioning");
-        } else if body.contains("Invalid origin") {
-            println!("✅ Initial OAuth2 flow: Origin validation working correctly");
-            println!("   This validates OAuth2 security validation is working");
-        } else if body.contains("Token exchange error") {
-            println!("✅ Initial OAuth2 flow: Reached token exchange step");
-            println!("   This validates OAuth2 integration is working");
-        } else {
-            return Err(format!("Failed to create initial user: {body} (status: {status})").into());
-        }
-    }
-
-    println!("✅ Step 1: Created user via OAuth2 and established session");
-
-    // Check if we have an active session
-    let has_session = browser.has_active_session().await;
-    println!("  Has active session: {has_session}");
-
-    // Since we completed OAuth2 flow, we should use the OAuth2 user data directly
-    // The session might not be queryable immediately, so let's use the known OAuth2 user
+    // Define test user data for passkey registration
     let user_email = std::env::var("TEST_USER_EMAIL").unwrap_or("passkey@example.com".to_string());
     let user_name = "Passkey Test User";
 
-    // Step 2: Start passkey registration in "create_user" mode (create new passkey user)
+    // Step 1: Start passkey registration in "create_user" mode (create new passkey user)
     let registration_options = browser
         .start_passkey_registration(&user_email, user_name, "create_user")
         .await?;
@@ -285,9 +256,9 @@ async fn test_passkey_credential_addition() -> Result<(), Box<dyn std::error::Er
         "Registration should include RP ID"
     );
 
-    println!("✅ Step 2: Received WebAuthn registration options for credential addition");
+    println!("✅ Step 1: Received WebAuthn registration options for credential registration");
 
-    // Step 3: Complete passkey registration to add credential
+    // Step 2: Complete passkey registration
     // Extract the actual challenge and user_handle from the registration options
     let challenge = registration_options["challenge"]
         .as_str()

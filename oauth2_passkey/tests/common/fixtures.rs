@@ -37,6 +37,28 @@ impl TestUsers {
             family_name: "User".to_string(),
         }
     }
+
+    /// Get a second OAuth2 test user for linking scenarios
+    pub fn oauth2_user_second() -> TestUser {
+        TestUser {
+            id: "test_oauth2_user_second".to_string(),
+            email: "oauth2-second@example.com".to_string(),
+            name: "OAuth2 Second User".to_string(),
+            given_name: "OAuth2 Second".to_string(),
+            family_name: "User".to_string(),
+        }
+    }
+
+    /// Get a third OAuth2 test user for linking scenarios
+    pub fn oauth2_user_third() -> TestUser {
+        TestUser {
+            id: "test_oauth2_user_third".to_string(),
+            email: "oauth2-third@example.com".to_string(),
+            name: "OAuth2 Third User".to_string(),
+            given_name: "OAuth2 Third".to_string(),
+            family_name: "User".to_string(),
+        }
+    }
 }
 
 /// Test user data structure
@@ -97,11 +119,14 @@ impl MockWebAuthnCredentials {
         let user_handle =
             general_purpose::URL_SAFE_NO_PAD.encode(format!("user_handle_{username}"));
 
+        // Use the actual test origin to match environment configuration
+        let test_origin = crate::common::test_server::get_test_origin();
+
         // Create client data JSON with the actual challenge
         let client_data = json!({
             "type": "webauthn.create",
             "challenge": challenge,
-            "origin": "http://localhost:3000"
+            "origin": test_origin
         });
         let client_data_json = general_purpose::URL_SAFE_NO_PAD.encode(client_data.to_string());
 
@@ -133,7 +158,7 @@ impl MockWebAuthnCredentials {
             _display_name,
             challenge,
             user_handle,
-            "http://localhost:3000",
+            &crate::common::test_server::get_test_origin(),
         )
     }
 
@@ -193,11 +218,14 @@ impl MockWebAuthnCredentials {
     /// Generate a mock authentication assertion response with specific challenge
     #[allow(dead_code)]
     pub fn authentication_response_with_challenge(credential_id: &str, challenge: &str) -> Value {
+        // Use the actual test origin to match environment configuration
+        let test_origin = crate::common::test_server::get_test_origin();
+
         // Create client data JSON with the actual challenge
         let client_data = json!({
             "type": "webauthn.get",
             "challenge": challenge,
-            "origin": "http://localhost:3000"
+            "origin": test_origin
         });
         let client_data_json = general_purpose::URL_SAFE_NO_PAD.encode(client_data.to_string());
 
@@ -228,7 +256,7 @@ impl MockWebAuthnCredentials {
             credential_id,
             challenge,
             auth_id,
-            "http://localhost:3000",
+            &crate::common::test_server::get_test_origin(),
         )
     }
 
@@ -377,8 +405,8 @@ impl TestConstants {
     pub const MOCK_CLIENT_ID: &'static str = "mock_client_id";
     #[allow(dead_code)]
     pub const MOCK_CLIENT_SECRET: &'static str = "mock_client_secret";
-    #[allow(dead_code)]
-    pub const TEST_ORIGIN: &'static str = "http://localhost:3000";
+    // #[allow(dead_code)]
+    // TEST_ORIGIN is now dynamically loaded from environment in test_server::get_test_origin()
 }
 
 #[cfg(test)]
