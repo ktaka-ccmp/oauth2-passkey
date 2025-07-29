@@ -43,9 +43,9 @@ x509-parser = { workspace = true }
 serial_test = { workspace = true }
 proptest = { workspace = true }
 axum = { workspace = true }
-reqwest = { workspace = true } 
+reqwest = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
 tracing-subscriber = { workspace = true }
-regex = "1.0"
+regex = { workspace = true }
 oauth2-passkey-axum = { path = "../oauth2_passkey_axum" }

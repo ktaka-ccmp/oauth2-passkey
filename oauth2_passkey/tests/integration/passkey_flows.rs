@@ -1,27 +1,29 @@
 use crate::common::{MockBrowser, MockWebAuthnCredentials, TestServer, TestUsers};
 use serial_test::serial;
 
-/// Test complete passkey authentication flows
+/// Common helper function for testing different WebAuthn attestation formats
 ///
-/// These integration tests verify end-to-end passkey functionality including:
-/// - New user registration via passkey
-/// - Existing user login via passkey
-/// - WebAuthn credential registration and authentication
-/// - Error scenarios and edge cases
-/// Test passkey new user registration flow
+/// This function contains the shared logic for testing passkey registration
+/// with different attestation formats (none, packed, tpm).
 ///
-/// Flow: Start registration → WebAuthn challenge → Mock credential response → Create user → Establish session
-#[tokio::test]
-#[serial]
-async fn test_passkey_new_user_registration() -> Result<(), Box<dyn std::error::Error>> {
+/// # Arguments
+/// * `format` - The attestation format to test ("none", "packed", "tpm")
+/// * `expected_success` - Whether the test expects successful registration
+///
+/// # Returns
+/// * `Result<(), Box<dyn std::error::Error>>` - Success or error
+async fn test_passkey_attestation_format(
+    format: &str,
+    expected_success: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Setup test environment
     let server = TestServer::start().await?;
     let browser = MockBrowser::new(&server.base_url, true);
     let test_user = TestUsers::passkey_user();
 
-    println!("🔐 Testing passkey new user registration flow");
+    println!("🔐 Testing passkey registration with {format} attestation format");
 
-    // Step 1: Start passkey registration in "create_user" mode
+    // Step 1: Start passkey registration
     let registration_options = browser
         .start_passkey_registration(&test_user.email, &test_user.name, "create_user")
         .await?;
@@ -40,11 +42,7 @@ async fn test_passkey_new_user_registration() -> Result<(), Box<dyn std::error::
         "Registration should include username"
     );
 
-    println!("Registration options: {registration_options:#?}");
-    println!("✅ Step 1: Received WebAuthn registration options");
-
-    // Step 2: Simulate WebAuthn client providing credential response
-    // Extract the actual challenge and user_handle from the registration options
+    // Extract challenge and user_handle
     let challenge = registration_options["challenge"]
         .as_str()
         .expect("Registration options should contain challenge");
@@ -52,73 +50,167 @@ async fn test_passkey_new_user_registration() -> Result<(), Box<dyn std::error::
         .as_str()
         .expect("Registration options should contain user_handle");
 
-    let mock_credential =
+    // Step 2: Create mock credential with specified attestation format
+    let mock_credential = if format == "none" {
+        // For none attestation, use the original method for backward compatibility
         MockWebAuthnCredentials::registration_response_with_challenge_user_handle_and_origin(
             &test_user.email,
             &test_user.name,
             challenge,
             user_handle,
             &server.base_url,
-        );
+        )
+    } else {
+        // For packed and tpm, use the format-specific method
+        MockWebAuthnCredentials::registration_response_with_format(
+            &test_user.email,
+            &test_user.name,
+            challenge,
+            user_handle,
+            format,
+        )
+    };
 
     let registration_response = browser
         .complete_passkey_registration(&mock_credential)
         .await?;
 
-    // For integration testing, we expect the passkey flow to reach credential verification
     let status = registration_response.status();
     let response_body = registration_response.text().await?;
 
     println!("Registration response status: {status}");
     println!("Registration response body: {response_body}");
 
-    // Check for successful registration flow
+    // Step 3: Verify response based on format and expected outcome
     if status.is_success() {
-        println!("✅ Passkey registration SUCCESS: Full flow completed");
-    } else if response_body.contains("verification")
-        || response_body.contains("credential")
-        || response_body.contains("CBOR")
-    {
-        println!("✅ Passkey registration SUCCESS: Reached cryptographic validation step");
-        println!("  - WebAuthn registration challenge: PASSED");
-        println!("  - Registration options generation: PASSED");
-        println!("  - Mock credential response handling: PASSED");
-        println!("  - Challenge verification: PASSED");
-        println!("  - User handle validation: PASSED");
-        println!("  - Reached CBOR/attestation validation: PASSED");
-        println!("  (CBOR validation failure expected with mock attestation data)");
-    } else if response_body.contains("Invalid origin") {
-        println!("✅ Passkey registration SUCCESS - Origin validation working:");
-        println!("  - WebAuthn registration flow: PASSED");
-        println!("  - Challenge generation and validation: PASSED");
-        println!("  - Origin security validation: PASSED");
-        println!("  - Security boundary enforcement: VERIFIED");
-        println!(
-            "  (Origin mismatch detected as expected - this validates the security mechanism)"
-        );
+        println!("✅ {format} attestation registration completed successfully");
+
+        if expected_success {
+            // Verify session establishment for successful cases
+            assert!(
+                browser.has_active_session().await,
+                "Session should be established after successful {format} attestation registration"
+            );
+
+            let user_info = browser.get_user_info().await?;
+            assert!(
+                user_info.is_some(),
+                "User info should be available after successful {format} registration"
+            );
+
+            let user_data = user_info.unwrap();
+
+            // The API returns "account" instead of "email" and "label" instead of "name"
+            let account = user_data.get("account").and_then(|v| v.as_str());
+            let label = user_data.get("label").and_then(|v| v.as_str());
+
+            assert_eq!(
+                account,
+                Some(test_user.email.as_str()),
+                "User account should match email"
+            );
+            assert_eq!(
+                label,
+                Some(test_user.name.as_str()),
+                "User label should match name"
+            );
+        }
     } else {
-        println!("❌ Unexpected error in passkey registration: {response_body}");
-        return Err(format!("Passkey registration failed: {response_body}").into());
-    }
-
-    // Step 3: Verify user session establishment (if successful)
-    if status.is_success() {
-        assert!(
-            browser.has_active_session().await,
-            "Session should be established after passkey registration"
-        );
-
-        let user_info = browser.get_user_info().await?;
-        assert!(user_info.is_some(), "User info should be available");
-
-        let user_data = user_info.unwrap();
-        assert_eq!(user_data["email"], test_user.email);
-        assert_eq!(user_data["name"], test_user.name);
+        // Handle failures - check if this was expected or not
+        if expected_success {
+            // If we expected success but got failure, this is a test failure
+            println!("❌ FAILURE: {format} attestation was expected to succeed but failed");
+            println!("Response status: {status}");
+            println!("Response: {response_body}");
+            server.shutdown().await;
+            return Err(format!("{format} attestation was expected to succeed but failed with status {status}: {response_body}").into());
+        } else {
+            // Handle expected failures based on format
+            match format {
+                "none" => {
+                    if response_body.contains("verification")
+                        || response_body.contains("credential")
+                        || response_body.contains("CBOR")
+                    {
+                        println!(
+                            "ⓘ {format} attestation failed as expected - reached CBOR validation step"
+                        );
+                    } else if response_body.contains("Invalid origin") {
+                        println!(
+                            "ⓘ {format} attestation failed as expected - origin validation rejected request"
+                        );
+                    } else {
+                        println!("❌ FAILURE: Unexpected error in {format} attestation");
+                        println!("Response: {response_body}");
+                        server.shutdown().await;
+                        return Err(format!(
+                            "{format} attestation failed unexpectedly: {response_body}"
+                        )
+                        .into());
+                    }
+                }
+                "packed" => {
+                    if response_body.contains("signature") || response_body.contains("verification")
+                    {
+                        println!(
+                            "ⓘ {format} attestation failed as expected - reached signature verification step"
+                        );
+                    } else {
+                        println!("❌ FAILURE: Unexpected error in {format} attestation");
+                        println!("Response: {response_body}");
+                        server.shutdown().await;
+                        return Err(format!(
+                            "{format} attestation failed unexpectedly: {response_body}"
+                        )
+                        .into());
+                    }
+                }
+                "tpm" => {
+                    if response_body.contains("TPM")
+                        || response_body.contains("certInfo")
+                        || response_body.contains("pubArea")
+                    {
+                        println!(
+                            "ⓘ {format} attestation failed as expected - reached TPM verification step"
+                        );
+                    } else {
+                        println!("❌ FAILURE: Unexpected error in {format} attestation");
+                        println!("Response: {response_body}");
+                        server.shutdown().await;
+                        return Err(format!(
+                            "{format} attestation failed unexpectedly: {response_body}"
+                        )
+                        .into());
+                    }
+                }
+                _ => {
+                    println!("❌ FAILURE: Unknown attestation format: {format}");
+                    server.shutdown().await;
+                    return Err(format!("Unknown attestation format: {format}").into());
+                }
+            }
+        }
     }
 
     // Cleanup
     server.shutdown().await;
     Ok(())
+}
+
+/// Test complete passkey authentication flows
+///
+/// These integration tests verify end-to-end passkey functionality including:
+/// - New user registration via passkey
+/// - Existing user login via passkey
+/// - WebAuthn credential registration and authentication
+/// - Error scenarios and edge cases
+/// Test passkey registration with none attestation format (default)
+///
+/// Flow: Start registration → WebAuthn challenge → Mock credential → Verify none attestation
+#[tokio::test]
+#[serial]
+async fn test_passkey_registration_none_attestation() -> Result<(), Box<dyn std::error::Error>> {
+    test_passkey_attestation_format("none", false).await
 }
 
 /// Test passkey existing user authentication flow
@@ -197,27 +289,16 @@ async fn test_passkey_existing_user_authentication() -> Result<(), Box<dyn std::
         || response_body.contains("assertion")
         || response_body.contains("Credential not found")
     {
-        println!("✅ Passkey authentication SUCCESS: Reached credential verification step");
-        println!("  - WebAuthn authentication challenge: PASSED");
-        println!("  - Authentication options generation: PASSED");
-        println!("  - Mock assertion response handling: PASSED");
-        println!("  - Challenge verification: PASSED");
-        println!("  - Auth ID validation: PASSED");
-        println!("  - Reached credential lookup: PASSED");
         println!(
-            "  ('Credential not found' expected for integration test without prior registration)"
+            "ⓘ Passkey authentication failed as expected - reached credential verification step"
         );
     } else if response_body.contains("Invalid origin") {
-        println!("✅ Passkey authentication SUCCESS - Origin validation working:");
-        println!("  - WebAuthn authentication flow: PASSED");
-        println!("  - Challenge generation and validation: PASSED");
-        println!("  - Origin security validation: PASSED");
-        println!("  - Security boundary enforcement: VERIFIED");
         println!(
-            "  (Origin mismatch detected as expected - this validates the security mechanism)"
+            "ⓘ Passkey authentication failed as expected - origin validation rejected request"
         );
     } else {
-        println!("❌ Unexpected error in passkey authentication: {response_body}");
+        println!("❌ FAILURE: Unexpected error in passkey authentication");
+        println!("Response: {response_body}");
         return Err(format!("Passkey authentication failed: {response_body}").into());
     }
 
@@ -284,36 +365,43 @@ async fn test_passkey_credential_addition() -> Result<(), Box<dyn std::error::Er
     let response_body = registration_response.text().await?;
 
     if status.is_success() {
-        println!("✅ Passkey credential addition SUCCESS: Full flow completed");
+        println!("✅ Passkey credential addition completed successfully");
     } else if response_body.contains("verification")
         || response_body.contains("credential")
         || response_body.contains("CBOR")
     {
-        println!("✅ Passkey credential addition SUCCESS: Reached cryptographic validation step");
-        println!("  - Credential addition flow initiated: PASSED");
-        println!("  - WebAuthn registration options: PASSED");
-        println!("  - Mock credential processing: PASSED");
-        println!("  - Challenge verification: PASSED");
-        println!("  - User handle validation: PASSED");
-        println!("  - Reached CBOR/attestation validation: PASSED");
-        println!("  (CBOR validation failure expected with mock attestation data)");
+        println!("ⓘ Passkey credential addition failed as expected - reached CBOR validation step");
     } else if response_body.contains("Invalid origin") {
-        println!("✅ Passkey credential addition SUCCESS - Origin validation working:");
-        println!("  - WebAuthn credential addition flow: PASSED");
-        println!("  - Challenge generation and validation: PASSED");
-        println!("  - Origin security validation: PASSED");
-        println!("  - Security boundary enforcement: VERIFIED");
         println!(
-            "  (Origin mismatch detected as expected - this validates the security mechanism)"
+            "ⓘ Passkey credential addition failed as expected - origin validation rejected request"
         );
     } else {
-        println!("❌ Unexpected error in passkey credential addition: {response_body}");
+        println!("❌ FAILURE: Unexpected error in passkey credential addition");
+        println!("Response: {response_body}");
         return Err(format!("Passkey credential addition failed: {response_body}").into());
     }
 
     // Cleanup
     server.shutdown().await;
     Ok(())
+}
+
+/// Test passkey registration with packed attestation format
+///
+/// Flow: Start registration → WebAuthn challenge → Mock packed credential → Verify attestation
+#[tokio::test]
+#[serial]
+async fn test_passkey_registration_packed_attestation() -> Result<(), Box<dyn std::error::Error>> {
+    test_passkey_attestation_format("packed", true).await
+}
+
+/// Test passkey registration with TPM attestation format
+///
+/// Flow: Start registration → WebAuthn challenge → Mock TPM credential → Verify attestation
+#[tokio::test]
+#[serial]
+async fn test_passkey_registration_tpm_attestation() -> Result<(), Box<dyn std::error::Error>> {
+    test_passkey_attestation_format("tpm", true).await
 }
 
 /// Test passkey error scenarios
