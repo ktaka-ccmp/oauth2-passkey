@@ -213,6 +213,24 @@ async fn test_passkey_registration_none_attestation() -> Result<(), Box<dyn std:
     test_passkey_attestation_format("none", false).await
 }
 
+/// Test passkey registration with packed attestation format
+///
+/// Flow: Start registration → WebAuthn challenge → Mock packed credential → Verify attestation
+#[tokio::test]
+#[serial]
+async fn test_passkey_registration_packed_attestation() -> Result<(), Box<dyn std::error::Error>> {
+    test_passkey_attestation_format("packed", true).await
+}
+
+/// Test passkey registration with TPM attestation format
+///
+/// Flow: Start registration → WebAuthn challenge → Mock TPM credential → Verify attestation
+#[tokio::test]
+#[serial]
+async fn test_passkey_registration_tpm_attestation() -> Result<(), Box<dyn std::error::Error>> {
+    test_passkey_attestation_format("tpm", true).await
+}
+
 /// Test passkey existing user authentication flow
 ///
 /// Flow: Pre-registered user → Start authentication → WebAuthn challenge → Mock assertion → Login
@@ -384,24 +402,6 @@ async fn test_passkey_credential_addition() -> Result<(), Box<dyn std::error::Er
     // Cleanup
     server.shutdown().await;
     Ok(())
-}
-
-/// Test passkey registration with packed attestation format
-///
-/// Flow: Start registration → WebAuthn challenge → Mock packed credential → Verify attestation
-#[tokio::test]
-#[serial]
-async fn test_passkey_registration_packed_attestation() -> Result<(), Box<dyn std::error::Error>> {
-    test_passkey_attestation_format("packed", true).await
-}
-
-/// Test passkey registration with TPM attestation format
-///
-/// Flow: Start registration → WebAuthn challenge → Mock TPM credential → Verify attestation
-#[tokio::test]
-#[serial]
-async fn test_passkey_registration_tpm_attestation() -> Result<(), Box<dyn std::error::Error>> {
-    test_passkey_attestation_format("tpm", true).await
 }
 
 /// Test passkey error scenarios
