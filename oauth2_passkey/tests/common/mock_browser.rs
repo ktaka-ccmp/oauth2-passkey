@@ -173,20 +173,90 @@ impl MockBrowser {
             "mode": mode
         });
 
-        let response = self
-            .post_json("/auth/passkey/register/start", &request_data)
-            .await?;
+        // For add_to_user mode, we need to handle CSRF tokens
+        let response = if mode == "add_to_user" {
+            // Get CSRF token from the dedicated endpoint
+            let csrf_response = self.get("/auth/user/csrf_token").await?;
+
+            println!("CSRF token extraction attempt from /auth/user/csrf_token");
+            println!("Response status: {}", csrf_response.status());
+            println!("Response headers: {:?}", csrf_response.headers());
+
+            if csrf_response.status().is_success() {
+                // Parse the JSON response to get the CSRF token
+                let csrf_data: serde_json::Value = csrf_response.json().await?;
+                if let Some(csrf_token) = csrf_data.get("csrf_token").and_then(|v| v.as_str()) {
+                    println!("Found CSRF token from JSON: {}", csrf_token);
+                    // Make the request with CSRF token
+                    let url = format!("{}/auth/passkey/register/start", self.base_url);
+                    self.client
+                        .post(&url)
+                        .header("Content-Type", "application/json")
+                        .header("X-CSRF-Token", csrf_token)
+                        .json(&request_data)
+                        .send()
+                        .await?
+                } else {
+                    println!("No csrf_token field found in JSON response");
+                    // No CSRF token found, make request without it (may fail)
+                    self.post_json("/auth/passkey/register/start", &request_data)
+                        .await?
+                }
+            } else {
+                println!(
+                    "Failed to get CSRF token from /auth/user/csrf_token, status: {}",
+                    csrf_response.status()
+                );
+                // No CSRF token found, make request without it (may fail)
+                self.post_json("/auth/passkey/register/start", &request_data)
+                    .await?
+            }
+        } else {
+            // For create_user mode, no CSRF needed
+            self.post_json("/auth/passkey/register/start", &request_data)
+                .await?
+        };
 
         if response.status().is_success() {
             let options: Value = response.json().await?;
             Ok(options)
         } else {
+            let status = response.status();
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error body".to_string());
             Err(format!(
-                "Failed to start passkey registration: {}",
-                response.status()
+                "Failed to start passkey registration: {} - {}",
+                status, error_body
             )
             .into())
         }
+    }
+
+    /// Extract CSRF token from response headers (both X-CSRF-Token header and Set-Cookie)  
+    fn extract_csrf_token(response: &reqwest::Response) -> Option<String> {
+        // First try to get CSRF token from X-CSRF-Token response header (preferred method)
+        if let Some(csrf_header) = response.headers().get("X-CSRF-Token") {
+            if let Ok(csrf_token) = csrf_header.to_str() {
+                return Some(csrf_token.to_string());
+            }
+        }
+
+        // Fallback: try to extract from Set-Cookie header
+        if let Some(set_cookie_header) = response.headers().get("set-cookie") {
+            if let Ok(cookie_str) = set_cookie_header.to_str() {
+                if cookie_str.contains("__Host-CsrfId=") {
+                    return cookie_str
+                        .split("__Host-CsrfId=")
+                        .nth(1)
+                        .and_then(|s| s.split(';').next())
+                        .map(|s| s.to_string());
+                }
+            }
+        }
+
+        None
     }
 
     /// Complete passkey registration

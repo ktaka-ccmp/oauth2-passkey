@@ -2,6 +2,7 @@ use base64::{Engine as _, engine::general_purpose};
 use ciborium::value::{Integer, Value as CborValue};
 use ring::signature::KeyPair;
 use serde_json::{Value, json};
+use uuid::Uuid;
 
 /// Test user fixtures for integration testing
 pub struct TestUsers;
@@ -92,6 +93,12 @@ impl TestUser {
 pub struct MockWebAuthnCredentials;
 
 impl MockWebAuthnCredentials {
+    /// Generate a unique credential ID for mock testing
+    fn generate_unique_credential_id() -> String {
+        let uuid = Uuid::new_v4().to_string().replace("-", "");
+        format!("mock_cred_{}", &uuid[..16])
+    }
+
     /// Helper function to create a valid test attestation object with "none" format
     fn create_valid_attestation_object() -> String {
         Self::create_attestation_object_with_format("none")
@@ -623,13 +630,43 @@ impl MockWebAuthnCredentials {
 
         cert_info
     }
+
+    /// Create authenticator data for authentication (no attested credential data)
+    fn create_authentication_auth_data() -> Vec<u8> {
+        let mut auth_data = Vec::new();
+
+        // Get the RP ID from test origin
+        let test_origin = crate::common::test_server::get_test_origin();
+        let rp_id = test_origin
+            .trim_start_matches("https://")
+            .trim_start_matches("http://")
+            .split(':')
+            .next()
+            .unwrap_or("127.0.0.1");
+
+        // Calculate RP ID hash (32 bytes) using SHA-256
+        use ring::digest;
+        let rp_id_hash = digest::digest(&digest::SHA256, rp_id.as_bytes());
+        auth_data.extend_from_slice(rp_id_hash.as_ref());
+
+        // Flags (1 byte) - UP (0x01) | UV (0x04) = 0x05 (no AT flag for authentication)
+        auth_data.push(0x05);
+
+        // Signature counter (4 bytes) - should be incremented but using 1 for simplicity
+        auth_data.extend_from_slice(&[0x00, 0x00, 0x00, 0x01]);
+
+        // No attested credential data for authentication
+
+        auth_data
+    }
     /// Generate a mock registration credential response
     pub fn registration_response(username: &str, _display_name: &str) -> Value {
         let user_handle =
             general_purpose::URL_SAFE_NO_PAD.encode(format!("user_handle_{username}"));
+        let credential_id = Self::generate_unique_credential_id();
         json!({
-            "id": "mock_credential_id_123",
-            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode("mock_credential_id_123"),
+            "id": credential_id,
+            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(&credential_id),
             "response": {
                 "client_data_json": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoibW9ja19jaGFsbGVuZ2UiLCJvcmlnaW4iOiJodHRwOi8vbG9jYWxob3N0OjMwMDAifQ",
                 "attestation_object": Self::create_valid_attestation_object(),
@@ -663,9 +700,10 @@ impl MockWebAuthnCredentials {
         });
         let client_data_json = general_purpose::URL_SAFE_NO_PAD.encode(client_data.to_string());
 
+        let credential_id = Self::generate_unique_credential_id();
         json!({
-            "id": "mock_credential_id_123",
-            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode("mock_credential_id_123"),
+            "id": credential_id,
+            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(&credential_id),
             "response": {
                 "client_data_json": client_data_json,
                 "attestation_object": Self::create_valid_attestation_object(),
@@ -721,9 +759,10 @@ impl MockWebAuthnCredentials {
             (client_data_json, attestation_object)
         };
 
+        let credential_id = Self::generate_unique_credential_id();
         json!({
-            "id": "mock_credential_id_123",
-            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode("mock_credential_id_123"),
+            "id": credential_id,
+            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(&credential_id),
             "response": {
                 "client_data_json": client_data_json,
                 "attestation_object": attestation_object,
@@ -734,6 +773,52 @@ impl MockWebAuthnCredentials {
             "authenticator_attachment": "platform",
             "user_handle": user_handle
         })
+    }
+
+    /// Generate a mock registration credential response with specific attestation format and return key pair
+    pub fn registration_response_with_format_and_key_pair(
+        username: &str,
+        _display_name: &str,
+        challenge: &str,
+        user_handle: &str,
+        fmt: &str,
+    ) -> (Value, Option<Vec<u8>>) {
+        // Use the actual test origin to match LazyLock ORIGIN configuration
+        let test_origin = crate::common::test_server::get_test_origin();
+
+        // For packed attestation, we need to create a matching client data JSON
+        let (client_data_json, attestation_object, key_pair_bytes) = if fmt == "packed" {
+            let (cdj, ao, kpb) =
+                Self::create_packed_attestation_with_key_pair(challenge, &test_origin);
+            (cdj, ao, Some(kpb))
+        } else {
+            // Create standard client data JSON for other formats
+            let client_data = json!({
+                "type": "webauthn.create",
+                "challenge": challenge,
+                "origin": test_origin
+            });
+            let client_data_json = general_purpose::URL_SAFE_NO_PAD.encode(client_data.to_string());
+            let attestation_object = Self::create_attestation_object_with_format(fmt);
+            (client_data_json, attestation_object, None)
+        };
+
+        let credential_id = Self::generate_unique_credential_id();
+        let response = json!({
+            "id": credential_id,
+            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(&credential_id),
+            "response": {
+                "client_data_json": client_data_json,
+                "attestation_object": attestation_object,
+                "transports": ["internal"]
+            },
+            "type": "public-key",
+            "client_extension_results": {},
+            "authenticator_attachment": "platform",
+            "user_handle": user_handle
+        });
+
+        (response, key_pair_bytes)
     }
 
     /// Create packed attestation with matching client data that validates properly
@@ -823,6 +908,97 @@ impl MockWebAuthnCredentials {
         (client_data_json, attestation_object)
     }
 
+    /// Create packed attestation with matching client data and return key pair bytes
+    pub fn create_packed_attestation_with_key_pair(
+        challenge: &str,
+        origin: &str,
+    ) -> (String, String, Vec<u8>) {
+        use ring::{rand, signature};
+
+        let rng = rand::SystemRandom::new();
+        let pkcs8_bytes = signature::EcdsaKeyPair::generate_pkcs8(
+            &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
+            &rng,
+        )
+        .expect("Failed to generate key pair");
+
+        // Clone the bytes to return them
+        let key_pair_bytes = pkcs8_bytes.as_ref().to_vec();
+
+        let key_pair = signature::EcdsaKeyPair::from_pkcs8(
+            &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
+            pkcs8_bytes.as_ref(),
+            &rng,
+        )
+        .expect("Failed to create key pair");
+
+        // Get the public key coordinates
+        let public_key = key_pair.public_key();
+        let public_key_bytes = public_key.as_ref();
+
+        if public_key_bytes.len() != 65 || public_key_bytes[0] != 0x04 {
+            panic!("Unexpected public key format");
+        }
+        let x_coord = public_key_bytes[1..33].to_vec();
+        let y_coord = public_key_bytes[33..65].to_vec();
+
+        // Create authenticator data
+        let auth_data = Self::create_auth_data_with_coords(&x_coord, &y_coord);
+
+        // Create client data JSON
+        let client_data = json!({
+            "type": "webauthn.create",
+            "challenge": challenge,
+            "origin": origin
+        });
+        let client_data_str = client_data.to_string();
+        let client_data_hash =
+            ring::digest::digest(&ring::digest::SHA256, client_data_str.as_bytes());
+
+        // Create signed data (auth_data + client_data_hash)
+        let mut signed_data = Vec::new();
+        signed_data.extend_from_slice(&auth_data);
+        signed_data.extend_from_slice(client_data_hash.as_ref());
+
+        // Sign the data
+        let signature = key_pair.sign(&rng, &signed_data).expect("Failed to sign");
+
+        // Create attestation statement for packed self-attestation
+        let att_stmt = CborValue::Map(vec![
+            (
+                CborValue::Text("alg".to_string()),
+                CborValue::Integer(Integer::from(-7)), // ES256
+            ),
+            (
+                CborValue::Text("sig".to_string()),
+                CborValue::Bytes(signature.as_ref().to_vec()),
+            ),
+        ]);
+
+        // Create the attestation object CBOR structure
+        let attestation_obj = CborValue::Map(vec![
+            (
+                CborValue::Text("fmt".to_string()),
+                CborValue::Text("packed".to_string()),
+            ),
+            (
+                CborValue::Text("authData".to_string()),
+                CborValue::Bytes(auth_data),
+            ),
+            (CborValue::Text("attStmt".to_string()), att_stmt),
+        ]);
+
+        // Serialize to CBOR bytes
+        let mut cbor_bytes = Vec::new();
+        ciborium::ser::into_writer(&attestation_obj, &mut cbor_bytes).unwrap();
+
+        // Encode both client data and attestation object as base64url
+        let client_data_json = general_purpose::URL_SAFE_NO_PAD.encode(client_data_str);
+        let attestation_object = general_purpose::URL_SAFE_NO_PAD.encode(&cbor_bytes);
+
+        (client_data_json, attestation_object, key_pair_bytes)
+    }
+
     /// Generate a mock registration credential response with specific challenge, user_handle, and origin
     pub fn registration_response_with_challenge_user_handle_and_origin(
         _username: &str,
@@ -842,9 +1018,10 @@ impl MockWebAuthnCredentials {
         });
         let client_data_json = general_purpose::URL_SAFE_NO_PAD.encode(client_data.to_string());
 
+        let credential_id = Self::generate_unique_credential_id();
         json!({
-            "id": "mock_credential_id_123",
-            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode("mock_credential_id_123"),
+            "id": credential_id.clone(),
+            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(&credential_id),
             "response": {
                 "client_data_json": client_data_json,
                 "attestation_object": Self::create_valid_attestation_object(),
@@ -947,6 +1124,69 @@ impl MockWebAuthnCredentials {
                 "authenticator_data": "EsoXtJryKJQ28wPgFmAwoh5SXSZuIJJnQzgBqP1AcaABAAAAAw",
                 "signature": "MEUCIQCj8BLqLqxHWBULHOhD6YKl7z8mhVisuLr1jq8MNkJ6nAIgOhYZ-tScOLJ8q5OLqxOdCJlF8zN7K9C7ZXjNFkJQhzg",
                 "user_handle": general_purpose::URL_SAFE_NO_PAD.encode(format!("user_handle_{credential_id}"))
+            },
+            "type": "public-key",
+            "client_extension_results": {},
+            "authenticator_attachment": "platform",
+            "auth_id": auth_id
+        })
+    }
+
+    /// Generate a mock authentication assertion response with valid signature using stored key pair
+    pub fn authentication_response_with_stored_credential(
+        credential_id: &str,
+        challenge: &str,
+        auth_id: &str,
+        user_handle: &str,
+        key_pair_bytes: &[u8],
+    ) -> Value {
+        use ring::{rand, signature};
+
+        let rng = rand::SystemRandom::new();
+        let key_pair = signature::EcdsaKeyPair::from_pkcs8(
+            &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
+            key_pair_bytes,
+            &rng,
+        )
+        .expect("Failed to recreate key pair");
+
+        // Use the actual test origin
+        let test_origin = crate::common::test_server::get_test_origin();
+
+        // Create client data JSON with the actual challenge
+        let client_data = json!({
+            "type": "webauthn.get",
+            "challenge": challenge,
+            "origin": test_origin
+        });
+        let client_data_str = client_data.to_string();
+        let client_data_hash =
+            ring::digest::digest(&ring::digest::SHA256, client_data_str.as_bytes());
+        let client_data_json = general_purpose::URL_SAFE_NO_PAD.encode(client_data_str);
+
+        // Create authenticator data with the correct RP ID hash
+        let auth_data = Self::create_authentication_auth_data();
+
+        // Create signed data (auth_data + client_data_hash)
+        let mut signed_data = Vec::new();
+        signed_data.extend_from_slice(&auth_data);
+        signed_data.extend_from_slice(client_data_hash.as_ref());
+
+        // Sign the data
+        let signature = key_pair.sign(&rng, &signed_data).expect("Failed to sign");
+
+        // Convert signature to base64url
+        let signature_b64 = general_purpose::URL_SAFE_NO_PAD.encode(signature.as_ref());
+        let auth_data_b64 = general_purpose::URL_SAFE_NO_PAD.encode(&auth_data);
+
+        json!({
+            "id": credential_id,
+            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(credential_id),
+            "response": {
+                "client_data_json": client_data_json,
+                "authenticator_data": auth_data_b64,
+                "signature": signature_b64,
+                "user_handle": user_handle
             },
             "type": "public-key",
             "client_extension_results": {},
