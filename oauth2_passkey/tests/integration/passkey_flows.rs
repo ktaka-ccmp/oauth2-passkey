@@ -1,6 +1,9 @@
 use crate::common::{MockBrowser, MockWebAuthnCredentials, TestServer, TestUsers};
 use serial_test::serial;
 
+// Constants for test configuration
+const FALLBACK_CREDENTIAL_ID: &str = "mock_credential_id_123";
+
 /// Test environment setup for passkey tests
 struct PasskeyTestSetup {
     server: TestServer,
@@ -39,6 +42,51 @@ struct RegistrationResult {
     key_pair_bytes: Option<Vec<u8>>,
 }
 
+/// Create mock credential for registration with specified format
+fn create_mock_credential(
+    email: &str,
+    display_name: &str,
+    challenge: &str,
+    user_handle: &str,
+    format: &str,
+    base_url: Option<&str>,
+) -> (serde_json::Value, Option<Vec<u8>>) {
+    match format {
+        "none" => {
+            // For none attestation, use the original method for backward compatibility
+            let cred = MockWebAuthnCredentials::registration_response_with_challenge_user_handle_and_origin(
+                email,
+                display_name,
+                challenge,
+                user_handle,
+                base_url.unwrap_or("http://127.0.0.1:3000"),
+            );
+            (cred, None)
+        }
+        "packed" => {
+            // For packed attestation, get the key pair for later authentication
+            MockWebAuthnCredentials::registration_response_with_format_and_key_pair(
+                email,
+                display_name,
+                challenge,
+                user_handle,
+                format,
+            )
+        }
+        _ => {
+            // For other formats (tpm), use the format-specific method
+            let cred = MockWebAuthnCredentials::registration_response_with_format(
+                email,
+                display_name,
+                challenge,
+                user_handle,
+                format,
+            );
+            (cred, None)
+        }
+    }
+}
+
 /// Helper function to register a user with specified attestation format
 async fn register_user_with_attestation(
     browser: &MockBrowser,
@@ -62,37 +110,14 @@ async fn register_user_with_attestation(
         .expect("Registration options should contain user_handle");
 
     // Create mock credential with specified attestation format
-    let (mock_credential, key_pair_bytes) = if format == "none" {
-        // For none attestation, use the original method for backward compatibility
-        let cred =
-            MockWebAuthnCredentials::registration_response_with_challenge_user_handle_and_origin(
-                &test_user.email,
-                &test_user.name,
-                challenge,
-                user_handle,
-                base_url,
-            );
-        (cred, None)
-    } else if format == "packed" {
-        // For packed attestation, get the key pair for later authentication
-        MockWebAuthnCredentials::registration_response_with_format_and_key_pair(
-            &test_user.email,
-            &test_user.name,
-            challenge,
-            user_handle,
-            format,
-        )
-    } else {
-        // For other formats (tpm), use the format-specific method
-        let cred = MockWebAuthnCredentials::registration_response_with_format(
-            &test_user.email,
-            &test_user.name,
-            challenge,
-            user_handle,
-            format,
-        );
-        (cred, None)
-    };
+    let (mock_credential, key_pair_bytes) = create_mock_credential(
+        &test_user.email,
+        &test_user.name,
+        challenge,
+        user_handle,
+        format,
+        Some(base_url),
+    );
 
     // Complete registration
     let registration_response = browser
@@ -157,26 +182,14 @@ async fn register_additional_credential(
     // Create mock credential with specified attestation format
     // IMPORTANT: Use the user handle provided by the server in the registration options
     // The server will handle associating this with the existing user account
-    let (mock_credential, key_pair_bytes) = if format == "packed" {
-        // For packed attestation, get the key pair for later authentication
-        MockWebAuthnCredentials::registration_response_with_format_and_key_pair(
-            &test_user.email,        // Use original username, not modified
-            &additional_displayname, // Use modified display name for readability
-            challenge,
-            user_handle, // Use the user handle from server registration options
-            format,
-        )
-    } else {
-        // For other formats, use the format-specific method
-        let cred = MockWebAuthnCredentials::registration_response_with_format(
-            &test_user.email,        // Use original username, not modified
-            &additional_displayname, // Use modified display name for readability
-            challenge,
-            user_handle, // Use the user handle from server registration options
-            format,
-        );
-        (cred, None)
-    };
+    let (mock_credential, key_pair_bytes) = create_mock_credential(
+        &test_user.email,        // Use original username, not modified
+        &additional_displayname, // Use modified display name for readability
+        challenge,
+        user_handle, // Use the user handle from server registration options
+        format,
+        None, // No base URL needed for additional credentials
+    );
 
     // Complete registration
     let registration_response = browser
@@ -256,6 +269,25 @@ async fn logout_and_verify(browser: &MockBrowser) -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+/// Extract credential ID from authentication options with fallback logic
+fn extract_credential_id(authentication_options: &serde_json::Value, credential_index: Option<usize>) -> &str {
+    if let Some(allowed_creds) = authentication_options["allowCredentials"].as_array() {
+        let index = credential_index.unwrap_or(0);
+        if let Some(cred) = allowed_creds.get(index) {
+            if let Some(id) = cred["id"].as_str() {
+                println!("Selected credential at index {}: {}", index, id);
+                return id;
+            }
+        } else if let Some(first_cred) = allowed_creds.first() {
+            println!("Credential index {} not found, using first credential", index);
+            if let Some(id) = first_cred["id"].as_str() {
+                return id;
+            }
+        }
+    }
+    FALLBACK_CREDENTIAL_ID
+}
+
 /// Helper function to authenticate user with stored credentials
 async fn authenticate_user(
     browser: &MockBrowser,
@@ -301,32 +333,7 @@ async fn authenticate_user_with_credential(
         .expect("Authentication options should contain authId");
 
     // Extract the actual credential ID from allowCredentials
-    let credential_id =
-        if let Some(allowed_creds) = authentication_options["allowCredentials"].as_array() {
-            let index = credential_index.unwrap_or(0);
-            if let Some(cred) = allowed_creds.get(index) {
-                if let Some(id) = cred["id"].as_str() {
-                    println!("Selected credential at index {}: {}", index, id);
-                    id
-                } else {
-                    "mock_credential_id_123"
-                }
-            } else if let Some(first_cred) = allowed_creds.first() {
-                println!(
-                    "Credential index {} not found, using first credential",
-                    index
-                );
-                if let Some(id) = first_cred["id"].as_str() {
-                    id
-                } else {
-                    "mock_credential_id_123"
-                }
-            } else {
-                "mock_credential_id_123"
-            }
-        } else {
-            "mock_credential_id_123"
-        };
+    let credential_id = extract_credential_id(&authentication_options, credential_index);
 
     println!("Using credential ID: {credential_id}");
     println!("Using stored user_handle: {stored_user_handle}");
@@ -351,6 +358,154 @@ async fn authenticate_user_with_credential(
     println!("Authentication response body: {response_body}");
 
     Ok(status.is_success())
+}
+
+/// Verify successful registration and session setup
+async fn verify_successful_registration(
+    setup: &PasskeyTestSetup,
+    format: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Verify session establishment for successful cases
+    assert!(
+        setup.browser.has_active_session().await,
+        "Session should be established after successful {format} attestation registration"
+    );
+
+    let user_info = setup.browser.get_user_info().await?;
+    assert!(
+        user_info.is_some(),
+        "User info should be available after successful {format} registration"
+    );
+
+    let user_data = user_info.unwrap();
+
+    // The API returns "account" instead of "email" and "label" instead of "name"
+    let account = user_data.get("account").and_then(|v| v.as_str());
+    let label = user_data.get("label").and_then(|v| v.as_str());
+
+    assert_eq!(
+        account,
+        Some(setup.test_user.email.as_str()),
+        "User account should match email"
+    );
+    assert_eq!(
+        label,
+        Some(setup.test_user.name.as_str()),
+        "User label should match name"
+    );
+
+    Ok(())
+}
+
+/// Verify that authentication was successful with valid session and user info
+async fn verify_successful_authentication(
+    browser: &MockBrowser,
+    expected_test_user: &crate::common::fixtures::TestUser,
+    context: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Verify session established
+    assert!(
+        browser.has_active_session().await,
+        "Session should be established after successful authentication in {context}"
+    );
+
+    let user_info = browser.get_user_info().await?;
+    assert!(
+        user_info.is_some(),
+        "User info should be available after successful authentication in {context}"
+    );
+
+    let user_data = user_info.unwrap();
+    let account = user_data.get("account").and_then(|v| v.as_str());
+    let label = user_data.get("label").and_then(|v| v.as_str());
+
+    assert_eq!(
+        account,
+        Some(expected_test_user.email.as_str()),
+        "Authenticated user account should match expected user in {context}"
+    );
+
+    // For multiple credential scenarios, the label might have suffixes like "#2"
+    // So we check if the label contains the base expected name
+    if let Some(actual_label) = label {
+        assert!(
+            actual_label.contains(&expected_test_user.name),
+            "Authenticated user label '{}' should contain expected name '{}' in {context}",
+            actual_label,
+            expected_test_user.name
+        );
+    } else {
+        panic!("No label found in user data for {context}");
+    }
+
+    println!("✅ Authentication and session validation successful for {context}");
+    Ok(())
+}
+
+/// Handle expected registration failures based on format
+fn handle_expected_failure(
+    format: &str,
+    error_msg: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    match format {
+        "none" => {
+            if error_msg.contains("verification")
+                || error_msg.contains("credential")
+                || error_msg.contains("CBOR")
+            {
+                println!(
+                    "ⓘ {format} attestation failed as expected - reached CBOR validation step"
+                );
+            } else if error_msg.contains("Invalid origin") {
+                println!(
+                    "ⓘ {format} attestation failed as expected - origin validation rejected request"
+                );
+            } else {
+                println!("❌ FAILURE: Unexpected error in {format} attestation");
+                println!("Error: {error_msg}");
+                return Err(format!(
+                    "{format} attestation failed unexpectedly: {error_msg}"
+                )
+                .into());
+            }
+        }
+        "packed" => {
+            if error_msg.contains("signature") || error_msg.contains("verification") {
+                println!(
+                    "ⓘ {format} attestation failed as expected - reached signature verification step"
+                );
+            } else {
+                println!("❌ FAILURE: Unexpected error in {format} attestation");
+                println!("Error: {error_msg}");
+                return Err(format!(
+                    "{format} attestation failed unexpectedly: {error_msg}"
+                )
+                .into());
+            }
+        }
+        "tpm" => {
+            if error_msg.contains("TPM")
+                || error_msg.contains("certInfo")
+                || error_msg.contains("pubArea")
+            {
+                println!(
+                    "ⓘ {format} attestation failed as expected - reached TPM verification step"
+                );
+            } else {
+                println!("❌ FAILURE: Unexpected error in {format} attestation");
+                println!("Error: {error_msg}");
+                return Err(format!(
+                    "{format} attestation failed unexpectedly: {error_msg}"
+                )
+                .into());
+            }
+        }
+        _ => {
+            println!("❌ FAILURE: Unknown attestation format: {format}");
+            return Err(format!("Unknown attestation format: {format}").into());
+        }
+    }
+    Ok(())
 }
 
 /// Common helper function for testing different WebAuthn attestation formats
@@ -381,36 +536,8 @@ async fn test_passkey_attestation_format(
     match registration_result {
         Ok(_) => {
             println!("✅ {format} attestation registration completed successfully");
-
             if expected_success {
-                // Verify session establishment for successful cases
-                assert!(
-                    setup.browser.has_active_session().await,
-                    "Session should be established after successful {format} attestation registration"
-                );
-
-                let user_info = setup.browser.get_user_info().await?;
-                assert!(
-                    user_info.is_some(),
-                    "User info should be available after successful {format} registration"
-                );
-
-                let user_data = user_info.unwrap();
-
-                // The API returns "account" instead of "email" and "label" instead of "name"
-                let account = user_data.get("account").and_then(|v| v.as_str());
-                let label = user_data.get("label").and_then(|v| v.as_str());
-
-                assert_eq!(
-                    account,
-                    Some(setup.test_user.email.as_str()),
-                    "User account should match email"
-                );
-                assert_eq!(
-                    label,
-                    Some(setup.test_user.name.as_str()),
-                    "User label should match name"
-                );
+                verify_successful_registration(&setup, format).await?;
             }
         }
         Err(e) => {
@@ -426,69 +553,7 @@ async fn test_passkey_attestation_format(
                 )
                 .into());
             } else {
-                // Handle expected failures based on format
-                match format {
-                    "none" => {
-                        if error_msg.contains("verification")
-                            || error_msg.contains("credential")
-                            || error_msg.contains("CBOR")
-                        {
-                            println!(
-                                "ⓘ {format} attestation failed as expected - reached CBOR validation step"
-                            );
-                        } else if error_msg.contains("Invalid origin") {
-                            println!(
-                                "ⓘ {format} attestation failed as expected - origin validation rejected request"
-                            );
-                        } else {
-                            println!("❌ FAILURE: Unexpected error in {format} attestation");
-                            println!("Error: {error_msg}");
-                            setup.shutdown().await?;
-                            return Err(format!(
-                                "{format} attestation failed unexpectedly: {error_msg}"
-                            )
-                            .into());
-                        }
-                    }
-                    "packed" => {
-                        if error_msg.contains("signature") || error_msg.contains("verification") {
-                            println!(
-                                "ⓘ {format} attestation failed as expected - reached signature verification step"
-                            );
-                        } else {
-                            println!("❌ FAILURE: Unexpected error in {format} attestation");
-                            println!("Error: {error_msg}");
-                            setup.shutdown().await?;
-                            return Err(format!(
-                                "{format} attestation failed unexpectedly: {error_msg}"
-                            )
-                            .into());
-                        }
-                    }
-                    "tpm" => {
-                        if error_msg.contains("TPM")
-                            || error_msg.contains("certInfo")
-                            || error_msg.contains("pubArea")
-                        {
-                            println!(
-                                "ⓘ {format} attestation failed as expected - reached TPM verification step"
-                            );
-                        } else {
-                            println!("❌ FAILURE: Unexpected error in {format} attestation");
-                            println!("Error: {error_msg}");
-                            setup.shutdown().await?;
-                            return Err(format!(
-                                "{format} attestation failed unexpectedly: {error_msg}"
-                            )
-                            .into());
-                        }
-                    }
-                    _ => {
-                        println!("❌ FAILURE: Unknown attestation format: {format}");
-                        setup.shutdown().await?;
-                        return Err(format!("Unknown attestation format: {format}").into());
-                    }
-                }
+                handle_expected_failure(format, &error_msg)?;
             }
         }
     }
@@ -585,35 +650,7 @@ async fn test_passkey_register_then_authenticate() -> Result<(), Box<dyn std::er
 
     if auth_success {
         println!("✅ Passkey authentication SUCCESS: Full flow completed");
-
-        // Verify session established for existing user
-        assert!(
-            browser_new_session.has_active_session().await,
-            "Session should be established after successful authentication"
-        );
-
-        let user_info = browser_new_session.get_user_info().await?;
-        assert!(
-            user_info.is_some(),
-            "User info should be available after successful authentication"
-        );
-
-        let user_data = user_info.unwrap();
-        let account = user_data.get("account").and_then(|v| v.as_str());
-        let label = user_data.get("label").and_then(|v| v.as_str());
-
-        assert_eq!(
-            account,
-            Some(setup.test_user.email.as_str()),
-            "Authenticated user account should match"
-        );
-        assert_eq!(
-            label,
-            Some(setup.test_user.name.as_str()),
-            "Authenticated user label should match"
-        );
-
-        println!("✅ Authentication and session validation successful");
+        verify_successful_authentication(&browser_new_session, &setup.test_user, "register-then-authenticate test").await?;
     } else {
         println!("ⓘ Passkey authentication did not succeed (may be expected for mock data)");
     }
@@ -732,6 +769,7 @@ async fn test_register_two_credentials_and_authenticate() -> Result<(), Box<dyn 
 
     if auth_success_1 {
         println!("✅ Step 5: Authentication with first credential successful");
+        verify_successful_authentication(&browser_new_session1, &setup.test_user, "first credential authentication").await?;
     } else {
         println!(
             "⚠️  Authentication failed at signature verification (expected with mock credentials)"
@@ -758,6 +796,7 @@ async fn test_register_two_credentials_and_authenticate() -> Result<(), Box<dyn 
 
     if auth_success_2 {
         println!("✅ Step 7: Authentication with second credential successful");
+        verify_successful_authentication(&browser_new_session2, &setup.test_user, "second credential authentication").await?;
     } else {
         println!(
             "⚠️  Authentication with second credential failed at signature verification (expected with mock credentials)"
