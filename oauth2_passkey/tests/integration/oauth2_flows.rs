@@ -1,6 +1,246 @@
 use crate::common::{MockBrowser, TestServer, TestUsers};
 use serial_test::serial;
 
+// Constants for OAuth2 test configuration
+const DEFAULT_RESPONSE_MODE: &str = "form_post";
+const OAUTH2_PROVIDER: &str = "google";
+const CREATE_USER_MODE: &str = "create_user_or_login";
+const LOGIN_MODE: &str = "login";
+const ADD_TO_USER_MODE: &str = "add_to_user";
+const NEW_USER_MESSAGE: &str = "Created%20new%20user";
+const EXISTING_USER_MESSAGE: &str = "Signing%20in%20as";
+const LINKED_ACCOUNT_MESSAGE: &str = "Successfully%20linked%20to";
+const DEFAULT_ISSUER_URL: &str = "http://127.0.0.1:9876";
+
+/// Test environment setup for OAuth2 tests
+struct OAuth2TestSetup {
+    server: TestServer,
+    browser: MockBrowser,
+    test_user: crate::common::fixtures::TestUser,
+}
+
+impl OAuth2TestSetup {
+    /// Create a new test environment
+    async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        let server = TestServer::start().await?;
+        let browser = MockBrowser::new(&server.base_url, true);
+        let test_user = TestUsers::oauth2_user();
+        Ok(Self {
+            server,
+            browser,
+            test_user,
+        })
+    }
+
+    /// Create a new test environment with a specific test user
+    async fn with_user(
+        test_user: crate::common::fixtures::TestUser,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let server = TestServer::start().await?;
+        let browser = MockBrowser::new(&server.base_url, true);
+        Ok(Self {
+            server,
+            browser,
+            test_user,
+        })
+    }
+
+    /// Get the base URL for the test server
+    fn base_url(&self) -> &str {
+        &self.server.base_url
+    }
+
+    /// Shutdown the test server
+    async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
+        self.server.shutdown().await;
+        Ok(())
+    }
+
+    /// Get the OAuth2 issuer URL from environment or use default
+    fn issuer_url() -> String {
+        std::env::var("OAUTH2_ISSUER_URL").unwrap_or_else(|_| DEFAULT_ISSUER_URL.to_string())
+    }
+
+    /// Get the response mode from environment or use default
+    fn response_mode() -> String {
+        std::env::var("OAUTH2_RESPONSE_MODE").unwrap_or_else(|_| DEFAULT_RESPONSE_MODE.to_string())
+    }
+}
+
+/// OAuth2 flow builder for structured test execution
+struct OAuth2Flow<'a> {
+    browser: &'a MockBrowser,
+    mode: &'a str,
+    context_token: Option<String>,
+}
+
+impl<'a> OAuth2Flow<'a> {
+    /// Create a new OAuth2 flow
+    fn new(browser: &'a MockBrowser, mode: &'a str) -> Self {
+        Self {
+            browser,
+            mode,
+            context_token: None,
+        }
+    }
+
+    /// Add context token for account linking
+    async fn with_context(mut self) -> Result<Self, Box<dyn std::error::Error>> {
+        if self.mode == ADD_TO_USER_MODE {
+            self.context_token =
+                Some(get_page_session_token_for_oauth2_linking(self.browser).await?);
+        }
+        Ok(self)
+    }
+
+    /// Execute the OAuth2 flow and return the response
+    async fn execute(self) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
+        complete_full_oauth2_flow_internal(self.browser, self.mode, self.context_token).await
+    }
+
+    /// Execute and validate the OAuth2 flow with expected message
+    async fn execute_and_validate(
+        self,
+        expected_message: &str,
+    ) -> Result<OAuth2ValidationResult, Box<dyn std::error::Error>> {
+        let response = self.execute().await?;
+        let status = response.status();
+        let headers = response.headers().clone();
+        let _body = response.text().await?;
+
+        Ok(OAuth2ValidationResult::from_response(
+            status,
+            &headers,
+            expected_message,
+        ))
+    }
+}
+
+/// Structured validation result for OAuth2 flows
+#[derive(Debug)]
+struct OAuth2ValidationResult {
+    is_success: bool,
+    status_code: reqwest::StatusCode,
+    has_valid_redirect: bool,
+    has_session_cookie: bool,
+    has_expected_message: bool,
+    has_csrf_management: bool,
+    details: Vec<String>,
+}
+
+impl OAuth2ValidationResult {
+    /// Create validation result from response
+    fn from_response(
+        status: reqwest::StatusCode,
+        headers: &reqwest::header::HeaderMap,
+        expected_message: &str,
+    ) -> Self {
+        let mut result = Self {
+            is_success: false,
+            status_code: status,
+            has_valid_redirect: false,
+            has_session_cookie: false,
+            has_expected_message: false,
+            has_csrf_management: false,
+            details: Vec::new(),
+        };
+
+        // Check status code
+        result.has_valid_redirect = status == reqwest::StatusCode::SEE_OTHER;
+        if result.has_valid_redirect {
+            result
+                .details
+                .push("✅ 303 See Other redirect: PASSED".to_string());
+        } else {
+            result
+                .details
+                .push(format!("❌ Expected 303 See Other, got: {}", status));
+        }
+
+        // Check session cookie
+        let session_cookie_name =
+            std::env::var("SESSION_COOKIE_NAME").unwrap_or_else(|_| "__Host-SessionId".to_string());
+        let session_cookie = headers
+            .get_all("set-cookie")
+            .iter()
+            .find(|cookie| cookie.to_str().unwrap_or("").contains(&session_cookie_name));
+
+        if let Some(cookie) = session_cookie {
+            let cookie_str = cookie.to_str().unwrap_or("");
+            result.has_session_cookie = cookie_str.contains("SameSite=Lax")
+                && cookie_str.contains("Secure")
+                && cookie_str.contains("HttpOnly")
+                && cookie_str.contains("Path=/");
+
+            if result.has_session_cookie {
+                result
+                    .details
+                    .push("✅ Session cookie with security flags: PASSED".to_string());
+            } else {
+                result
+                    .details
+                    .push("❌ Session cookie missing security flags".to_string());
+            }
+        } else {
+            result
+                .details
+                .push(format!("❌ No {} cookie found", session_cookie_name));
+        }
+
+        // Check location header
+        if let Some(location) = headers.get("location").and_then(|h| h.to_str().ok()) {
+            result.has_expected_message = location.contains("/auth/oauth2/popup_close")
+                && location.contains(expected_message);
+
+            if result.has_expected_message {
+                result.details.push(format!(
+                    "✅ Success redirect with expected message ({}): PASSED",
+                    expected_message
+                ));
+            } else {
+                result
+                    .details
+                    .push(format!("❌ Unexpected redirect location: {}", location));
+            }
+        } else {
+            result
+                .details
+                .push("❌ No location header found".to_string());
+        }
+
+        // Check CSRF management
+        result.has_csrf_management = headers
+            .get_all("set-cookie")
+            .iter()
+            .any(|cookie| cookie.to_str().unwrap_or("").contains("__Host-CsrfId"));
+
+        if result.has_csrf_management {
+            result
+                .details
+                .push("✅ CSRF token management: PASSED".to_string());
+        } else {
+            result
+                .details
+                .push("❌ No CSRF cookie management found".to_string());
+        }
+
+        // Overall success
+        result.is_success = result.has_valid_redirect
+            && result.has_session_cookie
+            && result.has_expected_message
+            && result.has_csrf_management;
+
+        result
+    }
+
+    /// Print validation details
+    fn print_details(&self) {
+        for detail in &self.details {
+            println!("  {}", detail);
+        }
+    }
+}
+
 /// Helper function to complete OAuth2 authorization flow
 /// Returns (auth_code, received_state)
 async fn complete_oauth2_authorization(
@@ -21,8 +261,7 @@ async fn complete_oauth2_authorization(
     let body = auth_response.text().await?;
 
     // Extract auth code and state based on response mode
-    let response_mode =
-        std::env::var("OAUTH2_RESPONSE_MODE").unwrap_or_else(|_| "form_post".to_string());
+    let response_mode = OAuth2TestSetup::response_mode();
 
     let (auth_code, received_state) = match response_mode.as_str() {
         "query" => {
@@ -83,8 +322,7 @@ async fn complete_oauth2_callback(
     received_state: &str,
     oauth2_issuer_url: &str,
 ) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
-    let response_mode =
-        std::env::var("OAUTH2_RESPONSE_MODE").unwrap_or_else(|_| "form_post".to_string());
+    let response_mode = OAuth2TestSetup::response_mode();
 
     let callback_response = match response_mode.as_str() {
         "query" => {
@@ -243,20 +481,16 @@ async fn verify_oauth2_accounts_linked(
     Ok(accounts_json)
 }
 
-/// Helper function to complete full OAuth2 flow
-/// Returns the final callback response
-pub(super) async fn complete_full_oauth2_flow(
+/// Internal helper function for OAuth2 flow execution (used by OAuth2Flow builder)
+async fn complete_full_oauth2_flow_internal(
     browser: &MockBrowser,
     mode: &str,
+    context_token: Option<String>,
 ) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
     // Step 1: Start OAuth2 flow
-    let url = if mode == "add_to_user" {
-        // For add_to_user mode, we need to include a context parameter
-        let context_token = get_page_session_token_for_oauth2_linking(browser).await?;
-        format!(
-            "/auth/oauth2/google?mode={}&context={}",
-            mode, context_token
-        )
+    let url = if let Some(token) = context_token {
+        // Use provided context token for add_to_user mode
+        format!("/auth/oauth2/google?mode={}&context={}", mode, token)
     } else {
         format!("/auth/oauth2/google?mode={}", mode)
     };
@@ -284,8 +518,7 @@ pub(super) async fn complete_full_oauth2_flow(
         .to_string();
 
     // Get OAuth2 issuer URL for assertions
-    let oauth2_issuer_url =
-        std::env::var("OAUTH2_ISSUER_URL").unwrap_or_else(|_| "http://127.0.0.1:9876".to_string());
+    let oauth2_issuer_url = OAuth2TestSetup::issuer_url();
 
     // Verify the authorization URL points to our OAuth2 provider
     assert!(
@@ -301,6 +534,22 @@ pub(super) async fn complete_full_oauth2_flow(
         complete_oauth2_callback(browser, &auth_code, &received_state, &oauth2_issuer_url).await?;
 
     Ok(callback_response)
+}
+
+/// Helper function to complete full OAuth2 flow
+/// Returns the final callback response
+pub(super) async fn complete_full_oauth2_flow(
+    browser: &MockBrowser,
+    mode: &str,
+) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
+    // For backward compatibility, handle context token generation internally
+    let context_token = if mode == ADD_TO_USER_MODE {
+        Some(get_page_session_token_for_oauth2_linking(browser).await?)
+    } else {
+        None
+    };
+
+    complete_full_oauth2_flow_internal(browser, mode, context_token).await
 }
 
 /// Helper function to validate OAuth2 success characteristics
@@ -688,197 +937,97 @@ async fn test_oauth2_uses_oidc_discovery() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 #[serial]
 async fn test_link_two_oauth2_users() -> Result<(), Box<dyn std::error::Error>> {
-    let server = TestServer::start().await?;
-    let browser = MockBrowser::new(&server.base_url, true);
-    let _test_user_first = TestUsers::oauth2_user();
-    let _test_user_second = TestUsers::oauth2_user_second();
+    let setup = OAuth2TestSetup::new().await?;
 
     println!("🔗 Testing linking two OAuth2 accounts to one user");
 
     // Step 1: Create initial user via OAuth2 registration
     println!("📝 Step 1: Creating initial user via OAuth2 registration");
-    let first_response = complete_full_oauth2_flow(&browser, "create_user_or_login").await?;
+    let first_result = OAuth2Flow::new(&setup.browser, CREATE_USER_MODE)
+        .execute_and_validate(NEW_USER_MESSAGE)
+        .await?;
 
-    let first_status = first_response.status();
-    let first_headers = first_response.headers().clone();
-    let _first_body = first_response.text().await?;
-
-    // Validate first user creation was successful
-    let first_success_checks =
-        validate_oauth2_success(&first_status, &first_headers, "Created%20new%20user");
-    let first_all_passed = first_success_checks
-        .iter()
-        .all(|check| check.starts_with("✅"));
-
-    if !first_all_passed {
-        // Print validation checks for debugging
-        for check in &first_success_checks {
-            println!("  {check}");
-        }
+    if !first_result.is_success {
+        first_result.print_details();
         return Err("First OAuth2 user creation failed validation".into());
     }
-
     println!("✅ Step 1: First OAuth2 user created successfully");
 
-    // Verify session is established and get user info
-    let first_user_response = browser.get("/auth/user/info").await?;
-    assert!(
-        first_user_response.status().is_success(),
-        "Should have active session after first OAuth2 registration"
-    );
-
-    let first_user_info: serde_json::Value = first_user_response.json().await?;
+    // Verify session and get user info
+    let first_user_info: serde_json::Value =
+        setup.browser.get("/auth/user/info").await?.json().await?;
     println!("  - First user email: {}", first_user_info["email"]);
 
-    // Debug: Check if we have an active session before trying to link
-    println!("🔍 Debug: Checking session state before linking");
-    let session_check = browser.has_active_session().await;
-    println!("  - Has active session: {}", session_check);
-
-    // Note: There appears to be a session management issue where user email comes back as null
-    // However, the OAuth2 flow itself completed successfully and we have an active session
-    // This test focuses on the OAuth2 account linking mechanism rather than session persistence
-    if first_user_info["email"].is_null() {
-        println!("⚠️  Note: User email is null, likely due to session management issue");
-        println!("   However, OAuth2 flow completed successfully and session is active");
-        println!("   Proceeding to test OAuth2 account linking mechanism");
-    }
-
-    // Step 2: Complete OAuth2 account linking (add_to_user mode)
-    println!("🔗 Step 2: Attempting to link second OAuth2 account to existing user");
-
-    // First, test OAuth2 linking validation (should fail without context)
-    let url_no_context = "/auth/oauth2/google?mode=add_to_user";
-    let no_context_response = browser.get(url_no_context).await?;
-
+    // Step 2: Test context validation (should fail without context)
+    println!("🔍 Step 2a: Testing OAuth2 linking validation");
+    let no_context_response = setup
+        .browser
+        .get("/auth/oauth2/google?mode=add_to_user")
+        .await?;
     if no_context_response.status() == reqwest::StatusCode::BAD_REQUEST {
-        let body = no_context_response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read body".to_string());
-        if body.contains("Missing Context") {
-            println!(
-                "✅ Step 2a: OAuth2 correctly requires context parameter for add_to_user mode"
-            );
-        }
+        println!("✅ Step 2a: OAuth2 correctly requires context parameter for add_to_user mode");
     }
 
-    // Configure mock server with second user data for the linking attempt
-    println!("🔧 Configuring mock server with second user data");
+    // Step 3: Configure mock server and link second account
+    println!("🔧 Step 2b: Configuring mock server with second user data");
     use crate::common::axum_mock_server::configure_mock_for_test;
     let test_user_second = TestUsers::oauth2_user_second();
     configure_mock_for_test(
         test_user_second.email.clone(),
         test_user_second.id.clone(),
-        server.base_url.clone(),
+        setup.base_url().to_string(),
     );
 
-    // Now attempt the complete OAuth2 account linking flow
-    let second_response = complete_full_oauth2_flow(&browser, "add_to_user").await?;
-
-    let second_status = second_response.status();
-    let second_headers = second_response.headers().clone();
-    let _second_body = second_response.text().await?;
+    let second_result = OAuth2Flow::new(&setup.browser, ADD_TO_USER_MODE)
+        .with_context()
+        .await?
+        .execute_and_validate(LINKED_ACCOUNT_MESSAGE)
+        .await?;
 
     println!(
         "  - OAuth2 account linking response status: {}",
-        second_status
+        second_result.status_code
     );
 
-    // Check if the account linking was successful
-    let second_success_checks = validate_oauth2_success(
-        &second_status,
-        &second_headers,
-        "Successfully%20linked%20to",
-    );
-    let second_all_passed = second_success_checks
-        .iter()
-        .all(|check| check.starts_with("✅"));
-
-    if second_all_passed {
+    if second_result.is_success {
         println!("✅ Step 2b: Second OAuth2 account linked successfully");
 
-        // Verify that we still have an active session and can get user info
-        let updated_user_response = browser.get("/auth/user/info").await?;
-        assert!(
-            updated_user_response.status().is_success(),
-            "Should have active session after OAuth2 account linking"
-        );
-
-        let updated_user_info: serde_json::Value = updated_user_response.json().await?;
-        println!("  - User after linking: {}", updated_user_info["email"]);
-
-        // User identity should remain the same
+        // Verify user identity consistency
+        let updated_user_info: serde_json::Value =
+            setup.browser.get("/auth/user/info").await?.json().await?;
         assert_eq!(
             first_user_info["id"], updated_user_info["id"],
             "User ID should remain consistent after account linking"
         );
 
-        // Step 2c: Verify that exactly 2 OAuth2 accounts are now linked to the user
+        // Verify OAuth2 accounts are properly linked
         println!("🔍 Step 2c: Verifying OAuth2 accounts are properly linked");
-        match verify_oauth2_accounts_linked(&browser, 2, "google").await {
+        match verify_oauth2_accounts_linked(&setup.browser, 2, OAUTH2_PROVIDER).await {
             Ok(accounts) => {
                 println!("✅ Step 2c: OAuth2 account verification successful");
-
-                // Verify the accounts have different provider_user_ids (different Google accounts)
                 let provider_ids: Vec<&str> = accounts
                     .iter()
                     .map(|acc| acc["provider_user_id"].as_str().unwrap_or(""))
                     .collect();
-
                 if provider_ids.len() == 2 && provider_ids[0] != provider_ids[1] {
                     println!("✅ Step 2c: Two distinct OAuth2 accounts confirmed");
-                } else {
-                    println!(
-                        "⚠️  Step 2c: Expected two distinct OAuth2 accounts, but provider IDs are: {:?}",
-                        provider_ids
-                    );
                 }
             }
-            Err(e) => {
-                println!("⚠️  Step 2c: OAuth2 account verification failed: {}", e);
-                // Continue with test but note the verification issue
-            }
+            Err(e) => println!("⚠️  Step 2c: OAuth2 account verification failed: {}", e),
         }
     } else {
         println!("⚠️  Step 2b: OAuth2 account linking attempted but may have validation issues");
-        for check in &second_success_checks {
-            println!("    {check}");
-        }
-
-        // Even if the response validation failed, let's check if accounts were actually linked
-        println!("🔍 Step 2c: Checking OAuth2 accounts despite validation issues");
-        match verify_oauth2_accounts_linked(&browser, 1, "google").await {
-            Ok(_) => {
-                println!(
-                    "✅ Step 2c: Initial OAuth2 account confirmed (linking may not have succeeded)"
-                );
-            }
-            Err(e) => {
-                println!("⚠️  Step 2c: OAuth2 account verification failed: {}", e);
-            }
-        }
+        second_result.print_details();
     }
 
-    println!("✅ Step 2: OAuth2 account linking flow completed");
-
-    // Verify session is still active after testing OAuth2 linking initiation
-    let final_session_check = browser.has_active_session().await;
+    // Verify session remains active
     assert!(
-        final_session_check,
-        "Session should remain active after OAuth2 linking initiation"
+        setup.browser.has_active_session().await,
+        "Session should remain active after OAuth2 linking"
     );
 
-    println!("🎉 OAuth2 account linking framework test SUCCESS:");
-    println!("  - First OAuth2 user registration: PASSED");
-    println!("  - OAuth2 linking initiation (add_to_user): PASSED");
-    println!("  - Session maintained during linking initiation: PASSED");
-    println!("  - Account linking framework: FUNCTIONAL");
-
-    // Note: Full OAuth2 linking flow would require different mock data for each account
-    // This test validates that the linking mechanism can be initiated successfully
-
-    server.shutdown().await;
+    println!("🎉 OAuth2 account linking framework test SUCCESS");
+    setup.shutdown().await?;
     Ok(())
 }
 
@@ -888,126 +1037,86 @@ async fn test_link_two_oauth2_users() -> Result<(), Box<dyn std::error::Error>> 
 #[tokio::test]
 #[serial]
 async fn test_link_three_oauth2_users() -> Result<(), Box<dyn std::error::Error>> {
-    let server = TestServer::start().await?;
-    let browser = MockBrowser::new(&server.base_url, true);
-    let _test_user_first = TestUsers::oauth2_user();
-    let _test_user_second = TestUsers::oauth2_user_second();
-    let _test_user_third = TestUsers::oauth2_user_third();
+    let setup = OAuth2TestSetup::new().await?;
 
     println!("🔗🔗🔗 Testing linking three OAuth2 accounts to one user");
 
     // Step 1: Create initial user via OAuth2 registration
     println!("📝 Step 1: Creating initial user via OAuth2 registration");
-    let first_response = complete_full_oauth2_flow(&browser, "create_user_or_login").await?;
+    let first_result = OAuth2Flow::new(&setup.browser, CREATE_USER_MODE)
+        .execute_and_validate(NEW_USER_MESSAGE)
+        .await?;
 
-    let first_status = first_response.status();
-    let first_headers = first_response.headers().clone();
-    let _first_body = first_response.text().await?;
-
-    // Validate first user creation
-    let first_success_checks =
-        validate_oauth2_success(&first_status, &first_headers, "Created%20new%20user");
-    let first_all_passed = first_success_checks
-        .iter()
-        .all(|check| check.starts_with("✅"));
-
-    if !first_all_passed {
-        for check in &first_success_checks {
-            println!("  {check}");
-        }
+    if !first_result.is_success {
+        first_result.print_details();
         return Err("First OAuth2 user creation failed validation".into());
     }
-
     println!("✅ Step 1: First OAuth2 user created successfully");
 
     // Get initial user info
-    let first_user_response = browser.get("/auth/user/info").await?;
-    assert!(first_user_response.status().is_success());
-    let first_user_info: serde_json::Value = first_user_response.json().await?;
+    let first_user_info: serde_json::Value =
+        setup.browser.get("/auth/user/info").await?.json().await?;
     println!("  - First user email: {}", first_user_info["email"]);
 
     // Step 2: Link second OAuth2 account
     println!("🔗 Step 2: Linking second OAuth2 account to existing user");
-
-    // Configure mock server with second user data
-    println!("🔧 Configuring mock server with second user data");
     use crate::common::axum_mock_server::configure_mock_for_test;
     let test_user_second = TestUsers::oauth2_user_second();
     configure_mock_for_test(
         test_user_second.email.clone(),
         test_user_second.id.clone(),
-        server.base_url.clone(),
+        setup.base_url().to_string(),
     );
 
-    let second_response = complete_full_oauth2_flow(&browser, "add_to_user").await?;
+    let second_result = OAuth2Flow::new(&setup.browser, ADD_TO_USER_MODE)
+        .with_context()
+        .await?
+        .execute_and_validate(LINKED_ACCOUNT_MESSAGE)
+        .await?;
 
-    let second_status = second_response.status();
-    let second_headers = second_response.headers().clone();
-    let _second_body = second_response.text().await?;
-
-    // Check second account linking
-    let second_success_checks = validate_oauth2_success(
-        &second_status,
-        &second_headers,
-        "Successfully%20linked%20to",
-    );
-    let second_all_passed = second_success_checks
-        .iter()
-        .all(|check| check.starts_with("✅"));
-
-    if second_all_passed {
+    let second_success = second_result.is_success;
+    if second_success {
         println!("✅ Step 2: Second OAuth2 account linked successfully");
     } else {
         println!("⚠️  Step 2: Second OAuth2 account linking attempted");
-        // Continue with third account even if second has validation issues
     }
 
     // Verify session is still active after second linking
-    let second_user_response = browser.get("/auth/user/info").await?;
     assert!(
-        second_user_response.status().is_success(),
+        setup
+            .browser
+            .get("/auth/user/info")
+            .await?
+            .status()
+            .is_success(),
         "Should have active session after second account linking"
     );
 
     // Step 3: Link third OAuth2 account
     println!("🔗 Step 3: Linking third OAuth2 account to existing user");
-
-    // Configure mock server with third user data
-    println!("🔧 Configuring mock server with third user data");
     let test_user_third = TestUsers::oauth2_user_third();
     configure_mock_for_test(
         test_user_third.email.clone(),
         test_user_third.id.clone(),
-        server.base_url.clone(),
+        setup.base_url().to_string(),
     );
 
-    let third_response = complete_full_oauth2_flow(&browser, "add_to_user").await?;
+    let third_result = OAuth2Flow::new(&setup.browser, ADD_TO_USER_MODE)
+        .with_context()
+        .await?
+        .execute_and_validate(LINKED_ACCOUNT_MESSAGE)
+        .await?;
 
-    let third_status = third_response.status();
-    let third_headers = third_response.headers().clone();
-    let _third_body = third_response.text().await?;
-
-    // Check third account linking
-    let third_success_checks =
-        validate_oauth2_success(&third_status, &third_headers, "Successfully%20linked%20to");
-    let third_all_passed = third_success_checks
-        .iter()
-        .all(|check| check.starts_with("✅"));
-
-    if third_all_passed {
+    let third_success = third_result.is_success;
+    if third_success {
         println!("✅ Step 3: Third OAuth2 account linked successfully");
     } else {
         println!("⚠️  Step 3: Third OAuth2 account linking attempted");
     }
 
     // Step 4: Verify final user state and OAuth2 accounts
-    let final_user_response = browser.get("/auth/user/info").await?;
-    assert!(
-        final_user_response.status().is_success(),
-        "Should have active session after all account linking"
-    );
-
-    let final_user_info: serde_json::Value = final_user_response.json().await?;
+    let final_user_info: serde_json::Value =
+        setup.browser.get("/auth/user/info").await?.json().await?;
     println!("  - Final user email: {}", final_user_info["email"]);
 
     // User identity should remain consistent
@@ -1018,24 +1127,21 @@ async fn test_link_three_oauth2_users() -> Result<(), Box<dyn std::error::Error>
 
     // Step 4b: Verify OAuth2 accounts are properly linked
     println!("🔍 Step 4b: Verifying final OAuth2 account count");
-    let expected_count = if second_all_passed && third_all_passed {
+    let expected_count = if second_success && third_success {
         3
-    } else if second_all_passed || third_all_passed {
+    } else if second_success || third_success {
         2
     } else {
         1
     };
 
-    match verify_oauth2_accounts_linked(&browser, expected_count, "google").await {
+    match verify_oauth2_accounts_linked(&setup.browser, expected_count, OAUTH2_PROVIDER).await {
         Ok(accounts) => {
             println!("✅ Step 4b: OAuth2 account verification successful");
-
-            // Verify all accounts have different provider_user_ids (different Google accounts)
             let provider_ids: Vec<&str> = accounts
                 .iter()
                 .map(|acc| acc["provider_user_id"].as_str().unwrap_or(""))
                 .collect();
-
             let unique_ids: std::collections::HashSet<&str> =
                 provider_ids.iter().cloned().collect();
             if unique_ids.len() == expected_count {
@@ -1050,15 +1156,11 @@ async fn test_link_three_oauth2_users() -> Result<(), Box<dyn std::error::Error>
                 );
             }
         }
-        Err(e) => {
-            println!("⚠️  Step 4b: OAuth2 account verification failed: {}", e);
-            // Continue with test but note the verification issue
-        }
+        Err(e) => println!("⚠️  Step 4b: OAuth2 account verification failed: {}", e),
     }
 
-    // Determine overall success
-    let overall_success = first_all_passed && (second_all_passed || third_all_passed);
-
+    // Determine overall success and print results
+    let overall_success = second_success && third_success;
     if overall_success {
         println!("🎉 OAuth2 multiple account linking test SUCCESS:");
         println!("  - First OAuth2 user registration: PASSED");
@@ -1075,6 +1177,6 @@ async fn test_link_three_oauth2_users() -> Result<(), Box<dyn std::error::Error>
         println!("  - Multi-account linking framework: FUNCTIONAL");
     }
 
-    server.shutdown().await;
+    setup.shutdown().await?;
     Ok(())
 }
