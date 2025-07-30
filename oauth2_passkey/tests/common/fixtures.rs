@@ -383,33 +383,33 @@ impl MockWebAuthnCredentials {
         ]);
 
         // Create COSE key for EC2 P-256 public key
-        let mut cose_key_map = Vec::new();
-
-        // kty = 2 (EC2)
-        cose_key_map.push((
-            CborValue::Integer(Integer::from(1)),
-            CborValue::Integer(Integer::from(2)),
-        ));
-        // alg = -7 (ES256)
-        cose_key_map.push((
-            CborValue::Integer(Integer::from(3)),
-            CborValue::Integer(Integer::from(-7)),
-        ));
-        // crv = 1 (P-256)
-        cose_key_map.push((
-            CborValue::Integer(Integer::from(-1)),
-            CborValue::Integer(Integer::from(1)),
-        ));
-        // x coordinate (32 bytes)
-        cose_key_map.push((
-            CborValue::Integer(Integer::from(-2)),
-            CborValue::Bytes(x_coord.to_vec()),
-        ));
-        // y coordinate (32 bytes)
-        cose_key_map.push((
-            CborValue::Integer(Integer::from(-3)),
-            CborValue::Bytes(y_coord.to_vec()),
-        ));
+        let cose_key_map = vec![
+            // kty = 2 (EC2)
+            (
+                CborValue::Integer(Integer::from(1)),
+                CborValue::Integer(Integer::from(2)),
+            ),
+            // alg = -7 (ES256)
+            (
+                CborValue::Integer(Integer::from(3)),
+                CborValue::Integer(Integer::from(-7)),
+            ),
+            // crv = 1 (P-256)
+            (
+                CborValue::Integer(Integer::from(-1)),
+                CborValue::Integer(Integer::from(1)),
+            ),
+            // x coordinate (32 bytes)
+            (
+                CborValue::Integer(Integer::from(-2)),
+                CborValue::Bytes(x_coord.to_vec()),
+            ),
+            // y coordinate (32 bytes)
+            (
+                CborValue::Integer(Integer::from(-3)),
+                CborValue::Bytes(y_coord.to_vec()),
+            ),
+        ];
 
         let cose_key = CborValue::Map(cose_key_map);
         let mut cose_key_bytes = Vec::new();

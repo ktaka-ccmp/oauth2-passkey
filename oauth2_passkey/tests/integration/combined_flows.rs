@@ -1,8 +1,11 @@
-use crate::common::{MockBrowser, MockWebAuthnCredentials, TestServer, TestUsers};
+use crate::common::{
+    MockBrowser, MockWebAuthnCredentials, TestServer, TestUsers,
+    validation_utils::validate_oauth2_success,
+};
 use serial_test::serial;
 
 // Import OAuth2 helper functions from oauth2_flows.rs
-use super::oauth2_flows::{complete_full_oauth2_flow, validate_oauth2_success};
+use super::oauth2_flows::complete_full_oauth2_flow;
 
 /// Test combined authentication flows
 ///

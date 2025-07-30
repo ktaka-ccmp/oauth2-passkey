@@ -1,16 +1,9 @@
-use crate::common::{MockBrowser, TestServer, TestUsers};
+use crate::common::{
+    MockBrowser, TestServer, TestUsers,
+    constants::oauth2::*,
+    validation_utils::{AuthValidationResult, validate_oauth2_success},
+};
 use serial_test::serial;
-
-// Constants for OAuth2 test configuration
-const DEFAULT_RESPONSE_MODE: &str = "form_post";
-const OAUTH2_PROVIDER: &str = "google";
-const CREATE_USER_MODE: &str = "create_user_or_login";
-const LOGIN_MODE: &str = "login";
-const ADD_TO_USER_MODE: &str = "add_to_user";
-const NEW_USER_MESSAGE: &str = "Created%20new%20user";
-const EXISTING_USER_MESSAGE: &str = "Signing%20in%20as";
-const LINKED_ACCOUNT_MESSAGE: &str = "Successfully%20linked%20to";
-const DEFAULT_ISSUER_URL: &str = "http://127.0.0.1:9876";
 
 /// Test environment setup for OAuth2 tests
 struct OAuth2TestSetup {
@@ -102,142 +95,17 @@ impl<'a> OAuth2Flow<'a> {
     async fn execute_and_validate(
         self,
         expected_message: &str,
-    ) -> Result<OAuth2ValidationResult, Box<dyn std::error::Error>> {
+    ) -> Result<AuthValidationResult, Box<dyn std::error::Error>> {
         let response = self.execute().await?;
         let status = response.status();
         let headers = response.headers().clone();
         let _body = response.text().await?;
 
-        Ok(OAuth2ValidationResult::from_response(
+        Ok(AuthValidationResult::from_oauth2_response(
             status,
             &headers,
             expected_message,
         ))
-    }
-}
-
-/// Structured validation result for OAuth2 flows
-#[derive(Debug)]
-struct OAuth2ValidationResult {
-    is_success: bool,
-    status_code: reqwest::StatusCode,
-    has_valid_redirect: bool,
-    has_session_cookie: bool,
-    has_expected_message: bool,
-    has_csrf_management: bool,
-    details: Vec<String>,
-}
-
-impl OAuth2ValidationResult {
-    /// Create validation result from response
-    fn from_response(
-        status: reqwest::StatusCode,
-        headers: &reqwest::header::HeaderMap,
-        expected_message: &str,
-    ) -> Self {
-        let mut result = Self {
-            is_success: false,
-            status_code: status,
-            has_valid_redirect: false,
-            has_session_cookie: false,
-            has_expected_message: false,
-            has_csrf_management: false,
-            details: Vec::new(),
-        };
-
-        // Check status code
-        result.has_valid_redirect = status == reqwest::StatusCode::SEE_OTHER;
-        if result.has_valid_redirect {
-            result
-                .details
-                .push("✅ 303 See Other redirect: PASSED".to_string());
-        } else {
-            result
-                .details
-                .push(format!("❌ Expected 303 See Other, got: {}", status));
-        }
-
-        // Check session cookie
-        let session_cookie_name =
-            std::env::var("SESSION_COOKIE_NAME").unwrap_or_else(|_| "__Host-SessionId".to_string());
-        let session_cookie = headers
-            .get_all("set-cookie")
-            .iter()
-            .find(|cookie| cookie.to_str().unwrap_or("").contains(&session_cookie_name));
-
-        if let Some(cookie) = session_cookie {
-            let cookie_str = cookie.to_str().unwrap_or("");
-            result.has_session_cookie = cookie_str.contains("SameSite=Lax")
-                && cookie_str.contains("Secure")
-                && cookie_str.contains("HttpOnly")
-                && cookie_str.contains("Path=/");
-
-            if result.has_session_cookie {
-                result
-                    .details
-                    .push("✅ Session cookie with security flags: PASSED".to_string());
-            } else {
-                result
-                    .details
-                    .push("❌ Session cookie missing security flags".to_string());
-            }
-        } else {
-            result
-                .details
-                .push(format!("❌ No {} cookie found", session_cookie_name));
-        }
-
-        // Check location header
-        if let Some(location) = headers.get("location").and_then(|h| h.to_str().ok()) {
-            result.has_expected_message = location.contains("/auth/oauth2/popup_close")
-                && location.contains(expected_message);
-
-            if result.has_expected_message {
-                result.details.push(format!(
-                    "✅ Success redirect with expected message ({}): PASSED",
-                    expected_message
-                ));
-            } else {
-                result
-                    .details
-                    .push(format!("❌ Unexpected redirect location: {}", location));
-            }
-        } else {
-            result
-                .details
-                .push("❌ No location header found".to_string());
-        }
-
-        // Check CSRF management
-        result.has_csrf_management = headers
-            .get_all("set-cookie")
-            .iter()
-            .any(|cookie| cookie.to_str().unwrap_or("").contains("__Host-CsrfId"));
-
-        if result.has_csrf_management {
-            result
-                .details
-                .push("✅ CSRF token management: PASSED".to_string());
-        } else {
-            result
-                .details
-                .push("❌ No CSRF cookie management found".to_string());
-        }
-
-        // Overall success
-        result.is_success = result.has_valid_redirect
-            && result.has_session_cookie
-            && result.has_expected_message
-            && result.has_csrf_management;
-
-        result
-    }
-
-    /// Print validation details
-    fn print_details(&self) {
-        for detail in &self.details {
-            println!("  {}", detail);
-        }
     }
 }
 
@@ -550,77 +418,6 @@ pub(super) async fn complete_full_oauth2_flow(
     };
 
     complete_full_oauth2_flow_internal(browser, mode, context_token).await
-}
-
-/// Helper function to validate OAuth2 success characteristics
-/// Returns vector of success/failure check messages
-pub(super) fn validate_oauth2_success(
-    status: &reqwest::StatusCode,
-    headers: &reqwest::header::HeaderMap,
-    expected_message_pattern: &str,
-) -> Vec<String> {
-    let mut success_checks = Vec::new();
-
-    // 1. Check for 303 redirect (successful OAuth2 completion)
-    if *status == reqwest::StatusCode::SEE_OTHER {
-        success_checks.push("✅ 303 See Other redirect: PASSED".to_string());
-    } else {
-        success_checks.push(format!("❌ Expected 303 See Other, got: {status}"));
-    }
-
-    // 2. Check for session cookie with correct characteristics
-    // In tests, we use "SessionId-Test" instead of "__Host-SessionId" (which requires HTTPS)
-    let session_cookie_name =
-        std::env::var("SESSION_COOKIE_NAME").unwrap_or_else(|_| "__Host-SessionId".to_string());
-    let session_cookie = headers
-        .get_all("set-cookie")
-        .iter()
-        .find(|cookie| cookie.to_str().unwrap_or("").contains(&session_cookie_name));
-
-    if let Some(cookie) = session_cookie {
-        let cookie_str = cookie.to_str().unwrap_or("");
-        if cookie_str.contains("SameSite=Lax")
-            && cookie_str.contains("Secure")
-            && cookie_str.contains("HttpOnly")
-            && cookie_str.contains("Path=/")
-        {
-            success_checks.push("✅ Session cookie with security flags: PASSED".to_string());
-        } else {
-            success_checks.push("❌ Session cookie missing security flags".to_string());
-        }
-    } else {
-        success_checks.push(format!("❌ No {} cookie found", session_cookie_name));
-    }
-
-    // 3. Check for location header with expected message
-    let location = headers.get("location").and_then(|h| h.to_str().ok());
-
-    if let Some(loc) = location {
-        if loc.contains("/auth/oauth2/popup_close") && loc.contains(expected_message_pattern) {
-            success_checks.push(format!(
-                "✅ Success redirect with expected message ({}): PASSED",
-                expected_message_pattern
-            ));
-        } else {
-            success_checks.push(format!("❌ Unexpected redirect location: {loc}"));
-        }
-    } else {
-        success_checks.push("❌ No location header found".to_string());
-    }
-
-    // 4. Check for CSRF cookie management
-    let csrf_cookie = headers
-        .get_all("set-cookie")
-        .iter()
-        .find(|cookie| cookie.to_str().unwrap_or("").contains("__Host-CsrfId"));
-
-    if csrf_cookie.is_some() {
-        success_checks.push("✅ CSRF token management: PASSED".to_string());
-    } else {
-        success_checks.push("❌ No CSRF cookie management found".to_string());
-    }
-
-    success_checks
 }
 
 /// Test complete OAuth2 authentication flows with Axum mock server
@@ -1002,7 +799,7 @@ async fn test_link_two_oauth2_users() -> Result<(), Box<dyn std::error::Error>> 
 
         // Verify OAuth2 accounts are properly linked
         println!("🔍 Step 2c: Verifying OAuth2 accounts are properly linked");
-        match verify_oauth2_accounts_linked(&setup.browser, 2, OAUTH2_PROVIDER).await {
+        match verify_oauth2_accounts_linked(&setup.browser, 2, PROVIDER).await {
             Ok(accounts) => {
                 println!("✅ Step 2c: OAuth2 account verification successful");
                 let provider_ids: Vec<&str> = accounts
@@ -1135,7 +932,7 @@ async fn test_link_three_oauth2_users() -> Result<(), Box<dyn std::error::Error>
         1
     };
 
-    match verify_oauth2_accounts_linked(&setup.browser, expected_count, OAUTH2_PROVIDER).await {
+    match verify_oauth2_accounts_linked(&setup.browser, expected_count, PROVIDER).await {
         Ok(accounts) => {
             println!("✅ Step 4b: OAuth2 account verification successful");
             let provider_ids: Vec<&str> = accounts
