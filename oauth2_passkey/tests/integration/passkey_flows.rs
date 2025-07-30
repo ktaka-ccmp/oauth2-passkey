@@ -228,11 +228,6 @@ impl CredentialSet {
         });
     }
 
-    /// Get credential by index
-    fn get_credential(&self, index: usize) -> Option<&StoredCredential> {
-        self.credentials.get(index)
-    }
-
     /// Get the first credential
     fn first(&self) -> Option<&StoredCredential> {
         self.credentials.first()
@@ -241,11 +236,6 @@ impl CredentialSet {
     /// Get the number of credentials
     fn len(&self) -> usize {
         self.credentials.len()
-    }
-
-    /// Check if the set is empty
-    fn is_empty(&self) -> bool {
-        self.credentials.is_empty()
     }
 }
 
@@ -568,23 +558,6 @@ async fn authenticate_user(
     AuthenticationFlow::new(browser, test_user, stored_user_handle, stored_key_pair)
         .execute()
         .await
-}
-
-/// Helper function to authenticate user with specific credential (backward compatibility)
-async fn authenticate_user_with_credential(
-    browser: &MockBrowser,
-    test_user: &crate::common::fixtures::TestUser,
-    stored_user_handle: &str,
-    stored_key_pair: &[u8],
-    credential_index: Option<usize>,
-) -> Result<bool, Box<dyn std::error::Error>> {
-    let mut flow = AuthenticationFlow::new(browser, test_user, stored_user_handle, stored_key_pair);
-
-    if let Some(index) = credential_index {
-        flow = flow.with_credential_index(index);
-    }
-
-    flow.execute().await
 }
 
 /// Verify successful registration and session setup

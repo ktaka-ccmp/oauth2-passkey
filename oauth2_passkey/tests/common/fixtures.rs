@@ -735,7 +735,7 @@ impl MockWebAuthnCredentials {
 
     /// Generate a mock registration credential response with specific attestation format
     pub fn registration_response_with_format(
-        username: &str,
+        _username: &str,
         _display_name: &str,
         challenge: &str,
         user_handle: &str,
@@ -777,7 +777,7 @@ impl MockWebAuthnCredentials {
 
     /// Generate a mock registration credential response with specific attestation format and return key pair
     pub fn registration_response_with_format_and_key_pair(
-        username: &str,
+        _username: &str,
         _display_name: &str,
         challenge: &str,
         user_handle: &str,

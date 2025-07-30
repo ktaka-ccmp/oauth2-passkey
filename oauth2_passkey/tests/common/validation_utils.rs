@@ -1,12 +1,5 @@
 use super::session_utils::{has_csrf_management, verify_session_cookie_security};
 
-/// Authentication method type for validation
-#[derive(Debug, Clone, Copy)]
-pub enum AuthType {
-    OAuth2,
-    Passkey,
-}
-
 /// Generic validation result for authentication flows
 ///
 /// This structure provides consistent validation across OAuth2 and passkey authentication,
@@ -104,73 +97,6 @@ impl AuthValidationResult {
             && result.has_session_cookie
             && result.has_expected_message
             && result.has_csrf_management;
-
-        result
-    }
-
-    /// Create validation result from HTTP response for passkey flows
-    pub fn from_passkey_response(
-        status: reqwest::StatusCode,
-        headers: &reqwest::header::HeaderMap,
-        expected_success: bool,
-    ) -> Self {
-        let mut result = Self {
-            is_success: false,
-            status_code: status,
-            has_valid_redirect: false,
-            has_session_cookie: false,
-            has_expected_message: true, // Not applicable for passkey
-            has_csrf_management: false,
-            details: Vec::new(),
-        };
-
-        // Check status code (passkey expects success status)
-        result.has_valid_redirect = status.is_success();
-        if result.has_valid_redirect {
-            result
-                .details
-                .push(format!("✅ Success status ({}): PASSED", status));
-        } else {
-            result
-                .details
-                .push(format!("❌ Expected success status, got: {}", status));
-        }
-
-        // Check session cookie for successful cases
-        if expected_success {
-            let session_cookie_name = std::env::var("SESSION_COOKIE_NAME")
-                .unwrap_or_else(|_| "__Host-SessionId".to_string());
-
-            result.has_session_cookie =
-                verify_session_cookie_security(headers, &session_cookie_name);
-            if result.has_session_cookie {
-                result
-                    .details
-                    .push("✅ Session cookie with security flags: PASSED".to_string());
-            } else {
-                result
-                    .details
-                    .push("❌ Session cookie missing security flags".to_string());
-            }
-        } else {
-            result.has_session_cookie = true; // Not required for failed cases
-        }
-
-        // Check CSRF management
-        result.has_csrf_management = has_csrf_management(headers);
-        if result.has_csrf_management {
-            result
-                .details
-                .push("✅ CSRF token management: PASSED".to_string());
-        } else {
-            result
-                .details
-                .push("❌ No CSRF cookie management found".to_string());
-        }
-
-        // Overall success for passkey
-        result.is_success =
-            result.has_valid_redirect && result.has_session_cookie && result.has_expected_message;
 
         result
     }

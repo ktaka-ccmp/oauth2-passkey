@@ -9,7 +9,6 @@ use serial_test::serial;
 struct OAuth2TestSetup {
     server: TestServer,
     browser: MockBrowser,
-    test_user: crate::common::fixtures::TestUser,
 }
 
 impl OAuth2TestSetup {
@@ -17,25 +16,7 @@ impl OAuth2TestSetup {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let server = TestServer::start().await?;
         let browser = MockBrowser::new(&server.base_url, true);
-        let test_user = TestUsers::oauth2_user();
-        Ok(Self {
-            server,
-            browser,
-            test_user,
-        })
-    }
-
-    /// Create a new test environment with a specific test user
-    async fn with_user(
-        test_user: crate::common::fixtures::TestUser,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        let server = TestServer::start().await?;
-        let browser = MockBrowser::new(&server.base_url, true);
-        Ok(Self {
-            server,
-            browser,
-            test_user,
-        })
+        Ok(Self { server, browser })
     }
 
     /// Get the base URL for the test server

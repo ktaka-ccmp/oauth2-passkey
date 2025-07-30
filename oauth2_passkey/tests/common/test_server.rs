@@ -92,11 +92,12 @@ impl TestServer {
         let bind_addr = format!("{host}:{port}");
         println!("🔧 Binding test server to {bind_addr} (from ORIGIN={origin})");
 
-        // Bind to the exact address specified in ORIGIN with retry logic
+        // Bind to the exact address specified in ORIGIN with retry logic and exponential backoff
         let listener = {
             let mut attempts = 0;
-            const MAX_RETRIES: u8 = 100;
-            const RETRY_DELAY_MS: u64 = 100;
+            const MAX_RETRIES: u16 = 300;
+            const BASE_DELAY_MS: u64 = 10;
+            const MAX_DELAY_MS: u64 = 500;
 
             loop {
                 match tokio::net::TcpListener::bind(&bind_addr).await {
@@ -108,12 +109,22 @@ impl TestServer {
                                 "Failed to bind to {bind_addr} after {MAX_RETRIES} attempts: {e}. Make sure the port is available."
                             ).into());
                         }
-                        println!(
-                            "⚠️  Failed to bind to {bind_addr} (attempt {}/{}): {e}. Retrying in {}ms...",
-                            attempts, MAX_RETRIES, RETRY_DELAY_MS
+
+                        // Exponential backoff with jitter to handle port conflicts better
+                        let delay_ms = std::cmp::min(
+                            BASE_DELAY_MS * 2_u64.pow(std::cmp::min(attempts as u32, 6)),
+                            MAX_DELAY_MS,
                         );
-                        tokio::time::sleep(tokio::time::Duration::from_millis(RETRY_DELAY_MS))
-                            .await;
+
+                        // Only show progress every 50 attempts to reduce noise
+                        if attempts % 50 == 0 || attempts <= 10 {
+                            println!(
+                                "⚠️  Failed to bind to {bind_addr} (attempt {}/{}): {e}. Retrying in {}ms...",
+                                attempts, MAX_RETRIES, delay_ms
+                            );
+                        }
+
+                        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
                     }
                 }
             }
@@ -121,7 +132,7 @@ impl TestServer {
 
         println!("✅ Test server bound to {bind_addr}");
 
-        let addr = listener.local_addr()?;
+        let _addr = listener.local_addr()?;
         let base_url = origin.clone();
 
         // Check if we should initialize

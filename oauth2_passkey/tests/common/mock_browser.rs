@@ -80,23 +80,6 @@ impl MockBrowser {
         request.send().await
     }
 
-    /// Make a POST request with form data and custom headers (for OAuth2 callbacks) - HeaderMap format
-    pub async fn post_form_with_headers(
-        &self,
-        path: &str,
-        form_data: &[(&str, &str)],
-        headers: &reqwest::header::HeaderMap,
-    ) -> Result<Response, reqwest::Error> {
-        let url = format!("{}{}", self.base_url, path);
-        let mut request = self.client.post(&url).form(form_data);
-
-        for (key, value) in headers {
-            request = request.header(key, value);
-        }
-
-        request.send().await
-    }
-
     /// Make a POST request with JSON data
     pub async fn post_json(
         &self,
@@ -232,31 +215,6 @@ impl MockBrowser {
             )
             .into())
         }
-    }
-
-    /// Extract CSRF token from response headers (both X-CSRF-Token header and Set-Cookie)  
-    fn extract_csrf_token(response: &reqwest::Response) -> Option<String> {
-        // First try to get CSRF token from X-CSRF-Token response header (preferred method)
-        if let Some(csrf_header) = response.headers().get("X-CSRF-Token") {
-            if let Ok(csrf_token) = csrf_header.to_str() {
-                return Some(csrf_token.to_string());
-            }
-        }
-
-        // Fallback: try to extract from Set-Cookie header
-        if let Some(set_cookie_header) = response.headers().get("set-cookie") {
-            if let Ok(cookie_str) = set_cookie_header.to_str() {
-                if cookie_str.contains("__Host-CsrfId=") {
-                    return cookie_str
-                        .split("__Host-CsrfId=")
-                        .nth(1)
-                        .and_then(|s| s.split(';').next())
-                        .map(|s| s.to_string());
-                }
-            }
-        }
-
-        None
     }
 
     /// Complete passkey registration
