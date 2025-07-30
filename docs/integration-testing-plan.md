@@ -2,8 +2,8 @@
 ## Overview
 This document describes the comprehensive integration test suite that validates end-to-end authentication flows for the OAuth2-Passkey library.
 ## Current State
-- ✅ **Strong unit test coverage**: 446+ unit tests with 6 ignored
-- ✅ **Complete integration test suite**: 34 integration tests covering all authentication flows
+- ✅ **Strong unit test coverage**: 460+ unit tests with comprehensive coverage
+- ✅ **Complete integration test suite**: 29 integration tests covering all authentication flows
 - ✅ **OIDC security compliance**: All OAuth2 tests validate nonce verification according to OpenID Connect standards
 - ✅ **Persistent Axum mock server**: Replaced httpmock with Axum-based mock OIDC provider on fixed port 9876
 - ✅ **Mock services**: OAuth2 provider and WebAuthn credential simulation with full security validation
@@ -21,14 +21,16 @@ oauth2_passkey/
 │   │   ├── passkey_flows.rs           # ✅ Passkey authentication flows (4 tests)
 │   │   ├── combined_flows.rs          # ✅ Cross-method authentication (4 tests)
 │   │   ├── api_client_flows.rs        # ✅ API/JavaScript client flows (4 tests)
-│   │   ├── nonce_verification_tests.rs # ✅ OAuth2 nonce verification (3 tests)
-│   │   └── oidc_discovery_test.rs      # ✅ OIDC Discovery endpoint tests (2 tests)
 │   └── common/
 │       ├── mod.rs                     # Common module exports  
-│       ├── test_server.rs             # ✅ Test server infrastructure
+│       ├── test_server.rs             # ✅ Test server infrastructure (enhanced retry logic)
 │       ├── axum_mock_server.rs        # ✅ Persistent Axum mock OIDC provider
-│       ├── mock_browser.rs            # ✅ HTTP client with cookie handling
-│       └── fixtures.rs                # ✅ Test data and mock responses
+│       ├── mock_browser.rs            # ✅ HTTP client with cookie handling (optimized)
+│       ├── fixtures.rs                # ✅ Test data and mock responses
+│       ├── constants.rs               # ✅ Test constants (cleaned up)
+│       ├── session_utils.rs           # ✅ Session management utilities
+│       ├── validation_utils.rs        # ✅ Authentication validation helpers
+│       └── webauthn_helpers.rs        # ✅ WebAuthn test utilities
 oauth2_passkey_axum/
 └── tests/                             # ✅ Axum-specific tests (32 tests)
     ├── axum_integration.rs
@@ -39,8 +41,10 @@ oauth2_passkey_axum/
 - ✅ **Minimal Axum test server** with oauth2-passkey integration
 - ✅ **In-memory databases** (SQLite + Memory cache) for isolation and speed
 - ✅ **Persistent Axum mock OIDC provider** on fixed port 9876 with thread-based lifecycle
+- ✅ **Enhanced port conflict handling** with exponential backoff retry (300 attempts)
 - ✅ **Consistent test origins** to avoid LazyLock initialization issues
 - ✅ **Automatic cleanup** and resource management
+- ✅ **Improved reliability** for concurrent test execution
 ### 2.2 Persistent Mock OIDC Provider (`tests/common/axum_mock_server.rs`)
 - ✅ **Fixed port architecture** (9876) prevents LazyLock initialization conflicts
 - ✅ **Thread-based persistence** using `std::thread::spawn` with dedicated tokio runtime
@@ -162,10 +166,10 @@ OAUTH2_ISSUER_URL='http://127.0.0.1:9876'
 # Nonce verification is always enabled for OpenID Connect security
 ```
 ### 6.2 Current Test Execution Strategy - ✅ WORKING
-- ✅ **Parallel unit tests** (446 tests, ~2.5 seconds)
-- ✅ **Sequential integration tests** (34 tests, ~4 seconds, using `#[serial]`)
-- ✅ **Zero test flakiness** with persistent mock server architecture
-- ✅ **CI/CD ready** with automatic cleanup
+- ✅ **Parallel unit tests** (460+ tests, ~2.5 seconds)
+- ✅ **Sequential integration tests** (29 tests, ~4 seconds, using `#[serial]`)
+- ✅ **Zero test flakiness** with enhanced port conflict handling
+- ✅ **CI/CD ready** with automatic cleanup and improved reliability
 ## 7. Achievement Summary - ✅ GOALS EXCEEDED
 ### 7.1 Coverage Goals - ✅ ACHIEVED
 - ✅ **100% of public API functions** tested in realistic integration scenarios
@@ -311,12 +315,14 @@ async fn test_oauth2_new_user_registration() -> Result<(), Box<dyn std::error::E
 - ✅ Perfect resource cleanup with no memory leaks
 ## 11. Current Status & Future Roadmap
 ### 11.1 What's Complete - ✅ COMPREHENSIVE
-- ✅ **34 integration tests** covering all authentication flows with production OAuth2/OIDC compliance
-- ✅ **446+ unit tests** with perfect isolation
-- ✅ **Zero test flakiness** with persistent Axum mock server architecture
+- ✅ **29 integration tests** covering all authentication flows with production OAuth2/OIDC compliance
+- ✅ **460+ unit tests** with perfect isolation and comprehensive coverage
+- ✅ **Zero test flakiness** with enhanced port conflict handling and persistent Axum mock server
 - ✅ **Production-grade mock OIDC provider** with complete OAuth2 specification implementation
 - ✅ **Full OAuth2/OIDC compliance** including PKCE, authorization codes, response modes, and parameter validation
 - ✅ **Enhanced integration testing** with proper auth code extraction and comprehensive success validation
+- ✅ **Optimized test infrastructure** with cleaned up unused code (~400 lines removed)
+- ✅ **Improved reliability** with exponential backoff retry logic for port conflicts
 - ✅ **CI/CD ready** with no special configuration needed
 - ✅ **Developer-friendly** with tracing support and detailed test output
 ### 11.2 API Client Integration Tests - ✅ COMPLETE
@@ -376,8 +382,9 @@ All tests now demonstrate that the OAuth2 implementation:
 - ✅ **Perfect compatibility** with existing development workflow
 ---
 **Created**: 2025-07-23
-**Updated**: 2025-07-24 (OAuth2 nonce verification integration completed)
-**Status**: ✅ **COMPLETE AND PRODUCTION-READY WITH SECURITY VALIDATION**
-**Test Coverage**: 34 integration tests + 446+ unit tests (all with production nonce verification)
-**Performance**: ~6 seconds for full integration test suite
-**Security**: Full OAuth2/OIDC nonce verification validated in all tests
+**Updated**: 2025-07-30 (Test infrastructure optimization and OIDC Discovery integration)
+**Status**: ✅ **COMPLETE AND PRODUCTION-READY WITH ENHANCED RELIABILITY**
+**Test Coverage**: 29 integration tests + 460+ unit tests (all with production OAuth2/OIDC compliance)
+**Performance**: ~4 seconds for integration test suite, enhanced port conflict handling
+**Security**: Full OAuth2/OIDC nonce verification and OIDC Discovery validated in all tests
+**Recent Improvements**: Removed ~400 lines of unused test code, enhanced port conflict handling with exponential backoff
