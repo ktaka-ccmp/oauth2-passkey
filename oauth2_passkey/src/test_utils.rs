@@ -91,3 +91,11 @@ async fn create_first_user_if_needed() {
         }
     }
 }
+
+/// Get the test origin from environment variables, with fallback to default test value
+///
+/// This function retrieves the ORIGIN environment variable which should be set in .env_test
+/// for consistent test environment configuration. Falls back to localhost if not set.
+pub fn get_test_origin() -> String {
+    std::env::var("ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string())
+}
