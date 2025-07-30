@@ -28,6 +28,15 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --all-features
 ```
 
+## Code Quality Standards
+
+**IMPORTANT**: Always run `cargo clippy --all-targets --all-features` and fix ALL warnings before committing code. Clippy warnings indicate potential issues that should be addressed:
+
+- Use `#[allow(clippy::lint_name)]` only when absolutely necessary with clear justification
+- Prefer fixing the underlying issue rather than suppressing warnings
+- Run clippy after any significant code changes
+- Address dead code, unused imports, and style issues promptly
+
 ### Run Demo Applications
 ```bash
 # Combined OAuth2 + Passkey demo
@@ -82,6 +91,36 @@ Environment variables (see `dot.env.example`):
 - Integration tests in `/tests/` directories
 - Use in-memory databases for fast testing
 - See `docs/TestStrategy.md` for testing best practices
+
+## Development Guidelines
+
+### Library Design Principles
+1. **Publication Ready**: Code should be suitable for publishing on crates.io
+2. **Simplicity First**: Make code as simple as possible while remaining feasible
+3. **Minimal Dependencies**: Reduce dependencies on external crates where possible
+4. **Error Handling**: Use `thiserror` crate instead of `anyhow` (better for library crates)
+5. **Documentation**: Include comprehensive tutorials and examples
+6. **Minimal Visibility**: Keep module internals private, re-export only necessary items
+
+### Development Workflow
+7. **Minimal Changes**: Code modifications should be minimal and targeted to fulfill specific needs
+8. **Change Approval**: Discuss and get explicit approval before making changes beyond the immediate request
+9. **Meaningful Commits**: Commit messages should reflect actual changes made and their intentions
+10. **Error Safety**: Avoid `unwrap()` or `expect()` unless absolutely reasonable (except in unit tests)
+
+### Testing Standards
+11. **Incremental Testing**: Write unit tests one by one, ensuring each passes before writing the next
+12. **Approval Required**: Ask for approval before proceeding to next file or writing multiple tests
+13. **Non-Invasive**: Never modify original functions when writing tests without explanation and permission
+14. **Test Placement**: Place inline unit tests at the bottom of files
+15. **Use Test Utils**: Utilize the `test_utils` module for data store and cache initialization
+16. **Functional Testing**: Test actual functionality by calling functions, not mimicking behavior
+
+### Documentation Standards
+17. **Fact-Based Only**: Never make assumptions about codebase structure or implementation
+18. **Verify First**: Always examine actual code using tools before making statements
+19. **Explicit Uncertainty**: Use phrases like "Based on examination of..." when documenting
+20. **Error Prevention**: STOP → Verify → Use Tools → Examine Code → Document Facts
 
 ## Development Tips
 

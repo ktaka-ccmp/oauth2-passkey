@@ -2134,11 +2134,9 @@ mod tests {
 
     /// Helper function to create a test RegisterCredential for extract_credential_public_key tests
     fn create_test_register_credential_for_extract_credential_public_key() -> RegisterCredential {
-        let client_data_json = create_test_client_data_json(
-            "webauthn.create",
-            "test-challenge",
-            "https://example.com",
-        );
+        let test_origin = crate::test_utils::get_test_origin();
+        let client_data_json =
+            create_test_client_data_json("webauthn.create", "test-challenge", &test_origin);
         let client_data_b64 =
             crate::utils::base64url_encode(client_data_json.as_bytes().to_vec()).unwrap();
 
@@ -2209,12 +2207,13 @@ mod tests {
         // Build authenticator data
         let mut auth_data = Vec::new();
 
-        // RP ID hash (32 bytes) - SHA256("example.com")
-        auth_data.extend_from_slice(&[
-            0xa3, 0x79, 0xa6, 0xf6, 0xee, 0xaf, 0xb9, 0xa5, 0x5e, 0x37, 0x8c, 0x11, 0x80, 0x34,
-            0xe2, 0x75, 0x1e, 0x68, 0x2f, 0xab, 0x9f, 0x2d, 0x30, 0xab, 0x13, 0xd2, 0x12, 0x55,
-            0x86, 0xce, 0x19, 0x47,
-        ]);
+        // RP ID hash (32 bytes) - use SHA256 of the actual RP ID from test environment
+        use ring::digest;
+        let rp_id_hash = digest::digest(
+            &digest::SHA256,
+            crate::passkey::config::PASSKEY_RP_ID.as_bytes(),
+        );
+        auth_data.extend_from_slice(rp_id_hash.as_ref());
 
         // Flags (1 byte) - 0x45 = user present + user verified + attested credential data
         auth_data.push(0x45);

@@ -515,6 +515,7 @@ mod tests {
     }
 
     // Helper function to create a mock ParsedClientData for testing
+    // Note: This can be replaced with crate::common::create_test_parsed_client_data in integration tests
     fn create_parsed_client_data(challenge: &str, origin: &str, type_: &str) -> ParsedClientData {
         ParsedClientData {
             challenge: challenge.to_string(),
@@ -685,11 +686,9 @@ mod tests {
             // Use test_utils to set up environment variables safely
             test_utils::init_test_environment().await;
 
-            let parsed_data = create_parsed_client_data(
-                "sample-challenge",
-                "https://example.com",
-                "webauthn.get",
-            );
+            let test_origin = crate::test_utils::get_test_origin();
+            let parsed_data =
+                create_parsed_client_data("sample-challenge", &test_origin, "webauthn.get");
             let result = parsed_data.verify("sample-challenge");
             assert!(result.is_ok(), "Expected Ok result, got {result:?}");
             // No need to restore environment variables as they're now managed by test_utils
@@ -740,7 +739,7 @@ mod tests {
             match result {
                 Err(PasskeyError::ClientData(msg)) => {
                     assert!(msg.contains("Invalid origin"));
-                    assert!(msg.contains("https://example.com"));
+                    assert!(msg.contains(&crate::test_utils::get_test_origin()));
                     assert!(msg.contains("https://attacker.com"));
                 }
                 _ => panic!("Expected ClientData error"),
@@ -757,11 +756,9 @@ mod tests {
             // Use test_utils to set up environment variables safely
             test_utils::init_test_environment().await;
 
-            let parsed_data = create_parsed_client_data(
-                "sample-challenge",
-                "https://example.com",
-                "webauthn.create",
-            );
+            let test_origin = crate::test_utils::get_test_origin();
+            let parsed_data =
+                create_parsed_client_data("sample-challenge", &test_origin, "webauthn.create");
             let result = parsed_data.verify("sample-challenge");
             assert!(result.is_err());
             match result {
@@ -1054,7 +1051,9 @@ mod tests {
             // Use test_utils to set up environment variables safely
             test_utils::init_test_environment().await;
 
-            let expected_hash = digest::digest(&digest::SHA256, "example.com".as_bytes());
+            // Get the current RP_ID from environment (should be set by init_test_environment)
+            let rp_id = std::env::var("PASSKEY_RP_ID").unwrap_or_else(|_| "127.0.0.1".to_string());
+            let expected_hash = digest::digest(&digest::SHA256, rp_id.as_bytes());
             let auth_data = AuthenticatorData {
                 rp_id_hash: expected_hash.as_ref().to_vec(),
                 flags: 0, // No flags set, user not present

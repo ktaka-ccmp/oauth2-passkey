@@ -36,4 +36,4 @@ urlencoding = { workspace = true }
 
 [dev-dependencies]
 dotenvy = { workspace = true }
-tokio = { version = "1", features = ["macros", "rt"] }
+tokio = { workspace = true }

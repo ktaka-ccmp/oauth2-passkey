@@ -33,7 +33,8 @@ pub async fn init_test_environment() {
     // Environment setup (synchronous, runs once)
     static ENV_INIT: Once = Once::new();
     ENV_INIT.call_once(|| {
-        // Try to load .env_test first, fallback to .env if it doesn't exist
+        // All tests now use .env_test - unit tests inject URLs directly to avoid HTTP requests
+        println!("🧪 Loading test environment (.env_test)");
         if dotenvy::from_filename(".env_test").is_err() {
             dotenvy::dotenv().ok();
         }
@@ -89,4 +90,12 @@ async fn create_first_user_if_needed() {
             eprintln!("Warning: Failed to check existing users: {e}");
         }
     }
+}
+
+/// Get the test origin from environment variables, with fallback to default test value
+///
+/// This function retrieves the ORIGIN environment variable which should be set in .env_test
+/// for consistent test environment configuration. Falls back to localhost if not set.
+pub fn get_test_origin() -> String {
+    std::env::var("ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string())
 }

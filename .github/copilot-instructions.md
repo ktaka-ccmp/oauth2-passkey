@@ -1,33 +1,45 @@
-## General Instructions
-1. I want to publish this as a crate on crates.io
-2. I want to make the code as simple as possible yet feasible
-3. I want to make the code dependencies on other crates as little as possible 
-4. I hear anyhow crate is not for library crates so I want to use thiserror crate instead
-5. I want to include nice tutorial and examples
-7. I want the code modifications by cascade to be minimal, as simple as possible while fullfilling the needs of the prompt
-8. I want to make the visibility of the library and module internals as minimal as possible
-9. When we need more visibility I want to re-export necessary items only
-10. I want the commit messages reflecting the changes actually made, and with intentions
-11. Avoid using unwrap() or expect() unless absolutely reasonable except in unit tests.
-12. Even when you voluntarily notice some changes are feasible, never modify the code beyond my requests without first discussing the changes and explicit approval from me.
-13. When I write unit tests for the library, I want to write them one by one, making sure each test passes before writing the next one.
-14. When you want to proceed to the next file, ask for my approval first.
-15. When you want to write multiple tests at once, ask for my approval first.
-16. When you want to modify the original function which you are writing the test for, you must explain the reason and ask for permission.
-17. The block of inline unit tests should be placed at the bottom of the file.
-18. For the inline unit tests, we have prepared test_utils module, where we can initialize data store and cache dedicated for unit tests.
-19. Unit tests should test the functionality of the code by actually calling the functions and methods, not by mimicking the behavior of the code.
+# Development Guidelines
 
-## Critical: Fact-Based Documentation Only
-**NEVER make assumptions about codebase structure, architecture, or implementation details.**
+**Primary Reference**: All development guidelines are consolidated in `CLAUDE.md`.
 
-Before writing ANY documentation or making statements about the codebase:
-1. **ALWAYS examine the actual code first** using `list_dir`, `file_search`, `semantic_search`, `read_file`, or `grep_search`
-2. **Base ALL statements on verified facts** from actual code examination
-3. **If you don't know something, say so explicitly** - use phrases like "Based on examination of..."
+Please review and follow the complete guidelines in `CLAUDE.md`, which include:
 
-**Forbidden:** Writing about architecture, modules, functions, or features without first verifying they exist in the actual codebase.
-**Required:** Start every documentation task with fact-gathering using appropriate tools.
+## Library Design Principles
+- Publication readiness for crates.io
+- Simplicity and minimal dependencies
+- Error handling with `thiserror` (not `anyhow` for libraries)
+- Minimal visibility and proper API design
 
-## Error Prevention Process
-Before making any statement about the codebase: **STOP** → Have I verified this? → **USE TOOLS** → Examine actual code → **DOCUMENT** only verified facts.
+## Development Workflow  
+- Minimal, targeted changes only
+- Explicit approval required for changes beyond immediate request
+- Meaningful commit messages reflecting actual changes
+- Error safety (avoid `unwrap()`/`expect()` except where reasonable)
+
+## Testing Standards
+- Incremental testing (write one test at a time, ensure it passes)
+- Approval required before proceeding to next file or writing multiple tests
+- Non-invasive testing (don't modify original functions without permission)
+- Test placement at bottom of files
+- Use `test_utils` module for data store and cache initialization
+- Test actual functionality by calling functions, not mimicking behavior
+
+## Documentation Standards
+- **Fact-based only** - never make assumptions about codebase structure
+- **Verify first** - always examine actual code before making statements
+- **Explicit uncertainty** - use phrases like "Based on examination of..."
+- **Error prevention**: STOP → Verify → Use Tools → Examine Code → Document Facts
+
+## Code Quality
+- Clippy enforcement (automated via pre-commit hook)
+- Consistent formatting with `cargo fmt`
+- All warnings must be addressed before commits
+
+## Quick Reminders for Copilot
+- Use `thiserror` instead of `anyhow` for library code
+- Avoid `unwrap()`/`expect()` except in unit tests where reasonable
+- Ask before making changes beyond the immediate request
+- Always verify code structure exists before documenting it
+- Follow the incremental testing approach
+
+**Please consult CLAUDE.md for complete details on all development standards.**
