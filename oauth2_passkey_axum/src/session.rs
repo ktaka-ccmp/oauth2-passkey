@@ -137,7 +137,7 @@ where
 
         // Get session from cookie
         let session_cookie = cookies.get(SESSION_COOKIE_NAME.as_str()).ok_or_else(|| {
-            tracing::error!(
+            tracing::warn!(
                 "Failed to get session cookie: {:?} from cookies: {:#?}",
                 SESSION_COOKIE_NAME.as_str(),
                 cookies
