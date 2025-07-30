@@ -515,6 +515,7 @@ mod tests {
     }
 
     // Helper function to create a mock ParsedClientData for testing
+    // Note: This can be replaced with crate::common::create_test_parsed_client_data in integration tests
     fn create_parsed_client_data(challenge: &str, origin: &str, type_: &str) -> ParsedClientData {
         ParsedClientData {
             challenge: challenge.to_string(),

@@ -191,9 +191,9 @@ impl PasskeyTestSetup {
 }
 
 /// Result of passkey registration including optional key pair for authentication
-struct RegistrationResult {
-    user_handle: String,
-    key_pair_bytes: Option<Vec<u8>>,
+pub(super) struct RegistrationResult {
+    pub(super) user_handle: String,
+    pub(super) key_pair_bytes: Option<Vec<u8>>,
 }
 
 /// Stored credential information for authentication testing
@@ -250,7 +250,7 @@ impl CredentialSet {
 }
 
 /// Create mock credential for registration with specified format
-fn create_mock_credential(
+pub(super) fn create_mock_credential(
     email: &str,
     display_name: &str,
     challenge: &str,
@@ -295,7 +295,7 @@ fn create_mock_credential(
 }
 
 /// Helper function to register a user with specified attestation format
-async fn register_user_with_attestation(
+pub(super) async fn register_user_with_attestation(
     browser: &MockBrowser,
     test_user: &crate::common::fixtures::TestUser,
     format: &str,

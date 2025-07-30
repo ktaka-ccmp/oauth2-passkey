@@ -230,7 +230,7 @@ async fn complete_oauth2_callback(
 ///
 /// This simulates what a real browser would do: use the established session to generate
 /// a page session token from the session's CSRF token, just like the UserSummaryTemplate does.
-async fn get_page_session_token_for_oauth2_linking(
+pub(super) async fn get_page_session_token_for_oauth2_linking(
     browser: &MockBrowser,
 ) -> Result<String, Box<dyn std::error::Error>> {
     use oauth2_passkey::generate_page_session_token;
