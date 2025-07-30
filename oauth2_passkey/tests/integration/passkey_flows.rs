@@ -3,6 +3,8 @@ use serial_test::serial;
 
 // Constants for test configuration
 const FALLBACK_CREDENTIAL_ID: &str = "mock_credential_id_123";
+const DEFAULT_ATTESTATION_FORMAT: &str = "packed";
+const ADDITIONAL_CREDENTIAL_SUFFIX: &str = "#2";
 
 /// Test environment setup for passkey tests
 struct PasskeyTestSetup {
@@ -34,12 +36,217 @@ impl PasskeyTestSetup {
         self.server.shutdown().await;
         Ok(())
     }
+
+    /// Register multiple passkey credentials for testing
+    async fn register_multiple_credentials(
+        &self,
+        count: usize,
+    ) -> Result<CredentialSet, Box<dyn std::error::Error>> {
+        let mut credentials = CredentialSet::new();
+
+        if count == 0 {
+            return Ok(credentials);
+        }
+
+        // Register first credential
+        println!("Step: Registering primary passkey credential");
+        let first_result = register_user_with_attestation(
+            &self.browser,
+            &self.test_user,
+            DEFAULT_ATTESTATION_FORMAT,
+            self.base_url(),
+        )
+        .await?;
+
+        if let Some(key_pair) = first_result.key_pair_bytes {
+            credentials.add_credential(first_result.user_handle, key_pair);
+        }
+
+        // Verify user is logged in after first registration
+        assert!(
+            self.browser.has_active_session().await,
+            "User should be logged in after primary registration"
+        );
+        println!("✅ Primary credential registered successfully");
+
+        // Register additional credentials if requested
+        for i in 1..count {
+            println!("Step: Registering additional passkey credential #{}", i + 1);
+            let additional_result = register_additional_credential(
+                &self.browser,
+                &self.test_user,
+                DEFAULT_ATTESTATION_FORMAT,
+                credentials
+                    .first()
+                    .map(|c| c.user_handle.as_str())
+                    .unwrap_or(""),
+            )
+            .await?;
+
+            if let Some(key_pair) = additional_result.key_pair_bytes {
+                credentials.add_credential(additional_result.user_handle, key_pair);
+            }
+
+            // Verify still logged in after additional registration
+            assert!(
+                self.browser.has_active_session().await,
+                "User should still be logged in after additional registration #{}",
+                i + 1
+            );
+            println!(
+                "✅ Additional credential #{} registered successfully",
+                i + 1
+            );
+        }
+
+        Ok(credentials)
+    }
+
+    /// Test logout and re-authentication cycle with multiple credentials
+    async fn test_logout_and_reauth_cycle(
+        &self,
+        credentials: &CredentialSet,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Logout the user
+        println!("Step: Logging out user");
+        logout_and_verify(&self.browser).await?;
+
+        // Test authentication with each credential
+        for (index, credential) in credentials.credentials.iter().enumerate() {
+            println!(
+                "Step: Testing authentication with credential #{}",
+                index + 1
+            );
+            let browser_session = MockBrowser::new(self.base_url(), true);
+
+            let auth_success = AuthenticationFlow::new(
+                &browser_session,
+                &self.test_user,
+                &credential.user_handle,
+                &credential.key_pair,
+            )
+            .with_credential_index(credential.index)
+            .with_context(&format!("credential {} authentication", index + 1))
+            .execute_and_verify()
+            .await?;
+
+            if auth_success {
+                println!(
+                    "✅ Authentication with credential #{} successful",
+                    index + 1
+                );
+            } else {
+                println!(
+                    "⚠️  Authentication with credential #{} failed (expected with mock credentials)",
+                    index + 1
+                );
+            }
+
+            // Logout after each test to prepare for next credential
+            if index < credentials.len() - 1 {
+                logout_and_verify(&browser_session).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Verify available credentials match expected count
+    async fn verify_available_credentials(
+        &self,
+        expected_count: usize,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        println!("Step: Verifying available credentials");
+        let auth_options = self
+            .browser
+            .start_passkey_authentication(Some(&self.test_user.email))
+            .await?;
+
+        println!(
+            "Available credentials: {}",
+            serde_json::to_string_pretty(&auth_options)?
+        );
+
+        let available_creds = auth_options
+            .get("allowCredentials")
+            .and_then(|v| v.as_array())
+            .ok_or("No allowCredentials found")?;
+
+        // For integration tests, we verify that we have at least the expected count
+        // since other parallel tests might add additional credentials
+        assert!(
+            available_creds.len() >= expected_count,
+            "Expected at least {} credentials, found {}",
+            expected_count,
+            available_creds.len()
+        );
+
+        println!(
+            "✅ Verified at least {} credentials are available (found {})",
+            expected_count,
+            available_creds.len()
+        );
+        Ok(())
+    }
 }
 
 /// Result of passkey registration including optional key pair for authentication
 struct RegistrationResult {
     user_handle: String,
     key_pair_bytes: Option<Vec<u8>>,
+}
+
+/// Stored credential information for authentication testing
+#[derive(Debug, Clone)]
+struct StoredCredential {
+    user_handle: String,
+    key_pair: Vec<u8>,
+    index: usize,
+}
+
+/// Manages a collection of credentials for testing
+#[derive(Debug)]
+struct CredentialSet {
+    credentials: Vec<StoredCredential>,
+}
+
+impl CredentialSet {
+    /// Create a new empty credential set
+    fn new() -> Self {
+        Self {
+            credentials: Vec::new(),
+        }
+    }
+
+    /// Add a credential to the set
+    fn add_credential(&mut self, user_handle: String, key_pair: Vec<u8>) {
+        let index = self.credentials.len();
+        self.credentials.push(StoredCredential {
+            user_handle,
+            key_pair,
+            index,
+        });
+    }
+
+    /// Get credential by index
+    fn get_credential(&self, index: usize) -> Option<&StoredCredential> {
+        self.credentials.get(index)
+    }
+
+    /// Get the first credential
+    fn first(&self) -> Option<&StoredCredential> {
+        self.credentials.first()
+    }
+
+    /// Get the number of credentials
+    fn len(&self) -> usize {
+        self.credentials.len()
+    }
+
+    /// Check if the set is empty
+    fn is_empty(&self) -> bool {
+        self.credentials.is_empty()
+    }
 }
 
 /// Create mock credential for registration with specified format
@@ -270,7 +477,10 @@ async fn logout_and_verify(browser: &MockBrowser) -> Result<(), Box<dyn std::err
 }
 
 /// Extract credential ID from authentication options with fallback logic
-fn extract_credential_id(authentication_options: &serde_json::Value, credential_index: Option<usize>) -> &str {
+fn extract_credential_id(
+    authentication_options: &serde_json::Value,
+    credential_index: Option<usize>,
+) -> &str {
     if let Some(allowed_creds) = authentication_options["allowCredentials"].as_array() {
         let index = credential_index.unwrap_or(0);
         if let Some(cred) = allowed_creds.get(index) {
@@ -279,7 +489,10 @@ fn extract_credential_id(authentication_options: &serde_json::Value, credential_
                 return id;
             }
         } else if let Some(first_cred) = allowed_creds.first() {
-            println!("Credential index {} not found, using first credential", index);
+            println!(
+                "Credential index {} not found, using first credential",
+                index
+            );
             if let Some(id) = first_cred["id"].as_str() {
                 return id;
             }
@@ -288,24 +501,127 @@ fn extract_credential_id(authentication_options: &serde_json::Value, credential_
     FALLBACK_CREDENTIAL_ID
 }
 
-/// Helper function to authenticate user with stored credentials
+/// Builder for passkey authentication flows
+struct AuthenticationFlow<'a> {
+    browser: &'a MockBrowser,
+    test_user: &'a crate::common::fixtures::TestUser,
+    stored_user_handle: &'a str,
+    stored_key_pair: &'a [u8],
+    credential_index: Option<usize>,
+    context: Option<&'a str>,
+}
+
+impl<'a> AuthenticationFlow<'a> {
+    /// Create a new authentication flow
+    fn new(
+        browser: &'a MockBrowser,
+        test_user: &'a crate::common::fixtures::TestUser,
+        stored_user_handle: &'a str,
+        stored_key_pair: &'a [u8],
+    ) -> Self {
+        Self {
+            browser,
+            test_user,
+            stored_user_handle,
+            stored_key_pair,
+            credential_index: None,
+            context: None,
+        }
+    }
+
+    /// Specify which credential to use (by index)
+    fn with_credential_index(mut self, index: usize) -> Self {
+        self.credential_index = Some(index);
+        self
+    }
+
+    /// Add context for debugging/logging
+    fn with_context(mut self, context: &'a str) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    /// Execute the authentication flow
+    async fn execute(self) -> Result<bool, Box<dyn std::error::Error>> {
+        let context = self.context.unwrap_or("authentication");
+        println!("Starting authentication for user in {context}");
+
+        let authentication_options = self
+            .browser
+            .start_passkey_authentication(Some(&self.test_user.email))
+            .await?;
+
+        println!(
+            "Authentication options received: {}",
+            serde_json::to_string_pretty(&authentication_options)?
+        );
+
+        // Extract authentication parameters
+        let auth_challenge = authentication_options["challenge"]
+            .as_str()
+            .expect("Authentication options should contain challenge");
+        let auth_id = authentication_options["authId"]
+            .as_str()
+            .expect("Authentication options should contain authId");
+
+        // Extract the actual credential ID from allowCredentials
+        let credential_id = extract_credential_id(&authentication_options, self.credential_index);
+
+        println!("Using credential ID: {credential_id}");
+        println!("Using stored user_handle: {}", self.stored_user_handle);
+
+        // Create authentication response with valid signature
+        let mock_assertion =
+            MockWebAuthnCredentials::authentication_response_with_stored_credential(
+                credential_id,
+                auth_challenge,
+                auth_id,
+                self.stored_user_handle,
+                self.stored_key_pair,
+            );
+
+        let auth_response = self
+            .browser
+            .complete_passkey_authentication(&mock_assertion)
+            .await?;
+
+        let status = auth_response.status();
+        let response_body = auth_response.text().await?;
+
+        println!("Authentication response status: {status}");
+        println!("Authentication response body: {response_body}");
+
+        Ok(status.is_success())
+    }
+
+    /// Execute authentication and verify session if successful
+    async fn execute_and_verify(self) -> Result<bool, Box<dyn std::error::Error>> {
+        let context = self.context.unwrap_or("authentication");
+        let browser = self.browser;
+        let test_user = self.test_user;
+        let success = self.execute().await?;
+
+        if success {
+            verify_successful_authentication(browser, test_user, context).await?;
+        }
+
+        Ok(success)
+    }
+}
+
+/// Helper function to authenticate user with stored credentials (backward compatibility)
 async fn authenticate_user(
     browser: &MockBrowser,
     test_user: &crate::common::fixtures::TestUser,
     stored_user_handle: &str,
     stored_key_pair: &[u8],
 ) -> Result<bool, Box<dyn std::error::Error>> {
-    authenticate_user_with_credential(
-        browser,
-        test_user,
-        stored_user_handle,
-        stored_key_pair,
-        None,
-    )
-    .await
+    AuthenticationFlow::new(browser, test_user, stored_user_handle, stored_key_pair)
+        .execute()
+        .await
 }
 
-/// Helper function to authenticate user with specific credential
+/// Helper function to authenticate user with specific credential (backward compatibility)
 async fn authenticate_user_with_credential(
     browser: &MockBrowser,
     test_user: &crate::common::fixtures::TestUser,
@@ -313,51 +629,13 @@ async fn authenticate_user_with_credential(
     stored_key_pair: &[u8],
     credential_index: Option<usize>,
 ) -> Result<bool, Box<dyn std::error::Error>> {
-    println!("Starting authentication for user");
+    let mut flow = AuthenticationFlow::new(browser, test_user, stored_user_handle, stored_key_pair);
 
-    let authentication_options = browser
-        .start_passkey_authentication(Some(&test_user.email))
-        .await?;
+    if let Some(index) = credential_index {
+        flow = flow.with_credential_index(index);
+    }
 
-    println!(
-        "Authentication options received: {}",
-        serde_json::to_string_pretty(&authentication_options)?
-    );
-
-    // Extract authentication parameters
-    let auth_challenge = authentication_options["challenge"]
-        .as_str()
-        .expect("Authentication options should contain challenge");
-    let auth_id = authentication_options["authId"]
-        .as_str()
-        .expect("Authentication options should contain authId");
-
-    // Extract the actual credential ID from allowCredentials
-    let credential_id = extract_credential_id(&authentication_options, credential_index);
-
-    println!("Using credential ID: {credential_id}");
-    println!("Using stored user_handle: {stored_user_handle}");
-
-    // Create authentication response with valid signature
-    let mock_assertion = MockWebAuthnCredentials::authentication_response_with_stored_credential(
-        credential_id,
-        auth_challenge,
-        auth_id,
-        stored_user_handle,
-        stored_key_pair,
-    );
-
-    let auth_response = browser
-        .complete_passkey_authentication(&mock_assertion)
-        .await?;
-
-    let status = auth_response.status();
-    let response_body = auth_response.text().await?;
-
-    println!("Authentication response status: {status}");
-    println!("Authentication response body: {response_body}");
-
-    Ok(status.is_success())
+    flow.execute().await
 }
 
 /// Verify successful registration and session setup
@@ -463,10 +741,9 @@ fn handle_expected_failure(
             } else {
                 println!("❌ FAILURE: Unexpected error in {format} attestation");
                 println!("Error: {error_msg}");
-                return Err(format!(
-                    "{format} attestation failed unexpectedly: {error_msg}"
-                )
-                .into());
+                return Err(
+                    format!("{format} attestation failed unexpectedly: {error_msg}").into(),
+                );
             }
         }
         "packed" => {
@@ -477,10 +754,9 @@ fn handle_expected_failure(
             } else {
                 println!("❌ FAILURE: Unexpected error in {format} attestation");
                 println!("Error: {error_msg}");
-                return Err(format!(
-                    "{format} attestation failed unexpectedly: {error_msg}"
-                )
-                .into());
+                return Err(
+                    format!("{format} attestation failed unexpectedly: {error_msg}").into(),
+                );
             }
         }
         "tpm" => {
@@ -494,10 +770,9 @@ fn handle_expected_failure(
             } else {
                 println!("❌ FAILURE: Unexpected error in {format} attestation");
                 println!("Error: {error_msg}");
-                return Err(format!(
-                    "{format} attestation failed unexpectedly: {error_msg}"
-                )
-                .into());
+                return Err(
+                    format!("{format} attestation failed unexpectedly: {error_msg}").into(),
+                );
             }
         }
         _ => {
@@ -650,7 +925,12 @@ async fn test_passkey_register_then_authenticate() -> Result<(), Box<dyn std::er
 
     if auth_success {
         println!("✅ Passkey authentication SUCCESS: Full flow completed");
-        verify_successful_authentication(&browser_new_session, &setup.test_user, "register-then-authenticate test").await?;
+        verify_successful_authentication(
+            &browser_new_session,
+            &setup.test_user,
+            "register-then-authenticate test",
+        )
+        .await?;
     } else {
         println!("ⓘ Passkey authentication did not succeed (may be expected for mock data)");
     }
@@ -672,143 +952,14 @@ async fn test_register_two_credentials_and_authenticate() -> Result<(), Box<dyn 
 
     println!("🔐 Testing passkey multiple credential registration and authentication");
 
-    // Step 1: Register first credential with packed attestation
-    println!("Step 1: Registering first passkey credential");
-    let first_reg_result = register_user_with_attestation(
-        &setup.browser,
-        &setup.test_user,
-        "packed",
-        setup.base_url(),
-    )
-    .await?;
+    // Step 1: Register multiple credentials (2 credentials)
+    let credentials = setup.register_multiple_credentials(2).await?;
 
-    let first_user_handle = first_reg_result.user_handle;
-    let first_key_pair = first_reg_result
-        .key_pair_bytes
-        .expect("Packed attestation should return key pair");
+    // Step 2: Verify the expected number of credentials were registered
+    setup.verify_available_credentials(2).await?;
 
-    // Verify user is registered and logged in
-    assert!(
-        setup.browser.has_active_session().await,
-        "User should be logged in after first registration"
-    );
-
-    println!("✅ Step 1: First credential registered successfully");
-
-    // Step 2: Register second credential while logged in (add_to_user mode)
-    println!("Step 2: Registering second passkey credential while logged in");
-    let second_reg_result = register_additional_credential(
-        &setup.browser,
-        &setup.test_user,
-        "packed",
-        &first_user_handle,
-    )
-    .await?;
-
-    let second_user_handle = second_reg_result.user_handle;
-    let second_key_pair = second_reg_result
-        .key_pair_bytes
-        .expect("Packed attestation should return key pair");
-
-    // Verify still logged in after second registration
-    assert!(
-        setup.browser.has_active_session().await,
-        "User should still be logged in after second registration"
-    );
-
-    println!("✅ Step 2: Second credential registered successfully");
-
-    // Step 3: Debug - check what credentials are available while still logged in
-    println!("Step 3: Checking available credentials while still logged in");
-    let debug_auth_options = setup
-        .browser
-        .start_passkey_authentication(Some(&setup.test_user.email))
-        .await?;
-    println!(
-        "Debug - Available credentials while logged in: {}",
-        serde_json::to_string_pretty(&debug_auth_options)?
-    );
-
-    // Step 4: Logout the user
-    println!("Step 4: Logging out user");
-    logout_and_verify(&setup.browser).await?;
-
-    // Step 5: Authenticate with available credentials using new browser session
-    println!("Step 5: Getting available credentials for authentication");
-    let browser_new_session1 = MockBrowser::new(setup.base_url(), true);
-
-    // Get authentication options to see what credentials are available
-    let auth_options = browser_new_session1
-        .start_passkey_authentication(Some(&setup.test_user.email))
-        .await?;
-
-    println!(
-        "Available credentials for authentication: {}",
-        serde_json::to_string_pretty(&auth_options)?
-    );
-
-    // Extract the available credentials
-    let available_creds = auth_options
-        .get("allowCredentials")
-        .and_then(|v| v.as_array())
-        .ok_or("No allowCredentials found")?;
-
-    assert!(
-        !available_creds.is_empty(),
-        "Should have at least one credential available"
-    );
-
-    println!("Step 5: Attempting authentication with first available credential");
-    let auth_success_1 = authenticate_user(
-        &browser_new_session1,
-        &setup.test_user,
-        &first_user_handle,
-        &first_key_pair,
-    )
-    .await?;
-
-    if auth_success_1 {
-        println!("✅ Step 5: Authentication with first credential successful");
-        verify_successful_authentication(&browser_new_session1, &setup.test_user, "first credential authentication").await?;
-    } else {
-        println!(
-            "⚠️  Authentication failed at signature verification (expected with mock credentials)"
-        );
-        println!("✅ Step 5: Core authentication flow tested successfully");
-    }
-
-    // Step 6: Logout and authenticate with second credential
-    println!("\nStep 6: Logging out to test authentication with second credential");
-    logout_and_verify(&browser_new_session1).await?;
-
-    // Step 7: Create a new browser session and authenticate with second credential
-    println!("Step 7: Testing authentication with second credential");
-    let browser_new_session2 = MockBrowser::new(setup.base_url(), true);
-
-    let auth_success_2 = authenticate_user_with_credential(
-        &browser_new_session2,
-        &setup.test_user,
-        &second_user_handle,
-        &second_key_pair,
-        Some(1), // Use the second credential (index 1)
-    )
-    .await?;
-
-    if auth_success_2 {
-        println!("✅ Step 7: Authentication with second credential successful");
-        verify_successful_authentication(&browser_new_session2, &setup.test_user, "second credential authentication").await?;
-    } else {
-        println!(
-            "⚠️  Authentication with second credential failed at signature verification (expected with mock credentials)"
-        );
-        println!("✅ Step 7: Core authentication flow with second credential tested successfully");
-    }
-
-    // The core multiple credential registration flow has been tested successfully
-    println!("✅ Multiple credential registration flow verified");
-
-    // Note: Authentication signature verification fails with mock credentials, but this is expected
-    // The important functionality (registration, CSRF handling, logout, credential availability) works correctly
+    // Step 3: Test logout and re-authentication cycle with all credentials
+    setup.test_logout_and_reauth_cycle(&credentials).await?;
 
     println!("✅ Multiple credential registration and authentication flow completed successfully");
 
