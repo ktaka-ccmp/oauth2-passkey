@@ -4,6 +4,23 @@
 
 ### High Priority
 
+- **Add Authorization Context to Core Admin Functions**: Core library functions like `get_all_users()`, `delete_user_account()`, etc. lack authorization context checks, relying entirely on framework integration layers for security. This creates security risks if framework authorization is bypassed or incorrectly implemented.
+  - **Security Risk**: Admin functions accessible without proper authorization context in core library
+  - **Current Design**: Framework integration enforces authorization, but core functions are unprotected database accessors
+  - **Impact**: Defense-in-depth missing, potential unauthorized access if framework layer fails
+  - **Solution**: Add `SessionUser` context parameter to admin functions with built-in authorization checks
+  - **Implementation**: 
+    - Phase 1: Add context-aware versions (e.g., `get_all_users(auth_user: &SessionUser)`)
+    - Phase 2: Update framework integrations to use new functions
+    - Phase 3: Deprecate old functions with migration path
+    - Phase 4: Remove old functions in next major version
+  - **Functions to Update**: `get_all_users`, `delete_user_account`, `delete_user_account_admin`, `update_user_admin_status`, `get_user`, and other admin operations
+  - **Location**: `oauth2_passkey/src/coordination/admin.rs` and related coordination modules
+- **Fix Security Flaw: User Creation Before Challenge Validation**: In passkey registration flow, users are created in the database before challenge validation occurs in `create_user_then_finish_registration()`. This causes failed registrations to leave orphaned user records and creates security concerns where invalid registration attempts still create accounts.
+  - **Root Cause**: `UserStore::upsert_user()` called before `finish_registration()` challenge validation
+  - **Impact**: Status 400 responses but users still created, database inconsistency, resource waste
+  - **Solution**: Reorder operations to validate challenge first using pre-generated user ID, then create user only if validation succeeds
+  - **Location**: `oauth2_passkey/src/coordination/passkey.rs:148-168` in `create_user_then_finish_registration()`
 - **Simplify OAuth2 Account Linking API**: Current implementation requires understanding CSRF tokens, page session tokens, and coordinating multiple API calls (50+ lines of code). Need simpler, more intuitive API. See detailed analysis and proposed solutions in `docs/oauth2-account-linking-api-simplification.md`.
 - **Finalize Public API**: Review and document all public interfaces for 1.0 release
 
