@@ -133,3 +133,10 @@ Environment variables (see `dot.env.example`):
 3. Database migrations are handled automatically by the storage layer
 
 4. For debugging authentication issues, check the coordination layer logs first
+
+## Commit Message Guidelines
+
+1. **Use ASCII characters only** for better copy-paste compatibility:
+   - Use "->" instead of "→" in commit messages
+   - Avoid Unicode symbols that may cause issues in different terminals/systems
+   - This ensures commit messages can be easily copied and pasted across all environments
