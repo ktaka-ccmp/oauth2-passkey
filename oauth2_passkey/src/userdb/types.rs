@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use std::fmt;
 
 /// Represents a core user identity in the system
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, PartialEq)]
@@ -27,6 +28,15 @@ pub struct User {
 pub enum UserSearchField {
     Id(String),
     SequenceNumber(i64),
+}
+
+impl fmt::Display for UserSearchField {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UserSearchField::Id(id) => write!(f, "Id({})", id),
+            UserSearchField::SequenceNumber(seq) => write!(f, "SequenceNumber({})", seq),
+        }
+    }
 }
 
 impl User {

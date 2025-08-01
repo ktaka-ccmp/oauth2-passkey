@@ -47,7 +47,7 @@ impl UserStore {
         Self::get_user_by(UserSearchField::Id(id.to_string())).await
     }
 
-    // #[tracing::instrument(fields(user_id = %id))]
+    #[tracing::instrument(fields(user_field = %field))]
     pub(crate) async fn get_user_by(field: UserSearchField) -> Result<Option<User>, UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
@@ -610,14 +610,6 @@ mod tests {
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
-
-        // Get all existing users and delete them to ensure clean state
-        // let existing_users = UserStore::get_all_users()
-        //     .await
-        //     .expect("Failed to get users");
-        // for user in existing_users {
-        //     let _ = UserStore::delete_user(&user.id).await;
-        // }
 
         // Now create a first user - this should automatically get admin privileges via sequence_number = 1
         let first_user = create_test_user("first");

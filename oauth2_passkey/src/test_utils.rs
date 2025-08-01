@@ -39,9 +39,11 @@ pub async fn init_test_environment() {
             dotenvy::dotenv().ok();
         }
 
-        // Clean up any existing test database file
-        if let Err(_) = std::fs::remove_file("/tmp/test_oauth2_passkey.db") {
-            // File doesn't exist or can't be removed - that's okay
+        // Clean up any existing test database file based on GENERIC_DATA_STORE_URL
+        if let Some(db_path) = extract_sqlite_file_path() {
+            if let Err(_) = std::fs::remove_file(&db_path) {
+                // File doesn't exist or can't be removed - that's okay
+            }
         }
     });
 
@@ -110,10 +112,135 @@ async fn create_first_user_if_needed() {
     }
 }
 
+/// Extract SQLite database file path from a database URL string
+///
+/// Parses a database URL to extract the file path for SQLite databases.
+/// Supports formats like:
+/// - `sqlite:/path/to/file.db`
+/// - `sqlite:./relative/path.db`
+/// - `sqlite:/tmp/test.db`
+///
+/// Returns None for non-SQLite URLs or if the URL cannot be parsed.
+fn extract_sqlite_file_path_from_url(url: &str) -> Option<String> {
+    if url.starts_with("sqlite:") {
+        let path = url.strip_prefix("sqlite:")?;
+
+        // Handle different SQLite URL formats
+        if path.starts_with("file:") {
+            // Handle sqlite:file:path?options format
+            let file_path = path.strip_prefix("file:")?;
+            // Extract path before any query parameters
+            let path_only = file_path.split('?').next()?;
+            // Skip special in-memory databases
+            if path_only.contains(":memory:") {
+                return None;
+            }
+            Some(path_only.to_string())
+        } else {
+            // Handle sqlite:path format
+            let path = path.strip_prefix("//").unwrap_or(path);
+            // Skip special in-memory databases
+            if path.contains(":memory:") {
+                return None;
+            }
+            Some(path.to_string())
+        }
+    } else {
+        None
+    }
+}
+
+/// Extract SQLite database file path from GENERIC_DATA_STORE_URL environment variable
+///
+/// Parses the GENERIC_DATA_STORE_URL to extract the file path for SQLite databases.
+/// Supports formats like:
+/// - `sqlite:/path/to/file.db`
+/// - `sqlite:./relative/path.db`
+/// - `sqlite:/tmp/test.db`
+///
+/// Returns None for non-SQLite URLs or if the URL cannot be parsed.
+fn extract_sqlite_file_path() -> Option<String> {
+    if let Ok(url) = std::env::var("GENERIC_DATA_STORE_URL") {
+        extract_sqlite_file_path_from_url(&url)
+    } else {
+        None
+    }
+}
+
 /// Get the test origin from environment variables, with fallback to default test value
 ///
 /// This function retrieves the ORIGIN environment variable which should be set in .env_test
 /// for consistent test environment configuration. Falls back to localhost if not set.
 pub fn get_test_origin() -> String {
     std::env::var("ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_sqlite_file_path_from_url() {
+        // Test sqlite: with absolute path
+        assert_eq!(
+            extract_sqlite_file_path_from_url("sqlite:/tmp/test.db"),
+            Some("/tmp/test.db".to_string())
+        );
+
+        // Test sqlite: with relative path
+        assert_eq!(
+            extract_sqlite_file_path_from_url("sqlite:./test.db"),
+            Some("./test.db".to_string())
+        );
+
+        // Test sqlite:file: format
+        assert_eq!(
+            extract_sqlite_file_path_from_url("sqlite:file:/tmp/test.db"),
+            Some("/tmp/test.db".to_string())
+        );
+
+        // Test sqlite:file: with query parameters
+        assert_eq!(
+            extract_sqlite_file_path_from_url("sqlite:file:/tmp/test.db?mode=rwc&cache=shared"),
+            Some("/tmp/test.db".to_string())
+        );
+
+        // Test in-memory database with query parameter (should still extract path)
+        assert_eq!(
+            extract_sqlite_file_path_from_url("sqlite:file:test?mode=memory&cache=shared"),
+            Some("test".to_string())
+        );
+
+        // Test :memory: database (should return None)
+        assert_eq!(extract_sqlite_file_path_from_url("sqlite::memory:"), None);
+
+        // Test file:memory: database (should return None)
+        assert_eq!(
+            extract_sqlite_file_path_from_url(
+                "sqlite:file:test_integrated?mode=memory&cache=shared"
+            ),
+            Some("test_integrated".to_string())
+        );
+
+        // Test actual :memory: in path (should return None)
+        assert_eq!(
+            extract_sqlite_file_path_from_url("sqlite:file::memory:?cache=shared"),
+            None
+        );
+
+        // Test non-SQLite URL (should return None)
+        assert_eq!(
+            extract_sqlite_file_path_from_url("postgresql://localhost/test"),
+            None
+        );
+
+        // Test empty string (should return None)
+        assert_eq!(extract_sqlite_file_path_from_url(""), None);
+
+        // Test sqlite with double slash format
+        assert_eq!(
+            extract_sqlite_file_path_from_url("sqlite:///tmp/test.db"),
+            Some("/tmp/test.db".to_string())
+        );
+    }
 }
