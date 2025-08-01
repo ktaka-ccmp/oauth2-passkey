@@ -26,6 +26,25 @@ use crate::passkey::types::{
 
 use crate::utils::{base64url_decode, base64url_encode, gen_random_string};
 
+/// Validated registration data parsed from client data and attestation
+///
+/// This struct holds all the validated and parsed data from the registration process
+/// without any side effects or database operations. It contains everything needed
+/// to create a credential object later.
+#[derive(Debug, Clone)]
+pub(crate) struct ValidatedRegistrationData {
+    /// Extracted public key from the attestation object
+    pub public_key: String,
+    /// User handle from the registration data
+    pub user_handle: String,
+    /// Stored user information from challenge validation
+    pub stored_user: PublicKeyCredentialUserEntity,
+    /// Raw credential ID
+    pub credential_id: String,
+    /// Extracted AAGUID from attestation object
+    pub aaguid: String,
+}
+
 /// Resolves a user handle for passkey registration
 ///
 /// Behavior depends on the PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting:
@@ -204,39 +223,71 @@ pub(crate) async fn verify_session_then_finish_registration(
     Ok("Registration successful".to_string())
 }
 
-/// Finishes the registration process by storing the credential
+/// Finishes the registration process using the new 3-step architecture
 ///
-/// 1. Verifies the client data
-/// 2. Extracts the public key
-/// 3. Validates the options
-/// 4. Stores the credential
+/// 1. Validates the registration data (pure validation)
+/// 2. Prepares credential storage (cleanup existing credentials)
+/// 3. Commits the registration (store credential + cleanup challenge)
 ///
 pub(crate) async fn finish_registration(
     user_id: &str,
     reg_data: &RegisterCredential,
 ) -> Result<String, PasskeyError> {
-    tracing::debug!("finish_registration user: {:?}", reg_data);
+    // Step 1: Pure validation
+    let validated_data = validate_registration_challenge(reg_data).await?;
+    let user_handle = validated_data.user_handle.clone();
 
+    // Step 2: Prepare storage (cleanup existing credentials, create credential object)
+    let credential = prepare_registration_storage(user_id, validated_data).await?;
+
+    // Step 3: Atomic commit (store credential + cleanup challenge)
+    commit_registration(credential, &user_handle).await
+}
+
+/// Pure validation function that performs cryptographic and format validation
+///
+/// This function performs all the critical security validations without any side effects:
+/// - Verifies client data integrity and origin
+/// - Validates challenge against stored options in cache
+/// - Extracts and validates all data needed for credential creation
+///
+/// It does NOT:
+/// - Create or modify database records
+/// - Clean up existing credentials
+/// - Remove challenge options from cache
+pub(crate) async fn validate_registration_challenge(
+    reg_data: &RegisterCredential,
+) -> Result<ValidatedRegistrationData, PasskeyError> {
+    tracing::debug!("validate_registration_challenge: {:?}", reg_data);
+
+    // Validate client data (includes challenge verification)
     verify_client_data(reg_data).await?;
 
+    // Extract and validate public key
     let public_key = extract_credential_public_key(reg_data)?;
 
+    // Extract user handle
     let user_handle = reg_data
         .user_handle
         .as_deref()
         .ok_or(PasskeyError::ClientData(
             "User handle is missing".to_string(),
-        ))?;
+        ))?
+        .to_string();
 
-    let stored_options = get_and_validate_options("regi_challenge", user_handle).await?;
+    // Validate stored challenge options (this is the key security validation)
+    let stored_options = get_and_validate_options("regi_challenge", &user_handle).await?;
     let stored_user = stored_options.user.clone();
 
-    let credential_id_str = reg_data.raw_id.clone();
+    // Extract credential ID
+    let credential_id = reg_data.raw_id.clone();
 
+    // Parse and validate attestation object
     let attestation_obj = parse_attestation_object(&reg_data.response.attestation_object)?;
     let aaguid = extract_aaguid(&attestation_obj)?;
     tracing::trace!("AAGUID: {}", aaguid);
 
+    // Get authenticator information
     let authenticator_info = match get_authenticator_info(&aaguid).await? {
         Some(info) => info,
         None => {
@@ -251,10 +302,42 @@ pub(crate) async fn finish_registration(
 
     tracing::trace!("Authenticator info: {:#?}", authenticator_info);
 
+    // Return all validated data without side effects
+    Ok(ValidatedRegistrationData {
+        public_key,
+        user_handle,
+        stored_user,
+        credential_id,
+        aaguid,
+    })
+}
+
+/// Prepares credential storage by handling existing credential cleanup and creating new credential
+///
+/// This function handles the database operations needed to prepare for credential storage:
+/// - Cleans up existing credentials with matching user_handle, user_id, and aaguid
+/// - Creates a new PasskeyCredential object ready for storage
+///
+/// This requires user_id and may modify the database (credential cleanup).
+pub(crate) async fn prepare_registration_storage(
+    user_id: &str,
+    validated_data: ValidatedRegistrationData,
+) -> Result<PasskeyCredential, PasskeyError> {
+    tracing::debug!("prepare_registration_storage for user_id: {}", user_id);
+
+    let ValidatedRegistrationData {
+        public_key,
+        user_handle,
+        stored_user,
+        credential_id,
+        aaguid,
+    } = validated_data;
+
+    // Handle existing credential cleanup if configured
     if !*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL {
         // If PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL is true,
-        //there isn't any pre-existing credentials with this user handle to begin with.
-        // Therefore, we can skip the deletion step, I think.
+        // there isn't any pre-existing credentials with this user handle to begin with.
+        // Therefore, we can skip the deletion step.
 
         // Important todo: we delete credentials for a combination of "AAGUID" and user_handle
         // But we can't distinguish multiple authenticators of the same type,
@@ -306,8 +389,9 @@ pub(crate) async fn finish_registration(
         }
     }
 
+    // Create the credential object ready for storage
     let credential = PasskeyCredential {
-        credential_id: credential_id_str.clone(),
+        credential_id: credential_id.clone(),
         user_id: user_id.to_string(),
         public_key,
         counter: 0,
@@ -318,12 +402,38 @@ pub(crate) async fn finish_registration(
         last_used_at: Utc::now(),
     };
 
-    PasskeyStore::store_credential(credential_id_str, credential)
+    Ok(credential)
+}
+
+/// Commits the registration by storing the credential and cleaning up the challenge
+///
+/// This function performs the final atomic operations:
+/// - Stores the credential in the database
+/// - Removes the used challenge from cache
+///
+/// Both operations are performed together to ensure consistency. If credential storage
+/// succeeds but challenge cleanup fails, the registration is still considered successful.
+pub(crate) async fn commit_registration(
+    credential: PasskeyCredential,
+    user_handle: &str,
+) -> Result<String, PasskeyError> {
+    tracing::debug!("commit_registration for user_handle: {}", user_handle);
+
+    let credential_id = credential.credential_id.clone();
+
+    // Store the credential in the database
+    PasskeyStore::store_credential(credential_id, credential)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    // Remove used challenge
-    remove_options("regi_challenge", user_handle).await?;
+    // Clean up the used challenge (best effort - don't fail registration if this fails)
+    if let Err(e) = remove_options("regi_challenge", user_handle).await {
+        tracing::warn!(
+            "Failed to remove challenge options for user_handle {}: {}. Registration still successful.",
+            user_handle,
+            e
+        );
+    }
 
     Ok("Registration successful".to_string())
 }

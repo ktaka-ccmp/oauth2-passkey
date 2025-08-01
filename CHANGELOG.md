@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **CRITICAL FIX**: Fixed passkey registration vulnerability where users were created before challenge validation, preventing orphaned user records on validation failures
+
 ### Changed
 
 - **OIDC Discovery**: Automatic endpoint discovery from `/.well-known/openid-configuration`
 - **OAuth2 endpoint configuration**: Replaced hardcoded Google URLs with dynamic discovery
+- **Passkey Registration**: Refactored to validate challenges before user creation, eliminating double validation and optimizing cleanup timing
 
 ## [0.1.3] - 2025-07-12
 

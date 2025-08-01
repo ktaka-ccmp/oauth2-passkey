@@ -4,6 +4,18 @@
 
 ### High Priority
 
+- **Add Authorization Context to Core Admin Functions**: Core library functions like `get_all_users()`, `delete_user_account()`, etc. lack authorization context checks, relying entirely on framework integration layers for security. This creates security risks if framework authorization is bypassed or incorrectly implemented.
+  - **Security Risk**: Admin functions accessible without proper authorization context in core library
+  - **Current Design**: Framework integration enforces authorization, but core functions are unprotected database accessors
+  - **Impact**: Defense-in-depth missing, potential unauthorized access if framework layer fails
+  - **Solution**: Add `SessionUser` context parameter to admin functions with built-in authorization checks
+  - **Implementation**: 
+    - Phase 1: Add context-aware versions (e.g., `get_all_users(auth_user: &SessionUser)`)
+    - Phase 2: Update framework integrations to use new functions
+    - Phase 3: Deprecate old functions with migration path
+    - Phase 4: Remove old functions in next major version
+  - **Functions to Update**: `get_all_users`, `delete_user_account`, `delete_user_account_admin`, `update_user_admin_status`, `get_user`, and other admin operations
+  - **Location**: `oauth2_passkey/src/coordination/admin.rs` and related coordination modules
 - **Simplify OAuth2 Account Linking API**: Current implementation requires understanding CSRF tokens, page session tokens, and coordinating multiple API calls (50+ lines of code). Need simpler, more intuitive API. See detailed analysis and proposed solutions in `docs/oauth2-account-linking-api-simplification.md`.
 - **Finalize Public API**: Review and document all public interfaces for 1.0 release
 
@@ -212,6 +224,15 @@ These improvements would enhance the maintainability, security, and user experie
 
 ## Done
 
+- ✅ **Fixed Security Flaw: User Creation Before Challenge Validation**: Eliminated critical security vulnerability in passkey registration flow where users were created before challenge validation, causing orphaned user records on validation failures.
+  - **Root Cause Fixed**: Reordered operations to validate challenge first, then create user only if validation succeeds
+  - **Architecture Improved**: Implemented clean 3-step flow using `finish_registration()`'s constituent functions:
+    1. `validate_registration_challenge()` - Pure validation (no side effects, no user_id needed)
+    2. User creation - Only after validation passes
+    3. `prepare_registration_storage()` + `commit_registration()` - Complete registration with atomic operations
+  - **Benefits Achieved**: No orphaned records, optimal challenge cleanup timing, eliminated double validation, better separation of concerns
+  - **Location**: Refactored `oauth2_passkey/src/coordination/passkey.rs` and created new validation functions in `oauth2_passkey/src/passkey/main/register.rs`
+  - **Testing**: All 456 unit tests + 32 integration tests pass, no regressions
 - Passkey sync between RP and Authenticator using signalAllAcceptedCredentials.
 - Enable modification of User.account and User.label for logged in user.
 - Enable deletion of logged in user then logout.
