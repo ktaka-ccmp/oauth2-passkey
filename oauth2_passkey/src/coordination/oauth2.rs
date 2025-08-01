@@ -669,20 +669,21 @@ mod tests {
         // Setup test environment
         init_test_environment().await;
 
-        // Create test users and OAuth2 account
-        let user_id = "test_user_delete_owner";
-        let other_user_id = "test_user_delete_unauthorized";
+        // Create test users and OAuth2 account with unique IDs
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let user_id = format!("test_user_delete_owner_{timestamp}");
+        let other_user_id = format!("test_user_delete_unauthorized_{timestamp}");
         let provider = "google";
-        let provider_user_id = "google_user_delete_456";
+        let provider_user_id = format!("google_user_delete_456_{timestamp}");
 
-        create_test_user_in_db(user_id).await?;
-        create_test_user_in_db(other_user_id).await?;
+        create_test_user_in_db(&user_id).await?;
+        create_test_user_in_db(&other_user_id).await?;
         let unique_provider_user_id =
-            create_test_oauth2_account_in_db(user_id, provider, provider_user_id).await?;
+            create_test_oauth2_account_in_db(&user_id, provider, &provider_user_id).await?;
 
         // Try to delete the OAuth2 account as a different user
         let result =
-            delete_oauth2_account_core(other_user_id, provider, &unique_provider_user_id).await;
+            delete_oauth2_account_core(&other_user_id, provider, &unique_provider_user_id).await;
         assert!(
             matches!(result, Err(CoordinationError::Unauthorized)),
             "Expected Unauthorized error, got: {result:?}"

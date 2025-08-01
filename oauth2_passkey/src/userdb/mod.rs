@@ -16,6 +16,8 @@ pub(crate) use errors::UserError;
 pub(crate) use storage::DB_TABLE_USERS;
 pub(crate) use storage::UserStore;
 pub use types::User;
+#[cfg(test)]
+pub(crate) use types::UserSearchField;
 
 pub(crate) async fn init() -> Result<(), UserError> {
     UserStore::init().await

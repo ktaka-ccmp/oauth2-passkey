@@ -1,7 +1,10 @@
 use sqlx::{Pool, Postgres};
 
 use crate::storage::validate_postgres_table_schema;
-use crate::userdb::{errors::UserError, types::User};
+use crate::userdb::{
+    errors::UserError,
+    types::{User, UserSearchField},
+};
 
 use super::config::DB_TABLE_USERS;
 
@@ -61,21 +64,32 @@ pub(super) async fn get_all_users_postgres(pool: &Pool<Postgres>) -> Result<Vec<
     .map_err(|e| UserError::Storage(e.to_string()))
 }
 
-pub(super) async fn get_user_postgres(
+pub(super) async fn get_user_by_field_postgres(
     pool: &Pool<Postgres>,
-    id: &str,
+    field: &UserSearchField,
 ) -> Result<Option<User>, UserError> {
     let table_name = DB_TABLE_USERS.as_str();
 
-    sqlx::query_as::<_, User>(&format!(
-        r#"
-        SELECT * FROM {table_name} WHERE id = $1
-        "#
-    ))
-    .bind(id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| UserError::Storage(e.to_string()))
+    match field {
+        UserSearchField::Id(id) => sqlx::query_as::<_, User>(&format!(
+            r#"
+                SELECT * FROM {table_name} WHERE id = $1
+                "#
+        ))
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| UserError::Storage(e.to_string())),
+        UserSearchField::SequenceNumber(sequence_number) => sqlx::query_as::<_, User>(&format!(
+            r#"
+                SELECT * FROM {table_name} WHERE sequence_number = $1
+                "#
+        ))
+        .bind(sequence_number)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| UserError::Storage(e.to_string())),
+    }
 }
 
 pub(super) async fn upsert_user_postgres(

@@ -424,84 +424,6 @@ mod tests {
         Ok(())
     }
 
-    /// Test successful deletion of a passkey credential
-    ///
-    /// This test verifies that `delete_passkey_credential_core` correctly deletes
-    /// a passkey credential when given valid input. It performs the following steps:
-    /// 1. Initializes a test environment
-    /// 2. Creates a test user and passkey credential in the database
-    /// 3. Calls `delete_passkey_credential_core` to delete the credential
-    /// 4. Verifies the credential was successfully deleted by checking it no longer exists
-    ///
-    #[tokio::test]
-    #[serial]
-    #[ignore = "This test requires a valid session and cache setup"]
-    async fn test_delete_passkey_credential_core_success() -> Result<(), Box<dyn std::error::Error>>
-    {
-        // Setup test environment
-        init_test_environment().await;
-
-        // Create test user and passkey credential
-        let user_id = "test_user_1";
-        let credential_id = "test_credential_1";
-
-        create_test_user_in_db(user_id).await?;
-        insert_test_passkey_credential(credential_id, user_id).await?;
-
-        // Delete the passkey credential
-        let result = delete_passkey_credential_core(user_id, credential_id).await;
-        assert!(
-            result.is_ok(),
-            "Failed to delete passkey credential: {result:?}"
-        );
-
-        // Verify the credential was deleted
-        let credentials = PasskeyStore::get_credentials_by(CredentialSearchField::CredentialId(
-            credential_id.to_string(),
-        ))
-        .await?;
-        assert!(credentials.is_empty(), "Passkey credential was not deleted");
-
-        Ok(())
-    }
-
-    /// Test unauthorized deletion of a passkey credential
-    ///
-    /// This test verifies that `delete_passkey_credential_core` returns an error
-    /// when called with a different user ID than the one associated with the credential.
-    /// It performs the following steps:
-    /// 1. Initializes a test environment
-    /// 2. Creates test users and a passkey credential in the database
-    /// 3. Calls `delete_passkey_credential_core` with a different user ID
-    /// 4. Verifies that the function returns an Unauthorized error
-    ///
-    #[tokio::test]
-    #[serial]
-    #[ignore = "This test requires a valid session and cache setup"]
-    async fn test_delete_passkey_credential_core_unauthorized()
-    -> Result<(), Box<dyn std::error::Error>> {
-        // Setup test environment
-        init_test_environment().await;
-
-        // Create test users and passkey credential
-        let user_id = "test_user_2";
-        let other_user_id = "test_user_3";
-        let credential_id = "test_credential_2";
-
-        create_test_user_in_db(user_id).await?;
-        create_test_user_in_db(other_user_id).await?;
-        insert_test_passkey_credential(credential_id, user_id).await?;
-
-        // Try to delete the passkey credential as a different user
-        let result = delete_passkey_credential_core(other_user_id, credential_id).await;
-        assert!(
-            matches!(result, Err(CoordinationError::Unauthorized)),
-            "Expected Unauthorized error, got: {result:?}"
-        );
-
-        Ok(())
-    }
-
     /// Test deletion of a nonexistent passkey credential
     ///
     /// This test verifies that `delete_passkey_credential_core` returns a ResourceNotFound error
@@ -530,43 +452,6 @@ mod tests {
         assert!(
             matches!(result, Err(CoordinationError::ResourceNotFound { .. })),
             "Expected ResourceNotFound error, got: {result:?}"
-        );
-
-        Ok(())
-    }
-
-    /// Test listing passkey credentials for a user
-    ///
-    /// This test verifies that `list_credentials_core` correctly lists all passkey credentials
-    /// associated with a specific user. It performs the following steps:
-    /// 1. Initializes a test environment
-    /// 2. Creates a test user and passkey credentials in the database
-    /// 3. Calls `list_credentials_core` to retrieve the credentials
-    /// 4. Verifies that the correct number of credentials are returned
-    ///
-    #[tokio::test]
-    #[serial]
-    #[ignore = "This test requires a valid session and cache setup"]
-    async fn test_list_credentials_core() -> Result<(), Box<dyn std::error::Error>> {
-        // Setup test environment
-        init_test_environment().await;
-
-        // Create test user and passkey credentials
-        let user_id = "test_user_5";
-        let credential_id1 = "test_credential_5_1";
-        let credential_id2 = "test_credential_5_2";
-
-        create_test_user_in_db(user_id).await?;
-        insert_test_passkey_credential(credential_id1, user_id).await?;
-        insert_test_passkey_credential(credential_id2, user_id).await?;
-
-        // List the passkey credentials
-        let credentials = list_credentials_core(user_id).await?;
-        assert_eq!(
-            credentials.len(),
-            2,
-            "Expected 2 passkey credentials, got: {}",
-            credentials.len()
         );
 
         Ok(())

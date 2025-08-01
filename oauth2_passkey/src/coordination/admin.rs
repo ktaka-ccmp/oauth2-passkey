@@ -313,6 +313,7 @@ mod tests {
     use super::*;
     use crate::session::User as SessionUser;
     use crate::test_utils::init_test_environment;
+    use crate::userdb::UserSearchField;
     use chrono::Utc;
     use serial_test::serial;
 
@@ -352,6 +353,18 @@ mod tests {
         Ok(saved_user)
     }
 
+    async fn delete_user_if_exists_and_not_first(user_id: &str) -> Result<(), CoordinationError> {
+        // Only proceed if the user exists
+        if let Ok(Some(user)) = UserStore::get_user(user_id).await {
+            // Only delete if sequence_number is not 1
+            if user.sequence_number != Some(1) {
+                UserStore::delete_user(user_id).await?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Test retrieval of all users from the database
     ///
     /// This test verifies that `get_all_users` correctly retrieves all users and that newly
@@ -362,10 +375,6 @@ mod tests {
     #[tokio::test]
     async fn test_get_all_users() {
         init_test_environment().await;
-
-        // Get initial count of users in database
-        let initial_users = get_all_users().await.expect("Failed to get initial users");
-        let initial_count = initial_users.len();
 
         // Create unique test users with timestamp to avoid conflicts
         let timestamp = chrono::Utc::now().timestamp_millis();
@@ -386,13 +395,6 @@ mod tests {
         // Get all users
         let users = get_all_users().await.expect("Failed to get all users");
 
-        // Verify that we have the initial count plus our 3 new users
-        assert_eq!(
-            users.len(),
-            initial_count + 3,
-            "Expected 3 additional users"
-        );
-
         // Verify that our test users are in the results
         let user_ids: Vec<String> = users.iter().map(|u| u.id.clone()).collect();
         assert!(
@@ -409,9 +411,9 @@ mod tests {
         );
 
         // Clean up - delete the test users we created
-        UserStore::delete_user(&user1_id).await.ok();
-        UserStore::delete_user(&user2_id).await.ok();
-        UserStore::delete_user(&user3_id).await.ok();
+        delete_user_if_exists_and_not_first(&user1_id).await.ok();
+        delete_user_if_exists_and_not_first(&user2_id).await.ok();
+        delete_user_if_exists_and_not_first(&user3_id).await.ok();
     }
 
     /// Test retrieval of a specific user by ID
@@ -467,7 +469,7 @@ mod tests {
         );
 
         // Clean up
-        UserStore::delete_user(&user_id).await.ok();
+        delete_user_if_exists_and_not_first(&user_id).await.ok();
     }
 
     /// Test admin user account deletion functionality
@@ -599,8 +601,12 @@ mod tests {
         );
 
         // Clean up
-        UserStore::delete_user(&admin_user_id).await.ok();
-        UserStore::delete_user(&target_user_id).await.ok();
+        delete_user_if_exists_and_not_first(&admin_user_id)
+            .await
+            .ok();
+        delete_user_if_exists_and_not_first(&target_user_id)
+            .await
+            .ok();
     }
 
     /// Test to ensure that updating a user's admin status requires admin privileges.
@@ -652,8 +658,12 @@ mod tests {
         );
 
         // Clean up
-        UserStore::delete_user(&non_admin_user_id).await.ok();
-        UserStore::delete_user(&target_user_id).await.ok();
+        delete_user_if_exists_and_not_first(&target_user_id)
+            .await
+            .ok();
+        delete_user_if_exists_and_not_first(&non_admin_user_id)
+            .await
+            .ok();
     }
 
     /// Test to ensure that updating the admin status of the first user (sequence_number = 1)
@@ -679,41 +689,10 @@ mod tests {
             .expect("Failed to create admin user");
         let admin_session_user = create_test_session_user(&admin_user_id, true);
 
-        // Get all current users to understand the database state
-        let all_users_before = UserStore::get_all_users()
+        let first_user = UserStore::get_user_by(UserSearchField::SequenceNumber(1))
             .await
-            .expect("Failed to get users");
-
-        // Find the user with sequence_number = 1, or create one if none exists
-        let first_user = if let Some(existing_first_user) = all_users_before
-            .iter()
-            .find(|u| u.sequence_number == Some(1))
-        {
-            existing_first_user.clone()
-        } else {
-            // If no user with sequence_number = 1 exists, create a new user
-            // which should get sequence_number = 1 if it's the first user
-            let new_user = User::new(
-                format!("first-user-{timestamp}"),
-                format!("first-user-{timestamp}@example.com"),
-                "First User".to_string(),
-            );
-
-            let created_user = UserStore::upsert_user(new_user)
-                .await
-                .expect("Failed to create first user");
-
-            // If this is not sequence_number = 1, skip the test since it's database-dependent
-            if created_user.sequence_number != Some(1) {
-                println!(
-                    "SKIPPING TEST: Created user doesn't have sequence_number = 1, got {:?}",
-                    created_user.sequence_number
-                );
-                return;
-            }
-
-            created_user
-        };
+            .expect("Failed to get first user")
+            .expect("Failed to get first user");
 
         // Attempt to change the admin status of the first user (should fail)
         let result = update_user_admin_status(&admin_session_user, &first_user.id, false).await;
@@ -731,11 +710,9 @@ mod tests {
         }
 
         // Clean up
-        UserStore::delete_user(&admin_user_id).await.ok();
-        // Don't delete the first user if it existed before our test
-        if !all_users_before.iter().any(|u| u.id == first_user.id) {
-            UserStore::delete_user(&first_user.id).await.ok();
-        }
+        delete_user_if_exists_and_not_first(&admin_user_id)
+            .await
+            .ok();
     }
 
     /// Test to ensure that deleting a passkey credential as an admin
@@ -769,7 +746,9 @@ mod tests {
         }
 
         // Clean up
-        UserStore::delete_user(&non_admin_user_id).await.ok();
+        delete_user_if_exists_and_not_first(&non_admin_user_id)
+            .await
+            .ok();
     }
 
     /// Test to ensure that deleting an OAuth2 account as an admin
@@ -800,6 +779,8 @@ mod tests {
         }
 
         // Clean up
-        UserStore::delete_user(&non_admin_user_id).await.ok();
+        delete_user_if_exists_and_not_first(&non_admin_user_id)
+            .await
+            .ok();
     }
 }

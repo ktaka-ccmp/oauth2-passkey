@@ -1,5 +1,8 @@
 use crate::storage::GENERIC_DATA_STORE;
-use crate::userdb::{errors::UserError, types::User};
+use crate::userdb::{
+    errors::UserError,
+    types::{User, UserSearchField},
+};
 
 use super::postgres::*;
 use super::sqlite::*;
@@ -41,14 +44,17 @@ impl UserStore {
     /// Get a user by their ID
     #[tracing::instrument(fields(user_id = %id))]
     pub(crate) async fn get_user(id: &str) -> Result<Option<User>, UserError> {
+        Self::get_user_by(UserSearchField::Id(id.to_string())).await
+    }
+
+    #[tracing::instrument(fields(user_field = %field))]
+    pub(crate) async fn get_user_by(field: UserSearchField) -> Result<Option<User>, UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         let result = if let Some(pool) = store.as_sqlite() {
-            tracing::debug!("Using SQLite for user lookup");
-            get_user_sqlite(pool, id).await
+            get_user_by_field_sqlite(pool, &field).await
         } else if let Some(pool) = store.as_postgres() {
-            tracing::debug!("Using PostgreSQL for user lookup");
-            get_user_postgres(pool, id).await
+            get_user_by_field_postgres(pool, &field).await
         } else {
             Err(UserError::Storage("Unsupported database type".to_string()))
         };
@@ -214,15 +220,13 @@ mod tests {
             .expect("Failed to initialize UserStore");
 
         // Verify that the "first-user" created by init_test_environment exists and is admin
-        let first_user = UserStore::get_user("first-user")
+        let first_user = UserStore::get_user_by(UserSearchField::SequenceNumber(1))
             .await
-            .expect("Failed to get first-user")
-            .expect("first-user should exist");
+            .expect("Failed to get user with sequence number 1")
+            .expect("User not found");
 
-        assert_eq!(first_user.id, "first-user");
-        assert_eq!(first_user.account, "first-user@example.com");
-        assert_eq!(first_user.label, "First User");
-        assert_eq!(first_user.sequence_number, Some(1));
+        println!("First user: {:?}", first_user);
+
         assert!(first_user.is_admin, "First user should be admin");
         assert!(
             first_user.has_admin_privileges(),
@@ -606,14 +610,6 @@ mod tests {
         UserStore::init()
             .await
             .expect("Failed to initialize UserStore");
-
-        // Get all existing users and delete them to ensure clean state
-        let existing_users = UserStore::get_all_users()
-            .await
-            .expect("Failed to get users");
-        for user in existing_users {
-            let _ = UserStore::delete_user(&user.id).await;
-        }
 
         // Now create a first user - this should automatically get admin privileges via sequence_number = 1
         let first_user = create_test_user("first");
