@@ -6,9 +6,9 @@ use std::{env, sync::LazyLock};
 
 use crate::passkey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyCredential,
-    PasskeyStore, RegisterCredential, RegistrationOptions, finish_authentication,
-    finish_registration, start_authentication, start_registration,
-    validate_registration_challenge_only, verify_session_then_finish_registration,
+    PasskeyStore, RegisterCredential, RegistrationOptions, commit_registration,
+    finish_authentication, prepare_registration_storage, start_authentication, start_registration,
+    validate_registration_challenge, verify_session_then_finish_registration,
 };
 use crate::session::User as SessionUser;
 use crate::session::new_session_header;
@@ -148,18 +148,21 @@ pub async fn handle_finish_registration_core(
 async fn create_user_then_finish_registration(
     reg_data: RegisterCredential,
 ) -> Result<(String, String), CoordinationError> {
-    // Generate user ID first, but don't create user in database yet
-    let user_id = gen_new_user_id().await?;
+    // We avoid calling finish_registration() directly since it expects an existing user,
+    // forcing us to create users before validation (which leaves orphaned records on failure).
+    // Instead, we use finish_registration()'s 3 constituent functions: validate_registration_challenge(),
+    // prepare_registration_storage(), and commit_registration() with user creation in between.
 
-    // Validate challenge and registration data BEFORE creating user
+    // Step 1: Pure validation (no user_id needed, no side effects)
     // This prevents orphaned user records if validation fails
-    validate_registration_challenge_only(&reg_data).await?;
+    let validated_data = validate_registration_challenge(&reg_data).await?;
+    let user_handle = validated_data.user_handle.clone();
 
-    // Only create user after successful challenge validation
+    // Step 2: Create user after successful challenge validation
     let (account, label) = get_account_and_label_from_passkey(&reg_data).await;
 
     let new_user = User {
-        id: user_id.clone(),
+        id: gen_new_user_id().await?,
         account,
         label,
         is_admin: false,
@@ -170,8 +173,11 @@ async fn create_user_then_finish_registration(
 
     let stored_user = UserStore::upsert_user(new_user).await?;
 
-    // After user is created, complete the registration by storing the credential
-    let message = finish_registration(&stored_user.id, &reg_data).await?;
+    // Step 3: Prepare credential storage (cleanup existing credentials)
+    let credential = prepare_registration_storage(&stored_user.id, validated_data).await?;
+
+    // Step 4: Atomic commit (store credential + cleanup challenge)
+    let message = commit_registration(credential, &user_handle).await?;
 
     Ok((message, stored_user.id))
 }

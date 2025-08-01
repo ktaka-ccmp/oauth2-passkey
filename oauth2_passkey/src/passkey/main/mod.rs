@@ -20,8 +20,8 @@ pub use related_origin::get_related_origin_json;
 pub(crate) use auth::{finish_authentication, start_authentication};
 
 pub(crate) use register::{
-    finish_registration, start_registration, validate_registration_challenge_only,
-    verify_session_then_finish_registration,
+    commit_registration, prepare_registration_storage, start_registration,
+    validate_registration_challenge, verify_session_then_finish_registration,
 };
 
 pub(crate) use aaguid::store_aaguids;
