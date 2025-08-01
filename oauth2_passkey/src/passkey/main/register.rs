@@ -204,6 +204,38 @@ pub(crate) async fn verify_session_then_finish_registration(
     Ok("Registration successful".to_string())
 }
 
+/// Validates registration challenge without storing credentials
+///
+/// This function performs the critical security validations:
+/// - Verifies client data integrity and origin
+/// - Validates challenge against stored options in cache
+/// - Ensures user handle exists
+///
+/// It does NOT store credentials in the database, preventing orphaned records
+/// if user creation fails later in the process.
+pub(crate) async fn validate_registration_challenge_only(
+    reg_data: &RegisterCredential,
+) -> Result<(), PasskeyError> {
+    tracing::debug!("validate_registration_challenge_only: {:?}", reg_data);
+
+    // Validate client data (includes challenge verification)
+    verify_client_data(reg_data).await?;
+
+    // Extract user handle for challenge validation
+    let user_handle = reg_data
+        .user_handle
+        .as_deref()
+        .ok_or_else(|| PasskeyError::ClientData("User handle is missing".to_string()))?;
+
+    // Validate stored challenge options (this is the key security validation)
+    let _stored_options = get_and_validate_options("regi_challenge", user_handle).await?;
+
+    // Note: We don't remove the challenge here because finish_registration will do that
+    // after successfully storing the credential
+
+    Ok(())
+}
+
 /// Finishes the registration process by storing the credential
 ///
 /// 1. Verifies the client data

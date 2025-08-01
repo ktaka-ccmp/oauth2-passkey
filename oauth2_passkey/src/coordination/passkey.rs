@@ -8,7 +8,7 @@ use crate::passkey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyCredential,
     PasskeyStore, RegisterCredential, RegistrationOptions, finish_authentication,
     finish_registration, start_authentication, start_registration,
-    verify_session_then_finish_registration,
+    validate_registration_challenge_only, verify_session_then_finish_registration,
 };
 use crate::session::User as SessionUser;
 use crate::session::new_session_header;
@@ -148,10 +148,18 @@ pub async fn handle_finish_registration_core(
 async fn create_user_then_finish_registration(
     reg_data: RegisterCredential,
 ) -> Result<(String, String), CoordinationError> {
+    // Generate user ID first, but don't create user in database yet
+    let user_id = gen_new_user_id().await?;
+
+    // Validate challenge and registration data BEFORE creating user
+    // This prevents orphaned user records if validation fails
+    validate_registration_challenge_only(&reg_data).await?;
+
+    // Only create user after successful challenge validation
     let (account, label) = get_account_and_label_from_passkey(&reg_data).await;
 
     let new_user = User {
-        id: gen_new_user_id().await?,
+        id: user_id.clone(),
         account,
         label,
         is_admin: false,
@@ -160,8 +168,9 @@ async fn create_user_then_finish_registration(
         updated_at: Utc::now(),
     };
 
-    let stored_user = UserStore::upsert_user(new_user.clone()).await?;
+    let stored_user = UserStore::upsert_user(new_user).await?;
 
+    // After user is created, complete the registration by storing the credential
     let message = finish_registration(&stored_user.id, &reg_data).await?;
 
     Ok((message, stored_user.id))

@@ -35,7 +35,7 @@ pub use types::PasskeyCredential;
 
 pub(crate) use main::{
     finish_authentication, finish_registration, start_authentication, start_registration,
-    verify_session_then_finish_registration,
+    validate_registration_challenge_only, verify_session_then_finish_registration,
 };
 
 pub(crate) use storage::PasskeyStore;
