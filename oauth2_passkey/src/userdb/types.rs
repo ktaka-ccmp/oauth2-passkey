@@ -22,6 +22,13 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
 }
 
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum UserSearchField {
+    Id(String),
+    SequenceNumber(i64),
+}
+
 impl User {
     /// Create a new user
     pub fn new(id: String, account: String, label: String) -> Self {

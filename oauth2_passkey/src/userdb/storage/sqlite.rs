@@ -1,7 +1,10 @@
 use sqlx::{Pool, Sqlite};
 
 use crate::storage::validate_sqlite_table_schema;
-use crate::userdb::{errors::UserError, types::User};
+use crate::userdb::{
+    errors::UserError,
+    types::{User, UserSearchField},
+};
 
 use super::config::DB_TABLE_USERS;
 
@@ -64,24 +67,35 @@ pub(super) async fn get_all_users_sqlite(pool: &Pool<Sqlite>) -> Result<Vec<User
     .map_err(|e| UserError::Storage(e.to_string()))
 }
 
-pub(super) async fn get_user_sqlite(
+pub(super) async fn get_user_by_field_sqlite(
     pool: &Pool<Sqlite>,
-    id: &str,
+    field: &UserSearchField,
 ) -> Result<Option<User>, UserError> {
     // Ensure tables exist before any operations - this is critical for in-memory databases
     create_tables_sqlite(pool).await?;
 
     let table_name = DB_TABLE_USERS.as_str();
 
-    sqlx::query_as::<_, User>(&format!(
-        r#"
-        SELECT * FROM {table_name} WHERE id = ?
-        "#
-    ))
-    .bind(id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| UserError::Storage(e.to_string()))
+    match field {
+        UserSearchField::Id(id) => sqlx::query_as::<_, User>(&format!(
+            r#"
+                SELECT * FROM {table_name} WHERE id = ?
+                "#
+        ))
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| UserError::Storage(e.to_string())),
+        UserSearchField::SequenceNumber(sequence_number) => sqlx::query_as::<_, User>(&format!(
+            r#"
+                SELECT * FROM {table_name} WHERE sequence_number = ?
+                "#
+        ))
+        .bind(sequence_number)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| UserError::Storage(e.to_string())),
+    }
 }
 
 pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Result<User, UserError> {

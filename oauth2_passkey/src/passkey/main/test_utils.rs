@@ -100,6 +100,12 @@ pub async fn insert_test_credential(data: TestCredentialData) -> Result<(), Pass
 /// Insert a test user and then a test passkey credential
 /// This ensures the foreign key constraint is satisfied
 pub async fn insert_test_user_and_credential(data: TestCredentialData) -> Result<(), PasskeyError> {
+    // Ensure stores are initialized to prevent race conditions
+    UserStore::init()
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    PasskeyStore::init().await?;
+
     // First create the user
     insert_test_user(&data.user_id, &data.name, &data.display_name, false)
         .await

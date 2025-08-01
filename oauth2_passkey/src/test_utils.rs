@@ -38,6 +38,11 @@ pub async fn init_test_environment() {
         if dotenvy::from_filename(".env_test").is_err() {
             dotenvy::dotenv().ok();
         }
+
+        // Clean up any existing test database file
+        if let Err(_) = std::fs::remove_file("/tmp/test_oauth2_passkey.db") {
+            // File doesn't exist or can't be removed - that's okay
+        }
     });
 
     // Simple database initialization
@@ -66,10 +71,18 @@ async fn ensure_database_initialized() {
 }
 
 /// Creates a first test user if no users exist in the database
+/// Uses proper race-condition handling to ensure only one first user is created
 async fn create_first_user_if_needed() {
     use crate::userdb::{User, UserStore};
+    use std::sync::LazyLock;
+    use tokio::sync::Mutex;
 
-    // Check if any users exist
+    // Use a mutex to prevent race conditions when creating the first user
+    static FIRST_USER_CREATION_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+    let _guard = FIRST_USER_CREATION_MUTEX.lock().await;
+
+    // Double-check pattern: check again after acquiring the mutex
     match UserStore::get_all_users().await {
         Ok(users) if users.is_empty() => {
             // No users exist, create a first test user
@@ -81,10 +94,15 @@ async fn create_first_user_if_needed() {
 
             if let Err(e) = UserStore::upsert_user(first_user).await {
                 eprintln!("Warning: Failed to create first test user: {e}");
+            } else {
+                println!("✅ Created first test user with sequence_number = 1");
             }
         }
-        Ok(_) => {
-            // Users already exist, no need to create a first user
+        Ok(users) => {
+            // Users already exist, log the first user for debugging
+            if let Some(first) = users.iter().find(|u| u.sequence_number == Some(1)) {
+                println!("✅ First user already exists: {}", first.id);
+            }
         }
         Err(e) => {
             eprintln!("Warning: Failed to check existing users: {e}");
