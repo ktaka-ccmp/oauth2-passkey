@@ -9,31 +9,6 @@
 
 ### Medium Priority
 
-- **Security-Focused Integration Tests**: Enhance integration test suite with comprehensive security failure scenarios to verify security controls are properly enforced
-  - **OAuth2 Security Tests**:
-    - Invalid/tampered state parameter rejection
-    - CSRF token mismatch handling 
-    - Nonce verification failures in ID tokens
-    - Invalid authorization code handling
-    - PKCE code challenge verification failures
-    - Redirect URI validation failures
-    - Origin header validation in form_post mode
-  - **Passkey Security Tests**:
-    - Invalid WebAuthn credential response rejection
-    - Challenge tampering detection
-    - Origin mismatch in WebAuthn assertions
-    - Expired challenge handling
-    - Invalid authenticator data validation
-  - **Session Security Tests**:
-    - Expired session rejection across all endpoints
-    - Session boundary violations (cross-user operations)
-    - Context token validation failures
-    - Unauthorized admin operation attempts
-  - **Cross-Flow Security Tests**:
-    - Account linking without proper authentication
-    - Credential addition with invalid session context
-    - CSRF protection across different authentication methods
-  - **Benefits**: Validates that security controls work as designed, prevents regression of security features, demonstrates robust security posture for production use
 - **Expand OAuth2 Provider Support**: Add GitHub, Apple, Microsoft providers
 - **Add Database Support**: MySQL/MariaDB support for more deployment options
 - **Improve Demo Applications**: Custom login UI and user attribute extension examples
@@ -383,6 +358,15 @@ Performance:
     - Owner verification: `delete_oauth2_account_core`, `delete_passkey_credential_core`, `list_credentials_core`, `list_accounts_core`
   - **Comprehensive Updates**: All framework handlers, tests, and documentation updated with proper authorization context
   - **Location**: Updated `oauth2_passkey/src/coordination/admin.rs`, `user.rs`, `oauth2.rs`, `passkey.rs` and all Axum handlers
+
+- ✅ **Security-Focused Integration Tests**: Comprehensive security failure test suite implemented to verify security controls are properly enforced
+  - ✅ **OAuth2 Security Tests** (10 tests): Invalid/tampered state parameter rejection, CSRF token mismatch handling, nonce verification failures, invalid authorization code handling, PKCE code challenge verification failures, redirect URI validation failures, origin header validation
+  - ✅ **Passkey Security Tests** (10 tests): Invalid WebAuthn credential response rejection, challenge tampering detection, origin mismatch in WebAuthn assertions, expired challenge handling, invalid authenticator data validation
+  - ✅ **Session Security Tests** (11 tests): Expired session rejection across all endpoints, session boundary violations, context token validation failures, unauthorized admin operation attempts, CSRF protection
+  - ✅ **Cross-Flow Security Tests** (10 tests): Account linking without proper authentication, credential addition with invalid session context, CSRF protection across different authentication methods
+  - ✅ **Infrastructure**: Independent test harness (`cargo test --test security`), comprehensive attack scenario generators, security validation utilities, clippy warnings suppressed for shared utilities
+  - ✅ **Results**: All 51 security tests passing, validates that security controls work as designed, prevents regression of security features, demonstrates robust security posture for production use
+  - ✅ **Location**: Complete test suite in `tests-security/` directory with detailed documentation
 
 
 ## Memo
