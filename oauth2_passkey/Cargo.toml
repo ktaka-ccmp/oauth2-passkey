@@ -49,3 +49,7 @@ chrono = { workspace = true }
 tracing-subscriber = { workspace = true }
 regex = { workspace = true }
 oauth2-passkey-axum = { path = "../oauth2_passkey_axum" }
+
+[[test]]
+name = "security"
+path = "tests-security/lib.rs"
