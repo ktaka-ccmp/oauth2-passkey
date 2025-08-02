@@ -9,13 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **CRITICAL FIX**: Fixed passkey registration vulnerability where users were created before challenge validation, preventing orphaned user records on validation failures
+- **CRITICAL FIX**: Fixed passkey registration vulnerability where users were created before challenge validation
 
 ### Changed
 
 - **OIDC Discovery**: Automatic endpoint discovery from `/.well-known/openid-configuration`
-- **OAuth2 endpoint configuration**: Replaced hardcoded Google URLs with dynamic discovery
-- **Passkey Registration**: Refactored to validate challenges before user creation, eliminating double validation and optimizing cleanup timing
+- **Passkey Registration**: Refactored to validate challenges before user creation
+
+### BREAKING CHANGES
+
+- **Fixed Authorization Context in Core Admin Functions**: Enhanced admin functions with proper authorization context and layered security
+  - **Migration**: Update all function calls to include authenticated SessionUser as first parameter
+  - **Function signature changes**:
+    - `get_all_users(auth_user: &SessionUser)` - Admin-only access
+    - `get_user(auth_user: &SessionUser, user_id: &str)` - Admin or self-access
+    - `delete_user_account(auth_user: &SessionUser, user_id: &str)` - Admin or self-access
+    - `delete_user_account_admin(auth_user: &SessionUser, user_id: &str)` - Admin-only access
+    - `update_user_account(auth_user: &SessionUser, user_id: &str, ...)` - Admin or self-access
+    - `list_credentials_core(auth_user: &SessionUser, user_id: &str)` - Admin or self-access
+    - `delete_passkey_credential_core(auth_user: &SessionUser, user_id: &str, credential_id: &str)` - Layered security with ownership verification
+    - `list_accounts_core(auth_user: &SessionUser, user_id: &str)` - Admin or self-access
+    - `delete_oauth2_account_core(auth_user: &SessionUser, user_id: &str, provider: &str, provider_user_id: &str)` - Layered security with ownership verification
 
 ## [0.1.3] - 2025-07-12
 

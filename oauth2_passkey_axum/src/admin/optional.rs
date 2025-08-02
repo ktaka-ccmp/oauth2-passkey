@@ -14,8 +14,8 @@ use std::{
 };
 
 use oauth2_passkey::{
-    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, get_authenticator_info_batch, get_user,
-    list_accounts_core, list_credentials_core,
+    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionUser, get_authenticator_info_batch,
+    get_user, list_accounts_core, list_credentials_core,
 };
 
 use crate::{O2P_ADMIN_URL, session::AuthUser};
@@ -114,7 +114,8 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    let user = match get_user(&user_id).await {
+    let session_user = SessionUser::from(&auth_user);
+    let user = match get_user(&session_user, &user_id).await {
         Ok(user) => user,
         Err(e) => {
             tracing::error!("Failed to fetch user: {:?}", e);
@@ -135,12 +136,14 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
     };
 
     // Fetch passkey credentials using the public function from libauth
-    let stored_credentials = list_credentials_core(&user_id).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch credentials: {e:?}"),
-        )
-    })?;
+    let stored_credentials = list_credentials_core(&session_user, &user_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to fetch credentials: {e:?}"),
+            )
+        })?;
 
     let unique_aaguids: HashSet<String> = stored_credentials
         .iter()
@@ -182,12 +185,14 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
 
     // Fetch OAuth2 accounts using the public function from libauth
     // let oauth2_accounts = list_accounts_core(Some(session_user)).await.map_err(|e| {
-    let oauth2_accounts = list_accounts_core(&user_id).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch accounts: {e:?}"),
-        )
-    })?;
+    let oauth2_accounts = list_accounts_core(&session_user, &user_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to fetch accounts: {e:?}"),
+            )
+        })?;
 
     // Convert OAuth2Account to TemplateAccount
     let oauth2_accounts = oauth2_accounts

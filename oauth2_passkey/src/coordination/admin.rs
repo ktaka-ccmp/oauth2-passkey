@@ -9,25 +9,38 @@ use super::errors::CoordinationError;
 ///
 /// This admin-level function fetches all user accounts from the database.
 /// It provides a comprehensive view of all registered users and their details.
+/// Requires admin privileges for access.
+///
+/// # Arguments
+///
+/// * `auth_user` - The authenticated user performing the action (must have admin privileges)
 ///
 /// # Returns
 ///
 /// * `Ok(Vec<User>)` - A vector containing all user accounts
+/// * `Err(CoordinationError::Unauthorized)` - If the user doesn't have admin privileges
 /// * `Err(CoordinationError)` - If a database error occurs
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::get_all_users;
+/// use oauth2_passkey::{get_all_users, SessionUser};
 ///
-/// async fn list_all_users() -> Vec<String> {
-///     match get_all_users().await {
+/// async fn list_all_users(admin: &SessionUser) -> Vec<String> {
+///     match get_all_users(admin).await {
 ///         Ok(users) => users.iter().map(|user| user.account.clone()).collect(),
 ///         Err(_) => Vec::new()
 ///     }
 /// }
 /// ```
-pub async fn get_all_users() -> Result<Vec<User>, CoordinationError> {
+pub async fn get_all_users(auth_user: &SessionUser) -> Result<Vec<User>, CoordinationError> {
+    if !auth_user.is_admin {
+        tracing::debug!("User {} is not authorized to get all users", auth_user.id);
+        return Err(CoordinationError::Unauthorized.log());
+    }
+
+    tracing::debug!("Admin user {} is retrieving all users", auth_user.id);
+
     UserStore::get_all_users()
         .await
         .map_err(|e| CoordinationError::Database(e.to_string()))
@@ -36,32 +49,52 @@ pub async fn get_all_users() -> Result<Vec<User>, CoordinationError> {
 /// Retrieves a specific user by their ID.
 ///
 /// This function fetches a user's account information from the database using their
-/// unique identifier. It's used for user profile viewing, account management,
-/// and administrative tasks.
+/// unique identifier. Access is granted to admin users or users requesting their own data.
 ///
 /// # Arguments
 ///
+/// * `auth_user` - The authenticated user performing the action
 /// * `user_id` - The unique identifier of the user to retrieve
 ///
 /// # Returns
 ///
-/// * `Ok(Some(User))` - The user's account information if found
+/// * `Ok(Some(User))` - The user's account information if found and authorized
 /// * `Ok(None)` - If no user exists with the provided ID
+/// * `Err(CoordinationError::Unauthorized)` - If the user lacks proper authorization
 /// * `Err(CoordinationError)` - If a database error occurs
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::get_user;
+/// use oauth2_passkey::{get_user, SessionUser};
 ///
-/// async fn fetch_user_profile(id: &str) -> Option<String> {
-///     match get_user(id).await {
+/// async fn fetch_user_profile(auth_user: &SessionUser, id: &str) -> Option<String> {
+///     match get_user(auth_user, id).await {
 ///         Ok(Some(user)) => Some(user.account),
 ///         _ => None
 ///     }
 /// }
 /// ```
-pub async fn get_user(user_id: &str) -> Result<Option<User>, CoordinationError> {
+pub async fn get_user(
+    auth_user: &SessionUser,
+    user_id: &str,
+) -> Result<Option<User>, CoordinationError> {
+    // Allow access if user is admin or requesting their own data
+    if !auth_user.is_admin && auth_user.id != user_id {
+        tracing::debug!(
+            "User {} is not authorized to get user {}",
+            auth_user.id,
+            user_id
+        );
+        return Err(CoordinationError::Unauthorized.log());
+    }
+
+    tracing::debug!(
+        "User {} is retrieving user data for {}",
+        auth_user.id,
+        user_id
+    );
+
     UserStore::get_user(user_id)
         .await
         .map_err(|e| CoordinationError::Database(e.to_string()))
@@ -196,28 +229,47 @@ pub async fn delete_oauth2_account_admin(
 ///
 /// This administrative function permanently removes a user account and all associated
 /// data (including OAuth2 accounts and passkey credentials). This is a destructive
-/// operation that cannot be undone.
+/// operation that cannot be undone. Requires admin privileges.
 ///
 /// # Arguments
 ///
+/// * `auth_user` - The administrator user performing the action (must have admin privileges)
 /// * `user_id` - The unique identifier of the user account to delete
 ///
 /// # Returns
 ///
 /// * `Ok(())` - If the user account was successfully deleted
+/// * `Err(CoordinationError::Unauthorized)` - If the user doesn't have admin privileges
 /// * `Err(CoordinationError::ResourceNotFound)` - If the user doesn't exist
 /// * `Err(CoordinationError)` - If another error occurs during deletion
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::delete_user_account_admin;
+/// use oauth2_passkey::{delete_user_account_admin, SessionUser};
 ///
-/// async fn purge_account(user_id: &str) -> Result<(), String> {
-///     delete_user_account_admin(user_id).await.map_err(|e| e.to_string())
+/// async fn purge_account(admin: &SessionUser, user_id: &str) -> Result<(), String> {
+///     delete_user_account_admin(admin, user_id).await.map_err(|e| e.to_string())
 /// }
 /// ```
-pub async fn delete_user_account_admin(user_id: &str) -> Result<(), CoordinationError> {
+pub async fn delete_user_account_admin(
+    auth_user: &SessionUser,
+    user_id: &str,
+) -> Result<(), CoordinationError> {
+    if !auth_user.is_admin {
+        tracing::debug!(
+            "User {} is not authorized to delete user accounts",
+            auth_user.id
+        );
+        return Err(CoordinationError::Unauthorized.log());
+    }
+
+    tracing::debug!(
+        "Admin user {} is deleting user account {}",
+        auth_user.id,
+        user_id
+    );
+
     // Check if the user exists
     let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
         CoordinationError::ResourceNotFound {
@@ -393,7 +445,10 @@ mod tests {
             .expect("Failed to create test user 3");
 
         // Get all users
-        let users = get_all_users().await.expect("Failed to get all users");
+        let admin_session = create_test_session_user("admin", true);
+        let users = get_all_users(&admin_session)
+            .await
+            .expect("Failed to get all users");
 
         // Verify that our test users are in the results
         let user_ids: Vec<String> = users.iter().map(|u| u.id.clone()).collect();
@@ -436,7 +491,10 @@ mod tests {
             .expect("Failed to create test user");
 
         // Get the user
-        let user_option = get_user(&user_id).await.expect("Failed to get user");
+        let admin_session = create_test_session_user("admin", true);
+        let user_option = get_user(&admin_session, &user_id)
+            .await
+            .expect("Failed to get user");
 
         // Verify that the user is returned
         assert!(user_option.is_some(), "User should be found");
@@ -458,7 +516,7 @@ mod tests {
 
         // Try to get a non-existent user
         let non_existent_user_id = format!("non-existent-user-{timestamp}");
-        let non_existent_user_option = get_user(&non_existent_user_id)
+        let non_existent_user_option = get_user(&admin_session, &non_existent_user_id)
             .await
             .expect("Failed to get non-existent user");
 
@@ -491,22 +549,25 @@ mod tests {
             .expect("Failed to create test user");
 
         // Verify the user exists before deletion
-        let user_before = get_user(&user_id).await.expect("Failed to get user");
+        let admin_session = create_test_session_user("admin", true);
+        let user_before = get_user(&admin_session, &user_id)
+            .await
+            .expect("Failed to get user");
         assert!(user_before.is_some(), "User should exist before deletion");
 
         // Delete the user
-        let result = delete_user_account_admin(&user_id).await;
+        let result = delete_user_account_admin(&admin_session, &user_id).await;
         assert!(result.is_ok(), "Expected successful user deletion");
 
         // Verify the user no longer exists
-        let user_after = get_user(&user_id)
+        let user_after = get_user(&admin_session, &user_id)
             .await
             .expect("Failed to get user after deletion");
         assert!(user_after.is_none(), "User should not exist after deletion");
 
         // Try to delete a non-existent user
         let non_existent_user_id = format!("non-existent-user-{timestamp}");
-        let result = delete_user_account_admin(&non_existent_user_id).await;
+        let result = delete_user_account_admin(&admin_session, &non_existent_user_id).await;
 
         // This should return a ResourceNotFound error
         assert!(
@@ -559,7 +620,7 @@ mod tests {
             .expect("Failed to create target user");
 
         // Verify the target user is not an admin initially
-        let user_before = get_user(&target_user_id)
+        let user_before = get_user(&admin_session_user, &target_user_id)
             .await
             .expect("Failed to get target user")
             .expect("Target user should exist");
@@ -580,7 +641,7 @@ mod tests {
         );
 
         // Verify the change was persisted in the database
-        let user_after = get_user(&target_user_id)
+        let user_after = get_user(&admin_session_user, &target_user_id)
             .await
             .expect("Failed to get target user after update")
             .expect("Target user should still exist");
@@ -647,8 +708,9 @@ mod tests {
             _ => panic!("Expected Unauthorized error, got {result:?}"),
         }
 
-        // Verify the target user's admin status was not changed
-        let user_after = get_user(&target_user_id)
+        // Verify the target user's admin status was not changed (need admin to check)
+        let admin_check_user = create_test_session_user("admin-check", true);
+        let user_after = get_user(&admin_check_user, &target_user_id)
             .await
             .expect("Failed to get target user after failed update")
             .expect("Target user should still exist");

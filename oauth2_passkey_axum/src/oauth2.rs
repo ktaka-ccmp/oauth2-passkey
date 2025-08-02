@@ -11,8 +11,8 @@ use axum_extra::{TypedHeader, headers};
 use std::collections::HashMap;
 
 use oauth2_passkey::{
-    AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, delete_oauth2_account_core, get_authorized_core,
-    list_accounts_core, post_authorized_core, prepare_oauth2_auth_request,
+    AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, SessionUser, delete_oauth2_account_core,
+    get_authorized_core, list_accounts_core, post_authorized_core, prepare_oauth2_auth_request,
     verify_page_session_token,
 };
 
@@ -143,12 +143,11 @@ async fn post_authorized(
 async fn list_oauth2_accounts(
     auth_user: AuthUser,
 ) -> Result<Json<Vec<OAuth2Account>>, (StatusCode, String)> {
-    // Convert AuthUser to SessionUser if present using deref coercion
-    // let session_user = auth_user.as_ref().map(|u| u as &SessionUser);
+    // Convert AuthUser to SessionUser for the core function
+    let session_user = SessionUser::from(&auth_user);
 
-    // Call the core function with the extracted data
-    // let accounts = list_accounts_core(session_user)
-    let accounts = list_accounts_core(&auth_user.id)
+    // Call the core function with proper authorization
+    let accounts = list_accounts_core(&session_user, &auth_user.id)
         .await
         .into_response_error()?;
     Ok(Json(accounts))
@@ -162,7 +161,10 @@ async fn delete_oauth2_account(
     auth_user: AuthUser,
     Path((provider, provider_user_id)): Path<(String, String)>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    delete_oauth2_account_core(&auth_user.id, &provider, &provider_user_id)
+    // Convert AuthUser to SessionUser for the core function
+    let session_user = SessionUser::from(&auth_user);
+
+    delete_oauth2_account_core(&session_user, &auth_user.id, &provider, &provider_user_id)
         .await
         .map(|()| StatusCode::NO_CONTENT)
         .into_response_error()

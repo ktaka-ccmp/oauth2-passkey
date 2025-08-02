@@ -3,7 +3,22 @@ use crate::common::{
     constants::oauth2::*,
     validation_utils::{AuthValidationResult, validate_oauth2_success},
 };
+use chrono::Utc;
+use oauth2_passkey::SessionUser;
 use serial_test::serial;
+
+// Helper function to create an admin session user for tests
+fn create_admin_session_user() -> SessionUser {
+    SessionUser {
+        id: "admin-test-user".to_string(),
+        account: "admin@test.com".to_string(),
+        label: "Test Admin".to_string(),
+        is_admin: true,
+        sequence_number: 1,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    }
+}
 
 /// Test environment setup for OAuth2 tests
 struct OAuth2TestSetup {
@@ -265,7 +280,8 @@ async fn verify_oauth2_accounts_linked(
         .ok_or("User ID not found in user info")?;
 
     // Call the same core function used by the summary page to get OAuth2 accounts
-    let oauth2_accounts = list_accounts_core(user_id)
+    let admin_user = create_admin_session_user();
+    let oauth2_accounts = list_accounts_core(&admin_user, user_id)
         .await
         .map_err(|e| format!("Failed to retrieve OAuth2 accounts: {:?}", e))?;
 

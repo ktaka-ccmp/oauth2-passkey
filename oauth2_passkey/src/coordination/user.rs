@@ -1,15 +1,48 @@
 use crate::oauth2::{AccountSearchField, OAuth2Store};
 use crate::passkey::{CredentialSearchField, PasskeyStore};
+use crate::session::User as SessionUser;
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
 
-/// Update a user's account and label
+/// Update a user's account and label.
+///
+/// Allows users to update their own account or admins to update any account.
+///
+/// # Arguments
+///
+/// * `auth_user` - The authenticated user performing the action
+/// * `user_id` - The ID of the user account to update
+/// * `account` - Optional new account identifier
+/// * `label` - Optional new display label
+///
+/// # Returns
+///
+/// * `Ok(User)` - The updated user account
+/// * `Err(CoordinationError::Unauthorized)` - If user lacks proper authorization
+/// * `Err(CoordinationError)` - If another error occurs
 pub async fn update_user_account(
+    auth_user: &SessionUser,
     user_id: &str,
     account: Option<String>,
     label: Option<String>,
 ) -> Result<User, CoordinationError> {
+    // Allow access if user is admin or updating their own account
+    if !auth_user.is_admin && auth_user.id != user_id {
+        tracing::debug!(
+            "User {} is not authorized to update user {}",
+            auth_user.id,
+            user_id
+        );
+        return Err(CoordinationError::Unauthorized.log());
+    }
+
+    tracing::debug!(
+        "User {} is updating account for user {}",
+        auth_user.id,
+        user_id
+    );
+
     // Get the current user
     let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
         CoordinationError::ResourceNotFound {
@@ -32,10 +65,41 @@ pub async fn update_user_account(
     Ok(user)
 }
 
-/// Delete a user account and all associated OAuth2 accounts and Passkey credentials
+/// Delete a user account and all associated OAuth2 accounts and Passkey credentials.
 ///
-/// Returns a list of deleted passkey credential IDs for client-side notification
-pub async fn delete_user_account(user_id: &str) -> Result<Vec<String>, CoordinationError> {
+/// Allows users to delete their own account or admins to delete any account.
+/// Returns a list of deleted passkey credential IDs for client-side notification.
+///
+/// # Arguments
+///
+/// * `auth_user` - The authenticated user performing the action
+/// * `user_id` - The ID of the user account to delete
+///
+/// # Returns
+///
+/// * `Ok(Vec<String>)` - List of deleted passkey credential IDs
+/// * `Err(CoordinationError::Unauthorized)` - If user lacks proper authorization
+/// * `Err(CoordinationError)` - If another error occurs
+pub async fn delete_user_account(
+    auth_user: &SessionUser,
+    user_id: &str,
+) -> Result<Vec<String>, CoordinationError> {
+    // Allow access if user is admin or deleting their own account
+    if !auth_user.is_admin && auth_user.id != user_id {
+        tracing::debug!(
+            "User {} is not authorized to delete user {}",
+            auth_user.id,
+            user_id
+        );
+        return Err(CoordinationError::Unauthorized.log());
+    }
+
+    tracing::debug!(
+        "User {} is deleting account for user {}",
+        auth_user.id,
+        user_id
+    );
+
     // Check if the user exists
     let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
         CoordinationError::ResourceNotFound {
@@ -103,7 +167,22 @@ mod tests {
 
     use crate::oauth2::OAuth2Store;
     use crate::passkey::{PasskeyCredential, PasskeyStore};
+    use crate::session::User as SessionUser;
     use crate::userdb::{User, UserStore};
+    use chrono::Utc;
+
+    // Helper function to create a test session user
+    fn create_test_session_user(id: &str, is_admin: bool) -> SessionUser {
+        SessionUser {
+            id: id.to_string(),
+            account: format!("{id}@example.com"),
+            label: format!("Test User {id}"),
+            is_admin,
+            sequence_number: 1,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
 
     // Helper function to create a test user
     fn create_test_user(id: &str, account: &str, label: &str) -> User {
@@ -182,7 +261,9 @@ mod tests {
             .expect("Failed to insert initial user");
 
         // 2. Call the actual function from the parent module
+        let session_user = create_test_session_user("test-user", false);
         let result = super::update_user_account(
+            &session_user,
             "test-user",
             Some("new-account".to_string()),
             Some("New Label".to_string()),
@@ -220,7 +301,9 @@ mod tests {
         init_test_environment().await;
 
         // Call the actual function with a non-existent user
+        let session_user = create_test_session_user("admin-user", true);
         let result = super::update_user_account(
+            &session_user,
             "nonexistent-user",
             Some("new-account".to_string()),
             Some("New Label".to_string()),
@@ -311,7 +394,8 @@ mod tests {
             .expect("Failed to upsert oauth_acc2");
 
         // 4. Call the actual function
-        let result = super::delete_user_account(&user_id_to_delete).await;
+        let session_user = create_test_session_user(&user_id_to_delete, false);
+        let result = super::delete_user_account(&session_user, &user_id_to_delete).await;
 
         // 5. Verify returned credential IDs
         assert!(
@@ -368,7 +452,8 @@ mod tests {
     async fn test_delete_user_account_not_found() {
         init_test_environment().await;
 
-        let result = super::delete_user_account("nonexistent-user").await;
+        let session_user = create_test_session_user("admin-user", true);
+        let result = super::delete_user_account(&session_user, "nonexistent-user").await;
 
         assert!(result.is_err());
         match result {

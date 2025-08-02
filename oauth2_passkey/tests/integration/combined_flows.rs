@@ -3,12 +3,27 @@ use crate::common::{
     session_utils::{logout_and_verify, verify_successful_authentication},
     validation_utils::AuthValidationResult,
 };
+use chrono::Utc;
+use oauth2_passkey::SessionUser;
 use serial_test::serial;
 
 // Import OAuth2 helper functions from oauth2_flows.rs
 use super::oauth2_flows::{complete_full_oauth2_flow, get_page_session_token_for_oauth2_linking};
 // Import passkey helper functions from passkey_flows.rs
 use super::passkey_flows::register_user_with_attestation;
+
+// Helper function to create an admin session user for tests
+fn create_admin_session_user() -> SessionUser {
+    SessionUser {
+        id: "admin-test-user".to_string(),
+        account: "admin@test.com".to_string(),
+        label: "Test Admin".to_string(),
+        is_admin: true,
+        sequence_number: 1,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    }
+}
 
 /// Test get_all_users coordination function with actual user data
 /// This replaces the flaky unit test test_get_all_users from coordination/admin.rs
@@ -19,7 +34,8 @@ async fn test_get_all_users_integration() -> Result<(), Box<dyn std::error::Erro
     oauth2_passkey::init().await?;
 
     // Get initial user count - there may be existing users from other tests
-    let initial_users = oauth2_passkey::get_all_users().await?;
+    let admin_user = create_admin_session_user();
+    let initial_users = oauth2_passkey::get_all_users(&admin_user).await?;
     let initial_count = initial_users.len();
 
     println!("Initial users: {:?}", initial_users);
@@ -29,7 +45,7 @@ async fn test_get_all_users_integration() -> Result<(), Box<dyn std::error::Erro
     let browser = MockBrowser::new(&server.base_url, true);
     let test_user = TestUsers::passkey_user();
 
-    let all_users = oauth2_passkey::get_all_users().await?;
+    let all_users = oauth2_passkey::get_all_users(&admin_user).await?;
     println!("All users: {:?}", all_users);
 
     // Register a user which will create an actual user record
@@ -52,13 +68,13 @@ async fn test_get_all_users_integration() -> Result<(), Box<dyn std::error::Erro
     let reg_finish_response = browser.complete_passkey_registration(&reg_response).await?;
 
     println!("Registration response: {:?}", reg_finish_response);
-    let all_users = oauth2_passkey::get_all_users().await?;
+    let all_users = oauth2_passkey::get_all_users(&admin_user).await?;
     println!("All users: {:?}", all_users);
 
     // Only proceed if registration was successful
     if reg_finish_response.status().is_success() {
         // Now test get_all_users
-        let all_users = oauth2_passkey::get_all_users().await?;
+        let all_users = oauth2_passkey::get_all_users(&admin_user).await?;
 
         // Verify we have at least one more user than initially
         assert!(
@@ -99,7 +115,7 @@ async fn test_get_all_users_integration() -> Result<(), Box<dyn std::error::Erro
         );
     } else {
         println!("⚠️ User registration failed, testing get_all_users with existing data only");
-        let _all_users = oauth2_passkey::get_all_users().await?;
+        let _all_users = oauth2_passkey::get_all_users(&admin_user).await?;
 
         println!("All users: {:?}", _all_users);
         // get_all_users should return a valid list (len() is always >= 0)
@@ -146,7 +162,9 @@ async fn test_list_credentials_core_integration() -> Result<(), Box<dyn std::err
         if let Some(info) = user_info {
             if let Some(user_id) = info.get("id").and_then(|v| v.as_str()) {
                 // Test list_credentials_core with the actual user
-                let credentials = oauth2_passkey::list_credentials_core(user_id).await?;
+                let admin_user = create_admin_session_user();
+                let credentials =
+                    oauth2_passkey::list_credentials_core(&admin_user, user_id).await?;
 
                 // We should have at least 1 credential
                 assert!(
@@ -178,7 +196,9 @@ async fn test_list_credentials_core_integration() -> Result<(), Box<dyn std::err
     }
 
     // Test with non-existent user (should return empty list)
-    let empty_credentials = oauth2_passkey::list_credentials_core("nonexistent_user").await?;
+    let admin_user = create_admin_session_user();
+    let empty_credentials =
+        oauth2_passkey::list_credentials_core(&admin_user, "nonexistent_user").await?;
     assert_eq!(
         empty_credentials.len(),
         0,
@@ -225,14 +245,16 @@ async fn test_delete_user_account_integration() -> Result<(), Box<dyn std::error
         if let Some(info) = user_info {
             if let Some(user_id) = info.get("id").and_then(|v| v.as_str()) {
                 // Verify user exists and has credentials
-                let initial_credentials = oauth2_passkey::list_credentials_core(user_id).await?;
-                let initial_users = oauth2_passkey::get_all_users().await?;
+                let admin_user = create_admin_session_user();
+                let initial_credentials =
+                    oauth2_passkey::list_credentials_core(&admin_user, user_id).await?;
+                let initial_users = oauth2_passkey::get_all_users(&admin_user).await?;
                 let user_exists_initially = initial_users.iter().any(|u| u.id == user_id);
 
                 assert!(user_exists_initially, "User should exist before deletion");
 
                 // Delete the user account
-                let delete_result = oauth2_passkey::delete_user_account(user_id).await;
+                let delete_result = oauth2_passkey::delete_user_account(&admin_user, user_id).await;
 
                 match delete_result {
                     Ok(deleted_credential_ids) => {
@@ -245,13 +267,13 @@ async fn test_delete_user_account_integration() -> Result<(), Box<dyn std::error
                         }
 
                         // Verify user no longer exists
-                        let users_after_delete = oauth2_passkey::get_all_users().await?;
+                        let users_after_delete = oauth2_passkey::get_all_users(&admin_user).await?;
                         let user_exists_after = users_after_delete.iter().any(|u| u.id == user_id);
                         assert!(!user_exists_after, "User should not exist after deletion");
 
                         // Verify credentials are gone
                         let credentials_after_delete =
-                            oauth2_passkey::list_credentials_core(user_id).await?;
+                            oauth2_passkey::list_credentials_core(&admin_user, user_id).await?;
                         assert_eq!(
                             credentials_after_delete.len(),
                             0,
@@ -273,7 +295,8 @@ async fn test_delete_user_account_integration() -> Result<(), Box<dyn std::error
     }
 
     // Test deleting non-existent user
-    let delete_result = oauth2_passkey::delete_user_account("nonexistent_user").await;
+    let admin_user = create_admin_session_user();
+    let delete_result = oauth2_passkey::delete_user_account(&admin_user, "nonexistent_user").await;
     assert!(
         delete_result.is_err(),
         "Deleting non-existent user should return error"
@@ -320,15 +343,20 @@ async fn test_delete_passkey_credential_core_integration() -> Result<(), Box<dyn
         if let Some(info) = user_info {
             if let Some(user_id) = info.get("id").and_then(|v| v.as_str()) {
                 // Get the user's credentials to find a credential ID to delete
-                let initial_credentials = oauth2_passkey::list_credentials_core(user_id).await?;
+                let admin_user = create_admin_session_user();
+                let initial_credentials =
+                    oauth2_passkey::list_credentials_core(&admin_user, user_id).await?;
 
                 if !initial_credentials.is_empty() {
                     let credential_id = &initial_credentials[0].credential_id;
 
                     // Test successful deletion with correct user ID
-                    let delete_result =
-                        oauth2_passkey::delete_passkey_credential_core(user_id, credential_id)
-                            .await;
+                    let delete_result = oauth2_passkey::delete_passkey_credential_core(
+                        &admin_user,
+                        user_id,
+                        credential_id,
+                    )
+                    .await;
                     assert!(
                         delete_result.is_ok(),
                         "Failed to delete passkey credential: {:?}",
@@ -337,7 +365,7 @@ async fn test_delete_passkey_credential_core_integration() -> Result<(), Box<dyn
 
                     // Verify the credential was deleted
                     let remaining_credentials =
-                        oauth2_passkey::list_credentials_core(user_id).await?;
+                        oauth2_passkey::list_credentials_core(&admin_user, user_id).await?;
                     assert_eq!(
                         remaining_credentials.len(),
                         initial_credentials.len() - 1,
@@ -428,15 +456,31 @@ async fn test_delete_passkey_credential_core_unauthorized_integration()
                 info2.get("id").and_then(|v| v.as_str()),
             ) {
                 // Get user1's credentials
-                let user1_credentials = oauth2_passkey::list_credentials_core(user_id1).await?;
+                let admin_user = create_admin_session_user();
+                let user1_credentials =
+                    oauth2_passkey::list_credentials_core(&admin_user, user_id1).await?;
 
                 if !user1_credentials.is_empty() {
                     let credential_id = &user1_credentials[0].credential_id;
 
+                    // Create a non-admin user2 session for unauthorized deletion test
+                    let user2_session = SessionUser {
+                        id: user_id2.to_string(),
+                        account: "user2@test.com".to_string(),
+                        label: "Test User 2".to_string(),
+                        is_admin: false, // Non-admin user
+                        sequence_number: 2,
+                        created_at: Utc::now(),
+                        updated_at: Utc::now(),
+                    };
+
                     // Test unauthorized deletion: user2 tries to delete user1's credential
-                    let delete_result =
-                        oauth2_passkey::delete_passkey_credential_core(user_id2, credential_id)
-                            .await;
+                    let delete_result = oauth2_passkey::delete_passkey_credential_core(
+                        &user2_session,
+                        user_id1,
+                        credential_id,
+                    )
+                    .await;
                     assert!(
                         matches!(
                             delete_result,
@@ -448,7 +492,7 @@ async fn test_delete_passkey_credential_core_unauthorized_integration()
 
                     // Verify the credential still exists (was not deleted)
                     let remaining_credentials =
-                        oauth2_passkey::list_credentials_core(user_id1).await?;
+                        oauth2_passkey::list_credentials_core(&admin_user, user_id1).await?;
                     assert_eq!(
                         remaining_credentials.len(),
                         user1_credentials.len(),
@@ -458,6 +502,7 @@ async fn test_delete_passkey_credential_core_unauthorized_integration()
                     // Test nonexistent credential deletion
                     let fake_credential_id = "nonexistent_credential_12345";
                     let delete_nonexistent_result = oauth2_passkey::delete_passkey_credential_core(
+                        &admin_user,
                         user_id1,
                         fake_credential_id,
                     )

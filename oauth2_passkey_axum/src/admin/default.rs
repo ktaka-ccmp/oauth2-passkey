@@ -9,7 +9,7 @@ use axum::{
 
 use oauth2_passkey::{
     DbUser, O2P_ROUTE_PREFIX, SessionUser, delete_oauth2_account_core,
-    delete_passkey_credential_core, delete_user_account_admin, update_user_admin_status,
+    delete_passkey_credential_core, update_user_admin_status,
 };
 
 use super::super::error::IntoResponseError;
@@ -46,8 +46,11 @@ async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, St
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     };
 
-    // Fetch users from storage
-    let users = oauth2_passkey::get_all_users()
+    // Convert AuthUser to SessionUser for the core functions
+    let session_user = oauth2_passkey::SessionUser::from(&auth_user);
+
+    // Fetch users from storage with proper authorization
+    let users = oauth2_passkey::get_all_users(&session_user)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -70,6 +73,11 @@ pub(super) struct DeleteUserRequest {
     user_id: String,
 }
 
+#[derive(serde::Deserialize)]
+pub(super) struct PageUserContext {
+    user_id: String,
+}
+
 pub(super) async fn delete_user_account_handler(
     auth_user: AuthUser,
     ExtractJson(payload): ExtractJson<DeleteUserRequest>,
@@ -83,9 +91,11 @@ pub(super) async fn delete_user_account_handler(
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    // Call the core function to delete the user account and all associated data
-    // Using the imported function from libauth
-    delete_user_account_admin(&payload.user_id)
+    // Convert AuthUser to SessionUser for the core function
+    let session_user = oauth2_passkey::SessionUser::from(&auth_user);
+
+    // Call the core function to delete the user account and all associated data with proper authorization
+    oauth2_passkey::delete_user_account_admin(&session_user, &payload.user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -99,11 +109,6 @@ pub(super) async fn delete_user_account_handler(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(serde::Deserialize)]
-pub(super) struct PageUserContext {
-    user_id: String,
-}
-
 async fn delete_passkey_credential(
     auth_user: AuthUser,
     Path(credential_id): Path<String>,
@@ -114,7 +119,11 @@ async fn delete_passkey_credential(
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    delete_passkey_credential_core(&payload.user_id, &credential_id)
+    // Convert AuthUser to SessionUser for the core function
+    let session_user = oauth2_passkey::SessionUser::from(&auth_user);
+
+    // Use the authorized version with proper user_id parameter
+    delete_passkey_credential_core(&session_user, &payload.user_id, &credential_id)
         .await
         .map(|()| StatusCode::NO_CONTENT)
         .into_response_error()
@@ -130,10 +139,19 @@ async fn delete_oauth2_account(
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    delete_oauth2_account_core(&payload.user_id, &provider, &provider_user_id)
-        .await
-        .map(|()| StatusCode::NO_CONTENT)
-        .into_response_error()
+    // Convert AuthUser to SessionUser for the core function
+    let session_user = oauth2_passkey::SessionUser::from(&auth_user);
+
+    // Use the authorized version with proper user_id parameter
+    delete_oauth2_account_core(
+        &session_user,
+        &payload.user_id,
+        &provider,
+        &provider_user_id,
+    )
+    .await
+    .map(|()| StatusCode::NO_CONTENT)
+    .into_response_error()
 }
 
 #[derive(serde::Deserialize)]

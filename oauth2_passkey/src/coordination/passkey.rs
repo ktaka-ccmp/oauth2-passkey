@@ -258,15 +258,30 @@ pub async fn handle_finish_authentication_core(
     Ok((uid, name, headers))
 }
 
-/// Core function that handles the business logic of listing passkey credentials
+/// Core function that handles the business logic of listing passkey credentials.
 ///
-/// This function takes a user ID and returns the list of stored credentials
-/// associated with that user, or an error if the user is not logged in.
-#[tracing::instrument(fields(user_id))]
+/// This function takes an authenticated user and returns the list of stored credentials
+/// associated with that user or the specified user if the requester is an admin.
+#[tracing::instrument(fields(user_id, auth_user_id = %auth_user.id))]
 pub async fn list_credentials_core(
+    auth_user: &SessionUser,
     user_id: &str,
 ) -> Result<Vec<PasskeyCredential>, CoordinationError> {
-    tracing::debug!("Listing passkey credentials for user");
+    // Allow access if user is admin or requesting their own data
+    if !auth_user.is_admin && auth_user.id != user_id {
+        tracing::debug!(
+            "User {} is not authorized to list credentials for user {}",
+            auth_user.id,
+            user_id
+        );
+        return Err(CoordinationError::Unauthorized.log());
+    }
+
+    tracing::debug!(
+        "User {} is listing passkey credentials for user {}",
+        auth_user.id,
+        user_id
+    );
     let credentials =
         PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_owned())).await?;
     tracing::info!(
@@ -276,16 +291,27 @@ pub async fn list_credentials_core(
     Ok(credentials)
 }
 
-/// Delete a passkey credential for a user
+/// Delete a passkey credential for a user.
 ///
-/// This function checks that the credential belongs to the authenticated user
-/// before deleting it to prevent unauthorized deletions.
-#[tracing::instrument(fields(user_id, credential_id))]
+/// This function checks that the credential belongs to the specified user
+/// and that the authenticated user has permission to delete it.
+#[tracing::instrument(fields(user_id, auth_user_id = %auth_user.id, credential_id))]
 pub async fn delete_passkey_credential_core(
+    auth_user: &SessionUser,
     user_id: &str,
     credential_id: &str,
 ) -> Result<(), CoordinationError> {
     tracing::info!("Attempting to delete passkey credential");
+
+    // Authorization check: Only admins can delete other users' credentials
+    if !auth_user.is_admin && auth_user.id != user_id {
+        tracing::debug!(
+            "User {} is not authorized to delete credentials for user {}",
+            auth_user.id,
+            user_id
+        );
+        return Err(CoordinationError::Unauthorized.log());
+    }
 
     let credential = PasskeyStore::get_credentials_by(CredentialSearchField::CredentialId(
         credential_id.to_owned(),
@@ -301,10 +327,27 @@ pub async fn delete_passkey_credential_core(
         .log(),
     )?;
 
-    // Verify the credential belongs to the authenticated user
+    // Data integrity check: Verify the credential actually belongs to the specified user
     if credential.user_id != user_id {
-        return Err(CoordinationError::Unauthorized.log());
+        tracing::debug!(
+            "Passkey credential {} belongs to user {} but was requested for user {}",
+            credential_id,
+            credential.user_id,
+            user_id
+        );
+        return Err(CoordinationError::ResourceNotFound {
+            resource_type: "Passkey".to_string(),
+            resource_id: format!("{credential_id} for user {user_id}"),
+        }
+        .log());
     }
+
+    tracing::debug!(
+        "User {} is deleting passkey credential {} owned by user {}",
+        auth_user.id,
+        credential_id,
+        credential.user_id
+    );
 
     // Delete the credential using the raw credential ID format from the database
     PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
@@ -391,9 +434,23 @@ pub async fn update_passkey_credential_core(
 mod tests {
     use super::*;
     use crate::passkey::PasskeyCredential;
+    use crate::session::User as SessionUser;
     use crate::test_utils::init_test_environment;
     use crate::userdb::User;
     use serial_test::serial;
+
+    // Helper function to create a test session user
+    fn create_test_session_user(id: &str, is_admin: bool) -> SessionUser {
+        SessionUser {
+            id: id.to_string(),
+            account: format!("{id}@example.com"),
+            label: format!("Test User {id}"),
+            is_admin,
+            sequence_number: 1,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
 
     async fn create_test_user_in_db(user_id: &str) -> Result<(), Box<dyn std::error::Error>> {
         let user = User {
@@ -463,7 +520,8 @@ mod tests {
         create_test_user_in_db(user_id).await?;
 
         // Try to delete a nonexistent passkey credential
-        let result = delete_passkey_credential_core(user_id, credential_id).await;
+        let session_user = create_test_session_user(user_id, false);
+        let result = delete_passkey_credential_core(&session_user, user_id, credential_id).await;
         assert!(
             matches!(result, Err(CoordinationError::ResourceNotFound { .. })),
             "Expected ResourceNotFound error, got: {result:?}"

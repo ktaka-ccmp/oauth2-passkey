@@ -4,18 +4,6 @@
 
 ### High Priority
 
-- **Add Authorization Context to Core Admin Functions**: Core library functions like `get_all_users()`, `delete_user_account()`, etc. lack authorization context checks, relying entirely on framework integration layers for security. This creates security risks if framework authorization is bypassed or incorrectly implemented.
-  - **Security Risk**: Admin functions accessible without proper authorization context in core library
-  - **Current Design**: Framework integration enforces authorization, but core functions are unprotected database accessors
-  - **Impact**: Defense-in-depth missing, potential unauthorized access if framework layer fails
-  - **Solution**: Add `SessionUser` context parameter to admin functions with built-in authorization checks
-  - **Implementation**: 
-    - Phase 1: Add context-aware versions (e.g., `get_all_users(auth_user: &SessionUser)`)
-    - Phase 2: Update framework integrations to use new functions
-    - Phase 3: Deprecate old functions with migration path
-    - Phase 4: Remove old functions in next major version
-  - **Functions to Update**: `get_all_users`, `delete_user_account`, `delete_user_account_admin`, `update_user_admin_status`, `get_user`, and other admin operations
-  - **Location**: `oauth2_passkey/src/coordination/admin.rs` and related coordination modules
 - **Simplify OAuth2 Account Linking API**: Current implementation requires understanding CSRF tokens, page session tokens, and coordinating multiple API calls (50+ lines of code). Need simpler, more intuitive API. See detailed analysis and proposed solutions in `docs/oauth2-account-linking-api-simplification.md`.
 - **Finalize Public API**: Review and document all public interfaces for 1.0 release
 
@@ -384,6 +372,18 @@ Performance:
   - ✅ Environment variable overrides still supported for specific endpoint customization
   - ✅ Full production testing with persistent Axum mock server providing OIDC Discovery endpoint
   - ✅ All integration tests validate OIDC Discovery functionality and nonce verification compliance
+
+- ✅ **Fixed Authorization Context in Core Admin Functions**: Unified core library functions to require `SessionUser` authorization context, implementing proper defense-in-depth security.
+  - **Security Issue Resolved**: Eliminated vulnerability where admin functions lacked authorization context checks
+  - **Implementation Completed**: Unified function signatures requiring `SessionUser` parameter with built-in authorization validation
+  - **Breaking Changes Applied**: Removed deprecated functions and unused parameters for cleaner codebase
+  - **Authorization Patterns Implemented**:
+    - Admin-only functions: `get_all_users`, `delete_user_account_admin`, `update_user_admin_status`
+    - Self-access or admin: `get_user`, `update_user_account`, `delete_user_account`
+    - Owner verification: `delete_oauth2_account_core`, `delete_passkey_credential_core`, `list_credentials_core`, `list_accounts_core`
+  - **Comprehensive Updates**: All framework handlers, tests, and documentation updated with proper authorization context
+  - **Location**: Updated `oauth2_passkey/src/coordination/admin.rs`, `user.rs`, `oauth2.rs`, `passkey.rs` and all Axum handlers
+
 
 ## Memo
 

@@ -153,7 +153,10 @@ async fn serve_conditional_ui_js() -> Response {
 async fn list_passkey_credentials(
     auth_user: AuthUser,
 ) -> Result<Json<Vec<PasskeyCredential>>, (StatusCode, String)> {
-    let credentials = list_credentials_core(&auth_user.id)
+    // Convert AuthUser to SessionUser for the core function
+    let session_user = SessionUser::from(&auth_user);
+
+    let credentials = list_credentials_core(&session_user, &auth_user.id)
         .await
         .into_response_error()?;
     Ok(Json(credentials))
@@ -163,7 +166,10 @@ async fn delete_passkey_credential(
     auth_user: AuthUser,
     Path(credential_id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    delete_passkey_credential_core(&auth_user.id, &credential_id)
+    // Convert AuthUser to SessionUser for the core function
+    let session_user = SessionUser::from(&auth_user);
+
+    delete_passkey_credential_core(&session_user, &auth_user.id, &credential_id)
         .await
         .into_response_error()
         .map(|()| StatusCode::NO_CONTENT)

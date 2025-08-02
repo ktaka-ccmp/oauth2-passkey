@@ -15,8 +15,8 @@ use std::{
 use serde_json::{Value, json};
 
 use oauth2_passkey::{
-    AuthenticatorInfo, O2P_ROUTE_PREFIX, generate_page_session_token, get_authenticator_info_batch,
-    list_accounts_core, list_credentials_core,
+    AuthenticatorInfo, O2P_ROUTE_PREFIX, SessionUser, generate_page_session_token,
+    get_authenticator_info_batch, list_accounts_core, list_credentials_core,
 };
 
 use crate::config::O2P_REDIRECT_ANON;
@@ -148,12 +148,15 @@ async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCo
         Some(user) => {
             // Get passkey credentials count for the user
             // let stored_credentials = list_credentials_core(Some(&user)).await.map_err(|e| {
-            let stored_credentials = list_credentials_core(&user.id).await.map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to fetch credentials: {e:?}"),
-                )
-            })?;
+            let session_user = SessionUser::from(&user);
+            let stored_credentials = list_credentials_core(&session_user, &user.id)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Failed to fetch credentials: {e:?}"),
+                    )
+                })?;
 
             // Return user information as JSON
             let user_data = json!({
@@ -184,17 +187,18 @@ async fn csrf_token(auth_user: AuthUser) -> Result<Json<Value>, (StatusCode, Str
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
 async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
-    // let session_user: &SessionUser = &auth_user;
+    let session_user = SessionUser::from(&auth_user);
     let user_id = &auth_user.id;
 
     // Fetch passkey credentials using the public function from libauth
-    // let stored_credentials = list_credentials_core(Some(session_user))
-    let stored_credentials = list_credentials_core(user_id).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch credentials: {e:?}"),
-        )
-    })?;
+    let stored_credentials = list_credentials_core(&session_user, user_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to fetch credentials: {e:?}"),
+            )
+        })?;
 
     let unique_aaguids: HashSet<String> = stored_credentials
         .iter()
@@ -236,13 +240,14 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
         .collect::<Vec<_>>();
 
     // Fetch OAuth2 accounts using the public function from libauth
-    // let oauth2_accounts = list_accounts_core(Some(session_user)).await.map_err(|e| {
-    let oauth2_accounts = list_accounts_core(user_id).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch accounts: {e:?}"),
-        )
-    })?;
+    let oauth2_accounts = list_accounts_core(&session_user, user_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to fetch accounts: {e:?}"),
+            )
+        })?;
 
     // Convert OAuth2Account to TemplateAccount
     let oauth2_accounts = oauth2_accounts
