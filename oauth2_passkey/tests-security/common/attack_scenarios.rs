@@ -73,22 +73,40 @@ pub mod oauth2_attacks {
 pub mod passkey_attacks {
     use super::*;
 
-    /// Create an invalid WebAuthn registration response
-    pub fn create_invalid_registration_response() -> serde_json::Value {
+    /// Create an invalid WebAuthn registration response (malformed CBOR in attestation)
+    pub fn create_invalid_registration_response(valid_challenge: &str) -> serde_json::Value {
+        // Valid structure but with invalid attestation object that will fail CBOR parsing
+        let client_data = json!({
+            "type": "webauthn.create",
+            "challenge": valid_challenge, // Use real challenge to pass challenge validation
+            "origin": "http://127.0.0.1:3000"
+        });
+
         json!({
-            "invalid_structure": true,
-            "missing_required_fields": "yes"
+            "id": "invalid_credential_id",
+            "raw_id": "aW52YWxpZF9jcmVkZW50aWFsX2lk", // base64 of "invalid_credential_id"
+            "response": {
+                "client_data_json": URL_SAFE_NO_PAD.encode(client_data.to_string().as_bytes()),
+                "attestation_object": "invalid_cbor_data_not_base64!!!" // This will fail CBOR parsing
+            },
+            "type": "public-key"
         })
     }
 
     /// Create a WebAuthn response with invalid CBOR data
-    pub fn create_invalid_cbor_response() -> serde_json::Value {
+    pub fn create_invalid_cbor_response(valid_challenge: &str) -> serde_json::Value {
+        let client_data = json!({
+            "type": "webauthn.create",
+            "challenge": valid_challenge, // Use real challenge to pass challenge validation
+            "origin": "http://127.0.0.1:3000"
+        });
+
         json!({
-            "id": "valid_credential_id",
-            "rawId": "dmFsaWRfY3JlZGVudGlhbF9pZA",
+            "id": "invalid_cbor_credential",
+            "raw_id": "aW52YWxpZF9jYm9yX2NyZWRlbnRpYWw",
             "response": {
-                "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiaW52YWxpZCJ9",
-                "attestationObject": "invalid_cbor_data_not_base64"
+                "client_data_json": URL_SAFE_NO_PAD.encode(client_data.to_string().as_bytes()),
+                "attestation_object": "dGhpc19pc19ub3RfdmFsaWRfY2Jvcl9kYXRh" // Base64 but invalid CBOR
             },
             "type": "public-key"
         })
@@ -104,11 +122,11 @@ pub mod passkey_attacks {
         });
 
         json!({
-            "id": "valid_credential_id",
-            "rawId": "dmFsaWRfY3JlZGVudGlhbF9pZA",
+            "id": "tampered_challenge_cred",
+            "raw_id": "dGFtcGVyZWRfY2hhbGxlbmdlX2NyZWQ",
             "response": {
-                "clientDataJSON": URL_SAFE_NO_PAD.encode(client_data.to_string().as_bytes()),
-                "attestationObject": "valid_attestation_object_base64"
+                "client_data_json": URL_SAFE_NO_PAD.encode(client_data.to_string().as_bytes()),
+                "attestation_object": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVik" // Valid base64 CBOR header
             },
             "type": "public-key"
         })
@@ -123,11 +141,11 @@ pub mod passkey_attacks {
         });
 
         json!({
-            "id": "valid_credential_id",
-            "rawId": "dmFsaWRfY3JlZGVudGlhbF9pZA",
+            "id": "wrong_origin_credential",
+            "raw_id": "d3Jvbmdfb3JpZ2luX2NyZWRlbnRpYWw",
             "response": {
-                "clientDataJSON": URL_SAFE_NO_PAD.encode(client_data.to_string().as_bytes()),
-                "attestationObject": "valid_attestation_object_base64"
+                "client_data_json": URL_SAFE_NO_PAD.encode(client_data.to_string().as_bytes()),
+                "attestation_object": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVik" // Valid base64 CBOR header
             },
             "type": "public-key"
         })
@@ -135,16 +153,23 @@ pub mod passkey_attacks {
 
     /// Create an authentication response with expired challenge ID
     pub fn create_expired_auth_response() -> serde_json::Value {
+        let client_data = json!({
+            "type": "webauthn.get",
+            "challenge": "ZXhwaXJlZF9jaGFsbGVuZ2U", // base64 of "expired_challenge"
+            "origin": "http://127.0.0.1:3000"
+        });
+
         json!({
-            "id": "valid_credential_id",
-            "rawId": "dmFsaWRfY3JlZGVudGlhbF9pZA",
+            "id": "expired_auth_credential",
+            "raw_id": "ZXhwaXJlZF9hdXRoX2NyZWRlbnRpYWw",
             "response": {
-                "clientDataJSON": "valid_client_data",
-                "authenticatorData": "valid_authenticator_data",
-                "signature": "valid_signature",
-                "userHandle": "valid_user_handle"
+                "client_data_json": URL_SAFE_NO_PAD.encode(client_data.to_string().as_bytes()),
+                "authenticator_data": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NBAAAACQ", // Valid base64
+                "signature": "MEUCIQDValid123Signature456Base64",
+                "user_handle": "dXNlcl9oYW5kbGU"
             },
-            "type": "public-key"
+            "type": "public-key",
+            "auth_id": "expired_challenge_id_12345" // This will be checked for expiration
         })
     }
 

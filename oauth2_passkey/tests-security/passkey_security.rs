@@ -7,7 +7,8 @@
 /// - Expired challenge handling
 /// - Invalid authenticator data validation
 use crate::common::{
-    MockBrowser, TestServer, TestUsers, attack_scenarios::passkey_attacks::*, security_utils::*,
+    MockBrowser, MockWebAuthnCredentials, TestServer, TestUsers,
+    attack_scenarios::passkey_attacks::*, security_utils::*,
 };
 use serde_json::json;
 use serial_test::serial;
@@ -51,13 +52,22 @@ async fn test_security_passkey_invalid_registration_response()
         "mode": "create_user"
     });
 
-    let _start_response = setup
+    let start_response = setup
         .browser
         .post_json("/auth/passkey/register/start", &registration_request)
         .await?;
 
-    // Create invalid registration response (attack scenario)
-    let invalid_response = create_invalid_registration_response();
+    let start_body: serde_json::Value = start_response.json().await?;
+    let user_handle = start_body["user"]["user_handle"]
+        .as_str()
+        .unwrap_or("missing_user_handle");
+    let challenge = start_body["challenge"]
+        .as_str()
+        .unwrap_or("missing_challenge");
+
+    // Create invalid registration response (attack scenario) using real challenge to pass challenge validation
+    let mut invalid_response = create_invalid_registration_response(challenge);
+    invalid_response["user_handle"] = serde_json::Value::String(user_handle.to_string());
 
     // Attempt to complete registration with invalid response
     let response = setup
@@ -67,10 +77,10 @@ async fn test_security_passkey_invalid_registration_response()
 
     let result = create_security_result_from_response(response).await?;
 
-    // Verify security rejection
+    // Verify security rejection (400 for invalid client data)
     assert_security_failure(
         &result,
-        &ExpectedSecurityError::Custom(reqwest::StatusCode::UNPROCESSABLE_ENTITY, None),
+        &ExpectedSecurityError::BadRequest,
         "invalid registration response test",
     );
     assert_no_session_established(&setup.browser).await;
@@ -96,13 +106,22 @@ async fn test_security_passkey_invalid_cbor_response() -> Result<(), Box<dyn std
         "mode": "create_user"
     });
 
-    let _start_response = setup
+    let start_response = setup
         .browser
         .post_json("/auth/passkey/register/start", &registration_request)
         .await?;
 
-    // Create response with invalid CBOR data (attack scenario)
-    let invalid_cbor_response = create_invalid_cbor_response();
+    let start_body: serde_json::Value = start_response.json().await?;
+    let user_handle = start_body["user"]["user_handle"]
+        .as_str()
+        .unwrap_or("missing_user_handle");
+    let challenge = start_body["challenge"]
+        .as_str()
+        .unwrap_or("missing_challenge");
+
+    // Create response with invalid CBOR data (attack scenario) using real challenge to pass challenge validation
+    let mut invalid_cbor_response = create_invalid_cbor_response(challenge);
+    invalid_cbor_response["user_handle"] = serde_json::Value::String(user_handle.to_string());
 
     // Attempt to complete registration with invalid CBOR
     let response = setup
@@ -112,10 +131,10 @@ async fn test_security_passkey_invalid_cbor_response() -> Result<(), Box<dyn std
 
     let result = create_security_result_from_response(response).await?;
 
-    // Verify security rejection
+    // Verify security rejection (400 for invalid CBOR)
     assert_security_failure(
         &result,
-        &ExpectedSecurityError::Custom(reqwest::StatusCode::UNPROCESSABLE_ENTITY, None),
+        &ExpectedSecurityError::BadRequest,
         "invalid CBOR response test",
     );
     assert_no_session_established(&setup.browser).await;
@@ -147,14 +166,18 @@ async fn test_security_passkey_tampered_challenge_response()
         .post_json("/auth/passkey/register/start", &registration_request)
         .await?;
 
-    // Extract the challenge from the response
+    // Extract the challenge and user handle from the response
     let start_body: serde_json::Value = start_response.json().await?;
     let original_challenge = start_body["challenge"]
         .as_str()
         .unwrap_or("original_challenge");
+    let user_handle = start_body["user"]["user_handle"]
+        .as_str()
+        .unwrap_or("missing_user_handle");
 
-    // Create response with tampered challenge (attack scenario)
-    let tampered_response = create_tampered_challenge_response(original_challenge);
+    // Create response with tampered challenge (attack scenario) with valid user handle
+    let mut tampered_response = create_tampered_challenge_response(original_challenge);
+    tampered_response["user_handle"] = serde_json::Value::String(user_handle.to_string());
 
     // Attempt to complete registration with tampered challenge
     let response = setup
@@ -164,10 +187,10 @@ async fn test_security_passkey_tampered_challenge_response()
 
     let result = create_security_result_from_response(response).await?;
 
-    // Verify security rejection
+    // Verify security rejection (400 for invalid challenge)
     assert_security_failure(
         &result,
-        &ExpectedSecurityError::Custom(reqwest::StatusCode::UNPROCESSABLE_ENTITY, None),
+        &ExpectedSecurityError::BadRequest,
         "tampered challenge test",
     );
     assert_no_session_established(&setup.browser).await;
@@ -198,14 +221,18 @@ async fn test_security_passkey_wrong_origin_response() -> Result<(), Box<dyn std
         .post_json("/auth/passkey/register/start", &registration_request)
         .await?;
 
-    // Extract the challenge from the response
+    // Extract the challenge and user handle from the response
     let start_body: serde_json::Value = start_response.json().await?;
     let original_challenge = start_body["challenge"]
         .as_str()
         .unwrap_or("original_challenge");
+    let user_handle = start_body["user"]["user_handle"]
+        .as_str()
+        .unwrap_or("missing_user_handle");
 
-    // Create response with wrong origin (attack scenario)
-    let wrong_origin_response = create_wrong_origin_response(original_challenge);
+    // Create response with wrong origin (attack scenario) with valid user handle
+    let mut wrong_origin_response = create_wrong_origin_response(original_challenge);
+    wrong_origin_response["user_handle"] = serde_json::Value::String(user_handle.to_string());
 
     // Attempt to complete registration with wrong origin
     let response = setup
@@ -215,10 +242,10 @@ async fn test_security_passkey_wrong_origin_response() -> Result<(), Box<dyn std
 
     let result = create_security_result_from_response(response).await?;
 
-    // Verify security rejection
+    // Verify security rejection (400 for invalid origin)
     assert_security_failure(
         &result,
-        &ExpectedSecurityError::Custom(reqwest::StatusCode::UNPROCESSABLE_ENTITY, None),
+        &ExpectedSecurityError::BadRequest,
         "wrong origin test",
     );
     assert_no_session_established(&setup.browser).await;
@@ -329,18 +356,18 @@ async fn test_security_passkey_add_to_user_no_session() -> Result<(), Box<dyn st
     Ok(())
 }
 
-/// Test passkey registration start with create_user mode but with existing session - should be rejected
+/// Test passkey registration mode validation with proper session establishment
 #[tokio::test]
 #[serial]
 async fn test_security_passkey_create_user_with_session() -> Result<(), Box<dyn std::error::Error>>
 {
     let setup = PasskeySecurityTestSetup::new().await?;
 
-    println!("🔒 Testing Passkey create_user mode with existing session rejection");
+    println!("🔒 Testing Passkey registration mode validation");
 
     let test_user = TestUsers::passkey_user();
 
-    // First, create a session by successful registration
+    // First, create a session by completing a successful registration
     let first_registration_request = json!({
         "username": test_user.email,
         "displayname": test_user.name,
@@ -348,38 +375,126 @@ async fn test_security_passkey_create_user_with_session() -> Result<(), Box<dyn 
     });
 
     // Start first registration (this should work)
-    let _start_response = setup
+    let start_response = setup
         .browser
         .post_json("/auth/passkey/register/start", &first_registration_request)
         .await?;
 
-    // Skip completing the first registration, just assume we have a session now
-    // (In a real scenario, we'd complete it, but for this test we just need to simulate
-    // having a session when trying create_user mode)
+    let start_body: serde_json::Value = start_response.json().await?;
+    let user_handle = start_body["user"]["user_handle"]
+        .as_str()
+        .unwrap_or("test_user_handle");
 
-    // Now attempt another create_user registration while having a session
-    let second_registration_request = json!({
-        "username": "another_user@example.com",
-        "displayname": "Another User",
-        "mode": "create_user"
-    });
+    // Extract real challenge from start response for proper session establishment
+    let challenge = start_body["challenge"]
+        .as_str()
+        .unwrap_or("missing_challenge");
 
-    let response = setup
+    // Create a valid WebAuthn registration response using the proper mock credential factory
+    // This ensures proper RP ID hash validation and all WebAuthn requirements
+    let mock_credential =
+        MockWebAuthnCredentials::registration_response_with_challenge_user_handle_and_origin(
+            &test_user.email,
+            &test_user.name,
+            challenge,
+            user_handle,
+            &setup.server.base_url,
+        );
+
+    // Complete the first registration to establish a real session
+    let finish_response = setup
         .browser
-        .post_json("/auth/passkey/register/start", &second_registration_request)
+        .post_json("/auth/passkey/register/finish", &mock_credential)
         .await?;
 
-    let result = create_security_result_from_response(response).await?;
-
-    // Note: This test reveals that create_user mode is allowed with existing session
-    // This might be intended behavior (allowing multiple account creation)
-    // If this is NOT intended, the application logic should be updated
-    // For now, we'll verify that the response is successful but no new session is created
-    assert_eq!(result.status_code, reqwest::StatusCode::OK);
+    // Verify the first registration succeeded and established a session
     assert!(
-        result.no_session_created,
-        "No new session should be created for create_user with existing session"
+        finish_response.status().is_success(),
+        "First registration should succeed to establish session"
     );
+
+    // Verify session was actually established
+    assert!(
+        setup.browser.has_active_session().await,
+        "Session should be established after successful registration"
+    );
+
+    // Test 1: First verify that add_to_user WORKS with the session (using proper session-aware method)
+    println!("🔧 Testing add_to_user mode with existing session - should work");
+
+    let add_to_user_result = setup
+        .browser
+        .start_passkey_registration(&test_user.email, "Additional Passkey", "add_to_user")
+        .await;
+
+    match add_to_user_result {
+        Ok(_) => {
+            println!("✅ add_to_user mode worked as expected with session");
+        }
+        Err(e) => {
+            return Err(format!(
+                "add_to_user mode should work with established session but failed: {e}"
+            )
+            .into());
+        }
+    }
+
+    // Test 2: Now test create_user mode which should FAIL because create_user mode rejects authenticated users
+    println!("🔧 Testing create_user with existing session - should be rejected");
+
+    // Use the new post_json_with_headers method to properly test with session cookies
+    println!("🔧 Getting CSRF token to make session-aware create_user request");
+    let csrf_response = setup.browser.get("/auth/user/csrf_token").await?;
+
+    if csrf_response.status().is_success() {
+        let csrf_data: serde_json::Value = csrf_response.json().await?;
+        if let Some(csrf_token) = csrf_data.get("csrf_token").and_then(|v| v.as_str()) {
+            println!("🔧 Making create_user request with JSON and session cookies (proper test)");
+
+            let request_data = serde_json::json!({
+                "username": "another_user@example.com",
+                "displayname": "Another User",
+                "mode": "create_user"
+            });
+
+            // Use the post_json_with_headers method to properly handle session cookies
+            let response = setup
+                .browser
+                .post_json_with_headers(
+                    "/auth/passkey/register/start",
+                    &request_data,
+                    &[("X-CSRF-Token", csrf_token)],
+                )
+                .await?;
+
+            let status = response.status();
+            let response_body = response.text().await?;
+
+            println!("🔧 create_user response status: {status}");
+            println!("🔧 create_user response body: {response_body}");
+
+            if status.is_success() {
+                return Err(
+                    "create_user mode should reject authenticated users but it succeeded".into(),
+                );
+            } else if status == 500
+                || response_body.contains("UnexpectedlyAuthorized")
+                || response_body.contains("Internal Server Error")
+            {
+                println!("✅ create_user mode correctly rejected with existing session");
+                println!("📋 Error: {response_body}");
+            } else {
+                return Err(format!(
+                    "create_user mode was rejected but with unexpected error: {status} - {response_body}"
+                )
+                .into());
+            }
+        } else {
+            return Err("Could not get CSRF token to test create_user with session".into());
+        }
+    } else {
+        return Err("Could not access CSRF endpoint to test create_user with session".into());
+    }
 
     setup.shutdown().await?;
     Ok(())

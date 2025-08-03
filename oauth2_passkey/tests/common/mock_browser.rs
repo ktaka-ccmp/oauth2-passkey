@@ -90,6 +90,24 @@ impl MockBrowser {
         self.client.post(&url).json(json_data).send().await
     }
 
+    /// Make a POST request with JSON data and custom headers (preserves cookies)
+    #[allow(dead_code)]
+    pub async fn post_json_with_headers(
+        &self,
+        path: &str,
+        json_data: &Value,
+        headers: &[(&str, &str)],
+    ) -> Result<Response, reqwest::Error> {
+        let url = format!("{}{}", self.base_url, path);
+        let mut request = self.client.post(&url).json(json_data);
+
+        for (key, value) in headers {
+            request = request.header(*key, *value);
+        }
+
+        request.send().await
+    }
+
     /// Follow a redirect response
     #[allow(dead_code)]
     pub async fn follow_redirect(
