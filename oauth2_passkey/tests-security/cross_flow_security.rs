@@ -306,7 +306,7 @@ async fn test_security_cross_flow_session_fixation_during_linking()
             "/auth/oauth2/google?mode=add_to_user",
             &[(
                 "Cookie",
-                &format!("{}={}", session_cookie_name, fixed_session_id),
+                &format!("{session_cookie_name}={fixed_session_id}"),
             )],
         )
         .await?;

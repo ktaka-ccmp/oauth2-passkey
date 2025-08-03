@@ -96,7 +96,7 @@ pub mod passkey_attacks {
 
     /// Create a WebAuthn response with tampered challenge
     pub fn create_tampered_challenge_response(valid_challenge: &str) -> serde_json::Value {
-        let tampered_challenge = format!("{}_tampered", valid_challenge);
+        let tampered_challenge = format!("{valid_challenge}_tampered");
         let client_data = json!({
             "type": "webauthn.create",
             "challenge": tampered_challenge,

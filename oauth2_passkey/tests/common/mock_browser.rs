@@ -169,7 +169,7 @@ impl MockBrowser {
                 // Parse the JSON response to get the CSRF token
                 let csrf_data: serde_json::Value = csrf_response.json().await?;
                 if let Some(csrf_token) = csrf_data.get("csrf_token").and_then(|v| v.as_str()) {
-                    println!("Found CSRF token from JSON: {}", csrf_token);
+                    println!("Found CSRF token from JSON: {csrf_token}");
                     // Make the request with CSRF token
                     let url = format!("{}/auth/passkey/register/start", self.base_url);
                     self.client
@@ -209,11 +209,7 @@ impl MockBrowser {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Failed to read error body".to_string());
-            Err(format!(
-                "Failed to start passkey registration: {} - {}",
-                status, error_body
-            )
-            .into())
+            Err(format!("Failed to start passkey registration: {status} - {error_body}").into())
         }
     }
 

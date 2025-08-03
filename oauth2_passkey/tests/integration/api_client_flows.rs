@@ -158,10 +158,7 @@ async fn test_authenticated_oauth2_linking_csrf_protection()
 
     // Step 3: Test OAuth2 linking with valid CSRF token (using browser client)
     println!("🌐 Step 3: Test OAuth2 account linking with valid session");
-    let oauth2_link_url = format!(
-        "/auth/oauth2/google?mode=add_to_user&context={}",
-        csrf_token
-    );
+    let oauth2_link_url = format!("/auth/oauth2/google?mode=add_to_user&context={csrf_token}");
     let oauth2_link_response = browser.get(&oauth2_link_url).await?;
 
     if oauth2_link_response.status().is_redirection() {

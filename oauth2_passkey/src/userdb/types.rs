@@ -33,8 +33,8 @@ pub enum UserSearchField {
 impl fmt::Display for UserSearchField {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UserSearchField::Id(id) => write!(f, "Id({})", id),
-            UserSearchField::SequenceNumber(seq) => write!(f, "SequenceNumber({})", seq),
+            UserSearchField::Id(id) => write!(f, "Id({id})"),
+            UserSearchField::SequenceNumber(seq) => write!(f, "SequenceNumber({seq})"),
         }
     }
 }

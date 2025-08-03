@@ -141,7 +141,7 @@ async fn test_security_session_expired_session_cookie() -> Result<(), Box<dyn st
             "/auth/user/info",
             &[(
                 "Cookie",
-                &format!("{}={}", session_cookie_name, expired_session_id),
+                &format!("{session_cookie_name}={expired_session_id}"),
             )],
         )
         .await?;
@@ -181,7 +181,7 @@ async fn test_security_session_malicious_session_cookie() -> Result<(), Box<dyn 
             "/auth/user/info",
             &[(
                 "Cookie",
-                &format!("{}={}", session_cookie_name, malicious_session_id),
+                &format!("{session_cookie_name}={malicious_session_id}"),
             )],
         )
         .await?;
@@ -378,7 +378,7 @@ async fn test_security_session_invalid_session_state() -> Result<(), Box<dyn std
             "/auth/user/info",
             &[(
                 "Cookie",
-                &format!("{}={}", session_cookie_name, invalid_session_format),
+                &format!("{session_cookie_name}={invalid_session_format}"),
             )],
         )
         .await?;

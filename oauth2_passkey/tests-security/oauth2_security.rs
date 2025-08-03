@@ -340,8 +340,7 @@ async fn test_security_oauth2_get_form_post_mode_rejection()
     let response = setup
         .browser
         .get(&format!(
-            "/auth/oauth2/authorized?code={}&state={}",
-            valid_code, valid_state
+            "/auth/oauth2/authorized?code={valid_code}&state={valid_state}"
         ))
         .await?;
 

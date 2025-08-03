@@ -100,7 +100,7 @@ impl SecurityTestResult {
 
     /// Print detailed security test result for debugging
     pub fn print_security_details(&self, test_name: &str) {
-        println!("🔍 Security Test Result: {}", test_name);
+        println!("🔍 Security Test Result: {test_name}");
         println!("  Status Code: {}", self.status_code);
         println!(
             "  Security Failure Detected: {}",
@@ -153,10 +153,7 @@ pub fn assert_security_failure(
         test_context, result.response_body
     );
 
-    println!(
-        "✅ Security test '{}' properly rejected malicious request",
-        test_context
-    );
+    println!("✅ Security test '{test_context}' properly rejected malicious request");
 }
 
 /// Assert that no active session exists after security failure
