@@ -304,6 +304,7 @@ mod tests {
             // Test cache put operation
             let cache_data = CacheData {
                 value: "test_value".to_string(),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
 
             let put_result = GENERIC_CACHE_STORE
@@ -363,6 +364,7 @@ mod tests {
         for malicious_value in malicious_values.iter() {
             let cache_data = CacheData {
                 value: malicious_value.to_string(),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
 
             let key = "safe_key";
@@ -420,6 +422,7 @@ mod tests {
         for malicious_prefix in malicious_prefixes.iter() {
             let cache_data = CacheData {
                 value: "test_value".to_string(),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
 
             let put_result = GENERIC_CACHE_STORE
@@ -462,6 +465,7 @@ mod tests {
         for prefix in prefixes.iter() {
             let cache_data = CacheData {
                 value: format!("value_for_{prefix}"),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
 
             GENERIC_CACHE_STORE
@@ -777,6 +781,7 @@ mod tests {
         // Store malicious data in cache first
         let malicious_cache_data = CacheData {
             value: r#"{"user_id": "'; DROP TABLE users; --", "is_admin": true}"#.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         let cache_put_result = GENERIC_CACHE_STORE
