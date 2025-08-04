@@ -68,7 +68,10 @@ async fn store_aaguid_in_cache(json: String) -> Result<(), PasskeyError> {
             serde_json::to_string(&info).map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
         // Create CacheData with the JSON string
-        let cache_data = CacheData { value: json_string };
+        let cache_data = CacheData {
+            value: json_string,
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(24), // AAGUID data expires in 24 hours
+        };
 
         GENERIC_CACHE_STORE
             .lock()
@@ -536,6 +539,7 @@ mod tests {
         // Manually insert invalid JSON into cache
         let corrupted_data = CacheData {
             value: "invalid json data".to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         let mut cache = GENERIC_CACHE_STORE.lock().await;

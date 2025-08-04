@@ -119,6 +119,7 @@ impl From<JwksCache> for CacheData {
     fn from(cache: JwksCache) -> Self {
         Self {
             value: serde_json::to_string(&cache).unwrap_or_default(),
+            expires_at: cache.expires_at,
         }
     }
 }
@@ -929,6 +930,7 @@ mod tests {
     fn test_jwks_cache_invalid_json() {
         let invalid_cache_data = CacheData {
             value: "invalid json".to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         let result: Result<JwksCache, TokenVerificationError> = invalid_cache_data.try_into();

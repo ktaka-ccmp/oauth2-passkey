@@ -243,44 +243,39 @@ async fn is_authenticated(
         } // Not authenticated, no CSRF check done
     };
 
-    let session_result = GENERIC_CACHE_STORE
+    // Use atomic get-and-delete-if-expired to prevent race conditions and ensure expired sessions are rejected
+    let stored_session: StoredSession = match GENERIC_CACHE_STORE
         .lock()
         .await
-        .get("session", session_id)
+        .get_and_delete_if_expired("session", session_id)
         .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?;
-
-    let Some(cached_session) = session_result else {
-        return Ok((
-            AuthenticationStatus(false),
-            None,
-            None,
-            CsrfHeaderVerified(false),
-        )); // Session ID not found, no CSRF check done
-    };
-
-    let stored_session: StoredSession = match cached_session.try_into() {
-        Ok(session) => session,
-        Err(_) => {
+        .map_err(|e| SessionError::Storage(e.to_string()))?
+    {
+        Some(fresh_session_data) => {
+            // Session exists and is not expired
+            match fresh_session_data.try_into() {
+                Ok(session) => session,
+                Err(_) => {
+                    return Ok((
+                        AuthenticationStatus(false),
+                        None,
+                        None,
+                        CsrfHeaderVerified(false),
+                    )); // Invalid session, no CSRF check done
+                }
+            }
+        }
+        None => {
+            // Session doesn't exist or was expired and deleted atomically
+            tracing::debug!("Session not found or expired: {}", session_id);
             return Ok((
                 AuthenticationStatus(false),
                 None,
                 None,
                 CsrfHeaderVerified(false),
-            ));
-        } // Invalid session, no CSRF check done
+            )); // Session not found or expired
+        }
     };
-
-    if stored_session.expires_at < Utc::now() {
-        tracing::debug!("Session expired at {}", stored_session.expires_at);
-        delete_session_from_store_by_session_id(session_id).await?;
-        return Ok((
-            AuthenticationStatus(false),
-            None,
-            None,
-            CsrfHeaderVerified(false),
-        )); // Expired session, no CSRF check done
-    }
 
     let mut csrf_via_header_verified = false;
 
@@ -829,6 +824,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // Store the session in the global cache store
@@ -895,6 +891,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // Store the session in the global cache store
@@ -1018,6 +1015,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // Store the session in global cache store
@@ -1069,6 +1067,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // Store the session in global cache store
@@ -1179,9 +1178,10 @@ mod tests {
             "ttl": 3600_u64,
         });
 
-        // Convert to CacheData
+        // Convert to CacheData with expired timestamp to match the session expiration
         let cache_data = CacheData {
             value: expired_session_json.to_string(),
+            expires_at: Utc::now() - Duration::hours(1),
         };
 
         // Store the expired session in global cache store
@@ -1241,6 +1241,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // Store the session in global cache store
@@ -1295,6 +1296,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // Store the session in global cache store
@@ -1349,6 +1351,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // Store the session in global cache store
@@ -1432,6 +1435,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: expired_session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // Store the expired session
@@ -1493,6 +1497,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: valid_session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         GENERIC_CACHE_STORE
@@ -1618,6 +1623,7 @@ mod tests {
 
         let cache_data = CacheData {
             value: serde_json::to_string(&stored_session).unwrap(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         GENERIC_CACHE_STORE
@@ -1676,6 +1682,7 @@ mod tests {
 
         let cache_data = CacheData {
             value: serde_json::to_string(&stored_session).unwrap(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         GENERIC_CACHE_STORE
@@ -1746,6 +1753,7 @@ mod tests {
 
         let cache_data = CacheData {
             value: serde_json::to_string(&stored_session).unwrap(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         GENERIC_CACHE_STORE
@@ -1840,6 +1848,7 @@ mod tests {
 
         let cache_data = CacheData {
             value: serde_json::to_string(&stored_session).unwrap(),
+            expires_at: Utc::now() - Duration::hours(1), // Match the stored session expiration
         };
 
         GENERIC_CACHE_STORE
@@ -1908,6 +1917,7 @@ mod tests {
 
         let cache_data = CacheData {
             value: serde_json::to_string(&stored_session).unwrap(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         GENERIC_CACHE_STORE
@@ -1976,6 +1986,7 @@ mod tests {
         // Convert JSON to CacheData for storage
         let cache_data = CacheData {
             value: session.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         GENERIC_CACHE_STORE

@@ -85,6 +85,7 @@ impl From<SessionInfo> for CacheData {
     fn from(data: SessionInfo) -> Self {
         Self {
             value: serde_json::to_string(&data).expect("Failed to serialize SessionInfo"),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(24), // SessionInfo expires in 24 hours
         }
     }
 }
@@ -101,6 +102,7 @@ impl From<StoredOptions> for CacheData {
     fn from(data: StoredOptions) -> Self {
         Self {
             value: serde_json::to_string(&data).expect("Failed to serialize StoredOptions"),
+            expires_at: chrono::Utc::now() + chrono::Duration::seconds(data.ttl as i64),
         }
     }
 }
