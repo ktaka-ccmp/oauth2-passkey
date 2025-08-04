@@ -67,4 +67,27 @@ impl CacheStore for RedisCacheStore {
         let _: () = conn.del(&key).await?;
         Ok(())
     }
+
+    async fn put_if_not_exists(
+        &mut self,
+        prefix: &str,
+        key: &str,
+        value: CacheData,
+        ttl: usize,
+    ) -> Result<bool, StorageError> {
+        let mut conn = self.client.get_multiplexed_async_connection().await?;
+
+        let key = Self::make_key(prefix, key);
+        let value = serde_json::to_string(&value)?;
+
+        // Use Redis SETNX (set if not exists) for atomic operation
+        let result: bool = conn.set_nx(&key, &value).await?;
+
+        if result && ttl > 0 {
+            // If we successfully set the key and TTL is specified, set expiration
+            let _: () = conn.expire(&key, ttl as i64).await?;
+        }
+
+        Ok(result)
+    }
 }

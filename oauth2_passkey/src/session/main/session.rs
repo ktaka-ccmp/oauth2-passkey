@@ -10,7 +10,7 @@ use crate::session::types::{
     AuthenticationStatus, CsrfHeaderVerified, CsrfToken, StoredSession, User as SessionUser, UserId,
 };
 use crate::userdb::UserStore;
-use crate::utils::{gen_random_string, header_set_cookie};
+use crate::utils::{gen_random_string_with_entropy_validation, header_set_cookie};
 
 use crate::storage::GENERIC_CACHE_STORE;
 
@@ -39,13 +39,13 @@ pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderM
 #[tracing::instrument(fields(user_id, session_id))]
 pub(super) async fn create_new_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {
     tracing::info!("Creating new session for user");
-    let session_id = gen_random_string(32)?;
+    let session_id = gen_random_string_with_entropy_validation(32)?;
 
     // Record session_id in the tracing span
     tracing::Span::current().record("session_id", &session_id);
     let expires_at = Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64);
 
-    let csrf_token = gen_random_string(32)?;
+    let csrf_token = gen_random_string_with_entropy_validation(32)?;
 
     let stored_session = StoredSession {
         user_id: user_id.to_string(),

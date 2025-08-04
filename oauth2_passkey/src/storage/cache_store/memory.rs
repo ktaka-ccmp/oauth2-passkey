@@ -55,6 +55,26 @@ impl CacheStore for InMemoryCacheStore {
         self.entry.remove(&key);
         Ok(())
     }
+
+    async fn put_if_not_exists(
+        &mut self,
+        prefix: &str,
+        key: &str,
+        value: CacheData,
+        _ttl: usize,
+    ) -> Result<bool, StorageError> {
+        let key = Self::make_key(prefix, key);
+
+        // Atomic check-and-set: only insert if key doesn't exist
+        // Note: In-memory cache doesn't implement TTL expiration yet,
+        // but maintains interface consistency with Redis implementation
+        if let std::collections::hash_map::Entry::Vacant(e) = self.entry.entry(key) {
+            e.insert(value);
+            Ok(true) // Successfully inserted
+        } else {
+            Ok(false) // Key already exists
+        }
+    }
 }
 
 #[cfg(test)]
