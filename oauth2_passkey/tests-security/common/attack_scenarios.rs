@@ -67,6 +67,108 @@ pub mod oauth2_attacks {
             ("User-Agent", "AttackerBot/1.0"),
         ]
     }
+
+    // ================================================================================
+    // ADVANCED OAUTH2 ATTACK SCENARIO FUNCTIONS
+    // ================================================================================
+
+    /// Create a valid state parameter for advanced tests
+    pub fn create_valid_state_parameter() -> String {
+        let valid_state = json!({
+            "csrf_id": "valid_csrf_id_12345",
+            "nonce_id": "valid_nonce_id_12345",
+            "pkce_id": "valid_pkce_id_12345",
+            "misc_id": null,
+            "mode_id": null
+        });
+        URL_SAFE_NO_PAD.encode(valid_state.to_string().as_bytes())
+    }
+
+    /// Create state parameter with replayed nonce for nonce replay attack testing
+    pub fn create_state_with_replayed_nonce() -> String {
+        let replayed_nonce_state = json!({
+            "csrf_id": "valid_csrf_id_12345",
+            "nonce_id": "previously_used_nonce_12345", // This nonce was "used" in a previous auth
+            "pkce_id": "valid_pkce_id_12345",
+            "misc_id": null,
+            "mode_id": null
+        });
+        URL_SAFE_NO_PAD.encode(replayed_nonce_state.to_string().as_bytes())
+    }
+
+    /// Create state parameter for concurrent nonce attack testing
+    pub fn create_state_with_concurrent_nonce_attack() -> String {
+        let concurrent_nonce_state = json!({
+            "csrf_id": "valid_csrf_id_concurrent",
+            "nonce_id": "concurrent_nonce_attack_12345", // Same nonce used concurrently
+            "pkce_id": "valid_pkce_id_concurrent",
+            "misc_id": null,
+            "mode_id": null
+        });
+        URL_SAFE_NO_PAD.encode(concurrent_nonce_state.to_string().as_bytes())
+    }
+
+    /// Create PKCE state without verifier for downgrade attack testing
+    pub fn create_pkce_state_without_verifier() -> String {
+        let pkce_state = json!({
+            "csrf_id": "valid_csrf_id_pkce",
+            "nonce_id": "valid_nonce_id_pkce",
+            "pkce_id": "pkce_without_verifier_attack", // PKCE flow without verifier
+            "misc_id": null,
+            "mode_id": null
+        });
+        URL_SAFE_NO_PAD.encode(pkce_state.to_string().as_bytes())
+    }
+
+    /// Create PKCE state with wrong verifier for downgrade attack testing
+    pub fn create_pkce_state_with_wrong_verifier() -> String {
+        let pkce_state = json!({
+            "csrf_id": "valid_csrf_id_pkce_wrong",
+            "nonce_id": "valid_nonce_id_pkce_wrong",
+            "pkce_id": "pkce_wrong_verifier_attack", // PKCE flow with wrong verifier
+            "misc_id": null,
+            "mode_id": null
+        });
+        URL_SAFE_NO_PAD.encode(pkce_state.to_string().as_bytes())
+    }
+
+    /// Create state for PKCE bypass attempt
+    pub fn create_pkce_bypass_state() -> String {
+        let pkce_bypass_state = json!({
+            "csrf_id": "valid_csrf_id_bypass",
+            "nonce_id": "valid_nonce_id_bypass",
+            "pkce_id": null, // Attempting to bypass PKCE by nullifying pkce_id
+            "misc_id": null,
+            "mode_id": null
+        });
+        URL_SAFE_NO_PAD.encode(pkce_bypass_state.to_string().as_bytes())
+    }
+
+    /// Create state with malicious redirect URI for redirect validation bypass testing
+    pub fn create_state_with_malicious_redirect(redirect_uri: &str) -> String {
+        let malicious_redirect_state = json!({
+            "csrf_id": "valid_csrf_id_redirect",
+            "nonce_id": "valid_nonce_id_redirect",
+            "pkce_id": "valid_pkce_id_redirect",
+            "redirect_uri": redirect_uri, // Malicious redirect URI injection
+            "misc_id": null,
+            "mode_id": null
+        });
+        URL_SAFE_NO_PAD.encode(malicious_redirect_state.to_string().as_bytes())
+    }
+
+    /// Create state with protocol confusion for protocol confusion attack testing
+    pub fn create_state_with_protocol_confusion(confused_uri: &str) -> String {
+        let protocol_confusion_state = json!({
+            "csrf_id": "valid_csrf_id_protocol",
+            "nonce_id": "valid_nonce_id_protocol",
+            "pkce_id": "valid_pkce_id_protocol",
+            "callback_uri": confused_uri, // Protocol confusion attack
+            "misc_id": null,
+            "mode_id": null
+        });
+        URL_SAFE_NO_PAD.encode(protocol_confusion_state.to_string().as_bytes())
+    }
 }
 
 /// Passkey/WebAuthn attack scenarios

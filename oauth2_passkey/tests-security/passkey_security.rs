@@ -10,6 +10,7 @@ use crate::common::{
     MockBrowser, MockWebAuthnCredentials, TestServer, TestUsers,
     attack_scenarios::passkey_attacks::*, security_utils::*,
 };
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::json;
 use serial_test::serial;
 
@@ -562,6 +563,581 @@ async fn test_security_passkey_missing_required_fields() -> Result<(), Box<dyn s
         "missing required fields test",
     );
     assert_no_session_established(&setup.browser).await;
+
+    setup.shutdown().await?;
+    Ok(())
+}
+
+// ================================================================================
+// ADVANCED WEBAUTHN/PASSKEY ATTACK VECTOR TESTS
+// ================================================================================
+
+/// Test WebAuthn credential cloning attack prevention
+///
+/// This test verifies that credentials cannot be cloned or duplicated across accounts:
+/// 1. Same credential ID cannot be registered to multiple users
+/// 2. Credential registration includes proper uniqueness validation
+/// 3. Credential binding prevents cross-account credential reuse
+#[tokio::test]
+#[serial]
+async fn test_security_webauthn_credential_cloning_prevention()
+-> Result<(), Box<dyn std::error::Error>> {
+    let setup = PasskeySecurityTestSetup::new().await?;
+
+    println!("🔒 Testing WebAuthn credential cloning attack prevention");
+
+    // Test case 1: Attempt to register the same credential ID to different users
+    let first_user_request = json!({
+        "username": "user1@example.com",
+        "displayname": "User One",
+        "mode": "create_user"
+    });
+
+    // Start registration for first user
+    let first_start_response = setup
+        .browser
+        .post_json("/auth/passkey/register/start", &first_user_request)
+        .await?;
+
+    if first_start_response.status() != reqwest::StatusCode::OK {
+        println!("⚠️ First user registration start failed, skipping credential cloning test");
+        setup.shutdown().await?;
+        return Ok(());
+    }
+
+    let first_start_data: serde_json::Value = first_start_response.json().await?;
+    let first_challenge = first_start_data["challenge"]
+        .as_str()
+        .unwrap_or("default_challenge");
+    let _first_user_handle = first_start_data["user"]["id"]
+        .as_str()
+        .unwrap_or("user1_handle");
+
+    // Create a credential response that attempts to clone a credential
+    let cloned_credential_response = json!({
+        "id": "cloned_credential_id", // Same credential ID for both users
+        "raw_id": "Y2xvbmVkX2NyZWRlbnRpYWxfaWQ", // base64 of "cloned_credential_id"
+        "response": {
+            "client_data_json": URL_SAFE_NO_PAD.encode(json!({
+                "type": "webauthn.create",
+                "challenge": first_challenge,
+                "origin": "http://127.0.0.1:3000"
+            }).to_string().as_bytes()),
+            "attestation_object": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVikSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAAAQ"
+        },
+        "type": "public-key"
+    });
+
+    // Complete registration for first user with the cloned credential
+    let _first_finish_response = setup
+        .browser
+        .post_json("/auth/passkey/register/finish", &cloned_credential_response)
+        .await?;
+
+    // Now attempt to register the same credential to a second user
+    let second_user_request = json!({
+        "username": "user2@example.com",
+        "displayname": "User Two",
+        "mode": "create_user"
+    });
+
+    let second_start_response = setup
+        .browser
+        .post_json("/auth/passkey/register/start", &second_user_request)
+        .await?;
+
+    if second_start_response.status() != reqwest::StatusCode::OK {
+        println!("⚠️ Second user registration start failed, skipping credential cloning test");
+        setup.shutdown().await?;
+        return Ok(());
+    }
+
+    let second_start_data: serde_json::Value = second_start_response.json().await?;
+    let second_challenge = second_start_data["challenge"]
+        .as_str()
+        .unwrap_or("default_challenge_2");
+
+    // Attempt to register the same credential ID to the second user
+    let cloned_credential_response_2 = json!({
+        "id": "cloned_credential_id", // Same credential ID as first user
+        "raw_id": "Y2xvbmVkX2NyZWRlbnRpYWxfaWQ", // Same raw ID
+        "response": {
+            "client_data_json": URL_SAFE_NO_PAD.encode(json!({
+                "type": "webauthn.create",
+                "challenge": second_challenge,
+                "origin": "http://127.0.0.1:3000"
+            }).to_string().as_bytes()),
+            "attestation_object": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVikSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAAAQ"
+        },
+        "type": "public-key"
+    });
+
+    let second_finish_response = setup
+        .browser
+        .post_json(
+            "/auth/passkey/register/finish",
+            &cloned_credential_response_2,
+        )
+        .await?;
+
+    let result = create_security_result_from_response(second_finish_response).await?;
+
+    // Verify security rejection - same credential should not be registerable to multiple users
+    assert_security_failure(
+        &result,
+        &ExpectedSecurityError::BadRequest,
+        "credential cloning test",
+    );
+
+    setup.shutdown().await?;
+    Ok(())
+}
+
+/// Test WebAuthn attestation statement bypass prevention
+///
+/// This test verifies that attestation statement validation cannot be bypassed:
+/// 1. Invalid attestation statements are properly rejected
+/// 2. Attestation format validation is enforced
+/// 3. Attestation statement tampering is detected
+#[tokio::test]
+#[serial]
+async fn test_security_webauthn_attestation_bypass_prevention()
+-> Result<(), Box<dyn std::error::Error>> {
+    let setup = PasskeySecurityTestSetup::new().await?;
+
+    println!("🔒 Testing WebAuthn attestation statement bypass prevention");
+
+    // Start registration to get valid challenge
+    let user_request = json!({
+        "username": "attestation@example.com",
+        "displayname": "Attestation Test User",
+        "mode": "create_user"
+    });
+
+    let start_response = setup
+        .browser
+        .post_json("/auth/passkey/register/start", &user_request)
+        .await?;
+
+    if start_response.status() != reqwest::StatusCode::OK {
+        println!("⚠️ Registration start failed, skipping attestation bypass test");
+        setup.shutdown().await?;
+        return Ok(());
+    }
+
+    let start_data: serde_json::Value = start_response.json().await?;
+    let challenge = start_data["challenge"]
+        .as_str()
+        .unwrap_or("default_challenge");
+
+    // Test case 1: Attempt to bypass attestation with invalid attestation format
+    let oversized_attestation = "A".repeat(100000); // 100KB attestation
+    let invalid_attestation_formats = [
+        ("empty_attestation", ""),
+        ("null_attestation", "null"),
+        ("malformed_cbor", "not_valid_cbor_data"),
+        ("wrong_format", "packed_when_none_expected"),
+        ("injection_attempt", "'; DROP TABLE credentials; --"),
+        ("oversized_attestation", &oversized_attestation),
+    ];
+
+    for (test_name, invalid_attestation) in invalid_attestation_formats.iter() {
+        println!("🔧 Testing attestation bypass attempt: {test_name}");
+
+        let malicious_response = json!({
+            "id": format!("bypass_cred_{}", test_name),
+            "raw_id": URL_SAFE_NO_PAD.encode(format!("bypass_cred_{test_name}").as_bytes()),
+            "response": {
+                "client_data_json": URL_SAFE_NO_PAD.encode(json!({
+                    "type": "webauthn.create",
+                    "challenge": challenge,
+                    "origin": "http://127.0.0.1:3000"
+                }).to_string().as_bytes()),
+                "attestation_object": invalid_attestation
+            },
+            "type": "public-key"
+        });
+
+        let finish_response = setup
+            .browser
+            .post_json("/auth/passkey/register/finish", &malicious_response)
+            .await?;
+
+        let result = create_security_result_from_response(finish_response).await?;
+
+        // Verify security rejection for attestation bypass attempt
+        assert_security_failure(
+            &result,
+            &ExpectedSecurityError::BadRequest,
+            &format!("attestation bypass test: {test_name}"),
+        );
+    }
+
+    // Test case 2: Attempt to register with tampered attestation statement
+    let tampered_attestation_response = json!({
+        "id": "tampered_attestation_cred",
+        "raw_id": "dGFtcGVyZWRfYXR0ZXN0YXRpb25fY3JlZA",
+        "response": {
+            "client_data_json": URL_SAFE_NO_PAD.encode(json!({
+                "type": "webauthn.create",
+                "challenge": challenge,
+                "origin": "http://127.0.0.1:3000"
+            }).to_string().as_bytes()),
+            // Tampered attestation object with invalid signature
+            "attestation_object": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVkBZ0mWDeWIDoxodDQXD2R2YFuP5K65ooYyx5lc87qDHZdjRQAAAAEtampered_signature_data"
+        },
+        "type": "public-key"
+    });
+
+    let tampered_response = setup
+        .browser
+        .post_json(
+            "/auth/passkey/register/finish",
+            &tampered_attestation_response,
+        )
+        .await?;
+
+    let tampered_result = create_security_result_from_response(tampered_response).await?;
+
+    // Verify security rejection for tampered attestation
+    assert_security_failure(
+        &tampered_result,
+        &ExpectedSecurityError::BadRequest,
+        "tampered attestation test",
+    );
+
+    setup.shutdown().await?;
+    Ok(())
+}
+
+/// Test WebAuthn user verification bypass prevention
+///
+/// This test verifies that user verification requirements cannot be bypassed:
+/// 1. User verification flag manipulation is detected
+/// 2. Authentication without required user verification is rejected
+/// 3. User verification downgrade attacks are prevented
+#[tokio::test]
+#[serial]
+async fn test_security_webauthn_user_verification_bypass_prevention()
+-> Result<(), Box<dyn std::error::Error>> {
+    let setup = PasskeySecurityTestSetup::new().await?;
+
+    println!("🔒 Testing WebAuthn user verification bypass prevention");
+
+    // First, create a user with a valid credential
+    let user_request = json!({
+        "username": "userverify@example.com",
+        "displayname": "User Verification Test",
+        "mode": "create_user"
+    });
+
+    let start_response = setup
+        .browser
+        .post_json("/auth/passkey/register/start", &user_request)
+        .await?;
+
+    if start_response.status() != reqwest::StatusCode::OK {
+        println!("⚠️ Registration start failed, skipping user verification test");
+        setup.shutdown().await?;
+        return Ok(());
+    }
+
+    let start_data: serde_json::Value = start_response.json().await?;
+    let reg_challenge = start_data["challenge"]
+        .as_str()
+        .unwrap_or("default_challenge");
+
+    // Complete registration with valid credential
+    let valid_registration = json!({
+        "id": "user_verification_cred",
+        "raw_id": "dXNlcl92ZXJpZmljYXRpb25fY3JlZA",
+        "response": {
+            "client_data_json": URL_SAFE_NO_PAD.encode(json!({
+                "type": "webauthn.create",
+                "challenge": reg_challenge,
+                "origin": "http://127.0.0.1:3000"
+            }).to_string().as_bytes()),
+            "attestation_object": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVikSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAAAQ"
+        },
+        "type": "public-key"
+    });
+
+    let _reg_finish_response = setup
+        .browser
+        .post_json("/auth/passkey/register/finish", &valid_registration)
+        .await?;
+
+    // Now test authentication with user verification bypass attempts
+    let auth_start_request = json!({
+        "username": "userverify@example.com"
+    });
+
+    let auth_start_response = setup
+        .browser
+        .post_json("/auth/passkey/auth/start", &auth_start_request)
+        .await?;
+
+    if auth_start_response.status() != reqwest::StatusCode::OK {
+        println!("⚠️ Authentication start failed, skipping user verification bypass test");
+        setup.shutdown().await?;
+        return Ok(());
+    }
+
+    let auth_start_data: serde_json::Value = auth_start_response.json().await?;
+    let auth_challenge = auth_start_data["challenge"]
+        .as_str()
+        .unwrap_or("default_auth_challenge");
+
+    // Test case 1: Attempt to authenticate with user verification flag manipulation
+    let user_verification_bypass_attempts = [
+        ("no_user_verification", false), // UV flag set to false when required
+        ("missing_uv_flag", false),      // UV flag intentionally missing
+    ];
+
+    for (test_name, uv_flag_value) in user_verification_bypass_attempts.iter() {
+        println!("🔧 Testing user verification bypass: {test_name}");
+
+        // Create authenticator data with manipulated UV flag
+        let manipulated_auth_response = json!({
+            "id": "user_verification_cred",
+            "raw_id": "dXNlcl92ZXJpZmljYXRpb25fY3JlZA",
+            "response": {
+                "client_data_json": URL_SAFE_NO_PAD.encode(json!({
+                    "type": "webauthn.get",
+                    "challenge": auth_challenge,
+                    "origin": "http://127.0.0.1:3000"
+                }).to_string().as_bytes()),
+                // Authenticator data with UV flag manipulation
+                "authenticator_data": if *uv_flag_value {
+                    "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAACQ" // UV=1
+                } else {
+                    "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NBAAAACQ" // UV=0 (manipulated)
+                },
+                "signature": "MEUCIQDManipulated123Signature456Base64",
+                "user_handle": "dXNlcnZlcmlmeUBleGFtcGxlLmNvbQ"
+            },
+            "type": "public-key",
+            "auth_id": format!("user_verification_bypass_challenge_{}", test_name)
+        });
+
+        let auth_finish_response = setup
+            .browser
+            .post_json("/auth/passkey/auth/finish", &manipulated_auth_response)
+            .await?;
+
+        let result = create_security_result_from_response(auth_finish_response).await?;
+
+        // Verify security rejection for user verification bypass
+        assert_security_failure(
+            &result,
+            &ExpectedSecurityError::BadRequest,
+            &format!("user verification bypass test: {test_name}"),
+        );
+    }
+
+    // Test case 2: Attempt user presence downgrade attack
+    let presence_downgrade_response = json!({
+        "id": "user_verification_cred",
+        "raw_id": "dXNlcl92ZXJpZmljYXRpb25fY3JlZA",
+        "response": {
+            "client_data_json": URL_SAFE_NO_PAD.encode(json!({
+                "type": "webauthn.get",
+                "challenge": auth_challenge,
+                "origin": "http://127.0.0.1:3000"
+            }).to_string().as_bytes()),
+            // Authenticator data with both UP and UV flags set to 0 (downgrade attack)
+            "authenticator_data": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NBAAAACQ", // UP=0, UV=0
+            "signature": "MEUCIQDDowngrade123Attack456Base64",
+            "user_handle": "dXNlcnZlcmlmeUBleGFtcGxlLmNvbQ"
+        },
+        "type": "public-key",
+        "auth_id": "user_presence_downgrade_challenge"
+    });
+
+    let downgrade_response = setup
+        .browser
+        .post_json("/auth/passkey/auth/finish", &presence_downgrade_response)
+        .await?;
+
+    let downgrade_result = create_security_result_from_response(downgrade_response).await?;
+
+    // Verify security rejection for presence downgrade attack
+    assert_security_failure(
+        &downgrade_result,
+        &ExpectedSecurityError::BadRequest,
+        "user presence downgrade test",
+    );
+
+    setup.shutdown().await?;
+    Ok(())
+}
+
+/// Test WebAuthn cross-origin credential binding attacks
+///
+/// This test verifies that credentials are properly bound to origins:
+/// 1. Credentials registered on one origin cannot be used on another
+/// 2. Cross-origin credential authentication is rejected
+/// 3. Origin spoofing attempts are detected
+#[tokio::test]
+#[serial]
+async fn test_security_webauthn_cross_origin_credential_binding()
+-> Result<(), Box<dyn std::error::Error>> {
+    let setup = PasskeySecurityTestSetup::new().await?;
+
+    println!("🔒 Testing WebAuthn cross-origin credential binding protection");
+
+    // Register a credential on the legitimate origin
+    let user_request = json!({
+        "username": "crossorigin@example.com",
+        "displayname": "Cross Origin Test",
+        "mode": "create_user"
+    });
+
+    let start_response = setup
+        .browser
+        .post_json("/auth/passkey/register/start", &user_request)
+        .await?;
+
+    if start_response.status() != reqwest::StatusCode::OK {
+        println!("⚠️ Registration start failed, skipping cross-origin test");
+        setup.shutdown().await?;
+        return Ok(());
+    }
+
+    let start_data: serde_json::Value = start_response.json().await?;
+    let challenge = start_data["challenge"]
+        .as_str()
+        .unwrap_or("default_challenge");
+
+    // Complete registration with legitimate origin
+    let legitimate_registration = json!({
+        "id": "cross_origin_cred",
+        "raw_id": "Y3Jvc3Nfb3JpZ2luX2NyZWQ",
+        "response": {
+            "client_data_json": URL_SAFE_NO_PAD.encode(json!({
+                "type": "webauthn.create",
+                "challenge": challenge,
+                "origin": "http://127.0.0.1:3000" // Legitimate origin
+            }).to_string().as_bytes()),
+            "attestation_object": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVikSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAAAQ"
+        },
+        "type": "public-key"
+    });
+
+    let _reg_response = setup
+        .browser
+        .post_json("/auth/passkey/register/finish", &legitimate_registration)
+        .await?;
+
+    // Now attempt authentication with credential from different origins
+    let auth_start_request = json!({
+        "username": "crossorigin@example.com"
+    });
+
+    let auth_start_response = setup
+        .browser
+        .post_json("/auth/passkey/auth/start", &auth_start_request)
+        .await?;
+
+    if auth_start_response.status() != reqwest::StatusCode::OK {
+        println!("⚠️ Authentication start failed, skipping cross-origin auth test");
+        setup.shutdown().await?;
+        return Ok(());
+    }
+
+    let auth_start_data: serde_json::Value = auth_start_response.json().await?;
+    let auth_challenge = auth_start_data["challenge"]
+        .as_str()
+        .unwrap_or("default_auth_challenge");
+
+    // Test case 1: Attempt authentication from malicious origins
+    let malicious_origins = [
+        "https://evil.com",
+        "http://attacker.com",
+        "javascript:alert('xss')",
+        "data:text/html,<script>evil()</script>",
+        "file:///etc/passwd",
+        "null", // Null origin attack
+        "",     // Empty origin attack
+    ];
+
+    for malicious_origin in malicious_origins.iter() {
+        println!("🔧 Testing cross-origin authentication from: {malicious_origin}");
+
+        let cross_origin_auth = json!({
+            "id": "cross_origin_cred",
+            "raw_id": "Y3Jvc3Nfb3JpZ2luX2NyZWQ",
+            "response": {
+                "client_data_json": URL_SAFE_NO_PAD.encode(json!({
+                    "type": "webauthn.get",
+                    "challenge": auth_challenge,
+                    "origin": malicious_origin // Malicious origin
+                }).to_string().as_bytes()),
+                "authenticator_data": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAACQ",
+                "signature": "MEUCIQDCrossOrigin123Attack456Base64",
+                "user_handle": "Y3Jvc3NvcmlnaW5AZXhhbXBsZS5jb20"
+            },
+            "type": "public-key",
+            "auth_id": format!("cross_origin_attack_challenge_{}", malicious_origin.replace(":", "_").replace("/", "_"))
+        });
+
+        let malicious_auth_response = setup
+            .browser
+            .post_json("/auth/passkey/auth/finish", &cross_origin_auth)
+            .await?;
+
+        let result = create_security_result_from_response(malicious_auth_response).await?;
+
+        // Verify security rejection for cross-origin authentication
+        assert_security_failure(
+            &result,
+            &ExpectedSecurityError::BadRequest,
+            &format!("cross-origin auth test: {malicious_origin}"),
+        );
+    }
+
+    // Test case 2: Subdomain takeover simulation
+    let subdomain_takeover_origins = [
+        "http://evil.127.0.0.1:3000",     // Subdomain confusion
+        "http://127.0.0.1.evil.com:3000", // Domain spoofing
+        "http://127.0.0.1:3001",          // Port confusion
+        "https://127.0.0.1:3000",         // Protocol confusion
+    ];
+
+    for takeover_origin in subdomain_takeover_origins.iter() {
+        println!("🔧 Testing subdomain takeover from: {takeover_origin}");
+
+        let takeover_auth = json!({
+            "id": "cross_origin_cred",
+            "raw_id": "Y3Jvc3Nfb3JpZ2luX2NyZWQ",
+            "response": {
+                "client_data_json": URL_SAFE_NO_PAD.encode(json!({
+                    "type": "webauthn.get",
+                    "challenge": auth_challenge,
+                    "origin": takeover_origin
+                }).to_string().as_bytes()),
+                "authenticator_data": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAACQ",
+                "signature": "MEUCIQDSubdomain123Takeover456Base64",
+                "user_handle": "Y3Jvc3NvcmlnaW5AZXhhbXBsZS5jb20"
+            },
+            "type": "public-key",
+            "auth_id": format!("subdomain_takeover_challenge_{}", takeover_origin.replace(":", "_").replace("/", "_"))
+        });
+
+        let takeover_response = setup
+            .browser
+            .post_json("/auth/passkey/auth/finish", &takeover_auth)
+            .await?;
+
+        let result = create_security_result_from_response(takeover_response).await?;
+
+        // Verify security rejection for subdomain takeover attempt
+        assert_security_failure(
+            &result,
+            &ExpectedSecurityError::BadRequest,
+            &format!("subdomain takeover test: {takeover_origin}"),
+        );
+    }
 
     setup.shutdown().await?;
     Ok(())

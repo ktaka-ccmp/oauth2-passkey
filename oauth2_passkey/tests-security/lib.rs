@@ -18,6 +18,8 @@ mod common;
 
 // Security test modules
 mod cross_flow_security;
+mod information_disclosure_security;
 mod oauth2_security;
 mod passkey_security;
+mod rate_limiting_security;
 mod session_security;
