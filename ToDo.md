@@ -4,6 +4,23 @@
 
 ### High Priority
 
+- **Enhance Authentication Function Security**: Modify critical authentication functions to receive session_id and validate session existence + fetch fresh user attributes from database instead of trusting session data. This prevents privilege escalation attacks and eliminates vulnerabilities from stale/tampered session data.
+  - **Security Risk**: Current functions trust session admin status without database validation (documented in authorization_security_tests.rs:321-333)
+  - **Functions to Modify**:
+    - **Admin Functions** (oauth2_passkey/src/coordination/admin.rs):
+      - `delete_passkey_credential_admin(user: &SessionUser, credential_id: &str)` :97
+      - `delete_oauth2_account_admin(user: &SessionUser, provider_user_id: &str)` :166
+      - `update_user_admin_status(admin_user: &SessionUser, user_id: &str, is_admin: bool)` :273
+      - `get_all_users()` :30 (add session validation)
+      - `get_user(user_id: &str)` :64 (add session validation)
+      - `delete_user_account_admin(user_id: &str)` :220 (add session validation)
+    - **User Functions** (oauth2_passkey/src/coordination/user.rs):
+      - `update_user_account(user_id: &str, account: Option<String>, label: Option<String>)` :8
+      - `delete_user_account(user_id: &str)` :38
+  - **Implementation**: Add session_id parameter to sensitive operations, validate session exists, fetch fresh user data from DB
+  - **Pattern**: `async fn secure_operation(session_id: &str) -> Result<(), Error>` with fresh DB lookups
+  - **Alternative Approaches**: See `docs/authorization-security-patterns.md` for helper functions (recommended) and middleware patterns that centralize authorization logic. Helper functions provide simple one-liners at the top of each function.
+  - **Impact**: Prevents privilege escalation, eliminates session tampering risks
 - **Simplify OAuth2 Account Linking API**: Current implementation requires understanding CSRF tokens, page session tokens, and coordinating multiple API calls (50+ lines of code). Need simpler, more intuitive API. See detailed analysis and proposed solutions in `docs/oauth2-account-linking-api-simplification.md`.
 - **Finalize Public API**: Review and document all public interfaces for 1.0 release
 
