@@ -7,6 +7,9 @@ pub(crate) enum StorageError {
 
     #[error("Json conversion(Serde) error: {0}")]
     Serde(String),
+
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 impl From<redis::RedisError> for StorageError {

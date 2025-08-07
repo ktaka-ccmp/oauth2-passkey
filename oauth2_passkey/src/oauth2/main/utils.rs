@@ -11,7 +11,7 @@ use crate::session::{
     User as SessionUser, delete_session_from_store_by_session_id, get_user_from_session,
 };
 use crate::storage::{CacheData, GENERIC_CACHE_STORE};
-use crate::utils::gen_random_string;
+use crate::utils::{gen_random_string, gen_random_string_with_entropy_validation};
 
 pub(super) fn encode_state(state_params: StateParams) -> Result<String, OAuth2Error> {
     let state_json =
@@ -81,14 +81,86 @@ pub(super) async fn store_token_in_cache(
     Ok(token_id)
 }
 
+/// Store OAuth2-related tokens with atomic collision detection.
+///
+/// This function provides enhanced security by:
+/// 1. Using entropy-validated random generation
+/// 2. Atomic check-and-set operations to prevent race conditions
+/// 3. Multiple collision detection attempts
+///
+/// # Arguments
+/// * `token_type` - Type identifier for the token (e.g., "access_token", "refresh_token")
+/// * `token` - The actual token string to store
+/// * `ttl` - Time to live in seconds
+/// * `expires_at` - The expiration time of the token
+/// * `user_agent` - Optional user agent string for tracking
+///
+/// # Returns
+/// * `Ok(token_id)` - The generated token ID that can be used to retrieve the token
+/// * `Err(OAuth2Error)` - If token generation or storage fails after max attempts
+pub(super) async fn store_token_in_cache_atomic(
+    token_type: &str,
+    token: &str,
+    ttl: u64,
+    expires_at: DateTime<Utc>,
+    user_agent: Option<String>,
+) -> Result<String, OAuth2Error> {
+    const MAX_COLLISION_ATTEMPTS: usize = 20;
+
+    let token_data = StoredToken {
+        token: token.to_string(),
+        expires_at,
+        user_agent,
+        ttl,
+    };
+
+    for attempt in 1..=MAX_COLLISION_ATTEMPTS {
+        // Use enhanced entropy validation for token ID generation
+        let token_id = gen_random_string_with_entropy_validation(32)
+            .map_err(|e| OAuth2Error::Storage(format!("Token ID generation failed: {e}")))?;
+
+        // Attempt atomic insertion
+        let ttl_usize = ttl.try_into().map_err(|_| {
+            OAuth2Error::Storage("TTL value too large for storage backend".to_string())
+        })?;
+
+        let inserted = GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .put_if_not_exists(token_type, &token_id, token_data.clone().into(), ttl_usize)
+            .await
+            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+        if inserted {
+            tracing::debug!(
+                "Token stored successfully with atomic operation on attempt {}/{}",
+                attempt,
+                MAX_COLLISION_ATTEMPTS
+            );
+            return Ok(token_id);
+        }
+
+        tracing::warn!(
+            "Token ID collision detected on attempt {}/{}, retrying with new ID",
+            attempt,
+            MAX_COLLISION_ATTEMPTS
+        );
+    }
+
+    Err(OAuth2Error::Storage(format!(
+        "Failed to store token after {MAX_COLLISION_ATTEMPTS} collision detection attempts"
+    )))
+}
+
 pub(super) async fn generate_store_token(
     token_type: &str,
     ttl: u64,
     expires_at: DateTime<Utc>,
     user_agent: Option<String>,
 ) -> Result<(String, String), OAuth2Error> {
-    let token = gen_random_string(32)?;
-    let token_id = store_token_in_cache(token_type, &token, ttl, expires_at, user_agent).await?;
+    let token = gen_random_string_with_entropy_validation(32)?;
+    let token_id =
+        store_token_in_cache_atomic(token_type, &token, ttl, expires_at, user_agent).await?;
 
     Ok((token, token_id))
 }

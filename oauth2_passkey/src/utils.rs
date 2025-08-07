@@ -51,6 +51,73 @@ pub(crate) fn gen_random_string(len: usize) -> Result<String, UtilError> {
     Ok(encoded)
 }
 
+/// Generate a cryptographically secure random string with entropy validation.
+///
+/// This function provides enhanced security by:
+/// 1. Using entropy-validated random generation with SystemRandom
+/// 2. Validating entropy quality to catch degenerate cases
+/// 3. Retry mechanism for entropy validation failures
+///
+/// # Arguments
+/// * `len` - The length in bytes for the random data (before base64url encoding)
+///
+/// # Returns
+/// * `Ok(String)` - A base64url encoded random string
+/// * `Err(UtilError)` - If random generation fails or entropy is insufficient
+pub(crate) fn gen_random_string_with_entropy_validation(len: usize) -> Result<String, UtilError> {
+    const MAX_GENERATION_ATTEMPTS: usize = 10;
+
+    for attempt in 1..=MAX_GENERATION_ATTEMPTS {
+        let rng = ring::rand::SystemRandom::new();
+        let mut random_bytes = vec![0u8; len];
+
+        rng.fill(&mut random_bytes)
+            .map_err(|_| UtilError::Crypto("Failed to generate random bytes".to_string()))?;
+
+        // Basic entropy validation: ensure we don't have all zeros or all same bytes
+        if validate_entropy(&random_bytes) {
+            let encoded = base64url_encode(random_bytes)
+                .map_err(|_| UtilError::Crypto("Failed to encode random string".to_string()))?;
+            return Ok(encoded);
+        }
+
+        tracing::warn!(
+            "Low entropy detected in random generation, attempt {}/{}",
+            attempt,
+            MAX_GENERATION_ATTEMPTS
+        );
+    }
+
+    Err(UtilError::Crypto(
+        "Failed to generate sufficiently random string after max attempts".to_string(),
+    ))
+}
+
+/// Validate that random bytes have sufficient entropy.
+///
+/// This performs basic entropy checks to catch obviously degenerate cases
+/// like all zeros or all same bytes, but allows normal cryptographic randomness.
+fn validate_entropy(bytes: &[u8]) -> bool {
+    if bytes.is_empty() {
+        return false;
+    }
+
+    // Check for all zeros
+    if bytes.iter().all(|&b| b == 0) {
+        return false;
+    }
+
+    // Check for all same bytes
+    let first_byte = bytes[0];
+    if bytes.iter().all(|&b| b == first_byte) {
+        return false;
+    }
+
+    // For cryptographically secure random data, basic checks are sufficient
+    // More sophisticated entropy tests could reject valid random data
+    true
+}
+
 /// Set a cookie in the provided headers with the given parameters.
 ///
 /// # Arguments

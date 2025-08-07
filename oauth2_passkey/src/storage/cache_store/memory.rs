@@ -55,6 +55,51 @@ impl CacheStore for InMemoryCacheStore {
         self.entry.remove(&key);
         Ok(())
     }
+
+    async fn put_if_not_exists(
+        &mut self,
+        prefix: &str,
+        key: &str,
+        value: CacheData,
+        _ttl: usize,
+    ) -> Result<bool, StorageError> {
+        let key = Self::make_key(prefix, key);
+
+        // Atomic check-and-set: only insert if key doesn't exist
+        // Note: In-memory cache doesn't implement TTL expiration yet,
+        // but maintains interface consistency with Redis implementation
+        if let std::collections::hash_map::Entry::Vacant(e) = self.entry.entry(key) {
+            e.insert(value);
+            Ok(true) // Successfully inserted
+        } else {
+            Ok(false) // Key already exists
+        }
+    }
+
+    async fn get_and_delete_if_expired(
+        &mut self,
+        prefix: &str,
+        key: &str,
+    ) -> Result<Option<CacheData>, StorageError> {
+        use chrono::Utc;
+
+        let key = Self::make_key(prefix, key);
+
+        // Get the entry to check expiration
+        if let Some(cache_data) = self.entry.get(&key) {
+            // Check if expired
+            if cache_data.expires_at < Utc::now() {
+                // Atomically remove the expired entry
+                self.entry.remove(&key);
+                Ok(None) // Return None for expired entries
+            } else {
+                // Return a clone of the non-expired entry (don't remove it)
+                Ok(Some(cache_data.clone()))
+            }
+        } else {
+            Ok(None) // Entry doesn't exist
+        }
+    }
 }
 
 #[cfg(test)]
@@ -96,6 +141,7 @@ mod tests {
         let key = "key1";
         let value = CacheData {
             value: "test value".to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // When putting a value
@@ -125,6 +171,7 @@ mod tests {
         let key = "key2";
         let value = CacheData {
             value: "test value with ttl".to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // When putting a value with TTL
@@ -153,6 +200,7 @@ mod tests {
         let key = "key3";
         let value = CacheData {
             value: "value to remove".to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // When storing and then removing a value
@@ -200,9 +248,11 @@ mod tests {
         let key = "same_key";
         let value1 = CacheData {
             value: "value for prefix1".to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
         let value2 = CacheData {
             value: "value for prefix2".to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         let _ = store.put("prefix1", key, value1).await;
@@ -227,9 +277,11 @@ mod tests {
 
         let original_value = CacheData {
             value: "original value".to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
         let new_value = CacheData {
             value: "new value".to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // When storing the original value and then overwriting it
@@ -264,6 +316,7 @@ mod tests {
 
         let value = CacheData {
             value: "test with empty strings".to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // When using empty strings for prefix and key
@@ -293,6 +346,7 @@ mod tests {
             let key = "test_key";
             let value = CacheData {
                 value: "integration test value".to_string(),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
 
             // Test storing data in the global cache store
@@ -355,6 +409,7 @@ mod tests {
                 let task_key = format!("key_{i}");
                 let task_value = CacheData {
                     value: format!("concurrent_value_{i}"),
+                    expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
                 };
 
                 let handle = tokio::spawn(async move {
@@ -394,12 +449,15 @@ mod tests {
             let key = "shared_key";
             let value1 = CacheData {
                 value: "value_for_prefix1".to_string(),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
             let value2 = CacheData {
                 value: "value_for_prefix2".to_string(),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
             let value3 = CacheData {
                 value: "value_for_prefix3".to_string(),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
 
             // Store values with different prefixes
@@ -455,6 +513,7 @@ mod tests {
             let key = "ttl_key";
             let value = CacheData {
                 value: "ttl test value".to_string(),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
 
             // Test put_with_ttl (in-memory store ignores TTL but should still work)
@@ -475,6 +534,7 @@ mod tests {
             // Test with zero TTL
             let zero_ttl_value = CacheData {
                 value: "zero ttl value".to_string(),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
 
             {
@@ -512,6 +572,7 @@ mod tests {
             let large_content = "x".repeat(1024 * 1024);
             let large_value = CacheData {
                 value: large_content.clone(),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
 
             // Store large data
@@ -566,6 +627,7 @@ mod tests {
                 for (test_key, test_value) in &test_cases {
                     let cache_data = CacheData {
                         value: test_value.to_string(),
+                        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
                     };
                     let put_result = cache.put(prefix, test_key, cache_data).await;
                     assert!(

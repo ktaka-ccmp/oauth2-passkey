@@ -35,4 +35,23 @@ pub(crate) trait CacheStore: Send + Sync + 'static {
 
     /// Remove a token from the store.
     async fn remove(&mut self, prefix: &str, key: &str) -> Result<(), StorageError>;
+
+    /// Put a token into the store only if it doesn't already exist (atomic check-and-set).
+    /// Returns true if the token was stored, false if it already existed.
+    async fn put_if_not_exists(
+        &mut self,
+        prefix: &str,
+        key: &str,
+        value: CacheData,
+        ttl: usize,
+    ) -> Result<bool, StorageError>;
+
+    /// Atomically get a token and delete it if it's expired.
+    /// Returns the token if it exists and is not expired, None if it doesn't exist or is expired.
+    /// This prevents race conditions between expiration check and deletion.
+    async fn get_and_delete_if_expired(
+        &mut self,
+        prefix: &str,
+        key: &str,
+    ) -> Result<Option<CacheData>, StorageError>;
 }

@@ -237,6 +237,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // Store the session in the global cache store
@@ -289,6 +290,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // Store the session in the global cache store
@@ -346,6 +348,7 @@ mod tests {
         // Convert to CacheData
         let cache_data = CacheData {
             value: session_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         // Store the session in the global cache store

@@ -225,7 +225,12 @@ async fn process_oauth2_authorization(
     let (user_id, message) = match (mode.clone(), uid_in_state, &existing_account) {
         // Case 1: AddToUser mode - User is logged in and account doesn't exist (success case)
         (Some(OAuth2Mode::AddToUser), Some(uid), None) => {
-            let message = format!("Successfully linked to {}", account_in_state.unwrap());
+            let account_info = account_in_state.ok_or_else(|| {
+                CoordinationError::InvalidState(
+                    "Missing account information in OAuth2 state".to_string(),
+                )
+            })?;
+            let message = format!("Successfully linked to {account_info}");
             tracing::debug!("{}", message);
             oauth2_account.user_id = uid.clone();
             OAuth2Store::upsert_oauth2_account(oauth2_account).await?;
@@ -236,10 +241,12 @@ async fn process_oauth2_authorization(
         // Case 2: AddToUser mode - User is logged in and account exists (already linked or error)
         (Some(OAuth2Mode::AddToUser), Some(uid), Some(existing)) => {
             if uid == &existing.user_id {
-                let msg = format!(
-                    "Already linked to current user {}",
-                    account_in_state.unwrap()
-                );
+                let account_info = account_in_state.ok_or_else(|| {
+                    CoordinationError::InvalidState(
+                        "Missing account information in OAuth2 state".to_string(),
+                    )
+                })?;
+                let msg = format!("Already linked to current user {account_info}");
                 tracing::debug!("{}", msg);
                 delete_session_and_misc_token_from_store(&state_in_response).await?;
                 (uid.to_string(), msg)
