@@ -56,6 +56,7 @@ pub mod mocks {
             updated_at: now,
             csrf_token: "test-csrf-token".to_string(),
             csrf_via_header_verified: true,
+            session_id: format!("test-session-{id}"),
         }
     }
 

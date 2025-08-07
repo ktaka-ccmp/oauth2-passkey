@@ -8,8 +8,8 @@ use axum::{
 };
 
 use oauth2_passkey::{
-    DbUser, O2P_ROUTE_PREFIX, SessionUser, delete_oauth2_account_core,
-    delete_passkey_credential_core, delete_user_account_admin, update_user_admin_status,
+    DbUser, O2P_ROUTE_PREFIX, delete_oauth2_account_core, delete_passkey_credential_core,
+    delete_user_account_admin, update_user_admin_status,
 };
 
 use super::super::error::IntoResponseError;
@@ -46,8 +46,8 @@ async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, St
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     };
 
-    // Fetch users from storage
-    let users = oauth2_passkey::get_all_users()
+    // Fetch users from storage using session ID
+    let users = oauth2_passkey::get_all_users(&auth_user.session_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -85,7 +85,7 @@ pub(super) async fn delete_user_account_handler(
 
     // Call the core function to delete the user account and all associated data
     // Using the imported function from libauth
-    delete_user_account_admin(&payload.user_id)
+    delete_user_account_admin(&auth_user.session_id, &payload.user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -146,20 +146,17 @@ pub(super) async fn update_admin_status_handler(
     auth_user: AuthUser,
     ExtractJson(payload): ExtractJson<UpdateAdminStatusRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // Convert AuthUser to SessionUser for the core function
-    let session_user = SessionUser::from(&auth_user);
-
     // Verify that the user has admin privileges
-    if !session_user.is_admin {
+    if !auth_user.is_admin {
         tracing::warn!(
             "User {} is not authorized to update admin status",
-            session_user.id
+            auth_user.id
         );
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
     // Call the core function to update the user's admin status
-    update_user_admin_status(&session_user, &payload.user_id, payload.is_admin)
+    update_user_admin_status(&auth_user.session_id, &payload.user_id, payload.is_admin)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -167,7 +164,7 @@ pub(super) async fn update_admin_status_handler(
         "User admin status updated: {} is_admin={} by {}",
         payload.user_id,
         payload.is_admin,
-        session_user.id
+        auth_user.id
     );
 
     Ok(StatusCode::OK)
@@ -195,6 +192,7 @@ mod tests {
             updated_at: chrono::Utc::now(),
             csrf_token: "token123".to_string(),
             csrf_via_header_verified: true,
+            session_id: "session123".to_string(),
         };
 
         // Create a delete request
@@ -234,6 +232,7 @@ mod tests {
             updated_at: chrono::Utc::now(),
             csrf_token: "token123".to_string(),
             csrf_via_header_verified: true,
+            session_id: "session123".to_string(),
         };
 
         // Create an update request

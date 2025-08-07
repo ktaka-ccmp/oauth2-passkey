@@ -12,6 +12,7 @@
 //! - `user`: User account management operations
 
 mod admin;
+mod auth_helpers;
 #[cfg(test)]
 mod authorization_security_tests;
 mod errors;
@@ -34,4 +35,6 @@ pub use passkey::{
 };
 pub use user::{delete_user_account, update_user_account};
 
+// Auth helper functions are now used internally by coordination functions
+// They are not exported as they should not be used directly by external code
 pub use errors::CoordinationError;
