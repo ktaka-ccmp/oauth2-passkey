@@ -225,7 +225,7 @@ mod tests {
             .expect("Failed to get user with sequence number 1")
             .expect("User not found");
 
-        println!("First user: {:?}", first_user);
+        println!("First user: {first_user:?}");
 
         assert!(first_user.is_admin, "First user should be admin");
         assert!(

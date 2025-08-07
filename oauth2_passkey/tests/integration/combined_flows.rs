@@ -22,15 +22,15 @@ async fn test_get_all_users_integration() -> Result<(), Box<dyn std::error::Erro
     let initial_users = oauth2_passkey::get_all_users().await?;
     let initial_count = initial_users.len();
 
-    println!("Initial users: {:?}", initial_users);
-    println!("Initial user count: {}", initial_count);
+    println!("Initial users: {initial_users:?}");
+    println!("Initial user count: {initial_count}");
 
     // Create a test user via passkey registration (this creates real users)
     let browser = MockBrowser::new(&server.base_url, true);
     let test_user = TestUsers::passkey_user();
 
     let all_users = oauth2_passkey::get_all_users().await?;
-    println!("All users: {:?}", all_users);
+    println!("All users: {all_users:?}");
 
     // Register a user which will create an actual user record
     let reg_options = browser
@@ -51,9 +51,9 @@ async fn test_get_all_users_integration() -> Result<(), Box<dyn std::error::Erro
 
     let reg_finish_response = browser.complete_passkey_registration(&reg_response).await?;
 
-    println!("Registration response: {:?}", reg_finish_response);
+    println!("Registration response: {reg_finish_response:?}");
     let all_users = oauth2_passkey::get_all_users().await?;
-    println!("All users: {:?}", all_users);
+    println!("All users: {all_users:?}");
 
     // Only proceed if registration was successful
     if reg_finish_response.status().is_success() {
@@ -101,7 +101,7 @@ async fn test_get_all_users_integration() -> Result<(), Box<dyn std::error::Erro
         println!("⚠️ User registration failed, testing get_all_users with existing data only");
         let _all_users = oauth2_passkey::get_all_users().await?;
 
-        println!("All users: {:?}", _all_users);
+        println!("All users: {_all_users:?}");
         // get_all_users should return a valid list (len() is always >= 0)
         println!("✅ get_all_users basic functionality verified");
     }
@@ -164,7 +164,7 @@ async fn test_list_credentials_core_integration() -> Result<(), Box<dyn std::err
                     assert!(!credential.user.display_name.is_empty());
                 }
 
-                println!("credentials: {:?}", credentials);
+                println!("credentials: {credentials:?}");
                 println!(
                     "✅ list_credentials_core integration test passed with {} credentials",
                     credentials.len()
@@ -263,7 +263,7 @@ async fn test_delete_user_account_integration() -> Result<(), Box<dyn std::error
                         );
                     }
                     Err(e) => {
-                        println!("⚠️ User deletion failed (may be expected): {:?}", e);
+                        println!("⚠️ User deletion failed (may be expected): {e:?}");
                     }
                 }
             }
@@ -442,8 +442,7 @@ async fn test_delete_passkey_credential_core_unauthorized_integration()
                             delete_result,
                             Err(oauth2_passkey::CoordinationError::Unauthorized)
                         ),
-                        "Expected Unauthorized error, got: {:?}",
-                        delete_result
+                        "Expected Unauthorized error, got: {delete_result:?}"
                     );
 
                     // Verify the credential still exists (was not deleted)
@@ -467,8 +466,7 @@ async fn test_delete_passkey_credential_core_unauthorized_integration()
                             delete_nonexistent_result,
                             Err(oauth2_passkey::CoordinationError::ResourceNotFound { .. })
                         ),
-                        "Expected ResourceNotFound error for nonexistent credential, got: {:?}",
-                        delete_nonexistent_result
+                        "Expected ResourceNotFound error for nonexistent credential, got: {delete_nonexistent_result:?}"
                     );
 
                     println!(
@@ -601,8 +599,8 @@ async fn test_oauth2_then_add_passkey() -> Result<(), Box<dyn std::error::Error>
     let passkey_auth_status = passkey_auth_response.status();
     let passkey_response_body = passkey_auth_response.text().await?;
 
-    println!("Passkey authentication status: {}", passkey_auth_status);
-    println!("Passkey authentication body: {}", passkey_response_body);
+    println!("Passkey authentication status: {passkey_auth_status}");
+    println!("Passkey authentication body: {passkey_response_body}");
 
     if passkey_auth_status.is_success() {
         verify_successful_authentication(&passkey_browser, &test_user, "Passkey authentication")
@@ -647,7 +645,7 @@ async fn test_oauth2_then_add_passkey() -> Result<(), Box<dyn std::error::Error>
 
     println!("🎉 Combined authentication flow completed:");
     println!("  ✅ OAuth2 account creation");
-    println!("  ✅ Passkey registration (user_handle: {})", user_handle);
+    println!("  ✅ Passkey registration (user_handle: {user_handle})");
     println!("  ✅ Session management verified");
     println!("  ✅ Cross-authentication integration functional");
 
@@ -798,8 +796,8 @@ async fn test_passkey_then_add_oauth2() -> Result<(), Box<dyn std::error::Error>
     let passkey_auth_status = passkey_auth_response.status();
     let passkey_response_body = passkey_auth_response.text().await?;
 
-    println!("Passkey authentication status: {}", passkey_auth_status);
-    println!("Passkey authentication body: {}", passkey_response_body);
+    println!("Passkey authentication status: {passkey_auth_status}");
+    println!("Passkey authentication body: {passkey_response_body}");
 
     if passkey_auth_status.is_success() {
         verify_successful_authentication(&passkey_browser, &test_user, "Passkey authentication")
@@ -815,10 +813,7 @@ async fn test_passkey_then_add_oauth2() -> Result<(), Box<dyn std::error::Error>
     println!("🎉 Combined authentication flow completed:");
     println!("  ✅ Passkey account creation");
     println!("  ✅ OAuth2 account linking");
-    println!(
-        "  ✅ Cross-authentication verified (user_handle: {})",
-        user_handle
-    );
+    println!("  ✅ Cross-authentication verified (user_handle: {user_handle})");
     println!("  ✅ Session management functional");
 
     server.shutdown().await;

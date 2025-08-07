@@ -119,8 +119,7 @@ impl TestServer {
                         // Only show progress every 50 attempts to reduce noise
                         if attempts % 50 == 0 || attempts <= 10 {
                             println!(
-                                "⚠️  Failed to bind to {bind_addr} (attempt {}/{}): {e}. Retrying in {}ms...",
-                                attempts, MAX_RETRIES, delay_ms
+                                "⚠️  Failed to bind to {bind_addr} (attempt {attempts}/{MAX_RETRIES}): {e}. Retrying in {delay_ms}ms..."
                             );
                         }
 

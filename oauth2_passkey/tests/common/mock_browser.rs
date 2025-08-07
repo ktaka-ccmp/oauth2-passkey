@@ -90,6 +90,24 @@ impl MockBrowser {
         self.client.post(&url).json(json_data).send().await
     }
 
+    /// Make a POST request with JSON data and custom headers (preserves cookies)
+    #[allow(dead_code)]
+    pub async fn post_json_with_headers(
+        &self,
+        path: &str,
+        json_data: &Value,
+        headers: &[(&str, &str)],
+    ) -> Result<Response, reqwest::Error> {
+        let url = format!("{}{}", self.base_url, path);
+        let mut request = self.client.post(&url).json(json_data);
+
+        for (key, value) in headers {
+            request = request.header(*key, *value);
+        }
+
+        request.send().await
+    }
+
     /// Follow a redirect response
     #[allow(dead_code)]
     pub async fn follow_redirect(
@@ -169,7 +187,7 @@ impl MockBrowser {
                 // Parse the JSON response to get the CSRF token
                 let csrf_data: serde_json::Value = csrf_response.json().await?;
                 if let Some(csrf_token) = csrf_data.get("csrf_token").and_then(|v| v.as_str()) {
-                    println!("Found CSRF token from JSON: {}", csrf_token);
+                    println!("Found CSRF token from JSON: {csrf_token}");
                     // Make the request with CSRF token
                     let url = format!("{}/auth/passkey/register/start", self.base_url);
                     self.client
@@ -209,11 +227,7 @@ impl MockBrowser {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Failed to read error body".to_string());
-            Err(format!(
-                "Failed to start passkey registration: {} - {}",
-                status, error_body
-            )
-            .into())
+            Err(format!("Failed to start passkey registration: {status} - {error_body}").into())
         }
     }
 

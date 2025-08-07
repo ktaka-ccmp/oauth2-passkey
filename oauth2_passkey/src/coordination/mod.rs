@@ -12,6 +12,8 @@
 //! - `user`: User account management operations
 
 mod admin;
+#[cfg(test)]
+mod authorization_security_tests;
 mod errors;
 mod oauth2;
 mod passkey;

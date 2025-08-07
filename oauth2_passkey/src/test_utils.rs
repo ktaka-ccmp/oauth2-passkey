@@ -41,7 +41,7 @@ pub async fn init_test_environment() {
 
         // Clean up any existing test database file based on GENERIC_DATA_STORE_URL
         if let Some(db_path) = extract_sqlite_file_path() {
-            if let Err(_) = std::fs::remove_file(&db_path) {
+            if std::fs::remove_file(&db_path).is_err() {
                 // File doesn't exist or can't be removed - that's okay
             }
         }

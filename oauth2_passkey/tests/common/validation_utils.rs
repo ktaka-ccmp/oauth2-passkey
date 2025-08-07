@@ -41,7 +41,7 @@ impl AuthValidationResult {
         } else {
             result
                 .details
-                .push(format!("❌ Expected 303 See Other, got: {}", status));
+                .push(format!("❌ Expected 303 See Other, got: {status}"));
         }
 
         // Check session cookie
@@ -66,13 +66,12 @@ impl AuthValidationResult {
 
             if result.has_expected_message {
                 result.details.push(format!(
-                    "✅ Success redirect with expected message ({}): PASSED",
-                    expected_message
+                    "✅ Success redirect with expected message ({expected_message}): PASSED"
                 ));
             } else {
                 result
                     .details
-                    .push(format!("❌ Unexpected redirect location: {}", location));
+                    .push(format!("❌ Unexpected redirect location: {location}"));
             }
         } else {
             result
@@ -104,7 +103,7 @@ impl AuthValidationResult {
     /// Print validation details to console
     pub fn print_details(&self) {
         for detail in &self.details {
-            println!("  {}", detail);
+            println!("  {detail}");
         }
     }
 }

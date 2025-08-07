@@ -22,8 +22,7 @@ pub async fn logout_and_verify(browser: &MockBrowser) -> Result<(), Box<dyn std:
     // Check logout response - should be success or redirect
     assert!(
         logout_status.is_redirection() || logout_status.is_success(),
-        "Logout should succeed with redirect or 200 OK, got: {}",
-        logout_status
+        "Logout should succeed with redirect or 200 OK, got: {logout_status}"
     );
 
     // Check for session cookie deletion

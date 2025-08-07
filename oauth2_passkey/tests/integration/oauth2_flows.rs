@@ -178,13 +178,10 @@ async fn complete_oauth2_callback(
             // Query mode: GET request with query parameters and headers
             browser
                 .get_with_headers(
-                    &format!(
-                        "/auth/oauth2/authorized?code={}&state={}",
-                        auth_code, received_state
-                    ),
+                    &format!("/auth/oauth2/authorized?code={auth_code}&state={received_state}"),
                     &[
                         ("Origin", oauth2_issuer_url),
-                        ("Referer", &format!("{}/oauth2/auth", oauth2_issuer_url)),
+                        ("Referer", &format!("{oauth2_issuer_url}/oauth2/auth")),
                     ],
                 )
                 .await?
@@ -197,7 +194,7 @@ async fn complete_oauth2_callback(
                     &[("code", auth_code), ("state", received_state)],
                     &[
                         ("Origin", oauth2_issuer_url),
-                        ("Referer", &format!("{}/oauth2/auth", oauth2_issuer_url)),
+                        ("Referer", &format!("{oauth2_issuer_url}/oauth2/auth")),
                     ],
                 )
                 .await?
@@ -267,7 +264,7 @@ async fn verify_oauth2_accounts_linked(
     // Call the same core function used by the summary page to get OAuth2 accounts
     let oauth2_accounts = list_accounts_core(user_id)
         .await
-        .map_err(|e| format!("Failed to retrieve OAuth2 accounts: {:?}", e))?;
+        .map_err(|e| format!("Failed to retrieve OAuth2 accounts: {e:?}"))?;
 
     // Verify the expected account count
     if oauth2_accounts.len() != expected_account_count {
@@ -316,7 +313,7 @@ async fn verify_oauth2_accounts_linked(
         accounts_json.len(),
         expected_account_count
     );
-    println!("  - Provider: {} (all accounts)", expected_provider);
+    println!("  - Provider: {expected_provider} (all accounts)");
     for (i, account) in accounts_json.iter().enumerate() {
         println!(
             "  - Account {}: {} <{}> (ID: {})",
@@ -339,9 +336,9 @@ async fn complete_full_oauth2_flow_internal(
     // Step 1: Start OAuth2 flow
     let url = if let Some(token) = context_token {
         // Use provided context token for add_to_user mode
-        format!("/auth/oauth2/google?mode={}&context={}", mode, token)
+        format!("/auth/oauth2/google?mode={mode}&context={token}")
     } else {
-        format!("/auth/oauth2/google?mode={}", mode)
+        format!("/auth/oauth2/google?mode={mode}")
     };
 
     let response = browser.get(&url).await?;
@@ -353,8 +350,7 @@ async fn complete_full_oauth2_flow_internal(
             .await
             .unwrap_or_else(|_| "Failed to read body".to_string());
         return Err(format!(
-            "Expected redirect for OAuth2 start (mode={}), got status: {}, body: {}",
-            mode, status, body
+            "Expected redirect for OAuth2 start (mode={mode}), got status: {status}, body: {body}"
         )
         .into());
     }
@@ -371,7 +367,7 @@ async fn complete_full_oauth2_flow_internal(
 
     // Verify the authorization URL points to our OAuth2 provider
     assert!(
-        auth_url.starts_with(&format!("{}/oauth2/auth", oauth2_issuer_url)),
+        auth_url.starts_with(&format!("{oauth2_issuer_url}/oauth2/auth")),
         "Authorization URL should use OAuth2 provider: {auth_url}"
     );
 
@@ -791,7 +787,7 @@ async fn test_link_two_oauth2_users() -> Result<(), Box<dyn std::error::Error>> 
                     println!("✅ Step 2c: Two distinct OAuth2 accounts confirmed");
                 }
             }
-            Err(e) => println!("⚠️  Step 2c: OAuth2 account verification failed: {}", e),
+            Err(e) => println!("⚠️  Step 2c: OAuth2 account verification failed: {e}"),
         }
     } else {
         println!("⚠️  Step 2b: OAuth2 account linking attempted but may have validation issues");
@@ -923,18 +919,14 @@ async fn test_link_three_oauth2_users() -> Result<(), Box<dyn std::error::Error>
             let unique_ids: std::collections::HashSet<&str> =
                 provider_ids.iter().cloned().collect();
             if unique_ids.len() == expected_count {
-                println!(
-                    "✅ Step 4b: {} distinct OAuth2 accounts confirmed",
-                    expected_count
-                );
+                println!("✅ Step 4b: {expected_count} distinct OAuth2 accounts confirmed");
             } else {
                 println!(
-                    "⚠️  Step 4b: Expected {} distinct OAuth2 accounts, but provider IDs are: {:?}",
-                    expected_count, provider_ids
+                    "⚠️  Step 4b: Expected {expected_count} distinct OAuth2 accounts, but provider IDs are: {provider_ids:?}"
                 );
             }
         }
-        Err(e) => println!("⚠️  Step 4b: OAuth2 account verification failed: {}", e),
+        Err(e) => println!("⚠️  Step 4b: OAuth2 account verification failed: {e}"),
     }
 
     // Determine overall success and print results

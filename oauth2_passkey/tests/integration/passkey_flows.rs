@@ -424,14 +424,11 @@ fn extract_credential_id(
         let index = credential_index.unwrap_or(0);
         if let Some(cred) = allowed_creds.get(index) {
             if let Some(id) = cred["id"].as_str() {
-                println!("Selected credential at index {}: {}", index, id);
+                println!("Selected credential at index {index}: {id}");
                 return id;
             }
         } else if let Some(first_cred) = allowed_creds.first() {
-            println!(
-                "Credential index {} not found, using first credential",
-                index
-            );
+            println!("Credential index {index} not found, using first credential");
             if let Some(id) = first_cred["id"].as_str() {
                 return id;
             }

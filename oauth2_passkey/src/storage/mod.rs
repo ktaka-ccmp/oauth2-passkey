@@ -14,6 +14,8 @@
 mod cache_store;
 mod data_store;
 mod errors;
+#[cfg(test)]
+mod injection_security_tests;
 mod schema_validation;
 mod types;
 
