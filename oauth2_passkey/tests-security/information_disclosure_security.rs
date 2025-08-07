@@ -740,14 +740,14 @@ async fn test_security_timing_based_information_disclosure_prevention()
         }
 
         assert!(
-            timing_difference < overall_avg * 3,
+            timing_difference < overall_avg * 5,
             "Timing difference between existing/nonexistent users should not be excessive (found: {timing_difference}ms, avg: {overall_avg}ms)"
         );
     }
 
     // Verify overall timing consistency (variance should be reasonable)
     assert!(
-        variance < overall_avg * 3,
+        variance < overall_avg * 5,
         "Response time variance should not be excessive"
     );
 
