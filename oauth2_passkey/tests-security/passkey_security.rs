@@ -28,6 +28,114 @@ impl PasskeySecurityTestSetup {
         Ok(Self { server, browser })
     }
 
+    /// Establish a WebAuthn challenge context and extract the real challenge
+    /// This is similar to establish_csrf_session_and_extract_state() for OAuth2 tests
+    async fn establish_webauthn_challenge_and_extract(
+        &self,
+        username: &str,
+        display_name: &str,
+    ) -> Result<(String, String), Box<dyn std::error::Error>> {
+        println!("🔧 Establishing WebAuthn challenge context for security test");
+
+        let registration_request = json!({
+            "username": username,
+            "displayname": display_name,
+            "mode": "create_user"
+        });
+
+        let start_response = self
+            .browser
+            .post_json("/auth/passkey/register/start", &registration_request)
+            .await?;
+
+        if !start_response.status().is_success() {
+            return Err(format!(
+                "Failed to start WebAuthn registration: {}",
+                start_response.status()
+            )
+            .into());
+        }
+
+        let start_body: serde_json::Value = start_response.json().await?;
+        let challenge = start_body["challenge"]
+            .as_str()
+            .ok_or("Missing challenge in WebAuthn start response")?
+            .to_string();
+        let user_handle = start_body["user"]["user_handle"]
+            .as_str()
+            .ok_or("Missing user_handle in WebAuthn start response")?
+            .to_string();
+
+        println!("🔧 Extracted real WebAuthn challenge: {challenge}");
+        println!("🔧 Extracted real user handle: {user_handle}");
+
+        Ok((challenge, user_handle))
+    }
+
+    /// Establish a WebAuthn authentication challenge context
+    async fn establish_webauthn_auth_challenge(
+        &self,
+        username: &str,
+    ) -> Result<(String, String), Box<dyn std::error::Error>> {
+        println!("🔧 Establishing WebAuthn authentication challenge context for security test");
+
+        // First register a user
+        let (reg_challenge, user_handle) = self
+            .establish_webauthn_challenge_and_extract(username, "Security Test User")
+            .await?;
+
+        // Complete registration with valid credential
+        let valid_registration =
+            MockWebAuthnCredentials::registration_response_with_challenge_user_handle_and_origin(
+                username,
+                "Security Test User",
+                &reg_challenge,
+                &user_handle,
+                &self.server.base_url,
+            );
+
+        let reg_finish_response = self
+            .browser
+            .post_json("/auth/passkey/register/finish", &valid_registration)
+            .await?;
+
+        if !reg_finish_response.status().is_success() {
+            return Err("Failed to complete WebAuthn registration for auth test setup".into());
+        }
+
+        // Now start authentication to get auth challenge
+        let auth_start_request = json!({
+            "username": username
+        });
+
+        let auth_start_response = self
+            .browser
+            .post_json("/auth/passkey/auth/start", &auth_start_request)
+            .await?;
+
+        if !auth_start_response.status().is_success() {
+            return Err(format!(
+                "Failed to start WebAuthn authentication: {}",
+                auth_start_response.status()
+            )
+            .into());
+        }
+
+        let auth_start_data: serde_json::Value = auth_start_response.json().await?;
+        let auth_challenge = auth_start_data["challenge"]
+            .as_str()
+            .ok_or("Missing challenge in WebAuthn auth start response")?
+            .to_string();
+        let auth_id = auth_start_data["authId"]
+            .as_str()
+            .ok_or("Missing authId in WebAuthn auth start response")?
+            .to_string();
+
+        println!("🔧 Extracted real WebAuthn auth challenge: {auth_challenge}");
+        println!("🔧 Extracted real WebAuthn auth ID: {auth_id}");
+        Ok((auth_challenge, auth_id))
+    }
+
     /// Shutdown the test server
     async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
         self.server.shutdown().await;
@@ -707,28 +815,13 @@ async fn test_security_webauthn_attestation_bypass_prevention()
 
     println!("🔒 Testing WebAuthn attestation statement bypass prevention");
 
-    // Start registration to get valid challenge
-    let user_request = json!({
-        "username": "attestation@example.com",
-        "displayname": "Attestation Test User",
-        "mode": "create_user"
-    });
-
-    let start_response = setup
-        .browser
-        .post_json("/auth/passkey/register/start", &user_request)
+    // Establish proper WebAuthn challenge context
+    let (challenge, user_handle) = setup
+        .establish_webauthn_challenge_and_extract(
+            "attestation@example.com",
+            "Attestation Test User",
+        )
         .await?;
-
-    if start_response.status() != reqwest::StatusCode::OK {
-        println!("⚠️ Registration start failed, skipping attestation bypass test");
-        setup.shutdown().await?;
-        return Ok(());
-    }
-
-    let start_data: serde_json::Value = start_response.json().await?;
-    let challenge = start_data["challenge"]
-        .as_str()
-        .unwrap_or("default_challenge");
 
     // Test case 1: Attempt to bypass attestation with invalid attestation format
     let oversized_attestation = "A".repeat(100000); // 100KB attestation
@@ -755,7 +848,8 @@ async fn test_security_webauthn_attestation_bypass_prevention()
                 }).to_string().as_bytes()),
                 "attestation_object": invalid_attestation
             },
-            "type": "public-key"
+            "type": "public-key",
+            "user_handle": user_handle.clone()
         });
 
         let finish_response = setup
@@ -786,7 +880,8 @@ async fn test_security_webauthn_attestation_bypass_prevention()
             // Tampered attestation object with invalid signature
             "attestation_object": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVkBZ0mWDeWIDoxodDQXD2R2YFuP5K65ooYyx5lc87qDHZdjRQAAAAEtampered_signature_data"
         },
-        "type": "public-key"
+        "type": "public-key",
+        "user_handle": user_handle
     });
 
     let tampered_response = setup
@@ -824,69 +919,10 @@ async fn test_security_webauthn_user_verification_bypass_prevention()
 
     println!("🔒 Testing WebAuthn user verification bypass prevention");
 
-    // First, create a user with a valid credential
-    let user_request = json!({
-        "username": "userverify@example.com",
-        "displayname": "User Verification Test",
-        "mode": "create_user"
-    });
-
-    let start_response = setup
-        .browser
-        .post_json("/auth/passkey/register/start", &user_request)
+    // Establish proper WebAuthn authentication challenge context
+    let (auth_challenge, auth_id) = setup
+        .establish_webauthn_auth_challenge("userverify@example.com")
         .await?;
-
-    if start_response.status() != reqwest::StatusCode::OK {
-        println!("⚠️ Registration start failed, skipping user verification test");
-        setup.shutdown().await?;
-        return Ok(());
-    }
-
-    let start_data: serde_json::Value = start_response.json().await?;
-    let reg_challenge = start_data["challenge"]
-        .as_str()
-        .unwrap_or("default_challenge");
-
-    // Complete registration with valid credential
-    let valid_registration = json!({
-        "id": "user_verification_cred",
-        "raw_id": "dXNlcl92ZXJpZmljYXRpb25fY3JlZA",
-        "response": {
-            "client_data_json": URL_SAFE_NO_PAD.encode(json!({
-                "type": "webauthn.create",
-                "challenge": reg_challenge,
-                "origin": "http://127.0.0.1:3000"
-            }).to_string().as_bytes()),
-            "attestation_object": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVikSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAAAQ"
-        },
-        "type": "public-key"
-    });
-
-    let _reg_finish_response = setup
-        .browser
-        .post_json("/auth/passkey/register/finish", &valid_registration)
-        .await?;
-
-    // Now test authentication with user verification bypass attempts
-    let auth_start_request = json!({
-        "username": "userverify@example.com"
-    });
-
-    let auth_start_response = setup
-        .browser
-        .post_json("/auth/passkey/auth/start", &auth_start_request)
-        .await?;
-
-    if auth_start_response.status() != reqwest::StatusCode::OK {
-        println!("⚠️ Authentication start failed, skipping user verification bypass test");
-        setup.shutdown().await?;
-        return Ok(());
-    }
-
-    let auth_start_data: serde_json::Value = auth_start_response.json().await?;
-    let auth_challenge = auth_start_data["challenge"]
-        .as_str()
-        .unwrap_or("default_auth_challenge");
 
     // Test case 1: Attempt to authenticate with user verification flag manipulation
     let user_verification_bypass_attempts = [
@@ -917,7 +953,7 @@ async fn test_security_webauthn_user_verification_bypass_prevention()
                 "user_handle": "dXNlcnZlcmlmeUBleGFtcGxlLmNvbQ"
             },
             "type": "public-key",
-            "auth_id": format!("user_verification_bypass_challenge_{}", test_name)
+            "auth_id": auth_id.clone()
         });
 
         let auth_finish_response = setup
@@ -951,7 +987,7 @@ async fn test_security_webauthn_user_verification_bypass_prevention()
             "user_handle": "dXNlcnZlcmlmeUBleGFtcGxlLmNvbQ"
         },
         "type": "public-key",
-        "auth_id": "user_presence_downgrade_challenge"
+        "auth_id": auth_id.clone()
     });
 
     let downgrade_response = setup
@@ -986,69 +1022,10 @@ async fn test_security_webauthn_cross_origin_credential_binding()
 
     println!("🔒 Testing WebAuthn cross-origin credential binding protection");
 
-    // Register a credential on the legitimate origin
-    let user_request = json!({
-        "username": "crossorigin@example.com",
-        "displayname": "Cross Origin Test",
-        "mode": "create_user"
-    });
-
-    let start_response = setup
-        .browser
-        .post_json("/auth/passkey/register/start", &user_request)
+    // Establish proper WebAuthn authentication challenge context
+    let (auth_challenge, auth_id) = setup
+        .establish_webauthn_auth_challenge("crossorigin@example.com")
         .await?;
-
-    if start_response.status() != reqwest::StatusCode::OK {
-        println!("⚠️ Registration start failed, skipping cross-origin test");
-        setup.shutdown().await?;
-        return Ok(());
-    }
-
-    let start_data: serde_json::Value = start_response.json().await?;
-    let challenge = start_data["challenge"]
-        .as_str()
-        .unwrap_or("default_challenge");
-
-    // Complete registration with legitimate origin
-    let legitimate_registration = json!({
-        "id": "cross_origin_cred",
-        "raw_id": "Y3Jvc3Nfb3JpZ2luX2NyZWQ",
-        "response": {
-            "client_data_json": URL_SAFE_NO_PAD.encode(json!({
-                "type": "webauthn.create",
-                "challenge": challenge,
-                "origin": "http://127.0.0.1:3000" // Legitimate origin
-            }).to_string().as_bytes()),
-            "attestation_object": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVikSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAAAQ"
-        },
-        "type": "public-key"
-    });
-
-    let _reg_response = setup
-        .browser
-        .post_json("/auth/passkey/register/finish", &legitimate_registration)
-        .await?;
-
-    // Now attempt authentication with credential from different origins
-    let auth_start_request = json!({
-        "username": "crossorigin@example.com"
-    });
-
-    let auth_start_response = setup
-        .browser
-        .post_json("/auth/passkey/auth/start", &auth_start_request)
-        .await?;
-
-    if auth_start_response.status() != reqwest::StatusCode::OK {
-        println!("⚠️ Authentication start failed, skipping cross-origin auth test");
-        setup.shutdown().await?;
-        return Ok(());
-    }
-
-    let auth_start_data: serde_json::Value = auth_start_response.json().await?;
-    let auth_challenge = auth_start_data["challenge"]
-        .as_str()
-        .unwrap_or("default_auth_challenge");
 
     // Test case 1: Attempt authentication from malicious origins
     let malicious_origins = [
@@ -1078,7 +1055,7 @@ async fn test_security_webauthn_cross_origin_credential_binding()
                 "user_handle": "Y3Jvc3NvcmlnaW5AZXhhbXBsZS5jb20"
             },
             "type": "public-key",
-            "auth_id": format!("cross_origin_attack_challenge_{}", malicious_origin.replace(":", "_").replace("/", "_"))
+            "auth_id": auth_id.clone()
         });
 
         let malicious_auth_response = setup
@@ -1121,7 +1098,7 @@ async fn test_security_webauthn_cross_origin_credential_binding()
                 "user_handle": "Y3Jvc3NvcmlnaW5AZXhhbXBsZS5jb20"
             },
             "type": "public-key",
-            "auth_id": format!("subdomain_takeover_challenge_{}", takeover_origin.replace(":", "_").replace("/", "_"))
+            "auth_id": auth_id.clone()
         });
 
         let takeover_response = setup

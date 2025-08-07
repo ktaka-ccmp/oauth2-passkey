@@ -52,8 +52,19 @@ mod tests {
         session_data: serde_json::Value,
         ttl: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        // Extract the actual session expiration time from the session data
+        let session_expires_at =
+            if let Some(expires_at_str) = session_data.get("expires_at").and_then(|v| v.as_str()) {
+                chrono::DateTime::parse_from_rfc3339(expires_at_str)
+                    .map(|dt| dt.with_timezone(&chrono::Utc))
+                    .unwrap_or_else(|_| chrono::Utc::now() + chrono::Duration::seconds(ttl as i64))
+            } else {
+                chrono::Utc::now() + chrono::Duration::seconds(ttl as i64)
+            };
+
         let cache_data = CacheData {
             value: session_data.to_string(),
+            expires_at: session_expires_at,
         };
 
         GENERIC_CACHE_STORE
@@ -762,6 +773,7 @@ mod tests {
             let attack_session_id = format!("attack_{attack_type}");
             let cache_data = CacheData {
                 value: invalid_data.to_string(),
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
 
             // Attempt to store invalid data

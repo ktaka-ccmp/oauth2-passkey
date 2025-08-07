@@ -48,6 +48,7 @@ pub async fn insert_test_session(
     let cache_data = CacheData {
         value: serde_json::to_string(&stored_session)
             .map_err(|e| SessionError::Storage(e.to_string()))?,
+        expires_at: chrono::Utc::now() + chrono::Duration::seconds(ttl as i64),
     };
 
     GENERIC_CACHE_STORE

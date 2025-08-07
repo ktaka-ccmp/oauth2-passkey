@@ -40,6 +40,7 @@ mod edge_cases {
         // Store the expired session directly
         let cache_data = CacheData {
             value: serde_json::to_string(&stored_session).unwrap(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         GENERIC_CACHE_STORE
@@ -82,6 +83,7 @@ mod edge_cases {
         // Create invalid JSON data
         let cache_data = CacheData {
             value: r#"{"user_id": "invalid_json"#.to_string(), // Intentionally malformed JSON
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         GENERIC_CACHE_STORE
@@ -119,6 +121,7 @@ mod edge_cases {
         let incomplete_json = r#"{"user_id": "test_user"}"#; // Missing csrf_token, expires_at, ttl
         let cache_data = CacheData {
             value: incomplete_json.to_string(),
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
         GENERIC_CACHE_STORE
