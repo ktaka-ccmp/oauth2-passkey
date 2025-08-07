@@ -29,6 +29,12 @@
   - **Types**: SessionId, UserId, CredentialId, CsrfToken, CachePrefix, CacheKey, Challenge, OAuth2State, OAuthProvider, and others
   - **Benefits**: Compile-time safety, zero runtime overhead, impossible to bypass validation, defense-in-depth security
   - **Security Impact**: Eliminates privilege escalation vulnerabilities, prevents injection attacks, provides consistent validation across all layers
+
+- **Simplify OAuth2 Account Linking API**: Current implementation requires understanding CSRF tokens, page session tokens, and coordinating multiple API calls (50+ lines of code). Need simpler, more intuitive API. See detailed analysis and proposed solutions in `docs/oauth2-account-linking-api-simplification.md`.
+- **Finalize Public API**: Review and document all public interfaces for 1.0 release
+
+### Medium Priority
+
 - **Expand OAuth2 Provider Support**: Add GitHub, Apple, Microsoft providers
 - **Add Database Support**: MySQL/MariaDB support for more deployment options
 - **Improve Demo Applications**: Custom login UI and user attribute extension examples
