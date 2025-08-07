@@ -114,7 +114,7 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    let user = match get_user(&user_id).await {
+    let user = match get_user(&auth_user.session_id, &user_id).await {
         Ok(user) => user,
         Err(e) => {
             tracing::error!("Failed to fetch user: {:?}", e);

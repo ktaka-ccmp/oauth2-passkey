@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Essential Guidelines
+
+**CRITICAL**: Always observe these fundamental principles:
+- **Never go beyond the scope of the request**
+- **Never shortcut what was requested**
+
+These guidelines ensure focused, complete work that addresses exactly what the user needs without unnecessary additions or omissions.
+
 ## Project Overview
 
 This is a Rust authentication library providing OAuth2 (Google) and WebAuthn/Passkey authentication for web applications, with Axum framework integration.

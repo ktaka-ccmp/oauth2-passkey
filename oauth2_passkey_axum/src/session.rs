@@ -56,6 +56,7 @@ impl IntoResponse for AuthRedirect {
 /// * `updated_at` - When the user account was last updated
 /// * `csrf_token` - CSRF token associated with the user's session
 /// * `csrf_via_header_verified` - Whether CSRF token was verified via header
+/// * `session_id` - The session ID for making secure API calls
 ///
 /// # Example
 ///
@@ -90,6 +91,8 @@ pub struct AuthUser {
     pub csrf_token: String,
     /// Whether CSRF token was verified via header
     pub csrf_via_header_verified: bool,
+    /// The session ID for making secure API calls
+    pub session_id: String,
 }
 
 impl From<&AuthUser> for SessionUser {
@@ -118,6 +121,7 @@ impl From<SessionUser> for AuthUser {
             updated_at: session_user.updated_at,
             csrf_token: String::new(),
             csrf_via_header_verified: false,
+            session_id: String::new(),
         }
     }
 }
@@ -155,6 +159,7 @@ where
 
         let mut auth_user = AuthUser::from(session_user);
         auth_user.csrf_token = session_csrf_token_str.as_str().to_string(); // Store the session's CSRF token
+        auth_user.session_id = session_cookie.to_string(); // Store the session ID for secure API calls
 
         // Verify CSRF token for state-changing methods
         if method == Method::POST
@@ -274,6 +279,7 @@ mod tests {
         // Verify default values for AuthUser-specific fields
         assert_eq!(auth_user.csrf_token, "");
         assert!(!auth_user.csrf_via_header_verified);
+        assert_eq!(auth_user.session_id, "");
     }
 
     /// Test the conversion from AuthUser to SessionUser
@@ -292,6 +298,7 @@ mod tests {
             updated_at: now,
             csrf_token: "csrf-token-value".to_string(),
             csrf_via_header_verified: true,
+            session_id: "session-123".to_string(),
         };
 
         // Convert to SessionUser

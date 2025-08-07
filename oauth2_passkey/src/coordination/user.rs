@@ -2,14 +2,36 @@ use crate::oauth2::{AccountSearchField, OAuth2Store};
 use crate::passkey::{CredentialSearchField, PasskeyStore};
 use crate::userdb::{User, UserStore};
 
+use super::auth_helpers::{validate_admin_or_owner_session, validate_owner_session};
 use super::errors::CoordinationError;
 
 /// Update a user's account and label
+///
+/// This function allows users to update their own account information.
+/// Only the account owner can perform this operation.
+///
+/// # Arguments
+///
+/// * `session_id` - The session ID of the user performing the action
+/// * `user_id` - The ID of the user whose account will be updated
+/// * `account` - The new account name (optional)
+/// * `label` - The new label (optional)
+///
+/// # Returns
+///
+/// * `Ok(User)` - The updated user account information
+/// * `Err(CoordinationError::Unauthorized)` - If the user is not the account owner
+/// * `Err(CoordinationError::ResourceNotFound)` - If the target user doesn't exist
+/// * `Err(CoordinationError)` - If another error occurs during the update
 pub async fn update_user_account(
+    session_id: &str,
     user_id: &str,
     account: Option<String>,
     label: Option<String>,
 ) -> Result<User, CoordinationError> {
+    // Validate owner session with fresh database lookup
+    let _owner_user = validate_owner_session(session_id, user_id).await?;
+
     // Get the current user
     let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
         CoordinationError::ResourceNotFound {
@@ -34,8 +56,29 @@ pub async fn update_user_account(
 
 /// Delete a user account and all associated OAuth2 accounts and Passkey credentials
 ///
+/// This function allows either an administrator (who can delete any user) or the user
+/// themselves (who can delete their own account) to perform the deletion.
+///
+/// # Arguments
+///
+/// * `session_id` - The session ID of the user performing the action
+/// * `user_id` - The ID of the user account to delete
+///
+/// # Returns
+///
+/// * `Ok(Vec<String>)` - A list of deleted passkey credential IDs for client-side notification
+/// * `Err(CoordinationError::Unauthorized)` - If the user is neither admin nor account owner
+/// * `Err(CoordinationError::ResourceNotFound)` - If the target user doesn't exist
+/// * `Err(CoordinationError)` - If another error occurs during deletion
+///
 /// Returns a list of deleted passkey credential IDs for client-side notification
-pub async fn delete_user_account(user_id: &str) -> Result<Vec<String>, CoordinationError> {
+pub async fn delete_user_account(
+    session_id: &str,
+    user_id: &str,
+) -> Result<Vec<String>, CoordinationError> {
+    // Validate admin or owner session with fresh database lookup
+    let _authorized_user = validate_admin_or_owner_session(session_id, user_id).await?;
+
     // Check if the user exists
     let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
         CoordinationError::ResourceNotFound {
@@ -103,6 +146,7 @@ mod tests {
 
     use crate::oauth2::OAuth2Store;
     use crate::passkey::{PasskeyCredential, PasskeyStore};
+    use crate::session::{insert_test_session, insert_test_user};
     use crate::userdb::{User, UserStore};
 
     // Helper function to create a test user
@@ -166,8 +210,8 @@ mod tests {
     /// Test successful update of a user account
     ///
     /// This test verifies that `update_user_account` correctly updates a user account
-    /// when given valid input. It creates a test user in the database, calls the update
-    /// function, and verifies both the return value and the updated database state.
+    /// when given valid input. It creates a test user in the database with a session,
+    /// calls the update function, and verifies both the return value and the updated database state.
     ///
     #[serial]
     #[tokio::test]
@@ -175,15 +219,21 @@ mod tests {
         use crate::test_utils::init_test_environment;
         init_test_environment().await;
 
-        // 1. Create initial user directly in the DB
-        let initial_user = create_test_user("test-user", "old-account", "Old Label");
-        UserStore::upsert_user(initial_user.clone())
+        let user_id = "test-user";
+        let session_id = "test-session-user";
+
+        // 1. Create user and session using test utilities
+        insert_test_user(user_id, "old-account", "Old Label", false)
             .await
-            .expect("Failed to insert initial user");
+            .expect("Failed to create test user");
+        insert_test_session(session_id, user_id, "test-csrf", 3600)
+            .await
+            .expect("Failed to create test session");
 
         // 2. Call the actual function from the parent module
         let result = super::update_user_account(
-            "test-user",
+            session_id, // session_id with valid session
+            user_id,    // user_id
             Some("new-account".to_string()),
             Some("New Label".to_string()),
         )
@@ -196,12 +246,12 @@ mod tests {
             result.err()
         );
         let updated_user_from_func = result.unwrap();
-        assert_eq!(updated_user_from_func.id, "test-user");
+        assert_eq!(updated_user_from_func.id, user_id);
         assert_eq!(updated_user_from_func.account, "new-account");
         assert_eq!(updated_user_from_func.label, "New Label");
 
         // 4. Verify directly from DB for extra confidence
-        let user_from_db = UserStore::get_user("test-user")
+        let user_from_db = UserStore::get_user(user_id)
             .await
             .expect("DB error getting user")
             .expect("User not found in DB after update");
@@ -219,25 +269,39 @@ mod tests {
     async fn test_update_user_account_not_found() {
         init_test_environment().await;
 
-        // Call the actual function with a non-existent user
+        let session_user_id = "session-user";
+        let session_id = "test-session";
+        let nonexistent_user_id = "nonexistent-user";
+
+        // Create a session user (who will try to update a non-existent user)
+        insert_test_user(
+            session_user_id,
+            "session@example.com",
+            "Session User",
+            false,
+        )
+        .await
+        .expect("Failed to create session user");
+        insert_test_session(session_id, session_user_id, "test-csrf", 3600)
+            .await
+            .expect("Failed to create session");
+
+        // Call the actual function with a non-existent target user
         let result = super::update_user_account(
-            "nonexistent-user",
+            session_id,          // session_id (valid session)
+            nonexistent_user_id, // user_id (non-existent)
             Some("new-account".to_string()),
             Some("New Label".to_string()),
         )
         .await;
 
-        // Verify the result
+        // Verify the result - should fail with Unauthorized because session user != target user
         assert!(result.is_err());
         match result {
-            Err(CoordinationError::ResourceNotFound {
-                resource_type,
-                resource_id,
-            }) => {
-                assert_eq!(resource_type, "User");
-                assert_eq!(resource_id, "nonexistent-user");
+            Err(CoordinationError::Unauthorized) => {
+                // Expected - session user cannot update other users unless they are the same
             }
-            _ => panic!("Expected ResourceNotFound error, got {result:?}"),
+            _ => panic!("Expected Unauthorized error, got {result:?}"),
         }
     }
 
@@ -310,8 +374,14 @@ mod tests {
             .await
             .expect("Failed to upsert oauth_acc2");
 
+        // Create session for the user (user deleting their own account)
+        let session_id = format!("test-session-{timestamp}");
+        insert_test_session(&session_id, &user_id_to_delete, "test-csrf", 3600)
+            .await
+            .expect("Failed to create session");
+
         // 4. Call the actual function
-        let result = super::delete_user_account(&user_id_to_delete).await;
+        let result = super::delete_user_account(&session_id, &user_id_to_delete).await;
 
         // 5. Verify returned credential IDs
         assert!(
@@ -368,18 +438,31 @@ mod tests {
     async fn test_delete_user_account_not_found() {
         init_test_environment().await;
 
-        let result = super::delete_user_account("nonexistent-user").await;
+        let session_user_id = "session-user";
+        let session_id = "test-session";
+        let nonexistent_user_id = "nonexistent-user";
+
+        // Create a session user (who will try to delete a non-existent user)
+        insert_test_user(
+            session_user_id,
+            "session@example.com",
+            "Session User",
+            false,
+        )
+        .await
+        .expect("Failed to create session user");
+        insert_test_session(session_id, session_user_id, "test-csrf", 3600)
+            .await
+            .expect("Failed to create session");
+
+        let result = super::delete_user_account(session_id, nonexistent_user_id).await;
 
         assert!(result.is_err());
         match result {
-            Err(CoordinationError::ResourceNotFound {
-                resource_type,
-                resource_id,
-            }) => {
-                assert_eq!(resource_type, "User");
-                assert_eq!(resource_id, "nonexistent-user");
+            Err(CoordinationError::Unauthorized) => {
+                // Expected - session user cannot delete other users unless they are the same or admin
             }
-            _ => panic!("Expected ResourceNotFound error, got {result:?}"),
+            _ => panic!("Expected Unauthorized error, got {result:?}"),
         }
     }
 
