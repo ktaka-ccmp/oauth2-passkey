@@ -21,6 +21,13 @@
   - **Pattern**: `async fn secure_operation(session_id: &str) -> Result<(), Error>` with fresh DB lookups
   - **Alternative Approaches**: See `docs/authorization-security-patterns.md` for helper functions (recommended) and middleware patterns that centralize authorization logic. Helper functions provide simple one-liners at the top of each function.
   - **Impact**: Prevents privilege escalation, eliminates session tampering risks
+- **Type-Safe Input Validation**: Replace string parameters with validated newtypes to prevent invalid input at compile time and eliminate runtime validation overhead.
+  - **High Priority Candidates**: `SessionId`, `UserId`, `CredentialId`, `CsrfToken` - frequently used, security-critical identifiers
+  - **Pattern**: `struct SessionId(String)` with `new()` constructor that validates length/format once at creation
+  - **Implementation Details**: See `docs/type-safe-input-validation.md` for complete implementation examples and migration strategy
+  - **Benefits**: Compile-time safety, zero runtime overhead after construction, impossible to bypass validation
+  - **Impact**: Eliminates entire classes of input validation bugs, prevents DoS via oversized identifiers
+  - **Example**: `pub async fn update_user_admin_status(session_id: SessionId, user_id: UserId, is_admin: bool)`
 - **Simplify OAuth2 Account Linking API**: Current implementation requires understanding CSRF tokens, page session tokens, and coordinating multiple API calls (50+ lines of code). Need simpler, more intuitive API. See detailed analysis and proposed solutions in `docs/oauth2-account-linking-api-simplification.md`.
 - **Finalize Public API**: Review and document all public interfaces for 1.0 release
 
