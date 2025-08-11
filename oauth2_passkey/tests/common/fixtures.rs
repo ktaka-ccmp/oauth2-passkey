@@ -741,7 +741,8 @@ impl MockWebAuthnCredentials {
         // Increment and get next counter value - guaranteed to be unique and increasing
         // Note: fetch_add returns the OLD value, so we add 1 to get the NEW value
         // Use wrapping_add to handle potential u32 overflow gracefully (though unlikely in tests)
-        let counter_value = COUNTER_BASE.fetch_add(1, Ordering::SeqCst).wrapping_add(1);
+        // Use Relaxed ordering for consistency and performance - only atomicity needed, not strict ordering
+        let counter_value = COUNTER_BASE.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
         auth_data.extend_from_slice(&counter_value.to_be_bytes());
 
         // No attested credential data for authentication
