@@ -85,7 +85,7 @@ async fn ensure_database_initialized() {
         eprintln!("Warning: Failed to initialize PasskeyStore: {e}");
     }
 
-    // Create a first user if no users exist (OAuth2 only for now)
+    // Create a first user if no users exist (with both OAuth2 and Passkey credentials)
     create_first_user_if_needed().await;
 }
 
@@ -118,6 +118,9 @@ async fn create_first_user_if_needed() {
 
                     // Create OAuth2 account for authentication testing
                     create_first_user_oauth2_account(&created_user.id).await;
+
+                    // Create Passkey credential for authentication testing
+                    create_first_user_passkey_credential(&created_user.id).await;
                 }
                 Err(e) => {
                     eprintln!("Warning: Failed to create first test user: {e}");
@@ -143,6 +146,9 @@ async fn create_first_user_if_needed() {
 
                 // Ensure first user has OAuth2 account for authentic testing
                 ensure_first_user_has_oauth2_account(&first.id).await;
+
+                // Ensure first user has Passkey credential for authentic testing
+                ensure_first_user_has_passkey_credential(&first.id).await;
             }
         }
         Err(e) => {
@@ -158,7 +164,7 @@ async fn create_first_user_oauth2_account(user_id: &str) {
 
     let now = Utc::now();
     let provider = "google";
-    let provider_user_id = format!("{}_first-user-test-google-id", provider);
+    let provider_user_id = format!("{provider}_first-user-test-google-id");
     let test_oauth2_account = OAuth2Account {
         id: "first-user-oauth2-account".to_string(),
         user_id: user_id.to_string(),
@@ -202,60 +208,98 @@ async fn ensure_first_user_has_oauth2_account(user_id: &str) {
     }
 }
 
-// TODO: Passkey credential creation disabled for now - needs proper API access
-// /// Creates a test Passkey credential for the first user to enable authentic authentication testing
-// async fn create_first_user_passkey_credential(user_id: &str) {
-//     use crate::passkey::{PasskeyStore, PasskeyCredential, PublicKeyCredentialUserEntity};
-//     use chrono::Utc;
-//
-//     let now = Utc::now();
-//
-//     // Create a test passkey credential with known values for testing
-//     let test_passkey_credential = PasskeyCredential {
-//         credential_id: "first-user-test-passkey-credential".to_string(),
-//         user_id: user_id.to_string(),
-//         public_key: "pQECAyYgASFYIIs-3FbrvHKA5KLYBZaEPUQeYIAY4U9qPcFgzp9Q9dAlIlggL2qPcxpGwz38P2iO3vKKhE7qJoRiPY3H7sGq2dECMwk".to_string(), // Known test P-256 public key (base64)
-//         aaguid: "00000000-0000-0000-0000-000000000000".to_string(), // Test AAGUID
-//         counter: 0,
-//         user: PublicKeyCredentialUserEntity {
-//             user_handle: "first-user-handle".to_string(),
-//             name: "first-user@example.com".to_string(),
-//             display_name: "First User".to_string(),
-//         },
-//         created_at: now,
-//         updated_at: now,
-//         last_used_at: now,
-//     };
-//
-//     match PasskeyStore::store_credential("first-user-test-passkey-credential".to_string(), test_passkey_credential).await {
-//         Ok(_) => {
-//             println!("✅ Created first user Passkey credential for testing");
-//         },
-//         Err(e) => {
-//             eprintln!("Warning: Failed to create first user Passkey credential: {e}");
-//         }
-//     }
-// }
+/// Creates a test Passkey credential for the first user to enable authentic authentication testing
+///
+/// This creates a WebAuthn credential with a fixed public key that corresponds to the private key
+/// used in mock authentication. This ensures signature verification works correctly in integration tests.
+///
+/// **Credential Flow**: Store public key → Mock auth signs with private key → Verification succeeds
+async fn create_first_user_passkey_credential(user_id: &str) {
+    // Use the internal passkey module imports since this is test utility code
+    use crate::passkey::{PasskeyCredential, PasskeyStore};
+    use chrono::Utc;
 
-// /// Ensures the first user has a Passkey credential (for cases where user exists but credential doesn't)
-// async fn ensure_first_user_has_passkey_credential(user_id: &str) {
-//     use crate::passkey::{PasskeyStore, CredentialSearchField};
-//
-//     // Check if first user already has Passkey credentials
-//     match PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_string())).await {
-//         Ok(credentials) if credentials.is_empty() => {
-//             // No Passkey credentials exist for first user, create one
-//             println!("ℹ️ First user exists but has no Passkey credential, creating one...");
-//             create_first_user_passkey_credential(user_id).await;
-//         },
-//         Ok(credentials) => {
-//             println!("✅ First user has {} Passkey credential(s)", credentials.len());
-//         },
-//         Err(e) => {
-//             eprintln!("Warning: Failed to check first user Passkey credentials: {e}");
-//         }
-//     }
-// }
+    let now = Utc::now();
+
+    // Get the fixed public key that corresponds to FIRST_USER_PRIVATE_KEY in integration tests
+    // This mathematical relationship enables proper WebAuthn signature verification
+    let public_key = generate_first_user_public_key();
+
+    // Create a test passkey credential with consistent key for testing
+    // Note: We construct the user entity directly here since it's internal test code
+    let test_passkey_credential = PasskeyCredential {
+        credential_id: "first-user-test-passkey-credential".to_string(),
+        user_id: user_id.to_string(),
+        public_key,
+        aaguid: "00000000-0000-0000-0000-000000000000".to_string(), // Test AAGUID
+        counter: 0,
+        user: serde_json::from_value(serde_json::json!({
+            "user_handle": "first-user-handle",
+            "name": "first-user@example.com",
+            "displayName": "First User"
+        }))
+        .expect("Valid user entity JSON"),
+        created_at: now,
+        updated_at: now,
+        last_used_at: now,
+    };
+
+    match PasskeyStore::store_credential(
+        "first-user-test-passkey-credential".to_string(),
+        test_passkey_credential,
+    )
+    .await
+    {
+        Ok(_) => {
+            println!("✅ Created first user Passkey credential for testing");
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to create first user Passkey credential: {e}");
+        }
+    }
+}
+
+/// Get the fixed ECDSA P-256 public key for the first user credentials
+///
+/// This public key is mathematically derived from the private key stored in `fixtures.rs`.
+/// Both are part of the same cryptographic key pair used for WebAuthn signature verification.
+///
+/// **Key Derivation**: This public key = FIRST_USER_PRIVATE_KEY × Generator Point (P-256 curve)
+/// **Format**: Base64url-encoded uncompressed point coordinates (64 bytes: 32-byte X + 32-byte Y)
+/// **Usage**: Stored in database credential → verifies signatures created by corresponding private key
+///
+/// 🔗 **Related**: See `fixtures.rs::first_user_key_pair()` for the matching private key
+fn generate_first_user_public_key() -> String {
+    // Fixed ECDSA P-256 public key in WebAuthn format (base64url-encoded coordinates)
+    // Corresponds to private key in FIRST_USER_PRIVATE_KEY (fixtures.rs)
+    // Coordinate breakdown: BB...Ps = X(32 bytes) + Y(32 bytes) in base64url
+    "BBtOg4PEjnY2yQkrPjL832Obw0qJxiR-vIoUjjMmkKbyNjO4tT3blJAlPI5Y39nDiNkn7UnkCFZIS39cYp9nLPs"
+        .to_string()
+}
+
+/// Ensures the first user has a Passkey credential (for cases where user exists but credential doesn't)
+async fn ensure_first_user_has_passkey_credential(user_id: &str) {
+    use crate::passkey::{CredentialSearchField, PasskeyStore};
+
+    // Check if first user already has Passkey credentials
+    match PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_string())).await
+    {
+        Ok(credentials) if credentials.is_empty() => {
+            // No Passkey credentials exist for first user, create one
+            println!("ℹ️ First user exists but has no Passkey credential, creating one...");
+            create_first_user_passkey_credential(user_id).await;
+        }
+        Ok(credentials) => {
+            println!(
+                "✅ First user has {} Passkey credential(s)",
+                credentials.len()
+            );
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to check first user Passkey credentials: {e}");
+        }
+    }
+}
 
 /// Extract SQLite database file path from a database URL string
 ///

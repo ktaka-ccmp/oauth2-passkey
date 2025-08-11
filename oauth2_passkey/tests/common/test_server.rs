@@ -162,8 +162,6 @@ impl TestServer {
             println!("🚀 Initializing oauth2_passkey library...");
             oauth2_passkey::init().await?;
 
-            // Note: Not creating first user here - let individual tests create users as needed
-
             OAUTH2_PASSKEY_INITIALIZED.store(true, std::sync::atomic::Ordering::Release);
             println!("✅ oauth2_passkey library initialized successfully");
         } else {

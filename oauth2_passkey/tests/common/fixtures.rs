@@ -1,3 +1,22 @@
+//! Test fixtures and mock data generators for oauth2-passkey integration tests
+//!
+//! This module provides utilities for generating consistent test data including:
+//! - Mock WebAuthn credentials and responses with **cryptographically valid signatures**
+//! - OAuth2 user information and tokens  
+//! - Test users with various authentication scenarios
+//!
+//! ## Key Cryptographic Components
+//!
+//! **Fixed ECDSA P-256 Key Pair**: A mathematically related private/public key pair ensures
+//! that mock WebAuthn authentication produces valid signatures that can be verified by the
+//! stored credentials, enabling end-to-end testing of the cryptographic verification flow.
+//!
+//! - `first_user_key_pair()` → Private key for signing authentication challenges
+//! - `test_utils.rs::generate_first_user_public_key()` → Public key for signature verification
+//!
+//! All generated data is designed to work seamlessly with the authentication flows
+//! while providing deterministic behavior for reliable testing.
+
 use base64::{Engine as _, engine::general_purpose};
 use ciborium::value::{Integer, Value as CborValue};
 use ring::signature::KeyPair;
@@ -94,6 +113,55 @@ impl MockWebAuthnCredentials {
     fn generate_unique_credential_id() -> String {
         let uuid = Uuid::new_v4().to_string().replace("-", "");
         format!("mock_cred_{}", &uuid[..16])
+    }
+
+    /// Get the fixed ECDSA P-256 key pair for the first user
+    ///
+    /// This ensures both the stored credential (public key) and mock authentication (private key)
+    /// use the same cryptographic key pair, enabling proper WebAuthn signature verification in tests.
+    ///
+    /// **Key Pair Relationship**: Public Key = Private Key × Generator Point (P-256 curve)
+    /// - Private Key: 32-byte scalar embedded in PKCS#8 DER structure below
+    /// - Public Key: Uncompressed point coordinates (X,Y) → base64url encoded for WebAuthn
+    /// - Verification: Private key signs challenge → Public key verifies signature
+    ///
+    /// **Generation Process**: Created using Ring cryptography library:
+    /// ```rust
+    /// use ring::{rand, signature};
+    /// let rng = rand::SystemRandom::new();
+    /// let pkcs8_bytes = signature::EcdsaKeyPair::generate_pkcs8(
+    ///     &signature::ECDSA_P256_SHA256_ASN1_SIGNING, &rng
+    /// ).expect("Failed to generate key pair");
+    /// // Then extracted the bytes and derived the public key
+    /// ```
+    ///
+    /// ⚠️ **TEST ONLY**: This private key is publicly visible - never use in production!
+    pub fn first_user_key_pair() -> Vec<u8> {
+        // Fixed ECDSA P-256 private key in PKCS#8 DER format (131 bytes)
+        // Generated with Ring cryptography library using proper entropy
+        // Corresponds to public key: "BBtOg4PEjnY2yQkrPjL832Obw0qJxiR-vIoUjjMmkKbyNjO4tT3blJAlPI5Y39nDiNkn7UnkCFZIS39cYp9nLPs"
+        /*
+         * ECDSA P-256 Private Key in PKCS#8 DER format (131 bytes total)
+         *
+         * Structure breakdown:
+         *   Bytes 0-5:    SEQUENCE header, version=0
+         *   Bytes 6-20:   Algorithm identifier (ecPublicKey + secp256r1)
+         *   Bytes 21-24:  Private key container header
+         *   Bytes 25-56:  32-byte private key scalar (the secret)
+         *   Bytes 57-61:  Public key section header
+         *   Bytes 62-126: 65-byte public key (0x04 + X coordinate + Y coordinate)
+         */
+        const FIRST_USER_PRIVATE_KEY: &[u8] = &[
+            48, 129, 135, 2, 1, 0, 48, 19, 6, 7, 42, 134, 72, 206, 61, 2, 1, 6, 8, 42, 134, 72,
+            206, 61, 3, 1, 7, 4, 109, 48, 107, 2, 1, 1, 4, 32, 139, 153, 75, 135, 130, 135, 200,
+            113, 147, 74, 215, 126, 194, 20, 14, 216, 17, 194, 26, 44, 245, 110, 139, 6, 6, 189,
+            51, 208, 44, 171, 153, 197, 161, 68, 3, 66, 0, 4, 27, 78, 131, 131, 196, 142, 118, 54,
+            201, 9, 43, 62, 50, 252, 223, 99, 155, 195, 74, 137, 198, 36, 126, 188, 138, 20, 142,
+            51, 38, 144, 166, 242, 54, 51, 184, 181, 61, 219, 148, 144, 37, 60, 142, 88, 223, 217,
+            195, 136, 217, 39, 237, 73, 228, 8, 86, 72, 75, 127, 92, 98, 159, 103, 44, 251,
+        ];
+
+        FIRST_USER_PRIVATE_KEY.to_vec()
     }
 
     /// Helper function to create a valid test attestation object with "none" format
@@ -649,8 +717,18 @@ impl MockWebAuthnCredentials {
         // Flags (1 byte) - UP (0x01) | UV (0x04) = 0x05 (no AT flag for authentication)
         auth_data.push(0x05);
 
-        // Signature counter (4 bytes) - should be incremented but using 1 for simplicity
-        auth_data.extend_from_slice(&[0x00, 0x00, 0x00, 0x01]);
+        // WebAuthn signature counter (4 bytes big-endian) - CRITICAL for security
+        //
+        // **Counter Rules**: Must always increase to prevent replay attacks and credential cloning
+        // **Test Problem**: Fixed counter values cause "Counter value decreased" errors in repeated tests
+        // **Solution**: Use timestamp-based counter that always increases with each authentication attempt
+        //
+        // Real authenticators increment this value on each use; we simulate this behavior in tests
+        let counter_value = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as u32;
+        auth_data.extend_from_slice(&counter_value.to_be_bytes());
 
         // No attested credential data for authentication
 
@@ -1136,25 +1214,17 @@ impl MockWebAuthnCredentials {
         auth_id: &str,
         user_handle: &str,
     ) -> Value {
-        // For the first user testing, use the same key generation logic that's used in
-        // create_packed_attestation_with_key_pair but with SystemRandom for validity
-        // This generates a proper key that works with the crypto library
-        use ring::{rand, signature};
+        // Use the fixed key pair for the first user to ensure consistency
+        // between the stored credential and mock authentication
+        let key_pair_bytes = Self::first_user_key_pair();
 
-        let rng = rand::SystemRandom::new();
-        let pkcs8_bytes = signature::EcdsaKeyPair::generate_pkcs8(
-            &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
-            &rng,
-        )
-        .expect("Failed to generate key pair");
-
-        // Use the existing method with the generated key
+        // Use the existing method with the fixed key
         Self::authentication_response_with_stored_credential(
             credential_id,
             challenge,
             auth_id,
             user_handle,
-            pkcs8_bytes.as_ref(),
+            &key_pair_bytes,
         )
     }
 

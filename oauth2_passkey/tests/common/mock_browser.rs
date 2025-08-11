@@ -82,7 +82,9 @@ impl MockBrowser {
             request = request.header(*key, *value);
         }
 
-        request.send().await
+        let response = request.send().await?;
+        self.extract_cookies_from_response(&response);
+        Ok(response)
     }
 
     /// Make a POST request with JSON data

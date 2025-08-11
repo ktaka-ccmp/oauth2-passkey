@@ -11,7 +11,7 @@ pub(crate) mod validation_utils;
 
 // OAuth2 authentication helper for first user (secure approach)
 // Secure authentication helpers - NO BACKDOORS, only authentic authentication flows
-pub(crate) use secure_auth::create_admin_session_via_oauth2;
+pub(crate) use secure_auth::{create_admin_session_via_oauth2, create_admin_session_via_passkey};
 
 pub(crate) use fixtures::*;
 pub(crate) use mock_browser::MockBrowser;

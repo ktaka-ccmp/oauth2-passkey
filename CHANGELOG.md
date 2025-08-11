@@ -10,12 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - **CRITICAL FIX**: Fixed passkey registration vulnerability where users were created before challenge validation, preventing orphaned user records on validation failures
+- **BREAKING**: Enhanced admin function security by requiring session ID validation with fresh database lookups instead of trusting session data, preventing privilege escalation attacks
 
 ### Changed
 
 - **OIDC Discovery**: Automatic endpoint discovery from `/.well-known/openid-configuration`
 - **OAuth2 endpoint configuration**: Replaced hardcoded Google URLs with dynamic discovery
 - **Passkey Registration**: Refactored to validate challenges before user creation, eliminating double validation and optimizing cleanup timing
+- **BREAKING**: `SessionUser.sequence_number` field changed from `i64` to `Option<i64>` for database consistency
+- **Database**: Enhanced SQLite connection with WAL journaling, memory temp storage, and optimized pragmas for better performance
+
+### Breaking Changes
+
+- **Admin Functions**: All admin functions now require `session_id` parameter instead of `SessionUser` object:
+  - `get_all_users(session_id: &str)` - was `get_all_users()`
+  - `get_user(session_id: &str, user_id: &str)` - was `get_user(user_id: &str)`
+  - `delete_user_account_admin(session_id: &str, user_id: &str)` - was `delete_user_account_admin(user_id: &str)`
+  - `delete_passkey_credential_admin(session_id: &str, credential_id: &str)` - was `delete_passkey_credential_admin(user: &SessionUser, credential_id: &str)`
+  - `delete_oauth2_account_admin(session_id: &str, provider_user_id: &str)` - was `delete_oauth2_account_admin(user: &SessionUser, provider_user_id: &str)`
+  - `update_user_admin_status(session_id: &str, user_id: &str, is_admin: bool)` - was `update_user_admin_status(admin_user: &SessionUser, user_id: &str, is_admin: bool)`
+
+- **User Functions**: User account management functions now require `session_id` parameter:
+  - `update_user_account(session_id: &str, user_id: &str, account: Option<String>, label: Option<String>)` - was `update_user_account(user_id: &str, account: Option<String>, label: Option<String>)`
+  - `delete_user_account(session_id: &str, user_id: &str)` - was `delete_user_account(user_id: &str)`
+
+- **Type Changes**: `SessionUser.sequence_number` type changed from `i64` to `Option<i64>` to match database schema consistency
 
 ## [0.1.3] - 2025-07-12
 

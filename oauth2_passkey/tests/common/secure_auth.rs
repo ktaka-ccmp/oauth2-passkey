@@ -82,7 +82,7 @@ pub(crate) async fn create_admin_session_via_oauth2(
 ///
 /// # Returns  
 /// Returns a session ID that can be used with coordination functions requiring admin privileges
-pub async fn create_admin_session_via_passkey(
+pub(crate) async fn create_admin_session_via_passkey(
     base_url: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let browser = MockBrowser::new(base_url, true);
