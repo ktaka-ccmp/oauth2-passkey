@@ -720,14 +720,29 @@ impl MockWebAuthnCredentials {
         // WebAuthn signature counter (4 bytes big-endian) - CRITICAL for security
         //
         // **Counter Rules**: Must always increase to prevent replay attacks and credential cloning
-        // **Test Problem**: Fixed counter values cause "Counter value decreased" errors in repeated tests
-        // **Solution**: Use timestamp-based counter that always increases with each authentication attempt
+        // **Test Problem**: Timestamp-based counters can have same value in rapid succession (CI/parallel tests)
+        // **Solution**: Use atomic counter with timestamp base to ensure monotonic increase
         //
         // Real authenticators increment this value on each use; we simulate this behavior in tests
-        let counter_value = std::time::SystemTime::now()
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static COUNTER_BASE: AtomicU32 = AtomicU32::new(0);
+
+        // Get current timestamp as base counter value
+        let timestamp_base = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs() as u32;
+
+        // Use fetch_max to ensure counter is at least timestamp_base (handles initialization and growth)
+        // This is atomic and thread-safe - if multiple threads call this, all will get increasing values
+        // Use Relaxed ordering since we only need atomicity, not specific inter-thread ordering
+        COUNTER_BASE.fetch_max(timestamp_base, Ordering::Relaxed);
+
+        // Increment and get next counter value - guaranteed to be unique and increasing
+        // Note: fetch_add returns the OLD value, so we add 1 to get the NEW value
+        // Use wrapping_add to handle potential u32 overflow gracefully (though unlikely in tests)
+        // Use Relaxed ordering for consistency and performance - only atomicity needed, not strict ordering
+        let counter_value = COUNTER_BASE.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
         auth_data.extend_from_slice(&counter_value.to_be_bytes());
 
         // No attested credential data for authentication
