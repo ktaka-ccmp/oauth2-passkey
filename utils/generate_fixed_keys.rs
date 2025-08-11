@@ -13,6 +13,10 @@
 //!   - Public key in WebAuthn base64url format (for test_utils.rs)
 
 use ring::{rand, signature};
+use ring::signature::KeyPair;
+use base64::Engine;
+use std::fs;
+use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🔑 Generating ECDSA P-256 key pair for oauth2-passkey test suite...\n");
@@ -22,13 +26,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pkcs8_bytes = signature::EcdsaKeyPair::generate_pkcs8(
         &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
         &rng,
-    )?;
+    ).map_err(|e| format!("Failed to generate key pair: {:?}", e))?;
 
     // Create key pair object to extract public key
     let key_pair = signature::EcdsaKeyPair::from_pkcs8(
         &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
         pkcs8_bytes.as_ref(),
-    )?;
+        &rng,
+    ).map_err(|e| format!("Failed to create key pair: {:?}", e))?;
 
     let public_key_bytes = key_pair.public_key().as_ref();
 
