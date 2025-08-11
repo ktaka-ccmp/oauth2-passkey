@@ -42,7 +42,7 @@ pub async fn update_user_admin_status(
 // Validate session + fetch fresh user data from database
 pub async fn update_user_admin_status(
     session_id: SessionId,     // ✅ Validated session identifier
-    user_id: UserId,          // ✅ Validated user identifier  
+    user_id: UserId,          // ✅ Validated user identifier
     is_admin: bool,
 ) -> Result<User, CoordinationError> {
     let _admin_user = validate_admin_session(session_id).await?;  // Fresh DB lookup
@@ -134,7 +134,7 @@ impl InMemoryCacheStore {
 ```rust
 // Current: Unvalidated strings in database operations
 pub enum UserSearchField {
-    Id(String),              // ❌ No validation  
+    Id(String),              // ❌ No validation
     SequenceNumber(i64),     // ✅ Already type-safe
 }
 
@@ -147,7 +147,7 @@ pub enum CredentialSearchField {
 // Better: Validated enum variants
 pub enum UserSearchField {
     Id(UserId),              // ✅ Validated user identifier
-    SequenceNumber(i64),     
+    SequenceNumber(i64),
 }
 
 pub enum CredentialSearchField {
@@ -181,21 +181,21 @@ impl SessionId {
         if id.is_empty() {
             return Err(CoordinationError::InvalidInput("Session ID cannot be empty".to_string()));
         }
-        
+
         if id.len() > MAX_SESSION_ID_LENGTH {
             return Err(CoordinationError::InvalidInput(
                 format!("Session ID too long: {} bytes (max: {})", id.len(), MAX_SESSION_ID_LENGTH)
             ));
         }
-        
+
         // Validate character set (alphanumeric + hyphens for UUIDs)
         if !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
             return Err(CoordinationError::InvalidInput("Invalid characters in session ID".to_string()));
         }
-        
+
         Ok(SessionId(id))
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -209,16 +209,16 @@ impl UserId {
         if id.is_empty() {
             return Err(CoordinationError::InvalidInput("User ID cannot be empty".to_string()));
         }
-        
+
         if id.len() > MAX_USER_ID_LENGTH {
             return Err(CoordinationError::InvalidInput(
                 format!("User ID too long: {} bytes (max: {})", id.len(), MAX_USER_ID_LENGTH)
             ));
         }
-        
+
         Ok(UserId(id))
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -242,22 +242,22 @@ impl CachePrefix {
         if prefix.is_empty() {
             return Err(StorageError::InvalidInput("Cache prefix cannot be empty".to_string()));
         }
-        
+
         if prefix.len() > MAX_CACHE_PREFIX_LENGTH {
             return Err(StorageError::InvalidInput(
                 format!("Cache prefix too long: {} bytes (max: {})", prefix.len(), MAX_CACHE_PREFIX_LENGTH)
             ));
         }
-        
+
         // Validate characters safe for all cache backends (Redis + Memory)
         let dangerous_chars = ['\n', '\r', ' ', '\t', ':', '*'];
         if prefix.chars().any(|c| dangerous_chars.contains(&c)) {
             return Err(StorageError::InvalidInput("Cache prefix contains unsafe characters".to_string()));
         }
-        
+
         Ok(CachePrefix(prefix))
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -271,19 +271,19 @@ impl CacheKey {
         if key.is_empty() {
             return Err(StorageError::InvalidInput("Cache key cannot be empty".to_string()));
         }
-        
+
         if key.len() > MAX_CACHE_KEY_LENGTH {
             return Err(StorageError::InvalidInput(
                 format!("Cache key too long: {} bytes (max: {})", key.len(), MAX_CACHE_KEY_LENGTH)
             ));
         }
-        
+
         // Combined validation for all cache backends
         let dangerous_chars = ['\n', '\r', ' ', '\t'];
         if key.chars().any(|c| dangerous_chars.contains(&c)) {
             return Err(StorageError::InvalidInput("Cache key contains unsafe characters".to_string()));
         }
-        
+
         // Check for Redis command keywords
         let key_upper = key.to_uppercase();
         let redis_commands = ["SET", "GET", "DEL", "FLUSHDB", "FLUSHALL", "EVAL", "SCRIPT"];
@@ -294,10 +294,10 @@ impl CacheKey {
                 ));
             }
         }
-        
+
         Ok(CacheKey(key))
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -316,21 +316,21 @@ impl SessionCookie {
         if cookie.is_empty() {
             return Err(SessionError::InvalidInput("Session cookie cannot be empty".to_string()));
         }
-        
+
         if cookie.len() > 512 {
             return Err(SessionError::InvalidInput(
                 format!("Session cookie too long: {} bytes (max: 512)", cookie.len())
             ));
         }
-        
+
         // Validate cookie format (base64url or similar)
         if !cookie.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
             return Err(SessionError::InvalidInput("Invalid characters in session cookie".to_string()));
         }
-        
+
         Ok(SessionCookie(cookie))
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -345,21 +345,21 @@ impl Challenge {
         if challenge.is_empty() {
             return Err(PasskeyError::InvalidInput("Challenge cannot be empty".to_string()));
         }
-        
+
         if challenge.len() > 512 {
             return Err(PasskeyError::InvalidInput(
                 format!("Challenge too long: {} bytes (max: 512)", challenge.len())
             ));
         }
-        
+
         // Validate base64url encoding
         if !is_valid_base64url(&challenge) {
             return Err(PasskeyError::InvalidInput("Challenge must be valid base64url".to_string()));
         }
-        
+
         Ok(Challenge(challenge))
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -373,21 +373,21 @@ impl UserHandle {
         if handle.is_empty() {
             return Err(PasskeyError::InvalidInput("User handle cannot be empty".to_string()));
         }
-        
+
         if handle.len() > 128 {
             return Err(PasskeyError::InvalidInput(
                 format!("User handle too long: {} bytes (max: 128)", handle.len())
             ));
         }
-        
+
         // WebAuthn user handles are typically base64url encoded
         if !is_valid_base64url(&handle) {
             return Err(PasskeyError::InvalidInput("User handle must be valid base64url".to_string()));
         }
-        
+
         Ok(UserHandle(handle))
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -406,15 +406,15 @@ impl ChallengeType {
             ))
         }
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
-    
+
     pub fn create() -> Self {
         ChallengeType("webauthn.create".to_string())
     }
-    
+
     pub fn get() -> Self {
         ChallengeType("webauthn.get".to_string())
     }
@@ -429,21 +429,21 @@ impl OAuth2State {
         if state.is_empty() {
             return Err(OAuth2Error::InvalidInput("OAuth2 state cannot be empty".to_string()));
         }
-        
+
         if state.len() > 256 {
             return Err(OAuth2Error::InvalidInput(
                 format!("OAuth2 state too long: {} bytes (max: 256)", state.len())
             ));
         }
-        
+
         // OAuth2 state is typically base64url encoded
         if !is_valid_base64url(&state) {
             return Err(OAuth2Error::InvalidInput("OAuth2 state must be valid base64url".to_string()));
         }
-        
+
         Ok(OAuth2State(state))
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -462,11 +462,11 @@ impl OAuthProvider {
             ))
         }
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
-    
+
     pub fn google() -> Self {
         OAuthProvider("google".to_string())
     }
@@ -488,11 +488,11 @@ impl CacheCategory {
             ))
         }
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
-    
+
     pub fn challenge() -> Self {
         CacheCategory("challenge".to_string())
     }
@@ -504,7 +504,7 @@ impl CacheCategory {
 The type-safe validation approach adds database lookups for session validation but this is acceptable because:
 
 - **User operations are infrequent**: Admin/user attribute modifications happen much less than simple page authentication
-- **Interactive context**: These operations involve user forms/interactions where milliseconds don't impact UX  
+- **Interactive context**: These operations involve user forms/interactions where milliseconds don't impact UX
 - **Security priority**: Correctness trumps micro-optimizations for critical authentication functions
 - **Defense-in-depth**: Multiple validation layers provide robust security
 
@@ -514,7 +514,7 @@ The type-safe validation approach adds database lookups for session validation b
 ```rust
 // Before: Trusts session data
 pub async fn update_user_admin_status(
-    admin_user: &SessionUser, 
+    admin_user: &SessionUser,
     user_id: &str,
     is_admin: bool,
 ) -> Result<User, CoordinationError> {
@@ -524,10 +524,10 @@ pub async fn update_user_admin_status(
     // ...
 }
 
-// After: Validates against database  
+// After: Validates against database
 pub async fn update_user_admin_status(
     session_id: SessionId,
-    user_id: UserId, 
+    user_id: UserId,
     is_admin: bool,
 ) -> Result<User, CoordinationError> {
     let _admin_user = validate_admin_session(session_id).await?;  // ✅ Fresh DB lookup
@@ -565,7 +565,7 @@ let state_params = decode_state(oauth_state)?;
 
 ### Testing Strategy
 - **Unit tests for all type constructors**: Verify validation logic
-- **Integration tests**: Ensure no regressions in end-to-end flows  
+- **Integration tests**: Ensure no regressions in end-to-end flows
 - **Security tests**: Verify attack scenarios are properly blocked
 - **Performance tests**: Ensure no significant performance regression
 
@@ -583,7 +583,7 @@ let state_params = decode_state(oauth_state)?;
 - **Defense-in-depth**: Multiple validation layers throughout the stack
 - **Consistent protection**: Same security guarantees regardless of deployment configuration
 
-### Development Benefits  
+### Development Benefits
 - **Compile-time safety**: Invalid data cannot be constructed or passed to functions
 - **Clear contracts**: Function signatures explicitly show validation requirements
 - **Refactoring safety**: Compiler catches all places needing updates during changes

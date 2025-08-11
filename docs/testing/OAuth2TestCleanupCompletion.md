@@ -10,7 +10,7 @@ This document summarizes the completed OAuth2 test suite improvements, focusing 
 
 **Removed from `oauth2/errors.rs`:**
 - `test_error_display()` - Tested basic Display trait implementations for all error variants
-- `test_error_equality_and_cloning()` - Tested basic Clone trait functionality  
+- `test_error_equality_and_cloning()` - Tested basic Clone trait functionality
 - `test_error_display_edge_cases()` - Tested Display formatting with special characters
 
 **Rationale**: These tests only verified derive macro functionality (thiserror) rather than business logic.
@@ -24,7 +24,7 @@ This document summarizes the completed OAuth2 test suite improvements, focusing 
 - Removed 15+ trivial environment variable getter/setter tests
 - Replaced with focused business logic tests:
   - `test_oauth2_response_mode_validation_logic()` - validates case-insensitive mode processing
-  - `test_oauth2_response_mode_invalid_validation()` - tests invalid input handling  
+  - `test_oauth2_response_mode_invalid_validation()` - tests invalid input handling
   - `test_oauth2_query_string_construction_logic()` - tests URI construction logic
   - `test_oauth2_redirect_uri_construction_logic()` - tests redirect URI building
   - `test_oauth2_csrf_cookie_max_age_parsing_logic()` - tests parsing and fallback behavior
@@ -55,7 +55,7 @@ The codebase implements sophisticated OAuth2 security with dynamic SameSite cook
 ```rust
 let samesite = match OAUTH2_RESPONSE_MODE.to_lowercase().as_str() {
     "form_post" => "None",    // Cross-origin POST requires None
-    "query" => "Lax",         // Redirect can use safer Lax  
+    "query" => "Lax",         // Redirect can use safer Lax
     _ => "Lax",               // Default fallback
 };
 ```
@@ -71,7 +71,7 @@ let samesite = match OAUTH2_RESPONSE_MODE.to_lowercase().as_str() {
 
 **Improvements Made**:
 - Eliminated ~40 trivial tests (serialization, error display, basic getters)
-- Fixed ~4 flaky environment variable tests  
+- Fixed ~4 flaky environment variable tests
 - Simplified ~30 tests with overengineered mock infrastructure
 - Enhanced test coverage for actual business logic
 - Improved test reliability and maintainability
@@ -115,6 +115,6 @@ The resulting test suite provides better confidence in the OAuth2 functionality 
 
 ---
 
-*Document created: June 8, 2025*  
-*Test Suite: OAuth2 Module*  
+*Document created: June 8, 2025*
+*Test Suite: OAuth2 Module*
 *Status: Cleanup Complete - All 101 tests passing*

@@ -32,10 +32,10 @@ If you find a bug or have a feature request, please open an issue on GitHub with
    ```bash
    # Install dependencies
    cargo build
-   
+
    # Run tests
    cargo test
-   
+
    # Run individual crate tests
    cd oauth2_passkey && cargo test
    cd oauth2_passkey_axum && cargo test
