@@ -394,7 +394,7 @@ Performance:
   - **Current Design**: Framework integration enforces authorization, but core functions are unprotected database accessors
   - **Impact**: Defense-in-depth missing, potential unauthorized access if framework layer fails
   - **Solution**: Add `SessionUser` context parameter to admin functions with built-in authorization checks
-  - **Implementation**: 
+  - **Implementation**:
     - Phase 1: Add context-aware versions (e.g., `get_all_users(auth_user: &SessionUser)`)
     - Phase 2: Update framework integrations to use new functions
     - Phase 3: Deprecate old functions with migration path
@@ -405,7 +405,7 @@ Performance:
 - ~~**Security-Focused Integration Tests**: Enhance integration test suite with comprehensive security failure scenarios to verify security controls are properly enforced~~ ✅ **DONE** - Comprehensive security test suite implemented with 51 negative tests
   - ✅ **OAuth2 Security Tests**: 10 tests implemented and passing
     - ✅ Invalid/tampered state parameter rejection
-    - ✅ CSRF token mismatch handling 
+    - ✅ CSRF token mismatch handling
     - ✅ Nonce verification failures in ID tokens
     - ✅ Invalid authorization code handling
     - ✅ PKCE code challenge verification failures

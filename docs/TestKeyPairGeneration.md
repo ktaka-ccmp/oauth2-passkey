@@ -25,19 +25,19 @@ fn main() {
         &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
         &rng,
     ).expect("Failed to generate key pair");
-    
+
     // Print the bytes for embedding in test code
     println!("Private key bytes: {:?}", pkcs8_bytes.as_ref());
-    
+
     // Extract and print public key for WebAuthn format
     let key_pair = signature::EcdsaKeyPair::from_pkcs8(
         &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
         pkcs8_bytes.as_ref(),
     ).expect("Failed to create key pair");
-    
+
     let public_key_bytes = key_pair.public_key().as_ref();
     println!("Public key (uncompressed): {:?}", public_key_bytes);
-    
+
     // Convert to base64url for WebAuthn
     let public_key_b64 = base64::encode_config(
         &public_key_bytes[1..], // Skip 0x04 prefix
@@ -103,7 +103,7 @@ pub fn first_user_key_pair() -> Vec<u8> {
     // Fixed private key (PKCS#8 DER format) that corresponds to the public key used in test_utils.rs
     // This ensures signature verification works between credential storage and authentication
     const FIRST_USER_PRIVATE_KEY: &[u8] = &[/* ... 131 bytes ... */];
-    
+
     FIRST_USER_PRIVATE_KEY.to_vec()
 }
 ```
@@ -169,7 +169,7 @@ If you need to modify the comments, use the same block comment style to maintain
 
 ### When to Regenerate
 - If cryptographic standards change
-- If test requirements evolve  
+- If test requirements evolve
 - If key format specifications are updated
 
 ### How to Regenerate

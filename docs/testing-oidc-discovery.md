@@ -51,7 +51,7 @@ cargo test --manifest-path oauth2_passkey/Cargo.toml --test integration -- --tes
 
 **Benefits:**
 - ✅ **No initialization order issues**: Persistent server is always ready
-- ✅ **Consistent OIDC Discovery**: Same endpoints used across all tests  
+- ✅ **Consistent OIDC Discovery**: Same endpoints used across all tests
 - ✅ **Reliable test execution**: No flaky failures due to port conflicts
 
 ## Production Verification

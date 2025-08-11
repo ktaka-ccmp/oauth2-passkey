@@ -94,7 +94,7 @@ echo "  - Cache type: $GENERIC_CACHE_STORE_TYPE"
 echo ""
 echo "Tables to be dropped:"
 echo "  - o2p_users"
-echo "  - o2p_oauth2_accounts" 
+echo "  - o2p_oauth2_accounts"
 echo "  - o2p_passkey_credentials"
 echo ""
 

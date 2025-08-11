@@ -107,7 +107,7 @@ This document provides a comprehensive assessment of testing practices across th
    ```rust
    // Before:
    let session = store.get_session(&id).unwrap();
-   
+
    // After:
    let session = store.get_session(&id)
        .expect("Failed to retrieve test session");

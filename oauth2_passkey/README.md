@@ -35,10 +35,10 @@ The library exposes coordination functions for authentication flows:
 
 ```rust
 use oauth2_passkey::{
-    init, 
+    init,
     handle_start_authentication_core,
     handle_finish_authentication_core,
-    handle_start_registration_core, 
+    handle_start_registration_core,
     handle_finish_registration_core,
     prepare_oauth2_auth_request,
     is_authenticated_basic,
@@ -49,7 +49,7 @@ use oauth2_passkey::{
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init().await?;
-    
+
     // Use authentication functions in your web framework handlers
     // See "Building Framework Integrations" section below for examples
     Ok(())
@@ -70,7 +70,7 @@ ORIGIN=https://yourdomain.com
 GENERIC_DATA_STORE_TYPE=sqlite
 GENERIC_DATA_STORE_URL=sqlite:data/auth.db
 
-# Cache configuration  
+# Cache configuration
 GENERIC_CACHE_STORE_TYPE=redis
 GENERIC_CACHE_STORE_URL=redis://localhost:6379
 
@@ -110,7 +110,7 @@ async fn handle_oauth2_auth(headers: HeaderMap) -> Result<String, StatusCode> {
     let (auth_url, response_headers) = prepare_oauth2_auth_request(headers, None)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    
+
     // Framework integration should:
     // 1. Set response_headers on the HTTP response
     // 2. Redirect to auth_url
@@ -122,7 +122,7 @@ async fn get_session_user(session_cookie: &str) -> Result<AuthUser, StatusCode> 
     let (session_user, csrf_token) = get_user_and_csrf_token_from_session(session_cookie)
         .await
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
-    
+
     // Convert to framework-specific user type
     let mut auth_user = AuthUser::from(session_user);
     auth_user.csrf_token = csrf_token.as_str().to_string();

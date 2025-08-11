@@ -8,7 +8,7 @@ This document captures detailed insights and lessons learned from implementing a
 
 ### Test Compilation Issues with `tokio_test::block_on`
 
-**Problem:** 
+**Problem:**
 - Tests were using `#[test]` with `tokio_test::block_on` pattern which failed to compile
 - Error: `tokio_test` crate wasn't available as a dependency
 
@@ -33,7 +33,7 @@ async fn test_extract_credential_public_key_success() {
 ### WebAuthn RP ID Hash Validation Issues
 
 **Problem:**
-- Test was failing with "Invalid RP ID hash" error 
+- Test was failing with "Invalid RP ID hash" error
 - Root cause: Mismatch between test origins and expected RP ID hashes
 
 **Analysis:**
@@ -50,7 +50,7 @@ async fn test_extract_credential_public_key_success() {
        0x6d, 0xc4, 0xc2, 0x9d, 0x90, 0x1f, 0x36, 0xf4,
        // ... rest of localhost hash
    ]);
-   
+
    // New hash (SHA256("example.com")):
    auth_data.extend_from_slice(&[
        0xa3, 0x79, 0xa6, 0xf6, 0xee, 0xaf, 0xb9, 0xa5,
@@ -82,7 +82,7 @@ auth_data.push(0x45); // user present + user verified + attested credential data
 
 **Key Learning:** WebAuthn authenticator data flags must accurately reflect the authentication ceremony:
 - `0x01`: User Present (UP)
-- `0x04`: User Verified (UV) 
+- `0x04`: User Verified (UV)
 - `0x40`: Attested Credential Data Present (AT)
 - Combined: `0x45` = UP + UV + AT
 
@@ -118,7 +118,7 @@ We identified that OAuth2Store tests were consistently passing while UserStore t
 The fundamental issue was not just missing initialization, but **database connection instance isolation** with in-memory SQLite:
 
 1. **`init_test_environment()` uses `OnceCell`** to run initialization once globally
-2. **However, with in-memory SQLite**, each new connection from the pool can get a fresh database instance  
+2. **However, with in-memory SQLite**, each new connection from the pool can get a fresh database instance
 3. **Even with `cache=shared`**, connection timing and pooling can create separate database instances
 4. **Result**: Tables created during global initialization exist only on that specific connection
 
@@ -129,11 +129,11 @@ Instead of repeating explicit store initialization in every test, we created a b
 **New Pattern (`init_test_environment_with_db()`):**
 ```rust
 #[serial] // or #[tokio::test]
-#[tokio::test] 
+#[tokio::test]
 async fn test_name() {
     use crate::test_utils::init_test_environment_with_db;
     init_test_environment_with_db().await;
-    
+
     // Test logic...
 }
 ```
@@ -146,15 +146,15 @@ This function:
 **Legacy Pattern (still works but verbose):**
 ```rust
 #[serial]
-#[tokio::test] 
+#[tokio::test]
 async fn test_name() {
     init_test_environment().await;
-    
+
     // Explicit store initialization - necessary due to connection isolation
     UserStore::init().await.expect("Failed to initialize UserStore");
     OAuth2Store::init().await.expect("Failed to initialize OAuth2Store");
     PasskeyStore::init().await.expect("Failed to initialize PasskeyStore");
-    
+
     // Test logic...
 }
 ```
@@ -214,12 +214,12 @@ The in-memory SQLite configuration, while excellent for test isolation and speed
 #[tokio::test]
 async fn test_function() {
     init_test_environment().await;
-    
+
     // Required for database tests
     UserStore::init().await.expect("Failed to initialize UserStore");
-    OAuth2Store::init().await.expect("Failed to initialize OAuth2Store"); 
+    OAuth2Store::init().await.expect("Failed to initialize OAuth2Store");
     PasskeyStore::init().await.expect("Failed to initialize PasskeyStore");
-    
+
     // Test implementation...
 }
 ```
@@ -261,7 +261,7 @@ async fn test_function() {
 - **Challenges**: Multiple store dependencies (User, OAuth2, Passkey)
 - **Solution**: Initialize all required stores
 
-### OAuth2 Store Tests  
+### OAuth2 Store Tests
 - **Pattern**: Already working with explicit initialization
 - **Insight**: This module set the standard that others needed to follow
 
@@ -354,7 +354,7 @@ The resulting test suite is now robust, deterministic, and provides a solid foun
 # Run all coordination tests
 cargo test coordination::
 
-# Run specific module tests  
+# Run specific module tests
 cargo test coordination::user::
 cargo test coordination::admin::
 cargo test coordination::oauth2::
