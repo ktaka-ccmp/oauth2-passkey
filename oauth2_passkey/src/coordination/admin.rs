@@ -334,7 +334,7 @@ async fn validate_admin_session(session_id: &str) -> Result<SessionUser, Coordin
         .map_err(|_| CoordinationError::Unauthorized.log())?;
 
     // Check if user has admin privileges (session_user already has fresh database data)
-    if !session_user.is_admin {
+    if !session_user.has_admin_privileges() {
         tracing::debug!(user_id = %session_user.id, "User is not authorized (not an admin)");
         return Err(CoordinationError::Unauthorized.log());
     }
@@ -652,8 +652,8 @@ mod tests {
             .expect("Failed to get target user")
             .expect("Target user should exist");
         assert!(
-            !user_before.is_admin,
-            "Target user should not be an admin initially"
+            !user_before.has_admin_privileges(),
+            "Target user should not have admin privileges initially"
         );
 
         // Update the user's admin status to true
@@ -663,8 +663,8 @@ mod tests {
 
         // Verify the user is now an admin
         assert!(
-            updated_user.is_admin,
-            "User should be an admin after update"
+            updated_user.has_admin_privileges(),
+            "User should have admin privileges after update"
         );
 
         // Verify the change was persisted in the database
@@ -673,8 +673,8 @@ mod tests {
             .expect("Failed to get target user after update")
             .expect("Target user should still exist");
         assert!(
-            user_after.is_admin,
-            "Target user should be an admin in the database"
+            user_after.has_admin_privileges(),
+            "Target user should have admin privileges in the database"
         );
 
         // Update the user's admin status back to false
@@ -684,8 +684,8 @@ mod tests {
 
         // Verify the user is no longer an admin
         assert!(
-            !updated_user.is_admin,
-            "User should not be an admin after second update"
+            !updated_user.has_admin_privileges(),
+            "User should not have admin privileges after second update"
         );
 
         // Clean up
@@ -765,8 +765,8 @@ mod tests {
             .expect("Failed to get target user after failed update")
             .expect("Target user should still exist");
         assert!(
-            !user_after.is_admin,
-            "Target user's admin status should not have changed"
+            !user_after.has_admin_privileges(),
+            "Target user's admin privileges should not have changed"
         );
 
         // Clean up

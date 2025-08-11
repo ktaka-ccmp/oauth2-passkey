@@ -88,11 +88,11 @@ pub async fn delete_user_account(
         .map_err(|_| CoordinationError::Unauthorized.log())?;
 
     // Validate admin or owner session - admin can delete any user, user can delete their own account
-    if !session_user.is_admin && session_user.id != user_id {
+    if !session_user.has_admin_privileges() && session_user.id != user_id {
         tracing::debug!(
             session_user_id = %session_user.id,
             target_user_id = %user_id,
-            is_admin = %session_user.is_admin,
+            has_admin_privileges = %session_user.has_admin_privileges(),
             "User is not authorized (neither admin nor resource owner)"
         );
         return Err(CoordinationError::Unauthorized.log());
