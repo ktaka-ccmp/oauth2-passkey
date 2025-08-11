@@ -145,7 +145,7 @@ The key pair enables proper WebAuthn signature verification in tests:
 ### Common Issues Fixed
 
 1. **"Signature verification failed"**: Solved by using matching key pairs
-2. **"Counter value decreased"**: Fixed by using timestamp-based counters in mock authentication
+2. **"Counter value decreased"**: Fixed by using atomic counter with timestamp base to ensure monotonic increase in parallel tests
 3. **"Key format mismatch"**: Resolved by proper PKCS#8 → WebAuthn format conversion
 
 ### Verification Commands

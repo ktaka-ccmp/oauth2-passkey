@@ -720,14 +720,24 @@ impl MockWebAuthnCredentials {
         // WebAuthn signature counter (4 bytes big-endian) - CRITICAL for security
         //
         // **Counter Rules**: Must always increase to prevent replay attacks and credential cloning
-        // **Test Problem**: Fixed counter values cause "Counter value decreased" errors in repeated tests
-        // **Solution**: Use timestamp-based counter that always increases with each authentication attempt
+        // **Test Problem**: Timestamp-based counters can have same value in rapid succession (CI/parallel tests)
+        // **Solution**: Use atomic counter with timestamp base to ensure monotonic increase
         //
         // Real authenticators increment this value on each use; we simulate this behavior in tests
-        let counter_value = std::time::SystemTime::now()
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static COUNTER_BASE: AtomicU32 = AtomicU32::new(0);
+
+        // Initialize base counter with current timestamp if not already set
+        let timestamp_base = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs() as u32;
+        COUNTER_BASE
+            .compare_exchange(0, timestamp_base, Ordering::SeqCst, Ordering::SeqCst)
+            .ok();
+
+        // Increment and get next counter value - guaranteed to be unique and increasing
+        let counter_value = COUNTER_BASE.fetch_add(1, Ordering::SeqCst);
         auth_data.extend_from_slice(&counter_value.to_be_bytes());
 
         // No attested credential data for authentication
