@@ -49,7 +49,7 @@ mod storage;
 mod userdb;
 mod utils;
 
-// Test utilities module (available in test builds and for integration tests)
+// Test utilities module (only available in test builds)
 #[cfg(test)]
 mod test_utils;
 
