@@ -157,11 +157,13 @@ async fn create_first_user_oauth2_account(user_id: &str) {
     use chrono::Utc;
 
     let now = Utc::now();
+    let provider = "google";
+    let provider_user_id = format!("{}_first-user-test-google-id", provider);
     let test_oauth2_account = OAuth2Account {
         id: "first-user-oauth2-account".to_string(),
         user_id: user_id.to_string(),
-        provider: "google".to_string(),
-        provider_user_id: "google_first-user-test-google-id".to_string(), // Already includes "google_" prefix
+        provider: provider.to_string(),
+        provider_user_id: provider_user_id.to_string(),
         name: "First User".to_string(),
         email: "first-user@example.com".to_string(),
         picture: Some("https://example.com/avatar/first-user.jpg".to_string()),

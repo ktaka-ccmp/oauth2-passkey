@@ -10,7 +10,7 @@ use crate::common::{MockBrowser, MockWebAuthnCredentials};
 use crate::integration::oauth2_flows::complete_full_oauth2_flow;
 
 /// Known values for the first user credentials created during test initialization
-pub struct FirstUserCredentials {
+struct FirstUserCredentials {
     pub oauth2_provider_user_id: &'static str,
     pub oauth2_email: &'static str,
     pub passkey_credential_id: &'static str,
@@ -30,7 +30,7 @@ impl FirstUserCredentials {
     }
 }
 
-pub const FIRST_USER_CREDS: FirstUserCredentials = FirstUserCredentials::new();
+const FIRST_USER_CREDS: FirstUserCredentials = FirstUserCredentials::new();
 
 /// Creates an admin session by performing AUTHENTIC OAuth2 authentication
 ///
@@ -40,7 +40,7 @@ pub const FIRST_USER_CREDS: FirstUserCredentials = FirstUserCredentials::new();
 ///
 /// # Returns
 /// Returns a session ID that can be used with coordination functions requiring admin privileges
-pub async fn create_admin_session_via_oauth2(
+pub(crate) async fn create_admin_session_via_oauth2(
     base_url: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let browser = MockBrowser::new(base_url, true);
