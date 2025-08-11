@@ -738,7 +738,8 @@ impl MockWebAuthnCredentials {
         COUNTER_BASE.fetch_max(timestamp_base, Ordering::SeqCst);
 
         // Increment and get next counter value - guaranteed to be unique and increasing
-        let counter_value = COUNTER_BASE.fetch_add(1, Ordering::SeqCst);
+        // Note: fetch_add returns the OLD value, so we add 1 to get the NEW value
+        let counter_value = COUNTER_BASE.fetch_add(1, Ordering::SeqCst) + 1;
         auth_data.extend_from_slice(&counter_value.to_be_bytes());
 
         // No attested credential data for authentication
