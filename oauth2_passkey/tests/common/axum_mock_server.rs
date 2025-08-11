@@ -99,15 +99,32 @@ pub struct AuthorizationRequest {
 }
 
 /// Shared state for the mock server
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct MockServerState {
     /// Current test user data
     pub test_user_email: Arc<Mutex<String>>,
     pub test_user_id: Arc<Mutex<String>>,
+    pub test_user_name: Arc<Mutex<String>>,
+    pub test_user_given_name: Arc<Mutex<String>>,
+    pub test_user_family_name: Arc<Mutex<String>>,
     /// Authorization codes with their associated request data
     pub authorization_codes: Arc<Mutex<HashMap<String, AuthorizationRequest>>>,
     /// Current test configuration
     pub test_config: Arc<Mutex<TestConfig>>,
+}
+
+impl Default for MockServerState {
+    fn default() -> Self {
+        Self {
+            test_user_email: Arc::new(Mutex::new("first-user@example.com".to_string())),
+            test_user_id: Arc::new(Mutex::new("google_first-user-test-google-id".to_string())),
+            test_user_name: Arc::new(Mutex::new("First User".to_string())),
+            test_user_given_name: Arc::new(Mutex::new("First".to_string())),
+            test_user_family_name: Arc::new(Mutex::new("User".to_string())),
+            authorization_codes: Arc::new(Mutex::new(HashMap::new())),
+            test_config: Arc::new(Mutex::new(TestConfig::default())),
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -388,7 +405,17 @@ async fn oauth2_token(
     let user_id = state.test_user_id.lock().unwrap().clone();
 
     // Create mock ID token with the stored nonce
-    let id_token = create_mock_id_token(&user_email, &user_id, auth_request.nonce.as_deref());
+    let user_name = state.test_user_name.lock().unwrap().clone();
+    let user_given_name = state.test_user_given_name.lock().unwrap().clone();
+    let user_family_name = state.test_user_family_name.lock().unwrap().clone();
+    let id_token = create_mock_id_token(
+        &user_email,
+        &user_id,
+        &user_name,
+        &user_given_name,
+        &user_family_name,
+        auth_request.nonce.as_deref(),
+    );
 
     println!("✅ Token exchange successful for code: {code}");
 
@@ -405,13 +432,16 @@ async fn oauth2_token(
 async fn oauth2_userinfo(State(state): State<MockServerState>) -> Json<Value> {
     let user_email = state.test_user_email.lock().unwrap().clone();
     let user_id = state.test_user_id.lock().unwrap().clone();
+    let user_name = state.test_user_name.lock().unwrap().clone();
+    let user_given_name = state.test_user_given_name.lock().unwrap().clone();
+    let user_family_name = state.test_user_family_name.lock().unwrap().clone();
 
     Json(json!({
         "sub": user_id,
         "email": user_email,
-        "name": "Test User",
-        "given_name": "Test",
-        "family_name": "User",
+        "name": user_name,
+        "given_name": user_given_name,
+        "family_name": user_family_name,
         "picture": "https://example.com/photo.jpg",
         "email_verified": true
     }))
@@ -433,7 +463,14 @@ async fn oauth2_jwks() -> Json<Value> {
 }
 
 /// Create a mock JWT ID token
-fn create_mock_id_token(email: &str, user_id: &str, nonce: Option<&str>) -> String {
+fn create_mock_id_token(
+    email: &str,
+    user_id: &str,
+    name: &str,
+    given_name: &str,
+    family_name: &str,
+    nonce: Option<&str>,
+) -> String {
     use jsonwebtoken::{EncodingKey, Header, encode};
 
     let now = SystemTime::now()
@@ -449,9 +486,9 @@ fn create_mock_id_token(email: &str, user_id: &str, nonce: Option<&str>) -> Stri
         "exp": now + 3600,
         "iat": now,
         "email": email,
-        "name": "Test User",
-        "given_name": "Test",
-        "family_name": "User",
+        "name": name,
+        "given_name": given_name,
+        "family_name": family_name,
         "email_verified": true
     });
 
@@ -494,7 +531,14 @@ fn cleanup_expired_codes(state: &MockServerState) {
 }
 
 /// Configure the mock server for a specific test
-pub fn configure_mock_for_test(user_email: String, user_id: String, origin_url: String) {
+pub fn configure_mock_for_test(
+    user_email: String,
+    user_id: String,
+    user_name: String,
+    user_given_name: String,
+    user_family_name: String,
+    origin_url: String,
+) {
     let server = get_oidc_mock_server();
 
     // The server is guaranteed to be running (persistent thread approach)
@@ -503,6 +547,9 @@ pub fn configure_mock_for_test(user_email: String, user_id: String, origin_url: 
     // Update test configuration
     *server.state.test_user_email.lock().unwrap() = user_email;
     *server.state.test_user_id.lock().unwrap() = user_id;
+    *server.state.test_user_name.lock().unwrap() = user_name;
+    *server.state.test_user_given_name.lock().unwrap() = user_given_name;
+    *server.state.test_user_family_name.lock().unwrap() = user_family_name;
 
     let mut config = server.state.test_config.lock().unwrap();
     config.origin_url = origin_url;

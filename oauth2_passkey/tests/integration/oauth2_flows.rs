@@ -1,44 +1,18 @@
 use crate::common::{
-    MockBrowser, TestServer, TestUsers,
+    MockBrowser, TestSetup, TestUsers,
     constants::oauth2::*,
     validation_utils::{AuthValidationResult, validate_oauth2_success},
 };
 use serial_test::serial;
 
-/// Test environment setup for OAuth2 tests
-struct OAuth2TestSetup {
-    server: TestServer,
-    browser: MockBrowser,
+/// Get the OAuth2 issuer URL from environment or use default
+fn get_oauth2_issuer_url() -> String {
+    std::env::var("OAUTH2_ISSUER_URL").unwrap_or_else(|_| DEFAULT_ISSUER_URL.to_string())
 }
 
-impl OAuth2TestSetup {
-    /// Create a new test environment
-    async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let server = TestServer::start().await?;
-        let browser = MockBrowser::new(&server.base_url, true);
-        Ok(Self { server, browser })
-    }
-
-    /// Get the base URL for the test server
-    fn base_url(&self) -> &str {
-        &self.server.base_url
-    }
-
-    /// Shutdown the test server
-    async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
-        self.server.shutdown().await;
-        Ok(())
-    }
-
-    /// Get the OAuth2 issuer URL from environment or use default
-    fn issuer_url() -> String {
-        std::env::var("OAUTH2_ISSUER_URL").unwrap_or_else(|_| DEFAULT_ISSUER_URL.to_string())
-    }
-
-    /// Get the response mode from environment or use default
-    fn response_mode() -> String {
-        std::env::var("OAUTH2_RESPONSE_MODE").unwrap_or_else(|_| DEFAULT_RESPONSE_MODE.to_string())
-    }
+/// Get the response mode from environment or use default
+fn get_oauth2_response_mode() -> String {
+    std::env::var("OAUTH2_RESPONSE_MODE").unwrap_or_else(|_| DEFAULT_RESPONSE_MODE.to_string())
 }
 
 /// OAuth2 flow builder for structured test execution
@@ -110,7 +84,7 @@ async fn complete_oauth2_authorization(
     let body = auth_response.text().await?;
 
     // Extract auth code and state based on response mode
-    let response_mode = OAuth2TestSetup::response_mode();
+    let response_mode = get_oauth2_response_mode();
 
     let (auth_code, received_state) = match response_mode.as_str() {
         "query" => {
@@ -171,7 +145,7 @@ async fn complete_oauth2_callback(
     received_state: &str,
     oauth2_issuer_url: &str,
 ) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
-    let response_mode = OAuth2TestSetup::response_mode();
+    let response_mode = get_oauth2_response_mode();
 
     let callback_response = match response_mode.as_str() {
         "query" => {
@@ -363,7 +337,7 @@ async fn complete_full_oauth2_flow_internal(
         .to_string();
 
     // Get OAuth2 issuer URL for assertions
-    let oauth2_issuer_url = OAuth2TestSetup::issuer_url();
+    let oauth2_issuer_url = get_oauth2_issuer_url();
 
     // Verify the authorization URL points to our OAuth2 provider
     assert!(
@@ -383,7 +357,7 @@ async fn complete_full_oauth2_flow_internal(
 
 /// Helper function to complete full OAuth2 flow
 /// Returns the final callback response
-pub(super) async fn complete_full_oauth2_flow(
+pub async fn complete_full_oauth2_flow(
     browser: &MockBrowser,
     mode: &str,
 ) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
@@ -411,14 +385,26 @@ pub(super) async fn complete_full_oauth2_flow(
 #[serial]
 async fn test_oauth2_new_user_registration() -> Result<(), Box<dyn std::error::Error>> {
     // Setup test environment - TestServer now uses global Axum mock server
-    let server = TestServer::start().await?;
-    let browser = MockBrowser::new(&server.base_url, true);
-    let _test_user = TestUsers::oauth2_user();
+    let setup = TestSetup::new().await?;
+    let test_user = TestUsers::unique_oauth2_user("oauth2_new_user_registration");
 
     println!("🚀 Starting OAuth2 new user registration flow");
 
+    // Configure mock server with unique test user data for this test
+    use crate::common::axum_mock_server::configure_mock_for_test;
+    configure_mock_for_test(
+        test_user.email.clone(),
+        test_user.id.clone(),
+        test_user.name.clone(),
+        test_user.given_name.clone(),
+        test_user.family_name.clone(),
+        setup.server.base_url.clone(),
+    );
+    println!("🔧 Mock server configured for test");
+
     // Complete full OAuth2 flow using helper function
-    let callback_response = complete_full_oauth2_flow(&browser, "create_user_or_login").await?;
+    let callback_response =
+        complete_full_oauth2_flow(&setup.browser, "create_user_or_login").await?;
 
     // Check the callback response
     let status = callback_response.status();
@@ -461,14 +447,26 @@ async fn test_oauth2_new_user_registration() -> Result<(), Box<dyn std::error::E
 #[serial]
 async fn test_oauth2_new_user_register_then_logout() -> Result<(), Box<dyn std::error::Error>> {
     // Setup test environment
-    let server = TestServer::start().await?;
-    let browser = MockBrowser::new(&server.base_url, true);
-    let _test_user = TestUsers::oauth2_user();
+    let setup = TestSetup::new().await?;
+    let test_user = TestUsers::unique_oauth2_user("oauth2_new_user_register_then_logout");
 
     println!("🚀 Starting OAuth2 new user registration and logout flow");
 
+    // Configure mock server with unique test user data for this test
+    use crate::common::axum_mock_server::configure_mock_for_test;
+    configure_mock_for_test(
+        test_user.email.clone(),
+        test_user.id.clone(),
+        test_user.name.clone(),
+        test_user.given_name.clone(),
+        test_user.family_name.clone(),
+        setup.server.base_url.clone(),
+    );
+    println!("🔧 Mock server configured for test");
+
     // Step 1: Complete OAuth2 registration flow
-    let callback_response = complete_full_oauth2_flow(&browser, "create_user_or_login").await?;
+    let callback_response =
+        complete_full_oauth2_flow(&setup.browser, "create_user_or_login").await?;
 
     // Verify registration was successful
     let status = callback_response.status();
@@ -491,7 +489,7 @@ async fn test_oauth2_new_user_register_then_logout() -> Result<(), Box<dyn std::
     println!("✅ Step 1: OAuth2 registration successful");
 
     // Step 2: Verify user has active session
-    let user_info_response = browser.get("/auth/user/info").await?;
+    let user_info_response = setup.browser.get("/auth/user/info").await?;
     assert!(
         user_info_response.status().is_success(),
         "Should have active session after OAuth2 login"
@@ -504,7 +502,7 @@ async fn test_oauth2_new_user_register_then_logout() -> Result<(), Box<dyn std::
     );
 
     // Step 3: Perform logout
-    let logout_response = browser.get("/auth/user/logout").await?;
+    let logout_response = setup.browser.get("/auth/user/logout").await?;
 
     // Check logout response
     println!("Logout response status: {}", logout_response.status());
@@ -532,7 +530,7 @@ async fn test_oauth2_new_user_register_then_logout() -> Result<(), Box<dyn std::
     println!("✅ Step 3: Logout successful, session cookie cleared");
 
     // Step 4: Verify session is no longer active
-    let post_logout_response = browser.get("/auth/user/info").await?;
+    let post_logout_response = setup.browser.get("/auth/user/info").await?;
     assert_eq!(
         post_logout_response.status(),
         reqwest::StatusCode::UNAUTHORIZED,
@@ -557,14 +555,26 @@ async fn test_oauth2_new_user_register_then_logout() -> Result<(), Box<dyn std::
 #[serial]
 async fn test_oauth2_existing_user_login() -> Result<(), Box<dyn std::error::Error>> {
     // Setup test environment
-    let server = TestServer::start().await?;
-    let browser = MockBrowser::new(&server.base_url, true);
-    let _test_user = TestUsers::oauth2_user();
+    let setup = TestSetup::new().await?;
+    let test_user = TestUsers::unique_oauth2_user("oauth2_existing_user_login");
 
     println!("🚀 STEP 1: Creating user via new user registration flow");
 
+    // Configure mock server with unique test user data for this test
+    use crate::common::axum_mock_server::configure_mock_for_test;
+    configure_mock_for_test(
+        test_user.email.clone(),
+        test_user.id.clone(),
+        test_user.name.clone(),
+        test_user.given_name.clone(),
+        test_user.family_name.clone(),
+        setup.server.base_url.clone(),
+    );
+    println!("🔧 Mock server configured for test");
+
     // First, create a user using the helper function
-    let creation_response = complete_full_oauth2_flow(&browser, "create_user_or_login").await?;
+    let creation_response =
+        complete_full_oauth2_flow(&setup.browser, "create_user_or_login").await?;
 
     // Verify user creation was successful
     assert!(creation_response.status().is_redirection());
@@ -586,7 +596,7 @@ async fn test_oauth2_existing_user_login() -> Result<(), Box<dyn std::error::Err
     println!("🚀 STEP 2: Testing existing user login flow");
 
     // Create a new browser session (different user session)
-    let login_browser = MockBrowser::new(&server.base_url, true);
+    let login_browser = MockBrowser::new(&setup.server.base_url, true);
 
     // Complete OAuth2 flow for existing user login using helper function
     let login_callback_response = complete_full_oauth2_flow(&login_browser, "login").await?;
@@ -636,7 +646,7 @@ async fn test_oauth2_existing_user_login() -> Result<(), Box<dyn std::error::Err
 #[serial]
 async fn test_oauth2_uses_oidc_discovery() -> Result<(), Box<dyn std::error::Error>> {
     // Setup test environment
-    let server = TestServer::start().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔍 Testing OAuth2 configuration with OIDC Discovery");
 
@@ -654,7 +664,7 @@ async fn test_oauth2_uses_oidc_discovery() -> Result<(), Box<dyn std::error::Err
     let oauth2_start_response = client
         .get(format!(
             "{}/auth/oauth2/google?mode=create_user_or_login",
-            server.base_url
+            setup.server.base_url
         ))
         .send()
         .await?;
@@ -711,9 +721,21 @@ async fn test_oauth2_uses_oidc_discovery() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 #[serial]
 async fn test_link_two_oauth2_users() -> Result<(), Box<dyn std::error::Error>> {
-    let setup = OAuth2TestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔗 Testing linking two OAuth2 accounts to one user");
+
+    // Configure mock server with unique first user data
+    use crate::common::axum_mock_server::configure_mock_for_test;
+    let test_user_first = TestUsers::unique_oauth2_user("link_two_oauth2_users_first");
+    configure_mock_for_test(
+        test_user_first.email.clone(),
+        test_user_first.id.clone(),
+        test_user_first.name.clone(),
+        test_user_first.given_name.clone(),
+        test_user_first.family_name.clone(),
+        setup.server.base_url.to_string(),
+    );
 
     // Step 1: Create initial user via OAuth2 registration
     println!("📝 Step 1: Creating initial user via OAuth2 registration");
@@ -744,12 +766,14 @@ async fn test_link_two_oauth2_users() -> Result<(), Box<dyn std::error::Error>> 
 
     // Step 3: Configure mock server and link second account
     println!("🔧 Step 2b: Configuring mock server with second user data");
-    use crate::common::axum_mock_server::configure_mock_for_test;
-    let test_user_second = TestUsers::oauth2_user_second();
+    let test_user_second = TestUsers::unique_oauth2_user("link_two_oauth2_users_second");
     configure_mock_for_test(
         test_user_second.email.clone(),
         test_user_second.id.clone(),
-        setup.base_url().to_string(),
+        test_user_second.name.clone(),
+        test_user_second.given_name.clone(),
+        test_user_second.family_name.clone(),
+        setup.server.base_url.to_string(),
     );
 
     let second_result = OAuth2Flow::new(&setup.browser, ADD_TO_USER_MODE)
@@ -801,7 +825,7 @@ async fn test_link_two_oauth2_users() -> Result<(), Box<dyn std::error::Error>> 
     );
 
     println!("🎉 OAuth2 account linking framework test SUCCESS");
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -811,9 +835,21 @@ async fn test_link_two_oauth2_users() -> Result<(), Box<dyn std::error::Error>> 
 #[tokio::test]
 #[serial]
 async fn test_link_three_oauth2_users() -> Result<(), Box<dyn std::error::Error>> {
-    let setup = OAuth2TestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔗🔗🔗 Testing linking three OAuth2 accounts to one user");
+
+    // Configure mock server with unique first user data
+    use crate::common::axum_mock_server::configure_mock_for_test;
+    let test_user_first = TestUsers::unique_oauth2_user("link_three_oauth2_users_first");
+    configure_mock_for_test(
+        test_user_first.email.clone(),
+        test_user_first.id.clone(),
+        test_user_first.name.clone(),
+        test_user_first.given_name.clone(),
+        test_user_first.family_name.clone(),
+        setup.server.base_url.to_string(),
+    );
 
     // Step 1: Create initial user via OAuth2 registration
     println!("📝 Step 1: Creating initial user via OAuth2 registration");
@@ -834,12 +870,14 @@ async fn test_link_three_oauth2_users() -> Result<(), Box<dyn std::error::Error>
 
     // Step 2: Link second OAuth2 account
     println!("🔗 Step 2: Linking second OAuth2 account to existing user");
-    use crate::common::axum_mock_server::configure_mock_for_test;
-    let test_user_second = TestUsers::oauth2_user_second();
+    let test_user_second = TestUsers::unique_oauth2_user("link_three_oauth2_users_second");
     configure_mock_for_test(
         test_user_second.email.clone(),
         test_user_second.id.clone(),
-        setup.base_url().to_string(),
+        test_user_second.name.clone(),
+        test_user_second.given_name.clone(),
+        test_user_second.family_name.clone(),
+        setup.server.base_url.to_string(),
     );
 
     let second_result = OAuth2Flow::new(&setup.browser, ADD_TO_USER_MODE)
@@ -868,11 +906,14 @@ async fn test_link_three_oauth2_users() -> Result<(), Box<dyn std::error::Error>
 
     // Step 3: Link third OAuth2 account
     println!("🔗 Step 3: Linking third OAuth2 account to existing user");
-    let test_user_third = TestUsers::oauth2_user_third();
+    let test_user_third = TestUsers::unique_oauth2_user("link_three_oauth2_users_third");
     configure_mock_for_test(
         test_user_third.email.clone(),
         test_user_third.id.clone(),
-        setup.base_url().to_string(),
+        test_user_third.name.clone(),
+        test_user_third.given_name.clone(),
+        test_user_third.family_name.clone(),
+        setup.server.base_url.to_string(),
     );
 
     let third_result = OAuth2Flow::new(&setup.browser, ADD_TO_USER_MODE)
@@ -947,6 +988,6 @@ async fn test_link_three_oauth2_users() -> Result<(), Box<dyn std::error::Error>
         println!("  - Multi-account linking framework: FUNCTIONAL");
     }
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }

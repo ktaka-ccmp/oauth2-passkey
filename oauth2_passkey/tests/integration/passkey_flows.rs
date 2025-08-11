@@ -1,5 +1,5 @@
 use crate::common::{
-    MockBrowser, MockWebAuthnCredentials, TestServer, TestUsers,
+    MockBrowser, MockWebAuthnCredentials, TestServer, TestSetup, TestUsers,
     constants::passkey::*,
     session_utils::{logout_and_verify, verify_successful_authentication},
     validation_utils::handle_expected_passkey_failure,
@@ -8,32 +8,37 @@ use serial_test::serial;
 
 /// Test environment setup for passkey tests
 struct PasskeyTestSetup {
-    server: TestServer,
-    browser: MockBrowser,
+    setup: TestSetup,
     test_user: crate::common::fixtures::TestUser,
 }
 
 impl PasskeyTestSetup {
     /// Create a new test environment
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let server = TestServer::start().await?;
-        let browser = MockBrowser::new(&server.base_url, true);
+        let setup = TestSetup::new().await?;
         let test_user = TestUsers::passkey_user();
-        Ok(Self {
-            server,
-            browser,
-            test_user,
-        })
+        Ok(Self { setup, test_user })
+    }
+
+    /// Access to server for specialized methods
+    #[allow(dead_code)]
+    fn server(&self) -> &TestServer {
+        &self.setup.server
+    }
+
+    /// Access to browser for specialized methods
+    fn browser(&self) -> &MockBrowser {
+        &self.setup.browser
     }
 
     /// Get the base URL for the test server
     fn base_url(&self) -> &str {
-        &self.server.base_url
+        &self.setup.server.base_url
     }
 
     /// Shutdown the test server
     async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
-        self.server.shutdown().await;
+        self.setup.shutdown().await;
         Ok(())
     }
 
@@ -51,7 +56,7 @@ impl PasskeyTestSetup {
         // Register first credential
         println!("Step: Registering primary passkey credential");
         let first_result = register_user_with_attestation(
-            &self.browser,
+            self.browser(),
             &self.test_user,
             DEFAULT_ATTESTATION_FORMAT,
             self.base_url(),
@@ -64,7 +69,7 @@ impl PasskeyTestSetup {
 
         // Verify user is logged in after first registration
         assert!(
-            self.browser.has_active_session().await,
+            self.browser().has_active_session().await,
             "User should be logged in after primary registration"
         );
         println!("✅ Primary credential registered successfully");
@@ -73,7 +78,7 @@ impl PasskeyTestSetup {
         for i in 1..count {
             println!("Step: Registering additional passkey credential #{}", i + 1);
             let additional_result = register_additional_credential(
-                &self.browser,
+                self.browser(),
                 &self.test_user,
                 DEFAULT_ATTESTATION_FORMAT,
                 credentials
@@ -89,7 +94,7 @@ impl PasskeyTestSetup {
 
             // Verify still logged in after additional registration
             assert!(
-                self.browser.has_active_session().await,
+                self.browser().has_active_session().await,
                 "User should still be logged in after additional registration #{}",
                 i + 1
             );
@@ -109,7 +114,7 @@ impl PasskeyTestSetup {
     ) -> Result<(), Box<dyn std::error::Error>> {
         // Logout the user
         println!("Step: Logging out user");
-        logout_and_verify(&self.browser).await?;
+        logout_and_verify(self.browser()).await?;
 
         // Test authentication with each credential
         for (index, credential) in credentials.credentials.iter().enumerate() {
@@ -158,7 +163,7 @@ impl PasskeyTestSetup {
     ) -> Result<(), Box<dyn std::error::Error>> {
         println!("Step: Verifying available credentials");
         let auth_options = self
-            .browser
+            .browser()
             .start_passkey_authentication(Some(&self.test_user.email))
             .await?;
 
@@ -564,11 +569,11 @@ async fn verify_successful_registration(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Verify session establishment for successful cases
     assert!(
-        setup.browser.has_active_session().await,
+        setup.browser().has_active_session().await,
         "Session should be established after successful {format} attestation registration"
     );
 
-    let user_info = setup.browser.get_user_info().await?;
+    let user_info = setup.browser().get_user_info().await?;
     assert!(
         user_info.is_some(),
         "User info should be available after successful {format} registration"
@@ -616,7 +621,7 @@ async fn test_passkey_attestation_format(
 
     // Try to register user with specified attestation format
     let registration_result =
-        register_user_with_attestation(&setup.browser, &setup.test_user, format, setup.base_url())
+        register_user_with_attestation(setup.browser(), &setup.test_user, format, setup.base_url())
             .await;
 
     match registration_result {
@@ -697,7 +702,7 @@ async fn test_passkey_register_then_authenticate() -> Result<(), Box<dyn std::er
     // Step 1: Register user with packed attestation (which we know works)
     println!("Step 1: Registering user for authentication test");
     let registration_result = register_user_with_attestation(
-        &setup.browser,
+        setup.browser(),
         &setup.test_user,
         "packed",
         setup.base_url(),
@@ -712,13 +717,13 @@ async fn test_passkey_register_then_authenticate() -> Result<(), Box<dyn std::er
 
     // Verify user is registered and logged in
     assert!(
-        setup.browser.has_active_session().await,
+        setup.browser().has_active_session().await,
         "User should be logged in after registration"
     );
 
     // Step 2: Logout the user
     println!("Step 2: Logging out user");
-    logout_and_verify(&setup.browser).await?;
+    logout_and_verify(setup.browser()).await?;
 
     // Step 3: Use a new browser session to simulate user coming back later
     println!("Step 3: Simulating user coming back later (new browser session)");
@@ -785,8 +790,7 @@ async fn test_register_two_credentials_and_authenticate() -> Result<(), Box<dyn 
 #[tokio::test]
 #[serial]
 async fn test_passkey_error_scenarios() -> Result<(), Box<dyn std::error::Error>> {
-    let server = TestServer::start().await?;
-    let browser = MockBrowser::new(&server.base_url, true);
+    let setup = TestSetup::new().await?;
 
     println!("🔐 Testing passkey error scenarios");
 
@@ -796,7 +800,8 @@ async fn test_passkey_error_scenarios() -> Result<(), Box<dyn std::error::Error>
         "missing": "required_fields"
     });
 
-    let response = browser
+    let response = setup
+        .browser
         .complete_passkey_registration(&invalid_credential)
         .await?;
 
@@ -807,7 +812,8 @@ async fn test_passkey_error_scenarios() -> Result<(), Box<dyn std::error::Error>
     );
 
     // Test 2: Authentication without prior registration
-    let authentication_options = browser
+    let authentication_options = setup
+        .browser
         .start_passkey_authentication(Some("nonexistent@example.com"))
         .await;
 
@@ -829,6 +835,6 @@ async fn test_passkey_error_scenarios() -> Result<(), Box<dyn std::error::Error>
     }
 
     // Cleanup
-    server.shutdown().await;
+    setup.shutdown().await;
     Ok(())
 }

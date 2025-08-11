@@ -501,7 +501,7 @@ mod tests {
             account: "test_account".to_string(),
             label: "Test User".to_string(),
             is_admin: false,
-            sequence_number: 0,
+            sequence_number: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -568,7 +568,7 @@ mod tests {
             account: "other_account".to_string(),
             label: "Other User".to_string(),
             is_admin: false,
-            sequence_number: 0,
+            sequence_number: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

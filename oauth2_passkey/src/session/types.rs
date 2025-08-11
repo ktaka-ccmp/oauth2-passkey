@@ -20,8 +20,8 @@ pub struct User {
     pub label: String,
     /// Whether the user has administrative privileges
     pub is_admin: bool,
-    /// Incremental number used for tracking user state changes
-    pub sequence_number: i64,
+    /// Database-assigned sequence number (primary key), None for users not yet persisted
+    pub sequence_number: Option<i64>,
     /// When the user account was created
     pub created_at: DateTime<Utc>,
     /// When the user account was last updated
@@ -35,9 +35,23 @@ impl From<DbUser> for User {
             account: db_user.account,
             label: db_user.label,
             is_admin: db_user.is_admin,
-            sequence_number: db_user.sequence_number.unwrap_or(0),
+            sequence_number: db_user.sequence_number,
             created_at: db_user.created_at,
             updated_at: db_user.updated_at,
+        }
+    }
+}
+
+impl From<User> for DbUser {
+    fn from(session_user: User) -> Self {
+        Self {
+            id: session_user.id,
+            account: session_user.account,
+            label: session_user.label,
+            is_admin: session_user.is_admin,
+            sequence_number: session_user.sequence_number,
+            created_at: session_user.created_at,
+            updated_at: session_user.updated_at,
         }
     }
 }

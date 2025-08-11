@@ -81,8 +81,8 @@ pub struct AuthUser {
     pub label: String,
     /// Whether the user has admin privileges
     pub is_admin: bool,
-    /// User version for tracking account changes
-    pub sequence_number: i64,
+    /// Database-assigned sequence number (primary key), None for users not yet persisted
+    pub sequence_number: Option<i64>,
     /// When the user account was created
     pub created_at: DateTime<Utc>,
     /// When the user account was last updated
@@ -259,7 +259,7 @@ mod tests {
             account: "test@example.com".to_string(),
             label: "Test User".to_string(),
             is_admin: true,
-            sequence_number: 42,
+            sequence_number: Some(42),
             created_at: now,
             updated_at: now,
         };
@@ -272,7 +272,7 @@ mod tests {
         assert_eq!(auth_user.account, "test@example.com");
         assert_eq!(auth_user.label, "Test User");
         assert!(auth_user.is_admin);
-        assert_eq!(auth_user.sequence_number, 42);
+        assert_eq!(auth_user.sequence_number, Some(42));
         assert_eq!(auth_user.created_at, now);
         assert_eq!(auth_user.updated_at, now);
 
@@ -293,7 +293,7 @@ mod tests {
             account: "test@example.com".to_string(),
             label: "Test User".to_string(),
             is_admin: true,
-            sequence_number: 42,
+            sequence_number: Some(42),
             created_at: now,
             updated_at: now,
             csrf_token: "csrf-token-value".to_string(),
@@ -309,7 +309,7 @@ mod tests {
         assert_eq!(session_user.account, "test@example.com");
         assert_eq!(session_user.label, "Test User");
         assert!(session_user.is_admin);
-        assert_eq!(session_user.sequence_number, 42);
+        assert_eq!(session_user.sequence_number, Some(42));
         assert_eq!(session_user.created_at, now);
         assert_eq!(session_user.updated_at, now);
 

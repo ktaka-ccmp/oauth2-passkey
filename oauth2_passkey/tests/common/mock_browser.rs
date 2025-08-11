@@ -9,9 +9,8 @@ use std::collections::HashMap;
 pub struct MockBrowser {
     client: Client,
     base_url: String,
-    /// Stored cookies from responses (automatically handled by reqwest client)
-    #[allow(dead_code)]
-    cookies: HashMap<String, String>,
+    /// Stored cookies from responses (manually tracked for testing)
+    cookies: std::sync::Arc<std::sync::Mutex<HashMap<String, String>>>,
 }
 
 impl MockBrowser {
@@ -26,14 +25,16 @@ impl MockBrowser {
         Self {
             client,
             base_url: base_url.to_string(),
-            cookies: HashMap::new(),
+            cookies: std::sync::Arc::new(std::sync::Mutex::new(HashMap::new())),
         }
     }
 
     /// Make a GET request to the specified path
     pub async fn get(&self, path: &str) -> Result<Response, reqwest::Error> {
         let url = format!("{}{}", self.base_url, path);
-        self.client.get(&url).send().await
+        let response = self.client.get(&url).send().await?;
+        self.extract_cookies_from_response(&response);
+        Ok(response)
     }
 
     /// Make a GET request with custom headers
@@ -49,7 +50,9 @@ impl MockBrowser {
             request = request.header(*key, *value);
         }
 
-        request.send().await
+        let response = request.send().await?;
+        self.extract_cookies_from_response(&response);
+        Ok(response)
     }
 
     /// Make a POST request with form data
@@ -60,7 +63,9 @@ impl MockBrowser {
         form_data: &[(&str, &str)],
     ) -> Result<Response, reqwest::Error> {
         let url = format!("{}{}", self.base_url, path);
-        self.client.post(&url).form(form_data).send().await
+        let response = self.client.post(&url).form(form_data).send().await?;
+        self.extract_cookies_from_response(&response);
+        Ok(response)
     }
 
     /// Make a POST request with form data and custom headers (for OAuth2 callbacks) - old format
@@ -87,7 +92,9 @@ impl MockBrowser {
         json_data: &Value,
     ) -> Result<Response, reqwest::Error> {
         let url = format!("{}{}", self.base_url, path);
-        self.client.post(&url).json(json_data).send().await
+        let response = self.client.post(&url).json(json_data).send().await?;
+        self.extract_cookies_from_response(&response);
+        Ok(response)
     }
 
     /// Make a POST request with JSON data and custom headers (preserves cookies)
@@ -131,7 +138,7 @@ impl MockBrowser {
         &self,
         mode: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        let path = format!("/oauth2/start?mode={mode}");
+        let path = format!("/auth/oauth2/google?mode={mode}");
         let response = self.get(&path).await?;
 
         if response.status().is_redirection() {
@@ -154,7 +161,7 @@ impl MockBrowser {
         code: &str,
         state: &str,
     ) -> Result<Response, Box<dyn std::error::Error>> {
-        let path = format!("/oauth2/callback?code={code}&state={state}");
+        let path = format!("/auth/oauth2/authorized?code={code}&state={state}");
         let response = self.get(&path).await?;
         Ok(response)
     }
@@ -315,6 +322,40 @@ impl MockBrowser {
     pub async fn logout(&self) -> Result<Response, Box<dyn std::error::Error>> {
         let response = self.post_form("/auth/logout", &[]).await?;
         Ok(response)
+    }
+
+    /// Extract cookies from response headers and store them
+    fn extract_cookies_from_response(&self, response: &Response) {
+        if let Ok(mut cookies) = self.cookies.lock() {
+            for cookie_header in response.headers().get_all("set-cookie") {
+                if let Ok(cookie_str) = cookie_header.to_str() {
+                    // Parse cookie string: "name=value; Path=/; HttpOnly; Secure"
+                    let cookie_parts: Vec<&str> = cookie_str.split(';').collect();
+                    if let Some(name_value) = cookie_parts.first() {
+                        let mut parts = name_value.splitn(2, '=');
+                        if let (Some(name), Some(value)) = (parts.next(), parts.next()) {
+                            let name = name.trim();
+                            let value = value.trim();
+                            cookies.insert(name.to_string(), value.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Get the session ID from stored cookies
+    pub fn get_session_id(&self) -> Option<String> {
+        if let Ok(cookies) = self.cookies.lock() {
+            // Look for the session cookie (usually __Host-SessionId)
+            cookies
+                .get("__Host-SessionId")
+                .or_else(|| cookies.get("SessionId"))
+                .or_else(|| cookies.get("session_id"))
+                .cloned()
+        } else {
+            None
+        }
     }
 }
 

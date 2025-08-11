@@ -29,6 +29,7 @@ pub(crate) use main::{
     get_mode_from_stored_session, get_uid_from_stored_session_by_state_param, validate_origin,
 };
 
+// Internal utilities needed by test setup
 pub(crate) use storage::OAuth2Store;
 pub(crate) use types::AccountSearchField;
 

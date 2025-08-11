@@ -12,9 +12,6 @@
 //! - `user`: User account management operations
 
 mod admin;
-mod auth_helpers;
-#[cfg(test)]
-mod authorization_security_tests;
 mod errors;
 mod oauth2;
 mod passkey;
@@ -28,6 +25,7 @@ pub use admin::{
     delete_oauth2_account_admin, delete_passkey_credential_admin, delete_user_account_admin,
     get_all_users, get_user, update_user_admin_status,
 };
+
 pub use passkey::{
     RegistrationStartRequest, delete_passkey_credential_core, handle_finish_authentication_core,
     handle_finish_registration_core, handle_start_authentication_core,

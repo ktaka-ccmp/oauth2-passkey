@@ -6,39 +6,18 @@
 /// - CSRF protection across different authentication methods
 /// - Cross-user operation attempts during account linking
 use crate::common::{
-    MockBrowser, TestServer, TestUsers, attack_scenarios::admin_attacks::*,
+    TestSetup, TestUsers, attack_scenarios::admin_attacks::*,
     attack_scenarios::cross_flow_attacks::*, security_utils::*,
 };
 use serde_json::json;
 use serial_test::serial;
-
-/// Test environment setup for Cross-flow security tests
-struct CrossFlowSecurityTestSetup {
-    server: TestServer,
-    browser: MockBrowser,
-}
-
-impl CrossFlowSecurityTestSetup {
-    /// Create a new security test environment
-    async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let server = TestServer::start().await?;
-        let browser = MockBrowser::new(&server.base_url, true);
-        Ok(Self { server, browser })
-    }
-
-    /// Shutdown the test server
-    async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
-        self.server.shutdown().await;
-        Ok(())
-    }
-}
 
 /// Test unauthenticated account linking attempt - should be rejected
 #[tokio::test]
 #[serial]
 async fn test_security_cross_flow_unauthenticated_linking() -> Result<(), Box<dyn std::error::Error>>
 {
-    let setup = CrossFlowSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing unauthenticated account linking rejection");
 
@@ -67,7 +46,7 @@ async fn test_security_cross_flow_unauthenticated_linking() -> Result<(), Box<dy
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -76,7 +55,7 @@ async fn test_security_cross_flow_unauthenticated_linking() -> Result<(), Box<dy
 #[serial]
 async fn test_security_cross_flow_invalid_context_credential_addition()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = CrossFlowSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing credential addition with invalid context rejection");
 
@@ -101,7 +80,7 @@ async fn test_security_cross_flow_invalid_context_credential_addition()
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -110,7 +89,7 @@ async fn test_security_cross_flow_invalid_context_credential_addition()
 #[serial]
 async fn test_security_cross_flow_cross_user_credential_addition()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = CrossFlowSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing cross-user credential addition rejection");
 
@@ -137,7 +116,7 @@ async fn test_security_cross_flow_cross_user_credential_addition()
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -146,7 +125,7 @@ async fn test_security_cross_flow_cross_user_credential_addition()
 #[serial]
 async fn test_security_cross_flow_csrf_protection_across_methods()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = CrossFlowSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing CSRF protection across authentication methods");
 
@@ -169,7 +148,7 @@ async fn test_security_cross_flow_csrf_protection_across_methods()
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -178,7 +157,7 @@ async fn test_security_cross_flow_csrf_protection_across_methods()
 #[serial]
 async fn test_security_cross_flow_privilege_escalation_during_linking()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = CrossFlowSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing privilege escalation during account linking rejection");
 
@@ -207,7 +186,7 @@ async fn test_security_cross_flow_privilege_escalation_during_linking()
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -216,7 +195,7 @@ async fn test_security_cross_flow_privilege_escalation_during_linking()
 #[serial]
 async fn test_security_cross_flow_unauthorized_admin_during_credential_mgmt()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = CrossFlowSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing unauthorized admin operation during credential management");
 
@@ -241,7 +220,7 @@ async fn test_security_cross_flow_unauthorized_admin_during_credential_mgmt()
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -250,7 +229,7 @@ async fn test_security_cross_flow_unauthorized_admin_during_credential_mgmt()
 #[serial]
 async fn test_security_cross_flow_mixed_auth_context_confusion()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = CrossFlowSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing mixed authentication context confusion rejection");
 
@@ -282,7 +261,7 @@ async fn test_security_cross_flow_mixed_auth_context_confusion()
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -291,7 +270,7 @@ async fn test_security_cross_flow_mixed_auth_context_confusion()
 #[serial]
 async fn test_security_cross_flow_session_fixation_during_linking()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = CrossFlowSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing session fixation during account linking rejection");
 
@@ -321,7 +300,7 @@ async fn test_security_cross_flow_session_fixation_during_linking()
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -330,7 +309,7 @@ async fn test_security_cross_flow_session_fixation_during_linking()
 #[serial]
 async fn test_security_cross_flow_concurrent_auth_interference()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = CrossFlowSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing concurrent authentication flow interference rejection");
 
@@ -363,7 +342,7 @@ async fn test_security_cross_flow_concurrent_auth_interference()
         "concurrent auth interference test",
     );
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -372,7 +351,7 @@ async fn test_security_cross_flow_concurrent_auth_interference()
 #[serial]
 async fn test_security_cross_flow_auth_bypass_via_flow_switching()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = CrossFlowSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing authentication bypass via flow switching rejection");
 
@@ -408,6 +387,6 @@ async fn test_security_cross_flow_auth_bypass_via_flow_switching()
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }

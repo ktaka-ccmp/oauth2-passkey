@@ -8,7 +8,7 @@
 ///
 /// Note: These tests focus on meaningful CSRF protection for authenticated operations,
 /// not just token extraction from unauthenticated flows.
-use crate::common::{MockBrowser, TestServer, TestUsers, validation_utils::AuthValidationResult};
+use crate::common::{MockBrowser, TestSetup, TestUsers, validation_utils::AuthValidationResult};
 use serial_test::serial;
 
 // Import helper functions for setting up authenticated sessions
@@ -24,14 +24,27 @@ use super::passkey_flows::register_user_with_attestation;
 #[tokio::test]
 #[serial]
 async fn test_authenticated_logout_csrf_protection() -> Result<(), Box<dyn std::error::Error>> {
-    let server = TestServer::start().await?;
-    let browser = MockBrowser::new(&server.base_url, true);
+    let setup = TestSetup::new().await?;
 
     println!("🔐 Testing CSRF protection for authenticated logout operations");
 
     // Step 1: Establish authenticated session using OAuth2
     println!("📝 Step 1: Establish authenticated session with OAuth2");
-    let oauth2_response = complete_full_oauth2_flow(&browser, "create_user_or_login").await?;
+
+    // Configure mock server with unique test user data for this test
+    use crate::common::axum_mock_server::configure_mock_for_test;
+    let test_user = TestUsers::unique_oauth2_user("authenticated_logout_csrf_protection");
+    configure_mock_for_test(
+        test_user.email.clone(),
+        test_user.id.clone(),
+        test_user.name.clone(),
+        test_user.given_name.clone(),
+        test_user.family_name.clone(),
+        setup.server.base_url.clone(),
+    );
+    println!("🔧 Mock server configured for test");
+
+    let oauth2_response = complete_full_oauth2_flow(&setup.browser, "create_user_or_login").await?;
     let oauth2_validation = AuthValidationResult::from_oauth2_response(
         oauth2_response.status(),
         oauth2_response.headers(),
@@ -45,14 +58,14 @@ async fn test_authenticated_logout_csrf_protection() -> Result<(), Box<dyn std::
 
     // Verify session is established
     assert!(
-        browser.has_active_session().await,
+        setup.browser.has_active_session().await,
         "Session should be established after OAuth2 authentication"
     );
     println!("✅ Authenticated session established");
 
     // Step 2: Get valid CSRF token for authenticated operations
     println!("🎫 Step 2: Get CSRF token for authenticated operations");
-    let csrf_response = browser.get("/auth/user/csrf_token").await?;
+    let csrf_response = setup.browser.get("/auth/user/csrf_token").await?;
     assert!(
         csrf_response.status().is_success(),
         "Should be able to get CSRF token when authenticated"
@@ -67,7 +80,7 @@ async fn test_authenticated_logout_csrf_protection() -> Result<(), Box<dyn std::
 
     // Step 3: Test logout with valid session (using browser client with cookies)
     println!("🚪 Step 3: Test logout with authenticated session");
-    let logout_response = browser.logout().await?;
+    let logout_response = setup.browser.logout().await?;
 
     if logout_response.status().is_success() || logout_response.status().is_redirection() {
         println!("✅ Step 3: Logout with authenticated session successful");
@@ -82,7 +95,16 @@ async fn test_authenticated_logout_csrf_protection() -> Result<(), Box<dyn std::
     println!("🔧 Step 4: Test API client patterns with CSRF tokens");
 
     // Re-establish session for this test
-    let browser2 = MockBrowser::new(&server.base_url, true);
+    let browser2 = MockBrowser::new(&setup.server.base_url, true);
+    // Configure mock server for second session test too
+    configure_mock_for_test(
+        test_user.email.clone(),
+        test_user.id.clone(),
+        test_user.name.clone(),
+        test_user.given_name.clone(),
+        test_user.family_name.clone(),
+        setup.server.base_url.clone(),
+    );
     let _oauth2_response2 = complete_full_oauth2_flow(&browser2, "create_user_or_login").await?;
 
     // Get CSRF token for API testing
@@ -93,7 +115,7 @@ async fn test_authenticated_logout_csrf_protection() -> Result<(), Box<dyn std::
         .ok_or("CSRF token should be present in response")?;
 
     // Test with valid CSRF token in headers
-    let api_client = MockBrowser::new(&server.base_url, false); // No automatic cookies
+    let api_client = MockBrowser::new(&setup.server.base_url, false); // No automatic cookies
     let valid_headers = &[("x-csrf-token", csrf_token2)];
 
     let user_info_response = api_client
@@ -109,7 +131,7 @@ async fn test_authenticated_logout_csrf_protection() -> Result<(), Box<dyn std::
     println!("✅ Step 4: API client CSRF header handling tested");
 
     println!("🎉 CSRF protection for authenticated logout operations verified");
-    server.shutdown().await;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -123,27 +145,31 @@ async fn test_authenticated_logout_csrf_protection() -> Result<(), Box<dyn std::
 #[serial]
 async fn test_authenticated_oauth2_linking_csrf_protection()
 -> Result<(), Box<dyn std::error::Error>> {
-    let server = TestServer::start().await?;
-    let browser = MockBrowser::new(&server.base_url, true);
+    let setup = TestSetup::new().await?;
     let test_user = TestUsers::admin_user();
 
     println!("🔐 Testing CSRF protection for OAuth2 account linking operations");
 
     // Step 1: Establish authenticated session using passkey
     println!("🔑 Step 1: Establish authenticated session with passkey");
-    let _registration_result =
-        register_user_with_attestation(&browser, &test_user, "packed", &server.base_url).await?;
+    let _registration_result = register_user_with_attestation(
+        &setup.browser,
+        &test_user,
+        "packed",
+        &setup.server.base_url,
+    )
+    .await?;
 
     // Verify session is established
     assert!(
-        browser.has_active_session().await,
+        setup.browser.has_active_session().await,
         "Session should be established after passkey registration"
     );
     println!("✅ Authenticated passkey session established");
 
     // Step 2: Get valid CSRF token for authenticated user
     println!("🎫 Step 2: Get CSRF token for account linking operations");
-    let csrf_response = browser.get("/auth/user/csrf_token").await?;
+    let csrf_response = setup.browser.get("/auth/user/csrf_token").await?;
     assert!(
         csrf_response.status().is_success(),
         "Should be able to get CSRF token when authenticated"
@@ -159,7 +185,7 @@ async fn test_authenticated_oauth2_linking_csrf_protection()
     // Step 3: Test OAuth2 linking with valid CSRF token (using browser client)
     println!("🌐 Step 3: Test OAuth2 account linking with valid session");
     let oauth2_link_url = format!("/auth/oauth2/google?mode=add_to_user&context={csrf_token}");
-    let oauth2_link_response = browser.get(&oauth2_link_url).await?;
+    let oauth2_link_response = setup.browser.get(&oauth2_link_url).await?;
 
     if oauth2_link_response.status().is_redirection() {
         println!("✅ Step 3: OAuth2 linking with valid CSRF token initiated successfully");
@@ -173,7 +199,7 @@ async fn test_authenticated_oauth2_linking_csrf_protection()
     // Step 4: Test API client pattern with CSRF tokens
     println!("🔧 Step 4: Test API client OAuth2 linking patterns");
 
-    let api_client = MockBrowser::new(&server.base_url, false);
+    let api_client = MockBrowser::new(&setup.server.base_url, false);
     let valid_headers = &[("x-csrf-token", csrf_token)];
 
     let api_oauth2_response = api_client
@@ -188,7 +214,7 @@ async fn test_authenticated_oauth2_linking_csrf_protection()
     println!("✅ Step 4: API client OAuth2 linking patterns tested");
 
     println!("🎉 CSRF protection for OAuth2 account linking operations verified");
-    server.shutdown().await;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -201,27 +227,31 @@ async fn test_authenticated_oauth2_linking_csrf_protection()
 #[tokio::test]
 #[serial]
 async fn test_authenticated_user_info_csrf_protection() -> Result<(), Box<dyn std::error::Error>> {
-    let server = TestServer::start().await?;
-    let browser = MockBrowser::new(&server.base_url, true);
+    let setup = TestSetup::new().await?;
     let test_user = TestUsers::admin_user();
 
     println!("🔐 Testing CSRF protection for user information access");
 
     // Step 1: Establish authenticated session using passkey
     println!("🔑 Step 1: Establish authenticated session with passkey");
-    let _registration_result =
-        register_user_with_attestation(&browser, &test_user, "packed", &server.base_url).await?;
+    let _registration_result = register_user_with_attestation(
+        &setup.browser,
+        &test_user,
+        "packed",
+        &setup.server.base_url,
+    )
+    .await?;
 
     // Verify session is established
     assert!(
-        browser.has_active_session().await,
+        setup.browser.has_active_session().await,
         "Session should be established after passkey registration"
     );
     println!("✅ Authenticated passkey session established");
 
     // Step 2: Test browser client access (should work with cookies)
     println!("🌐 Step 2: Test browser client user info access");
-    let browser_user_info = browser.get("/auth/user/info").await?;
+    let browser_user_info = setup.browser.get("/auth/user/info").await?;
     assert!(
         browser_user_info.status().is_success(),
         "Browser client should access user info with session cookies"
@@ -230,7 +260,7 @@ async fn test_authenticated_user_info_csrf_protection() -> Result<(), Box<dyn st
 
     // Step 3: Test API client access without session (should fail)
     println!("❌ Step 3: Test API client user info access without session");
-    let api_client_no_session = MockBrowser::new(&server.base_url, false);
+    let api_client_no_session = MockBrowser::new(&setup.server.base_url, false);
     let no_session_response = api_client_no_session.get("/auth/user/info").await?;
 
     assert!(
@@ -245,13 +275,13 @@ async fn test_authenticated_user_info_csrf_protection() -> Result<(), Box<dyn st
     println!("🔧 Step 4: Test API client patterns with CSRF headers");
 
     // Get CSRF token
-    let csrf_response = browser.get("/auth/user/csrf_token").await?;
+    let csrf_response = setup.browser.get("/auth/user/csrf_token").await?;
     let csrf_data: serde_json::Value = csrf_response.json().await?;
     let csrf_token = csrf_data["csrf_token"]
         .as_str()
         .ok_or("CSRF token should be present in response")?;
 
-    let api_client = MockBrowser::new(&server.base_url, false);
+    let api_client = MockBrowser::new(&setup.server.base_url, false);
     let csrf_headers = &[("x-csrf-token", csrf_token)];
 
     let api_user_info = api_client
@@ -266,7 +296,7 @@ async fn test_authenticated_user_info_csrf_protection() -> Result<(), Box<dyn st
     println!("✅ Step 4: API client CSRF header patterns tested");
 
     println!("🎉 CSRF protection for user information access verified");
-    server.shutdown().await;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -279,14 +309,27 @@ async fn test_authenticated_user_info_csrf_protection() -> Result<(), Box<dyn st
 #[tokio::test]
 #[serial]
 async fn test_authenticated_api_client_csrf_validation() -> Result<(), Box<dyn std::error::Error>> {
-    let server = TestServer::start().await?;
-    let browser = MockBrowser::new(&server.base_url, true);
+    let setup = TestSetup::new().await?;
 
     println!("🔐 Testing CSRF validation for authenticated API client operations");
 
     // Step 1: Establish authenticated session using OAuth2
     println!("📝 Step 1: Establish authenticated session with OAuth2");
-    let oauth2_response = complete_full_oauth2_flow(&browser, "create_user_or_login").await?;
+
+    // Configure mock server with unique test user data for this test
+    use crate::common::axum_mock_server::configure_mock_for_test;
+    let test_user = TestUsers::unique_oauth2_user("authenticated_api_client_csrf_validation");
+    configure_mock_for_test(
+        test_user.email.clone(),
+        test_user.id.clone(),
+        test_user.name.clone(),
+        test_user.given_name.clone(),
+        test_user.family_name.clone(),
+        setup.server.base_url.clone(),
+    );
+    println!("🔧 Mock server configured for test");
+
+    let oauth2_response = complete_full_oauth2_flow(&setup.browser, "create_user_or_login").await?;
     let oauth2_validation = AuthValidationResult::from_oauth2_response(
         oauth2_response.status(),
         oauth2_response.headers(),
@@ -300,14 +343,14 @@ async fn test_authenticated_api_client_csrf_validation() -> Result<(), Box<dyn s
 
     // Verify session is established
     assert!(
-        browser.has_active_session().await,
+        setup.browser.has_active_session().await,
         "Session should be established after OAuth2 authentication"
     );
     println!("✅ Authenticated session established");
 
     // Step 2: Get valid CSRF token for authenticated operations
     println!("🎫 Step 2: Get CSRF token for authenticated operations");
-    let csrf_response = browser.get("/auth/user/csrf_token").await?;
+    let csrf_response = setup.browser.get("/auth/user/csrf_token").await?;
     assert!(
         csrf_response.status().is_success(),
         "Should be able to get CSRF token when authenticated"
@@ -322,7 +365,7 @@ async fn test_authenticated_api_client_csrf_validation() -> Result<(), Box<dyn s
 
     // Step 3: Test authenticated operation with browser client (should succeed)
     println!("✅ Step 3: Test authenticated operation with browser client");
-    let user_info_response = browser.get("/auth/user/info").await?;
+    let user_info_response = setup.browser.get("/auth/user/info").await?;
     assert!(
         user_info_response.status().is_success(),
         "Authenticated browser client should access user info, got: {}",
@@ -333,7 +376,7 @@ async fn test_authenticated_api_client_csrf_validation() -> Result<(), Box<dyn s
     // Step 4: Test API client patterns with various CSRF scenarios
     println!("🔧 Step 4: Test API client CSRF validation patterns");
 
-    let api_client = MockBrowser::new(&server.base_url, false);
+    let api_client = MockBrowser::new(&setup.server.base_url, false);
 
     // Test with valid CSRF token
     let valid_headers = &[("x-csrf-token", csrf_token)];
@@ -376,6 +419,6 @@ async fn test_authenticated_api_client_csrf_validation() -> Result<(), Box<dyn s
     println!("✅ Step 5: Operation without session properly rejected");
 
     println!("🎉 CSRF validation behavior for authenticated API clients verified");
-    server.shutdown().await;
+    setup.shutdown().await;
     Ok(())
 }

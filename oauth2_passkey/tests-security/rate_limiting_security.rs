@@ -6,30 +6,38 @@
 /// - Protection against resource exhaustion attacks
 /// - Prevention of brute force attacks
 /// - Proper handling of high-volume malicious requests
-use crate::common::{MockBrowser, TestServer, attack_scenarios::oauth2_attacks::*};
+use crate::common::{MockBrowser, TestSetup, attack_scenarios::oauth2_attacks::*};
 use serde_json::json;
 use serial_test::serial;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
-/// Test environment setup for rate limiting security tests
+/// Extended test setup for rate limiting security tests
 struct RateLimitingTestSetup {
-    server: TestServer,
-    browser: MockBrowser,
+    setup: TestSetup,
 }
 
 impl RateLimitingTestSetup {
     /// Create a new rate limiting test environment
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let server = TestServer::start().await?;
-        let browser = MockBrowser::new(&server.base_url, true);
-        Ok(Self { server, browser })
+        let setup = TestSetup::new().await?;
+        Ok(Self { setup })
     }
 
     /// Shutdown the test server
     async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
-        self.server.shutdown().await;
+        self.setup.shutdown().await;
         Ok(())
+    }
+
+    /// Access to browser for specialized methods
+    fn browser(&self) -> &crate::common::MockBrowser {
+        &self.setup.browser
+    }
+
+    /// Access to server for specialized methods
+    fn server(&self) -> &crate::common::TestServer {
+        &self.setup.server
     }
 
     /// Perform rapid OAuth2 authentication attempts
@@ -37,14 +45,14 @@ impl RateLimitingTestSetup {
         &self,
         count: usize,
     ) -> Result<Vec<reqwest::Response>, Box<dyn std::error::Error>> {
-        let mut responses = Vec::new();
+        let mut responses: Vec<reqwest::Response> = Vec::new();
 
         for i in 0..count {
             let invalid_code = format!("brute_force_attempt_{i}");
             let invalid_state = create_empty_state();
 
             let response = self
-                .browser
+                .browser()
                 .get(&format!(
                     "/auth/oauth2/authorized?code={invalid_code}&state={invalid_state}"
                 ))
@@ -64,7 +72,7 @@ impl RateLimitingTestSetup {
         &self,
         count: usize,
     ) -> Result<Vec<reqwest::Response>, Box<dyn std::error::Error>> {
-        let mut responses = Vec::new();
+        let mut responses: Vec<reqwest::Response> = Vec::new();
 
         for i in 0..count {
             let malicious_json = json!({
@@ -72,7 +80,7 @@ impl RateLimitingTestSetup {
             });
 
             let response = self
-                .browser
+                .browser()
                 .post_json("/auth/passkey/authenticate", &malicious_json)
                 .await?;
 
@@ -90,7 +98,7 @@ impl RateLimitingTestSetup {
         &self,
         count: usize,
     ) -> Result<Vec<reqwest::Response>, Box<dyn std::error::Error>> {
-        let mut responses = Vec::new();
+        let mut responses: Vec<reqwest::Response> = Vec::new();
 
         for i in 0..count {
             let registration_data = json!({
@@ -100,7 +108,7 @@ impl RateLimitingTestSetup {
             });
 
             let response = self
-                .browser
+                .browser()
                 .post_json("/auth/passkey/register", &registration_data)
                 .await?;
 
@@ -127,7 +135,7 @@ impl RateLimitingTestSetup {
         });
 
         let response = self
-            .browser
+            .browser()
             .post_json("/auth/passkey/register", &large_payload)
             .await?;
 
@@ -429,7 +437,7 @@ async fn test_security_concurrent_connection_protection() -> Result<(), Box<dyn 
     let start_time = Instant::now();
 
     for i in 0..concurrent_requests {
-        let browser = MockBrowser::new(&setup.server.base_url, true);
+        let browser = MockBrowser::new(&setup.server().base_url, true);
         let handle = tokio::spawn(async move {
             let invalid_code = format!("concurrent_attack_{i}");
             let invalid_state = create_empty_state();
@@ -445,7 +453,7 @@ async fn test_security_concurrent_connection_protection() -> Result<(), Box<dyn 
     }
 
     // Wait for all concurrent requests to complete
-    let mut responses = Vec::new();
+    let mut responses: Vec<reqwest::Response> = Vec::new();
     for handle in handles {
         match handle.await {
             Ok(Ok(response)) => responses.push(response),

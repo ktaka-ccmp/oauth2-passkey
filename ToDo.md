@@ -4,6 +4,20 @@
 
 ### High Priority
 
+- **Fix Inconsistent Admin Privilege Checking**: Critical security issue where some functions use `session_user.is_admin` directly instead of the centralized `has_admin_privileges()` method, causing first user (sequence_number = 1) to lose admin access in some code paths.
+  - **Security Risk**: First user created in system (sequence_number = 1) should automatically have admin privileges via `has_admin_privileges()` method, but direct field access (`session_user.is_admin`) bypasses this logic
+  - **✅ Type System Fixed**: `SessionUser.sequence_number` changed from `i64` to `Option<i64>` for consistency with database User type, eliminating fake sequence numbers
+  - **Functions Affected**:
+    - `validate_admin_session()` in `oauth2_passkey/src/coordination/admin.rs:331` - Uses `!session_user.is_admin`
+    - User deletion authorization in `oauth2_passkey/src/coordination/user.rs` - Uses `!session_user.is_admin && session_user.id != user_id`
+  - **Remaining Work**: Add `has_admin_privileges()` method to `SessionUser` type now that it has proper `sequence_number: Option<i64>` field
+  - **Impact**: High priority security fix to ensure consistent admin privilege enforcement across all code paths
+
+- **Add has_admin_privileges() Method to SessionUser**: Now that SessionUser has proper `sequence_number: Option<i64>` field, implement the `has_admin_privileges()` method to enable complete admin privilege checking without database roundtrips.
+  - **Implementation**: `impl User { pub fn has_admin_privileges(&self) -> bool { self.is_admin || self.sequence_number == Some(1) } }`
+  - **Benefits**: Consistent admin privilege checking, eliminates need for database lookups, fixes architectural flaw in admin authorization
+  - **Usage**: Replace direct `session_user.is_admin` checks with `session_user.has_admin_privileges()` calls
+
 - **Enhance Authentication Function Security**: Modify critical authentication functions to receive session_id and validate session existence + fetch fresh user attributes from database instead of trusting session data. This prevents privilege escalation attacks and eliminates vulnerabilities from stale/tampered session data.
   - **Security Risk**: Current functions trust session admin status without database validation (documented in authorization_security_tests.rs:321-333)
   - **Functions to Modify**:

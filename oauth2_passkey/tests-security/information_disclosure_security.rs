@@ -6,30 +6,38 @@
 /// - Metadata disclosure that could aid attackers
 /// - User existence confirmation attacks
 /// - Timing-based information disclosure
-use crate::common::{MockBrowser, TestServer, attack_scenarios::oauth2_attacks::*};
+use crate::common::{TestSetup, attack_scenarios::oauth2_attacks::*};
 use serde_json::json;
 use serial_test::serial;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
-/// Test environment setup for information disclosure security tests
+/// Extended test setup for information disclosure security tests
 struct InformationDisclosureTestSetup {
-    server: TestServer,
-    browser: MockBrowser,
+    setup: TestSetup,
 }
 
 impl InformationDisclosureTestSetup {
     /// Create a new information disclosure test environment
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let server = TestServer::start().await?;
-        let browser = MockBrowser::new(&server.base_url, true);
-        Ok(Self { server, browser })
+        let setup = TestSetup::new().await?;
+        Ok(Self { setup })
     }
 
     /// Shutdown the test server
     async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
-        self.server.shutdown().await;
+        self.setup.shutdown().await;
         Ok(())
+    }
+
+    /// Access to browser for specialized methods
+    fn browser(&self) -> &crate::common::MockBrowser {
+        &self.setup.browser
+    }
+
+    /// Access to server for specialized methods
+    fn server(&self) -> &crate::common::TestServer {
+        &self.setup.server
     }
 
     /// Attempt to register a user to create known state for testing
@@ -41,7 +49,7 @@ impl InformationDisclosureTestSetup {
         });
 
         let _response = self
-            .browser
+            .browser()
             .post_json("/auth/passkey/register", &registration_data)
             .await?;
 
@@ -170,7 +178,7 @@ async fn test_security_oauth2_error_message_enumeration_prevention()
         println!("🔧 Testing OAuth2 error scenario: {scenario_name}");
 
         let response = setup
-            .browser
+            .browser()
             .get(&format!(
                 "/auth/oauth2/authorized?code={auth_code}&state={state}"
             ))
@@ -287,7 +295,7 @@ async fn test_security_passkey_user_enumeration_prevention()
 
         let start_time = Instant::now();
         let response = setup
-            .browser
+            .browser()
             .post_json("/auth/passkey/register", &registration_data)
             .await?;
         let response_time = start_time.elapsed();
@@ -384,7 +392,7 @@ async fn test_security_debug_information_leakage_prevention()
         println!("🔧 Testing debug info leakage in: {method} {endpoint} ({scenario})");
 
         let response = match method {
-            "GET" => setup.browser.get(endpoint).await?,
+            "GET" => setup.browser().get(endpoint).await?,
             "POST" => {
                 let malformed_data = if scenario == "oversized_request" {
                     json!({
@@ -397,13 +405,13 @@ async fn test_security_debug_information_leakage_prevention()
                         "nested": { "deeply": { "very": { "much": "so" } } }
                     })
                 };
-                setup.browser.post_json(endpoint, &malformed_data).await?
+                setup.browser().post_json(endpoint, &malformed_data).await?
             }
             "DELETE" => {
                 // Use reqwest directly for unsupported methods
                 let client = reqwest::Client::new();
                 client
-                    .delete(format!("{}{}", setup.server.base_url, endpoint))
+                    .delete(format!("{}{}", setup.server().base_url, endpoint))
                     .send()
                     .await?
             }
@@ -518,7 +526,7 @@ async fn test_security_metadata_disclosure_prevention() -> Result<(), Box<dyn st
     for (scenario, endpoint, method) in test_scenarios {
         println!("🔧 Testing metadata exposure: {method} {endpoint}");
 
-        let response = setup.browser.get(endpoint).await?;
+        let response = setup.browser().get(endpoint).await?;
         let status = response.status();
         let headers = response.headers().clone();
         let body = response.text().await?;
@@ -575,7 +583,7 @@ async fn test_security_metadata_disclosure_prevention() -> Result<(), Box<dyn st
         println!("🔧 Testing auth endpoint headers: {endpoint}");
 
         // Test with GET request to check for unnecessary header disclosure
-        let response = setup.browser.get(endpoint).await?;
+        let response = setup.browser().get(endpoint).await?;
         let headers = response.headers().clone();
 
         // Check for unnecessary header disclosure
@@ -670,7 +678,7 @@ async fn test_security_timing_based_information_disclosure_prevention()
 
             let start_time = Instant::now();
             let _response = setup
-                .browser
+                .browser()
                 .post_json("/auth/passkey/register", &registration_data)
                 .await?;
             let response_time = start_time.elapsed();

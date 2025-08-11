@@ -32,7 +32,7 @@ mod tests {
         insert_test_user(user_id, account, label, true).await?;
 
         // Create session for the admin user
-        let session_id = format!("test-session-{}", user_id);
+        let session_id = format!("test-session-{user_id}");
         let csrf_token = "test-csrf-token";
         insert_test_session(&session_id, user_id, csrf_token, 3600).await?;
 
@@ -161,7 +161,7 @@ mod tests {
         ];
 
         for malicious_account in sql_injection_accounts.iter() {
-            let test_user_id = format!("test_account_{}", timestamp);
+            let test_user_id = format!("test_account_{timestamp}");
             let test_user = DbUser {
                 sequence_number: None,
                 id: test_user_id.clone(),
@@ -193,7 +193,7 @@ mod tests {
         ];
 
         for malicious_label in sql_injection_labels.iter() {
-            let test_user_id = format!("test_label_{}", timestamp);
+            let test_user_id = format!("test_label_{timestamp}");
             let test_user = DbUser {
                 sequence_number: None,
                 id: test_user_id.clone(),
@@ -414,8 +414,7 @@ mod tests {
         let malicious_user_id = "'; DROP TABLE users; --";
 
         // First, store the user with malicious ID (this should be safe)
-        if let Ok(_) = create_test_db_user(malicious_user_id, "malicious@example.com", false).await
-        {
+        if (create_test_db_user(malicious_user_id, "malicious@example.com", false).await).is_ok() {
             // Now use the stored malicious ID in admin operations
             // This tests whether the system is vulnerable when the malicious data
             // comes from the database rather than direct user input

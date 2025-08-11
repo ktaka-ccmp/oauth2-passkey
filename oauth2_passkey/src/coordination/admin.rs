@@ -2,8 +2,8 @@ use crate::oauth2::{AccountSearchField, OAuth2Store};
 use crate::passkey::{CredentialSearchField, PasskeyStore};
 use crate::userdb::{User, UserStore};
 
-use super::auth_helpers::validate_admin_session;
 use super::errors::CoordinationError;
+use crate::session::{User as SessionUser, get_user_from_session};
 
 /// Retrieves a list of all users in the system.
 ///
@@ -322,6 +322,28 @@ pub async fn update_user_admin_status(
     Ok(user)
 }
 
+/// Validates that a session belongs to an admin user.
+///
+/// This is a private helper function used only within the admin module.
+/// It validates session data using get_user_from_session which already
+/// performs fresh database lookup to ensure current user state.
+async fn validate_admin_session(session_id: &str) -> Result<SessionUser, CoordinationError> {
+    // Get user from session (this already does fresh database validation)
+    let session_user = get_user_from_session(session_id)
+        .await
+        .map_err(|_| CoordinationError::Unauthorized.log())?;
+
+    // Check if user has admin privileges (session_user already has fresh database data)
+    if !session_user.is_admin {
+        tracing::debug!(user_id = %session_user.id, "User is not authorized (not an admin)");
+        return Err(CoordinationError::Unauthorized.log());
+    }
+
+    tracing::debug!(user_id = %session_user.id, "Admin session validated successfully");
+
+    Ok(session_user)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -341,7 +363,7 @@ mod tests {
         insert_test_user(user_id, account, label, true).await?;
 
         // Create session for the admin user
-        let session_id = format!("test-session-{}", user_id);
+        let session_id = format!("test-session-{user_id}");
         let csrf_token = "test-csrf-token";
         insert_test_session(&session_id, user_id, csrf_token, 3600).await?;
 
@@ -699,7 +721,7 @@ mod tests {
         .await
         .expect("Failed to create non-admin user");
 
-        let non_admin_session_id = format!("test-session-{}", non_admin_user_id);
+        let non_admin_session_id = format!("test-session-{non_admin_user_id}");
         insert_test_session(
             &non_admin_session_id,
             &non_admin_user_id,
@@ -828,7 +850,7 @@ mod tests {
         .await
         .expect("Failed to create non-admin user");
 
-        let non_admin_session_id = format!("test-session-{}", non_admin_user_id);
+        let non_admin_session_id = format!("test-session-{non_admin_user_id}");
         insert_test_session(
             &non_admin_session_id,
             &non_admin_user_id,
@@ -876,7 +898,7 @@ mod tests {
         .await
         .expect("Failed to create non-admin user");
 
-        let non_admin_session_id = format!("test-session-{}", non_admin_user_id);
+        let non_admin_session_id = format!("test-session-{non_admin_user_id}");
         insert_test_session(
             &non_admin_session_id,
             &non_admin_user_id,

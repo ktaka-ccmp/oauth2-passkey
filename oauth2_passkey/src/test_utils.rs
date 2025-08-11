@@ -51,6 +51,23 @@ pub async fn init_test_environment() {
     ensure_database_initialized().await;
 }
 
+/// Extract SQLite database file path from GENERIC_DATA_STORE_URL environment variable
+///
+/// Parses the GENERIC_DATA_STORE_URL to extract the file path for SQLite databases.
+/// Supports formats like:
+/// - `sqlite:/path/to/file.db`
+/// - `sqlite:./relative/path.db`
+/// - `sqlite:/tmp/test.db`
+///
+/// Returns None for non-SQLite URLs or if the URL cannot be parsed.
+fn extract_sqlite_file_path() -> Option<String> {
+    if let Ok(url) = std::env::var("GENERIC_DATA_STORE_URL") {
+        extract_sqlite_file_path_from_url(&url)
+    } else {
+        None
+    }
+}
+
 /// Ensures database is properly initialized and creates a first user if none exists
 async fn ensure_database_initialized() {
     use crate::oauth2::OAuth2Store;
@@ -68,11 +85,11 @@ async fn ensure_database_initialized() {
         eprintln!("Warning: Failed to initialize PasskeyStore: {e}");
     }
 
-    // Create a first user if no users exist
+    // Create a first user if no users exist (OAuth2 only for now)
     create_first_user_if_needed().await;
 }
 
-/// Creates a first test user if no users exist in the database
+/// Creates a first test user with passkey credential if no users exist in the database
 /// Uses proper race-condition handling to ensure only one first user is created
 async fn create_first_user_if_needed() {
     use crate::userdb::{User, UserStore};
@@ -87,23 +104,45 @@ async fn create_first_user_if_needed() {
     // Double-check pattern: check again after acquiring the mutex
     match UserStore::get_all_users().await {
         Ok(users) if users.is_empty() => {
-            // No users exist, create a first test user
-            let first_user = User::new(
+            // No users exist, create a first test user with passkey credential
+            let mut first_user = User::new(
                 "first-user".to_string(),
                 "first-user@example.com".to_string(),
                 "First User".to_string(),
             );
+            first_user.is_admin = true; // First user should be admin
 
-            if let Err(e) = UserStore::upsert_user(first_user).await {
-                eprintln!("Warning: Failed to create first test user: {e}");
-            } else {
-                println!("✅ Created first test user with sequence_number = 1");
+            match UserStore::upsert_user(first_user).await {
+                Ok(created_user) => {
+                    println!("✅ Created first test user with sequence_number = 1");
+
+                    // Create OAuth2 account for authentication testing
+                    create_first_user_oauth2_account(&created_user.id).await;
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to create first test user: {e}");
+                }
             }
         }
         Ok(users) => {
             // Users already exist, log the first user for debugging
             if let Some(first) = users.iter().find(|u| u.sequence_number == Some(1)) {
                 println!("✅ First user already exists: {}", first.id);
+
+                // Ensure first user has admin privileges (update if needed)
+                if !first.is_admin {
+                    println!("🔧 Updating first user to have admin privileges...");
+                    let mut updated_user = first.clone();
+                    updated_user.is_admin = true;
+                    if let Err(e) = UserStore::upsert_user(updated_user).await {
+                        eprintln!("Warning: Failed to update first user admin status: {e}");
+                    } else {
+                        println!("✅ First user now has admin privileges");
+                    }
+                }
+
+                // Ensure first user has OAuth2 account for authentic testing
+                ensure_first_user_has_oauth2_account(&first.id).await;
             }
         }
         Err(e) => {
@@ -111,6 +150,110 @@ async fn create_first_user_if_needed() {
         }
     }
 }
+
+/// Creates a test OAuth2 account for the first user to enable authentic authentication testing
+async fn create_first_user_oauth2_account(user_id: &str) {
+    use crate::oauth2::{OAuth2Account, OAuth2Store};
+    use chrono::Utc;
+
+    let now = Utc::now();
+    let test_oauth2_account = OAuth2Account {
+        id: "first-user-oauth2-account".to_string(),
+        user_id: user_id.to_string(),
+        provider: "google".to_string(),
+        provider_user_id: "google_first-user-test-google-id".to_string(), // Already includes "google_" prefix
+        name: "First User".to_string(),
+        email: "first-user@example.com".to_string(),
+        picture: Some("https://example.com/avatar/first-user.jpg".to_string()),
+        metadata: serde_json::json!({"test_account": true, "created_by": "test_utils"}),
+        created_at: now,
+        updated_at: now,
+    };
+
+    match OAuth2Store::upsert_oauth2_account(test_oauth2_account).await {
+        Ok(_account) => {
+            println!("✅ Created first user OAuth2 account for testing");
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to create first user OAuth2 account: {e}");
+        }
+    }
+}
+
+/// Ensures the first user has an OAuth2 account (for cases where user exists but OAuth2 account doesn't)  
+async fn ensure_first_user_has_oauth2_account(user_id: &str) {
+    use crate::oauth2::OAuth2Store;
+
+    // Check if first user already has OAuth2 accounts
+    match OAuth2Store::get_oauth2_accounts(user_id).await {
+        Ok(accounts) if accounts.is_empty() => {
+            // No OAuth2 accounts exist for first user, create one
+            println!("ℹ️ First user exists but has no OAuth2 account, creating one...");
+            create_first_user_oauth2_account(user_id).await;
+        }
+        Ok(accounts) => {
+            println!("✅ First user has {} OAuth2 account(s)", accounts.len());
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to check first user OAuth2 accounts: {e}");
+        }
+    }
+}
+
+// TODO: Passkey credential creation disabled for now - needs proper API access
+// /// Creates a test Passkey credential for the first user to enable authentic authentication testing
+// async fn create_first_user_passkey_credential(user_id: &str) {
+//     use crate::passkey::{PasskeyStore, PasskeyCredential, PublicKeyCredentialUserEntity};
+//     use chrono::Utc;
+//
+//     let now = Utc::now();
+//
+//     // Create a test passkey credential with known values for testing
+//     let test_passkey_credential = PasskeyCredential {
+//         credential_id: "first-user-test-passkey-credential".to_string(),
+//         user_id: user_id.to_string(),
+//         public_key: "pQECAyYgASFYIIs-3FbrvHKA5KLYBZaEPUQeYIAY4U9qPcFgzp9Q9dAlIlggL2qPcxpGwz38P2iO3vKKhE7qJoRiPY3H7sGq2dECMwk".to_string(), // Known test P-256 public key (base64)
+//         aaguid: "00000000-0000-0000-0000-000000000000".to_string(), // Test AAGUID
+//         counter: 0,
+//         user: PublicKeyCredentialUserEntity {
+//             user_handle: "first-user-handle".to_string(),
+//             name: "first-user@example.com".to_string(),
+//             display_name: "First User".to_string(),
+//         },
+//         created_at: now,
+//         updated_at: now,
+//         last_used_at: now,
+//     };
+//
+//     match PasskeyStore::store_credential("first-user-test-passkey-credential".to_string(), test_passkey_credential).await {
+//         Ok(_) => {
+//             println!("✅ Created first user Passkey credential for testing");
+//         },
+//         Err(e) => {
+//             eprintln!("Warning: Failed to create first user Passkey credential: {e}");
+//         }
+//     }
+// }
+
+// /// Ensures the first user has a Passkey credential (for cases where user exists but credential doesn't)
+// async fn ensure_first_user_has_passkey_credential(user_id: &str) {
+//     use crate::passkey::{PasskeyStore, CredentialSearchField};
+//
+//     // Check if first user already has Passkey credentials
+//     match PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_string())).await {
+//         Ok(credentials) if credentials.is_empty() => {
+//             // No Passkey credentials exist for first user, create one
+//             println!("ℹ️ First user exists but has no Passkey credential, creating one...");
+//             create_first_user_passkey_credential(user_id).await;
+//         },
+//         Ok(credentials) => {
+//             println!("✅ First user has {} Passkey credential(s)", credentials.len());
+//         },
+//         Err(e) => {
+//             eprintln!("Warning: Failed to check first user Passkey credentials: {e}");
+//         }
+//     }
+// }
 
 /// Extract SQLite database file path from a database URL string
 ///
@@ -145,23 +288,6 @@ fn extract_sqlite_file_path_from_url(url: &str) -> Option<String> {
             }
             Some(path.to_string())
         }
-    } else {
-        None
-    }
-}
-
-/// Extract SQLite database file path from GENERIC_DATA_STORE_URL environment variable
-///
-/// Parses the GENERIC_DATA_STORE_URL to extract the file path for SQLite databases.
-/// Supports formats like:
-/// - `sqlite:/path/to/file.db`
-/// - `sqlite:./relative/path.db`
-/// - `sqlite:/tmp/test.db`
-///
-/// Returns None for non-SQLite URLs or if the URL cannot be parsed.
-fn extract_sqlite_file_path() -> Option<String> {
-    if let Ok(url) = std::env::var("GENERIC_DATA_STORE_URL") {
-        extract_sqlite_file_path_from_url(&url)
     } else {
         None
     }

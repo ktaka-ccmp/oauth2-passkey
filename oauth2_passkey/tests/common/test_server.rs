@@ -1,6 +1,5 @@
 use crate::common::axum_mock_server::{configure_mock_for_test, get_oidc_mock_server};
 use tokio::task::JoinHandle;
-use uuid::Uuid;
 
 /// Global flag to track if oauth2_passkey has been initialized
 static OAUTH2_PASSKEY_INITIALIZED: std::sync::atomic::AtomicBool =
@@ -137,31 +136,35 @@ impl TestServer {
         // Check if we should initialize
         let should_initialize = should_initialize_oauth2_passkey();
 
-        // Generate unique user data for this test
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let process_id = std::process::id();
-        let thread_id = format!("{:?}", std::thread::current().id());
-        let uuid = Uuid::new_v4().to_string().replace("-", "");
-        let unique_id = format!("{}_{}_{}_{}", timestamp, process_id, thread_id, &uuid[..8]);
-        let unique_email = format!("test_{unique_id}@example.com");
-        let unique_user_id = format!("mock_user_{unique_id}");
-        println!("🆔 Using unique test user: {unique_email} (ID: {unique_user_id})");
+        // Always use first user credentials for admin authentication tests
+        // NOTE: OAuth2 system automatically adds "google_" prefix, so mock server provides base ID
+        let first_user_email = "first-user@example.com".to_string();
+        let first_user_provider_id = "first-user-test-google-id".to_string();
+        println!(
+            "🆔 Using first user credentials: {first_user_email} (Provider ID: {first_user_provider_id})"
+        );
 
         // Get the persistent mock server (automatically starts if needed)
         let _server = get_oidc_mock_server();
 
-        // Configure the Axum mock server for this test
-        configure_mock_for_test(unique_email, unique_user_id, base_url.clone());
+        // Configure mock server to use first user credentials for admin authentication
+        configure_mock_for_test(
+            first_user_email,
+            first_user_provider_id,
+            "First User".to_string(),
+            "First".to_string(),
+            "User".to_string(),
+            base_url.clone(),
+        );
 
         // Initialize test environment with in-memory stores (only once per test process)
         if should_initialize {
             println!("🚀 Initializing oauth2_passkey library...");
             oauth2_passkey::init().await?;
-            OAUTH2_PASSKEY_INITIALIZED.store(true, std::sync::atomic::Ordering::Release);
 
+            // Note: Not creating first user here - let individual tests create users as needed
+
+            OAUTH2_PASSKEY_INITIALIZED.store(true, std::sync::atomic::Ordering::Release);
             println!("✅ oauth2_passkey library initialized successfully");
         } else {
             println!("⏭️  Skipping oauth2_passkey::init() - already initialized");

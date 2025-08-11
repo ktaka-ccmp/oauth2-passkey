@@ -1,9 +1,9 @@
 use crate::oauth2::{AccountSearchField, OAuth2Store};
 use crate::passkey::{CredentialSearchField, PasskeyStore};
-use crate::userdb::{User, UserStore};
+use crate::userdb::{User as DbUser, UserStore};
 
-use super::auth_helpers::{validate_admin_or_owner_session, validate_owner_session};
 use super::errors::CoordinationError;
+use crate::session::get_user_from_session;
 
 /// Update a user's account and label
 ///
@@ -19,7 +19,7 @@ use super::errors::CoordinationError;
 ///
 /// # Returns
 ///
-/// * `Ok(User)` - The updated user account information
+/// * `Ok(DbUser)` - The updated user account information
 /// * `Err(CoordinationError::Unauthorized)` - If the user is not the account owner
 /// * `Err(CoordinationError::ResourceNotFound)` - If the target user doesn't exist
 /// * `Err(CoordinationError)` - If another error occurs during the update
@@ -28,21 +28,27 @@ pub async fn update_user_account(
     user_id: &str,
     account: Option<String>,
     label: Option<String>,
-) -> Result<User, CoordinationError> {
-    // Validate owner session with fresh database lookup
-    let _owner_user = validate_owner_session(session_id, user_id).await?;
+) -> Result<DbUser, CoordinationError> {
+    // Get user from session (already does fresh database lookup)
+    let session_user = get_user_from_session(session_id)
+        .await
+        .map_err(|_| CoordinationError::Unauthorized.log())?;
 
-    // Get the current user
-    let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
-        CoordinationError::ResourceNotFound {
-            resource_type: "User".to_string(),
-            resource_id: user_id.to_string(),
-        }
-        .log()
-    })?;
+    // Validate owner session - user can only update their own account
+    if session_user.id != user_id {
+        tracing::debug!(
+            session_user_id = %session_user.id,
+            target_user_id = %user_id,
+            "User is not authorized (not resource owner)"
+        );
+        return Err(CoordinationError::Unauthorized.log());
+    }
+
+    // Convert SessionUser to DbUser for database operations
+    let user = DbUser::from(session_user);
 
     // Update the user with the new values
-    let updated_user = User {
+    let updated_user = DbUser {
         account: account.unwrap_or(user.account),
         label: label.unwrap_or(user.label),
         ..user
@@ -76,17 +82,37 @@ pub async fn delete_user_account(
     session_id: &str,
     user_id: &str,
 ) -> Result<Vec<String>, CoordinationError> {
-    // Validate admin or owner session with fresh database lookup
-    let _authorized_user = validate_admin_or_owner_session(session_id, user_id).await?;
+    // Get user from session (already does fresh database lookup)
+    let session_user = get_user_from_session(session_id)
+        .await
+        .map_err(|_| CoordinationError::Unauthorized.log())?;
 
-    // Check if the user exists
-    let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
-        CoordinationError::ResourceNotFound {
-            resource_type: "User".to_string(),
-            resource_id: user_id.to_string(),
-        }
-        .log()
-    })?;
+    // Validate admin or owner session - admin can delete any user, user can delete their own account
+    if !session_user.is_admin && session_user.id != user_id {
+        tracing::debug!(
+            session_user_id = %session_user.id,
+            target_user_id = %user_id,
+            is_admin = %session_user.is_admin,
+            "User is not authorized (neither admin nor resource owner)"
+        );
+        return Err(CoordinationError::Unauthorized.log());
+    }
+
+    // For owner deletion, use session user data (no second DB query needed)
+    // For admin deletion of other user, we need to fetch the target user
+    let user = if session_user.id == user_id {
+        // Self-deletion: convert SessionUser to DbUser
+        DbUser::from(session_user)
+    } else {
+        // Admin deleting another user: fetch target user
+        UserStore::get_user(user_id).await?.ok_or_else(|| {
+            CoordinationError::ResourceNotFound {
+                resource_type: "User".to_string(),
+                resource_id: user_id.to_string(),
+            }
+            .log()
+        })?
+    };
 
     tracing::debug!("Deleting user account: {:#?}", user);
 
@@ -108,6 +134,7 @@ pub async fn delete_user_account(
     // Finally, delete the user account
     UserStore::delete_user(user_id).await?;
 
+    // Returns a list of deleted passkey credential IDs for client-side notification
     Ok(credential_ids)
 }
 
@@ -147,11 +174,11 @@ mod tests {
     use crate::oauth2::OAuth2Store;
     use crate::passkey::{PasskeyCredential, PasskeyStore};
     use crate::session::{insert_test_session, insert_test_user};
-    use crate::userdb::{User, UserStore};
+    use crate::userdb::{User as DbUser, UserStore};
 
     // Helper function to create a test user
-    fn create_test_user(id: &str, account: &str, label: &str) -> User {
-        User {
+    fn create_test_user(id: &str, account: &str, label: &str) -> DbUser {
+        DbUser {
             id: id.to_string(),
             account: account.to_string(),
             label: label.to_string(),
@@ -504,227 +531,6 @@ mod tests {
         assert!(
             user_from_db.is_none(),
             "Generated ID was found in DB, but should be unique"
-        );
-    }
-
-    /// Test successful retrieval of a specific user
-    ///
-    /// This test verifies that `get_user` correctly retrieves a specific user
-    /// when given a valid user ID. It performs the following steps:
-    /// 1. Initializes a test environment
-    /// 2. Creates a test user directly in the database
-    /// 3. Calls `get_user` to retrieve the user
-    /// 4. Verifies that the user was successfully retrieved
-    ///
-    #[serial]
-    #[tokio::test]
-    async fn test_get_user() {
-        // Set up the test database
-        init_test_environment().await;
-
-        // Explicitly ensure tables exist for this test's connection
-        // This is necessary for in-memory databases where each test may get a fresh instance
-        UserStore::init()
-            .await
-            .expect("Failed to initialize UserStore");
-        OAuth2Store::init()
-            .await
-            .expect("Failed to initialize OAuth2Store");
-        PasskeyStore::init()
-            .await
-            .expect("Failed to initialize PasskeyStore");
-
-        // Create and insert a test user with timestamp to avoid conflicts
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let user_id = format!("test-user-id-{timestamp}");
-        let test_user = create_test_user(
-            &user_id,
-            &format!("user-{timestamp}@example.com"),
-            "Test User",
-        );
-        UserStore::upsert_user(test_user.clone())
-            .await
-            .expect("Failed to insert test user");
-
-        // Test getting an existing user
-        let result = UserStore::get_user(&user_id)
-            .await
-            .expect("Failed to get user");
-        assert!(result.is_some(), "Expected to find the user");
-
-        let retrieved_user = result.unwrap();
-        assert_eq!(retrieved_user.id, user_id);
-        assert_eq!(
-            retrieved_user.account,
-            format!("user-{timestamp}@example.com")
-        );
-        assert_eq!(retrieved_user.label, "Test User");
-
-        // Test getting a non-existent user
-        let non_existent_result = UserStore::get_user("non-existent-id")
-            .await
-            .expect("Failed to query non-existent user");
-        assert!(
-            non_existent_result.is_none(),
-            "Expected not to find a non-existent user"
-        );
-
-        // Clean up
-        UserStore::delete_user(&user_id).await.ok();
-    }
-
-    /// Test successful upsert of a user
-    ///
-    /// This test verifies that `upsert_user` correctly upserts a user
-    /// when given a valid user ID. It performs the following steps:
-    /// 1. Initializes a test environment
-    /// 2. Creates a test user directly in the database
-    /// 3. Calls `upsert_user` to upsert the user
-    /// 4. Verifies that the user was successfully upserted
-    ///
-    #[serial]
-    #[tokio::test]
-    async fn test_upsert_user() {
-        // Set up the test database
-        init_test_environment().await;
-
-        // Explicitly ensure tables exist for this test's connection
-        // This is necessary for in-memory databases where each test may get a fresh instance
-        UserStore::init()
-            .await
-            .expect("Failed to initialize UserStore");
-        OAuth2Store::init()
-            .await
-            .expect("Failed to initialize OAuth2Store");
-        PasskeyStore::init()
-            .await
-            .expect("Failed to initialize PasskeyStore");
-
-        // Test creating a new user with unique timestamp to avoid conflicts
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let user_id = format!("new-user-id-{timestamp}");
-        let new_user = create_test_user(
-            &user_id,
-            &format!("new-{timestamp}@example.com"),
-            "New User",
-        );
-        let created_user = UserStore::upsert_user(new_user.clone())
-            .await
-            .expect("Failed to create new user");
-
-        // Verify the created user matches what we provided
-        assert_eq!(created_user.id, user_id);
-        assert_eq!(created_user.account, format!("new-{timestamp}@example.com"));
-        assert_eq!(created_user.label, "New User");
-
-        // Verify the user was actually stored in the database
-        let stored_user = UserStore::get_user(&user_id)
-            .await
-            .expect("Failed to get user")
-            .expect("User not found in database");
-
-        assert_eq!(stored_user.id, user_id);
-        assert_eq!(stored_user.account, format!("new-{timestamp}@example.com"));
-        assert_eq!(stored_user.label, "New User");
-
-        // Test updating an existing user
-        let mut updated_user = stored_user;
-        updated_user.account = format!("updated-{timestamp}@example.com");
-        updated_user.label = "Updated User".to_string();
-
-        let result = UserStore::upsert_user(updated_user)
-            .await
-            .expect("Failed to update user");
-
-        // Verify the update was returned correctly
-        assert_eq!(result.id, user_id);
-        assert_eq!(result.account, format!("updated-{timestamp}@example.com"));
-        assert_eq!(result.label, "Updated User");
-
-        // Verify the update was stored in the database
-        let stored_updated_user = UserStore::get_user(&user_id)
-            .await
-            .expect("Failed to get updated user")
-            .expect("Updated user not found in database");
-
-        assert_eq!(stored_updated_user.id, user_id);
-        assert_eq!(
-            stored_updated_user.account,
-            format!("updated-{timestamp}@example.com")
-        );
-        assert_eq!(stored_updated_user.label, "Updated User");
-
-        // Clean up
-        UserStore::delete_user(&user_id).await.ok();
-    }
-
-    /// Test successful deletion of a user
-    ///
-    /// This test verifies that `delete_user` correctly deletes a user
-    /// when given a valid user ID. It performs the following steps:
-    /// 1. Initializes a test environment
-    /// 2. Creates a test user directly in the database
-    /// 3. Calls `delete_user` to delete the user
-    /// 4. Verifies that the user was successfully deleted
-    ///
-    #[serial]
-    #[tokio::test]
-    async fn test_delete_user() {
-        // Set up the test database
-        init_test_environment().await;
-
-        // Explicitly ensure tables exist for this test's connection
-        // This is necessary for in-memory databases where each test may get a fresh instance
-        UserStore::init()
-            .await
-            .expect("Failed to initialize UserStore");
-        OAuth2Store::init()
-            .await
-            .expect("Failed to initialize OAuth2Store");
-        PasskeyStore::init()
-            .await
-            .expect("Failed to initialize PasskeyStore");
-
-        // Create a test user with unique timestamp to avoid conflicts
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let user_id = format!("delete-user-id-{timestamp}");
-        let test_user = create_test_user(
-            &user_id,
-            &format!("delete-{timestamp}@example.com"),
-            "Delete User",
-        );
-        UserStore::upsert_user(test_user.clone())
-            .await
-            .expect("Failed to insert test user");
-
-        // Verify the user exists before deletion
-        let user_before_delete = UserStore::get_user(&user_id)
-            .await
-            .expect("Failed to get user")
-            .expect("User not found before deletion");
-
-        assert_eq!(user_before_delete.id, user_id);
-
-        // Delete the user
-        UserStore::delete_user(&user_id)
-            .await
-            .expect("Failed to delete user");
-
-        // Verify the user no longer exists
-        let user_after_delete = UserStore::get_user(&user_id)
-            .await
-            .expect("Failed to query deleted user");
-
-        assert!(
-            user_after_delete.is_none(),
-            "User still exists after deletion"
-        );
-
-        // Test deleting a non-existent user (should not error)
-        let result = UserStore::delete_user("non-existent-id").await;
-        assert!(
-            result.is_ok(),
-            "Deleting a non-existent user should not error"
         );
     }
 

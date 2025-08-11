@@ -6,38 +6,17 @@
 /// - Context token validation failures
 /// - Unauthorized admin operation attempts
 use crate::common::{
-    MockBrowser, TestServer, attack_scenarios::admin_attacks::*,
-    attack_scenarios::session_attacks::*, security_utils::*,
+    TestSetup, attack_scenarios::admin_attacks::*, attack_scenarios::session_attacks::*,
+    security_utils::*,
 };
 use serde_json::json;
 use serial_test::serial;
-
-/// Test environment setup for Session security tests
-struct SessionSecurityTestSetup {
-    server: TestServer,
-    browser: MockBrowser,
-}
-
-impl SessionSecurityTestSetup {
-    /// Create a new security test environment
-    async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let server = TestServer::start().await?;
-        let browser = MockBrowser::new(&server.base_url, true);
-        Ok(Self { server, browser })
-    }
-
-    /// Shutdown the test server
-    async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
-        self.server.shutdown().await;
-        Ok(())
-    }
-}
 
 /// Test access to protected endpoints without session - should be rejected
 #[tokio::test]
 #[serial]
 async fn test_security_session_no_session_access() -> Result<(), Box<dyn std::error::Error>> {
-    let setup = SessionSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing access to protected endpoints without session");
 
@@ -54,7 +33,7 @@ async fn test_security_session_no_session_access() -> Result<(), Box<dyn std::er
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -62,7 +41,7 @@ async fn test_security_session_no_session_access() -> Result<(), Box<dyn std::er
 #[tokio::test]
 #[serial]
 async fn test_security_session_csrf_bypass_attempt() -> Result<(), Box<dyn std::error::Error>> {
-    let setup = SessionSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing CSRF bypass attempt rejection");
 
@@ -85,7 +64,7 @@ async fn test_security_session_csrf_bypass_attempt() -> Result<(), Box<dyn std::
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -93,7 +72,7 @@ async fn test_security_session_csrf_bypass_attempt() -> Result<(), Box<dyn std::
 #[tokio::test]
 #[serial]
 async fn test_security_session_invalid_csrf_token() -> Result<(), Box<dyn std::error::Error>> {
-    let setup = SessionSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing invalid CSRF token rejection");
 
@@ -116,7 +95,7 @@ async fn test_security_session_invalid_csrf_token() -> Result<(), Box<dyn std::e
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -124,7 +103,7 @@ async fn test_security_session_invalid_csrf_token() -> Result<(), Box<dyn std::e
 #[tokio::test]
 #[serial]
 async fn test_security_session_expired_session_cookie() -> Result<(), Box<dyn std::error::Error>> {
-    let setup = SessionSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing expired session cookie rejection");
 
@@ -156,7 +135,7 @@ async fn test_security_session_expired_session_cookie() -> Result<(), Box<dyn st
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -165,7 +144,7 @@ async fn test_security_session_expired_session_cookie() -> Result<(), Box<dyn st
 #[serial]
 async fn test_security_session_malicious_session_cookie() -> Result<(), Box<dyn std::error::Error>>
 {
-    let setup = SessionSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing malicious session cookie rejection");
 
@@ -196,7 +175,7 @@ async fn test_security_session_malicious_session_cookie() -> Result<(), Box<dyn 
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -204,7 +183,7 @@ async fn test_security_session_malicious_session_cookie() -> Result<(), Box<dyn 
 #[tokio::test]
 #[serial]
 async fn test_security_session_cross_user_operation() -> Result<(), Box<dyn std::error::Error>> {
-    let setup = SessionSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing cross-user operation rejection");
 
@@ -236,7 +215,7 @@ async fn test_security_session_cross_user_operation() -> Result<(), Box<dyn std:
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -245,7 +224,7 @@ async fn test_security_session_cross_user_operation() -> Result<(), Box<dyn std:
 #[serial]
 async fn test_security_session_unauthorized_admin_operation()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = SessionSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing unauthorized admin operation rejection");
 
@@ -262,7 +241,7 @@ async fn test_security_session_unauthorized_admin_operation()
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -271,7 +250,7 @@ async fn test_security_session_unauthorized_admin_operation()
 #[serial]
 async fn test_security_session_admin_context_validation_failure()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = SessionSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing admin context token validation failure");
 
@@ -299,7 +278,7 @@ async fn test_security_session_admin_context_validation_failure()
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -308,7 +287,7 @@ async fn test_security_session_admin_context_validation_failure()
 #[serial]
 async fn test_security_session_user_data_without_session() -> Result<(), Box<dyn std::error::Error>>
 {
-    let setup = SessionSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing user data access without session");
 
@@ -325,7 +304,7 @@ async fn test_security_session_user_data_without_session() -> Result<(), Box<dyn
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -334,7 +313,7 @@ async fn test_security_session_user_data_without_session() -> Result<(), Box<dyn
 #[serial]
 async fn test_security_session_page_token_boundary_violation()
 -> Result<(), Box<dyn std::error::Error>> {
-    let setup = SessionSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing page session token boundary violation");
 
@@ -354,7 +333,7 @@ async fn test_security_session_page_token_boundary_violation()
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }
 
@@ -362,7 +341,7 @@ async fn test_security_session_page_token_boundary_violation()
 #[tokio::test]
 #[serial]
 async fn test_security_session_invalid_session_state() -> Result<(), Box<dyn std::error::Error>> {
-    let setup = SessionSecurityTestSetup::new().await?;
+    let setup = TestSetup::new().await?;
 
     println!("🔒 Testing invalid session state rejection");
 
@@ -393,6 +372,6 @@ async fn test_security_session_invalid_session_state() -> Result<(), Box<dyn std
     );
     assert_no_session_established(&setup.browser).await;
 
-    setup.shutdown().await?;
+    setup.shutdown().await;
     Ok(())
 }

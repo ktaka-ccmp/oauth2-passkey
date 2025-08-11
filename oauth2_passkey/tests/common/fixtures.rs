@@ -19,6 +19,25 @@ impl TestUsers {
         }
     }
 
+    /// Generate a unique OAuth2 test user for integration tests
+    /// This ensures each test gets a unique provider_user_id that won't collide with existing accounts
+    pub fn unique_oauth2_user(test_name: &str) -> TestUser {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+
+        let unique_id = format!("{test_name}-{timestamp}");
+        TestUser {
+            id: unique_id.clone(),
+            email: format!("oauth2-{timestamp}@example.com"),
+            name: format!("OAuth2 User {timestamp}"),
+            given_name: "OAuth2".to_string(),
+            family_name: format!("User-{timestamp}"),
+        }
+    }
+
     /// Get a standard test user for passkey flows
     pub fn passkey_user() -> TestUser {
         TestUser {
@@ -37,28 +56,6 @@ impl TestUsers {
             email: "admin@example.com".to_string(),
             name: "Admin Test User".to_string(),
             given_name: "Admin".to_string(),
-            family_name: "User".to_string(),
-        }
-    }
-
-    /// Get a second OAuth2 test user for linking scenarios
-    pub fn oauth2_user_second() -> TestUser {
-        TestUser {
-            id: "test_oauth2_user_second".to_string(),
-            email: "oauth2-second@example.com".to_string(),
-            name: "OAuth2 Second User".to_string(),
-            given_name: "OAuth2 Second".to_string(),
-            family_name: "User".to_string(),
-        }
-    }
-
-    /// Get a third OAuth2 test user for linking scenarios
-    pub fn oauth2_user_third() -> TestUser {
-        TestUser {
-            id: "test_oauth2_user_third".to_string(),
-            email: "oauth2-third@example.com".to_string(),
-            name: "OAuth2 Third User".to_string(),
-            given_name: "OAuth2 Third".to_string(),
             family_name: "User".to_string(),
         }
     }
@@ -1130,6 +1127,35 @@ impl MockWebAuthnCredentials {
             "authenticator_attachment": "platform",
             "auth_id": auth_id
         })
+    }
+
+    /// Generate a mock authentication assertion response with predictable credential for first user
+    pub fn authentication_response_with_predictable_credential(
+        credential_id: &str,
+        challenge: &str,
+        auth_id: &str,
+        user_handle: &str,
+    ) -> Value {
+        // For the first user testing, use the same key generation logic that's used in
+        // create_packed_attestation_with_key_pair but with SystemRandom for validity
+        // This generates a proper key that works with the crypto library
+        use ring::{rand, signature};
+
+        let rng = rand::SystemRandom::new();
+        let pkcs8_bytes = signature::EcdsaKeyPair::generate_pkcs8(
+            &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
+            &rng,
+        )
+        .expect("Failed to generate key pair");
+
+        // Use the existing method with the generated key
+        Self::authentication_response_with_stored_credential(
+            credential_id,
+            challenge,
+            auth_id,
+            user_handle,
+            pkcs8_bytes.as_ref(),
+        )
     }
 
     /// Generate a mock authentication assertion response with valid signature using stored key pair
