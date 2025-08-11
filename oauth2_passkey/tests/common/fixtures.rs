@@ -735,11 +735,13 @@ impl MockWebAuthnCredentials {
 
         // Use fetch_max to ensure counter is at least timestamp_base (handles initialization and growth)
         // This is atomic and thread-safe - if multiple threads call this, all will get increasing values
-        COUNTER_BASE.fetch_max(timestamp_base, Ordering::SeqCst);
+        // Use Relaxed ordering since we only need atomicity, not specific inter-thread ordering
+        COUNTER_BASE.fetch_max(timestamp_base, Ordering::Relaxed);
 
         // Increment and get next counter value - guaranteed to be unique and increasing
         // Note: fetch_add returns the OLD value, so we add 1 to get the NEW value
-        let counter_value = COUNTER_BASE.fetch_add(1, Ordering::SeqCst) + 1;
+        // Use wrapping_add to handle potential u32 overflow gracefully (though unlikely in tests)
+        let counter_value = COUNTER_BASE.fetch_add(1, Ordering::SeqCst).wrapping_add(1);
         auth_data.extend_from_slice(&counter_value.to_be_bytes());
 
         // No attested credential data for authentication
