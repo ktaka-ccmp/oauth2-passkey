@@ -49,9 +49,9 @@ mod storage;
 mod userdb;
 mod utils;
 
-// Test utilities module (only available in test builds)
+// Test utilities module (available in test builds and for integration tests)
 #[cfg(test)]
-mod test_utils;
+pub mod test_utils;
 
 // Core coordination components for authentication
 pub use coordination::{

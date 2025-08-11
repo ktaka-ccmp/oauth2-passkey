@@ -22,11 +22,16 @@ async fn test_get_all_users_integration() -> Result<(), Box<dyn std::error::Erro
     println!("🔐 Testing OAuth2 authentication...");
     let oauth2_session_id =
         crate::common::create_admin_session_via_oauth2(&setup.server.base_url).await?;
-    println!("✅ OAuth2 authentication successful");
+    println!("✅ OAuth2 authentication successful {oauth2_session_id}");
+
+    let passkey_session_id =
+        crate::common::create_admin_session_via_passkey(&setup.server.base_url).await?;
+    println!("✅ Passkey authentication successful {passkey_session_id}");
 
     // Use the OAuth2 session for testing admin functions (OAuth2 user should have admin privileges)
     println!("👑 Using OAuth2 session for get_all_users test...");
-    let admin_session_id = oauth2_session_id;
+    // let admin_session_id = oauth2_session_id;
+    let admin_session_id = passkey_session_id;
 
     // Get initial user count - there may be existing users from other tests
     let initial_users = oauth2_passkey::get_all_users(&admin_session_id).await?;
@@ -218,8 +223,16 @@ async fn test_delete_user_account_integration() -> Result<(), Box<dyn std::error
 
     // Create admin session using AUTHENTIC OAuth2 authentication
     // This uses the first user created during server initialization
-    let admin_session_id =
+    let oauth2_session_id =
         crate::common::create_admin_session_via_oauth2(&setup.server.base_url).await?;
+    let passkey_session_id =
+        crate::common::create_admin_session_via_passkey(&setup.server.base_url).await?;
+    println!("OAuth2 admin session ID: {oauth2_session_id}");
+    println!("Passkey admin session ID: {passkey_session_id}");
+
+    let admin_session_id = oauth2_session_id;
+    // let admin_session_id = passkey_session_id;
+
     let test_user = TestUsers::passkey_user();
 
     // Create a user with credentials
