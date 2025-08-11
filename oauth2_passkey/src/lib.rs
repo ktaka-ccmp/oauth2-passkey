@@ -51,7 +51,7 @@ mod utils;
 
 // Test utilities module (available in test builds and for integration tests)
 #[cfg(test)]
-pub mod test_utils;
+mod test_utils;
 
 // Core coordination components for authentication
 pub use coordination::{
