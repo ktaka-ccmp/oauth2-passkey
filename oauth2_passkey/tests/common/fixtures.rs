@@ -727,14 +727,15 @@ impl MockWebAuthnCredentials {
         use std::sync::atomic::{AtomicU32, Ordering};
         static COUNTER_BASE: AtomicU32 = AtomicU32::new(0);
 
-        // Initialize base counter with current timestamp if not already set
+        // Get current timestamp as base counter value
         let timestamp_base = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs() as u32;
-        COUNTER_BASE
-            .compare_exchange(0, timestamp_base, Ordering::SeqCst, Ordering::SeqCst)
-            .ok();
+
+        // Use fetch_max to ensure counter is at least timestamp_base (handles initialization and growth)
+        // This is atomic and thread-safe - if multiple threads call this, all will get increasing values
+        COUNTER_BASE.fetch_max(timestamp_base, Ordering::SeqCst);
 
         // Increment and get next counter value - guaranteed to be unique and increasing
         let counter_value = COUNTER_BASE.fetch_add(1, Ordering::SeqCst);
