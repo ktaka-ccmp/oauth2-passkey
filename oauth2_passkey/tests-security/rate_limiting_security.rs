@@ -150,7 +150,6 @@ impl RateLimitingTestSetup {
 /// 2. Rate limiting should prevent brute force attacks on OAuth2 callbacks
 /// 3. Legitimate requests should still be processed after rate limiting period
 #[tokio::test]
-
 async fn test_security_rate_limiting_oauth2_authentication()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = RateLimitingTestSetup::new().await?;
@@ -221,7 +220,6 @@ async fn test_security_rate_limiting_oauth2_authentication()
 /// 2. Rate limiting should prevent brute force attacks on passkey endpoints
 /// 3. Resource consumption should be controlled during attack attempts
 #[tokio::test]
-
 async fn test_security_rate_limiting_passkey_authentication()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = RateLimitingTestSetup::new().await?;
@@ -289,7 +287,6 @@ async fn test_security_rate_limiting_passkey_authentication()
 /// 2. Rate limiting should prevent spam account creation
 /// 3. Resource consumption should be controlled during registration floods
 #[tokio::test]
-
 async fn test_security_rate_limiting_registration_attempts()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = RateLimitingTestSetup::new().await?;
@@ -358,7 +355,6 @@ async fn test_security_rate_limiting_registration_attempts()
 /// 2. Memory consumption should be controlled
 /// 3. Server should remain stable under resource exhaustion attempts
 #[tokio::test]
-
 async fn test_security_resource_exhaustion_protection() -> Result<(), Box<dyn std::error::Error>> {
     let setup = RateLimitingTestSetup::new().await?;
 
@@ -423,7 +419,6 @@ async fn test_security_resource_exhaustion_protection() -> Result<(), Box<dyn st
 /// 2. Connection limits should prevent resource exhaustion
 /// 3. Server should remain responsive under concurrent load
 #[tokio::test]
-
 async fn test_security_concurrent_connection_protection() -> Result<(), Box<dyn std::error::Error>>
 {
     let setup = RateLimitingTestSetup::new().await?;
