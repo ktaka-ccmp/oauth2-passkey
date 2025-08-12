@@ -111,6 +111,8 @@ impl User {
     /// };
     /// assert!(!regular_user.has_admin_privileges());
     /// ```
+    /// IMPORTANT: This logic must stay in sync with DbUser::has_admin_privileges()
+    /// and AuthUser::has_admin_privileges() implementations.
     pub fn has_admin_privileges(&self) -> bool {
         self.is_admin || self.sequence_number == Some(1)
     }

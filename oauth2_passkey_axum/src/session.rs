@@ -133,8 +133,8 @@ impl AuthUser {
     /// 1. They have the `is_admin` flag set to true, OR
     /// 2. They are the first user in the system (sequence_number = 1)
     ///
-    /// This method provides consistent admin privilege checking in the Axum layer
-    /// and ensures the first user always has admin access regardless of the is_admin flag.
+    /// IMPORTANT: This logic must stay in sync with DbUser::has_admin_privileges()
+    /// and SessionUser::has_admin_privileges() implementations.
     ///
     /// # Returns
     /// * `true` if the user has administrative privileges
