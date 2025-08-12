@@ -653,54 +653,76 @@ async fn test_passkey_attestation_format(
     Ok(())
 }
 
-/// Test complete passkey authentication flows
+/// **CONSOLIDATED TEST 1**: Passkey Attestation Formats
 ///
-/// These integration tests verify end-to-end passkey functionality including:
-/// - New user registration via passkey
-/// - Existing user login via passkey
-/// - WebAuthn credential registration and authentication
-/// - Error scenarios and edge cases
-/// Test passkey registration with none attestation format (default)
-///
-/// Flow: Start registration → WebAuthn challenge → Mock credential → Verify none attestation
+/// This test consolidates:
+/// - test_passkey_registration_none_attestation
+/// - test_passkey_registration_packed_attestation  
+/// - test_passkey_registration_tpm_attestation
 #[tokio::test]
-async fn test_passkey_registration_none_attestation() -> Result<(), Box<dyn std::error::Error>> {
-    test_passkey_attestation_format("none", false).await
+async fn test_passkey_attestation_formats() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🔐 === CONSOLIDATED PASSKEY ATTESTATION FORMATS TEST ===");
+
+    // === SUBTEST 1: None Attestation Format ===
+    println!("\n🔑 SUBTEST 1: Testing none attestation format");
+    let result_none = test_passkey_attestation_format("none", false).await;
+    match result_none {
+        Ok(_) => println!("✅ SUBTEST 1 PASSED: None attestation format test completed"),
+        Err(e) => {
+            println!("❌ SUBTEST 1 FAILED: None attestation format test failed: {e}");
+            return Err(e);
+        }
+    }
+
+    // === SUBTEST 2: Packed Attestation Format ===
+    println!("\n📦 SUBTEST 2: Testing packed attestation format");
+    let result_packed = test_passkey_attestation_format("packed", true).await;
+    match result_packed {
+        Ok(_) => println!("✅ SUBTEST 2 PASSED: Packed attestation format test completed"),
+        Err(e) => {
+            println!("❌ SUBTEST 2 FAILED: Packed attestation format test failed: {e}");
+            return Err(e);
+        }
+    }
+
+    // === SUBTEST 3: TPM Attestation Format ===
+    println!("\n🛡️ SUBTEST 3: Testing TPM attestation format");
+    let result_tpm = test_passkey_attestation_format("tpm", true).await;
+    match result_tpm {
+        Ok(_) => println!("✅ SUBTEST 3 PASSED: TPM attestation format test completed"),
+        Err(e) => {
+            println!("❌ SUBTEST 3 FAILED: TPM attestation format test failed: {e}");
+            return Err(e);
+        }
+    }
+
+    println!("🎯 === CONSOLIDATED PASSKEY ATTESTATION FORMATS TEST COMPLETED ===");
+    Ok(())
 }
 
-/// Test passkey registration with packed attestation format
+/// **CONSOLIDATED TEST 2**: Passkey Multi-Credential Flows
 ///
-/// Flow: Start registration → WebAuthn challenge → Mock packed credential → Verify attestation
+/// This test consolidates:
+/// - test_passkey_register_then_authenticate
+/// - test_register_two_credentials_and_authenticate
+/// - test_passkey_error_scenarios
 #[tokio::test]
-async fn test_passkey_registration_packed_attestation() -> Result<(), Box<dyn std::error::Error>> {
-    test_passkey_attestation_format("packed", true).await
-}
+async fn test_passkey_multi_credential_flows() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🔐 === CONSOLIDATED PASSKEY MULTI-CREDENTIAL FLOWS TEST ===");
 
-/// Test passkey registration with TPM attestation format
-///
-/// Flow: Start registration → WebAuthn challenge → Mock TPM credential → Verify attestation
-#[tokio::test]
-async fn test_passkey_registration_tpm_attestation() -> Result<(), Box<dyn std::error::Error>> {
-    test_passkey_attestation_format("tpm", true).await
-}
+    // === SUBTEST 1: Register Then Authenticate Flow ===
+    println!("\n🔄 SUBTEST 1: Testing register then authenticate flow");
 
-/// Test passkey existing user authentication flow
-///
-/// Flow: Register user → Logout → Start authentication → WebAuthn challenge → Mock assertion → Login
-#[tokio::test]
-async fn test_passkey_register_then_authenticate() -> Result<(), Box<dyn std::error::Error>> {
-    // Setup test environment
-    let setup = PasskeyTestSetup::new().await?;
-
-    println!("🔐 Testing passkey existing user authentication flow");
+    // Setup test environment for this subtest
+    let passkey_setup = PasskeyTestSetup::new().await?;
 
     // Step 1: Register user with packed attestation (which we know works)
-    println!("Step 1: Registering user for authentication test");
+    println!("  Step 1: Registering user for authentication test");
     let registration_result = register_user_with_attestation(
-        setup.browser(),
-        &setup.test_user,
+        passkey_setup.browser(),
+        &passkey_setup.test_user,
         "packed",
-        setup.base_url(),
+        passkey_setup.base_url(),
     )
     .await?;
 
@@ -712,80 +734,71 @@ async fn test_passkey_register_then_authenticate() -> Result<(), Box<dyn std::er
 
     // Verify user is registered and logged in
     assert!(
-        setup.browser().has_active_session().await,
+        passkey_setup.browser().has_active_session().await,
         "User should be logged in after registration"
     );
 
     // Step 2: Logout the user
-    println!("Step 2: Logging out user");
-    logout_and_verify(setup.browser()).await?;
+    println!("  Step 2: Logging out user");
+    logout_and_verify(passkey_setup.browser()).await?;
 
     // Step 3: Use a new browser session to simulate user coming back later
-    println!("Step 3: Simulating user coming back later (new browser session)");
-    let browser_new_session = MockBrowser::new(setup.base_url(), true);
+    println!("  Step 3: Simulating user coming back later (new browser session)");
+    let browser_new_session = MockBrowser::new(passkey_setup.base_url(), true);
 
     // Step 4: Authenticate with the stored credentials
-    println!("Step 4: Authenticating with stored credentials");
+    println!("  Step 4: Authenticating with stored credentials");
     let auth_success = authenticate_user(
         &browser_new_session,
-        &setup.test_user,
+        &passkey_setup.test_user,
         &stored_user_handle,
         &stored_key_pair,
     )
     .await?;
 
     if auth_success {
-        println!("✅ Passkey authentication SUCCESS: Full flow completed");
+        println!("  ✅ Passkey authentication SUCCESS: Full flow completed");
         verify_successful_authentication(
             &browser_new_session,
-            &setup.test_user,
+            &passkey_setup.test_user,
             "register-then-authenticate test",
         )
         .await?;
     } else {
-        println!("ⓘ Passkey authentication did not succeed (may be expected for mock data)");
+        println!("  ⓘ Passkey authentication did not succeed (may be expected for mock data)");
     }
 
-    // Cleanup
-    setup.shutdown().await?;
-    Ok(())
-}
+    passkey_setup.shutdown().await?;
+    println!("✅ SUBTEST 1 PASSED: Register then authenticate flow completed");
 
-/// Test registering two passkey credentials, logout, then authenticate with either
-///
-/// Flow: Register first credential → Register second credential while logged in → Logout → Auth with first → Auth with second
-#[tokio::test]
-async fn test_register_two_credentials_and_authenticate() -> Result<(), Box<dyn std::error::Error>>
-{
-    // Setup test environment
-    let setup = PasskeyTestSetup::new().await?;
+    // === SUBTEST 2: Multiple Credentials Registration and Authentication ===
+    println!("\n🔗 SUBTEST 2: Testing multiple credentials registration and authentication");
 
-    println!("🔐 Testing passkey multiple credential registration and authentication");
+    // Setup new test environment for this subtest
+    let multi_setup = PasskeyTestSetup::new().await?;
 
     // Step 1: Register multiple credentials (2 credentials)
-    let credentials = setup.register_multiple_credentials(2).await?;
+    let credentials = multi_setup.register_multiple_credentials(2).await?;
 
     // Step 2: Verify the expected number of credentials were registered
-    setup.verify_available_credentials(2).await?;
+    multi_setup.verify_available_credentials(2).await?;
 
     // Step 3: Test logout and re-authentication cycle with all credentials
-    setup.test_logout_and_reauth_cycle(&credentials).await?;
+    multi_setup
+        .test_logout_and_reauth_cycle(&credentials)
+        .await?;
 
-    println!("✅ Multiple credential registration and authentication flow completed successfully");
+    println!(
+        "  ✅ Multiple credential registration and authentication flow completed successfully"
+    );
+    multi_setup.shutdown().await?;
+    println!("✅ SUBTEST 2 PASSED: Multiple credentials flows completed");
 
-    // Cleanup
-    setup.shutdown().await?;
-    Ok(())
-}
+    // === SUBTEST 3: Error Scenarios ===
+    println!("\n❌ SUBTEST 3: Testing passkey error scenarios");
 
-/// Test passkey error scenarios
-///
-/// Verifies proper error handling for various passkey failure cases
-#[tokio::test]
-async fn test_passkey_error_scenarios() -> Result<(), Box<dyn std::error::Error>> {
-    let setup = TestSetup::new().await?;
-
-    println!("🔐 Testing passkey error scenarios");
+    // Setup new test environment for this subtest
+    let error_setup = TestSetup::new().await?;
 
     // Test 1: Invalid credential response structure
     let invalid_credential = serde_json::json!({
@@ -793,7 +806,7 @@ async fn test_passkey_error_scenarios() -> Result<(), Box<dyn std::error::Error>
         "missing": "required_fields"
     });
 
-    let response = setup
+    let response = error_setup
         .browser
         .complete_passkey_registration(&invalid_credential)
         .await?;
@@ -805,7 +818,7 @@ async fn test_passkey_error_scenarios() -> Result<(), Box<dyn std::error::Error>
     );
 
     // Test 2: Authentication without prior registration
-    let authentication_options = setup
+    let authentication_options = error_setup
         .browser
         .start_passkey_authentication(Some("nonexistent@example.com"))
         .await;
@@ -820,14 +833,16 @@ async fn test_passkey_error_scenarios() -> Result<(), Box<dyn std::error::Error>
                     "Non-existent user should have no allowed credentials"
                 );
             }
-            println!("✅ Non-existent user authentication handled correctly");
+            println!("  ✅ Non-existent user authentication handled correctly");
         }
         Err(_) => {
-            println!("✅ Non-existent user authentication returned error (also acceptable)");
+            println!("  ✅ Non-existent user authentication returned error (also acceptable)");
         }
     }
 
-    // Cleanup
-    setup.shutdown().await;
+    error_setup.shutdown().await;
+    println!("✅ SUBTEST 3 PASSED: Error scenarios handled correctly");
+
+    println!("🎯 === CONSOLIDATED PASSKEY MULTI-CREDENTIAL FLOWS TEST COMPLETED ===");
     Ok(())
 }
