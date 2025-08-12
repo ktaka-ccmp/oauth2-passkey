@@ -126,6 +126,24 @@ impl From<SessionUser> for AuthUser {
     }
 }
 
+impl AuthUser {
+    /// Determines if the user has administrative privileges.
+    ///
+    /// A user has admin privileges if:
+    /// 1. They have the `is_admin` flag set to true, OR
+    /// 2. They are the first user in the system (sequence_number = 1)
+    ///
+    /// IMPORTANT: This logic must stay in sync with DbUser::has_admin_privileges()
+    /// and SessionUser::has_admin_privileges() implementations.
+    ///
+    /// # Returns
+    /// * `true` if the user has administrative privileges
+    /// * `false` otherwise
+    pub fn has_admin_privileges(&self) -> bool {
+        self.is_admin || self.sequence_number == Some(1)
+    }
+}
+
 impl<B> FromRequestParts<B> for AuthUser
 where
     B: Send + Sync,
