@@ -7,6 +7,7 @@ use super::session_utils::{has_csrf_management, verify_session_cookie_security};
 #[derive(Debug)]
 pub struct AuthValidationResult {
     pub is_success: bool,
+    #[allow(dead_code)] // Used by security tests in other modules
     pub status_code: reqwest::StatusCode,
     pub has_valid_redirect: bool,
     pub has_session_cookie: bool,
@@ -106,18 +107,6 @@ impl AuthValidationResult {
             println!("  {detail}");
         }
     }
-}
-
-/// Validate OAuth2 success characteristics (legacy function for backward compatibility)
-/// Returns vector of success/failure check messages
-pub fn validate_oauth2_success(
-    status: &reqwest::StatusCode,
-    headers: &reqwest::header::HeaderMap,
-    expected_message_pattern: &str,
-) -> Vec<String> {
-    let result =
-        AuthValidationResult::from_oauth2_response(*status, headers, expected_message_pattern);
-    result.details
 }
 
 /// Handle expected registration failures based on attestation format

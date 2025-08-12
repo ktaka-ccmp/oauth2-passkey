@@ -52,13 +52,6 @@ impl MultiBrowserTestSetup {
         })
     }
 
-    /// Create a new multi-browser test setup with library initialization
-    pub async fn new_with_init() -> Result<Self, Box<dyn std::error::Error>> {
-        let setup = Self::new().await?;
-        oauth2_passkey::init().await?;
-        Ok(setup)
-    }
-
     /// Shutdown the test server
     pub async fn shutdown(self) {
         self.server.shutdown().await;
@@ -91,8 +84,5 @@ macro_rules! test_setup {
 macro_rules! multi_browser_test_setup {
     ($setup:ident) => {
         let $setup = $crate::common::test_setup::MultiBrowserTestSetup::new().await?;
-    };
-    ($setup:ident, init) => {
-        let $setup = $crate::common::test_setup::MultiBrowserTestSetup::new_with_init().await?;
     };
 }
