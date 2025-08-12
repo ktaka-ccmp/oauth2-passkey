@@ -163,3 +163,5 @@ Environment variables (see `dot.env.example`):
    - Use "->" instead of "→" in commit messages
    - Avoid Unicode symbols that may cause issues in different terminals/systems
    - This ensures commit messages can be easily copied and pasted across all environments
+
+- Investigation should never be superficial, should always be deep and thorough.
