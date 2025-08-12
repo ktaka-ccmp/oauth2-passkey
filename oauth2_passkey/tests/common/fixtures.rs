@@ -1409,8 +1409,20 @@ impl MockOAuth2Responses {
 mod tests {
     use super::*;
 
+    /// **CONSOLIDATED TEST**: Test Fixtures and Generation
+    ///
+    /// This test consolidates:
+    /// - test_user_fixtures
+    /// - test_oauth2_userinfo_conversion  
+    /// - test_webauthn_credential_generation
+    /// - test_oauth2_token_generation
     #[test]
-    fn test_user_fixtures() {
+    fn test_consolidated_fixtures_and_generation() {
+        println!("🧪 === CONSOLIDATED TEST FIXTURES AND GENERATION TEST ===");
+
+        // === SUBTEST 1: User Fixtures ===
+        println!("👤 SUBTEST 1: Testing user fixtures");
+
         let oauth2_user = TestUsers::oauth2_user();
         assert_eq!(oauth2_user.email, "oauth2@example.com");
 
@@ -1419,28 +1431,34 @@ mod tests {
 
         let admin_user = TestUsers::admin_user();
         assert_eq!(admin_user.email, "admin@example.com");
-    }
 
-    #[test]
-    fn test_oauth2_userinfo_conversion() {
+        println!("✅ SUBTEST 1 PASSED: User fixtures verified");
+
+        // === SUBTEST 2: OAuth2 UserInfo Conversion ===
+        println!("🌐 SUBTEST 2: Testing OAuth2 userinfo conversion");
+
         let user = TestUsers::oauth2_user();
         let userinfo = user.to_oauth2_userinfo();
 
         assert_eq!(userinfo["email"], "oauth2@example.com");
         assert_eq!(userinfo["name"], "OAuth2 Test User");
         assert!(userinfo["picture"].as_str().unwrap().contains(&user.id));
-    }
 
-    #[test]
-    fn test_webauthn_credential_generation() {
+        println!("✅ SUBTEST 2 PASSED: OAuth2 userinfo conversion verified");
+
+        // === SUBTEST 3: WebAuthn Credential Generation ===
+        println!("🔑 SUBTEST 3: Testing WebAuthn credential generation");
+
         let cred = MockWebAuthnCredentials::registration_response("testuser", "Test User");
         assert_eq!(cred["type"], "public-key");
         assert!(cred["id"].as_str().is_some());
         assert!(cred["response"]["client_data_json"].as_str().is_some());
-    }
 
-    #[test]
-    fn test_oauth2_token_generation() {
+        println!("✅ SUBTEST 3 PASSED: WebAuthn credential generation verified");
+
+        // === SUBTEST 4: OAuth2 Token Generation ===
+        println!("🎫 SUBTEST 4: Testing OAuth2 token generation");
+
         let user = TestUsers::oauth2_user();
         let token_response = MockOAuth2Responses::token_response(&user);
 
@@ -1452,5 +1470,9 @@ mod tests {
                 .unwrap()
                 .contains(&user.id)
         );
+
+        println!("✅ SUBTEST 4 PASSED: OAuth2 token generation verified");
+
+        println!("🎯 === CONSOLIDATED TEST FIXTURES AND GENERATION TEST COMPLETED ===");
     }
 }

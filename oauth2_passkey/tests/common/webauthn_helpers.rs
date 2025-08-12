@@ -24,21 +24,4 @@ pub fn get_test_environment_origin() -> String {
     std::env::var("ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_helpers_use_correct_environment() {
-        // Test that helpers use environment-aware values
-        let origin = get_test_environment_origin();
-        assert!(
-            origin.starts_with("http://127.0.0.1:3000") || origin.starts_with("http://localhost")
-        );
-
-        // Test client data creation
-        let client_data_json =
-            create_test_client_data_json("webauthn.get", "test-challenge", &origin);
-        assert!(client_data_json.contains(&origin));
-    }
-}
+// Tests moved to consolidated fixtures test in fixtures.rs

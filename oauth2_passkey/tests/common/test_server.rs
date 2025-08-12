@@ -69,9 +69,9 @@ impl TestServer {
     /// Start a new test server instance
     ///
     /// Creates a test server with:
-    /// - Port specified by ORIGIN environment variable (default: http://127.0.0.1:3000)
+    /// - Port from ORIGIN environment variable (default: http://127.0.0.1:3000)
     /// - In-memory database and cache
-    /// - Global Axum mock server for external provider simulation
+    /// - Global Axum mock server for external provider simulation  
     /// - Clean state for each test
     pub async fn start() -> Result<Self, Box<dyn std::error::Error>> {
         // Load test environment first to get ORIGIN
@@ -91,16 +91,23 @@ impl TestServer {
         let bind_addr = format!("{host}:{port}");
         println!("🔧 Binding test server to {bind_addr} (from ORIGIN={origin})");
 
-        // Bind to the exact address specified in ORIGIN with retry logic and exponential backoff
+        // Bind to the exact address specified in ORIGIN with highly aggressive retry logic and jitter
         let listener = {
             let mut attempts = 0;
-            const MAX_RETRIES: u16 = 300;
-            const BASE_DELAY_MS: u64 = 10;
-            const MAX_DELAY_MS: u64 = 500;
+            const MAX_RETRIES: u16 = 3000; // Very high retry count
+            const BASE_DELAY_MS: u64 = 1; // Start with 1ms
+            const MAX_DELAY_MS: u64 = 50; // Cap at 50ms to allow more cleanup time
 
             loop {
                 match tokio::net::TcpListener::bind(&bind_addr).await {
-                    Ok(listener) => break listener,
+                    Ok(listener) => {
+                        if attempts > 0 {
+                            println!(
+                                "✅ Successfully bound to {bind_addr} after {attempts} attempts"
+                            );
+                        }
+                        break listener;
+                    }
                     Err(e) => {
                         attempts += 1;
                         if attempts >= MAX_RETRIES {
@@ -109,14 +116,13 @@ impl TestServer {
                             ).into());
                         }
 
-                        // Exponential backoff with jitter to handle port conflicts better
-                        let delay_ms = std::cmp::min(
-                            BASE_DELAY_MS * 2_u64.pow(std::cmp::min(attempts as u32, 6)),
-                            MAX_DELAY_MS,
-                        );
+                        // Exponential backoff with significant jitter for better contention handling
+                        let base_delay = BASE_DELAY_MS * (1 << std::cmp::min(attempts / 300, 3)); // Exponential every 300 attempts
+                        let jitter = (attempts as u64 * 7919) % 8; // Pseudo-random jitter 0-7ms
+                        let delay_ms = std::cmp::min(base_delay + jitter, MAX_DELAY_MS);
 
-                        // Only show progress every 50 attempts to reduce noise
-                        if attempts % 50 == 0 || attempts <= 10 {
+                        // Only show progress every 200 attempts to reduce noise
+                        if attempts % 200 == 0 || attempts <= 5 {
                             println!(
                                 "⚠️  Failed to bind to {bind_addr} (attempt {attempts}/{MAX_RETRIES}): {e}. Retrying in {delay_ms}ms..."
                             );
@@ -128,9 +134,6 @@ impl TestServer {
             }
         };
 
-        println!("✅ Test server bound to {bind_addr}");
-
-        let _addr = listener.local_addr()?;
         let base_url = origin.clone();
 
         // Check if we should initialize
@@ -191,6 +194,13 @@ impl TestServer {
     /// Shutdown the test server and clean up resources
     pub async fn shutdown(self) {
         self.server_handle.abort();
+        // Ensure the server task is fully terminated and port is released
+        // Increased delay significantly for more reliable cleanup under high contention
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Force multiple yields to allow all cleanup to complete
+        for _ in 0..5 {
+            tokio::task::yield_now().await;
+        }
         // Axum mock server continues running as a global instance
     }
 }
@@ -208,66 +218,4 @@ async fn create_test_app() -> axum::Router {
         .nest("/auth", oauth2_passkey_axum::oauth2_passkey_router())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    #[serial_test::serial]
-    async fn test_server_startup_and_shutdown() {
-        let server = TestServer::start()
-            .await
-            .expect("Failed to start test server");
-
-        // Verify server is running
-        let client = reqwest::Client::new();
-        let response = client
-            .get(format!("{}/health", server.base_url))
-            .send()
-            .await
-            .expect("Failed to connect to test server");
-
-        assert!(response.status().is_success());
-
-        // Clean shutdown
-        server.shutdown().await;
-    }
-
-    #[tokio::test]
-    #[serial_test::serial]
-    async fn test_axum_mock_oauth2_server() {
-        let server = TestServer::start()
-            .await
-            .expect("Failed to start test server");
-
-        // Get OAuth2 issuer URL from environment
-        let oauth2_issuer_url = std::env::var("OAUTH2_ISSUER_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:9876".to_string());
-
-        // Test OAuth2 OIDC Discovery endpoint
-        let client = reqwest::Client::new();
-        let discovery_response = client
-            .get(format!(
-                "{oauth2_issuer_url}/.well-known/openid-configuration"
-            ))
-            .send()
-            .await
-            .expect("Failed to call OAuth2 OIDC Discovery endpoint");
-
-        assert!(discovery_response.status().is_success());
-
-        let discovery_doc: serde_json::Value = discovery_response
-            .json()
-            .await
-            .expect("Failed to parse OIDC Discovery response");
-
-        // Verify it's properly configured
-        assert_eq!(discovery_doc["issuer"], oauth2_issuer_url);
-        assert_eq!(
-            discovery_doc["authorization_endpoint"],
-            format!("{oauth2_issuer_url}/oauth2/auth")
-        );
-
-        server.shutdown().await;
-    }
-}
+// Tests moved to consolidated mock infrastructure test in mock_browser.rs
