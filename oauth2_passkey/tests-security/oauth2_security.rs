@@ -11,7 +11,7 @@
 use crate::common::{
     MockBrowser, TestServer, attack_scenarios::oauth2_attacks::*, security_utils::*,
 };
-use serial_test::serial;
+
 use std::env;
 
 /// Test environment setup for OAuth2 security tests
@@ -167,7 +167,7 @@ impl OAuth2SecurityTestSetup {
 
 /// Test OAuth2 with empty state parameter - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_empty_state_rejection() -> Result<(), Box<dyn std::error::Error>> {
     let setup = OAuth2SecurityTestSetup::new().await?;
 
@@ -203,7 +203,7 @@ async fn test_security_oauth2_empty_state_rejection() -> Result<(), Box<dyn std:
 
 /// Test OAuth2 with malformed state parameter - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_malformed_state_rejection() -> Result<(), Box<dyn std::error::Error>>
 {
     let setup = OAuth2SecurityTestSetup::new().await?;
@@ -244,7 +244,7 @@ async fn test_security_oauth2_malformed_state_rejection() -> Result<(), Box<dyn 
 
 /// Test OAuth2 with invalid JSON in state parameter - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_invalid_json_state_rejection()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = OAuth2SecurityTestSetup::new().await?;
@@ -285,7 +285,7 @@ async fn test_security_oauth2_invalid_json_state_rejection()
 
 /// Test OAuth2 with incomplete state parameter (missing required fields) - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_incomplete_state_rejection() -> Result<(), Box<dyn std::error::Error>>
 {
     let setup = OAuth2SecurityTestSetup::new().await?;
@@ -326,7 +326,7 @@ async fn test_security_oauth2_incomplete_state_rejection() -> Result<(), Box<dyn
 
 /// Test OAuth2 with expired state parameter tokens - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_expired_state_rejection() -> Result<(), Box<dyn std::error::Error>> {
     let setup = OAuth2SecurityTestSetup::new().await?;
 
@@ -366,7 +366,7 @@ async fn test_security_oauth2_expired_state_rejection() -> Result<(), Box<dyn st
 
 /// Test OAuth2 with invalid authorization code - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_invalid_auth_code_rejection() -> Result<(), Box<dyn std::error::Error>>
 {
     let setup = OAuth2SecurityTestSetup::new().await?;
@@ -405,7 +405,7 @@ async fn test_security_oauth2_invalid_auth_code_rejection() -> Result<(), Box<dy
 
 /// Test OAuth2 with malicious origin headers - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_malicious_origin_rejection() -> Result<(), Box<dyn std::error::Error>>
 {
     let setup = OAuth2SecurityTestSetup::new().await?;
@@ -438,7 +438,7 @@ async fn test_security_oauth2_malicious_origin_rejection() -> Result<(), Box<dyn
 
 /// Test OAuth2 with missing origin headers - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_missing_origin_rejection() -> Result<(), Box<dyn std::error::Error>> {
     let setup = OAuth2SecurityTestSetup::new().await?;
 
@@ -470,7 +470,7 @@ async fn test_security_oauth2_missing_origin_rejection() -> Result<(), Box<dyn s
 
 /// Test OAuth2 HTTP method validation - tests wrong method for current response mode
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_get_form_post_mode_rejection()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = OAuth2SecurityTestSetup::new().await?;
@@ -530,7 +530,7 @@ async fn test_security_oauth2_get_form_post_mode_rejection()
 
 /// Test OAuth2 start endpoint with no existing session (for add_to_user mode) - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_add_to_user_no_session_rejection()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = OAuth2SecurityTestSetup::new().await?;
@@ -568,7 +568,7 @@ async fn test_security_oauth2_add_to_user_no_session_rejection()
 /// 2. ID token validation includes proper subject verification
 /// 3. Token binding prevents cross-user token reuse
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_id_token_substitution_prevention()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = OAuth2SecurityTestSetup::new().await?;
@@ -621,7 +621,7 @@ async fn test_security_oauth2_id_token_substitution_prevention()
 /// 2. Nonce values cannot be replayed from previous authentications
 /// 3. Expired nonce values are properly rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_nonce_replay_attack_prevention()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = OAuth2SecurityTestSetup::new().await?;
@@ -709,7 +709,7 @@ async fn test_security_oauth2_nonce_replay_attack_prevention()
 /// 2. Attempts to bypass PKCE verification are rejected
 /// 3. PKCE parameters cannot be stripped from the flow
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_pkce_downgrade_attack_prevention()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = OAuth2SecurityTestSetup::new().await?;
@@ -804,7 +804,7 @@ async fn test_security_oauth2_pkce_downgrade_attack_prevention()
 /// 2. Expired authorization codes are properly rejected
 /// 3. Authorization code format validation prevents injection
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_authorization_code_injection_prevention()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = OAuth2SecurityTestSetup::new().await?;
@@ -910,7 +910,7 @@ async fn test_security_oauth2_authorization_code_injection_prevention()
 /// 3. Protocol confusion attacks (http vs https)
 /// 4. Domain validation bypass attempts
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_redirect_uri_validation_bypass()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = OAuth2SecurityTestSetup::new().await?;

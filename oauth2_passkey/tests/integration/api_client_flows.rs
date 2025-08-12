@@ -9,7 +9,6 @@
 /// Note: These tests focus on meaningful CSRF protection for authenticated operations,
 /// not just token extraction from unauthenticated flows.
 use crate::common::{MockBrowser, TestSetup, TestUsers, validation_utils::AuthValidationResult};
-use serial_test::serial;
 
 // Import helper functions for setting up authenticated sessions
 use super::oauth2_flows::complete_full_oauth2_flow;
@@ -22,7 +21,6 @@ use super::passkey_flows::register_user_with_attestation;
 /// 2. Logout operations require valid CSRF tokens
 /// 3. API clients can safely perform authenticated logout
 #[tokio::test]
-#[serial]
 async fn test_authenticated_logout_csrf_protection() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 
@@ -142,7 +140,6 @@ async fn test_authenticated_logout_csrf_protection() -> Result<(), Box<dyn std::
 /// 2. OAuth2 account linking requires valid CSRF tokens
 /// 3. API clients can safely perform authenticated account linking
 #[tokio::test]
-#[serial]
 async fn test_authenticated_oauth2_linking_csrf_protection()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -225,7 +222,6 @@ async fn test_authenticated_oauth2_linking_csrf_protection()
 /// 2. API clients can securely access protected user information
 /// 3. Mixed browser and API client access patterns work correctly
 #[tokio::test]
-#[serial]
 async fn test_authenticated_user_info_csrf_protection() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
     let test_user = TestUsers::admin_user();
@@ -307,7 +303,6 @@ async fn test_authenticated_user_info_csrf_protection() -> Result<(), Box<dyn st
 /// 2. API clients properly handle header-based CSRF token validation  
 /// 3. Mixed authentication and API patterns work correctly
 #[tokio::test]
-#[serial]
 async fn test_authenticated_api_client_csrf_validation() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 

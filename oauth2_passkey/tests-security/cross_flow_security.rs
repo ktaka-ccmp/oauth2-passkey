@@ -10,11 +10,10 @@ use crate::common::{
     attack_scenarios::cross_flow_attacks::*, security_utils::*,
 };
 use serde_json::json;
-use serial_test::serial;
 
 /// Test unauthenticated account linking attempt - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_cross_flow_unauthenticated_linking() -> Result<(), Box<dyn std::error::Error>>
 {
     let setup = TestSetup::new().await?;
@@ -52,7 +51,7 @@ async fn test_security_cross_flow_unauthenticated_linking() -> Result<(), Box<dy
 
 /// Test credential addition with invalid session context - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_cross_flow_invalid_context_credential_addition()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -86,7 +85,7 @@ async fn test_security_cross_flow_invalid_context_credential_addition()
 
 /// Test cross-user credential addition attempt - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_cross_flow_cross_user_credential_addition()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -122,7 +121,7 @@ async fn test_security_cross_flow_cross_user_credential_addition()
 
 /// Test CSRF protection across different authentication methods - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_cross_flow_csrf_protection_across_methods()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -154,7 +153,7 @@ async fn test_security_cross_flow_csrf_protection_across_methods()
 
 /// Test privilege escalation attempt during account linking - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_cross_flow_privilege_escalation_during_linking()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -192,7 +191,7 @@ async fn test_security_cross_flow_privilege_escalation_during_linking()
 
 /// Test unauthorized admin operation during credential management - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_cross_flow_unauthorized_admin_during_credential_mgmt()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -226,7 +225,7 @@ async fn test_security_cross_flow_unauthorized_admin_during_credential_mgmt()
 
 /// Test mixed authentication context confusion - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_cross_flow_mixed_auth_context_confusion()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -267,7 +266,7 @@ async fn test_security_cross_flow_mixed_auth_context_confusion()
 
 /// Test account linking with session fixation attempt - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_cross_flow_session_fixation_during_linking()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -306,7 +305,7 @@ async fn test_security_cross_flow_session_fixation_during_linking()
 
 /// Test concurrent authentication flow interference - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_cross_flow_concurrent_auth_interference()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -348,7 +347,7 @@ async fn test_security_cross_flow_concurrent_auth_interference()
 
 /// Test authentication bypass via flow switching - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_cross_flow_auth_bypass_via_flow_switching()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;

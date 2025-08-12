@@ -3,7 +3,6 @@ use crate::common::{
     session_utils::{logout_and_verify, verify_successful_authentication},
     validation_utils::AuthValidationResult,
 };
-use serial_test::serial;
 
 // Import OAuth2 helper functions from oauth2_flows.rs
 use super::oauth2_flows::{complete_full_oauth2_flow, get_page_session_token_for_oauth2_linking};
@@ -13,7 +12,6 @@ use super::passkey_flows::register_user_with_attestation;
 /// Test get_all_users coordination function with actual user data
 /// This test now uses the safer test-only create_admin_test_session function.
 #[tokio::test]
-#[serial]
 async fn test_get_all_users_integration() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 
@@ -137,7 +135,6 @@ async fn test_get_all_users_integration() -> Result<(), Box<dyn std::error::Erro
 /// Test list_credentials_core coordination function with actual credential data
 /// This replaces the flaky unit test test_list_credentials_core from coordination/passkey.rs
 #[tokio::test]
-#[serial]
 async fn test_list_credentials_core_integration() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new_with_init().await?;
     let test_user = TestUsers::passkey_user();
@@ -217,7 +214,6 @@ async fn test_list_credentials_core_integration() -> Result<(), Box<dyn std::err
 /// Test delete_user_account coordination function with cascade deletion
 /// This test now uses the safer test-only create_admin_test_session function.
 #[tokio::test]
-#[serial]
 async fn test_delete_user_account_integration() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new_with_init().await?;
 
@@ -351,7 +347,6 @@ async fn test_delete_user_account_integration() -> Result<(), Box<dyn std::error
 /// Test delete_passkey_credential_core coordination function with actual credential data
 /// This replaces the flaky unit test test_delete_passkey_credential_core_success from coordination/passkey.rs
 #[tokio::test]
-#[serial]
 async fn test_delete_passkey_credential_core_integration() -> Result<(), Box<dyn std::error::Error>>
 {
     let setup = TestSetup::new_with_init().await?;
@@ -431,7 +426,6 @@ async fn test_delete_passkey_credential_core_integration() -> Result<(), Box<dyn
 /// Test delete_passkey_credential_core coordination function with unauthorized access
 /// This replaces the flaky unit test test_delete_passkey_credential_core_unauthorized from coordination/passkey.rs
 #[tokio::test]
-#[serial]
 async fn test_delete_passkey_credential_core_unauthorized_integration()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = MultiBrowserTestSetup::new_with_init().await?;
@@ -574,7 +568,6 @@ async fn test_delete_passkey_credential_core_unauthorized_integration()
 /// 3. Logout → auth with passkey → verify session
 /// 4. Logout → auth with OAuth2 → verify session
 #[tokio::test]
-#[serial]
 async fn test_oauth2_then_add_passkey() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 
@@ -752,7 +745,6 @@ async fn test_oauth2_then_add_passkey() -> Result<(), Box<dyn std::error::Error>
 /// 3. Logout → auth with OAuth2 → verify session
 /// 4. Logout → auth with passkey → verify session
 #[tokio::test]
-#[serial]
 async fn test_passkey_then_add_oauth2() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
     let test_user = TestUsers::admin_user();

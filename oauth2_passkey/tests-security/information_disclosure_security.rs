@@ -8,7 +8,7 @@
 /// - Timing-based information disclosure
 use crate::common::{TestSetup, attack_scenarios::oauth2_attacks::*};
 use serde_json::json;
-use serial_test::serial;
+
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
@@ -148,7 +148,7 @@ impl InformationDisclosureTestSetup {
 /// 2. No disclosure of internal system details
 /// 3. No user existence confirmation through error differences
 #[tokio::test]
-#[serial]
+
 async fn test_security_oauth2_error_message_enumeration_prevention()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = InformationDisclosureTestSetup::new().await?;
@@ -261,7 +261,7 @@ async fn test_security_oauth2_error_message_enumeration_prevention()
 /// 2. Consistent error messages regardless of user state
 /// 3. No disclosure of user database structure
 #[tokio::test]
-#[serial]
+
 async fn test_security_passkey_user_enumeration_prevention()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = InformationDisclosureTestSetup::new().await?;
@@ -371,7 +371,7 @@ async fn test_security_passkey_user_enumeration_prevention()
 /// 2. No file path disclosure
 /// 3. No internal configuration exposure
 #[tokio::test]
-#[serial]
+
 async fn test_security_debug_information_leakage_prevention()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = InformationDisclosureTestSetup::new().await?;
@@ -500,7 +500,7 @@ async fn test_security_debug_information_leakage_prevention()
 /// 2. No internal configuration exposure
 /// 3. No database schema information
 #[tokio::test]
-#[serial]
+
 async fn test_security_metadata_disclosure_prevention() -> Result<(), Box<dyn std::error::Error>> {
     let setup = InformationDisclosureTestSetup::new().await?;
 
@@ -630,7 +630,7 @@ async fn test_security_metadata_disclosure_prevention() -> Result<(), Box<dyn st
 /// 2. No timing differences between valid/invalid user scenarios
 /// 3. Protection against timing-based side-channel attacks
 #[tokio::test]
-#[serial]
+
 async fn test_security_timing_based_information_disclosure_prevention()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = InformationDisclosureTestSetup::new().await?;

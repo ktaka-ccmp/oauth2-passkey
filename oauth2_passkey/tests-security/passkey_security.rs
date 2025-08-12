@@ -12,7 +12,6 @@ use crate::common::{
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::json;
-use serial_test::serial;
 
 /// Test environment setup for Passkey security tests
 struct PasskeySecurityTestSetup {
@@ -145,7 +144,7 @@ impl PasskeySecurityTestSetup {
 
 /// Test passkey registration with invalid WebAuthn response structure - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_passkey_invalid_registration_response()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
@@ -200,7 +199,7 @@ async fn test_security_passkey_invalid_registration_response()
 
 /// Test passkey registration with invalid CBOR data - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_passkey_invalid_cbor_response() -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
 
@@ -254,7 +253,7 @@ async fn test_security_passkey_invalid_cbor_response() -> Result<(), Box<dyn std
 
 /// Test passkey registration with tampered challenge - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_passkey_tampered_challenge_response()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
@@ -310,7 +309,7 @@ async fn test_security_passkey_tampered_challenge_response()
 
 /// Test passkey registration with wrong origin - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_passkey_wrong_origin_response() -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
 
@@ -365,7 +364,7 @@ async fn test_security_passkey_wrong_origin_response() -> Result<(), Box<dyn std
 
 /// Test passkey authentication with nonexistent challenge ID - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_passkey_nonexistent_challenge() -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
 
@@ -400,7 +399,7 @@ async fn test_security_passkey_nonexistent_challenge() -> Result<(), Box<dyn std
 
 /// Test passkey authentication with expired authentication response - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_passkey_expired_auth_response() -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
 
@@ -431,7 +430,7 @@ async fn test_security_passkey_expired_auth_response() -> Result<(), Box<dyn std
 
 /// Test passkey registration start with add_to_user mode but no session - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_passkey_add_to_user_no_session() -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
 
@@ -467,7 +466,7 @@ async fn test_security_passkey_add_to_user_no_session() -> Result<(), Box<dyn st
 
 /// Test passkey registration mode validation with proper session establishment
 #[tokio::test]
-#[serial]
+
 async fn test_security_passkey_create_user_with_session() -> Result<(), Box<dyn std::error::Error>>
 {
     let setup = PasskeySecurityTestSetup::new().await?;
@@ -611,7 +610,7 @@ async fn test_security_passkey_create_user_with_session() -> Result<(), Box<dyn 
 
 /// Test passkey registration with malformed JSON request body - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_passkey_malformed_json_request() -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
 
@@ -645,7 +644,7 @@ async fn test_security_passkey_malformed_json_request() -> Result<(), Box<dyn st
 
 /// Test passkey registration with missing required fields - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_passkey_missing_required_fields() -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
 
@@ -687,7 +686,7 @@ async fn test_security_passkey_missing_required_fields() -> Result<(), Box<dyn s
 /// 2. Credential registration includes proper uniqueness validation
 /// 3. Credential binding prevents cross-account credential reuse
 #[tokio::test]
-#[serial]
+
 async fn test_security_webauthn_credential_cloning_prevention()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
@@ -808,7 +807,7 @@ async fn test_security_webauthn_credential_cloning_prevention()
 /// 2. Attestation format validation is enforced
 /// 3. Attestation statement tampering is detected
 #[tokio::test]
-#[serial]
+
 async fn test_security_webauthn_attestation_bypass_prevention()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
@@ -912,7 +911,7 @@ async fn test_security_webauthn_attestation_bypass_prevention()
 /// 2. Authentication without required user verification is rejected
 /// 3. User verification downgrade attacks are prevented
 #[tokio::test]
-#[serial]
+
 async fn test_security_webauthn_user_verification_bypass_prevention()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;
@@ -1015,7 +1014,7 @@ async fn test_security_webauthn_user_verification_bypass_prevention()
 /// 2. Cross-origin credential authentication is rejected
 /// 3. Origin spoofing attempts are detected
 #[tokio::test]
-#[serial]
+
 async fn test_security_webauthn_cross_origin_credential_binding()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = PasskeySecurityTestSetup::new().await?;

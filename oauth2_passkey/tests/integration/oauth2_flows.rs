@@ -3,7 +3,6 @@ use crate::common::{
     constants::oauth2::*,
     validation_utils::{AuthValidationResult, validate_oauth2_success},
 };
-use serial_test::serial;
 
 /// Get the OAuth2 issuer URL from environment or use default
 fn get_oauth2_issuer_url() -> String {
@@ -382,7 +381,6 @@ pub async fn complete_full_oauth2_flow(
 ///
 /// Flow: Start OAuth2 → Axum mock provider redirect → Create new user → Establish session
 #[tokio::test]
-#[serial]
 async fn test_oauth2_new_user_registration() -> Result<(), Box<dyn std::error::Error>> {
     // Setup test environment - TestServer now uses global Axum mock server
     let setup = TestSetup::new().await?;
@@ -444,7 +442,6 @@ async fn test_oauth2_new_user_registration() -> Result<(), Box<dyn std::error::E
 ///
 /// Flow: Register new user via OAuth2 → Verify session → Logout → Verify session cleared
 #[tokio::test]
-#[serial]
 async fn test_oauth2_new_user_register_then_logout() -> Result<(), Box<dyn std::error::Error>> {
     // Setup test environment
     let setup = TestSetup::new().await?;
@@ -552,7 +549,6 @@ async fn test_oauth2_new_user_register_then_logout() -> Result<(), Box<dyn std::
 ///
 /// Flow: Create user → Complete OAuth2 existing user login → Verify "Signing in as" message
 #[tokio::test]
-#[serial]
 async fn test_oauth2_existing_user_login() -> Result<(), Box<dyn std::error::Error>> {
     // Setup test environment
     let setup = TestSetup::new().await?;
@@ -643,7 +639,6 @@ async fn test_oauth2_existing_user_login() -> Result<(), Box<dyn std::error::Err
 /// This test validates that the oauth2-passkey library properly discovers
 /// and uses endpoints from the OIDC Discovery document instead of hardcoded URLs.
 #[tokio::test]
-#[serial]
 async fn test_oauth2_uses_oidc_discovery() -> Result<(), Box<dyn std::error::Error>> {
     // Setup test environment
     let setup = TestSetup::new().await?;
@@ -719,7 +714,6 @@ async fn test_oauth2_uses_oidc_discovery() -> Result<(), Box<dyn std::error::Err
 ///
 /// Flow: Register first user → Add second OAuth2 account → Verify both accounts linked to same user
 #[tokio::test]
-#[serial]
 async fn test_link_two_oauth2_users() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 
@@ -833,7 +827,6 @@ async fn test_link_two_oauth2_users() -> Result<(), Box<dyn std::error::Error>> 
 ///
 /// Flow: Register first user → Add second OAuth2 account → Add third OAuth2 account → Verify all accounts linked
 #[tokio::test]
-#[serial]
 async fn test_link_three_oauth2_users() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 

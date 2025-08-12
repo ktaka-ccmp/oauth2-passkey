@@ -4,7 +4,6 @@ use crate::common::{
     session_utils::{logout_and_verify, verify_successful_authentication},
     validation_utils::handle_expected_passkey_failure,
 };
-use serial_test::serial;
 
 /// Test environment setup for passkey tests
 struct PasskeyTestSetup {
@@ -665,7 +664,6 @@ async fn test_passkey_attestation_format(
 ///
 /// Flow: Start registration → WebAuthn challenge → Mock credential → Verify none attestation
 #[tokio::test]
-#[serial]
 async fn test_passkey_registration_none_attestation() -> Result<(), Box<dyn std::error::Error>> {
     test_passkey_attestation_format("none", false).await
 }
@@ -674,7 +672,6 @@ async fn test_passkey_registration_none_attestation() -> Result<(), Box<dyn std:
 ///
 /// Flow: Start registration → WebAuthn challenge → Mock packed credential → Verify attestation
 #[tokio::test]
-#[serial]
 async fn test_passkey_registration_packed_attestation() -> Result<(), Box<dyn std::error::Error>> {
     test_passkey_attestation_format("packed", true).await
 }
@@ -683,7 +680,6 @@ async fn test_passkey_registration_packed_attestation() -> Result<(), Box<dyn st
 ///
 /// Flow: Start registration → WebAuthn challenge → Mock TPM credential → Verify attestation
 #[tokio::test]
-#[serial]
 async fn test_passkey_registration_tpm_attestation() -> Result<(), Box<dyn std::error::Error>> {
     test_passkey_attestation_format("tpm", true).await
 }
@@ -692,7 +688,6 @@ async fn test_passkey_registration_tpm_attestation() -> Result<(), Box<dyn std::
 ///
 /// Flow: Register user → Logout → Start authentication → WebAuthn challenge → Mock assertion → Login
 #[tokio::test]
-#[serial]
 async fn test_passkey_register_then_authenticate() -> Result<(), Box<dyn std::error::Error>> {
     // Setup test environment
     let setup = PasskeyTestSetup::new().await?;
@@ -760,7 +755,6 @@ async fn test_passkey_register_then_authenticate() -> Result<(), Box<dyn std::er
 ///
 /// Flow: Register first credential → Register second credential while logged in → Logout → Auth with first → Auth with second
 #[tokio::test]
-#[serial]
 async fn test_register_two_credentials_and_authenticate() -> Result<(), Box<dyn std::error::Error>>
 {
     // Setup test environment
@@ -788,7 +782,6 @@ async fn test_register_two_credentials_and_authenticate() -> Result<(), Box<dyn 
 ///
 /// Verifies proper error handling for various passkey failure cases
 #[tokio::test]
-#[serial]
 async fn test_passkey_error_scenarios() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 

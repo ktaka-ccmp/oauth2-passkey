@@ -10,11 +10,10 @@ use crate::common::{
     security_utils::*,
 };
 use serde_json::json;
-use serial_test::serial;
 
 /// Test access to protected endpoints without session - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_session_no_session_access() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 
@@ -39,7 +38,7 @@ async fn test_security_session_no_session_access() -> Result<(), Box<dyn std::er
 
 /// Test state-changing operations without CSRF token - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_session_csrf_bypass_attempt() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 
@@ -70,7 +69,7 @@ async fn test_security_session_csrf_bypass_attempt() -> Result<(), Box<dyn std::
 
 /// Test state-changing operations with invalid CSRF token - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_session_invalid_csrf_token() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 
@@ -101,7 +100,7 @@ async fn test_security_session_invalid_csrf_token() -> Result<(), Box<dyn std::e
 
 /// Test session access with expired session cookie - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_session_expired_session_cookie() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 
@@ -141,7 +140,7 @@ async fn test_security_session_expired_session_cookie() -> Result<(), Box<dyn st
 
 /// Test session access with malicious session cookie (SQL injection attempt) - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_session_malicious_session_cookie() -> Result<(), Box<dyn std::error::Error>>
 {
     let setup = TestSetup::new().await?;
@@ -181,7 +180,7 @@ async fn test_security_session_malicious_session_cookie() -> Result<(), Box<dyn 
 
 /// Test cross-user operation attempt - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_session_cross_user_operation() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 
@@ -221,7 +220,7 @@ async fn test_security_session_cross_user_operation() -> Result<(), Box<dyn std:
 
 /// Test unauthorized admin operation attempt - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_session_unauthorized_admin_operation()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -247,7 +246,7 @@ async fn test_security_session_unauthorized_admin_operation()
 
 /// Test admin context token validation failure - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_session_admin_context_validation_failure()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -284,7 +283,7 @@ async fn test_security_session_admin_context_validation_failure()
 
 /// Test access to user data endpoints without proper session - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_session_user_data_without_session() -> Result<(), Box<dyn std::error::Error>>
 {
     let setup = TestSetup::new().await?;
@@ -310,7 +309,7 @@ async fn test_security_session_user_data_without_session() -> Result<(), Box<dyn
 
 /// Test session boundary violations with page session tokens - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_session_page_token_boundary_violation()
 -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
@@ -339,7 +338,7 @@ async fn test_security_session_page_token_boundary_violation()
 
 /// Test concurrent session access with invalid session state - should be rejected
 #[tokio::test]
-#[serial]
+
 async fn test_security_session_invalid_session_state() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestSetup::new().await?;
 
