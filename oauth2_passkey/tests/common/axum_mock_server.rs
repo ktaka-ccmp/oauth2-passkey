@@ -45,25 +45,35 @@ impl TestServerContext {
 
         println!("🔧 Starting persistent mock OAuth2 server on port {MOCK_OAUTH2_PORT}...");
 
-        // Start cleanup task for expired codes
+        // Start cleanup task for expired codes - optimized thread with minimal blocking
         let cleanup_state = state.clone();
+        let cleanup_shutdown = shutdown.clone();
         thread::spawn(move || {
             loop {
-                thread::sleep(std::time::Duration::from_secs(60)); // Clean every minute
+                thread::sleep(std::time::Duration::from_millis(1000)); // Faster cleanup cycle
+                if cleanup_shutdown.load(std::sync::atomic::Ordering::Acquire) {
+                    break;
+                }
                 cleanup_expired_codes(&cleanup_state);
             }
+            println!("🧹 Mock server cleanup task terminated");
         });
 
-        // Start server in background thread (persistent across all tests)
+        // Start server in background thread with optimized runtime
         let thread_handle = thread::spawn(move || {
-            // Create a new tokio runtime for this thread
-            let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+            // Create optimized tokio runtime with fewer worker threads to reduce contention
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(1) // Single worker thread to reduce contention
+                .enable_all()
+                .build()
+                .expect("Failed to create optimized tokio runtime");
+
             rt.block_on(async {
                 start_persistent_mock_server(state_clone, shutdown_clone).await;
             });
         });
 
-        // Wait for server to be ready
+        // Wait for server to be ready (sync version for LazyLock compatibility)
         wait_for_server_ready(&base_url);
 
         println!("✅ Persistent mock OAuth2 server is ready and will stay alive for all tests");
@@ -99,15 +109,32 @@ pub struct AuthorizationRequest {
 }
 
 /// Shared state for the mock server
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct MockServerState {
     /// Current test user data
     pub test_user_email: Arc<Mutex<String>>,
     pub test_user_id: Arc<Mutex<String>>,
+    pub test_user_name: Arc<Mutex<String>>,
+    pub test_user_given_name: Arc<Mutex<String>>,
+    pub test_user_family_name: Arc<Mutex<String>>,
     /// Authorization codes with their associated request data
     pub authorization_codes: Arc<Mutex<HashMap<String, AuthorizationRequest>>>,
     /// Current test configuration
     pub test_config: Arc<Mutex<TestConfig>>,
+}
+
+impl Default for MockServerState {
+    fn default() -> Self {
+        Self {
+            test_user_email: Arc::new(Mutex::new("first-user@example.com".to_string())),
+            test_user_id: Arc::new(Mutex::new("google_first-user-test-google-id".to_string())),
+            test_user_name: Arc::new(Mutex::new("First User".to_string())),
+            test_user_given_name: Arc::new(Mutex::new("First".to_string())),
+            test_user_family_name: Arc::new(Mutex::new("User".to_string())),
+            authorization_codes: Arc::new(Mutex::new(HashMap::new())),
+            test_config: Arc::new(Mutex::new(TestConfig::default())),
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -122,7 +149,7 @@ pub fn get_oidc_mock_server() -> &'static TestServerContext {
     &TEST_SERVER
 }
 
-/// Wait for server to be ready by attempting to connect
+/// Wait for server to be ready by attempting to connect (sync fallback for compatibility)
 fn wait_for_server_ready(_base_url: &str) {
     use std::time::Duration;
 
@@ -388,7 +415,17 @@ async fn oauth2_token(
     let user_id = state.test_user_id.lock().unwrap().clone();
 
     // Create mock ID token with the stored nonce
-    let id_token = create_mock_id_token(&user_email, &user_id, auth_request.nonce.as_deref());
+    let user_name = state.test_user_name.lock().unwrap().clone();
+    let user_given_name = state.test_user_given_name.lock().unwrap().clone();
+    let user_family_name = state.test_user_family_name.lock().unwrap().clone();
+    let id_token = create_mock_id_token(
+        &user_email,
+        &user_id,
+        &user_name,
+        &user_given_name,
+        &user_family_name,
+        auth_request.nonce.as_deref(),
+    );
 
     println!("✅ Token exchange successful for code: {code}");
 
@@ -405,13 +442,16 @@ async fn oauth2_token(
 async fn oauth2_userinfo(State(state): State<MockServerState>) -> Json<Value> {
     let user_email = state.test_user_email.lock().unwrap().clone();
     let user_id = state.test_user_id.lock().unwrap().clone();
+    let user_name = state.test_user_name.lock().unwrap().clone();
+    let user_given_name = state.test_user_given_name.lock().unwrap().clone();
+    let user_family_name = state.test_user_family_name.lock().unwrap().clone();
 
     Json(json!({
         "sub": user_id,
         "email": user_email,
-        "name": "Test User",
-        "given_name": "Test",
-        "family_name": "User",
+        "name": user_name,
+        "given_name": user_given_name,
+        "family_name": user_family_name,
         "picture": "https://example.com/photo.jpg",
         "email_verified": true
     }))
@@ -433,7 +473,14 @@ async fn oauth2_jwks() -> Json<Value> {
 }
 
 /// Create a mock JWT ID token
-fn create_mock_id_token(email: &str, user_id: &str, nonce: Option<&str>) -> String {
+fn create_mock_id_token(
+    email: &str,
+    user_id: &str,
+    name: &str,
+    given_name: &str,
+    family_name: &str,
+    nonce: Option<&str>,
+) -> String {
     use jsonwebtoken::{EncodingKey, Header, encode};
 
     let now = SystemTime::now()
@@ -449,9 +496,9 @@ fn create_mock_id_token(email: &str, user_id: &str, nonce: Option<&str>) -> Stri
         "exp": now + 3600,
         "iat": now,
         "email": email,
-        "name": "Test User",
-        "given_name": "Test",
-        "family_name": "User",
+        "name": name,
+        "given_name": given_name,
+        "family_name": family_name,
         "email_verified": true
     });
 
@@ -494,7 +541,14 @@ fn cleanup_expired_codes(state: &MockServerState) {
 }
 
 /// Configure the mock server for a specific test
-pub fn configure_mock_for_test(user_email: String, user_id: String, origin_url: String) {
+pub fn configure_mock_for_test(
+    user_email: String,
+    user_id: String,
+    user_name: String,
+    user_given_name: String,
+    user_family_name: String,
+    origin_url: String,
+) {
     let server = get_oidc_mock_server();
 
     // The server is guaranteed to be running (persistent thread approach)
@@ -503,6 +557,9 @@ pub fn configure_mock_for_test(user_email: String, user_id: String, origin_url: 
     // Update test configuration
     *server.state.test_user_email.lock().unwrap() = user_email;
     *server.state.test_user_id.lock().unwrap() = user_id;
+    *server.state.test_user_name.lock().unwrap() = user_name;
+    *server.state.test_user_given_name.lock().unwrap() = user_given_name;
+    *server.state.test_user_family_name.lock().unwrap() = user_family_name;
 
     let mut config = server.state.test_config.lock().unwrap();
     config.origin_url = origin_url;
@@ -512,117 +569,4 @@ pub fn configure_mock_for_test(user_email: String, user_id: String, origin_url: 
     println!("🔧 Mock server configured for test");
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Test that the mock server's OIDC Discovery endpoint works correctly
-    ///
-    /// This test validates the mock OAuth2 provider infrastructure, not the oauth2-passkey library.
-    /// Useful for debugging when OAuth2 flows fail and you need to isolate mock server issues.
-    #[tokio::test]
-    async fn test_mock_oidc_discovery_endpoint() -> Result<(), Box<dyn std::error::Error>> {
-        // Get the mock server (starts automatically if not running)
-        let _server = get_oidc_mock_server();
-
-        // Test OIDC Discovery endpoint directly
-        let client = reqwest::Client::new();
-        let discovery_url = format!("{MOCK_OAUTH2_URL}/.well-known/openid-configuration");
-        println!("🔍 Testing mock OIDC Discovery endpoint at: {discovery_url}");
-
-        let discovery_response = client.get(discovery_url).send().await?;
-
-        println!(
-            "OIDC Discovery response status: {}",
-            discovery_response.status()
-        );
-        assert!(
-            discovery_response.status().is_success(),
-            "OIDC Discovery endpoint should return 200"
-        );
-
-        let discovery_doc: serde_json::Value = discovery_response.json().await?;
-        println!(
-            "OIDC Discovery document: {}",
-            serde_json::to_string_pretty(&discovery_doc)?
-        );
-
-        // Validate all required OIDC Discovery fields are present as strings
-        assert!(
-            discovery_doc["issuer"].is_string(),
-            "issuer field should be present"
-        );
-        assert!(
-            discovery_doc["authorization_endpoint"].is_string(),
-            "authorization_endpoint should be present"
-        );
-        assert!(
-            discovery_doc["token_endpoint"].is_string(),
-            "token_endpoint should be present"
-        );
-        assert!(
-            discovery_doc["userinfo_endpoint"].is_string(),
-            "userinfo_endpoint should be present"
-        );
-        assert!(
-            discovery_doc["jwks_uri"].is_string(),
-            "jwks_uri should be present"
-        );
-
-        // Verify exact endpoint URLs
-        assert_eq!(discovery_doc["issuer"], MOCK_OAUTH2_URL);
-        assert_eq!(
-            discovery_doc["authorization_endpoint"],
-            format!("{MOCK_OAUTH2_URL}/oauth2/auth")
-        );
-        assert_eq!(
-            discovery_doc["token_endpoint"],
-            format!("{MOCK_OAUTH2_URL}/oauth2/token")
-        );
-        assert_eq!(
-            discovery_doc["userinfo_endpoint"],
-            format!("{MOCK_OAUTH2_URL}/oauth2/userinfo")
-        );
-        assert_eq!(
-            discovery_doc["jwks_uri"],
-            format!("{MOCK_OAUTH2_URL}/oauth2/v3/certs")
-        );
-
-        // Verify supported features arrays
-        assert!(
-            discovery_doc["scopes_supported"].is_array(),
-            "scopes_supported should be an array"
-        );
-        assert!(
-            discovery_doc["response_types_supported"].is_array(),
-            "response_types_supported should be an array"
-        );
-        assert!(
-            discovery_doc["grant_types_supported"].is_array(),
-            "grant_types_supported should be an array"
-        );
-        assert!(
-            discovery_doc["subject_types_supported"].is_array(),
-            "subject_types_supported should be an array"
-        );
-        assert!(
-            discovery_doc["id_token_signing_alg_values_supported"].is_array(),
-            "id_token_signing_alg_values_supported should be an array"
-        );
-
-        println!("✅ Mock OIDC Discovery endpoint validation PASSED");
-        println!("  - Issuer URL: {}", discovery_doc["issuer"]);
-        println!(
-            "  - Authorization endpoint: {}",
-            discovery_doc["authorization_endpoint"]
-        );
-        println!("  - Token endpoint: {}", discovery_doc["token_endpoint"]);
-        println!(
-            "  - Userinfo endpoint: {}",
-            discovery_doc["userinfo_endpoint"]
-        );
-        println!("  - JWKS URI: {}", discovery_doc["jwks_uri"]);
-
-        Ok(())
-    }
-}
+// Tests moved to consolidated mock infrastructure test in mock_browser.rs

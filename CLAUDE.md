@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Essential Guidelines
+
+**CRITICAL**: Always observe these fundamental principles:
+- **Never go beyond the scope of the request**
+- **Never shortcut what was requested**
+- Must read ~/.claude/CLAUDE.md
+
+These guidelines ensure focused, complete work that addresses exactly what the user needs without unnecessary additions or omissions.
+
 ## Project Overview
 
 This is a Rust authentication library providing OAuth2 (Google) and WebAuthn/Passkey authentication for web applications, with Axum framework integration.
@@ -30,12 +39,26 @@ cargo clippy --all-targets --all-features
 
 ## Code Quality Standards
 
-**IMPORTANT**: Always run `cargo clippy --all-targets --all-features` and fix ALL warnings before committing code. Clippy warnings indicate potential issues that should be addressed:
+**CRITICAL**: Always run these commands after making code changes (in this order):
+
+1. **Format code**: `cargo fmt --all` (handles all Rust file formatting including whitespace)
+2. **Check quality**: `cargo clippy --all-targets --all-features` (finds potential issues)
+3. **Run tests**: `cargo test` (verifies functionality)
+
+**Clippy Standards**: Fix ALL warnings before committing code. Clippy warnings indicate potential issues that should be addressed:
 
 - Use `#[allow(clippy::lint_name)]` only when absolutely necessary with clear justification
 - Prefer fixing the underlying issue rather than suppressing warnings
 - Run clippy after any significant code changes
 - Address dead code, unused imports, and style issues promptly
+
+**Claude Code Workflow**: After completing any task involving code changes, always run `cargo fmt --all` to ensure consistent formatting before finishing.
+
+**File-Type Specific Formatting**:
+- **Rust files** (`.rs`): `cargo fmt --all` handles all formatting including whitespace
+- **Non-Rust files** (`.md`, `.toml`, `.sh`, etc.): Manual whitespace cleanup may be needed
+  - Remove trailing spaces: `sed -i -e 's/^[[:space:]]*$//g' -e 's/[[:space:]]*$//' filename`
+  - Utility script: `./utils/cleanup_whitespace.sh` (for non-Rust files only)
 
 ### Run Demo Applications
 ```bash
@@ -140,3 +163,5 @@ Environment variables (see `dot.env.example`):
    - Use "->" instead of "→" in commit messages
    - Avoid Unicode symbols that may cause issues in different terminals/systems
    - This ensures commit messages can be easily copied and pasted across all environments
+
+- Investigation should never be superficial, should always be deep and thorough.

@@ -2087,21 +2087,21 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) async fn start_authentication(username: Option<String>) -> Result<AuthenticationOptions, PasskeyError> {}`
   - **Purpose**: Initiates WebAuthn authentication flow by generating challenge and authentication options
-  - **Parameters**: 
+  - **Parameters**:
     - `username`: Optional username to filter credentials for authentication
   - **Returns**: `Result<AuthenticationOptions, PasskeyError>` - Authentication options including challenge and allowed credentials
   - **Type**: Public crate-level async API function for authentication initiation
 
 - `pub(crate) async fn finish_authentication(auth_response: AuthenticatorResponse) -> Result<(String, String), PasskeyError> {}`
   - **Purpose**: Completes WebAuthn authentication by verifying authenticator response and challenge
-  - **Parameters**: 
+  - **Parameters**:
     - `auth_response`: Authenticator response containing signed challenge and authentication data
   - **Returns**: `Result<(String, String), PasskeyError>` - Tuple of (username, credential_id) on successful authentication
   - **Type**: Public crate-level async API function for authentication completion
 
 - `fn verify_user_handle(auth_response: &AuthenticatorResponse, stored_credential: &PasskeyCredential, is_discoverable: bool) -> Result<(), PasskeyError> {}`
   - **Purpose**: Verifies user handle consistency between authentication response and stored credential
-  - **Parameters**: 
+  - **Parameters**:
     - `auth_response`: Reference to authenticator response containing user handle
     - `stored_credential`: Reference to stored passkey credential for comparison
     - `is_discoverable`: Boolean flag indicating if credential supports discoverable authentication
@@ -2110,7 +2110,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn verify_counter(credential_id: &str, auth_data: &AuthenticatorData, stored_credential: &PasskeyCredential) -> Result<(), PasskeyError> {}`
   - **Purpose**: Verifies and updates authenticator counter to prevent replay attacks
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: String identifier of the credential being verified
     - `auth_data`: Authenticator data containing current counter value
     - `stored_credential`: Stored credential containing previous counter value
@@ -2119,7 +2119,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn verify_signature(auth_response: &AuthenticatorResponse, client_data: &ParsedClientData, auth_data: &AuthenticatorData, stored_credential: &PasskeyCredential) -> Result<(), PasskeyError> {}`
   - **Purpose**: Cryptographically verifies the authentication signature using stored public key
-  - **Parameters**: 
+  - **Parameters**:
     - `auth_response`: Authenticator response containing the signature
     - `client_data`: Parsed client data JSON containing challenge
     - `auth_data`: Authenticator data used in signature generation
@@ -2129,7 +2129,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn create_test_authenticator_response(user_handle: Option<String>, auth_id: String) -> AuthenticatorResponse {}`
   - **Purpose**: Creates mock authenticator response for testing authentication flows
-  - **Parameters**: 
+  - **Parameters**:
     - `user_handle`: Optional user handle to include in test response
     - `auth_id`: Authentication ID for the test response
   - **Returns**: `AuthenticatorResponse` - Mock authenticator response with test data
@@ -2137,14 +2137,14 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn create_test_passkey_credential(user_handle: String) -> PasskeyCredential {}`
   - **Purpose**: Creates mock passkey credential for testing authentication verification
-  - **Parameters**: 
+  - **Parameters**:
     - `user_handle`: User handle to associate with test credential
   - **Returns**: `PasskeyCredential` - Mock credential with test data
   - **Type**: Test utility function for credential creation
 
 - `fn create_test_authenticator_data(counter: u32) -> AuthenticatorData {}`
   - **Purpose**: Creates mock authenticator data for testing counter verification
-  - **Parameters**: 
+  - **Parameters**:
     - `counter`: Counter value to include in test authenticator data
   - **Returns**: `AuthenticatorData` - Mock authenticator data with specified counter
   - **Type**: Test utility function for authenticator data creation
@@ -2199,7 +2199,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn verify_counter_with_mock(credential_id: &str, auth_data: &AuthenticatorData, stored_credential: &PasskeyCredential, skip_db_update: bool) -> Result<(), PasskeyError> {}`
   - **Purpose**: Test helper function to verify counter with database update control
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: String identifier of credential being tested
     - `auth_data`: Authenticator data containing counter to verify
     - `stored_credential`: Stored credential for counter comparison
@@ -2209,14 +2209,14 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn create_test_parsed_client_data(challenge: &str) -> ParsedClientData {}`
   - **Purpose**: Creates mock parsed client data for testing signature verification
-  - **Parameters**: 
+  - **Parameters**:
     - `challenge`: Challenge string to include in test client data
   - **Returns**: `ParsedClientData` - Mock parsed client data with specified challenge
   - **Type**: Test utility function for client data creation
 
 - `fn create_test_authenticator_data_with_raw(counter: u32, raw_data: Vec<u8>) -> AuthenticatorData {}`
   - **Purpose**: Creates mock authenticator data with custom raw data for advanced testing
-  - **Parameters**: 
+  - **Parameters**:
     - `counter`: Counter value for the authenticator data
     - `raw_data`: Raw byte data to include in authenticator data
   - **Returns**: `AuthenticatorData` - Mock authenticator data with custom raw data
@@ -2266,7 +2266,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn get_and_validate_options(challenge_type: &str, id: &str) -> Result<StoredOptions, PasskeyError> {}`
   - **Purpose**: Retrieves and validates stored challenge options from cache, checking expiration
-  - **Parameters**: 
+  - **Parameters**:
     - `challenge_type`: String identifying the type of challenge (registration/authentication)
     - `id`: String identifier for the specific challenge options
   - **Returns**: `Result<StoredOptions, PasskeyError>` - Valid stored options or retrieval/validation error
@@ -2274,7 +2274,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn remove_options(challenge_type: &str, id: &str) -> Result<(), PasskeyError> {}`
   - **Purpose**: Removes stored challenge options from cache after use or expiration
-  - **Parameters**: 
+  - **Parameters**:
     - `challenge_type`: String identifying the type of challenge to remove
     - `id`: String identifier for the specific challenge options to remove
   - **Returns**: `Result<(), PasskeyError>` - Success or removal error
@@ -2330,14 +2330,14 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn get_or_create_user_handle(session_user: &Option<SessionUser>) -> Result<String, PasskeyError> {}`
   - **Purpose**: Gets existing user handle from session or creates new one for registration
-  - **Parameters**: 
+  - **Parameters**:
     - `session_user`: Optional reference to authenticated session user
   - **Returns**: `Result<String, PasskeyError>` - User handle string or creation error
   - **Type**: Internal async function for user handle management
 
 - `pub(crate) async fn start_registration(session_user: Option<SessionUser>, username: String, displayname: String) -> Result<RegistrationOptions, PasskeyError> {}`
   - **Purpose**: Initiates WebAuthn registration flow by generating registration options and challenge
-  - **Parameters**: 
+  - **Parameters**:
     - `session_user`: Optional authenticated session user for context
     - `username`: Username for the new credential being registered
     - `displayname`: Display name for user-friendly credential identification
@@ -2346,14 +2346,14 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn create_registration_options(user_info: PublicKeyCredentialUserEntity) -> Result<RegistrationOptions, PasskeyError> {}`
   - **Purpose**: Creates WebAuthn registration options with user entity and challenge data
-  - **Parameters**: 
+  - **Parameters**:
     - `user_info`: User entity containing ID, name, and display name information
   - **Returns**: `Result<RegistrationOptions, PasskeyError>` - Complete registration options structure
   - **Type**: Internal async function for registration options creation
 
 - `pub(crate) async fn verify_session_then_finish_registration(session_user: SessionUser, reg_data: RegisterCredential) -> Result<String, PasskeyError> {}`
   - **Purpose**: Verifies session validity then completes registration with credential data
-  - **Parameters**: 
+  - **Parameters**:
     - `session_user`: Authenticated session user for authorization
     - `reg_data`: Registration credential data from authenticator
   - **Returns**: `Result<String, PasskeyError>` - Credential ID string on successful registration
@@ -2361,7 +2361,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) async fn finish_registration(user_id: &str, reg_data: &RegisterCredential) -> Result<String, PasskeyError> {}`
   - **Purpose**: Completes WebAuthn registration by verifying and storing new credential
-  - **Parameters**: 
+  - **Parameters**:
     - `user_id`: String identifier of user registering the credential
     - `reg_data`: Reference to registration credential data for verification
   - **Returns**: `Result<String, PasskeyError>` - Credential ID string on successful storage
@@ -2369,42 +2369,42 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn extract_credential_public_key(reg_data: &RegisterCredential) -> Result<String, PasskeyError> {}`
   - **Purpose**: Extracts and encodes public key from registration credential data
-  - **Parameters**: 
+  - **Parameters**:
     - `reg_data`: Reference to registration credential containing attestation object
   - **Returns**: `Result<String, PasskeyError>` - Base64-encoded public key string or extraction error
   - **Type**: Internal function for public key extraction from attestation
 
 - `fn parse_attestation_object(attestation_base64: &str) -> Result<AttestationObject, PasskeyError> {}`
   - **Purpose**: Parses base64-encoded attestation object into structured CBOR data
-  - **Parameters**: 
+  - **Parameters**:
     - `attestation_base64`: Base64-encoded attestation object string
   - **Returns**: `Result<AttestationObject, PasskeyError>` - Parsed attestation object or parsing error
   - **Type**: Internal function for attestation object CBOR parsing
 
 - `fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<String, PasskeyError> {}`
   - **Purpose**: Extracts public key from authenticator data and converts to base64 string
-  - **Parameters**: 
+  - **Parameters**:
     - `auth_data`: Byte slice containing authenticator data with embedded public key
   - **Returns**: `Result<String, PasskeyError>` - Base64-encoded public key or extraction error
   - **Type**: Internal function for public key extraction from authenticator data
 
 - `fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], PasskeyError> {}`
   - **Purpose**: Parses credential data section from authenticator data byte array
-  - **Parameters**: 
+  - **Parameters**:
     - `auth_data`: Byte slice containing full authenticator data
   - **Returns**: `Result<&[u8], PasskeyError>` - Credential data slice or parsing error
   - **Type**: Internal function for credential data section parsing
 
 - `fn extract_key_coordinates(credential_data: &[u8]) -> Result<(Vec<u8>, Vec<u8>), PasskeyError> {}`
   - **Purpose**: Extracts X and Y coordinates from ECDSA public key in credential data
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_data`: Byte slice containing CBOR-encoded credential public key
   - **Returns**: `Result<(Vec<u8>, Vec<u8>), PasskeyError>` - Tuple of (X, Y) coordinate vectors or extraction error
   - **Type**: Internal function for ECDSA coordinate extraction
 
 - `async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), PasskeyError> {}`
   - **Purpose**: Verifies client data JSON from registration credential against stored challenge
-  - **Parameters**: 
+  - **Parameters**:
     - `reg_data`: Reference to registration credential containing client data JSON
   - **Returns**: `Result<(), PasskeyError>` - Success or client data verification error
   - **Type**: Internal async function for client data validation
@@ -2499,7 +2499,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn create_test_register_credential_for_verify_client_data(client_data_json: String, user_handle: Option<String>) -> RegisterCredential {}`
   - **Purpose**: Creates mock registration credential for client data verification testing
-  - **Parameters**: 
+  - **Parameters**:
     - `client_data_json`: JSON string containing client data for testing
     - `user_handle`: Optional user handle to include in test credential
   - **Returns**: `RegisterCredential` - Mock registration credential with specified client data
@@ -2507,7 +2507,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn create_test_client_data_json(type_: &str, challenge: &str, origin: &str) -> String {}`
   - **Purpose**: Creates JSON client data string for testing client data verification
-  - **Parameters**: 
+  - **Parameters**:
     - `type_`: Type field value for the client data (e.g., "webauthn.create")
     - `challenge`: Challenge string to include in client data
     - `origin`: Origin string for client data verification
@@ -2585,7 +2585,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn get_related_origin_json_with_core(rp_id: String, origin: String, additional_origins: Vec<String>) -> Result<String, PasskeyError> {}`
   - **Purpose**: Creates related origins JSON with core origin and additional origins list
-  - **Parameters**: 
+  - **Parameters**:
     - `rp_id`: Relying party identifier for WebAuthn
     - `origin`: Primary origin for the application
     - `additional_origins`: Vector of additional trusted origins
@@ -2616,7 +2616,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn insert_test_user(user_id: &str, account: &str, label: &str, is_admin: bool) -> Result<User, PasskeyError> {}`
   - **Purpose**: Inserts test user into database for testing passkey functionality
-  - **Parameters**: 
+  - **Parameters**:
     - `user_id`: String identifier for the test user
     - `account`: Account name for the test user
     - `label`: Display label for the test user
@@ -2626,7 +2626,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn insert_test_credential(credential_id: &str, user_id: &str, user_handle: &str, name: &str, display_name: &str, public_key: &str, aaguid: &str, counter: u32) -> Result<(), PasskeyError> {}`
   - **Purpose**: Inserts test passkey credential into database for testing authentication flows
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: String identifier for the credential
     - `user_id`: String identifier of the user owning the credential
     - `user_handle`: User handle associated with the credential
@@ -2640,7 +2640,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn insert_test_user_and_credential(credential_id: &str, user_id: &str, user_handle: &str, name: &str, display_name: &str, public_key: &str, aaguid: &str, counter: u32) -> Result<(), PasskeyError> {}`
   - **Purpose**: Inserts both test user and credential in single operation for comprehensive testing
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: String identifier for the credential
     - `user_id`: String identifier for the user
     - `user_handle`: User handle for WebAuthn operations
@@ -2654,14 +2654,14 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn delete_test_credential(credential_id: &str) -> Result<(), PasskeyError> {}`
   - **Purpose**: Deletes test credential from database for test cleanup
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: String identifier of credential to delete
   - **Returns**: `Result<(), PasskeyError>` - Success or deletion error
   - **Type**: Public async test utility function for credential cleanup
 
 - `pub async fn remove_from_cache(category: &str, key: &str) -> Result<(), PasskeyError> {}`
   - **Purpose**: Removes specific item from cache for testing cache operations
-  - **Parameters**: 
+  - **Parameters**:
     - `category`: Cache category string for item organization
     - `key`: Specific key for the cached item to remove
   - **Returns**: `Result<(), PasskeyError>` - Success or cache operation error
@@ -2669,14 +2669,14 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn cleanup_test_credential(credential_id: &str) -> Result<(), PasskeyError> {}`
   - **Purpose**: Comprehensive cleanup of test credential from database and cache
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: String identifier of credential to clean up
   - **Returns**: `Result<(), PasskeyError>` - Success or cleanup error
   - **Type**: Public async test utility function for comprehensive credential cleanup
 
 - `pub async fn create_test_challenge( challenge_type: &str, id: &str, challenge: &str, user_handle: &str, name: &str, display_name: &str, ttl: u64, ) -> Result<(), PasskeyError> {}`
   - **Purpose**: Creates a test challenge entry in storage for testing authentication/registration flows
-  - **Parameters**: 
+  - **Parameters**:
     - `challenge_type`: Challenge type identifier (authentication/registration)
     - `id`: Unique challenge identifier
     - `challenge`: Base64-encoded challenge data
@@ -2689,7 +2689,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn check_cache_exists(category: &str, key: &str) -> bool {}`
   - **Purpose**: Checks if a cache entry exists for the given category and key
-  - **Parameters**: 
+  - **Parameters**:
     - `category`: Cache category/prefix to check
     - `key`: Cache key to verify existence
   - **Returns**: `bool` - True if cache entry exists, false otherwise
@@ -2699,7 +2699,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) fn new_for_test(id: String, response: AuthenticatorAssertionResponse, auth_id: String) -> Self {}`
   - **Purpose**: Creates new test authenticator response for testing authentication flows
-  - **Parameters**: 
+  - **Parameters**:
     - `id`: String identifier for the test response
     - `response`: Authenticator assertion response data
     - `auth_id`: Authentication ID for the test
@@ -2713,21 +2713,21 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) fn from_base64(client_data_json: &str) -> Result<Self, PasskeyError> {}`
   - **Purpose**: Parses base64-encoded client data JSON into structured format
-  - **Parameters**: 
+  - **Parameters**:
     - `client_data_json`: Base64-encoded client data JSON string
   - **Returns**: `Result<Self, PasskeyError>` - Parsed client data or parsing error
   - **Type**: Public super-level constructor for client data parsing
 
 - `pub(super) fn verify(&self, stored_challenge: &str) -> Result<(), PasskeyError> {}`
   - **Purpose**: Verifies client data against stored challenge and validates origin
-  - **Parameters**: 
+  - **Parameters**:
     - `stored_challenge`: Previously stored challenge string for verification
   - **Returns**: `Result<(), PasskeyError>` - Success or verification error
   - **Type**: Public super-level verification method
 
 - `pub(super) fn from_base64(auth_data: &str) -> Result<Self, PasskeyError> {}`
   - **Purpose**: Parses base64-encoded authenticator data into structured format
-  - **Parameters**: 
+  - **Parameters**:
     - `auth_data`: Base64-encoded authenticator data string
   - **Returns**: `Result<Self, PasskeyError>` - Parsed authenticator data or parsing error
   - **Type**: Public super-level constructor for authenticator data parsing
@@ -2781,7 +2781,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn create_parsed_client_data(challenge: &str, origin: &str, type_: &str) -> ParsedClientData {}`
   - **Purpose**: Creates test parsed client data with specified parameters
-  - **Parameters**: 
+  - **Parameters**:
     - `challenge`: Challenge string for test data
     - `origin`: Origin string for test data
     - `type_`: WebAuthn ceremony type
@@ -2834,7 +2834,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn create_test_auth_data(rp_id_hash: Vec<u8>, flags: u8, counter: u32, extra_data: Option<Vec<u8>>) -> Vec<u8> {}`
   - **Purpose**: Creates test authenticator data with specified parameters
-  - **Parameters**: 
+  - **Parameters**:
     - `rp_id_hash`: RP ID hash bytes
     - `flags`: Authenticator flags byte
     - `counter`: Signature counter value
@@ -2882,21 +2882,21 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn get_credential_id_strs_by(field: CredentialSearchField) -> Result<Vec<UserIdCredentialIdStr>, PasskeyError> {}`
   - **Purpose**: Retrieves credential ID strings filtered by search field criteria
-  - **Parameters**: 
+  - **Parameters**:
     - `field`: Search criteria for filtering credentials
   - **Returns**: `Result<Vec<UserIdCredentialIdStr>, PasskeyError>` - Vector of user-credential ID pairs or error
   - **Type**: Internal async function for credential lookup
 
 - `pub(super) async fn name2cid_str_vec(name: &str) -> Result<Vec<UserIdCredentialIdStr>, PasskeyError> {}`
   - **Purpose**: Converts username to credential ID string vector for credential lookup
-  - **Parameters**: 
+  - **Parameters**:
     - `name`: Username string for credential search
   - **Returns**: `Result<Vec<UserIdCredentialIdStr>, PasskeyError>` - Vector of associated credential IDs or error
   - **Type**: Public super-level async function for username-to-credential mapping
 
 - `pub(super) async fn store_in_cache<T>(category: &str, key: &str, data: T, ttl: usize) -> Result<(), PasskeyError> where T: Into<CacheData> {}`
   - **Purpose**: Stores typed data in cache with specified category, key, and TTL
-  - **Parameters**: 
+  - **Parameters**:
     - `category`: Cache category for organization
     - `key`: Cache key for retrieval
     - `data`: Data to store (must convert to CacheData)
@@ -2906,7 +2906,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn get_from_cache<T>(category: &str, key: &str) -> Result<Option<T>, PasskeyError> where T: TryFrom<CacheData, Error = PasskeyError> {}`
   - **Purpose**: Retrieves and converts typed data from cache by category and key
-  - **Parameters**: 
+  - **Parameters**:
     - `category`: Cache category for organization
     - `key`: Cache key for lookup
   - **Returns**: `Result<Option<T>, PasskeyError>` - Optional converted data or error
@@ -2914,7 +2914,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn remove_from_cache(category: &str, key: &str) -> Result<(), PasskeyError> {}`
   - **Purpose**: Removes cached item by category and key
-  - **Parameters**: 
+  - **Parameters**:
     - `category`: Cache category for organization
     - `key`: Cache key for item removal
   - **Returns**: `Result<(), PasskeyError>` - Success or cache removal error
@@ -2951,21 +2951,21 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), PasskeyError> {}`
   - **Purpose**: Creates PostgreSQL tables required for passkey credential storage
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool for database operations
   - **Returns**: `Result<(), PasskeyError>` - Success or table creation error
   - **Type**: Public super-level async function for database schema setup
 
 - `pub(super) async fn validate_passkey_tables_postgres(pool: &Pool<Postgres>) -> Result<(), PasskeyError> {}`
   - **Purpose**: Validates PostgreSQL table schema matches expected passkey table structure
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool for schema validation
   - **Returns**: `Result<(), PasskeyError>` - Success or validation error
   - **Type**: Public super-level async function for schema validation
 
 - `pub(super) async fn store_credential_postgres(pool: &Pool<Postgres>, credential_id: &str, credential: &PasskeyCredential) -> Result<(), PasskeyError> {}`
   - **Purpose**: Stores passkey credential in PostgreSQL database
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool
     - `credential_id`: Unique identifier for the credential
     - `credential`: Passkey credential data to store
@@ -2974,7 +2974,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn get_credential_postgres(pool: &Pool<Postgres>, credential_id: &str) -> Result<Option<PasskeyCredential>, PasskeyError> {}`
   - **Purpose**: Retrieves passkey credential from PostgreSQL database by ID
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool
     - `credential_id`: Unique identifier for credential lookup
   - **Returns**: `Result<Option<PasskeyCredential>, PasskeyError>` - Optional credential or error
@@ -2982,7 +2982,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn get_credentials_by_field_postgres(pool: &Pool<Postgres>, field: &CredentialSearchField) -> Result<Vec<PasskeyCredential>, PasskeyError> {}`
   - **Purpose**: Retrieves multiple passkey credentials from PostgreSQL filtered by search field
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool
     - `field`: Search criteria for filtering credentials
   - **Returns**: `Result<Vec<PasskeyCredential>, PasskeyError>` - Vector of matching credentials or error
@@ -2990,7 +2990,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn update_credential_counter_postgres(pool: &Pool<Postgres>, credential_id: &str, counter: u32) -> Result<(), PasskeyError> {}`
   - **Purpose**: Updates authenticator counter for specific credential in PostgreSQL
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool
     - `credential_id`: Unique identifier for credential
     - `counter`: New counter value for replay attack prevention
@@ -2999,7 +2999,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn delete_credential_by_field_postgres(pool: &Pool<Postgres>, field: &CredentialSearchField) -> Result<(), PasskeyError> {}`
   - **Purpose**: Deletes passkey credentials from PostgreSQL filtered by search field
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool
     - `field`: Search criteria for identifying credentials to delete
   - **Returns**: `Result<(), PasskeyError>` - Success or deletion error
@@ -3007,7 +3007,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn update_credential_user_details_postgres(pool: &Pool<Postgres>, credential_id: &str, name: &str, display_name: &str) -> Result<(), PasskeyError> {}`
   - **Purpose**: Updates user-visible details for passkey credential in PostgreSQL
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool
     - `credential_id`: Unique identifier for credential
     - `name`: Updated user name
@@ -3017,21 +3017,21 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn from_row(row: &'r SqliteRow) -> Result<Self, sqlx::Error> {}`
   - **Purpose**: Converts SQLite database row to PasskeyCredential struct
-  - **Parameters**: 
+  - **Parameters**:
     - `row`: SQLite row reference for data conversion
   - **Returns**: `Result<Self, sqlx::Error>` - Converted credential or conversion error
   - **Type**: Trait implementation for SQLite row mapping
 
 - `fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {}`
   - **Purpose**: Converts PostgreSQL database row to PasskeyCredential struct
-  - **Parameters**: 
+  - **Parameters**:
     - `row`: PostgreSQL row reference for data conversion
   - **Returns**: `Result<Self, sqlx::Error>` - Converted credential or conversion error
   - **Type**: Trait implementation for PostgreSQL row mapping
 
 - `pub(super) async fn update_credential_last_used_at_postgres(pool: &Pool<Postgres>, credential_id: &str, last_used_at: DateTime<Utc>) -> Result<(), PasskeyError> {}`
   - **Purpose**: Updates last used timestamp for passkey credential in PostgreSQL
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool
     - `credential_id`: Unique identifier for credential
     - `last_used_at`: UTC timestamp of last credential usage
@@ -3042,21 +3042,21 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), PasskeyError> {}`
   - **Purpose**: Creates SQLite tables required for passkey credential storage
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool for database operations
   - **Returns**: `Result<(), PasskeyError>` - Success or table creation error
   - **Type**: Public super-level async function for database schema setup
 
 - `pub(super) async fn validate_passkey_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), PasskeyError> {}`
   - **Purpose**: Validates SQLite table schema matches expected passkey table structure
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool for schema validation
   - **Returns**: `Result<(), PasskeyError>` - Success or validation error
   - **Type**: Public super-level async function for schema validation
 
 - `pub(super) async fn store_credential_sqlite(pool: &Pool<Sqlite>, credential_id: &str, credential: &PasskeyCredential) -> Result<(), PasskeyError> {}`
   - **Purpose**: Stores passkey credential in SQLite database
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool
     - `credential_id`: Unique identifier for the credential
     - `credential`: Passkey credential data to store
@@ -3065,7 +3065,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn get_credential_sqlite(pool: &Pool<Sqlite>, credential_id: &str) -> Result<Option<PasskeyCredential>, PasskeyError> {}`
   - **Purpose**: Retrieves passkey credential from SQLite database by ID
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool
     - `credential_id`: Unique identifier for credential lookup
   - **Returns**: `Result<Option<PasskeyCredential>, PasskeyError>` - Optional credential or error
@@ -3073,7 +3073,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn get_credentials_by_field_sqlite(pool: &Pool<Sqlite>, field: &CredentialSearchField) -> Result<Vec<PasskeyCredential>, PasskeyError> {}`
   - **Purpose**: Retrieves multiple passkey credentials from SQLite filtered by search field
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool
     - `field`: Search criteria for filtering credentials
   - **Returns**: `Result<Vec<PasskeyCredential>, PasskeyError>` - Vector of matching credentials or error
@@ -3081,7 +3081,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn update_credential_counter_sqlite(pool: &Pool<Sqlite>, credential_id: &str, counter: u32) -> Result<(), PasskeyError> {}`
   - **Purpose**: Updates authenticator counter for specific credential in SQLite
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool
     - `credential_id`: Unique identifier for credential
     - `counter`: New counter value for replay attack prevention
@@ -3090,7 +3090,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn delete_credential_by_field_sqlite(pool: &Pool<Sqlite>, field: &CredentialSearchField) -> Result<(), PasskeyError> {}`
   - **Purpose**: Deletes passkey credentials from SQLite filtered by search field
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool
     - `field`: Search criteria for identifying credentials to delete
   - **Returns**: `Result<(), PasskeyError>` - Success or deletion error
@@ -3098,7 +3098,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn update_credential_user_details_sqlite(pool: &Pool<Sqlite>, credential_id: &str, name: &str, display_name: &str) -> Result<(), PasskeyError> {}`
   - **Purpose**: Updates user-visible details for passkey credential in SQLite
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool
     - `credential_id`: Unique identifier for credential
     - `name`: Updated user name
@@ -3108,7 +3108,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn update_credential_last_used_at_sqlite(pool: &Pool<Sqlite>, credential_id: &str, last_used_at: DateTime<Utc>) -> Result<(), PasskeyError> {}`
   - **Purpose**: Updates last used timestamp for passkey credential in SQLite
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool
     - `credential_id`: Unique identifier for credential
     - `last_used_at`: UTC timestamp of last credential usage
@@ -3124,7 +3124,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) async fn store_credential(credential_id: String, credential: PasskeyCredential) -> Result<(), PasskeyError> {}`
   - **Purpose**: Stores passkey credential in the configured database backend
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: Unique identifier for the credential
     - `credential`: Passkey credential data to store
   - **Returns**: `Result<(), PasskeyError>` - Success or storage error
@@ -3132,21 +3132,21 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) async fn get_credential(credential_id: &str) -> Result<Option<PasskeyCredential>, PasskeyError> {}`
   - **Purpose**: Retrieves passkey credential from database by credential ID
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: Unique identifier for credential lookup
   - **Returns**: `Result<Option<PasskeyCredential>, PasskeyError>` - Optional credential or error
   - **Type**: Public crate-level async function for credential retrieval
 
 - `pub(crate) async fn get_credentials_by(field: CredentialSearchField) -> Result<Vec<PasskeyCredential>, PasskeyError> {}`
   - **Purpose**: Retrieves multiple passkey credentials filtered by search criteria
-  - **Parameters**: 
+  - **Parameters**:
     - `field`: Search criteria for filtering credentials
   - **Returns**: `Result<Vec<PasskeyCredential>, PasskeyError>` - Vector of matching credentials or error
   - **Type**: Public crate-level async function for filtered credential retrieval
 
 - `pub(crate) async fn update_credential_counter(credential_id: &str, counter: u32) -> Result<(), PasskeyError> {}`
   - **Purpose**: Updates authenticator counter for replay attack prevention
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: Unique identifier for credential
     - `counter`: New counter value
   - **Returns**: `Result<(), PasskeyError>` - Success or update error
@@ -3154,14 +3154,14 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) async fn delete_credential_by(field: CredentialSearchField) -> Result<(), PasskeyError> {}`
   - **Purpose**: Deletes passkey credentials filtered by search criteria
-  - **Parameters**: 
+  - **Parameters**:
     - `field`: Search criteria for identifying credentials to delete
   - **Returns**: `Result<(), PasskeyError>` - Success or deletion error
   - **Type**: Public crate-level async function for credential cleanup
 
 - `pub(crate) async fn update_credential(credential_id: &str, name: &str, display_name: &str) -> Result<(), PasskeyError> {}`
   - **Purpose**: Updates user-visible details for passkey credential
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: Unique identifier for credential
     - `name`: Updated user name
     - `display_name`: Updated display name
@@ -3170,7 +3170,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) async fn update_credential_last_used_at(credential_id: &str, last_used_at: DateTime<Utc>) -> Result<(), PasskeyError> {}`
   - **Purpose**: Updates last used timestamp for passkey credential
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: Unique identifier for credential
     - `last_used_at`: UTC timestamp of last credential usage
   - **Returns**: `Result<(), PasskeyError>` - Success or update error
@@ -3178,7 +3178,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn create_test_credential(credential_id: &str, user_id: &str, user_handle: &str) -> PasskeyCredential {}`
   - **Purpose**: Creates mock passkey credential for testing storage operations
-  - **Parameters**: 
+  - **Parameters**:
     - `credential_id`: Unique identifier for test credential
     - `user_id`: User ID for test credential
     - `user_handle`: User handle for test credential
@@ -3187,7 +3187,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn create_test_user(user_id: &str) -> Result<User, Box<dyn std::error::Error>> {}`
   - **Purpose**: Creates test user in database for storage testing
-  - **Parameters**: 
+  - **Parameters**:
     - `user_id`: Unique identifier for test user
   - **Returns**: `Result<User, Box<dyn std::error::Error>>` - Created user or error
   - **Type**: Test utility function for user creation
@@ -3248,28 +3248,28 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn from(data: SessionInfo) -> Self {}`
   - **Purpose**: Converts SessionInfo data into CacheData format for storage
-  - **Parameters**: 
+  - **Parameters**:
     - `data`: SessionInfo instance to convert
   - **Returns**: `Self` - CacheData instance containing session information
   - **Type**: Trait implementation for data conversion
 
 - `fn try_from(data: CacheData) -> Result<Self, Self::Error> {}`
   - **Purpose**: Attempts to convert CacheData back to SessionInfo with error handling
-  - **Parameters**: 
+  - **Parameters**:
     - `data`: CacheData instance to convert
   - **Returns**: `Result<Self, Self::Error>` - SessionInfo instance or conversion error
   - **Type**: Trait implementation for fallible data conversion
 
 - `fn from(data: StoredOptions) -> Self {}`
   - **Purpose**: Converts StoredOptions data into CacheData format for storage
-  - **Parameters**: 
+  - **Parameters**:
     - `data`: StoredOptions instance to convert
   - **Returns**: `Self` - CacheData instance containing stored options
   - **Type**: Trait implementation for data conversion
 
 - `fn try_from(data: CacheData) -> Result<Self, Self::Error> {}`
   - **Purpose**: Attempts to convert CacheData back to StoredOptions with error handling
-  - **Parameters**: 
+  - **Parameters**:
     - `data`: CacheData instance to convert
   - **Returns**: `Result<Self, Self::Error>` - StoredOptions instance or conversion error
   - **Type**: Trait implementation for fallible data conversion
@@ -3278,7 +3278,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) async fn new_session_header(user_id: String) -> Result<HeaderMap, SessionError> {}`
   - **Purpose**: Creates new session headers with authentication cookies for user
-  - **Parameters**: 
+  - **Parameters**:
     - `user_id`: String identifier for the user to create session for
   - **Returns**: `Result<HeaderMap, SessionError>` - Headers with session cookies or session creation error
   - **Type**: Public crate-level async function for session header creation
@@ -3287,14 +3287,14 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub fn generate_page_session_token(token: &str) -> String {}`
   - **Purpose**: Generates HMAC-based page session token for CSRF protection
-  - **Parameters**: 
+  - **Parameters**:
     - `token`: Input token string to generate HMAC for
   - **Returns**: `String` - HMAC-based page session token
   - **Type**: Public function for CSRF token generation
 
 - `pub async fn verify_page_session_token( headers: &HeaderMap, page_session_token: Option<&String>, ) -> Result<(), SessionError> {}`
   - **Purpose**: Verifies page session token against session data to prevent CSRF attacks
-  - **Parameters**: 
+  - **Parameters**:
     - `headers`: HTTP headers containing session information
     - `page_session_token`: Optional page session token to verify
   - **Returns**: `Result<(), SessionError>` - Success or token verification error
@@ -3314,7 +3314,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn create_test_session(csrf_token: &str) -> serde_json::Value {}`
   - **Purpose**: Creates test session JSON object with specified CSRF token
-  - **Parameters**: 
+  - **Parameters**:
     - `csrf_token`: CSRF token string for test session
   - **Returns**: `serde_json::Value` - JSON session object for testing
   - **Type**: Test utility function for session creation
@@ -3344,21 +3344,21 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderMap, SessionError> {}`
   - **Purpose**: Prepares HTTP response headers for user logout with session cleanup
-  - **Parameters**: 
+  - **Parameters**:
     - `cookies`: Cookie header containing session information to clean up
   - **Returns**: `Result<HeaderMap, SessionError>` - Headers with logout cookies or error
   - **Type**: Public async function for logout handling
 
 - `pub(super) async fn create_new_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {}`
   - **Purpose**: Creates new authenticated session for specified user ID
-  - **Parameters**: 
+  - **Parameters**:
     - `user_id`: String identifier for user to create session for
   - **Returns**: `Result<HeaderMap, SessionError>` - Headers with session cookies or error
   - **Type**: Public super-level async function for session creation
 
 - `async fn delete_session_from_store( cookies: Cookie, cookie_name: String, ) -> Result<(), SessionError> {}`
   - **Purpose**: Deletes session from storage using cookie information
-  - **Parameters**: 
+  - **Parameters**:
     - `cookies`: Cookie data containing session information
     - `cookie_name`: Name of session cookie to delete
   - **Returns**: `Result<(), SessionError>` - Success or deletion error
@@ -3366,28 +3366,28 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) async fn delete_session_from_store_by_session_id( session_id: &str, ) -> Result<(), SessionError> {}`
   - **Purpose**: Deletes session from storage using session ID directly
-  - **Parameters**: 
+  - **Parameters**:
     - `session_id`: Session identifier to delete from storage
   - **Returns**: `Result<(), SessionError>` - Success or deletion error
   - **Type**: Public crate-level async function for session cleanup
 
 - `pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, SessionError> {}`
   - **Purpose**: Retrieves user information from active session cookie
-  - **Parameters**: 
+  - **Parameters**:
     - `session_cookie`: Session cookie string for user lookup
   - **Returns**: `Result<SessionUser, SessionError>` - User session data or error
   - **Type**: Public async function for user retrieval
 
 - `pub(crate) fn get_session_id_from_headers( headers: &HeaderMap, ) -> Result<Option<&str>, SessionError> {}`
   - **Purpose**: Extracts session ID from HTTP headers cookie data
-  - **Parameters**: 
+  - **Parameters**:
     - `headers`: HTTP headers containing cookie information
   - **Returns**: `Result<Option<&str>, SessionError>` - Optional session ID or parsing error
   - **Type**: Public crate-level function for session ID extraction
 
 - `async fn is_authenticated( headers: &HeaderMap, method: &Method, verify_user_exists: bool, ) -> Result< ( AuthenticationStatus, Option<UserId>, Option<CsrfToken>, CsrfHeaderVerified, ), SessionError, > {}`
   - **Purpose**: Comprehensive authentication check with optional user verification and CSRF validation
-  - **Parameters**: 
+  - **Parameters**:
     - `headers`: HTTP headers containing session information
     - `method`: HTTP method for CSRF validation requirements
     - `verify_user_exists`: Whether to verify user exists in database
@@ -3396,7 +3396,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn is_authenticated_basic( headers: &HeaderMap, method: &Method, ) -> Result<AuthenticationStatus, SessionError> {}`
   - **Purpose**: Basic authentication check without user verification or CSRF validation
-  - **Parameters**: 
+  - **Parameters**:
     - `headers`: HTTP headers containing session information
     - `method`: HTTP method for context
   - **Returns**: `Result<AuthenticationStatus, SessionError>` - Authentication status or error
@@ -3404,7 +3404,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn is_authenticated_basic_then_csrf( headers: &HeaderMap, method: &Method, ) -> Result<(CsrfToken, CsrfHeaderVerified), SessionError> {}`
   - **Purpose**: Basic authentication check followed by CSRF token validation
-  - **Parameters**: 
+  - **Parameters**:
     - `headers`: HTTP headers containing session and CSRF information
     - `method`: HTTP method for CSRF validation requirements
   - **Returns**: `Result<(CsrfToken, CsrfHeaderVerified), SessionError>` - CSRF tokens or error
@@ -3412,7 +3412,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn is_authenticated_strict( headers: &HeaderMap, method: &Method, ) -> Result<AuthenticationStatus, SessionError> {}`
   - **Purpose**: Strict authentication check with user existence verification
-  - **Parameters**: 
+  - **Parameters**:
     - `headers`: HTTP headers containing session information
     - `method`: HTTP method for context
   - **Returns**: `Result<AuthenticationStatus, SessionError>` - Authentication status or error
@@ -3420,7 +3420,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn is_authenticated_strict_then_csrf( headers: &HeaderMap, method: &Method, ) -> Result<(CsrfToken, CsrfHeaderVerified), SessionError> {}`
   - **Purpose**: Strict authentication check with user verification followed by CSRF validation
-  - **Parameters**: 
+  - **Parameters**:
     - `headers`: HTTP headers containing session and CSRF information
     - `method`: HTTP method for CSRF validation requirements
   - **Returns**: `Result<(CsrfToken, CsrfHeaderVerified), SessionError>` - CSRF tokens or error
@@ -3428,7 +3428,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn is_authenticated_basic_then_user_and_csrf( headers: &HeaderMap, method: &Method, ) -> Result<(SessionUser, CsrfToken, CsrfHeaderVerified), SessionError> {}`
   - **Purpose**: Basic authentication followed by user data and CSRF token retrieval
-  - **Parameters**: 
+  - **Parameters**:
     - `headers`: HTTP headers containing session and CSRF information
     - `method`: HTTP method for CSRF validation requirements
   - **Returns**: `Result<(SessionUser, CsrfToken, CsrfHeaderVerified), SessionError>` - User and CSRF data or error
@@ -3436,21 +3436,21 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, SessionError> {}`
   - **Purpose**: Retrieves CSRF token from session storage by session ID
-  - **Parameters**: 
+  - **Parameters**:
     - `session_id`: Session identifier for CSRF token lookup
   - **Returns**: `Result<CsrfToken, SessionError>` - CSRF token or retrieval error
   - **Type**: Public async function for CSRF token retrieval
 
 - `pub async fn get_user_and_csrf_token_from_session( session_id: &str, ) -> Result<(SessionUser, CsrfToken), SessionError> {}`
   - **Purpose**: Retrieves both user data and CSRF token from session storage
-  - **Parameters**: 
+  - **Parameters**:
     - `session_id`: Session identifier for data lookup
   - **Returns**: `Result<(SessionUser, CsrfToken), SessionError>` - User and CSRF data or error
   - **Type**: Public async function for combined session data retrieval
 
 - `fn create_header_map_with_cookie(cookie_name: &str, cookie_value: &str) -> HeaderMap {}`
   - **Purpose**: Creates HTTP header map with specified cookie for testing
-  - **Parameters**: 
+  - **Parameters**:
     - `cookie_name`: Name of the cookie to set
     - `cookie_value`: Value of the cookie to set
   - **Returns**: `HeaderMap` - Headers with cookie set
@@ -3478,7 +3478,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn create_test_session(csrf_token: &str, user_id: &str) -> serde_json::Value {}`
   - **Purpose**: Creates test session JSON object with CSRF token and user ID
-  - **Parameters**: 
+  - **Parameters**:
     - `csrf_token`: CSRF token for test session
     - `user_id`: User ID for test session
   - **Returns**: `serde_json::Value` - JSON session object for testing
@@ -3618,7 +3618,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn insert_test_user( user_id: &str, account: &str, label: &str, is_admin: bool, ) -> Result<User, SessionError> {}`
   - **Purpose**: Inserts test user into database for session testing scenarios
-  - **Parameters**: 
+  - **Parameters**:
     - `user_id`: String identifier for the test user
     - `account`: Account name for the test user
     - `label`: Display label for the test user
@@ -3628,7 +3628,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn insert_test_session( session_id: &str, user_id: &str, csrf_token: &str, ttl: u64, ) -> Result<(), SessionError> {}`
   - **Purpose**: Inserts test session into cache for session testing scenarios
-  - **Parameters**: 
+  - **Parameters**:
     - `session_id`: String identifier for the test session
     - `user_id`: String identifier of the user for this session
     - `csrf_token`: CSRF token for the test session
@@ -3638,7 +3638,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn create_test_user_and_session( user_id: &str, account: &str, label: &str, is_admin: bool, session_id: &str, csrf_token: &str, ttl: u64, ) -> Result<User, SessionError> {}`
   - **Purpose**: Creates both test user and session in single operation for comprehensive testing
-  - **Parameters**: 
+  - **Parameters**:
     - `user_id`: String identifier for the user
     - `account`: Account name for the user
     - `label`: Display label for the user
@@ -3651,21 +3651,21 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub async fn delete_test_session(session_id: &str) -> Result<(), SessionError> {}`
   - **Purpose**: Deletes test session from cache for test cleanup
-  - **Parameters**: 
+  - **Parameters**:
     - `session_id`: String identifier of session to delete
   - **Returns**: `Result<(), SessionError>` - Success or deletion error
   - **Type**: Public async test utility function for session cleanup
 
 - `pub async fn delete_test_user(user_id: &str) -> Result<(), SessionError> {}`
   - **Purpose**: Deletes test user from database for test cleanup
-  - **Parameters**: 
+  - **Parameters**:
     - `user_id`: String identifier of user to delete
   - **Returns**: `Result<(), SessionError>` - Success or deletion error
   - **Type**: Public async test utility function for user cleanup
 
 - `pub async fn cleanup_test_resources(user_id: &str, session_id: &str) -> Result<(), SessionError> {}`
   - **Purpose**: Comprehensive cleanup of test user and session resources
-  - **Parameters**: 
+  - **Parameters**:
     - `user_id`: String identifier of user to clean up
     - `session_id`: String identifier of session to clean up
   - **Returns**: `Result<(), SessionError>` - Success or cleanup error
@@ -3675,42 +3675,42 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn from(db_user: DbUser) -> Self {}`
   - **Purpose**: Converts database user representation to session user
-  - **Parameters**: 
+  - **Parameters**:
     - `db_user`: Database user object to convert
   - **Returns**: `Self` - Session user representation
   - **Type**: Trait implementation for user conversion
 
 - `fn from(data: StoredSession) -> Self {}`
   - **Purpose**: Converts stored session data into cache data format
-  - **Parameters**: 
+  - **Parameters**:
     - `data`: Stored session data to convert
   - **Returns**: `Self` - Cache data representation of session
   - **Type**: Trait implementation for session data conversion
 
 - `fn try_from(data: CacheData) -> Result<Self, Self::Error> {}`
   - **Purpose**: Attempts to convert cache data back to stored session with error handling
-  - **Parameters**: 
+  - **Parameters**:
     - `data`: Cache data to convert back to session
   - **Returns**: `Result<Self, Self::Error>` - Stored session or conversion error
   - **Type**: Trait implementation for fallible session conversion
 
 - `fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {}`
   - **Purpose**: Formats session user for debug display output
-  - **Parameters**: 
+  - **Parameters**:
     - `f`: Formatter for writing display output
   - **Returns**: `std::fmt::Result` - Formatting result
   - **Type**: Debug trait implementation for session user
 
 - `fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {}`
   - **Purpose**: Formats CSRF token for debug display output
-  - **Parameters**: 
+  - **Parameters**:
     - `f`: Formatter for writing display output
   - **Returns**: `std::fmt::Result` - Formatting result
   - **Type**: Debug trait implementation for CSRF token
 
 - `pub fn new(token: String) -> Self {}`
   - **Purpose**: Creates new CSRF token from provided string
-  - **Parameters**: 
+  - **Parameters**:
     - `token`: String value for the CSRF token
   - **Returns**: `Self` - CSRF token instance
   - **Type**: Constructor for CSRF token
@@ -3722,7 +3722,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub fn new(id: String) -> Self {}`
   - **Purpose**: Creates new user ID from provided string
-  - **Parameters**: 
+  - **Parameters**:
     - `id`: String value for the user ID
   - **Returns**: `Self` - User ID instance
   - **Type**: Constructor for user ID
@@ -3741,7 +3741,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn make_key(prefix: &str, key: &str) -> String {}`
   - **Purpose**: Constructs a cache key by combining prefix and key with separator
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for the cache key
     - `key`: Individual key identifier
   - **Returns**: `String` - Combined cache key in format "prefix:key"
@@ -3754,7 +3754,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn put(&mut self, prefix: &str, key: &str, value: CacheData) -> Result<(), StorageError> {}`
   - **Purpose**: Stores a cache entry with the given prefix, key, and value
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for organization
     - `key`: Cache key identifier
     - `value`: CacheData to store
@@ -3763,7 +3763,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn put_with_ttl( &mut self, prefix: &str, key: &str, value: CacheData, _ttl: usize, ) -> Result<(), StorageError> {}`
   - **Purpose**: Stores cache entry with TTL (TTL ignored for memory implementation)
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for organization
     - `key`: Cache key identifier
     - `value`: CacheData to store
@@ -3773,7 +3773,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn get(&self, prefix: &str, key: &str) -> Result<Option<CacheData>, StorageError> {}`
   - **Purpose**: Retrieves cache entry for the given prefix and key
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for lookup
     - `key`: Cache key identifier
   - **Returns**: `Result<Option<CacheData>, StorageError>` - Optional cached data or error
@@ -3781,7 +3781,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn remove(&mut self, prefix: &str, key: &str) -> Result<(), StorageError> {}`
   - **Purpose**: Removes cache entry with the specified prefix and key
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for removal
     - `key`: Cache key identifier
   - **Returns**: `Result<(), StorageError>` - Success or removal error
@@ -3871,7 +3871,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn make_key(prefix: &str, key: &str) -> String {}`
   - **Purpose**: Constructs Redis cache key by combining prefix and key with separator
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for the cache key
     - `key`: Individual key identifier
   - **Returns**: `String` - Combined cache key in format "prefix:key"
@@ -3884,7 +3884,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn put(&mut self, prefix: &str, key: &str, value: CacheData) -> Result<(), StorageError> {}`
   - **Purpose**: Stores a cache entry in Redis with the given prefix, key, and value
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for organization
     - `key`: Cache key identifier
     - `value`: CacheData to store in Redis
@@ -3893,7 +3893,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn put_with_ttl( &mut self, prefix: &str, key: &str, value: CacheData, ttl: usize, ) -> Result<(), StorageError> {}`
   - **Purpose**: Stores cache entry in Redis with automatic expiration after TTL seconds
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for organization
     - `key`: Cache key identifier
     - `value`: CacheData to store in Redis
@@ -3903,7 +3903,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn get(&self, prefix: &str, key: &str) -> Result<Option<CacheData>, StorageError> {}`
   - **Purpose**: Retrieves cache entry from Redis for the given prefix and key
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for lookup
     - `key`: Cache key identifier
   - **Returns**: `Result<Option<CacheData>, StorageError>` - Optional cached data or Redis error
@@ -3911,7 +3911,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn remove(&mut self, prefix: &str, key: &str) -> Result<(), StorageError> {}`
   - **Purpose**: Removes cache entry from Redis with the specified prefix and key
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for removal
     - `key`: Cache key identifier
   - **Returns**: `Result<(), StorageError>` - Success or Redis removal error
@@ -3926,7 +3926,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn put(&mut self, prefix: &str, key: &str, value: CacheData) -> Result<(), StorageError>;`
   - **Purpose**: Trait method for storing cache data with prefix and key
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for the cache key
     - `key`: Cache key identifier
     - `value`: Cache data to store
@@ -3934,8 +3934,8 @@ The following is a complete listing of all functions in the oauth2_passkey crate
   - **Type**: Async trait method for cache data storage
 
 - `async fn put_with_ttl( &mut self, prefix: &str, key: &str, value: CacheData, ttl: usize, ) -> Result<(), StorageError>;`
-  - **Purpose**: Trait method for storing cache data with time-to-live expiration  
-  - **Parameters**: 
+  - **Purpose**: Trait method for storing cache data with time-to-live expiration
+  - **Parameters**:
     - `prefix`: Namespace prefix for the cache key
     - `key`: Cache key identifier
     - `value`: Cache data to store
@@ -3945,7 +3945,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn get(&self, prefix: &str, key: &str) -> Result<Option<CacheData>, StorageError>;`
   - **Purpose**: Trait method for retrieving cache data by prefix and key
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for the cache key
     - `key`: Cache key identifier
   - **Returns**: `Result<Option<CacheData>, StorageError>` - Optional cache data or storage error
@@ -3953,7 +3953,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `async fn remove(&mut self, prefix: &str, key: &str) -> Result<(), StorageError>;`
   - **Purpose**: Trait method for removing cache data by prefix and key
-  - **Parameters**: 
+  - **Parameters**:
     - `prefix`: Namespace prefix for the cache key
     - `key`: Cache key identifier
   - **Returns**: `Result<(), StorageError>` - Success or storage error
@@ -4003,14 +4003,14 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn from(err: redis::RedisError) -> Self {}`
   - **Purpose**: Converts Redis error into storage error type
-  - **Parameters**: 
+  - **Parameters**:
     - `err`: Redis error to convert
   - **Returns**: `Self` - Storage error representation of Redis error
   - **Type**: Error conversion trait implementation
 
 - `fn from(err: serde_json::Error) -> Self {}`
   - **Purpose**: Converts JSON serialization error into storage error type
-  - **Parameters**: 
+  - **Parameters**:
     - `err`: JSON error to convert
   - **Returns**: `Self` - Storage error representation of JSON error
   - **Type**: Error conversion trait implementation
@@ -4026,7 +4026,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) async fn validate_postgres_table_schema<E>( pool: &Pool<Postgres>, table_name: &str, expected_columns: &[(&str, &str)], error_mapper: impl Fn(String) -> E, ) -> Result<(), E> {}`
   - **Purpose**: Validates PostgreSQL table schema matches expected column definitions
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool reference
     - `table_name`: Name of table to validate
     - `expected_columns`: Array of expected column name and type pairs
@@ -4036,7 +4036,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) async fn validate_sqlite_table_schema<E>( pool: &Pool<Sqlite>, table_name: &str, expected_columns: &[(&str, &str)], error_mapper: impl Fn(String) -> E, ) -> Result<(), E> {}`
   - **Purpose**: Validates SQLite table schema matches expected column definitions
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool reference
     - `table_name`: Name of table to validate
     - `expected_columns`: Array of expected column name and type pairs
@@ -4058,14 +4058,14 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `fn from(err: serde_json::Error) -> Self {}`
   - **Purpose**: Converts JSON serialization error into user error type
-  - **Parameters**: 
+  - **Parameters**:
     - `err`: JSON error to convert
   - **Returns**: `Self` - User error representation of JSON error
   - **Type**: Error conversion trait implementation
 
 - `fn from(err: redis::RedisError) -> Self {}`
   - **Purpose**: Converts Redis error into user error type
-  - **Parameters**: 
+  - **Parameters**:
     - `err`: Redis error to convert
   - **Returns**: `Self` - User error representation of Redis error
   - **Type**: Error conversion trait implementation
@@ -4105,28 +4105,28 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), UserError> {}`
   - **Purpose**: Creates PostgreSQL user management tables with required schema
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool reference
   - **Returns**: `Result<(), UserError>` - Success or table creation error
   - **Type**: Module-level PostgreSQL table creation function
 
 - `pub(super) async fn validate_user_tables_postgres(pool: &Pool<Postgres>) -> Result<(), UserError> {}`
   - **Purpose**: Validates PostgreSQL user tables have correct schema structure
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool reference
   - **Returns**: `Result<(), UserError>` - Success or validation error
   - **Type**: Module-level PostgreSQL schema validation function
 
 - `pub(super) async fn get_all_users_postgres(pool: &Pool<Postgres>) -> Result<Vec<User>, UserError> {}`
   - **Purpose**: Retrieves all users from PostgreSQL database
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool reference
   - **Returns**: `Result<Vec<User>, UserError>` - Vector of users or database error
   - **Type**: Module-level PostgreSQL user retrieval function
 
 - `pub(super) async fn get_user_postgres( pool: &Pool<Postgres>, id: &str, ) -> Result<Option<User>, UserError> {}`
   - **Purpose**: Retrieves specific user by ID from PostgreSQL database
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool reference
     - `id`: User ID to search for
   - **Returns**: `Result<Option<User>, UserError>` - Optional user or database error
@@ -4134,7 +4134,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn upsert_user_postgres( pool: &Pool<Postgres>, user: User, ) -> Result<User, UserError> {}`
   - **Purpose**: Inserts new user or updates existing user in PostgreSQL database
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool reference
     - `user`: User object to insert or update
   - **Returns**: `Result<User, UserError>` - Saved user with updated sequence or database error
@@ -4142,7 +4142,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn delete_user_postgres(pool: &Pool<Postgres>, id: &str) -> Result<(), UserError> {}`
   - **Purpose**: Deletes user by ID from PostgreSQL database
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: PostgreSQL connection pool reference
     - `id`: User ID to delete
   - **Returns**: `Result<(), UserError>` - Success or deletion error
@@ -4152,28 +4152,28 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), UserError> {}`
   - **Purpose**: Creates SQLite user management tables with required schema
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool reference
   - **Returns**: `Result<(), UserError>` - Success or table creation error
   - **Type**: Module-level SQLite table creation function
 
 - `pub(super) async fn validate_user_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), UserError> {}`
   - **Purpose**: Validates SQLite user tables have correct schema structure
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool reference
   - **Returns**: `Result<(), UserError>` - Success or validation error
   - **Type**: Module-level SQLite schema validation function
 
 - `pub(super) async fn get_all_users_sqlite(pool: &Pool<Sqlite>) -> Result<Vec<User>, UserError> {}`
   - **Purpose**: Retrieves all users from SQLite database
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool reference
   - **Returns**: `Result<Vec<User>, UserError>` - Vector of users or database error
   - **Type**: Module-level SQLite user retrieval function
 
 - `pub(super) async fn get_user_sqlite( pool: &Pool<Sqlite>, id: &str, ) -> Result<Option<User>, UserError> {}`
   - **Purpose**: Retrieves specific user by ID from SQLite database
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool reference
     - `id`: User ID to search for
   - **Returns**: `Result<Option<User>, UserError>` - Optional user or database error
@@ -4181,7 +4181,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Result<User, UserError> {}`
   - **Purpose**: Inserts new user or updates existing user in SQLite database
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool reference
     - `user`: User object to insert or update
   - **Returns**: `Result<User, UserError>` - Saved user with updated sequence or database error
@@ -4189,7 +4189,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(super) async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<(), UserError> {}`
   - **Purpose**: Deletes user by ID from SQLite database
-  - **Parameters**: 
+  - **Parameters**:
     - `pool`: SQLite connection pool reference
     - `id`: User ID to delete
   - **Returns**: `Result<(), UserError>` - Success or deletion error
@@ -4209,28 +4209,28 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) async fn get_user(id: &str) -> Result<Option<User>, UserError> {}`
   - **Purpose**: Retrieves specific user by ID from configured database store
-  - **Parameters**: 
+  - **Parameters**:
     - `id`: User ID to search for
   - **Returns**: `Result<Option<User>, UserError>` - Optional user or database error
   - **Type**: Public crate-level user lookup function
 
 - `pub(crate) async fn upsert_user(user: User) -> Result<User, UserError> {}`
   - **Purpose**: Inserts new user or updates existing user in configured database store
-  - **Parameters**: 
+  - **Parameters**:
     - `user`: User object to insert or update
   - **Returns**: `Result<User, UserError>` - Saved user with updated sequence or database error
   - **Type**: Public crate-level user upsert function
 
 - `pub(crate) async fn delete_user(id: &str) -> Result<(), UserError> {}`
   - **Purpose**: Deletes user by ID from configured database store
-  - **Parameters**: 
+  - **Parameters**:
     - `id`: User ID to delete
   - **Returns**: `Result<(), UserError>` - Success or deletion error
   - **Type**: Public crate-level user deletion function
 
 - `fn create_test_user(suffix: &str) -> User {}`
   - **Purpose**: Creates test user with specified suffix for testing purposes
-  - **Parameters**: 
+  - **Parameters**:
     - `suffix`: Suffix to append to test user identifier
   - **Returns**: `User` - Test user object
   - **Type**: Test utility function for user creation
@@ -4275,7 +4275,7 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub fn new(id: String, account: String, label: String) -> Self {}`
   - **Purpose**: Creates new User instance with provided identifier, account, and label
-  - **Parameters**: 
+  - **Parameters**:
     - `id`: Unique user identifier string
     - `account`: User account name string
     - `label`: User display label string
@@ -4319,28 +4319,28 @@ The following is a complete listing of all functions in the oauth2_passkey crate
 
 - `pub(crate) fn base64url_decode(input: &str) -> Result<Vec<u8>, UtilError> {}`
   - **Purpose**: Decodes base64url-encoded string to byte vector
-  - **Parameters**: 
+  - **Parameters**:
     - `input`: Base64url-encoded string to decode
   - **Returns**: `Result<Vec<u8>, UtilError>` - Decoded byte vector or decoding error
   - **Type**: Public crate-level utility function for base64url decoding
 
 - `pub(crate) fn base64url_encode(input: Vec<u8>) -> Result<String, UtilError> {}`
   - **Purpose**: Encodes byte vector to base64url-encoded string
-  - **Parameters**: 
+  - **Parameters**:
     - `input`: Byte vector to encode
   - **Returns**: `Result<String, UtilError>` - Base64url-encoded string or encoding error
   - **Type**: Public crate-level utility function for base64url encoding
 
 - `pub(crate) fn gen_random_string(len: usize) -> Result<String, UtilError> {}`
   - **Purpose**: Generates cryptographically secure random string of specified length
-  - **Parameters**: 
+  - **Parameters**:
     - `len`: Length of random string to generate
   - **Returns**: `Result<String, UtilError>` - Random string or generation error
   - **Type**: Public crate-level utility function for secure random generation
 
 - `pub(crate) fn header_set_cookie(headers: &mut HeaderMap, name: String, value: String, _expires_at: DateTime<Utc>, max_age: i64) -> Result<&HeaderMap, UtilError> {}`
   - **Purpose**: Sets HTTP cookie header with specified name, value, and expiration
-  - **Parameters**: 
+  - **Parameters**:
     - `headers`: Mutable reference to HTTP header map
     - `name`: Cookie name string
     - `value`: Cookie value string

@@ -28,7 +28,12 @@ pub(crate) static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = Lazy
         "sqlite" => {
             let opts = sqlx::sqlite::SqliteConnectOptions::from_str(store_url)
                 .expect("Failed to parse SQLite connection string")
-                .create_if_missing(true);
+                .create_if_missing(true)
+                .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+                .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
+                .busy_timeout(std::time::Duration::from_secs(30))
+                .pragma("temp_store", "memory")
+                .pragma("mmap_size", "268435456"); // 256MB
 
             Box::new(SqliteDataStore {
                 pool: sqlx::sqlite::SqlitePool::connect_lazy_with(opts),

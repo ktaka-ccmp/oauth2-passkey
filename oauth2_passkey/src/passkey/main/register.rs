@@ -1409,7 +1409,7 @@ mod tests {
             account: "test_account_789".to_string(),
             label: "Test User 789".to_string(),
             is_admin: false,
-            sequence_number: 1,
+            sequence_number: Some(1),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         });
@@ -1473,7 +1473,7 @@ mod tests {
             account: "test_account".to_string(),
             label: "Test User".to_string(),
             is_admin: false,
-            sequence_number: 1,
+            sequence_number: Some(1),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };
@@ -1641,7 +1641,7 @@ mod tests {
             account: "test_account".to_string(),
             label: "Test User".to_string(),
             is_admin: false,
-            sequence_number: 1,
+            sequence_number: Some(1),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };
@@ -1691,7 +1691,7 @@ mod tests {
             account: "test_account".to_string(),
             label: "Test User".to_string(),
             is_admin: false,
-            sequence_number: 1,
+            sequence_number: Some(1),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };
@@ -1744,7 +1744,7 @@ mod tests {
             account: "test_account".to_string(),
             label: "Stored User".to_string(),
             is_admin: false,
-            sequence_number: 1,
+            sequence_number: Some(1),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };
@@ -1755,7 +1755,7 @@ mod tests {
             account: "test_account".to_string(),
             label: "Current User".to_string(),
             is_admin: false,
-            sequence_number: 1,
+            sequence_number: Some(1),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };

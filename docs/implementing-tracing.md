@@ -23,7 +23,7 @@ The library now has **full tracing implementation**:
 - `delete_oauth2_account_core()` - Account deletion with security logging
 - `list_accounts_core()` - Account listing with count metrics
 - `handle_start_registration_core()` - Passkey registration initiation
-- `handle_finish_registration_core()` - Passkey registration completion 
+- `handle_finish_registration_core()` - Passkey registration completion
 - `handle_start_authentication_core()` - Passkey authentication start
 - `handle_finish_authentication_core()` - Passkey authentication completion
 - `list_credentials_core()` - Credential listing with metrics
@@ -86,16 +86,16 @@ pub async fn authorized_core(
     code: &str,
 ) -> Result<(User, bool), CoordinationError> {
     tracing::info!("Processing OAuth2 authorization callback");
-    
+
     // Set user_id in span when we have it
     let current_span = tracing::Span::current();
-    
+
     // ... existing code ...
-    
+
     if let Ok(user) = &result {
         current_span.record("user_id", &user.0.id);
     }
-    
+
     result
 }
 
@@ -293,7 +293,7 @@ impl UserStore {
     pub async fn get_user(id: &str) -> Result<Option<User>, UserError> {
         // No manual timing needed - tracing measures the span automatically!
         let store = GENERIC_DATA_STORE.lock().await;
-        
+
         let result = if let Some(pool) = store.as_sqlite() {
             tracing::debug!("Using SQLite for user lookup");
             get_user_sqlite(pool, id).await
@@ -303,13 +303,13 @@ impl UserStore {
         } else {
             Err(UserError::Storage("Unsupported database type".to_string()))
         };
-        
+
         match &result {
             Ok(Some(_)) => tracing::info!(found = true, "User lookup completed"),
             Ok(None) => tracing::info!(found = false, "User lookup completed - not found"),
             Err(e) => tracing::error!(error = %e, "User lookup failed"),
         }
-        
+
         result
     }
 }
@@ -325,7 +325,7 @@ Update demo applications with comprehensive tracing:
 // demo-*/src/server.rs
 pub(crate) fn init_tracing(app_name: &str) {
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, fmt, EnvFilter};
-    
+
     // Create environment filter with sane defaults
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| {
@@ -428,7 +428,7 @@ RUST_LOG=debug cargo run --bin demo-both
 # Monitor specific authentication flows
 RUST_LOG="oauth2_passkey::coordination::oauth2=trace" cargo run --bin demo-both
 
-# Performance monitoring mode  
+# Performance monitoring mode
 RUST_LOG="oauth2_passkey::storage=debug,oauth2_passkey::coordination=info" cargo run --bin demo-both
 
 # Production logging with HTTP tracing

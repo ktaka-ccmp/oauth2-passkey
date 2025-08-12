@@ -591,21 +591,22 @@ mod tests {
         // Setup test environment
         init_test_environment().await;
 
-        // Create test user and OAuth2 accounts
-        let user_id = "test_user_list_accounts";
+        // Create test user and OAuth2 accounts with unique timestamp-based ID
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let user_id = format!("test_user_list_accounts_{timestamp}");
         let provider1 = "google";
         let provider2 = "github";
         let provider_user_id1 = "google_user_123";
         let provider_user_id2 = "github_user_456";
 
-        create_test_user_in_db(user_id).await?;
+        create_test_user_in_db(&user_id).await?;
         let _unique_provider_user_id1 =
-            create_test_oauth2_account_in_db(user_id, provider1, provider_user_id1).await?;
+            create_test_oauth2_account_in_db(&user_id, provider1, provider_user_id1).await?;
         let _unique_provider_user_id2 =
-            create_test_oauth2_account_in_db(user_id, provider2, provider_user_id2).await?;
+            create_test_oauth2_account_in_db(&user_id, provider2, provider_user_id2).await?;
 
         // List the OAuth2 accounts
-        let accounts = list_accounts_core(user_id).await?;
+        let accounts = list_accounts_core(&user_id).await?;
         assert_eq!(
             accounts.len(),
             2,

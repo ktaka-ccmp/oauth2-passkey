@@ -59,6 +59,9 @@ impl User {
     /// This is determined by either:
     /// 1. The user has is_admin flag set to true, or
     /// 2. The user is the first user in the system (sequence_number = 1)
+    ///
+    /// IMPORTANT: This logic must stay in sync with SessionUser::has_admin_privileges()
+    /// and AuthUser::has_admin_privileges() implementations.
     pub fn has_admin_privileges(&self) -> bool {
         self.is_admin || self.sequence_number == Some(1)
     }

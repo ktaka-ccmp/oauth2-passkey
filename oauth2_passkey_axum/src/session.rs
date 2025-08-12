@@ -56,6 +56,7 @@ impl IntoResponse for AuthRedirect {
 /// * `updated_at` - When the user account was last updated
 /// * `csrf_token` - CSRF token associated with the user's session
 /// * `csrf_via_header_verified` - Whether CSRF token was verified via header
+/// * `session_id` - The session ID for making secure API calls
 ///
 /// # Example
 ///
@@ -80,8 +81,8 @@ pub struct AuthUser {
     pub label: String,
     /// Whether the user has admin privileges
     pub is_admin: bool,
-    /// User version for tracking account changes
-    pub sequence_number: i64,
+    /// Database-assigned sequence number (primary key), None for users not yet persisted
+    pub sequence_number: Option<i64>,
     /// When the user account was created
     pub created_at: DateTime<Utc>,
     /// When the user account was last updated
@@ -90,6 +91,8 @@ pub struct AuthUser {
     pub csrf_token: String,
     /// Whether CSRF token was verified via header
     pub csrf_via_header_verified: bool,
+    /// The session ID for making secure API calls
+    pub session_id: String,
 }
 
 impl From<&AuthUser> for SessionUser {
@@ -118,7 +121,26 @@ impl From<SessionUser> for AuthUser {
             updated_at: session_user.updated_at,
             csrf_token: String::new(),
             csrf_via_header_verified: false,
+            session_id: String::new(),
         }
+    }
+}
+
+impl AuthUser {
+    /// Determines if the user has administrative privileges.
+    ///
+    /// A user has admin privileges if:
+    /// 1. They have the `is_admin` flag set to true, OR
+    /// 2. They are the first user in the system (sequence_number = 1)
+    ///
+    /// IMPORTANT: This logic must stay in sync with DbUser::has_admin_privileges()
+    /// and SessionUser::has_admin_privileges() implementations.
+    ///
+    /// # Returns
+    /// * `true` if the user has administrative privileges
+    /// * `false` otherwise
+    pub fn has_admin_privileges(&self) -> bool {
+        self.is_admin || self.sequence_number == Some(1)
     }
 }
 
@@ -155,6 +177,7 @@ where
 
         let mut auth_user = AuthUser::from(session_user);
         auth_user.csrf_token = session_csrf_token_str.as_str().to_string(); // Store the session's CSRF token
+        auth_user.session_id = session_cookie.to_string(); // Store the session ID for secure API calls
 
         // Verify CSRF token for state-changing methods
         if method == Method::POST
@@ -254,7 +277,7 @@ mod tests {
             account: "test@example.com".to_string(),
             label: "Test User".to_string(),
             is_admin: true,
-            sequence_number: 42,
+            sequence_number: Some(42),
             created_at: now,
             updated_at: now,
         };
@@ -267,13 +290,14 @@ mod tests {
         assert_eq!(auth_user.account, "test@example.com");
         assert_eq!(auth_user.label, "Test User");
         assert!(auth_user.is_admin);
-        assert_eq!(auth_user.sequence_number, 42);
+        assert_eq!(auth_user.sequence_number, Some(42));
         assert_eq!(auth_user.created_at, now);
         assert_eq!(auth_user.updated_at, now);
 
         // Verify default values for AuthUser-specific fields
         assert_eq!(auth_user.csrf_token, "");
         assert!(!auth_user.csrf_via_header_verified);
+        assert_eq!(auth_user.session_id, "");
     }
 
     /// Test the conversion from AuthUser to SessionUser
@@ -287,11 +311,12 @@ mod tests {
             account: "test@example.com".to_string(),
             label: "Test User".to_string(),
             is_admin: true,
-            sequence_number: 42,
+            sequence_number: Some(42),
             created_at: now,
             updated_at: now,
             csrf_token: "csrf-token-value".to_string(),
             csrf_via_header_verified: true,
+            session_id: "session-123".to_string(),
         };
 
         // Convert to SessionUser
@@ -302,7 +327,7 @@ mod tests {
         assert_eq!(session_user.account, "test@example.com");
         assert_eq!(session_user.label, "Test User");
         assert!(session_user.is_admin);
-        assert_eq!(session_user.sequence_number, 42);
+        assert_eq!(session_user.sequence_number, Some(42));
         assert_eq!(session_user.created_at, now);
         assert_eq!(session_user.updated_at, now);
 

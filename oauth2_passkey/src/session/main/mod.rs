@@ -5,7 +5,7 @@ mod session_edge_cases_tests;
 #[cfg(test)]
 mod session_security_tests;
 #[cfg(test)]
-mod test_utils;
+pub(crate) mod test_utils;
 
 use crate::session::errors::SessionError;
 use http::HeaderMap;
@@ -26,5 +26,3 @@ pub(crate) async fn new_session_header(user_id: String) -> Result<HeaderMap, Ses
 
     Ok(headers)
 }
-
-// pub(crate) use session::create_new_session_with_uid as new_session_header;

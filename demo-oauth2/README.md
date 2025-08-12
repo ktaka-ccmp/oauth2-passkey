@@ -103,4 +103,3 @@ demo-oauth2/
 - **Logs**: Check console output for detailed error messages
 - **Database**: SQLite file `auth.db` stores user sessions
 - **Reset**: Delete `auth.db` and restart to clear all sessions
-

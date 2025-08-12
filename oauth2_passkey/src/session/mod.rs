@@ -35,6 +35,9 @@ pub use main::{
     is_authenticated_strict_then_csrf, prepare_logout_response, verify_page_session_token,
 };
 
+#[cfg(test)]
+pub(crate) use main::test_utils::{insert_test_session, insert_test_user};
+
 pub(crate) use main::{
     delete_session_from_store_by_session_id, get_session_id_from_headers, new_session_header,
 };

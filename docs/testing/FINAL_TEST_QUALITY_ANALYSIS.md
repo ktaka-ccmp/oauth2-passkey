@@ -70,9 +70,9 @@ fn test_error_is_sync_and_send() {
 
 ### 🚨 **Category C: Extensive Serialization Tests (27+ tests) - PARTIALLY RESOLVED ✅**
 
-**Locations**: 
+**Locations**:
 - `src/oauth2/main/google.rs` - 8 serialization tests
-- `src/passkey/main/types.rs` - 12 serialization tests  
+- `src/passkey/main/types.rs` - 12 serialization tests
 - ~~`src/userdb/types.rs` - 3 serialization tests~~ - **All removed** ✅
 - `src/passkey/main/related_origin.rs` - 5 JSON tests
 - `src/passkey/main/aaguid.rs` - 4 serialization tests
@@ -172,7 +172,7 @@ let user = UserStore::get_user("test-user")
 - **Patterns**: Proper async testing, comprehensive edge cases
 - **Infrastructure**: Full integration with test environment
 
-### **OAuth2 Module** ✅ GOOD  
+### **OAuth2 Module** ✅ GOOD
 - **Status**: Previously cleaned and improved
 - **Tests**: 101 tests focusing on security and flows
 - **Strengths**: Business logic focus, CSRF protection testing
@@ -203,7 +203,7 @@ let user = UserStore::get_user("test-user")
 - **Patterns**: Exemplary use of property-based testing, explicit cleanup, and descriptive error messages
 
 ### **Coordination Module** ✅ GOOD
-- **Status**: Well-structured integration tests  
+- **Status**: Well-structured integration tests
 - **Tests**: 18 tests with proper initialization patterns
 - **Strengths**: Proper use of `#[serial]`, comprehensive setup
 - **Patterns**: Good example of complex module testing
@@ -276,7 +276,7 @@ fn test_webauthn_client_data_field_mapping() {
 
 ```rust
 // Remove - tests serde derive
-#[test] 
+#[test]
 fn test_user_serialization() {
     // Only verifies JSON contains expected strings
 }
@@ -296,7 +296,7 @@ fn test_user_serialization() {
 
 ### **Before Recent Improvements**
 - **OAuth2**: 109 tests → 101 tests (8 trivial removed)
-- **Session**: 67 tests → 59 tests (8 improved/removed)  
+- **Session**: 67 tests → 59 tests (8 improved/removed)
 - **Storage**: 35 tests → 16 tests (19 trivial removed)
 
 ### **Current State**
@@ -305,7 +305,7 @@ fn test_user_serialization() {
 - **Quality Issues**: ~40 `.unwrap()` instances
 - **Pass Rate**: 100%
 
-### **Target State** 
+### **Target State**
 - **Total Tests**: ~448 tests (9 trivial removed)
 - **Quality Issues**: 0 `.unwrap()` violations
 - **Trivial Tests**: 0 remaining
@@ -319,7 +319,7 @@ fn test_user_serialization() {
 - ✅ Updated all userdb tests to use `.expect()` with descriptive messages instead of `.unwrap()`
 - ⏳ Session module tests still need updating
 
-### **Week 2-3: Serialization Test Review - COMPLETED FOR USERDB ✅** 
+### **Week 2-3: Serialization Test Review - COMPLETED FOR USERDB ✅**
 - ✅ Audited all serialization tests in userdb module
 - ✅ Removed 3 redundant serialization tests from userdb/types.rs
 - ✅ Verified property-based tests provide comprehensive coverage

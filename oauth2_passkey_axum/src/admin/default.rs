@@ -8,8 +8,8 @@ use axum::{
 };
 
 use oauth2_passkey::{
-    DbUser, O2P_ROUTE_PREFIX, SessionUser, delete_oauth2_account_core,
-    delete_passkey_credential_core, delete_user_account_admin, update_user_admin_status,
+    DbUser, O2P_ROUTE_PREFIX, delete_oauth2_account_core, delete_passkey_credential_core,
+    delete_user_account_admin, update_user_admin_status,
 };
 
 use super::super::error::IntoResponseError;
@@ -42,12 +42,12 @@ struct UserListTemplate {
 
 async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
-    if !auth_user.is_admin {
+    if !auth_user.has_admin_privileges() {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     };
 
-    // Fetch users from storage
-    let users = oauth2_passkey::get_all_users()
+    // Fetch users from storage using session ID
+    let users = oauth2_passkey::get_all_users(&auth_user.session_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -75,7 +75,7 @@ pub(super) async fn delete_user_account_handler(
     ExtractJson(payload): ExtractJson<DeleteUserRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Verify that the user has admin privileges
-    if !auth_user.is_admin {
+    if !auth_user.has_admin_privileges() {
         tracing::warn!(
             "User {} is not authorized to delete another user's account",
             auth_user.id
@@ -85,7 +85,7 @@ pub(super) async fn delete_user_account_handler(
 
     // Call the core function to delete the user account and all associated data
     // Using the imported function from libauth
-    delete_user_account_admin(&payload.user_id)
+    delete_user_account_admin(&auth_user.session_id, &payload.user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -110,7 +110,7 @@ async fn delete_passkey_credential(
     ExtractJson(payload): ExtractJson<PageUserContext>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Check admin status
-    if !auth_user.is_admin {
+    if !auth_user.has_admin_privileges() {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
@@ -126,7 +126,7 @@ async fn delete_oauth2_account(
     ExtractJson(payload): ExtractJson<PageUserContext>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Check admin status
-    if !auth_user.is_admin {
+    if !auth_user.has_admin_privileges() {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
@@ -146,20 +146,17 @@ pub(super) async fn update_admin_status_handler(
     auth_user: AuthUser,
     ExtractJson(payload): ExtractJson<UpdateAdminStatusRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // Convert AuthUser to SessionUser for the core function
-    let session_user = SessionUser::from(&auth_user);
-
     // Verify that the user has admin privileges
-    if !session_user.is_admin {
+    if !auth_user.has_admin_privileges() {
         tracing::warn!(
             "User {} is not authorized to update admin status",
-            session_user.id
+            auth_user.id
         );
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
     // Call the core function to update the user's admin status
-    update_user_admin_status(&session_user, &payload.user_id, payload.is_admin)
+    update_user_admin_status(&auth_user.session_id, &payload.user_id, payload.is_admin)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -167,7 +164,7 @@ pub(super) async fn update_admin_status_handler(
         "User admin status updated: {} is_admin={} by {}",
         payload.user_id,
         payload.is_admin,
-        session_user.id
+        auth_user.id
     );
 
     Ok(StatusCode::OK)
@@ -184,17 +181,18 @@ mod tests {
     /// 2. The error message is "Not authorized".
     #[tokio::test]
     async fn test_delete_user_account_handler_unauthorized() {
-        // Create a non-admin user
+        // Create a non-admin user (not the first user)
         let auth_user = AuthUser {
             id: "user123".to_string(),
             account: "test@example.com".to_string(),
             label: "Test User".to_string(),
             is_admin: false,
-            sequence_number: 1,
+            sequence_number: Some(2), // Not the first user, so no admin privileges
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
             csrf_token: "token123".to_string(),
             csrf_via_header_verified: true,
+            session_id: "session123".to_string(),
         };
 
         // Create a delete request
@@ -223,17 +221,18 @@ mod tests {
     /// 3. The handler does not panic or return Ok when it should return an error.
     #[tokio::test]
     async fn test_update_admin_status_handler_unauthorized() {
-        // Create a non-admin user
+        // Create a non-admin user (not the first user)
         let auth_user = AuthUser {
             id: "user123".to_string(),
             account: "test@example.com".to_string(),
             label: "Test User".to_string(),
             is_admin: false,
-            sequence_number: 1,
+            sequence_number: Some(2), // Not the first user, so no admin privileges
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
             csrf_token: "token123".to_string(),
             csrf_via_header_verified: true,
+            session_id: "session123".to_string(),
         };
 
         // Create an update request

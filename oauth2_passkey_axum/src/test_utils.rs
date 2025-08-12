@@ -51,11 +51,12 @@ pub mod mocks {
             account: account.to_string(),
             label: format!("Test User {id}"),
             is_admin: false,
-            sequence_number: 1,
+            sequence_number: Some(1),
             created_at: now,
             updated_at: now,
             csrf_token: "test-csrf-token".to_string(),
             csrf_via_header_verified: true,
+            session_id: format!("test-session-{id}"),
         }
     }
 
@@ -79,7 +80,7 @@ pub mod mocks {
             account: account.to_string(),
             label: format!("Test User {id}"),
             is_admin: false,
-            sequence_number: 1,
+            sequence_number: Some(1),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
