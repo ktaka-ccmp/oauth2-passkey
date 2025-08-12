@@ -45,25 +45,35 @@ impl TestServerContext {
 
         println!("🔧 Starting persistent mock OAuth2 server on port {MOCK_OAUTH2_PORT}...");
 
-        // Start cleanup task for expired codes
+        // Start cleanup task for expired codes - optimized thread with minimal blocking
         let cleanup_state = state.clone();
+        let cleanup_shutdown = shutdown.clone();
         thread::spawn(move || {
             loop {
-                thread::sleep(std::time::Duration::from_secs(60)); // Clean every minute
+                thread::sleep(std::time::Duration::from_millis(1000)); // Faster cleanup cycle
+                if cleanup_shutdown.load(std::sync::atomic::Ordering::Acquire) {
+                    break;
+                }
                 cleanup_expired_codes(&cleanup_state);
             }
+            println!("🧹 Mock server cleanup task terminated");
         });
 
-        // Start server in background thread (persistent across all tests)
+        // Start server in background thread with optimized runtime
         let thread_handle = thread::spawn(move || {
-            // Create a new tokio runtime for this thread
-            let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+            // Create optimized tokio runtime with fewer worker threads to reduce contention
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(1) // Single worker thread to reduce contention
+                .enable_all()
+                .build()
+                .expect("Failed to create optimized tokio runtime");
+
             rt.block_on(async {
                 start_persistent_mock_server(state_clone, shutdown_clone).await;
             });
         });
 
-        // Wait for server to be ready
+        // Wait for server to be ready (sync version for LazyLock compatibility)
         wait_for_server_ready(&base_url);
 
         println!("✅ Persistent mock OAuth2 server is ready and will stay alive for all tests");
@@ -139,7 +149,7 @@ pub fn get_oidc_mock_server() -> &'static TestServerContext {
     &TEST_SERVER
 }
 
-/// Wait for server to be ready by attempting to connect
+/// Wait for server to be ready by attempting to connect (sync fallback for compatibility)
 fn wait_for_server_ready(_base_url: &str) {
     use std::time::Duration;
 
@@ -559,117 +569,4 @@ pub fn configure_mock_for_test(
     println!("🔧 Mock server configured for test");
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Test that the mock server's OIDC Discovery endpoint works correctly
-    ///
-    /// This test validates the mock OAuth2 provider infrastructure, not the oauth2-passkey library.
-    /// Useful for debugging when OAuth2 flows fail and you need to isolate mock server issues.
-    #[tokio::test]
-    async fn test_mock_oidc_discovery_endpoint() -> Result<(), Box<dyn std::error::Error>> {
-        // Get the mock server (starts automatically if not running)
-        let _server = get_oidc_mock_server();
-
-        // Test OIDC Discovery endpoint directly
-        let client = reqwest::Client::new();
-        let discovery_url = format!("{MOCK_OAUTH2_URL}/.well-known/openid-configuration");
-        println!("🔍 Testing mock OIDC Discovery endpoint at: {discovery_url}");
-
-        let discovery_response = client.get(discovery_url).send().await?;
-
-        println!(
-            "OIDC Discovery response status: {}",
-            discovery_response.status()
-        );
-        assert!(
-            discovery_response.status().is_success(),
-            "OIDC Discovery endpoint should return 200"
-        );
-
-        let discovery_doc: serde_json::Value = discovery_response.json().await?;
-        println!(
-            "OIDC Discovery document: {}",
-            serde_json::to_string_pretty(&discovery_doc)?
-        );
-
-        // Validate all required OIDC Discovery fields are present as strings
-        assert!(
-            discovery_doc["issuer"].is_string(),
-            "issuer field should be present"
-        );
-        assert!(
-            discovery_doc["authorization_endpoint"].is_string(),
-            "authorization_endpoint should be present"
-        );
-        assert!(
-            discovery_doc["token_endpoint"].is_string(),
-            "token_endpoint should be present"
-        );
-        assert!(
-            discovery_doc["userinfo_endpoint"].is_string(),
-            "userinfo_endpoint should be present"
-        );
-        assert!(
-            discovery_doc["jwks_uri"].is_string(),
-            "jwks_uri should be present"
-        );
-
-        // Verify exact endpoint URLs
-        assert_eq!(discovery_doc["issuer"], MOCK_OAUTH2_URL);
-        assert_eq!(
-            discovery_doc["authorization_endpoint"],
-            format!("{MOCK_OAUTH2_URL}/oauth2/auth")
-        );
-        assert_eq!(
-            discovery_doc["token_endpoint"],
-            format!("{MOCK_OAUTH2_URL}/oauth2/token")
-        );
-        assert_eq!(
-            discovery_doc["userinfo_endpoint"],
-            format!("{MOCK_OAUTH2_URL}/oauth2/userinfo")
-        );
-        assert_eq!(
-            discovery_doc["jwks_uri"],
-            format!("{MOCK_OAUTH2_URL}/oauth2/v3/certs")
-        );
-
-        // Verify supported features arrays
-        assert!(
-            discovery_doc["scopes_supported"].is_array(),
-            "scopes_supported should be an array"
-        );
-        assert!(
-            discovery_doc["response_types_supported"].is_array(),
-            "response_types_supported should be an array"
-        );
-        assert!(
-            discovery_doc["grant_types_supported"].is_array(),
-            "grant_types_supported should be an array"
-        );
-        assert!(
-            discovery_doc["subject_types_supported"].is_array(),
-            "subject_types_supported should be an array"
-        );
-        assert!(
-            discovery_doc["id_token_signing_alg_values_supported"].is_array(),
-            "id_token_signing_alg_values_supported should be an array"
-        );
-
-        println!("✅ Mock OIDC Discovery endpoint validation PASSED");
-        println!("  - Issuer URL: {}", discovery_doc["issuer"]);
-        println!(
-            "  - Authorization endpoint: {}",
-            discovery_doc["authorization_endpoint"]
-        );
-        println!("  - Token endpoint: {}", discovery_doc["token_endpoint"]);
-        println!(
-            "  - Userinfo endpoint: {}",
-            discovery_doc["userinfo_endpoint"]
-        );
-        println!("  - JWKS URI: {}", discovery_doc["jwks_uri"]);
-
-        Ok(())
-    }
-}
+// Tests moved to consolidated mock infrastructure test in mock_browser.rs

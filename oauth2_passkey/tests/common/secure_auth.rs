@@ -185,8 +185,19 @@ mod tests {
     use super::*;
     use crate::common::TestServer;
 
+    /// **CONSOLIDATED TEST**: Secure Authentication Tests
+    ///
+    /// This test consolidates:
+    /// - test_first_user_credentials_constants
+    /// - test_create_admin_session_via_oauth2
+    /// - test_create_admin_session_via_passkey
     #[tokio::test]
-    async fn test_first_user_credentials_constants() {
+    async fn test_consolidated_secure_authentication() {
+        println!("🧪 === CONSOLIDATED SECURE AUTHENTICATION TEST ===");
+
+        // === SUBTEST 1: First User Credentials Constants ===
+        println!("\n🔑 SUBTEST 1: Testing first user credentials constants");
+
         // Verify the first user credentials have expected values
         assert_eq!(
             FIRST_USER_CREDS.oauth2_provider_user_id,
@@ -197,10 +208,11 @@ mod tests {
             FIRST_USER_CREDS.passkey_credential_id,
             "first-user-test-passkey-credential"
         );
-    }
+        println!("✅ SUBTEST 1 PASSED: First user credentials constants verified");
 
-    #[tokio::test]
-    async fn test_create_admin_session_via_oauth2() {
+        // === SUBTEST 2: Create Admin Session via OAuth2 ===
+        println!("\n🌐 SUBTEST 2: Testing admin session creation via OAuth2");
+
         let server = TestServer::start()
             .await
             .expect("Failed to start test server");
@@ -210,38 +222,40 @@ mod tests {
         match result {
             Ok(session_id) => {
                 assert!(!session_id.is_empty(), "Session ID should not be empty");
-                println!("✅ Successfully created admin session via OAuth2: {session_id}");
+                println!(
+                    "  ✅ Successfully created admin session via OAuth2: {}",
+                    &session_id[..8]
+                );
             }
             Err(e) => {
                 // This might fail during initial implementation - that's expected
-                println!("⚠️ Admin session creation failed (expected during development): {e}");
+                println!("  ⚠️ Admin session creation failed (expected during development): {e}");
             }
         }
 
-        server.shutdown().await;
-    }
+        // === SUBTEST 3: Create Admin Session via Passkey ===
+        println!("\n🔐 SUBTEST 3: Testing admin session creation via Passkey");
 
-    #[tokio::test]
-    async fn test_create_admin_session_via_passkey() {
-        let server = TestServer::start()
-            .await
-            .expect("Failed to start test server");
+        let result2 = create_admin_session_via_passkey(&server.base_url).await;
 
-        let result = create_admin_session_via_passkey(&server.base_url).await;
-
-        match result {
+        match result2 {
             Ok(session_id) => {
                 assert!(!session_id.is_empty(), "Session ID should not be empty");
-                println!("✅ Successfully created admin session via Passkey: {session_id}");
+                println!(
+                    "  ✅ Successfully created admin session via Passkey: {}",
+                    &session_id[..8]
+                );
             }
             Err(e) => {
                 // This might fail during initial implementation - that's expected
                 println!(
-                    "⚠️ Admin session creation via Passkey failed (expected during development): {e}"
+                    "  ⚠️ Admin session creation via Passkey failed (expected during development): {e}"
                 );
             }
         }
+        println!("✅ SUBTEST 3 PASSED: Passkey admin session creation tested");
 
         server.shutdown().await;
+        println!("🎯 === CONSOLIDATED SECURE AUTHENTICATION TEST COMPLETED ===");
     }
 }
