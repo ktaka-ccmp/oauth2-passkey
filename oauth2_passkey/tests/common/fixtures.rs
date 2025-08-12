@@ -1405,22 +1405,6 @@ impl MockOAuth2Responses {
     }
 }
 
-/// Common test state values
-pub struct TestConstants;
-
-impl TestConstants {
-    #[allow(dead_code)]
-    pub const MOCK_STATE: &'static str = "test_state_12345";
-    #[allow(dead_code)]
-    pub const MOCK_AUTH_CODE: &'static str = "mock_authorization_code";
-    #[allow(dead_code)]
-    pub const MOCK_CLIENT_ID: &'static str = "mock_client_id";
-    #[allow(dead_code)]
-    pub const MOCK_CLIENT_SECRET: &'static str = "mock_client_secret";
-    // #[allow(dead_code)]
-    // TEST_ORIGIN is now dynamically loaded from environment in test_server::get_test_origin()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

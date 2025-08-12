@@ -57,32 +57,3 @@ impl MultiBrowserTestSetup {
         self.server.shutdown().await;
     }
 }
-
-/// Convenience macro for standard test setup pattern
-///
-/// Usage:
-/// ```
-/// test_setup!(setup);
-/// // Equivalent to:
-/// // let setup = TestSetup::new().await?;
-/// // ... test code ...
-/// // setup.shutdown().await;
-/// ```
-#[macro_export]
-macro_rules! test_setup {
-    ($setup:ident) => {
-        let $setup = $crate::common::test_setup::TestSetup::new().await?;
-        // Automatically shutdown on drop would be ideal, but requires more complex Drop implementation
-    };
-    ($setup:ident, init) => {
-        let $setup = $crate::common::test_setup::TestSetup::new_with_init().await?;
-    };
-}
-
-/// Convenience macro for multi-browser test setup pattern
-#[macro_export]
-macro_rules! multi_browser_test_setup {
-    ($setup:ident) => {
-        let $setup = $crate::common::test_setup::MultiBrowserTestSetup::new().await?;
-    };
-}
