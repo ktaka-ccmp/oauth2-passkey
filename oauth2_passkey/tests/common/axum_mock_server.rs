@@ -45,25 +45,35 @@ impl TestServerContext {
 
         println!("🔧 Starting persistent mock OAuth2 server on port {MOCK_OAUTH2_PORT}...");
 
-        // Start cleanup task for expired codes
+        // Start cleanup task for expired codes - optimized thread with minimal blocking
         let cleanup_state = state.clone();
+        let cleanup_shutdown = shutdown.clone();
         thread::spawn(move || {
             loop {
-                thread::sleep(std::time::Duration::from_secs(60)); // Clean every minute
+                thread::sleep(std::time::Duration::from_millis(1000)); // Faster cleanup cycle
+                if cleanup_shutdown.load(std::sync::atomic::Ordering::Acquire) {
+                    break;
+                }
                 cleanup_expired_codes(&cleanup_state);
             }
+            println!("🧹 Mock server cleanup task terminated");
         });
 
-        // Start server in background thread (persistent across all tests)
+        // Start server in background thread with optimized runtime
         let thread_handle = thread::spawn(move || {
-            // Create a new tokio runtime for this thread
-            let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+            // Create optimized tokio runtime with fewer worker threads to reduce contention
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(1) // Single worker thread to reduce contention
+                .enable_all()
+                .build()
+                .expect("Failed to create optimized tokio runtime");
+
             rt.block_on(async {
                 start_persistent_mock_server(state_clone, shutdown_clone).await;
             });
         });
 
-        // Wait for server to be ready
+        // Wait for server to be ready (sync version for LazyLock compatibility)
         wait_for_server_ready(&base_url);
 
         println!("✅ Persistent mock OAuth2 server is ready and will stay alive for all tests");
@@ -139,7 +149,7 @@ pub fn get_oidc_mock_server() -> &'static TestServerContext {
     &TEST_SERVER
 }
 
-/// Wait for server to be ready by attempting to connect
+/// Wait for server to be ready by attempting to connect (sync fallback for compatibility)
 fn wait_for_server_ready(_base_url: &str) {
     use std::time::Duration;
 
