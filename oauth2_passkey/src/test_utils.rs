@@ -133,7 +133,7 @@ async fn create_first_user_if_needed() {
                 println!("✅ First user already exists: {}", first.id);
 
                 // Ensure first user has admin privileges (update if needed)
-                if !first.is_admin {
+                if !first.has_admin_privileges() {
                     println!("🔧 Updating first user to have admin privileges...");
                     let mut updated_user = first.clone();
                     updated_user.is_admin = true;

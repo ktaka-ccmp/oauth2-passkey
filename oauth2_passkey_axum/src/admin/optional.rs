@@ -89,7 +89,7 @@ impl UserSummaryTemplate {
         Self {
             user: TemplateUser {
                 id: user.id.clone(),
-                is_admin: user.is_admin,
+                is_admin: user.has_admin_privileges(),
                 account: user.account.clone(),
                 label: user.label.clone(),
                 created_at: format_date_tz(&user.created_at, "JST"),
@@ -106,7 +106,7 @@ impl UserSummaryTemplate {
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
 async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoResponse {
-    if !auth_user.is_admin {
+    if !auth_user.has_admin_privileges() {
         tracing::warn!(
             "User {} is not authorized to view user summary",
             auth_user.id

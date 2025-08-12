@@ -123,7 +123,7 @@ impl UserSummaryTemplate {
         Self {
             user: TemplateAuthUser {
                 id: user.id.clone(),
-                is_admin: user.is_admin,
+                is_admin: user.has_admin_privileges(),
                 account: user.account.clone(),
                 label: user.label.clone(),
                 created_at: format_date_tz(&user.created_at, "JST"),
