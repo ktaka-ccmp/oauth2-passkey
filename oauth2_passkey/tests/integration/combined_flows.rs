@@ -3,6 +3,8 @@ use crate::common::{
     validation_utils::AuthValidationResult,
 };
 
+use oauth2_passkey::{CredentialId, SessionId, UserId};
+
 // Import OAuth2 helper functions from oauth2_flows.rs
 use super::oauth2_flows::complete_full_oauth2_flow;
 // Import passkey helper functions from passkey_flows.rs
@@ -43,7 +45,8 @@ async fn test_combined_admin_operations() -> Result<(), Box<dyn std::error::Erro
     println!("\n👥 SUBTEST 1: Testing get_all_users integration");
 
     // Get initial user count - there may be existing users from other tests
-    let initial_users = oauth2_passkey::get_all_users(&admin_session_id).await?;
+    let initial_users =
+        oauth2_passkey::get_all_users(SessionId::new(admin_session_id.clone())).await?;
     let initial_count = initial_users.len();
     println!("  Initial user count: {initial_count}");
 
@@ -86,7 +89,8 @@ async fn test_combined_admin_operations() -> Result<(), Box<dyn std::error::Erro
     );
 
     // Now check if the user count increased
-    let updated_users = oauth2_passkey::get_all_users(&admin_session_id).await?;
+    let updated_users =
+        oauth2_passkey::get_all_users(SessionId::new(admin_session_id.clone())).await?;
     let updated_count = updated_users.len();
     println!("  Updated user count: {updated_count}");
 
@@ -160,22 +164,26 @@ async fn test_combined_admin_operations() -> Result<(), Box<dyn std::error::Erro
     );
 
     // Find the user to delete
-    let all_users = oauth2_passkey::get_all_users(&admin_session_id).await?;
+    let all_users = oauth2_passkey::get_all_users(SessionId::new(admin_session_id.clone())).await?;
     let user_to_delete = all_users
         .iter()
         .find(|u| u.account == delete_test_user.email)
         .expect("Should find the delete test user");
 
     // Delete the user account (using admin function with correct parameter order)
-    let delete_result =
-        oauth2_passkey::delete_user_account_admin(&admin_session_id, &user_to_delete.id).await;
+    let delete_result = oauth2_passkey::delete_user_account_admin(
+        SessionId::new(admin_session_id.clone()),
+        UserId::new(user_to_delete.id.clone()),
+    )
+    .await;
     assert!(
         delete_result.is_ok(),
         "User account deletion should succeed"
     );
 
     // Verify user was deleted
-    let users_after_delete = oauth2_passkey::get_all_users(&admin_session_id).await?;
+    let users_after_delete =
+        oauth2_passkey::get_all_users(SessionId::new(admin_session_id.clone())).await?;
     let deleted_user_exists = users_after_delete
         .iter()
         .any(|u| u.account == delete_test_user.email);
@@ -195,8 +203,8 @@ async fn test_combined_admin_operations() -> Result<(), Box<dyn std::error::Erro
 
     if let Some(credential_to_delete) = remaining_user_credentials.first() {
         let delete_cred_result = oauth2_passkey::delete_passkey_credential_admin(
-            &admin_session_id,
-            &credential_to_delete.credential_id,
+            SessionId::new(admin_session_id.clone()),
+            CredentialId::new(credential_to_delete.credential_id.clone()),
         )
         .await;
 
@@ -261,7 +269,8 @@ async fn test_combined_admin_operations() -> Result<(), Box<dyn std::error::Erro
         .expect("Regular user should have session");
 
     // Try to delete a credential using non-admin session - should fail
-    let all_users_final = oauth2_passkey::get_all_users(&admin_session_id).await?;
+    let all_users_final =
+        oauth2_passkey::get_all_users(SessionId::new(admin_session_id.clone())).await?;
     if let Some(some_user) = all_users_final.first() {
         let some_credentials = oauth2_passkey::list_credentials_core(&some_user.id).await?;
         if let Some(some_credential) = some_credentials.first() {
@@ -271,8 +280,8 @@ async fn test_combined_admin_operations() -> Result<(), Box<dyn std::error::Erro
                 .get_session_id()
                 .expect("Regular user should have session");
             let unauthorized_delete_result = oauth2_passkey::delete_passkey_credential_admin(
-                &regular_session_id,
-                &some_credential.credential_id,
+                SessionId::new(regular_session_id.clone()),
+                CredentialId::new(some_credential.credential_id.clone()),
             )
             .await;
 

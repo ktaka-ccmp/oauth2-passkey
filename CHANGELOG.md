@@ -22,17 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
-- **Admin Functions**: All admin functions now require `session_id` parameter instead of `SessionUser` object:
-  - `get_all_users(session_id: &str)` - was `get_all_users()`
-  - `get_user(session_id: &str, user_id: &str)` - was `get_user(user_id: &str)`
-  - `delete_user_account_admin(session_id: &str, user_id: &str)` - was `delete_user_account_admin(user_id: &str)`
-  - `delete_passkey_credential_admin(session_id: &str, credential_id: &str)` - was `delete_passkey_credential_admin(user: &SessionUser, credential_id: &str)`
-  - `delete_oauth2_account_admin(session_id: &str, provider_user_id: &str)` - was `delete_oauth2_account_admin(user: &SessionUser, provider_user_id: &str)`
-  - `update_user_admin_status(session_id: &str, user_id: &str, is_admin: bool)` - was `update_user_admin_status(admin_user: &SessionUser, user_id: &str, is_admin: bool)`
-
-- **User Functions**: User account management functions now require `session_id` parameter:
-  - `update_user_account(session_id: &str, user_id: &str, account: Option<String>, label: Option<String>)` - was `update_user_account(user_id: &str, account: Option<String>, label: Option<String>)`
-  - `delete_user_account(session_id: &str, user_id: &str)` - was `delete_user_account(user_id: &str)`
+- **Coordination Functions**: All coordination functions now use type-safe wrapper types and require session validation:
+  - **Admin Functions**: Now require `SessionId` parameter instead of `SessionUser` object and use typed identifiers:
+    - `get_all_users(SessionId)` - was `get_all_users()`
+    - `get_user(SessionId, UserId)` - was `get_user(user_id: &str)`
+    - `delete_user_account_admin(SessionId, UserId)` - was `delete_user_account_admin(user_id: &str)`
+    - `delete_passkey_credential_admin(SessionId, CredentialId)` - was `delete_passkey_credential_admin(user: &SessionUser, credential_id: &str)`
+    - `delete_oauth2_account_admin(SessionId, String)` - was `delete_oauth2_account_admin(user: &SessionUser, provider_user_id: &str)`
+    - `update_user_admin_status(SessionId, UserId, bool)` - was `update_user_admin_status(admin_user: &SessionUser, user_id: &str, is_admin: bool)`
+  - **User Functions**: Now require `SessionId` parameter and use typed identifiers:
+    - `update_user_account(SessionId, UserId, Option<String>, Option<String>)` - was `update_user_account(user_id: &str, account: Option<String>, label: Option<String>)`
+    - `delete_user_account(SessionId, UserId)` - was `delete_user_account(user_id: &str)`
+  - **Type-Safe Wrappers**: Use `SessionId::new(session_id)`, `UserId::new(user_id)`, `CredentialId::new(credential_id)` instead of raw strings
 
 - **Type Changes**: `SessionUser.sequence_number` type changed from `i64` to `Option<i64>` to match database schema consistency
 

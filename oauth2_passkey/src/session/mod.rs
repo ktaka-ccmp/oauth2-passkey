@@ -26,7 +26,7 @@ mod types;
 
 pub use config::SESSION_COOKIE_NAME; // Required for cookie configuration
 pub use errors::SessionError;
-pub use types::{AuthenticationStatus, CsrfHeaderVerified, CsrfToken, User}; // Required for session data
+pub use types::{AuthenticationStatus, CsrfHeaderVerified, CsrfToken, SessionId, User, UserId}; // Required for session data
 
 pub use main::{
     generate_page_session_token, get_csrf_token_from_session, get_user_and_csrf_token_from_session,

@@ -10,7 +10,9 @@ use axum_extra::{TypedHeader, headers};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use oauth2_passkey::{delete_user_account, prepare_logout_response, update_user_account};
+use oauth2_passkey::{
+    SessionId, UserId, delete_user_account, prepare_logout_response, update_user_account,
+};
 
 use crate::session::AuthUser;
 
@@ -96,8 +98,8 @@ pub(super) async fn update_user_account_handler(
 
     // Call the core function to update the user account
     let updated_user = update_user_account(
-        &auth_user.session_id,
-        &session_user_id,
+        SessionId::new(auth_user.session_id.clone()),
+        UserId::new(session_user_id.clone()),
         payload.account,
         payload.label,
     )
@@ -156,9 +158,12 @@ pub(super) async fn delete_user_account_handler(
 
     // Call the core function to delete the user account and all associated data
     // Using the imported function from oauth2_passkey
-    let credential_ids = delete_user_account(&auth_user.session_id, &session_user_id)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let credential_ids = delete_user_account(
+        SessionId::new(auth_user.session_id.clone()),
+        UserId::new(session_user_id.clone()),
+    )
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Return the credential IDs in the response for client-side notification
     Ok(Json(json!({

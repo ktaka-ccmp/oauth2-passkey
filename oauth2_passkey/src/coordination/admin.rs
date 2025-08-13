@@ -1,9 +1,9 @@
 use crate::oauth2::{AccountSearchField, OAuth2Store};
-use crate::passkey::{CredentialSearchField, PasskeyStore};
+use crate::passkey::{CredentialId, CredentialSearchField, PasskeyStore};
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
-use crate::session::{User as SessionUser, get_user_from_session};
+use crate::session::{SessionId, User as SessionUser, UserId, get_user_from_session};
 
 /// Retrieves a list of all users in the system.
 ///
@@ -24,18 +24,18 @@ use crate::session::{User as SessionUser, get_user_from_session};
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::get_all_users;
+/// use oauth2_passkey::{get_all_users, SessionId};
 ///
 /// async fn list_all_users(session_id: &str) -> Vec<String> {
-///     match get_all_users(session_id).await {
+///     match get_all_users(SessionId::new(session_id.to_string())).await {
 ///         Ok(users) => users.iter().map(|user| user.account.clone()).collect(),
 ///         Err(_) => Vec::new()
 ///     }
 /// }
 /// ```
-pub async fn get_all_users(session_id: &str) -> Result<Vec<User>, CoordinationError> {
+pub async fn get_all_users(session_id: SessionId) -> Result<Vec<User>, CoordinationError> {
     // Validate admin session with fresh database lookup
-    let _admin_user = validate_admin_session(session_id).await?;
+    let _admin_user = validate_admin_session(session_id.as_str()).await?;
 
     UserStore::get_all_users()
         .await
@@ -63,20 +63,23 @@ pub async fn get_all_users(session_id: &str) -> Result<Vec<User>, CoordinationEr
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::get_user;
+/// use oauth2_passkey::{get_user, SessionId, UserId};
 ///
 /// async fn fetch_user_profile(session_id: &str, id: &str) -> Option<String> {
-///     match get_user(session_id, id).await {
+///     match get_user(SessionId::new(session_id.to_string()), UserId::new(id.to_string())).await {
 ///         Ok(Some(user)) => Some(user.account),
 ///         _ => None
 ///     }
 /// }
 /// ```
-pub async fn get_user(session_id: &str, user_id: &str) -> Result<Option<User>, CoordinationError> {
+pub async fn get_user(
+    session_id: SessionId,
+    user_id: UserId,
+) -> Result<Option<User>, CoordinationError> {
     // Validate admin session with fresh database lookup
-    let _admin_user = validate_admin_session(session_id).await?;
+    let _admin_user = validate_admin_session(session_id.as_str()).await?;
 
-    UserStore::get_user(user_id)
+    UserStore::get_user(user_id.as_str())
         .await
         .map_err(|e| CoordinationError::Database(e.to_string()))
 }
@@ -102,27 +105,27 @@ pub async fn get_user(session_id: &str, user_id: &str) -> Result<Option<User>, C
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::delete_passkey_credential_admin;
+/// use oauth2_passkey::{delete_passkey_credential_admin, SessionId, CredentialId};
 ///
 /// async fn remove_credential(session_id: &str, credential_id: &str) -> bool {
-///     delete_passkey_credential_admin(session_id, credential_id).await.is_ok()
+///     delete_passkey_credential_admin(SessionId::new(session_id.to_string()), CredentialId::new(credential_id.to_string())).await.is_ok()
 /// }
 /// ```
 pub async fn delete_passkey_credential_admin(
-    session_id: &str,
-    credential_id: &str,
+    session_id: SessionId,
+    credential_id: CredentialId,
 ) -> Result<(), CoordinationError> {
     // Validate admin session with fresh database lookup
-    let admin_user = validate_admin_session(session_id).await?;
+    let admin_user = validate_admin_session(session_id.as_str()).await?;
 
     tracing::debug!(
         "Admin user: {} is deleting credential with ID: {}",
         admin_user.id,
-        credential_id
+        credential_id.as_str()
     );
 
     let credential = PasskeyStore::get_credentials_by(CredentialSearchField::CredentialId(
-        credential_id.to_owned(),
+        credential_id.as_str().to_string(),
     ))
     .await?
     .into_iter()
@@ -130,7 +133,7 @@ pub async fn delete_passkey_credential_admin(
     .ok_or_else(|| {
         CoordinationError::ResourceNotFound {
             resource_type: "Passkey".to_string(),
-            resource_id: credential_id.to_string(),
+            resource_id: credential_id.as_str().to_string(),
         }
         .log()
     })?;
@@ -169,34 +172,34 @@ pub async fn delete_passkey_credential_admin(
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::delete_oauth2_account_admin;
+/// use oauth2_passkey::{delete_oauth2_account_admin, SessionId};
 ///
 /// async fn remove_oauth2_account(session_id: &str, provider_id: &str) -> bool {
-///     delete_oauth2_account_admin(session_id, provider_id).await.is_ok()
+///     delete_oauth2_account_admin(SessionId::new(session_id.to_string()), provider_id.to_string()).await.is_ok()
 /// }
 /// ```
 pub async fn delete_oauth2_account_admin(
-    session_id: &str,
-    provider_user_id: &str,
+    session_id: SessionId,
+    provider_user_id: String,
 ) -> Result<(), CoordinationError> {
     // Validate admin session with fresh database lookup
-    let admin_user = validate_admin_session(session_id).await?;
+    let admin_user = validate_admin_session(session_id.as_str()).await?;
 
     tracing::debug!(
         "Admin user: {} is deleting OAuth2 account with ID: {}",
         admin_user.id,
-        provider_user_id
+        &provider_user_id
     );
 
     // Delete the OAuth2 account
     OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::ProviderUserId(
-        provider_user_id.to_string(),
+        provider_user_id.clone(),
     ))
     .await?;
 
     tracing::info!(
         "Successfully deleted OAuth2 account {} for user {}",
-        provider_user_id,
+        &provider_user_id,
         admin_user.id
     );
     Ok(())
@@ -223,37 +226,43 @@ pub async fn delete_oauth2_account_admin(
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::delete_user_account_admin;
+/// use oauth2_passkey::{delete_user_account_admin, SessionId, UserId};
 ///
 /// async fn purge_account(session_id: &str, user_id: &str) -> Result<(), String> {
-///     delete_user_account_admin(session_id, user_id).await.map_err(|e| e.to_string())
+///     delete_user_account_admin(SessionId::new(session_id.to_string()), UserId::new(user_id.to_string())).await.map_err(|e| e.to_string())
 /// }
 /// ```
 pub async fn delete_user_account_admin(
-    session_id: &str,
-    user_id: &str,
+    session_id: SessionId,
+    user_id: UserId,
 ) -> Result<(), CoordinationError> {
     // Validate admin session with fresh database lookup
-    let _admin_user = validate_admin_session(session_id).await?;
+    let _admin_user = validate_admin_session(session_id.as_str()).await?;
     // Check if the user exists
-    let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
-        CoordinationError::ResourceNotFound {
-            resource_type: "User".to_string(),
-            resource_id: user_id.to_string(),
-        }
-        .log()
-    })?;
+    let user = UserStore::get_user(user_id.as_str())
+        .await?
+        .ok_or_else(|| {
+            CoordinationError::ResourceNotFound {
+                resource_type: "User".to_string(),
+                resource_id: user_id.as_str().to_string(),
+            }
+            .log()
+        })?;
 
     tracing::debug!("Deleting user account: {:#?}", user);
 
     // Delete all OAuth2 accounts for this user
-    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.to_string())).await?;
+    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(
+        user_id.as_str().to_string(),
+    ))
+    .await?;
 
     // Delete all Passkey credentials for this user
-    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.to_string())).await?;
+    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.as_str().to_string()))
+        .await?;
 
     // Finally, delete the user account
-    UserStore::delete_user(user_id).await?;
+    UserStore::delete_user(user_id.as_str()).await?;
 
     Ok(())
 }
@@ -281,28 +290,30 @@ pub async fn delete_user_account_admin(
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::update_user_admin_status;
+/// use oauth2_passkey::{update_user_admin_status, SessionId, UserId};
 ///
 /// async fn make_user_admin(session_id: &str, user_id: &str) -> bool {
-///     update_user_admin_status(session_id, user_id, true).await.is_ok()
+///     update_user_admin_status(SessionId::new(session_id.to_string()), UserId::new(user_id.to_string()), true).await.is_ok()
 /// }
 /// ```
 pub async fn update_user_admin_status(
-    session_id: &str,
-    user_id: &str,
+    session_id: SessionId,
+    user_id: UserId,
     is_admin: bool,
 ) -> Result<User, CoordinationError> {
     // Validate admin session with fresh database lookup
-    let _admin_user = validate_admin_session(session_id).await?;
+    let _admin_user = validate_admin_session(session_id.as_str()).await?;
 
     // Get the current user
-    let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
-        CoordinationError::ResourceNotFound {
-            resource_type: "User".to_string(),
-            resource_id: user_id.to_string(),
-        }
-        .log()
-    })?;
+    let user = UserStore::get_user(user_id.as_str())
+        .await?
+        .ok_or_else(|| {
+            CoordinationError::ResourceNotFound {
+                resource_type: "User".to_string(),
+                resource_id: user_id.as_str().to_string(),
+            }
+            .log()
+        })?;
 
     // Prevent changing admin status of the first user (sequence_number = 1)
     if user.sequence_number == Some(1) {
@@ -440,7 +451,7 @@ mod tests {
             .expect("Failed to create test user 2");
 
         // Get all users using admin session
-        let users = get_all_users(&admin_session_id)
+        let users = get_all_users(SessionId::new(admin_session_id.clone()))
             .await
             .expect("Failed to get all users");
 
@@ -498,9 +509,12 @@ mod tests {
             .expect("Failed to create test user");
 
         // Get the user using admin session
-        let user_option = get_user(&admin_session_id, &target_user_id)
-            .await
-            .expect("Failed to get user");
+        let user_option = get_user(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(target_user_id.clone()),
+        )
+        .await
+        .expect("Failed to get user");
 
         // Verify that the user is returned
         assert!(user_option.is_some(), "User should be found");
@@ -521,9 +535,12 @@ mod tests {
 
         // Try to get a non-existent user
         let non_existent_user_id = format!("non-existent-user-{timestamp}");
-        let non_existent_user_option = get_user(&admin_session_id, &non_existent_user_id)
-            .await
-            .expect("Failed to get non-existent user");
+        let non_existent_user_option = get_user(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(non_existent_user_id.clone()),
+        )
+        .await
+        .expect("Failed to get non-existent user");
 
         // Verify that no user is returned
         assert!(
@@ -571,24 +588,38 @@ mod tests {
             .expect("Failed to create test user");
 
         // Verify the user exists before deletion
-        let user_before = get_user(&admin_session_id, &user_to_delete_id)
-            .await
-            .expect("Failed to get user");
+        let user_before = get_user(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(user_to_delete_id.clone()),
+        )
+        .await
+        .expect("Failed to get user");
         assert!(user_before.is_some(), "User should exist before deletion");
 
         // Delete the user using admin session
-        let result = delete_user_account_admin(&admin_session_id, &user_to_delete_id).await;
+        let result = delete_user_account_admin(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(user_to_delete_id.clone()),
+        )
+        .await;
         assert!(result.is_ok(), "Expected successful user deletion");
 
         // Verify the user no longer exists
-        let user_after = get_user(&admin_session_id, &user_to_delete_id)
-            .await
-            .expect("Failed to get user after deletion");
+        let user_after = get_user(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(user_to_delete_id.clone()),
+        )
+        .await
+        .expect("Failed to get user after deletion");
         assert!(user_after.is_none(), "User should not exist after deletion");
 
         // Try to delete a non-existent user
         let non_existent_user_id = format!("non-existent-user-{timestamp}");
-        let result = delete_user_account_admin(&admin_session_id, &non_existent_user_id).await;
+        let result = delete_user_account_admin(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(non_existent_user_id.clone()),
+        )
+        .await;
 
         // This should return a ResourceNotFound error
         assert!(
@@ -647,19 +678,26 @@ mod tests {
             .expect("Failed to create target user");
 
         // Verify the target user is not an admin initially
-        let user_before = get_user(&admin_session_id, &target_user_id)
-            .await
-            .expect("Failed to get target user")
-            .expect("Target user should exist");
+        let user_before = get_user(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(target_user_id.clone()),
+        )
+        .await
+        .expect("Failed to get target user")
+        .expect("Target user should exist");
         assert!(
             !user_before.has_admin_privileges(),
             "Target user should not have admin privileges initially"
         );
 
         // Update the user's admin status to true
-        let updated_user = update_user_admin_status(&admin_session_id, &target_user_id, true)
-            .await
-            .expect("Failed to update user admin status");
+        let updated_user = update_user_admin_status(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(target_user_id.clone()),
+            true,
+        )
+        .await
+        .expect("Failed to update user admin status");
 
         // Verify the user is now an admin
         assert!(
@@ -668,19 +706,26 @@ mod tests {
         );
 
         // Verify the change was persisted in the database
-        let user_after = get_user(&admin_session_id, &target_user_id)
-            .await
-            .expect("Failed to get target user after update")
-            .expect("Target user should still exist");
+        let user_after = get_user(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(target_user_id.clone()),
+        )
+        .await
+        .expect("Failed to get target user after update")
+        .expect("Target user should still exist");
         assert!(
             user_after.has_admin_privileges(),
             "Target user should have admin privileges in the database"
         );
 
         // Update the user's admin status back to false
-        let updated_user = update_user_admin_status(&admin_session_id, &target_user_id, false)
-            .await
-            .expect("Failed to update user admin status back");
+        let updated_user = update_user_admin_status(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(target_user_id.clone()),
+            false,
+        )
+        .await
+        .expect("Failed to update user admin status back");
 
         // Verify the user is no longer an admin
         assert!(
@@ -737,7 +782,12 @@ mod tests {
             .expect("Failed to create target user");
 
         // Attempt to update the user's admin status as a non-admin
-        let result = update_user_admin_status(&non_admin_session_id, &target_user_id, true).await;
+        let result = update_user_admin_status(
+            SessionId::new(non_admin_session_id.clone()),
+            UserId::new(target_user_id.clone()),
+            true,
+        )
+        .await;
 
         // Verify the operation fails with Unauthorized error
         assert!(
@@ -760,10 +810,13 @@ mod tests {
         .expect("Failed to create temp admin session");
 
         // Verify the target user's admin status was not changed
-        let user_after = get_user(&admin_session_id, &target_user_id)
-            .await
-            .expect("Failed to get target user after failed update")
-            .expect("Target user should still exist");
+        let user_after = get_user(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(target_user_id.clone()),
+        )
+        .await
+        .expect("Failed to get target user after failed update")
+        .expect("Target user should still exist");
         assert!(
             !user_after.has_admin_privileges(),
             "Target user's admin privileges should not have changed"
@@ -808,7 +861,12 @@ mod tests {
             .expect("Failed to get first user");
 
         // Attempt to change the admin status of the first user (should fail)
-        let result = update_user_admin_status(&admin_session_id, &first_user.id, false).await;
+        let result = update_user_admin_status(
+            SessionId::new(admin_session_id.clone()),
+            UserId::new(first_user.id.clone()),
+            false,
+        )
+        .await;
 
         // Verify the operation fails with Coordination error
         assert!(
@@ -861,7 +919,11 @@ mod tests {
         .expect("Failed to create non-admin session");
 
         // Attempt to delete a passkey credential (authorization should fail before credential lookup)
-        let result = delete_passkey_credential_admin(&non_admin_session_id, "credential1").await;
+        let result = delete_passkey_credential_admin(
+            SessionId::new(non_admin_session_id.clone()),
+            CredentialId::new("credential1".to_string()),
+        )
+        .await;
 
         // Verify that the operation is rejected due to lack of admin privileges
         assert!(result.is_err());
@@ -909,7 +971,11 @@ mod tests {
         .expect("Failed to create non-admin session");
 
         // Attempt to delete an OAuth2 account (authorization should fail before account lookup)
-        let result = delete_oauth2_account_admin(&non_admin_session_id, "provider_user_id").await;
+        let result = delete_oauth2_account_admin(
+            SessionId::new(non_admin_session_id.clone()),
+            "provider_user_id".to_string(),
+        )
+        .await;
 
         // Verify that the operation is rejected due to lack of admin privileges
         assert!(result.is_err());

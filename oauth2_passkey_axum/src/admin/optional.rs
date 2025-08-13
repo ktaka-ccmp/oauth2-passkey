@@ -14,8 +14,8 @@ use std::{
 };
 
 use oauth2_passkey::{
-    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, get_authenticator_info_batch, get_user,
-    list_accounts_core, list_credentials_core,
+    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, get_authenticator_info_batch,
+    get_user, list_accounts_core, list_credentials_core,
 };
 
 use crate::{O2P_ADMIN_URL, session::AuthUser};
@@ -114,7 +114,12 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    let user = match get_user(&auth_user.session_id, &user_id).await {
+    let user = match get_user(
+        SessionId::new(auth_user.session_id.clone()),
+        UserId::new(user_id.0.clone()),
+    )
+    .await
+    {
         Ok(user) => user,
         Err(e) => {
             tracing::error!("Failed to fetch user: {:?}", e);

@@ -15,7 +15,7 @@
 #[cfg(test)]
 mod tests {
     use crate::coordination::{CoordinationError, get_all_users, update_user_admin_status};
-    use crate::session::{insert_test_session, insert_test_user};
+    use crate::session::{SessionId, UserId, insert_test_session, insert_test_user};
     use crate::storage::{CacheData, GENERIC_CACHE_STORE};
     use crate::test_utils::init_test_environment;
     use crate::userdb::{User as DbUser, UserStore};
@@ -135,8 +135,12 @@ mod tests {
             );
 
             // Test admin status update with injection in user ID
-            let update_result =
-                update_user_admin_status(&admin_session_id, malicious_id, true).await;
+            let update_result = update_user_admin_status(
+                SessionId::new(admin_session_id.clone()),
+                UserId::new(malicious_id.to_string()),
+                true,
+            )
+            .await;
             // This should fail gracefully (user not found) rather than causing injection
             if let Err(e) = update_result {
                 // Verify it's a normal application error, not a database error
@@ -218,7 +222,7 @@ mod tests {
         }
 
         // Test get_all_users operation to ensure it still works after injection attempts
-        let all_users_result = get_all_users(&admin_session_id).await;
+        let all_users_result = get_all_users(SessionId::new(admin_session_id.clone())).await;
         assert!(
             all_users_result.is_ok(),
             "get_all_users should work after SQL injection attempts"
@@ -418,8 +422,12 @@ mod tests {
             // Now use the stored malicious ID in admin operations
             // This tests whether the system is vulnerable when the malicious data
             // comes from the database rather than direct user input
-            if let Ok(updated_user) =
-                update_user_admin_status(&admin_session_id, malicious_user_id, true).await
+            if let Ok(updated_user) = update_user_admin_status(
+                SessionId::new(admin_session_id.clone()),
+                UserId::new(malicious_user_id.to_string()),
+                true,
+            )
+            .await
             {
                 // Verify the operation worked correctly without SQL injection
                 assert_eq!(
@@ -458,7 +466,7 @@ mod tests {
         let create_result = UserStore::upsert_user(user_with_malicious_account).await;
         if create_result.is_ok() {
             // Now fetch all users - this should not execute the malicious account data
-            if let Ok(all_users) = get_all_users(&admin_session_id).await {
+            if let Ok(all_users) = get_all_users(SessionId::new(admin_session_id.clone())).await {
                 // Find our test user
                 if let Some(found_user) = all_users.iter().find(|u| u.id == cache_to_db_user_id) {
                     // Verify malicious data is stored as-is, not executed
@@ -532,7 +540,7 @@ mod tests {
         }
 
         // Final verification that the system still works normally
-        let final_check = get_all_users(&admin_session_id).await;
+        let final_check = get_all_users(SessionId::new(admin_session_id.clone())).await;
         assert!(
             final_check.is_ok(),
             "System should still function normally after second-order injection tests"

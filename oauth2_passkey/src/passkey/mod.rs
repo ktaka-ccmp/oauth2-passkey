@@ -31,7 +31,7 @@ pub use main::{
     get_related_origin_json,
 };
 
-pub use types::PasskeyCredential;
+pub use types::{CredentialId, PasskeyCredential};
 
 pub(crate) use main::{
     commit_registration, finish_authentication, prepare_registration_storage, start_authentication,

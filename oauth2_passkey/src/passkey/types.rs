@@ -114,3 +114,31 @@ impl TryFrom<CacheData> for StoredOptions {
         serde_json::from_str(&data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
     }
 }
+
+/// Type-safe wrapper for credential identifiers.
+///
+/// This provides compile-time safety to prevent mixing up credential IDs with other string types.
+/// It's used in passkey coordination functions to ensure type safety when passing credential identifiers.
+#[derive(Debug, Clone)]
+pub struct CredentialId(String);
+
+impl CredentialId {
+    /// Creates a new CredentialId from a string.
+    ///
+    /// # Arguments
+    /// * `id` - The credential ID string
+    ///
+    /// # Returns
+    /// * A new CredentialId instance
+    pub fn new(id: String) -> Self {
+        Self(id)
+    }
+
+    /// Returns the credential ID as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the credential ID
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}

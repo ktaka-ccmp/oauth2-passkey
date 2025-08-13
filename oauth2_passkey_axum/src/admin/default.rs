@@ -8,8 +8,8 @@ use axum::{
 };
 
 use oauth2_passkey::{
-    DbUser, O2P_ROUTE_PREFIX, delete_oauth2_account_core, delete_passkey_credential_core,
-    delete_user_account_admin, update_user_admin_status,
+    DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, delete_oauth2_account_core,
+    delete_passkey_credential_core, delete_user_account_admin, update_user_admin_status,
 };
 
 use super::super::error::IntoResponseError;
@@ -47,7 +47,7 @@ async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, St
     };
 
     // Fetch users from storage using session ID
-    let users = oauth2_passkey::get_all_users(&auth_user.session_id)
+    let users = oauth2_passkey::get_all_users(SessionId::new(auth_user.session_id.clone()))
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -85,9 +85,12 @@ pub(super) async fn delete_user_account_handler(
 
     // Call the core function to delete the user account and all associated data
     // Using the imported function from libauth
-    delete_user_account_admin(&auth_user.session_id, &payload.user_id)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    delete_user_account_admin(
+        SessionId::new(auth_user.session_id.clone()),
+        UserId::new(payload.user_id.clone()),
+    )
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::debug!(
         "User account deleted: {} by {}",
@@ -156,9 +159,13 @@ pub(super) async fn update_admin_status_handler(
     }
 
     // Call the core function to update the user's admin status
-    update_user_admin_status(&auth_user.session_id, &payload.user_id, payload.is_admin)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    update_user_admin_status(
+        SessionId::new(auth_user.session_id.clone()),
+        UserId::new(payload.user_id.clone()),
+        payload.is_admin,
+    )
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::debug!(
         "User admin status updated: {} is_admin={} by {}",

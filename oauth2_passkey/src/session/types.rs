@@ -289,13 +289,57 @@ impl CsrfToken {
     }
 }
 
+/// Type-safe wrapper for user identifiers.
+///
+/// This provides compile-time safety to prevent mixing up user IDs with other string types.
+/// It's used in coordination layer functions to ensure type safety when passing user identifiers.
 #[derive(Debug, Clone)]
 pub struct UserId(String);
 
 impl UserId {
+    /// Creates a new UserId from a string.
+    ///
+    /// # Arguments
+    /// * `id` - The user ID string
+    ///
+    /// # Returns
+    /// * A new UserId instance
     pub fn new(id: String) -> Self {
         Self(id)
     }
+
+    /// Returns the user ID as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the user ID
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for session identifiers.
+///
+/// This provides compile-time safety to prevent mixing up session IDs with other string types.
+/// It's used in coordination layer functions to ensure type safety when passing session identifiers.
+#[derive(Debug, Clone)]
+pub struct SessionId(String);
+
+impl SessionId {
+    /// Creates a new SessionId from a string.
+    ///
+    /// # Arguments
+    /// * `id` - The session ID string
+    ///
+    /// # Returns
+    /// * A new SessionId instance
+    pub fn new(id: String) -> Self {
+        Self(id)
+    }
+
+    /// Returns the session ID as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the session ID
     pub fn as_str(&self) -> &str {
         &self.0
     }
