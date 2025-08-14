@@ -1,4 +1,4 @@
-use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+use crate::storage::{CacheData, GENERIC_CACHE_STORE, create_cache_keys};
 
 use crate::passkey::PasskeyError;
 use crate::passkey::PasskeyStore;
@@ -26,6 +26,14 @@ pub(super) async fn name2cid_str_vec(
     get_credential_id_strs_by(CredentialSearchField::UserName(name.to_string())).await
 }
 
+/// Helper function to create cache prefix and key with PasskeyError conversion
+fn create_passkey_cache_keys(
+    category: &str,
+    key: &str,
+) -> Result<(crate::storage::CachePrefix, crate::storage::CacheKey), PasskeyError> {
+    create_cache_keys(category, key).map_err(|e| PasskeyError::Storage(e.to_string()))
+}
+
 /// Helper function to store data in the cache
 pub(super) async fn store_in_cache<T>(
     category: &str,
@@ -36,23 +44,28 @@ pub(super) async fn store_in_cache<T>(
 where
     T: Into<CacheData>,
 {
+    let (cache_prefix, cache_key) = create_passkey_cache_keys(category, key)?;
+
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .put_with_ttl(category, key, data.into(), ttl)
+        .put_with_ttl(cache_prefix, cache_key, data.into(), ttl)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))
 }
 
 /// Helper function to retrieve data from the cache
-pub(super) async fn get_from_cache<T>(category: &str, key: &str) -> Result<Option<T>, PasskeyError>
+pub(super) async fn get_from_cache<T>(
+    cache_prefix: crate::storage::CachePrefix,
+    cache_key: crate::storage::CacheKey,
+) -> Result<Option<T>, PasskeyError>
 where
     T: TryFrom<CacheData, Error = PasskeyError>,
 {
     let data = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get(category, key)
+        .get(cache_prefix, cache_key)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
@@ -63,11 +76,14 @@ where
 }
 
 /// Helper function to remove data from the cache
-pub(super) async fn remove_from_cache(category: &str, key: &str) -> Result<(), PasskeyError> {
+pub(super) async fn remove_from_cache(
+    cache_prefix: crate::storage::CachePrefix,
+    cache_key: crate::storage::CacheKey,
+) -> Result<(), PasskeyError> {
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .remove(category, key)
+        .remove(cache_prefix, cache_key)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))
 }
@@ -183,7 +199,9 @@ mod tests {
         assert!(store_result.is_ok());
 
         // Test retrieving data
-        let retrieved: Result<Option<StoredOptions>, _> = get_from_cache(category, key).await;
+        let (cache_prefix, cache_key) = crate::storage::create_cache_keys(category, key).unwrap();
+        let retrieved: Result<Option<StoredOptions>, _> =
+            get_from_cache(cache_prefix.clone(), cache_key.clone()).await;
         assert!(retrieved.is_ok());
 
         let retrieved_options = retrieved.unwrap();
@@ -195,11 +213,13 @@ mod tests {
         assert_eq!(retrieved_data.timestamp, options.timestamp);
 
         // Test removing data
-        let remove_result = remove_from_cache(category, key).await;
+        let remove_result = remove_from_cache(cache_prefix, cache_key).await;
         assert!(remove_result.is_ok());
 
         // Verify data is gone
-        let after_remove: Result<Option<StoredOptions>, _> = get_from_cache(category, key).await;
+        let (cache_prefix2, cache_key2) = crate::storage::create_cache_keys(category, key).unwrap();
+        let after_remove: Result<Option<StoredOptions>, _> =
+            get_from_cache(cache_prefix2, cache_key2).await;
         assert!(after_remove.is_ok());
         assert!(after_remove.unwrap().is_none());
     }
@@ -244,8 +264,14 @@ mod tests {
         let _ = store_in_cache(category, key2, data2.clone(), 200).await;
 
         // Verify each key returns its own data
-        let retrieved1: Option<StoredOptions> = get_from_cache(category, key1).await.unwrap();
-        let retrieved2: Option<StoredOptions> = get_from_cache(category, key2).await.unwrap();
+        let (cache_prefix1, cache_key1) =
+            crate::storage::create_cache_keys(category, key1).unwrap();
+        let (cache_prefix2, cache_key2) =
+            crate::storage::create_cache_keys(category, key2).unwrap();
+        let retrieved1: Option<StoredOptions> =
+            get_from_cache(cache_prefix1, cache_key1).await.unwrap();
+        let retrieved2: Option<StoredOptions> =
+            get_from_cache(cache_prefix2, cache_key2).await.unwrap();
 
         assert!(retrieved1.is_some());
         assert!(retrieved2.is_some());
@@ -288,7 +314,9 @@ mod tests {
         assert!(store_result.is_ok());
 
         // Test retrieving data
-        let retrieved: Result<Option<StoredOptions>, _> = get_from_cache(category, key).await;
+        let (cache_prefix, cache_key) = crate::storage::create_cache_keys(category, key).unwrap();
+        let retrieved: Result<Option<StoredOptions>, _> =
+            get_from_cache(cache_prefix.clone(), cache_key.clone()).await;
         assert!(retrieved.is_ok());
 
         let retrieved_options = retrieved.unwrap();
@@ -300,11 +328,13 @@ mod tests {
         assert_eq!(retrieved_data.timestamp, options.timestamp);
 
         // Test removing data
-        let remove_result = remove_from_cache(category, key).await;
+        let remove_result = remove_from_cache(cache_prefix, cache_key).await;
         assert!(remove_result.is_ok());
 
         // Verify data is gone
-        let after_remove: Result<Option<StoredOptions>, _> = get_from_cache(category, key).await;
+        let (cache_prefix2, cache_key2) = crate::storage::create_cache_keys(category, key).unwrap();
+        let after_remove: Result<Option<StoredOptions>, _> =
+            get_from_cache(cache_prefix2, cache_key2).await;
         assert!(after_remove.is_ok());
         assert!(after_remove.unwrap().is_none());
     }

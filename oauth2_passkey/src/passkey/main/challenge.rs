@@ -15,7 +15,10 @@ pub(super) async fn get_and_validate_options(
     challenge_type: &str,
     id: &str,
 ) -> Result<StoredOptions, PasskeyError> {
-    let stored_options: StoredOptions = get_from_cache(challenge_type, id)
+    let (cache_prefix, cache_key) = crate::storage::create_cache_keys(challenge_type, id)
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    let stored_options: StoredOptions = get_from_cache(cache_prefix, cache_key)
         .await?
         .ok_or(PasskeyError::NotFound("Challenge not found".to_string()))?;
 
@@ -46,9 +49,12 @@ pub(super) async fn get_and_validate_options(
 ///
 /// This function is called after a successful registration or authentication
 /// to clean up the challenge data from the cache.
-pub(super) async fn remove_options(challenge_type: &str, id: &str) -> Result<(), PasskeyError> {
-    remove_from_cache(challenge_type, id).await?;
-    tracing::debug!("Removed {} options for ID: {}", challenge_type, id);
+pub(super) async fn remove_options(
+    cache_prefix: crate::storage::CachePrefix,
+    cache_key: crate::storage::CacheKey,
+) -> Result<(), PasskeyError> {
+    remove_from_cache(cache_prefix, cache_key).await?;
+    tracing::debug!("Removed challenge options for cache operation");
 
     Ok(())
 }
@@ -56,7 +62,7 @@ pub(super) async fn remove_options(challenge_type: &str, id: &str) -> Result<(),
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+    use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
     use crate::test_utils::init_test_environment;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -202,21 +208,31 @@ mod tests {
         .expect("Failed to store options");
 
         // Verify it exists
-        let before_removal =
-            super::super::utils::get_from_cache::<StoredOptions>(challenge_type, id)
-                .await
-                .expect("Failed to get from cache");
+        let (cache_prefix_verify, cache_key_verify) =
+            crate::storage::create_cache_keys(challenge_type, id).unwrap();
+        let before_removal = super::super::utils::get_from_cache::<StoredOptions>(
+            cache_prefix_verify,
+            cache_key_verify,
+        )
+        .await
+        .expect("Failed to get from cache");
         assert!(before_removal.is_some());
 
         // Remove it
-        let result = remove_options(challenge_type, id).await;
+        let (cache_prefix_remove, cache_key_remove) =
+            crate::storage::create_cache_keys(challenge_type, id).unwrap();
+        let result = remove_options(cache_prefix_remove, cache_key_remove).await;
         assert!(result.is_ok());
 
         // Verify it's gone
-        let after_removal =
-            super::super::utils::get_from_cache::<StoredOptions>(challenge_type, id)
-                .await
-                .expect("Failed to get from cache");
+        let (cache_prefix_after, cache_key_after) =
+            crate::storage::create_cache_keys(challenge_type, id).unwrap();
+        let after_removal = super::super::utils::get_from_cache::<StoredOptions>(
+            cache_prefix_after,
+            cache_key_after,
+        )
+        .await
+        .expect("Failed to get from cache");
         assert!(after_removal.is_none());
     }
 
@@ -229,7 +245,9 @@ mod tests {
     async fn test_remove_options_nonexistent() {
         init_test_environment().await;
         // Removing a non-existent entry should not fail
-        let result = remove_options("authentication", "nonexistent").await;
+        let (cache_prefix, cache_key) =
+            crate::storage::create_cache_keys("authentication", "nonexistent").unwrap();
+        let result = remove_options(cache_prefix, cache_key).await;
         assert!(result.is_ok());
     }
 
@@ -302,18 +320,22 @@ mod tests {
         };
 
         // Store in cache
+        let cache_prefix = CachePrefix::new(test_category.to_string()).unwrap();
+        let cache_key = CacheKey::new(test_key.to_string()).unwrap();
         let result = GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl(test_category, test_key, cache_data, 300)
+            .put_with_ttl(cache_prefix, cache_key, cache_data, 300)
             .await;
         assert!(result.is_ok(), "Failed to put test data in cache");
 
         // Retrieve from cache
+        let cache_prefix = CachePrefix::new(test_category.to_string()).unwrap();
+        let cache_key = CacheKey::new(test_key.to_string()).unwrap();
         let get_result = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get(test_category, test_key)
+            .get(cache_prefix, cache_key)
             .await;
         assert!(get_result.is_ok(), "Failed to get test data from cache");
 
@@ -325,17 +347,22 @@ mod tests {
         assert_eq!(retrieved_data.unwrap().value, test_value);
 
         // Remove from cache
-        let remove_result = passkey_test_utils::remove_from_cache(test_category, test_key).await;
+        let (cache_prefix_remove, cache_key_remove) =
+            crate::storage::create_cache_keys(test_category, test_key).unwrap();
+        let remove_result =
+            passkey_test_utils::remove_from_cache(cache_prefix_remove, cache_key_remove).await;
         assert!(
             remove_result.is_ok(),
             "Failed to remove test data from cache"
         );
 
         // Verify it's removed
+        let cache_prefix = CachePrefix::new(test_category.to_string()).unwrap();
+        let cache_key = CacheKey::new(test_key.to_string()).unwrap();
         let final_result = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get(test_category, test_key)
+            .get(cache_prefix, cache_key)
             .await
             .unwrap();
         assert!(
@@ -378,7 +405,10 @@ mod tests {
         assert!(create_result.is_ok(), "Failed to create test challenge");
 
         // 2. Verify the challenge exists in cache
-        let exists = passkey_test_utils::check_cache_exists(challenge_type, id).await;
+        let (cache_prefix_exists, cache_key_exists) =
+            crate::storage::create_cache_keys(challenge_type, id).unwrap();
+        let exists =
+            passkey_test_utils::check_cache_exists(cache_prefix_exists, cache_key_exists).await;
         assert!(exists, "Challenge should exist in cache");
 
         // 3. Validate the challenge
@@ -393,11 +423,16 @@ mod tests {
         assert_eq!(stored_options.user.display_name, display_name);
 
         // 5. Remove the challenge
-        let remove_result = super::remove_options(challenge_type, id).await;
+        let (cache_prefix_remove, cache_key_remove) =
+            crate::storage::create_cache_keys(challenge_type, id).unwrap();
+        let remove_result = super::remove_options(cache_prefix_remove, cache_key_remove).await;
         assert!(remove_result.is_ok(), "Failed to remove challenge");
 
         // 6. Verify it's gone
-        let exists_after = passkey_test_utils::check_cache_exists(challenge_type, id).await;
+        let (cache_prefix_check, cache_key_check) =
+            crate::storage::create_cache_keys(challenge_type, id).unwrap();
+        let exists_after =
+            passkey_test_utils::check_cache_exists(cache_prefix_check, cache_key_check).await;
         assert!(!exists_after, "Challenge should be removed from cache");
 
         // 7. Try to validate again - should fail with NotFound

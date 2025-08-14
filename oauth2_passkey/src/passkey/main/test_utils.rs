@@ -7,7 +7,7 @@
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::{PublicKeyCredentialUserEntity, StoredOptions};
 use crate::passkey::{PasskeyCredential, PasskeyStore};
-use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
 use crate::userdb::{User, UserStore};
 use chrono::Utc;
 use std::time::SystemTime;
@@ -124,11 +124,14 @@ pub async fn delete_test_credential(credential_id: &str) -> Result<(), PasskeyEr
 }
 
 /// Remove a key from the cache store
-pub async fn remove_from_cache(category: &str, key: &str) -> Result<(), PasskeyError> {
+pub async fn remove_from_cache(
+    cache_prefix: CachePrefix,
+    cache_key: CacheKey,
+) -> Result<(), PasskeyError> {
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .remove(category, key)
+        .remove(cache_prefix, cache_key)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))
 }
@@ -170,18 +173,27 @@ pub async fn create_test_challenge(
         expires_at: chrono::Utc::now() + chrono::Duration::seconds(ttl as i64),
     };
 
+    let cache_prefix = CachePrefix::new(challenge_type.to_string())
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    let cache_key =
+        CacheKey::new(id.to_string()).map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .put_with_ttl(challenge_type, id, cache_data, ttl as usize)
+        .put_with_ttl(cache_prefix, cache_key, cache_data, ttl as usize)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))
 }
 
 /// Check cache store for a specific key
-pub async fn check_cache_exists(category: &str, key: &str) -> bool {
+pub async fn check_cache_exists(cache_prefix: CachePrefix, cache_key: CacheKey) -> bool {
     matches!(
-        GENERIC_CACHE_STORE.lock().await.get(category, key).await,
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get(cache_prefix, cache_key)
+            .await,
         Ok(Some(_))
     )
 }

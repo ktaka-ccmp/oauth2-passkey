@@ -11,7 +11,7 @@ use sha2::Sha256;
 
 use crate::{
     session::{config::AUTH_SERVER_SECRET, errors::SessionError, types::StoredSession},
-    storage::GENERIC_CACHE_STORE,
+    storage::{CacheKey, CachePrefix, GENERIC_CACHE_STORE},
 };
 
 use super::session::get_session_id_from_headers;
@@ -91,7 +91,11 @@ pub async fn verify_page_session_token(
     let cached_session = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get("session", session_id)
+        .get(
+            CachePrefix::session(),
+            CacheKey::new(session_id.to_string())
+                .map_err(|e| SessionError::Storage(e.to_string()))?,
+        )
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?
         .ok_or(SessionError::SessionError)?;
@@ -241,10 +245,12 @@ mod tests {
         };
 
         // Store the session in the global cache store
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(cache_prefix, cache_key, cache_data, 3600)
             .await
             .unwrap();
 
@@ -294,10 +300,12 @@ mod tests {
         };
 
         // Store the session in the global cache store
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(cache_prefix, cache_key, cache_data, 3600)
             .await
             .unwrap();
 
@@ -352,10 +360,12 @@ mod tests {
         };
 
         // Store the session in the global cache store
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(cache_prefix, cache_key, cache_data, 3600)
             .await
             .unwrap();
 

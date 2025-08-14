@@ -134,14 +134,15 @@ impl TryFrom<CacheData> for JwksCache {
 }
 
 async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
-    // Try to get from cache first
-    let prefix = "jwks";
-    let cache_key = jwks_url;
+    // Create cache keys once for the entire function using unified helper
+    let (cache_prefix, cache_key) = crate::storage::create_cache_keys("jwks", jwks_url)
+        .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache key creation error: {e}")))?;
 
+    // Try to get from cache first
     if let Some(cached) = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get(prefix, cache_key)
+        .get(cache_prefix.clone(), cache_key.clone())
         .await
         .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?
     {
@@ -157,7 +158,7 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .remove(prefix, cache_key)
+            .remove(cache_prefix.clone(), cache_key.clone())
             .await
             .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?;
     }
@@ -177,9 +178,8 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
     GENERIC_CACHE_STORE
         .lock()
         .await
-        // .put(prefix, cache_key, jwks_cache.into())
         .put_with_ttl(
-            prefix,
+            cache_prefix,
             cache_key,
             jwks_cache.into(),
             CACHE_EXPIRATION.as_secs() as usize,

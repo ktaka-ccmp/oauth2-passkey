@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 
 use crate::storage::errors::StorageError;
-use crate::storage::types::CacheData;
+use crate::storage::types::{CacheData, CacheKey, CachePrefix};
 
 use super::types::{CacheStore, InMemoryCacheStore};
 
@@ -16,8 +16,8 @@ impl InMemoryCacheStore {
         }
     }
 
-    fn make_key(prefix: &str, key: &str) -> String {
-        format!("{CACHE_PREFIX}:{prefix}:{key}")
+    fn make_key(prefix: CachePrefix, key: CacheKey) -> String {
+        format!("{CACHE_PREFIX}:{}:{}", prefix.as_str(), key.as_str())
     }
 }
 
@@ -27,7 +27,12 @@ impl CacheStore for InMemoryCacheStore {
         Ok(()) // Nothing to initialize for in-memory store
     }
 
-    async fn put(&mut self, prefix: &str, key: &str, value: CacheData) -> Result<(), StorageError> {
+    async fn put(
+        &mut self,
+        prefix: CachePrefix,
+        key: CacheKey,
+        value: CacheData,
+    ) -> Result<(), StorageError> {
         let key = Self::make_key(prefix, key);
         self.entry.insert(key, value);
         Ok(())
@@ -35,8 +40,8 @@ impl CacheStore for InMemoryCacheStore {
 
     async fn put_with_ttl(
         &mut self,
-        prefix: &str,
-        key: &str,
+        prefix: CachePrefix,
+        key: CacheKey,
         value: CacheData,
         _ttl: usize,
     ) -> Result<(), StorageError> {
@@ -45,12 +50,16 @@ impl CacheStore for InMemoryCacheStore {
         Ok(())
     }
 
-    async fn get(&self, prefix: &str, key: &str) -> Result<Option<CacheData>, StorageError> {
+    async fn get(
+        &self,
+        prefix: CachePrefix,
+        key: CacheKey,
+    ) -> Result<Option<CacheData>, StorageError> {
         let key = Self::make_key(prefix, key);
         Ok(self.entry.get(&key).cloned())
     }
 
-    async fn remove(&mut self, prefix: &str, key: &str) -> Result<(), StorageError> {
+    async fn remove(&mut self, prefix: CachePrefix, key: CacheKey) -> Result<(), StorageError> {
         let key = Self::make_key(prefix, key);
         self.entry.remove(&key);
         Ok(())
@@ -58,8 +67,8 @@ impl CacheStore for InMemoryCacheStore {
 
     async fn put_if_not_exists(
         &mut self,
-        prefix: &str,
-        key: &str,
+        prefix: CachePrefix,
+        key: CacheKey,
         value: CacheData,
         _ttl: usize,
     ) -> Result<bool, StorageError> {
@@ -78,8 +87,8 @@ impl CacheStore for InMemoryCacheStore {
 
     async fn get_and_delete_if_expired(
         &mut self,
-        prefix: &str,
-        key: &str,
+        prefix: CachePrefix,
+        key: CacheKey,
     ) -> Result<Option<CacheData>, StorageError> {
         use chrono::Utc;
 
@@ -109,8 +118,8 @@ mod tests {
     #[test]
     fn test_make_key() {
         // Given a prefix and key
-        let prefix = "session";
-        let key = "user123";
+        let prefix = CachePrefix::session();
+        let key = CacheKey::new("user123".to_string()).unwrap();
 
         // When creating a key
         let result = InMemoryCacheStore::make_key(prefix, key);
@@ -137,8 +146,8 @@ mod tests {
     async fn test_put_and_get() {
         // Given an in-memory cache store
         let mut store = InMemoryCacheStore::new();
-        let prefix = "test";
-        let key = "key1";
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("key1".to_string()).unwrap();
         let value = CacheData {
             value: "test value".to_string(),
             expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
@@ -151,6 +160,8 @@ mod tests {
         assert!(put_result.is_ok());
 
         // And when getting the value
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("key1".to_string()).unwrap();
         let get_result = store.get(prefix, key).await;
 
         // Then it should return the stored value
@@ -167,8 +178,8 @@ mod tests {
     async fn test_put_with_ttl() {
         // Given an in-memory cache store
         let mut store = InMemoryCacheStore::new();
-        let prefix = "test";
-        let key = "key2";
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("key2".to_string()).unwrap();
         let value = CacheData {
             value: "test value with ttl".to_string(),
             expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
@@ -181,6 +192,8 @@ mod tests {
         assert!(put_result.is_ok());
 
         // And when getting the value
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("key2".to_string()).unwrap();
         let get_result = store.get(prefix, key).await;
 
         // Then it should return the stored value
@@ -196,8 +209,8 @@ mod tests {
     async fn test_remove() {
         // Given an in-memory cache store with a stored value
         let mut store = InMemoryCacheStore::new();
-        let prefix = "test";
-        let key = "key3";
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("key3".to_string()).unwrap();
         let value = CacheData {
             value: "value to remove".to_string(),
             expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
@@ -205,12 +218,16 @@ mod tests {
 
         // When storing and then removing a value
         let _ = store.put(prefix, key, value).await;
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("key3".to_string()).unwrap();
         let remove_result = store.remove(prefix, key).await;
 
         // Then the removal should succeed
         assert!(remove_result.is_ok());
 
         // And when getting the removed value
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("key3".to_string()).unwrap();
         let get_result = store.get(prefix, key).await;
 
         // Then it should return None
@@ -225,8 +242,8 @@ mod tests {
     async fn test_get_nonexistent_key() {
         // Given an in-memory cache store
         let store = InMemoryCacheStore::new();
-        let prefix = "test";
-        let key = "nonexistent";
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("nonexistent".to_string()).unwrap();
 
         // When getting a non-existent key
         let get_result = store.get(prefix, key).await;
@@ -245,7 +262,8 @@ mod tests {
         let mut store = InMemoryCacheStore::new();
 
         // When storing values with different prefixes but same key
-        let key = "same_key";
+        let key1 = CacheKey::new("same_key".to_string()).unwrap();
+        let key2 = CacheKey::new("same_key".to_string()).unwrap();
         let value1 = CacheData {
             value: "value for prefix1".to_string(),
             expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
@@ -255,12 +273,18 @@ mod tests {
             expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
-        let _ = store.put("prefix1", key, value1).await;
-        let _ = store.put("prefix2", key, value2).await;
+        let prefix1 = CachePrefix::new("prefix1".to_string()).unwrap();
+        let prefix2 = CachePrefix::new("prefix2".to_string()).unwrap();
+        let _ = store.put(prefix1, key1, value1).await;
+        let _ = store.put(prefix2, key2, value2).await;
 
         // Then retrieving with different prefixes should get different values
-        let get1 = store.get("prefix1", key).await.unwrap().unwrap();
-        let get2 = store.get("prefix2", key).await.unwrap().unwrap();
+        let prefix1 = CachePrefix::new("prefix1".to_string()).unwrap();
+        let prefix2 = CachePrefix::new("prefix2".to_string()).unwrap();
+        let key1 = CacheKey::new("same_key".to_string()).unwrap();
+        let key2 = CacheKey::new("same_key".to_string()).unwrap();
+        let get1 = store.get(prefix1, key1).await.unwrap().unwrap();
+        let get2 = store.get(prefix2, key2).await.unwrap().unwrap();
 
         assert_eq!(get1.value, "value for prefix1");
         assert_eq!(get2.value, "value for prefix2");
@@ -272,8 +296,8 @@ mod tests {
     async fn test_overwrite_existing_key() {
         // Given an in-memory cache store with an existing value
         let mut store = InMemoryCacheStore::new();
-        let prefix = "test";
-        let key = "key1";
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("key1".to_string()).unwrap();
 
         let original_value = CacheData {
             value: "original value".to_string(),
@@ -286,9 +310,13 @@ mod tests {
 
         // When storing the original value and then overwriting it
         let _ = store.put(prefix, key, original_value).await;
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("key1".to_string()).unwrap();
         let _ = store.put(prefix, key, new_value).await;
 
         // Then the retrieved value should be the new one
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("key1".to_string()).unwrap();
         let retrieved = store.get(prefix, key).await.unwrap().unwrap();
         assert_eq!(retrieved.value, "new value");
     }
@@ -301,7 +329,9 @@ mod tests {
         let mut store = InMemoryCacheStore::new();
 
         // When removing a non-existent key
-        let result = store.remove("test", "nonexistent").await;
+        let prefix = CachePrefix::new("test".to_string()).unwrap();
+        let key = CacheKey::new("nonexistent".to_string()).unwrap();
+        let result = store.remove(prefix, key).await;
 
         // Then it should succeed without error
         assert!(result.is_ok());
@@ -320,18 +350,22 @@ mod tests {
         };
 
         // When using empty strings for prefix and key
-        let put_result = store.put("", "", value.clone()).await;
+        let prefix = CachePrefix::new("".to_string()).unwrap();
+        let key = CacheKey::new("".to_string()).unwrap();
+        let put_result = store.put(prefix, key, value.clone()).await;
 
         // Then it should work correctly
         assert!(put_result.is_ok());
 
-        let get_result = store.get("", "").await.unwrap().unwrap();
+        let prefix = CachePrefix::new("".to_string()).unwrap();
+        let key = CacheKey::new("".to_string()).unwrap();
+        let get_result = store.get(prefix, key).await.unwrap().unwrap();
         assert_eq!(get_result.value, "test with empty strings");
     }
 
     // Integration tests for the global GENERIC_CACHE_STORE
     mod integration_tests {
-        use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+        use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
         use crate::test_utils::init_test_environment;
 
         /// Test for the global GENERIC_CACHE_STORE integration.
@@ -352,14 +386,18 @@ mod tests {
             // Test storing data in the global cache store
             {
                 let mut cache = GENERIC_CACHE_STORE.lock().await;
-                let put_result = cache.put(prefix, key, value.clone()).await;
+                let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                let cache_key = CacheKey::new(key.to_string()).unwrap();
+                let put_result = cache.put(cache_prefix, cache_key, value.clone()).await;
                 assert!(put_result.is_ok(), "Should be able to store data in cache");
             }
 
             // Test retrieving data from the global cache store
             {
                 let cache = GENERIC_CACHE_STORE.lock().await;
-                let get_result = cache.get(prefix, key).await;
+                let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                let cache_key = CacheKey::new(key.to_string()).unwrap();
+                let get_result = cache.get(cache_prefix, cache_key).await;
                 assert!(
                     get_result.is_ok(),
                     "Should be able to retrieve data from cache"
@@ -373,7 +411,9 @@ mod tests {
             // Test removing data from the global cache store
             {
                 let mut cache = GENERIC_CACHE_STORE.lock().await;
-                let remove_result = cache.remove(prefix, key).await;
+                let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                let cache_key = CacheKey::new(key.to_string()).unwrap();
+                let remove_result = cache.remove(cache_prefix, cache_key).await;
                 assert!(
                     remove_result.is_ok(),
                     "Should be able to remove data from cache"
@@ -383,7 +423,9 @@ mod tests {
             // Verify data was actually removed
             {
                 let cache = GENERIC_CACHE_STORE.lock().await;
-                let get_result = cache.get(prefix, key).await;
+                let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                let cache_key = CacheKey::new(key.to_string()).unwrap();
+                let get_result = cache.get(cache_prefix, cache_key).await;
                 assert!(get_result.is_ok(), "Get operation should succeed");
                 assert!(
                     get_result.unwrap().is_none(),
@@ -416,13 +458,20 @@ mod tests {
                     // Store data
                     {
                         let mut cache = GENERIC_CACHE_STORE.lock().await;
-                        cache.put(prefix, &task_key, task_value).await.unwrap();
+                        let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                        let cache_key = CacheKey::new(task_key.clone()).unwrap();
+                        cache
+                            .put(cache_prefix, cache_key, task_value)
+                            .await
+                            .unwrap();
                     }
 
                     // Retrieve data
                     {
                         let cache = GENERIC_CACHE_STORE.lock().await;
-                        let result = cache.get(prefix, &task_key).await.unwrap();
+                        let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                        let cache_key = CacheKey::new(task_key).unwrap();
+                        let result = cache.get(cache_prefix, cache_key).await.unwrap();
                         assert!(result.is_some());
                         result.unwrap().value
                     }
@@ -463,40 +512,62 @@ mod tests {
             // Store values with different prefixes
             {
                 let mut cache = GENERIC_CACHE_STORE.lock().await;
-                cache.put("prefix1", key, value1).await.unwrap();
-                cache.put("prefix2", key, value2).await.unwrap();
-                cache.put("prefix3", key, value3).await.unwrap();
+                let prefix1 = CachePrefix::new("prefix1".to_string()).unwrap();
+                let prefix2 = CachePrefix::new("prefix2".to_string()).unwrap();
+                let prefix3 = CachePrefix::new("prefix3".to_string()).unwrap();
+                let key1 = CacheKey::new(key.to_string()).unwrap();
+                let key2 = CacheKey::new(key.to_string()).unwrap();
+                let key3 = CacheKey::new(key.to_string()).unwrap();
+                cache.put(prefix1, key1, value1).await.unwrap();
+                cache.put(prefix2, key2, value2).await.unwrap();
+                cache.put(prefix3, key3, value3).await.unwrap();
             }
 
             // Verify each prefix maintains its own value
             {
                 let cache = GENERIC_CACHE_STORE.lock().await;
 
-                let result1 = cache.get("prefix1", key).await.unwrap().unwrap();
+                let prefix1 = CachePrefix::new("prefix1".to_string()).unwrap();
+                let prefix2 = CachePrefix::new("prefix2".to_string()).unwrap();
+                let prefix3 = CachePrefix::new("prefix3".to_string()).unwrap();
+                let key1 = CacheKey::new(key.to_string()).unwrap();
+                let key2 = CacheKey::new(key.to_string()).unwrap();
+                let key3 = CacheKey::new(key.to_string()).unwrap();
+
+                let result1 = cache.get(prefix1, key1).await.unwrap().unwrap();
                 assert_eq!(result1.value, "value_for_prefix1");
 
-                let result2 = cache.get("prefix2", key).await.unwrap().unwrap();
+                let result2 = cache.get(prefix2, key2).await.unwrap().unwrap();
                 assert_eq!(result2.value, "value_for_prefix2");
 
-                let result3 = cache.get("prefix3", key).await.unwrap().unwrap();
+                let result3 = cache.get(prefix3, key3).await.unwrap().unwrap();
                 assert_eq!(result3.value, "value_for_prefix3");
             }
 
             // Remove from one prefix and verify others are unaffected
             {
                 let mut cache = GENERIC_CACHE_STORE.lock().await;
-                cache.remove("prefix2", key).await.unwrap();
+                let prefix2 = CachePrefix::new("prefix2".to_string()).unwrap();
+                let key2 = CacheKey::new(key.to_string()).unwrap();
+                cache.remove(prefix2, key2).await.unwrap();
             }
 
             {
                 let cache = GENERIC_CACHE_STORE.lock().await;
 
+                let prefix1 = CachePrefix::new("prefix1".to_string()).unwrap();
+                let prefix2 = CachePrefix::new("prefix2".to_string()).unwrap();
+                let prefix3 = CachePrefix::new("prefix3".to_string()).unwrap();
+                let key1 = CacheKey::new(key.to_string()).unwrap();
+                let key2 = CacheKey::new(key.to_string()).unwrap();
+                let key3 = CacheKey::new(key.to_string()).unwrap();
+
                 // prefix1 and prefix3 should still exist
-                assert!(cache.get("prefix1", key).await.unwrap().is_some());
-                assert!(cache.get("prefix3", key).await.unwrap().is_some());
+                assert!(cache.get(prefix1, key1).await.unwrap().is_some());
+                assert!(cache.get(prefix3, key3).await.unwrap().is_some());
 
                 // prefix2 should be removed
-                assert!(cache.get("prefix2", key).await.unwrap().is_none());
+                assert!(cache.get(prefix2, key2).await.unwrap().is_none());
             }
         }
 
@@ -519,14 +590,20 @@ mod tests {
             // Test put_with_ttl (in-memory store ignores TTL but should still work)
             {
                 let mut cache = GENERIC_CACHE_STORE.lock().await;
-                let put_result = cache.put_with_ttl(prefix, key, value.clone(), 300).await;
+                let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                let cache_key = CacheKey::new(key.to_string()).unwrap();
+                let put_result = cache
+                    .put_with_ttl(cache_prefix, cache_key, value.clone(), 300)
+                    .await;
                 assert!(put_result.is_ok(), "put_with_ttl should succeed");
             }
 
             // Verify the value was stored (even though TTL is ignored in memory store)
             {
                 let cache = GENERIC_CACHE_STORE.lock().await;
-                let get_result = cache.get(prefix, key).await.unwrap();
+                let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                let cache_key = CacheKey::new(key.to_string()).unwrap();
+                let get_result = cache.get(cache_prefix, cache_key).await.unwrap();
                 assert!(get_result.is_some(), "Value should be stored despite TTL");
                 assert_eq!(get_result.unwrap().value, "ttl test value");
             }
@@ -539,8 +616,10 @@ mod tests {
 
             {
                 let mut cache = GENERIC_CACHE_STORE.lock().await;
+                let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                let cache_key = CacheKey::new("zero_ttl_key".to_string()).unwrap();
                 let put_result = cache
-                    .put_with_ttl(prefix, "zero_ttl_key", zero_ttl_value, 0)
+                    .put_with_ttl(cache_prefix, cache_key, zero_ttl_value, 0)
                     .await;
                 assert!(
                     put_result.is_ok(),
@@ -550,7 +629,9 @@ mod tests {
 
             {
                 let cache = GENERIC_CACHE_STORE.lock().await;
-                let get_result = cache.get(prefix, "zero_ttl_key").await.unwrap();
+                let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                let cache_key = CacheKey::new("zero_ttl_key".to_string()).unwrap();
+                let get_result = cache.get(cache_prefix, cache_key).await.unwrap();
                 assert!(
                     get_result.is_some(),
                     "Value should be stored even with zero TTL in memory store"
@@ -578,14 +659,18 @@ mod tests {
             // Store large data
             {
                 let mut cache = GENERIC_CACHE_STORE.lock().await;
-                let put_result = cache.put(prefix, key, large_value).await;
+                let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                let cache_key = CacheKey::new(key.to_string()).unwrap();
+                let put_result = cache.put(cache_prefix, cache_key, large_value).await;
                 assert!(put_result.is_ok(), "Should be able to store large data");
             }
 
             // Retrieve and verify large data
             {
                 let cache = GENERIC_CACHE_STORE.lock().await;
-                let get_result = cache.get(prefix, key).await.unwrap();
+                let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                let cache_key = CacheKey::new(key.to_string()).unwrap();
+                let get_result = cache.get(cache_prefix, cache_key).await.unwrap();
                 assert!(get_result.is_some(), "Large data should be retrievable");
 
                 let retrieved = get_result.unwrap();
@@ -629,7 +714,9 @@ mod tests {
                         value: test_value.to_string(),
                         expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
                     };
-                    let put_result = cache.put(prefix, test_key, cache_data).await;
+                    let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                    let cache_key = CacheKey::new(test_key.to_string()).unwrap();
+                    let put_result = cache.put(cache_prefix, cache_key, cache_data).await;
                     assert!(
                         put_result.is_ok(),
                         "Should handle special characters in key: {test_key}"
@@ -641,7 +728,9 @@ mod tests {
             {
                 let cache = GENERIC_CACHE_STORE.lock().await;
                 for (test_key, expected_value) in &test_cases {
-                    let get_result = cache.get(prefix, test_key).await.unwrap();
+                    let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+                    let cache_key = CacheKey::new(test_key.to_string()).unwrap();
+                    let get_result = cache.get(cache_prefix, cache_key).await.unwrap();
                     assert!(
                         get_result.is_some(),
                         "Should retrieve value for key: {test_key}"

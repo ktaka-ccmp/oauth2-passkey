@@ -189,7 +189,10 @@ async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, OAuth
     let pkce_session: StoredToken =
         get_token_from_store("pkce", &state_in_response.pkce_id).await?;
 
-    remove_token_from_store("pkce", &state_in_response.pkce_id).await?;
+    let (cache_prefix, cache_key) =
+        crate::storage::create_cache_keys("pkce", &state_in_response.pkce_id)
+            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+    remove_token_from_store(cache_prefix, cache_key).await?;
 
     Ok(pkce_session.token)
 }
@@ -217,7 +220,10 @@ async fn verify_nonce(
         return Err(OAuth2Error::NonceMismatch);
     }
 
-    remove_token_from_store("nonce", &state_in_response.nonce_id).await?;
+    let (cache_prefix, cache_key) =
+        crate::storage::create_cache_keys("nonce", &state_in_response.nonce_id)
+            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+    remove_token_from_store(cache_prefix, cache_key).await?;
 
     Ok(())
 }
@@ -242,7 +248,9 @@ pub(crate) async fn csrf_checks(
     let csrf_session: StoredToken = get_token_from_store("csrf", csrf_id).await?;
     tracing::debug!("CSRF Session: {:#?}", csrf_session);
 
-    remove_token_from_store("csrf", csrf_id).await?;
+    let (cache_prefix, cache_key) = crate::storage::create_cache_keys("csrf", csrf_id)
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+    remove_token_from_store(cache_prefix, cache_key).await?;
 
     let user_agent = headers
         .get(http::header::USER_AGENT)

@@ -65,13 +65,15 @@ pub(super) async fn store_token_in_cache(
         ttl,
     };
 
+    let (cache_prefix, cache_key) = crate::storage::create_cache_keys(token_type, &token_id)
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
     GENERIC_CACHE_STORE
         .lock()
         .await
-        // .put(token_type, &token_id, token_data.into())
         .put_with_ttl(
-            token_type,
-            &token_id,
+            cache_prefix,
+            cache_key,
             token_data.into(),
             ttl.try_into().unwrap(),
         )
@@ -114,20 +116,29 @@ pub(super) async fn store_token_in_cache_atomic(
         ttl,
     };
 
+    // Convert TTL once outside the loop
+    let ttl_usize = ttl
+        .try_into()
+        .map_err(|_| OAuth2Error::Storage("TTL value too large for storage backend".to_string()))?;
+
     for attempt in 1..=MAX_COLLISION_ATTEMPTS {
         // Use enhanced entropy validation for token ID generation
         let token_id = gen_random_string_with_entropy_validation(32)
             .map_err(|e| OAuth2Error::Storage(format!("Token ID generation failed: {e}")))?;
 
-        // Attempt atomic insertion
-        let ttl_usize = ttl.try_into().map_err(|_| {
-            OAuth2Error::Storage("TTL value too large for storage backend".to_string())
-        })?;
+        let (cache_prefix, cache_key) = crate::storage::create_cache_keys(token_type, &token_id)
+            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
+        // Attempt atomic insertion
         let inserted = GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_if_not_exists(token_type, &token_id, token_data.clone().into(), ttl_usize)
+            .put_if_not_exists(
+                cache_prefix,
+                cache_key,
+                token_data.clone().into(),
+                ttl_usize,
+            )
             .await
             .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
@@ -172,10 +183,13 @@ pub(super) async fn get_token_from_store<T>(
 where
     T: TryFrom<CacheData, Error = OAuth2Error>,
 {
+    let (cache_prefix, cache_key) = crate::storage::create_cache_keys(token_type, token_id)
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .get(token_type, token_id)
+        .get(cache_prefix, cache_key)
         .await
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?
         .ok_or_else(|| {
@@ -185,13 +199,13 @@ where
 }
 
 pub(super) async fn remove_token_from_store(
-    token_type: &str,
-    token_id: &str,
+    cache_prefix: crate::storage::CachePrefix,
+    cache_key: crate::storage::CacheKey,
 ) -> Result<(), OAuth2Error> {
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .remove(token_type, token_id)
+        .remove(cache_prefix, cache_key)
         .await
         .map_err(|e| OAuth2Error::Storage(e.to_string()))
 }
@@ -295,7 +309,9 @@ pub(crate) async fn delete_session_and_misc_token_from_store(
             .await
             .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
-        remove_token_from_store("misc_session", misc_id).await?;
+        let (cache_prefix, cache_key) = crate::storage::create_cache_keys("misc_session", misc_id)
+            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+        remove_token_from_store(cache_prefix, cache_key).await?;
     }
 
     Ok(())
@@ -662,7 +678,9 @@ mod tests {
         assert_eq!(stored_token.token, token_value);
 
         // Remove the token
-        let result = remove_token_from_store(token_type, &token_id).await;
+        let (cache_prefix, cache_key) =
+            crate::storage::create_cache_keys(token_type, &token_id).unwrap();
+        let result = remove_token_from_store(cache_prefix, cache_key).await;
         assert!(result.is_ok());
 
         // Verify the token is no longer available
@@ -1318,7 +1336,9 @@ mod tests {
         assert!(retrieved.is_ok());
 
         // Remove the token
-        let remove_result1 = remove_token_from_store(token_type, &token_id).await;
+        let (cache_prefix, cache_key) =
+            crate::storage::create_cache_keys(token_type, &token_id).unwrap();
+        let remove_result1 = remove_token_from_store(cache_prefix, cache_key).await;
         assert!(remove_result1.is_ok());
 
         // Verify token is gone
@@ -1326,7 +1346,9 @@ mod tests {
         assert!(get_after_remove.is_err());
 
         // Try to remove the same token again (should handle gracefully)
-        let remove_result2 = remove_token_from_store(token_type, &token_id).await;
+        let (cache_prefix2, cache_key2) =
+            crate::storage::create_cache_keys(token_type, &token_id).unwrap();
+        let remove_result2 = remove_token_from_store(cache_prefix2, cache_key2).await;
         assert!(remove_result2.is_ok(), "Second removal should not fail");
 
         // Try multiple concurrent removals of the same token
@@ -1335,7 +1357,10 @@ mod tests {
                 let token_id_clone = token_id.clone();
                 let token_type_clone = token_type;
                 tokio::spawn(async move {
-                    remove_token_from_store(token_type_clone, &token_id_clone).await
+                    let (cache_prefix, cache_key) =
+                        crate::storage::create_cache_keys(token_type_clone, &token_id_clone)
+                            .unwrap();
+                    remove_token_from_store(cache_prefix, cache_key).await
                 })
             })
             .collect::<Vec<_>>();

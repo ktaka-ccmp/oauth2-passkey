@@ -2,7 +2,7 @@
 
 use crate::session::errors::SessionError;
 use crate::session::types::StoredSession;
-use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
 use crate::userdb::User;
 use crate::userdb::UserStore;
 use chrono::{Duration, Utc};
@@ -53,10 +53,13 @@ pub(crate) async fn insert_test_session(
         expires_at: chrono::Utc::now() + chrono::Duration::seconds(ttl as i64),
     };
 
+    let cache_key =
+        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?;
+
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .put_with_ttl("session", session_id, cache_data, ttl as usize)
+        .put_with_ttl(CachePrefix::session(), cache_key, cache_data, ttl as usize)
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?;
 
@@ -82,10 +85,13 @@ pub(crate) async fn create_test_user_and_session(
 /// Delete a test session from cache for cleanup
 #[cfg(test)]
 pub(crate) async fn delete_test_session(session_id: &str) -> Result<(), SessionError> {
+    let cache_key =
+        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?;
+
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .remove("session", session_id)
+        .remove(CachePrefix::session(), cache_key)
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?;
     Ok(())

@@ -202,12 +202,15 @@ pub(crate) async fn verify_session_then_finish_registration(
             "User handle is missing".to_string(),
         ))?;
 
-    let session_info: SessionInfo = get_from_cache("session_info", user_handle)
+    let (cache_prefix, cache_key) = crate::storage::create_cache_keys("session_info", user_handle)
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    let session_info: SessionInfo = get_from_cache(cache_prefix.clone(), cache_key.clone())
         .await?
         .ok_or(PasskeyError::NotFound("Session not found".to_string()))?;
 
     // Delete the session info from the store
-    remove_from_cache("session_info", user_handle).await?;
+    remove_from_cache(cache_prefix, cache_key).await?;
 
     tracing::trace!("session_info.user.id: {:#?}", session_info.user.id);
     tracing::trace!("session_user.id: {:#?}", session_user.id);
@@ -427,12 +430,16 @@ pub(crate) async fn commit_registration(
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     // Clean up the used challenge (best effort - don't fail registration if this fails)
-    if let Err(e) = remove_options("regi_challenge", user_handle).await {
-        tracing::warn!(
-            "Failed to remove challenge options for user_handle {}: {}. Registration still successful.",
-            user_handle,
-            e
-        );
+    if let Ok((cache_prefix, cache_key)) =
+        crate::storage::create_cache_keys("regi_challenge", user_handle)
+    {
+        if let Err(e) = remove_options(cache_prefix, cache_key).await {
+            tracing::warn!(
+                "Failed to remove challenge options for user_handle {}: {}. Registration still successful.",
+                user_handle,
+                e
+            );
+        }
     }
 
     Ok("Registration successful".to_string())
@@ -708,6 +715,7 @@ async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), Passkey
 mod tests {
     use super::*;
     use crate::passkey::main::types::AuthenticatorAttestationResponse;
+    use crate::storage::{CacheKey, CachePrefix};
     use ciborium::value::Value as CborValue;
 
     /// Test parse attestation object success none fmt
@@ -1358,18 +1366,21 @@ mod tests {
         );
 
         // Clean up cache
-        let cleanup_result =
-            passkey_test_utils::remove_from_cache("regi_challenge", user_handle).await;
+        let (cache_prefix, cache_key) =
+            crate::storage::create_cache_keys("regi_challenge", user_handle).unwrap();
+        let cleanup_result = passkey_test_utils::remove_from_cache(cache_prefix, cache_key).await;
         assert!(
             cleanup_result.is_ok(),
             "Failed to clean up test data from cache"
         );
 
         // Verify removal
+        let cache_prefix = CachePrefix::new("regi_challenge".to_string()).unwrap();
+        let cache_key = CacheKey::new(user_handle.to_string()).unwrap();
         let cache_get = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("regi_challenge", user_handle)
+            .get(cache_prefix, cache_key)
             .await;
         assert!(cache_get.is_ok(), "Error checking cache");
         assert!(
@@ -1608,7 +1619,9 @@ mod tests {
         );
 
         // Verify session info was removed from cache
-        let session_check = get_from_cache::<SessionInfo>("session_info", user_handle).await;
+        let (cache_prefix, cache_key) =
+            crate::storage::create_cache_keys("session_info", user_handle).unwrap();
+        let session_check = get_from_cache::<SessionInfo>(cache_prefix, cache_key).await;
         assert!(session_check.is_ok());
         assert!(
             session_check.unwrap().is_none(),
@@ -1618,7 +1631,11 @@ mod tests {
         // Cleanup
         let cleanup_result = passkey_test_utils::cleanup_test_credential(credential_id).await;
         assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
-        let _ = remove_from_cache("regi_challenge", user_handle).await;
+        if let Ok((cache_prefix, cache_key)) =
+            crate::storage::create_cache_keys("regi_challenge", user_handle)
+        {
+            let _ = remove_from_cache(cache_prefix, cache_key).await;
+        }
     }
 
     /// Test verify session then finish registration missing user handle
@@ -1794,7 +1811,9 @@ mod tests {
         }
 
         // Verify session info was still removed from cache (cleanup on security failure)
-        let session_check = get_from_cache::<SessionInfo>("session_info", user_handle).await;
+        let (cache_prefix, cache_key) =
+            crate::storage::create_cache_keys("session_info", user_handle).unwrap();
+        let session_check = get_from_cache::<SessionInfo>(cache_prefix, cache_key).await;
         assert!(session_check.is_ok());
         assert!(
             session_check.unwrap().is_none(),
@@ -1890,7 +1909,11 @@ mod tests {
         );
 
         // Cleanup
-        let _ = remove_from_cache("regi_challenge", user_handle).await;
+        if let Ok((cache_prefix, cache_key)) =
+            crate::storage::create_cache_keys("regi_challenge", user_handle)
+        {
+            let _ = remove_from_cache(cache_prefix, cache_key).await;
+        }
     }
 
     /// Test verify client data invalid base64
@@ -2170,7 +2193,11 @@ mod tests {
         }
 
         // Cleanup
-        let _ = remove_from_cache("regi_challenge", user_handle).await;
+        if let Ok((cache_prefix, cache_key)) =
+            crate::storage::create_cache_keys("regi_challenge", user_handle)
+        {
+            let _ = remove_from_cache(cache_prefix, cache_key).await;
+        }
     }
 
     /// Test verify client data origin mismatch
@@ -2235,7 +2262,11 @@ mod tests {
         }
 
         // Cleanup
-        let _ = remove_from_cache("regi_challenge", user_handle).await;
+        if let Ok((cache_prefix, cache_key)) =
+            crate::storage::create_cache_keys("regi_challenge", user_handle)
+        {
+            let _ = remove_from_cache(cache_prefix, cache_key).await;
+        }
     } // ========================================
     // extract_credential_public_key tests
     // ========================================

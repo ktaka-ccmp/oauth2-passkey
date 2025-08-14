@@ -7,7 +7,7 @@ mod edge_cases {
     use crate::SESSION_COOKIE_NAME;
     use crate::session::errors::SessionError;
     use crate::session::types::StoredSession;
-    use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+    use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
     use crate::test_utils::init_test_environment;
     use chrono::{Duration, Utc};
     use http::{HeaderMap, Method};
@@ -43,10 +43,12 @@ mod edge_cases {
             expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put("session", session_id, cache_data)
+            .put(cache_prefix, cache_key, cache_data)
             .await
             .unwrap();
 
@@ -59,10 +61,12 @@ mod edge_cases {
         }
 
         // Verify the expired session was removed
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         let check_session = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(cache_prefix, cache_key)
             .await
             .unwrap();
         assert!(check_session.is_none());
@@ -86,10 +90,12 @@ mod edge_cases {
             expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put("session", session_id, cache_data)
+            .put(cache_prefix, cache_key, cache_data)
             .await
             .unwrap();
 
@@ -124,10 +130,12 @@ mod edge_cases {
             expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put("session", session_id, cache_data)
+            .put(cache_prefix, cache_key, cache_data)
             .await
             .unwrap();
 
