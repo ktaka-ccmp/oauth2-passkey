@@ -371,7 +371,9 @@ mod tests {
     async fn test_upsert_oauth2_account_update() {
         init_test_environment().await;
 
-        let test_account = create_test_user_and_account("user123", "google", "google123").await;
+        let user_id = generate_unique_test_id("user");
+        let provider_id = generate_unique_test_id("google");
+        let test_account = create_test_user_and_account(&user_id, "google", &provider_id).await;
 
         // Insert the account
         let mut inserted_account = OAuth2Store::upsert_oauth2_account(test_account)
@@ -470,7 +472,9 @@ mod tests {
     async fn test_get_oauth2_accounts_by_id() {
         init_test_environment().await;
 
-        let inserted_account = create_test_user_and_account("user123", "google", "google123").await;
+        let user_id = generate_unique_test_id("user");
+        let provider_id = generate_unique_test_id("google");
+        let inserted_account = create_test_user_and_account(&user_id, "google", &provider_id).await;
 
         // Search by ID
         let accounts = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Id(
@@ -548,10 +552,23 @@ mod tests {
                 .await
                 .unwrap();
 
-        assert_eq!(google_accounts.len(), 2, "Should find 2 Google accounts");
+        assert!(
+            google_accounts.len() >= 2,
+            "Should find at least 2 Google accounts"
+        );
         for account in &google_accounts {
             assert_eq!(account.provider, "google");
         }
+
+        // Verify that our specific test accounts are found
+        let test_account_ids: std::collections::HashSet<_> =
+            [&inserted1.id, &inserted2.id].into_iter().collect();
+        let found_account_ids: std::collections::HashSet<_> =
+            google_accounts.iter().map(|acc| &acc.id).collect();
+        assert!(
+            test_account_ids.is_subset(&found_account_ids),
+            "Should find both test accounts we created"
+        );
 
         // Clean up
         OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted1.id))
@@ -577,10 +594,12 @@ mod tests {
     async fn test_get_oauth2_account_by_provider() {
         init_test_environment().await;
 
-        let inserted_account = create_test_user_and_account("user123", "google", "google123").await;
+        let user_id = generate_unique_test_id("user");
+        let provider_id = generate_unique_test_id("google");
+        let inserted_account = create_test_user_and_account(&user_id, "google", &provider_id).await;
 
         // Find by provider and provider_user_id
-        let found_account = OAuth2Store::get_oauth2_account_by_provider("google", "google123")
+        let found_account = OAuth2Store::get_oauth2_account_by_provider("google", &provider_id)
             .await
             .unwrap();
 
@@ -588,7 +607,7 @@ mod tests {
         let found_account = found_account.unwrap();
         assert_eq!(found_account.id, inserted_account.id);
         assert_eq!(found_account.provider, "google");
-        assert_eq!(found_account.provider_user_id, "google123");
+        assert_eq!(found_account.provider_user_id, provider_id);
 
         // Try to find non-existent account
         let not_found = OAuth2Store::get_oauth2_account_by_provider("google", "nonexistent")
