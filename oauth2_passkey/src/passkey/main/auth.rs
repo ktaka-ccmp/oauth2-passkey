@@ -16,7 +16,7 @@ use super::types::{
     ParsedClientData,
 };
 use super::utils::name2cid_str_vec;
-use crate::storage::{CacheKey, CachePrefix, store_cache_keyed};
+use crate::storage::{CacheErrorConversion, CacheKey, CachePrefix, store_cache_keyed};
 
 pub(crate) async fn start_authentication(
     username: Option<String>,
@@ -55,10 +55,8 @@ pub(crate) async fn start_authentication(
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    let cache_prefix = CachePrefix::new("auth_challenge".to_string())
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-    let cache_key =
-        CacheKey::new(auth_id.clone()).map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    let cache_prefix = CachePrefix::auth_challenge();
+    let cache_key = CacheKey::new(auth_id.clone()).map_err(PasskeyError::convert_storage_error)?;
     store_cache_keyed::<_, PasskeyError>(
         cache_prefix,
         cache_key,
@@ -161,9 +159,9 @@ pub(crate) async fn finish_authentication(
     PasskeyStore::update_credential_last_used_at(&auth_response.id, Utc::now()).await?;
 
     // Remove challenge from cache
-    let (cache_prefix, cache_key) =
-        crate::storage::create_cache_keys("auth_challenge", &auth_response.auth_id)
-            .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    let cache_prefix = CachePrefix::auth_challenge();
+    let cache_key = CacheKey::new(auth_response.auth_id.clone())
+        .map_err(PasskeyError::convert_storage_error)?;
     remove_options(cache_prefix, cache_key).await?;
     let user_name = stored_credential.user.name.clone();
     let user_id = stored_credential.user_id.clone();
@@ -1056,8 +1054,8 @@ mod tests {
         assert!(cache_get.unwrap().is_some(), "Challenge should be in cache");
 
         // Clean up
-        let (cache_prefix, cache_key) =
-            crate::storage::create_cache_keys("auth_challenge", &auth_id).unwrap();
+        let cache_prefix = CachePrefix::new("auth_challenge".to_string()).unwrap();
+        let cache_key = CacheKey::new(auth_id.clone()).unwrap();
         let remove_cache = passkey_test_utils::remove_from_cache(cache_prefix, cache_key).await;
         assert!(remove_cache.is_ok(), "Failed to clean up cache");
 

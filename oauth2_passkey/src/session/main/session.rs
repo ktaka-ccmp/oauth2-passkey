@@ -12,7 +12,9 @@ use crate::session::types::{
 use crate::userdb::UserStore;
 use crate::utils::{gen_random_string_with_entropy_validation, header_set_cookie};
 
-use crate::storage::{CacheKey, CachePrefix, GENERIC_CACHE_STORE, get_data, remove_data};
+use crate::storage::{
+    CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE, get_data, remove_data,
+};
 
 /// Prepare a logout response by removing the session cookie and deleting the session from storage
 ///
@@ -80,7 +82,7 @@ async fn delete_session_from_store(
     if let Some(cookie) = cookies.get(&cookie_name) {
         remove_data::<SessionError>(
             CachePrefix::session(),
-            CacheKey::new(cookie.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?,
+            CacheKey::new(cookie.to_string()).map_err(SessionError::convert_storage_error)?,
         )
         .await?;
     };
@@ -92,7 +94,7 @@ pub(crate) async fn delete_session_from_store_by_session_id(
 ) -> Result<(), SessionError> {
     remove_data::<SessionError>(
         CachePrefix::session(),
-        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?,
+        CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?,
     )
     .await?;
     Ok(())
@@ -128,8 +130,7 @@ pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, 
     tracing::debug!("Retrieving user from session");
     let stored_session = get_data::<StoredSession, SessionError>(
         CachePrefix::session(),
-        CacheKey::new(session_cookie.to_string())
-            .map_err(|e| SessionError::Storage(e.to_string()))?,
+        CacheKey::new(session_cookie.to_string()).map_err(SessionError::convert_storage_error)?,
     )
     .await?
     .ok_or(SessionError::SessionError)?;
@@ -235,14 +236,14 @@ async fn is_authenticated(
 
     // Use atomic get-and-delete-if-expired to prevent race conditions and ensure expired sessions are rejected
     let cache_key =
-        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?;
+        CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?;
 
     let stored_session: StoredSession = match GENERIC_CACHE_STORE
         .lock()
         .await
         .get_and_delete_if_expired(CachePrefix::session(), cache_key)
         .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
+        .map_err(SessionError::convert_storage_error)?
     {
         Some(fresh_session_data) => {
             // Session exists and is not expired
@@ -583,7 +584,7 @@ pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, 
     tracing::debug!("Retrieving CSRF token from session");
     let stored_session = get_data::<StoredSession, SessionError>(
         CachePrefix::session(),
-        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?,
+        CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?,
     )
     .await?
     .ok_or(SessionError::SessionError)?;
@@ -627,7 +628,7 @@ pub async fn get_user_and_csrf_token_from_session(
 ) -> Result<(SessionUser, CsrfToken), SessionError> {
     let stored_session = get_data::<StoredSession, SessionError>(
         CachePrefix::session(),
-        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?,
+        CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?,
     )
     .await?
     .ok_or(SessionError::SessionError)?;

@@ -11,7 +11,7 @@ use sha2::Sha256;
 
 use crate::{
     session::{config::AUTH_SERVER_SECRET, errors::SessionError, types::StoredSession},
-    storage::{CacheKey, CachePrefix, GENERIC_CACHE_STORE},
+    storage::{CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE},
 };
 
 use super::session::get_session_id_from_headers;
@@ -93,11 +93,10 @@ pub async fn verify_page_session_token(
         .await
         .get(
             CachePrefix::session(),
-            CacheKey::new(session_id.to_string())
-                .map_err(|e| SessionError::Storage(e.to_string()))?,
+            CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?,
         )
         .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
+        .map_err(SessionError::convert_storage_error)?
         .ok_or(SessionError::SessionError)?;
 
     let stored_session: StoredSession = cached_session.try_into()?;

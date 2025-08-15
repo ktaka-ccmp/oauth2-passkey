@@ -16,10 +16,10 @@ use crate::utils::base64url_encode;
 
 use super::google::{exchange_code_for_token, fetch_user_data_from_google};
 use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken_with_algorithm};
-use super::utils::{
-    decode_state, encode_state, generate_store_token, get_token_from_store, remove_token_from_store,
+use super::utils::{decode_state, encode_state, generate_store_token};
+use crate::storage::{
+    CacheErrorConversion, CacheKey, CachePrefix, get_data, remove_data, store_cache_auto,
 };
-use crate::storage::{CachePrefix, store_cache_auto};
 
 /// Prepares an OAuth2 authentication request URL and necessary headers.
 ///
@@ -91,8 +91,7 @@ async fn prepare_oauth2_auth_request_with_params(
             user_agent: None,
             ttl,
         };
-        let cache_prefix = CachePrefix::new("misc_session".to_string())
-            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+        let cache_prefix = CachePrefix::misc_session();
         Some(store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await?)
     } else {
         tracing::debug!("No session ID found");
@@ -106,8 +105,7 @@ async fn prepare_oauth2_auth_request_with_params(
             user_agent: None,
             ttl,
         };
-        let cache_prefix = CachePrefix::new("mode".to_string())
-            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+        let cache_prefix = CachePrefix::mode();
         Some(store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await?)
     } else {
         None
@@ -202,13 +200,16 @@ pub(crate) async fn get_idinfo_userinfo(
 async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, OAuth2Error> {
     let state_in_response = decode_state(&auth_response.state)?;
 
+    let pkce_cache_key = CacheKey::new(state_in_response.pkce_id.clone())
+        .map_err(OAuth2Error::convert_storage_error)?;
     let pkce_session: StoredToken =
-        get_token_from_store("pkce", &state_in_response.pkce_id).await?;
+        get_data::<StoredToken, OAuth2Error>(CachePrefix::pkce(), pkce_cache_key.clone())
+            .await?
+            .ok_or_else(|| {
+                OAuth2Error::SecurityTokenNotFound("pkce-session not found".to_string())
+            })?;
 
-    let (cache_prefix, cache_key) =
-        crate::storage::create_cache_keys("pkce", &state_in_response.pkce_id)
-            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-    remove_token_from_store(cache_prefix, cache_key).await?;
+    remove_data::<OAuth2Error>(CachePrefix::pkce(), pkce_cache_key).await?;
 
     Ok(pkce_session.token)
 }
@@ -219,8 +220,14 @@ async fn verify_nonce(
 ) -> Result<(), OAuth2Error> {
     let state_in_response = decode_state(&auth_response.state)?;
 
+    let nonce_cache_key = CacheKey::new(state_in_response.nonce_id.clone())
+        .map_err(OAuth2Error::convert_storage_error)?;
     let nonce_session: StoredToken =
-        get_token_from_store("nonce", &state_in_response.nonce_id).await?;
+        get_data::<StoredToken, OAuth2Error>(CachePrefix::nonce(), nonce_cache_key.clone())
+            .await?
+            .ok_or_else(|| {
+                OAuth2Error::SecurityTokenNotFound("nonce-session not found".to_string())
+            })?;
 
     tracing::debug!("Nonce Data: {:#?}", nonce_session);
 
@@ -236,10 +243,7 @@ async fn verify_nonce(
         return Err(OAuth2Error::NonceMismatch);
     }
 
-    let (cache_prefix, cache_key) =
-        crate::storage::create_cache_keys("nonce", &state_in_response.nonce_id)
-            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-    remove_token_from_store(cache_prefix, cache_key).await?;
+    remove_data::<OAuth2Error>(CachePrefix::nonce(), nonce_cache_key).await?;
 
     Ok(())
 }
@@ -261,12 +265,17 @@ pub(crate) async fn csrf_checks(
     // Get the csrf_id from the state parameter
     let csrf_id = &state_in_response.csrf_id;
 
-    let csrf_session: StoredToken = get_token_from_store("csrf", csrf_id).await?;
+    let csrf_cache_key =
+        CacheKey::new(csrf_id.clone()).map_err(OAuth2Error::convert_storage_error)?;
+    let csrf_session: StoredToken =
+        get_data::<StoredToken, OAuth2Error>(CachePrefix::csrf(), csrf_cache_key.clone())
+            .await?
+            .ok_or_else(|| {
+                OAuth2Error::SecurityTokenNotFound("csrf-session not found".to_string())
+            })?;
     tracing::debug!("CSRF Session: {:#?}", csrf_session);
 
-    let (cache_prefix, cache_key) = crate::storage::create_cache_keys("csrf", csrf_id)
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-    remove_token_from_store(cache_prefix, cache_key).await?;
+    remove_data::<OAuth2Error>(CachePrefix::csrf(), csrf_cache_key).await?;
 
     let user_agent = headers
         .get(http::header::USER_AGENT)

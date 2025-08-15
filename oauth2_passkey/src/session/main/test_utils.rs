@@ -2,7 +2,7 @@
 
 use crate::session::errors::SessionError;
 use crate::session::types::StoredSession;
-use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
+use crate::storage::{CacheData, CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
 use crate::userdb::User;
 use crate::userdb::UserStore;
 use chrono::{Duration, Utc};
@@ -54,14 +54,14 @@ pub(crate) async fn insert_test_session(
     };
 
     let cache_key =
-        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?;
+        CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?;
 
     GENERIC_CACHE_STORE
         .lock()
         .await
         .put_with_ttl(CachePrefix::session(), cache_key, cache_data, ttl as usize)
         .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?;
+        .map_err(SessionError::convert_storage_error)?;
 
     Ok(())
 }
@@ -86,14 +86,14 @@ pub(crate) async fn create_test_user_and_session(
 #[cfg(test)]
 pub(crate) async fn delete_test_session(session_id: &str) -> Result<(), SessionError> {
     let cache_key =
-        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?;
+        CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?;
 
     GENERIC_CACHE_STORE
         .lock()
         .await
         .remove(CachePrefix::session(), cache_key)
         .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?;
+        .map_err(SessionError::convert_storage_error)?;
     Ok(())
 }
 

@@ -1,5 +1,5 @@
 use crate::passkey::PasskeyError;
-use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
+use crate::storage::{CacheData, CacheKey, CachePrefix, get_data};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -38,6 +38,14 @@ impl From<AuthenticatorInfo> for CacheData {
             value,
             expires_at: chrono::Utc::now() + chrono::Duration::days(365), // 1 year, effectively permanent
         }
+    }
+}
+
+impl TryFrom<CacheData> for AuthenticatorInfo {
+    type Error = PasskeyError;
+
+    fn try_from(cache_data: CacheData) -> Result<Self, Self::Error> {
+        serde_json::from_str(&cache_data.value).map_err(|e| PasskeyError::Storage(e.to_string()))
     }
 }
 
@@ -118,22 +126,8 @@ pub async fn get_authenticator_info(
     let cache_prefix = CachePrefix::aaguid();
     let cache_key =
         CacheKey::new(aaguid.to_string()).map_err(|e| PasskeyError::Storage(e.to_string()))?;
-    let cache_value = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get(cache_prefix, cache_key)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    match cache_value {
-        Some(cache_data) => {
-            // Parse the JSON string back to AuthenticatorInfo
-            let info: AuthenticatorInfo = serde_json::from_str(&cache_data.value)
-                .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-            Ok(Some(info))
-        }
-        None => Ok(None),
-    }
+    get_data::<AuthenticatorInfo, PasskeyError>(cache_prefix, cache_key).await
 }
 
 /// Retrieves information for multiple authenticators in a batch.
@@ -154,18 +148,17 @@ pub async fn get_authenticator_info_batch(
     aaguids: &[String],
 ) -> Result<HashMap<String, AuthenticatorInfo>, PasskeyError> {
     let mut result = HashMap::new();
-    let cache = GENERIC_CACHE_STORE.lock().await;
 
-    // If your cache store supports MGET, use it here for efficiency.
-    // For now, do it sequentially (still avoids duplicate lookups).
+    // Process each AAGUID using unified cache operations
     for aaguid in aaguids {
         let cache_prefix = CachePrefix::aaguid();
         if let Ok(cache_key) = CacheKey::new(aaguid.clone()) {
-            if let Some(cache_data) = cache.get(cache_prefix, cache_key).await.ok().flatten() {
-                if let Ok(info) = serde_json::from_str::<AuthenticatorInfo>(&cache_data.value) {
-                    result.insert(aaguid.clone(), info);
-                }
+            if let Ok(Some(info)) =
+                get_data::<AuthenticatorInfo, PasskeyError>(cache_prefix, cache_key).await
+            {
+                result.insert(aaguid.clone(), info);
             }
+            // Silently ignore errors for individual entries to maintain batch operation behavior
         }
     }
     Ok(result)
@@ -173,6 +166,7 @@ pub async fn get_authenticator_info_batch(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::GENERIC_CACHE_STORE;
 
     /// Test store_aaguid_in_cache function with valid JSON
     /// This test checks that the function stores the AAGUID mappings in the cache successfully.
@@ -206,39 +200,23 @@ mod tests {
         let result = store_aaguid_in_cache(json.to_string()).await;
         assert!(result.is_ok(), "Failed to store valid JSON: {result:?}");
 
-        // Verify both AAGUIDs were stored in the cache
-        let cache = GENERIC_CACHE_STORE.lock().await;
-
-        // Check first AAGUID
-        let cache_prefix = CachePrefix::new("aaguid".to_string()).unwrap();
-        let cache_key = CacheKey::new("00000000-0000-0000-0000-000000000000".to_string()).unwrap();
-        let cache_data1 = cache.get(cache_prefix, cache_key).await;
-        assert!(cache_data1.is_ok(), "Failed to get first AAGUID from cache");
-        let cache_data1 = cache_data1.unwrap();
-        assert!(cache_data1.is_some(), "First AAGUID should exist in cache");
-
-        // Check second AAGUID
-        let cache_prefix = CachePrefix::new("aaguid".to_string()).unwrap();
-        let cache_key = CacheKey::new("11111111-1111-1111-1111-111111111111".to_string()).unwrap();
-        let cache_data2 = cache.get(cache_prefix, cache_key).await;
-        assert!(
-            cache_data2.is_ok(),
-            "Failed to get second AAGUID from cache"
-        );
-        let cache_data2 = cache_data2.unwrap();
-        assert!(cache_data2.is_some(), "Second AAGUID should exist in cache");
-
-        // Verify the stored data can be parsed back to AuthenticatorInfo
-        let stored_data1 = cache_data1.unwrap();
-        let info1: AuthenticatorInfo = serde_json::from_str(&stored_data1.value).unwrap();
+        // Verify both AAGUIDs were stored by retrieving them using the unified cache operations
+        let info1 = get_authenticator_info("00000000-0000-0000-0000-000000000000").await;
+        assert!(info1.is_ok(), "Failed to get first AAGUID from cache");
+        let info1 = info1.unwrap();
+        assert!(info1.is_some(), "First AAGUID should exist in cache");
+        let info1 = info1.unwrap();
         assert_eq!(info1.name, "Test Authenticator");
         assert_eq!(
             info1.icon_dark,
             Some("https://example.com/icon-dark.png".to_string())
         );
 
-        let stored_data2 = cache_data2.unwrap();
-        let info2: AuthenticatorInfo = serde_json::from_str(&stored_data2.value).unwrap();
+        let info2 = get_authenticator_info("11111111-1111-1111-1111-111111111111").await;
+        assert!(info2.is_ok(), "Failed to get second AAGUID from cache");
+        let info2 = info2.unwrap();
+        assert!(info2.is_some(), "Second AAGUID should exist in cache");
+        let info2 = info2.unwrap();
         assert_eq!(info2.name, "Another Authenticator");
         assert_eq!(info2.icon_dark, None);
     }
@@ -594,11 +572,8 @@ mod tests {
 
         assert!(result.is_ok(), "Empty JSON object should be valid");
 
-        // Verify no AAGUIDs were stored
-        let cache = GENERIC_CACHE_STORE.lock().await;
-        let cache_prefix = CachePrefix::new("aaguid".to_string()).unwrap();
-        let cache_key = CacheKey::new("any-aaguid".to_string()).unwrap();
-        let non_existent = cache.get(cache_prefix, cache_key).await;
+        // Verify no AAGUIDs were stored by trying to get a non-existent AAGUID
+        let non_existent = get_authenticator_info("any-aaguid").await;
         assert!(non_existent.is_ok());
         assert!(
             non_existent.unwrap().is_none(),

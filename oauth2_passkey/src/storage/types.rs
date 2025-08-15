@@ -103,6 +103,51 @@ impl CachePrefix {
     pub fn challenge() -> Self {
         CachePrefix("challenge".to_string())
     }
+
+    /// Convenience constructor for PKCE prefix.
+    pub fn pkce() -> Self {
+        CachePrefix("pkce".to_string())
+    }
+
+    /// Convenience constructor for nonce prefix.
+    pub fn nonce() -> Self {
+        CachePrefix("nonce".to_string())
+    }
+
+    /// Convenience constructor for CSRF prefix.
+    pub fn csrf() -> Self {
+        CachePrefix("csrf".to_string())
+    }
+
+    /// Convenience constructor for misc_session prefix.
+    pub fn misc_session() -> Self {
+        CachePrefix("misc_session".to_string())
+    }
+
+    /// Convenience constructor for mode prefix.
+    pub fn mode() -> Self {
+        CachePrefix("mode".to_string())
+    }
+
+    /// Convenience constructor for JWKS prefix.
+    pub fn jwks() -> Self {
+        CachePrefix("jwks".to_string())
+    }
+
+    /// Convenience constructor for authentication challenge prefix.
+    pub fn auth_challenge() -> Self {
+        CachePrefix("auth_challenge".to_string())
+    }
+
+    /// Convenience constructor for registration challenge prefix.
+    pub fn reg_challenge() -> Self {
+        CachePrefix("reg_challenge".to_string())
+    }
+
+    /// Convenience constructor for session info prefix.
+    pub fn session_info() -> Self {
+        CachePrefix("session_info".to_string())
+    }
 }
 
 /// Type-safe wrapper for cache keys.
@@ -176,35 +221,6 @@ impl CacheKey {
     pub fn as_str(&self) -> &str {
         &self.0
     }
-}
-
-/// Unified helper function to create cache prefix and key from strings.
-/// This eliminates duplication across modules that need to create cache keys.
-///
-/// # Arguments
-/// * `prefix_str` - The prefix string (e.g., "session", "jwks", "oauth2_token")
-/// * `key_str` - The key string (e.g., session_id, token_id, aaguid)
-///
-/// # Returns
-/// * `Ok((CachePrefix, CacheKey))` - The validated cache prefix and key
-/// * `Err(StorageError)` - If validation fails for either prefix or key
-///
-/// # Example
-/// ```no_run
-/// // This function is used internally within the crate
-/// // External users should use the public coordination API instead
-/// # fn example() {
-/// // let (prefix, key) = create_cache_keys("session", "abc123")?;
-/// // Use prefix and key for cache operations
-/// # }
-/// ```
-pub fn create_cache_keys(
-    prefix_str: &str,
-    key_str: &str,
-) -> Result<(CachePrefix, CacheKey), StorageError> {
-    let cache_prefix = CachePrefix::new(prefix_str.to_string())?;
-    let cache_key = CacheKey::new(key_str.to_string())?;
-    Ok((cache_prefix, cache_key))
 }
 
 #[cfg(test)]

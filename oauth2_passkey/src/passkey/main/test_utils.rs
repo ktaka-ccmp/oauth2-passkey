@@ -7,7 +7,7 @@
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::{PublicKeyCredentialUserEntity, StoredOptions};
 use crate::passkey::{PasskeyCredential, PasskeyStore};
-use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
+use crate::storage::{CacheData, CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
 use crate::userdb::{User, UserStore};
 use chrono::Utc;
 use std::time::SystemTime;
@@ -107,9 +107,7 @@ pub async fn insert_test_user_and_credential(data: TestCredentialData) -> Result
     PasskeyStore::init().await?;
 
     // First create the user
-    insert_test_user(&data.user_id, &data.name, &data.display_name, false)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    insert_test_user(&data.user_id, &data.name, &data.display_name, false).await?;
 
     // Then create the credential
     insert_test_credential(data).await
@@ -133,7 +131,7 @@ pub async fn remove_from_cache(
         .await
         .remove(cache_prefix, cache_key)
         .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))
+        .map_err(PasskeyError::convert_storage_error)
 }
 
 /// Clean up test credential data
@@ -174,16 +172,15 @@ pub async fn create_test_challenge(
     };
 
     let cache_prefix = CachePrefix::new(challenge_type.to_string())
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-    let cache_key =
-        CacheKey::new(id.to_string()).map_err(|e| PasskeyError::Storage(e.to_string()))?;
+        .map_err(PasskeyError::convert_storage_error)?;
+    let cache_key = CacheKey::new(id.to_string()).map_err(PasskeyError::convert_storage_error)?;
 
     GENERIC_CACHE_STORE
         .lock()
         .await
         .put_with_ttl(cache_prefix, cache_key, cache_data, ttl as usize)
         .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))
+        .map_err(PasskeyError::convert_storage_error)
 }
 
 /// Check cache store for a specific key

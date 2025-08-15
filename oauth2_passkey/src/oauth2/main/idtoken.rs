@@ -6,7 +6,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 use crate::oauth2::config::get_jwks_url;
-use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+use crate::storage::{
+    CacheData, CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE, StorageError,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Jwks {
@@ -89,6 +91,14 @@ pub enum TokenVerificationError {
     JwksFetch(String),
     #[error("OIDC Discovery error: {0}")]
     OidcDiscovery(#[from] crate::oauth2::discovery::OidcDiscoveryError),
+    #[error("Storage error: {0}")]
+    Storage(String),
+}
+
+impl CacheErrorConversion<TokenVerificationError> for TokenVerificationError {
+    fn convert_storage_error(error: StorageError) -> TokenVerificationError {
+        TokenVerificationError::Storage(error.to_string())
+    }
 }
 
 const CACHE_MODE: &str = "cached";
@@ -134,9 +144,10 @@ impl TryFrom<CacheData> for JwksCache {
 }
 
 async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
-    // Create cache keys once for the entire function using unified helper
-    let (cache_prefix, cache_key) = crate::storage::create_cache_keys("jwks", jwks_url)
-        .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache key creation error: {e}")))?;
+    // Create cache keys once for the entire function with earliest possible conversion
+    let cache_prefix = CachePrefix::jwks();
+    let cache_key = CacheKey::new(jwks_url.to_string())
+        .map_err(TokenVerificationError::convert_storage_error)?;
 
     // Try to get from cache first
     if let Some(cached) = GENERIC_CACHE_STORE

@@ -33,7 +33,7 @@ pub(crate) use cache_operations::{
 
 pub(crate) use cache_store::GENERIC_CACHE_STORE;
 pub(crate) use errors::StorageError;
-pub(crate) use types::{CacheData, CacheKey, CachePrefix, create_cache_keys};
+pub(crate) use types::{CacheData, CacheKey, CachePrefix};
 
 pub(crate) use data_store::{DB_TABLE_PREFIX, GENERIC_DATA_STORE};
 
