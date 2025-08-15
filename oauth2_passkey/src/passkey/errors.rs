@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use crate::storage::{CacheErrorConversion, StorageError};
 use crate::utils::UtilError;
 
 /// Errors that can occur during WebAuthn/Passkey operations.
@@ -75,4 +76,10 @@ pub enum PasskeyError {
     /// Error from JSON serialization/deserialization
     #[error("Serde error: {0}")]
     SerdeJson(#[from] serde_json::Error),
+}
+
+impl CacheErrorConversion<PasskeyError> for PasskeyError {
+    fn convert_storage_error(error: StorageError) -> PasskeyError {
+        PasskeyError::Storage(error.to_string())
+    }
 }

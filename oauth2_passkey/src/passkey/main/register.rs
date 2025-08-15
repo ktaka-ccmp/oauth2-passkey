@@ -10,7 +10,9 @@ use super::types::{
     AttestationObject, AuthenticatorSelection, PubKeyCredParam, RegisterCredential,
     RegistrationOptions, RelyingParty, WebAuthnClientData,
 };
-use super::utils::{get_from_cache, remove_from_cache, store_in_cache};
+use crate::storage::{
+    CacheKey, CachePrefix, get_data_by_category, remove_data_by_category, store_data_with_category,
+};
 
 use crate::passkey::config::{
     ORIGIN, PASSKEY_ATTESTATION, PASSKEY_AUTHENTICATOR_ATTACHMENT, PASSKEY_CHALLENGE_TIMEOUT,
@@ -113,12 +115,17 @@ pub(crate) async fn start_registration(
 
     if let Some(u) = session_user {
         tracing::debug!("User: {:#?}", u);
+        let cache_prefix = CachePrefix::new("session_info".to_string())
+            .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+        let cache_key =
+            CacheKey::new(user_handle.clone()).map_err(|e| PasskeyError::Storage(e.to_string()))?;
         let session_info = SessionInfo { user: u };
-        store_in_cache(
-            "session_info",
-            &user_handle,
+        store_data_with_category::<_, PasskeyError>(
+            cache_prefix,
+            Some(cache_key),
             session_info,
-            *PASSKEY_CHALLENGE_TIMEOUT as usize,
+            (*PASSKEY_CHALLENGE_TIMEOUT).into(),
+            None,
         )
         .await?;
     }
@@ -148,11 +155,16 @@ async fn create_registration_options(
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    store_in_cache(
-        "regi_challenge",
-        &user_info.user_handle,
+    let cache_prefix = CachePrefix::new("regi_challenge".to_string())
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    let cache_key = CacheKey::new(user_info.user_handle.clone())
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    store_data_with_category::<_, PasskeyError>(
+        cache_prefix,
+        Some(cache_key),
         stored_challenge,
-        *PASSKEY_CHALLENGE_TIMEOUT as usize,
+        (*PASSKEY_CHALLENGE_TIMEOUT).into(),
+        None,
     )
     .await?;
 
@@ -205,12 +217,13 @@ pub(crate) async fn verify_session_then_finish_registration(
     let (cache_prefix, cache_key) = crate::storage::create_cache_keys("session_info", user_handle)
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    let session_info: SessionInfo = get_from_cache(cache_prefix.clone(), cache_key.clone())
-        .await?
-        .ok_or(PasskeyError::NotFound("Session not found".to_string()))?;
+    let session_info: SessionInfo =
+        get_data_by_category::<_, PasskeyError>(cache_prefix.clone(), cache_key.clone())
+            .await?
+            .ok_or(PasskeyError::NotFound("Session not found".to_string()))?;
 
     // Delete the session info from the store
-    remove_from_cache(cache_prefix, cache_key).await?;
+    remove_data_by_category::<PasskeyError>(cache_prefix, cache_key).await?;
 
     tracing::trace!("session_info.user.id: {:#?}", session_info.user.id);
     tracing::trace!("session_user.id: {:#?}", session_user.id);
@@ -1468,9 +1481,12 @@ mod tests {
     async fn test_verify_session_then_finish_registration_success() {
         use crate::passkey::main::test_utils as passkey_test_utils;
         use crate::passkey::main::types::AuthenticatorAttestationResponse;
-        use crate::passkey::main::utils::{get_from_cache, remove_from_cache, store_in_cache};
         use crate::passkey::types::{PublicKeyCredentialUserEntity, SessionInfo};
         use crate::session::User as SessionUser;
+        use crate::storage::{
+            CacheKey, CachePrefix, get_data_by_category, remove_data_by_category,
+            store_data_with_category,
+        };
         use crate::test_utils::init_test_environment;
 
         init_test_environment().await;
@@ -1493,7 +1509,17 @@ mod tests {
         let session_info = SessionInfo {
             user: session_user.clone(),
         };
-        let store_result = store_in_cache("session_info", user_handle, session_info, 3600).await;
+        let cache_prefix =
+            CachePrefix::new("session_info".to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(user_handle.to_string()).expect("Failed to create cache key");
+        let store_result = store_data_with_category::<_, PasskeyError>(
+            cache_prefix,
+            Some(cache_key),
+            session_info,
+            3600,
+            None,
+        )
+        .await;
         assert!(store_result.is_ok(), "Failed to store session info");
 
         // Create registration challenge in cache
@@ -1511,8 +1537,17 @@ mod tests {
                 .as_secs(),
             ttl: 3600,
         };
-        let challenge_store_result =
-            store_in_cache("regi_challenge", user_handle, stored_options, 3600).await;
+        let cache_prefix =
+            CachePrefix::new("regi_challenge".to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(user_handle.to_string()).expect("Failed to create cache key");
+        let challenge_store_result = store_data_with_category::<_, PasskeyError>(
+            cache_prefix,
+            Some(cache_key),
+            stored_options,
+            3600,
+            None,
+        )
+        .await;
         assert!(challenge_store_result.is_ok(), "Failed to store challenge");
 
         // Create test credential for storage
@@ -1621,7 +1656,8 @@ mod tests {
         // Verify session info was removed from cache
         let (cache_prefix, cache_key) =
             crate::storage::create_cache_keys("session_info", user_handle).unwrap();
-        let session_check = get_from_cache::<SessionInfo>(cache_prefix, cache_key).await;
+        let session_check =
+            get_data_by_category::<SessionInfo, PasskeyError>(cache_prefix, cache_key).await;
         assert!(session_check.is_ok());
         assert!(
             session_check.unwrap().is_none(),
@@ -1634,7 +1670,7 @@ mod tests {
         if let Ok((cache_prefix, cache_key)) =
             crate::storage::create_cache_keys("regi_challenge", user_handle)
         {
-            let _ = remove_from_cache(cache_prefix, cache_key).await;
+            let _ = remove_data_by_category::<PasskeyError>(cache_prefix, cache_key).await;
         }
     }
 
@@ -1746,9 +1782,11 @@ mod tests {
     #[tokio::test]
     async fn test_verify_session_then_finish_registration_user_id_mismatch() {
         use crate::passkey::main::types::AuthenticatorAttestationResponse;
-        use crate::passkey::main::utils::{get_from_cache, store_in_cache};
         use crate::passkey::types::SessionInfo;
         use crate::session::User as SessionUser;
+        use crate::storage::{
+            CacheKey, CachePrefix, get_data_by_category, store_data_with_category,
+        };
         use crate::test_utils::init_test_environment;
 
         init_test_environment().await;
@@ -1781,7 +1819,17 @@ mod tests {
         let session_info = SessionInfo {
             user: stored_session_user,
         };
-        let store_result = store_in_cache("session_info", user_handle, session_info, 3600).await;
+        let cache_prefix =
+            CachePrefix::new("session_info".to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(user_handle.to_string()).expect("Failed to create cache key");
+        let store_result = store_data_with_category::<_, PasskeyError>(
+            cache_prefix,
+            Some(cache_key),
+            session_info,
+            3600,
+            None,
+        )
+        .await;
         assert!(store_result.is_ok(), "Failed to store session info");
 
         let reg_data = super::RegisterCredential {
@@ -1813,7 +1861,8 @@ mod tests {
         // Verify session info was still removed from cache (cleanup on security failure)
         let (cache_prefix, cache_key) =
             crate::storage::create_cache_keys("session_info", user_handle).unwrap();
-        let session_check = get_from_cache::<SessionInfo>(cache_prefix, cache_key).await;
+        let session_check =
+            get_data_by_category::<SessionInfo, PasskeyError>(cache_prefix, cache_key).await;
         assert!(session_check.is_ok());
         assert!(
             session_check.unwrap().is_none(),
@@ -1859,7 +1908,7 @@ mod tests {
     /// 4. Verifies that verification succeeds and cleans up cache data
     #[tokio::test]
     async fn test_verify_client_data_success() {
-        use crate::passkey::main::utils::store_in_cache;
+        use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
         use crate::test_utils::init_test_environment;
 
         init_test_environment().await;
@@ -1882,8 +1931,17 @@ mod tests {
             ttl: 3600,
         };
 
-        let store_result =
-            store_in_cache("regi_challenge", user_handle, stored_options, 3600).await;
+        let cache_prefix =
+            CachePrefix::new("regi_challenge".to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(user_handle.to_string()).expect("Failed to create cache key");
+        let store_result = store_data_with_category::<_, PasskeyError>(
+            cache_prefix,
+            Some(cache_key),
+            stored_options,
+            3600,
+            None,
+        )
+        .await;
         assert!(store_result.is_ok(), "Failed to store challenge in cache");
 
         // Create valid client data
@@ -1912,7 +1970,7 @@ mod tests {
         if let Ok((cache_prefix, cache_key)) =
             crate::storage::create_cache_keys("regi_challenge", user_handle)
         {
-            let _ = remove_from_cache(cache_prefix, cache_key).await;
+            let _ = remove_data_by_category::<PasskeyError>(cache_prefix, cache_key).await;
         }
     }
 
@@ -2140,7 +2198,7 @@ mod tests {
     /// 4. Verifies that verification fails with challenge validation error
     #[tokio::test]
     async fn test_verify_client_data_challenge_mismatch() {
-        use crate::passkey::main::utils::store_in_cache;
+        use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
         use crate::test_utils::init_test_environment;
 
         init_test_environment().await;
@@ -2164,8 +2222,17 @@ mod tests {
             ttl: 3600,
         };
 
-        let store_result =
-            store_in_cache("regi_challenge", user_handle, stored_options, 3600).await;
+        let cache_prefix =
+            CachePrefix::new("regi_challenge".to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(user_handle.to_string()).expect("Failed to create cache key");
+        let store_result = store_data_with_category::<_, PasskeyError>(
+            cache_prefix,
+            Some(cache_key),
+            stored_options,
+            3600,
+            None,
+        )
+        .await;
         assert!(store_result.is_ok(), "Failed to store challenge in cache");
 
         // Create client data with different challenge
@@ -2196,7 +2263,7 @@ mod tests {
         if let Ok((cache_prefix, cache_key)) =
             crate::storage::create_cache_keys("regi_challenge", user_handle)
         {
-            let _ = remove_from_cache(cache_prefix, cache_key).await;
+            let _ = remove_data_by_category::<PasskeyError>(cache_prefix, cache_key).await;
         }
     }
 
@@ -2209,7 +2276,7 @@ mod tests {
     /// 4. Verifies that verification fails with "Invalid origin" error (prevents origin spoofing)
     #[tokio::test]
     async fn test_verify_client_data_origin_mismatch() {
-        use crate::passkey::main::utils::store_in_cache;
+        use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
         use crate::test_utils::init_test_environment;
 
         init_test_environment().await;
@@ -2232,8 +2299,17 @@ mod tests {
             ttl: 3600,
         };
 
-        let store_result =
-            store_in_cache("regi_challenge", user_handle, stored_options, 3600).await;
+        let cache_prefix =
+            CachePrefix::new("regi_challenge".to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(user_handle.to_string()).expect("Failed to create cache key");
+        let store_result = store_data_with_category::<_, PasskeyError>(
+            cache_prefix,
+            Some(cache_key),
+            stored_options,
+            3600,
+            None,
+        )
+        .await;
         assert!(store_result.is_ok(), "Failed to store challenge in cache");
 
         // Create client data with wrong origin
@@ -2265,7 +2341,7 @@ mod tests {
         if let Ok((cache_prefix, cache_key)) =
             crate::storage::create_cache_keys("regi_challenge", user_handle)
         {
-            let _ = remove_from_cache(cache_prefix, cache_key).await;
+            let _ = remove_data_by_category::<PasskeyError>(cache_prefix, cache_key).await;
         }
     } // ========================================
     // extract_credential_public_key tests

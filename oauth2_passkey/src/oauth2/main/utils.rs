@@ -10,8 +10,10 @@ use crate::oauth2::{OAuth2Error, OAuth2Mode, StateParams, StoredToken};
 use crate::session::{
     User as SessionUser, delete_session_from_store_by_session_id, get_user_from_session,
 };
-use crate::storage::{CacheData, GENERIC_CACHE_STORE};
-use crate::utils::{gen_random_string, gen_random_string_with_entropy_validation};
+use crate::storage::{
+    CacheData, CacheKey, CachePrefix, get_data_by_category, remove_data, store_data_with_category,
+};
+use crate::utils::gen_random_string_with_entropy_validation;
 
 pub(super) fn encode_state(state_params: StateParams) -> Result<String, OAuth2Error> {
     let state_json =
@@ -56,8 +58,6 @@ pub(super) async fn store_token_in_cache(
     expires_at: DateTime<Utc>,
     user_agent: Option<String>,
 ) -> Result<String, OAuth2Error> {
-    let token_id = gen_random_string(32)?;
-
     let token_data = StoredToken {
         token: token.to_string(),
         expires_at,
@@ -65,20 +65,14 @@ pub(super) async fn store_token_in_cache(
         ttl,
     };
 
-    let (cache_prefix, cache_key) = crate::storage::create_cache_keys(token_type, &token_id)
+    let cache_prefix = CachePrefix::new(token_type.to_string())
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .put_with_ttl(
-            cache_prefix,
-            cache_key,
-            token_data.into(),
-            ttl.try_into().unwrap(),
-        )
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+    // Use unified wrapper with auto-generated key (no collision detection for simple case)
+    let token_id =
+        store_data_with_category::<_, OAuth2Error>(cache_prefix, None, token_data, ttl, Some(1))
+            .await?
+            .unwrap(); // Safe unwrap - auto-generated key always returns Some(key)
 
     Ok(token_id)
 }
@@ -116,51 +110,21 @@ pub(super) async fn store_token_in_cache_atomic(
         ttl,
     };
 
-    // Convert TTL once outside the loop
-    let ttl_usize = ttl
-        .try_into()
-        .map_err(|_| OAuth2Error::Storage("TTL value too large for storage backend".to_string()))?;
+    let cache_prefix = CachePrefix::new(token_type.to_string())
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
-    for attempt in 1..=MAX_COLLISION_ATTEMPTS {
-        // Use enhanced entropy validation for token ID generation
-        let token_id = gen_random_string_with_entropy_validation(32)
-            .map_err(|e| OAuth2Error::Storage(format!("Token ID generation failed: {e}")))?;
+    // Use unified wrapper with auto-generated key and collision detection
+    let token_id = store_data_with_category::<_, OAuth2Error>(
+        cache_prefix,
+        None,
+        token_data,
+        ttl,
+        Some(MAX_COLLISION_ATTEMPTS),
+    )
+    .await?
+    .unwrap(); // Safe unwrap - auto-generated key always returns Some(key)
 
-        let (cache_prefix, cache_key) = crate::storage::create_cache_keys(token_type, &token_id)
-            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-        // Attempt atomic insertion
-        let inserted = GENERIC_CACHE_STORE
-            .lock()
-            .await
-            .put_if_not_exists(
-                cache_prefix,
-                cache_key,
-                token_data.clone().into(),
-                ttl_usize,
-            )
-            .await
-            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-        if inserted {
-            tracing::debug!(
-                "Token stored successfully with atomic operation on attempt {}/{}",
-                attempt,
-                MAX_COLLISION_ATTEMPTS
-            );
-            return Ok(token_id);
-        }
-
-        tracing::warn!(
-            "Token ID collision detected on attempt {}/{}, retrying with new ID",
-            attempt,
-            MAX_COLLISION_ATTEMPTS
-        );
-    }
-
-    Err(OAuth2Error::Storage(format!(
-        "Failed to store token after {MAX_COLLISION_ATTEMPTS} collision detection attempts"
-    )))
+    Ok(token_id)
 }
 
 pub(super) async fn generate_store_token(
@@ -183,31 +147,23 @@ pub(super) async fn get_token_from_store<T>(
 where
     T: TryFrom<CacheData, Error = OAuth2Error>,
 {
-    let (cache_prefix, cache_key) = crate::storage::create_cache_keys(token_type, token_id)
+    let cache_prefix = CachePrefix::new(token_type.to_string())
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+    let cache_key =
+        CacheKey::new(token_id.to_string()).map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get(cache_prefix, cache_key)
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?
+    get_data_by_category::<T, OAuth2Error>(cache_prefix, cache_key)
+        .await?
         .ok_or_else(|| {
             OAuth2Error::SecurityTokenNotFound(format!("{token_type}-session not found"))
-        })?
-        .try_into()
+        })
 }
 
 pub(super) async fn remove_token_from_store(
     cache_prefix: crate::storage::CachePrefix,
     cache_key: crate::storage::CacheKey,
 ) -> Result<(), OAuth2Error> {
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .remove(cache_prefix, cache_key)
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))
+    remove_data::<OAuth2Error>(cache_prefix, cache_key).await
 }
 
 pub(crate) async fn validate_origin(

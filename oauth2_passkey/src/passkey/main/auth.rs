@@ -15,7 +15,8 @@ use super::types::{
     AllowCredential, AuthenticationOptions, AuthenticatorData, AuthenticatorResponse,
     ParsedClientData,
 };
-use super::utils::{name2cid_str_vec, store_in_cache};
+use super::utils::name2cid_str_vec;
+use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
 
 pub(crate) async fn start_authentication(
     username: Option<String>,
@@ -54,11 +55,16 @@ pub(crate) async fn start_authentication(
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    store_in_cache(
-        "auth_challenge",
-        &auth_id,
+    let cache_prefix = CachePrefix::new("auth_challenge".to_string())
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    let cache_key =
+        CacheKey::new(auth_id.clone()).map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    store_data_with_category::<_, PasskeyError>(
+        cache_prefix,
+        Some(cache_key),
         stored_options,
-        *PASSKEY_CHALLENGE_TIMEOUT as usize,
+        (*PASSKEY_CHALLENGE_TIMEOUT).into(),
+        None,
     )
     .await?;
 

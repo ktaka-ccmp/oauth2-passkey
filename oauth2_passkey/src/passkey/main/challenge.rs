@@ -1,9 +1,9 @@
 use std::time::SystemTime;
 
-use super::utils::{get_from_cache, remove_from_cache};
 use crate::passkey::config::PASSKEY_CHALLENGE_TIMEOUT;
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::StoredOptions;
+use crate::storage::{get_data, remove_data};
 
 /// Retrieves and validates a stored challenge from the cache
 ///
@@ -18,9 +18,10 @@ pub(super) async fn get_and_validate_options(
     let (cache_prefix, cache_key) = crate::storage::create_cache_keys(challenge_type, id)
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    let stored_options: StoredOptions = get_from_cache(cache_prefix, cache_key)
-        .await?
-        .ok_or(PasskeyError::NotFound("Challenge not found".to_string()))?;
+    let stored_options: StoredOptions =
+        get_data::<StoredOptions, PasskeyError>(cache_prefix, cache_key)
+            .await?
+            .ok_or(PasskeyError::NotFound("Challenge not found".to_string()))?;
 
     // Validate challenge TTL
     let now = SystemTime::now()
@@ -53,7 +54,7 @@ pub(super) async fn remove_options(
     cache_prefix: crate::storage::CachePrefix,
     cache_key: crate::storage::CacheKey,
 ) -> Result<(), PasskeyError> {
-    remove_from_cache(cache_prefix, cache_key).await?;
+    remove_data::<PasskeyError>(cache_prefix, cache_key).await?;
     tracing::debug!("Removed challenge options for cache operation");
 
     Ok(())
@@ -118,12 +119,17 @@ mod tests {
         let id = "test_id";
         let stored_options = create_valid_stored_options();
 
-        // Store the options first using the utils function
-        super::super::utils::store_in_cache(
-            challenge_type,
-            id,
+        // Store the options first using unified cache operations
+        use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
+        let cache_prefix =
+            CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
+        store_data_with_category::<_, PasskeyError>(
+            cache_prefix,
+            Some(cache_key),
             stored_options.clone(),
             300, // TTL in seconds
+            None,
         )
         .await
         .expect("Failed to store options");
@@ -165,11 +171,16 @@ mod tests {
         let expired_options = create_expired_stored_options();
 
         // Store the expired options
-        super::super::utils::store_in_cache(
-            challenge_type,
-            id,
+        use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
+        let cache_prefix =
+            CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
+        store_data_with_category::<_, PasskeyError>(
+            cache_prefix,
+            Some(cache_key),
             expired_options,
             300, // TTL in seconds
+            None,
         )
         .await
         .expect("Failed to store expired options");
@@ -198,11 +209,16 @@ mod tests {
         let stored_options = create_valid_stored_options();
 
         // Store the options first
-        super::super::utils::store_in_cache(
-            challenge_type,
-            id,
+        use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
+        let cache_prefix =
+            CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
+        store_data_with_category::<_, PasskeyError>(
+            cache_prefix,
+            Some(cache_key),
             stored_options,
             300, // TTL in seconds
+            None,
         )
         .await
         .expect("Failed to store options");
@@ -210,12 +226,11 @@ mod tests {
         // Verify it exists
         let (cache_prefix_verify, cache_key_verify) =
             crate::storage::create_cache_keys(challenge_type, id).unwrap();
-        let before_removal = super::super::utils::get_from_cache::<StoredOptions>(
-            cache_prefix_verify,
-            cache_key_verify,
-        )
-        .await
-        .expect("Failed to get from cache");
+        use crate::storage::get_data_by_category;
+        let before_removal: Option<StoredOptions> =
+            get_data_by_category::<_, PasskeyError>(cache_prefix_verify, cache_key_verify)
+                .await
+                .expect("Failed to get from cache");
         assert!(before_removal.is_some());
 
         // Remove it
@@ -227,12 +242,10 @@ mod tests {
         // Verify it's gone
         let (cache_prefix_after, cache_key_after) =
             crate::storage::create_cache_keys(challenge_type, id).unwrap();
-        let after_removal = super::super::utils::get_from_cache::<StoredOptions>(
-            cache_prefix_after,
-            cache_key_after,
-        )
-        .await
-        .expect("Failed to get from cache");
+        let after_removal: Option<StoredOptions> =
+            get_data_by_category::<_, PasskeyError>(cache_prefix_after, cache_key_after)
+                .await
+                .expect("Failed to get from cache");
         assert!(after_removal.is_none());
     }
 
@@ -279,11 +292,16 @@ mod tests {
             ttl: 86400, // 24 hours - should be ignored
         };
 
-        super::super::utils::store_in_cache(
-            challenge_type,
-            id,
+        use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
+        let cache_prefix =
+            CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
+        store_data_with_category::<_, PasskeyError>(
+            cache_prefix,
+            Some(cache_key),
             stored_options,
             300, // TTL in seconds
+            None,
         )
         .await
         .expect("Failed to store options");

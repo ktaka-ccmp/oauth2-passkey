@@ -12,7 +12,10 @@ use crate::session::types::{
 use crate::userdb::UserStore;
 use crate::utils::{gen_random_string_with_entropy_validation, header_set_cookie};
 
-use crate::storage::{CacheKey, CachePrefix, GENERIC_CACHE_STORE};
+use crate::storage::{
+    CacheKey, CachePrefix, GENERIC_CACHE_STORE, get_data_by_category, remove_data_by_category,
+    store_data_with_category,
+};
 
 /// Prepare a logout response by removing the session cookie and deleting the session from storage
 ///
@@ -54,21 +57,14 @@ pub(super) async fn create_new_session_with_uid(user_id: &str) -> Result<HeaderM
         ttl: *SESSION_COOKIE_MAX_AGE,
     };
 
-    {
-        let cache_key =
-            CacheKey::new(session_id.clone()).map_err(|e| SessionError::Storage(e.to_string()))?;
-        GENERIC_CACHE_STORE
-            .lock()
-            .await
-            .put_with_ttl(
-                CachePrefix::session(),
-                cache_key,
-                stored_session.into(),
-                *SESSION_COOKIE_MAX_AGE as usize,
-            )
-            .await
-    }
-    .map_err(|e| SessionError::Storage(e.to_string()))?;
+    store_data_with_category::<_, SessionError>(
+        CachePrefix::session(),
+        Some(CacheKey::new(session_id.clone()).map_err(|e| SessionError::Storage(e.to_string()))?),
+        stored_session,
+        *SESSION_COOKIE_MAX_AGE,
+        None,
+    )
+    .await?;
 
     let mut headers = HeaderMap::new();
     header_set_cookie(
@@ -88,15 +84,11 @@ async fn delete_session_from_store(
     cookie_name: String,
 ) -> Result<(), SessionError> {
     if let Some(cookie) = cookies.get(&cookie_name) {
-        let cache_key =
-            CacheKey::new(cookie.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?;
-
-        GENERIC_CACHE_STORE
-            .lock()
-            .await
-            .remove(CachePrefix::session(), cache_key)
-            .await
-            .map_err(|e| SessionError::Storage(e.to_string()))?;
+        remove_data_by_category::<SessionError>(
+            CachePrefix::session(),
+            CacheKey::new(cookie.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?,
+        )
+        .await?;
     };
     Ok(())
 }
@@ -104,15 +96,11 @@ async fn delete_session_from_store(
 pub(crate) async fn delete_session_from_store_by_session_id(
     session_id: &str,
 ) -> Result<(), SessionError> {
-    let cache_key =
-        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?;
-
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .remove(CachePrefix::session(), cache_key)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?;
+    remove_data_by_category::<SessionError>(
+        CachePrefix::session(),
+        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?,
+    )
+    .await?;
     Ok(())
 }
 
@@ -144,17 +132,13 @@ pub(crate) async fn delete_session_from_store_by_session_id(
 #[tracing::instrument(fields(session_cookie = %session_cookie, user_id))]
 pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, SessionError> {
     tracing::debug!("Retrieving user from session");
-    let cache_key = CacheKey::new(session_cookie.to_string())
-        .map_err(|e| SessionError::Storage(e.to_string()))?;
-    let cached_session = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get(CachePrefix::session(), cache_key)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
-        .ok_or(SessionError::SessionError)?;
-
-    let stored_session: StoredSession = cached_session.try_into()?;
+    let stored_session = get_data_by_category::<StoredSession, SessionError>(
+        CachePrefix::session(),
+        CacheKey::new(session_cookie.to_string())
+            .map_err(|e| SessionError::Storage(e.to_string()))?,
+    )
+    .await?
+    .ok_or(SessionError::SessionError)?;
 
     let user = UserStore::get_user(&stored_session.user_id)
         .await
@@ -603,17 +587,12 @@ pub async fn is_authenticated_basic_then_user_and_csrf(
 #[tracing::instrument(fields(session_id = %session_id))]
 pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, SessionError> {
     tracing::debug!("Retrieving CSRF token from session");
-    let cache_key =
-        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?;
-    let cached_session = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get(CachePrefix::session(), cache_key)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
-        .ok_or(SessionError::SessionError)?;
-
-    let stored_session: StoredSession = cached_session.try_into()?;
+    let stored_session = get_data_by_category::<StoredSession, SessionError>(
+        CachePrefix::session(),
+        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?,
+    )
+    .await?
+    .ok_or(SessionError::SessionError)?;
 
     // Check if session is expired
     if stored_session.expires_at < Utc::now() {
@@ -652,17 +631,12 @@ pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, 
 pub async fn get_user_and_csrf_token_from_session(
     session_id: &str,
 ) -> Result<(SessionUser, CsrfToken), SessionError> {
-    let cache_key =
-        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?;
-    let cached_session = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get(CachePrefix::session(), cache_key)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
-        .ok_or(SessionError::SessionError)?;
-
-    let stored_session: StoredSession = cached_session.try_into()?;
+    let stored_session = get_data_by_category::<StoredSession, SessionError>(
+        CachePrefix::session(),
+        CacheKey::new(session_id.to_string()).map_err(|e| SessionError::Storage(e.to_string()))?,
+    )
+    .await?
+    .ok_or(SessionError::SessionError)?;
 
     // Check if session is expired
     if stored_session.expires_at < Utc::now() {

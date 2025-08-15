@@ -11,6 +11,7 @@
 //! - Schema validation: Database schema verification for supported backends
 //! - Adapters for SQLite, PostgreSQL, and Redis
 
+mod cache_operations;
 mod cache_store;
 mod data_store;
 mod errors;
@@ -26,7 +27,12 @@ pub(crate) async fn init() -> Result<(), errors::StorageError> {
     Ok(())
 }
 
+pub(crate) use cache_operations::{
+    CacheErrorConversion, get_data, get_data_by_category, remove_data, remove_data_by_category,
+    store_data_with_category, store_data_with_manual_expiration,
+};
 pub(crate) use cache_store::GENERIC_CACHE_STORE;
+pub(crate) use errors::StorageError;
 pub(crate) use types::{CacheData, CacheKey, CachePrefix, create_cache_keys};
 
 pub(crate) use data_store::{DB_TABLE_PREFIX, GENERIC_DATA_STORE};

@@ -1,5 +1,7 @@
 use crate::passkey::PasskeyError;
-use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
+use crate::storage::{
+    CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE, store_data_with_manual_expiration,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -73,16 +75,14 @@ async fn store_aaguid_in_cache(json: String) -> Result<(), PasskeyError> {
             expires_at: chrono::Utc::now() + chrono::Duration::hours(24), // AAGUID data expires in 24 hours
         };
 
+        let cache_prefix = CachePrefix::aaguid();
         let cache_key =
-            CacheKey::new(aaguid.clone()).map_err(|e| PasskeyError::Storage(e.to_string()))?;
-        GENERIC_CACHE_STORE
-            .lock()
-            .await
-            .put(CachePrefix::aaguid(), cache_key, cache_data)
+            CacheKey::new(aaguid.to_string()).map_err(|e| PasskeyError::Storage(e.to_string()))?;
+        store_data_with_manual_expiration::<_, PasskeyError>(cache_prefix, cache_key, cache_data)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to store AAGUID {} in cache: {}", aaguid, e);
-                PasskeyError::Storage(e.to_string())
+                e
             })?;
     }
     tracing::info!(
@@ -110,12 +110,13 @@ async fn store_aaguid_in_cache(json: String) -> Result<(), PasskeyError> {
 pub async fn get_authenticator_info(
     aaguid: &str,
 ) -> Result<Option<AuthenticatorInfo>, PasskeyError> {
+    let cache_prefix = CachePrefix::aaguid();
     let cache_key =
         CacheKey::new(aaguid.to_string()).map_err(|e| PasskeyError::Storage(e.to_string()))?;
     let cache_value = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get(CachePrefix::aaguid(), cache_key)
+        .get(cache_prefix, cache_key)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
@@ -153,13 +154,9 @@ pub async fn get_authenticator_info_batch(
     // If your cache store supports MGET, use it here for efficiency.
     // For now, do it sequentially (still avoids duplicate lookups).
     for aaguid in aaguids {
+        let cache_prefix = CachePrefix::aaguid();
         if let Ok(cache_key) = CacheKey::new(aaguid.clone()) {
-            if let Some(cache_data) = cache
-                .get(CachePrefix::aaguid(), cache_key)
-                .await
-                .ok()
-                .flatten()
-            {
+            if let Some(cache_data) = cache.get(cache_prefix, cache_key).await.ok().flatten() {
                 if let Ok(info) = serde_json::from_str::<AuthenticatorInfo>(&cache_data.value) {
                     result.insert(aaguid.clone(), info);
                 }
