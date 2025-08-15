@@ -119,17 +119,16 @@ mod tests {
         let id = "test_id";
         let stored_options = create_valid_stored_options();
 
-        // Store the options first using unified cache operations
-        use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
+        // Store the options first using simplified cache operations
+        use crate::storage::{CacheKey, CachePrefix, store_cache_keyed};
         let cache_prefix =
             CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
         let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
-        store_data_with_category::<_, PasskeyError>(
+        store_cache_keyed::<_, PasskeyError>(
             cache_prefix,
-            Some(cache_key),
+            cache_key,
             stored_options.clone(),
             300, // TTL in seconds
-            None,
         )
         .await
         .expect("Failed to store options");
@@ -171,16 +170,15 @@ mod tests {
         let expired_options = create_expired_stored_options();
 
         // Store the expired options
-        use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
+        use crate::storage::{CacheKey, CachePrefix, store_cache_keyed};
         let cache_prefix =
             CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
         let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
-        store_data_with_category::<_, PasskeyError>(
+        store_cache_keyed::<_, PasskeyError>(
             cache_prefix,
-            Some(cache_key),
+            cache_key,
             expired_options,
             300, // TTL in seconds
-            None,
         )
         .await
         .expect("Failed to store expired options");
@@ -209,16 +207,15 @@ mod tests {
         let stored_options = create_valid_stored_options();
 
         // Store the options first
-        use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
+        use crate::storage::{CacheKey, CachePrefix, store_cache_keyed};
         let cache_prefix =
             CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
         let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
-        store_data_with_category::<_, PasskeyError>(
+        store_cache_keyed::<_, PasskeyError>(
             cache_prefix,
-            Some(cache_key),
+            cache_key,
             stored_options,
             300, // TTL in seconds
-            None,
         )
         .await
         .expect("Failed to store options");
@@ -226,9 +223,9 @@ mod tests {
         // Verify it exists
         let (cache_prefix_verify, cache_key_verify) =
             crate::storage::create_cache_keys(challenge_type, id).unwrap();
-        use crate::storage::get_data_by_category;
+        use crate::storage::get_data;
         let before_removal: Option<StoredOptions> =
-            get_data_by_category::<_, PasskeyError>(cache_prefix_verify, cache_key_verify)
+            get_data::<_, PasskeyError>(cache_prefix_verify, cache_key_verify)
                 .await
                 .expect("Failed to get from cache");
         assert!(before_removal.is_some());
@@ -243,7 +240,7 @@ mod tests {
         let (cache_prefix_after, cache_key_after) =
             crate::storage::create_cache_keys(challenge_type, id).unwrap();
         let after_removal: Option<StoredOptions> =
-            get_data_by_category::<_, PasskeyError>(cache_prefix_after, cache_key_after)
+            get_data::<_, PasskeyError>(cache_prefix_after, cache_key_after)
                 .await
                 .expect("Failed to get from cache");
         assert!(after_removal.is_none());
@@ -292,16 +289,15 @@ mod tests {
             ttl: 86400, // 24 hours - should be ignored
         };
 
-        use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
+        use crate::storage::{CacheKey, CachePrefix, store_cache_keyed};
         let cache_prefix =
             CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
         let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
-        store_data_with_category::<_, PasskeyError>(
+        store_cache_keyed::<_, PasskeyError>(
             cache_prefix,
-            Some(cache_key),
+            cache_key,
             stored_options,
             300, // TTL in seconds
-            None,
         )
         .await
         .expect("Failed to store options");

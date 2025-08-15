@@ -17,9 +17,9 @@ use crate::utils::base64url_encode;
 use super::google::{exchange_code_for_token, fetch_user_data_from_google};
 use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken_with_algorithm};
 use super::utils::{
-    decode_state, encode_state, generate_store_token, get_token_from_store,
-    remove_token_from_store, store_token_in_cache,
+    decode_state, encode_state, generate_store_token, get_token_from_store, remove_token_from_store,
 };
+use crate::storage::{CachePrefix, store_cache_auto};
 
 /// Prepares an OAuth2 authentication request URL and necessary headers.
 ///
@@ -85,14 +85,30 @@ async fn prepare_oauth2_auth_request_with_params(
 
     let misc_id = if let Some(session_id) = get_session_id_from_headers(&headers)? {
         tracing::info!("Session ID found: {}", session_id);
-        Some(store_token_in_cache("misc_session", session_id, ttl, expires_at, None).await?)
+        let stored_token = StoredToken {
+            token: session_id.to_string(),
+            expires_at,
+            user_agent: None,
+            ttl,
+        };
+        let cache_prefix = CachePrefix::new("misc_session".to_string())
+            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+        Some(store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await?)
     } else {
         tracing::debug!("No session ID found");
         None
     };
 
     let mode_id = if let Some(mode) = mode {
-        Some(store_token_in_cache("mode", mode, ttl, expires_at, None).await?)
+        let stored_token = StoredToken {
+            token: mode.to_string(),
+            expires_at,
+            user_agent: None,
+            ttl,
+        };
+        let cache_prefix = CachePrefix::new("mode".to_string())
+            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+        Some(store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await?)
     } else {
         None
     };

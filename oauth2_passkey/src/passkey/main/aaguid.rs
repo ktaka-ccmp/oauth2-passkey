@@ -1,7 +1,5 @@
 use crate::passkey::PasskeyError;
-use crate::storage::{
-    CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE, store_data_with_manual_expiration,
-};
+use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -29,6 +27,16 @@ impl Default for AuthenticatorInfo {
             name: "Unknown Authenticator".to_string(),
             icon_dark: None,
             icon_light: None,
+        }
+    }
+}
+
+impl From<AuthenticatorInfo> for CacheData {
+    fn from(info: AuthenticatorInfo) -> Self {
+        let value = serde_json::to_string(&info).unwrap_or_else(|_| "{}".to_string()); // Fallback to empty JSON on serialization error
+        CacheData {
+            value,
+            expires_at: chrono::Utc::now() + chrono::Duration::days(365), // 1 year, effectively permanent
         }
     }
 }
@@ -65,25 +73,22 @@ async fn store_aaguid_in_cache(json: String) -> Result<(), PasskeyError> {
     })?;
 
     for (aaguid, info) in &aaguid_map.0 {
-        // Convert to JSON string first
-        let json_string =
-            serde_json::to_string(&info).map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-        // Create CacheData with the JSON string
-        let cache_data = CacheData {
-            value: json_string,
-            expires_at: chrono::Utc::now() + chrono::Duration::hours(24), // AAGUID data expires in 24 hours
-        };
-
         let cache_prefix = CachePrefix::aaguid();
         let cache_key =
             CacheKey::new(aaguid.to_string()).map_err(|e| PasskeyError::Storage(e.to_string()))?;
-        store_data_with_manual_expiration::<_, PasskeyError>(cache_prefix, cache_key, cache_data)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to store AAGUID {} in cache: {}", aaguid, e);
-                e
-            })?;
+
+        // Use simplified cache API for meaningful AAGUID keys (1 year = 31536000 seconds, effectively permanent)
+        crate::storage::store_cache_keyed::<_, PasskeyError>(
+            cache_prefix,
+            cache_key,
+            info.clone(),
+            31536000,
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to store AAGUID {} in cache: {}", aaguid, e);
+            e
+        })?;
     }
     tracing::info!(
         "Successfully loaded {} AAGUID mappings into cache",

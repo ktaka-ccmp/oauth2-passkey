@@ -28,9 +28,9 @@ pub(crate) async fn init() -> Result<(), errors::StorageError> {
 }
 
 pub(crate) use cache_operations::{
-    CacheErrorConversion, get_data, get_data_by_category, remove_data, remove_data_by_category,
-    store_data_with_category, store_data_with_manual_expiration,
+    CacheErrorConversion, get_data, remove_data, store_cache_auto, store_cache_keyed,
 };
+
 pub(crate) use cache_store::GENERIC_CACHE_STORE;
 pub(crate) use errors::StorageError;
 pub(crate) use types::{CacheData, CacheKey, CachePrefix, create_cache_keys};

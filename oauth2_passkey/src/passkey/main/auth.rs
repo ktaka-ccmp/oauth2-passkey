@@ -16,7 +16,7 @@ use super::types::{
     ParsedClientData,
 };
 use super::utils::name2cid_str_vec;
-use crate::storage::{CacheKey, CachePrefix, store_data_with_category};
+use crate::storage::{CacheKey, CachePrefix, store_cache_keyed};
 
 pub(crate) async fn start_authentication(
     username: Option<String>,
@@ -59,12 +59,11 @@ pub(crate) async fn start_authentication(
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
     let cache_key =
         CacheKey::new(auth_id.clone()).map_err(|e| PasskeyError::Storage(e.to_string()))?;
-    store_data_with_category::<_, PasskeyError>(
+    store_cache_keyed::<_, PasskeyError>(
         cache_prefix,
-        Some(cache_key),
+        cache_key,
         stored_options,
         (*PASSKEY_CHALLENGE_TIMEOUT).into(),
-        None,
     )
     .await?;
 

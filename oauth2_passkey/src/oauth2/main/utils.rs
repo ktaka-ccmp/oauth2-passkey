@@ -10,9 +10,7 @@ use crate::oauth2::{OAuth2Error, OAuth2Mode, StateParams, StoredToken};
 use crate::session::{
     User as SessionUser, delete_session_from_store_by_session_id, get_user_from_session,
 };
-use crate::storage::{
-    CacheData, CacheKey, CachePrefix, get_data_by_category, remove_data, store_data_with_category,
-};
+use crate::storage::{CacheData, CacheKey, CachePrefix, get_data, remove_data, store_cache_auto};
 use crate::utils::gen_random_string_with_entropy_validation;
 
 pub(super) fn encode_state(state_params: StateParams) -> Result<String, OAuth2Error> {
@@ -32,101 +30,6 @@ pub(crate) fn decode_state(state: &str) -> Result<StateParams, OAuth2Error> {
     Ok(state_in_response)
 }
 
-/// Store OAuth2-related tokens in the cache store
-///
-/// This function:
-/// 1. Generates a unique token ID
-/// 2. Creates a StoredToken struct with the token data and TTL
-/// 3. Stores the token in the cache using the provided token type and token ID
-///
-/// The token is stored with a TTL based on OAUTH2_CSRF_COOKIE_MAX_AGE
-/// and can be retrieved later using the token_type and token_id
-///
-/// # Arguments
-/// * `token_type` - Type identifier for the token (e.g., "access_token", "refresh_token")
-/// * `token` - The actual token string to store
-/// * `expires_at` - The expiration time of the token
-/// * `user_agent` - Optional user agent string for tracking
-///
-/// # Returns
-/// * `Ok(token_id)` - The generated token ID that can be used to retrieve the token
-/// * `Err(OAuth2Error)` - If token generation or storage fails
-pub(super) async fn store_token_in_cache(
-    token_type: &str,
-    token: &str,
-    ttl: u64,
-    expires_at: DateTime<Utc>,
-    user_agent: Option<String>,
-) -> Result<String, OAuth2Error> {
-    let token_data = StoredToken {
-        token: token.to_string(),
-        expires_at,
-        user_agent,
-        ttl,
-    };
-
-    let cache_prefix = CachePrefix::new(token_type.to_string())
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-    // Use unified wrapper with auto-generated key (no collision detection for simple case)
-    let token_id =
-        store_data_with_category::<_, OAuth2Error>(cache_prefix, None, token_data, ttl, Some(1))
-            .await?
-            .unwrap(); // Safe unwrap - auto-generated key always returns Some(key)
-
-    Ok(token_id)
-}
-
-/// Store OAuth2-related tokens with atomic collision detection.
-///
-/// This function provides enhanced security by:
-/// 1. Using entropy-validated random generation
-/// 2. Atomic check-and-set operations to prevent race conditions
-/// 3. Multiple collision detection attempts
-///
-/// # Arguments
-/// * `token_type` - Type identifier for the token (e.g., "access_token", "refresh_token")
-/// * `token` - The actual token string to store
-/// * `ttl` - Time to live in seconds
-/// * `expires_at` - The expiration time of the token
-/// * `user_agent` - Optional user agent string for tracking
-///
-/// # Returns
-/// * `Ok(token_id)` - The generated token ID that can be used to retrieve the token
-/// * `Err(OAuth2Error)` - If token generation or storage fails after max attempts
-pub(super) async fn store_token_in_cache_atomic(
-    token_type: &str,
-    token: &str,
-    ttl: u64,
-    expires_at: DateTime<Utc>,
-    user_agent: Option<String>,
-) -> Result<String, OAuth2Error> {
-    const MAX_COLLISION_ATTEMPTS: usize = 20;
-
-    let token_data = StoredToken {
-        token: token.to_string(),
-        expires_at,
-        user_agent,
-        ttl,
-    };
-
-    let cache_prefix = CachePrefix::new(token_type.to_string())
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-    // Use unified wrapper with auto-generated key and collision detection
-    let token_id = store_data_with_category::<_, OAuth2Error>(
-        cache_prefix,
-        None,
-        token_data,
-        ttl,
-        Some(MAX_COLLISION_ATTEMPTS),
-    )
-    .await?
-    .unwrap(); // Safe unwrap - auto-generated key always returns Some(key)
-
-    Ok(token_id)
-}
-
 pub(super) async fn generate_store_token(
     token_type: &str,
     ttl: u64,
@@ -134,8 +37,18 @@ pub(super) async fn generate_store_token(
     user_agent: Option<String>,
 ) -> Result<(String, String), OAuth2Error> {
     let token = gen_random_string_with_entropy_validation(32)?;
-    let token_id =
-        store_token_in_cache_atomic(token_type, &token, ttl, expires_at, user_agent).await?;
+
+    let stored_token = StoredToken {
+        token: token.clone(),
+        expires_at,
+        user_agent,
+        ttl,
+    };
+
+    let cache_prefix = CachePrefix::new(token_type.to_string())
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+    let token_id = store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await?;
 
     Ok((token, token_id))
 }
@@ -152,7 +65,7 @@ where
     let cache_key =
         CacheKey::new(token_id.to_string()).map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
-    get_data_by_category::<T, OAuth2Error>(cache_prefix, cache_key)
+    get_data::<T, OAuth2Error>(cache_prefix, cache_key)
         .await?
         .ok_or_else(|| {
             OAuth2Error::SecurityTokenNotFound(format!("{token_type}-session not found"))
@@ -295,6 +208,27 @@ pub(crate) async fn get_mode_from_stored_session(
 mod tests {
     use super::*;
     use http::HeaderValue;
+
+    // Test helper function to replace the removed store_token_in_cache function
+    async fn store_token_in_cache(
+        token_type: &str,
+        token: &str,
+        ttl: u64,
+        expires_at: DateTime<Utc>,
+        user_agent: Option<String>,
+    ) -> Result<String, OAuth2Error> {
+        let stored_token = StoredToken {
+            token: token.to_string(),
+            expires_at,
+            user_agent,
+            ttl,
+        };
+
+        let cache_prefix = CachePrefix::new(token_type.to_string())
+            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+        store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await
+    }
 
     /// Test state parameter encoding and decoding roundtrip
     ///

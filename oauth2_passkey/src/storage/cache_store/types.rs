@@ -19,6 +19,7 @@ pub(crate) trait CacheStore: Send + Sync + 'static {
     async fn init(&self) -> Result<(), StorageError>;
 
     /// Put a token into the store.
+    #[allow(dead_code)] // Used in tests
     async fn put(
         &mut self,
         prefix: CachePrefix,

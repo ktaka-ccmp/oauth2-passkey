@@ -132,19 +132,15 @@ mod tests {
         };
 
         // Test storing data using unified cache operations
-        use crate::storage::{
-            CacheKey, CachePrefix, get_data_by_category, remove_data_by_category,
-            store_data_with_category,
-        };
+        use crate::storage::{CacheKey, CachePrefix, get_data, remove_data, store_cache_keyed};
         let cache_prefix =
             CachePrefix::new(category.to_string()).expect("Failed to create cache prefix");
         let cache_key = CacheKey::new(key.to_string()).expect("Failed to create cache key");
-        let store_result = store_data_with_category::<_, crate::passkey::PasskeyError>(
+        let store_result = store_cache_keyed::<_, crate::passkey::PasskeyError>(
             cache_prefix,
-            Some(cache_key),
+            cache_key,
             options.clone(),
             300,
-            None,
         )
         .await;
         assert!(store_result.is_ok());
@@ -152,11 +148,8 @@ mod tests {
         // Test retrieving data using unified cache operations
         let (cache_prefix, cache_key) = crate::storage::create_cache_keys(category, key).unwrap();
         let retrieved: Result<Option<StoredOptions>, _> =
-            get_data_by_category::<_, crate::passkey::PasskeyError>(
-                cache_prefix.clone(),
-                cache_key.clone(),
-            )
-            .await;
+            get_data::<_, crate::passkey::PasskeyError>(cache_prefix.clone(), cache_key.clone())
+                .await;
         assert!(retrieved.is_ok());
 
         let retrieved_options = retrieved.unwrap();
@@ -169,14 +162,13 @@ mod tests {
 
         // Test removing data using unified cache operations
         let remove_result =
-            remove_data_by_category::<crate::passkey::PasskeyError>(cache_prefix, cache_key).await;
+            remove_data::<crate::passkey::PasskeyError>(cache_prefix, cache_key).await;
         assert!(remove_result.is_ok());
 
         // Verify data is gone
         let (cache_prefix2, cache_key2) = crate::storage::create_cache_keys(category, key).unwrap();
         let after_remove: Result<Option<StoredOptions>, _> =
-            get_data_by_category::<_, crate::passkey::PasskeyError>(cache_prefix2, cache_key2)
-                .await;
+            get_data::<_, crate::passkey::PasskeyError>(cache_prefix2, cache_key2).await;
         assert!(after_remove.is_ok());
         assert!(after_remove.unwrap().is_none());
     }
@@ -217,30 +209,26 @@ mod tests {
         };
 
         // Store different data with different keys using unified cache operations
-        use crate::storage::{
-            CacheKey, CachePrefix, get_data_by_category, store_data_with_category,
-        };
+        use crate::storage::{CacheKey, CachePrefix, get_data, store_cache_keyed};
         let cache_prefix1 =
             CachePrefix::new(category.to_string()).expect("Failed to create cache prefix");
         let cache_key1 = CacheKey::new(key1.to_string()).expect("Failed to create cache key");
-        let _ = store_data_with_category::<_, crate::passkey::PasskeyError>(
+        let _ = store_cache_keyed::<_, crate::passkey::PasskeyError>(
             cache_prefix1,
-            Some(cache_key1),
+            cache_key1,
             data1.clone(),
             100,
-            None,
         )
         .await;
 
         let cache_prefix2 =
             CachePrefix::new(category.to_string()).expect("Failed to create cache prefix");
         let cache_key2 = CacheKey::new(key2.to_string()).expect("Failed to create cache key");
-        let _ = store_data_with_category::<_, crate::passkey::PasskeyError>(
+        let _ = store_cache_keyed::<_, crate::passkey::PasskeyError>(
             cache_prefix2,
-            Some(cache_key2),
+            cache_key2,
             data2.clone(),
             200,
-            None,
         )
         .await;
 
@@ -250,11 +238,11 @@ mod tests {
         let (cache_prefix2, cache_key2) =
             crate::storage::create_cache_keys(category, key2).unwrap();
         let retrieved1: Option<StoredOptions> =
-            get_data_by_category::<_, crate::passkey::PasskeyError>(cache_prefix1, cache_key1)
+            get_data::<_, crate::passkey::PasskeyError>(cache_prefix1, cache_key1)
                 .await
                 .unwrap();
         let retrieved2: Option<StoredOptions> =
-            get_data_by_category::<_, crate::passkey::PasskeyError>(cache_prefix2, cache_key2)
+            get_data::<_, crate::passkey::PasskeyError>(cache_prefix2, cache_key2)
                 .await
                 .unwrap();
 
@@ -295,19 +283,15 @@ mod tests {
         };
 
         // Test storing data using unified cache operations
-        use crate::storage::{
-            CacheKey, CachePrefix, get_data_by_category, remove_data_by_category,
-            store_data_with_category,
-        };
+        use crate::storage::{CacheKey, CachePrefix, get_data, remove_data, store_cache_keyed};
         let cache_prefix =
             CachePrefix::new(category.to_string()).expect("Failed to create cache prefix");
         let cache_key = CacheKey::new(key.to_string()).expect("Failed to create cache key");
-        let store_result = store_data_with_category::<_, crate::passkey::PasskeyError>(
+        let store_result = store_cache_keyed::<_, crate::passkey::PasskeyError>(
             cache_prefix,
-            Some(cache_key),
+            cache_key,
             options.clone(),
             300,
-            None,
         )
         .await;
         assert!(store_result.is_ok());
@@ -315,11 +299,8 @@ mod tests {
         // Test retrieving data using unified cache operations
         let (cache_prefix, cache_key) = crate::storage::create_cache_keys(category, key).unwrap();
         let retrieved: Result<Option<StoredOptions>, _> =
-            get_data_by_category::<_, crate::passkey::PasskeyError>(
-                cache_prefix.clone(),
-                cache_key.clone(),
-            )
-            .await;
+            get_data::<_, crate::passkey::PasskeyError>(cache_prefix.clone(), cache_key.clone())
+                .await;
         assert!(retrieved.is_ok());
 
         let retrieved_options = retrieved.unwrap();
@@ -332,14 +313,13 @@ mod tests {
 
         // Test removing data using unified cache operations
         let remove_result =
-            remove_data_by_category::<crate::passkey::PasskeyError>(cache_prefix, cache_key).await;
+            remove_data::<crate::passkey::PasskeyError>(cache_prefix, cache_key).await;
         assert!(remove_result.is_ok());
 
         // Verify data is gone
         let (cache_prefix2, cache_key2) = crate::storage::create_cache_keys(category, key).unwrap();
         let after_remove: Result<Option<StoredOptions>, _> =
-            get_data_by_category::<_, crate::passkey::PasskeyError>(cache_prefix2, cache_key2)
-                .await;
+            get_data::<_, crate::passkey::PasskeyError>(cache_prefix2, cache_key2).await;
         assert!(after_remove.is_ok());
         assert!(after_remove.unwrap().is_none());
     }
