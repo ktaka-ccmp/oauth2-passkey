@@ -1,598 +1,379 @@
-# Type-Safe Validation Strategy
+# Type-Safe Validation
 
-## Overview
-
-This document provides a comprehensive strategy for implementing type-safe validation throughout the oauth2-passkey codebase. The approach eliminates validation inconsistencies, prevents security vulnerabilities, and provides compile-time guarantees for all data validation.
+The oauth2-passkey library implements comprehensive type-safe validation throughout the codebase to prevent authentication vulnerabilities and provide compile-time safety guarantees.
 
 ## Problem Statement
 
-Current implementation has validation gaps across multiple layers:
+The type-safe validation system was implemented to address critical security and consistency issues:
 
-1. **Security Vulnerabilities**: Functions trust session data without database validation (coordination layer)
-2. **Backend Inconsistency**: Redis validates while Memory doesn't, causing different behavior (storage layer)
-3. **Validation Gaps**: Many functions accept raw strings without format validation (comprehensive coverage)
+1. **Security Vulnerabilities**: Functions were trusting session data without database validation, enabling privilege escalation attacks
+2. **Backend Inconsistency**: Redis deployments had validation while Memory deployments didn't, creating deployment-specific vulnerabilities  
+3. **Parameter Confusion**: Raw string parameters could be mixed up, leading to authentication logic errors
 
 ## Core Benefits
 
-- ✅ **Compile-time safety**: Impossible to construct invalid values
-- ✅ **Single validation point**: Validate once at construction, never again
+- ✅ **Compile-time safety**: Impossible to construct invalid values or mix up parameter types
+- ✅ **Single validation point**: Validate once at construction, never again  
 - ✅ **Consistent behavior**: Same validation rules regardless of backend/deployment
 - ✅ **Defense-in-depth**: Multiple layers of validation protection
 - ✅ **Performance**: Zero runtime overhead after construction
 - ✅ **Maintainability**: Centralized validation logic
 
-## Implementation Phases
+## Available Types
 
-### Phase 1: Coordination Layer (High Priority - Security Critical)
+### Session & User Management
 
-**Problem**: Authentication functions trust session data without validating against database, enabling privilege escalation attacks.
-
-**Current Vulnerability** (documented in authorization_security_tests.rs:321-333):
-```rust
-// Functions trust SessionUser data without DB validation
-pub async fn update_user_admin_status(
-    admin_user: &SessionUser,  // ❌ Could be tampered session data
-    user_id: &str,            // ❌ Raw string
-    is_admin: bool,
-) -> Result<User, CoordinationError>
-```
-
-**Secure Implementation**:
-```rust
-// Validate session + fetch fresh user data from database
-pub async fn update_user_admin_status(
-    session_id: SessionId,     // ✅ Validated session identifier
-    user_id: UserId,          // ✅ Validated user identifier
-    is_admin: bool,
-) -> Result<User, CoordinationError> {
-    let _admin_user = validate_admin_session(session_id).await?;  // Fresh DB lookup
-    // ... function logic
-}
-```
-
-**Helper Functions Approach** (Recommended):
-```rust
-// Simple one-liners for common authorization patterns
-pub async fn validate_admin_session(session_id: SessionId) -> Result<User, CoordinationError> {
-    let session = validate_session(session_id.as_str()).await?;
-    let user = UserStore::get_user(&session.user_id).await?.ok_or(NotFound)?;
-    if !user.is_admin { return Err(Unauthorized); }
-    Ok(user)
-}
-
-pub async fn validate_owner_session(session_id: SessionId, resource_user_id: UserId) -> Result<User, CoordinationError> {
-    let session = validate_session(session_id.as_str()).await?;
-    let user = UserStore::get_user(&session.user_id).await?.ok_or(NotFound)?;
-    if user.id != resource_user_id.as_str() { return Err(Unauthorized); }
-    Ok(user)
-}
-```
-
-**Functions to Update**:
-- **Admin Functions** (oauth2_passkey/src/coordination/admin.rs):
-  - `delete_passkey_credential_admin(user: &SessionUser, credential_id: &str)` :97
-  - `delete_oauth2_account_admin(user: &SessionUser, provider_user_id: &str)` :166
-  - `update_user_admin_status(admin_user: &SessionUser, user_id: &str, is_admin: bool)` :273
-  - `get_all_users()` :30 (add session validation)
-  - `get_user(user_id: &str)` :64 (add session validation)
-  - `delete_user_account_admin(user_id: &str)` :220 (add session validation)
-- **User Functions** (oauth2_passkey/src/coordination/user.rs):
-  - `update_user_account(user_id: &str, account: Option<String>, label: Option<String>)` :8
-  - `delete_user_account(user_id: &str)` :38
-
-### Phase 2: Storage Layer (Medium Priority - Consistency)
-
-**Problem**: Storage implementations have different validation approaches, causing inconsistent behavior across deployment configurations.
-
-**Cache Store Inconsistency**:
-```rust
-// Redis - validates every call
-impl RedisCacheStore {
-    fn make_key(prefix: &str, key: &str) -> Result<String, StorageError> {
-        Self::validate_key_component(prefix, "prefix")?;  // Length, chars, commands
-        Self::validate_key_component(key, "key")?;        // Runtime validation
-        Ok(format!("{CACHE_PREFIX}:{prefix}:{key}"))
-    }
-}
-
-// Memory - no validation at all
-impl InMemoryCacheStore {
-    fn make_key(prefix: &str, key: &str) -> String {
-        format!("{CACHE_PREFIX}:{prefix}:{key}")  // ❌ Inconsistent behavior
-    }
-}
-```
-
-**Unified Solution**:
-```rust
-// Both implementations use same validated types
-trait CacheStore {
-    async fn put(&mut self, prefix: CachePrefix, key: CacheKey, value: CacheData) -> Result<(), StorageError>;
-    async fn get(&self, prefix: CachePrefix, key: CacheKey) -> Result<Option<CacheData>, StorageError>;
-    // ... other methods
-}
-
-// No validation needed in implementations - types guarantee validity
-impl RedisCacheStore {
-    fn make_key(prefix: CachePrefix, key: CacheKey) -> String {
-        format!("{CACHE_PREFIX}:{}:{}", prefix.as_str(), key.as_str())
-    }
-}
-
-impl InMemoryCacheStore {
-    fn make_key(prefix: CachePrefix, key: CacheKey) -> String {
-        format!("{CACHE_PREFIX}:{}:{}", prefix.as_str(), key.as_str())
-    }
-}
-```
-
-### Phase 3: Comprehensive Coverage (Medium Priority - Completeness)
-
-**Problem**: Many functions throughout the codebase accept raw strings without validation, creating gaps in the validation strategy.
-
-**Critical Gap: Search Field Enums**:
-```rust
-// Current: Unvalidated strings in database operations
-pub enum UserSearchField {
-    Id(String),              // ❌ No validation
-    SequenceNumber(i64),     // ✅ Already type-safe
-}
-
-pub enum CredentialSearchField {
-    CredentialId(String),    // ❌ Could be malformed
-    UserId(String),          // ❌ Could be empty/oversized
-    UserHandle(String),      // ❌ No WebAuthn format validation
-}
-
-// Better: Validated enum variants
-pub enum UserSearchField {
-    Id(UserId),              // ✅ Validated user identifier
-    SequenceNumber(i64),
-}
-
-pub enum CredentialSearchField {
-    CredentialId(CredentialId),  // ✅ Base64url validated
-    UserId(UserId),             // ✅ Consistent validation
-    UserHandle(UserHandle),     // ✅ WebAuthn format validation
-}
-```
-
-**Additional Categories**:
-
-- **Session Management**: `get_user_from_session(session_cookie: &str)` → `get_user_from_session(session_cookie: SessionCookie)`
-- **WebAuthn Challenges**: `remove_options(challenge_type: &str, id: &str)` → `remove_options(challenge_type: ChallengeType, id: ChallengeId)`
-- **OAuth2 Parameters**: `decode_state(state: &str)` → `decode_state(state: OAuth2State)`
-- **Cache Operations**: `get_from_cache(category: &str, key: &str)` → `get_from_cache(category: CacheCategory, key: CacheKey)`
-
-## Type Implementations
-
-### Phase 1 Types (High Priority)
+#### `SessionId`
+Type-safe wrapper for session identifiers used in coordination layer functions.
 
 ```rust
-// Session and User Identifiers
-const MAX_SESSION_ID_LENGTH: usize = 64;
-const MAX_USER_ID_LENGTH: usize = 128;
+use oauth2_passkey::SessionId;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SessionId(String);
+// Create from string
+let session_id = SessionId::new("session_abc123".to_string());
 
-impl SessionId {
-    pub fn new(id: String) -> Result<Self, CoordinationError> {
-        if id.is_empty() {
-            return Err(CoordinationError::InvalidInput("Session ID cannot be empty".to_string()));
-        }
-
-        if id.len() > MAX_SESSION_ID_LENGTH {
-            return Err(CoordinationError::InvalidInput(
-                format!("Session ID too long: {} bytes (max: {})", id.len(), MAX_SESSION_ID_LENGTH)
-            ));
-        }
-
-        // Validate character set (alphanumeric + hyphens for UUIDs)
-        if !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
-            return Err(CoordinationError::InvalidInput("Invalid characters in session ID".to_string()));
-        }
-
-        Ok(SessionId(id))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UserId(String);
-
-impl UserId {
-    pub fn new(id: String) -> Result<Self, CoordinationError> {
-        if id.is_empty() {
-            return Err(CoordinationError::InvalidInput("User ID cannot be empty".to_string()));
-        }
-
-        if id.len() > MAX_USER_ID_LENGTH {
-            return Err(CoordinationError::InvalidInput(
-                format!("User ID too long: {} bytes (max: {})", id.len(), MAX_USER_ID_LENGTH)
-            ));
-        }
-
-        Ok(UserId(id))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-// Additional Phase 1 types: CredentialId, CsrfToken, ProviderUserId
+// Use in coordination functions
+let users = get_all_users(session_id).await?;
 ```
 
-### Phase 2 Types (Storage Layer)
+#### `UserId` 
+Type-safe wrapper for user identifiers to prevent mixing up with other ID types.
 
 ```rust
-// Cache Types
-const MAX_CACHE_PREFIX_LENGTH: usize = 50;
-const MAX_CACHE_KEY_LENGTH: usize = 200;
+use oauth2_passkey::UserId;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CachePrefix(String);
-
-impl CachePrefix {
-    pub fn new(prefix: String) -> Result<Self, StorageError> {
-        if prefix.is_empty() {
-            return Err(StorageError::InvalidInput("Cache prefix cannot be empty".to_string()));
-        }
-
-        if prefix.len() > MAX_CACHE_PREFIX_LENGTH {
-            return Err(StorageError::InvalidInput(
-                format!("Cache prefix too long: {} bytes (max: {})", prefix.len(), MAX_CACHE_PREFIX_LENGTH)
-            ));
-        }
-
-        // Validate characters safe for all cache backends (Redis + Memory)
-        let dangerous_chars = ['\n', '\r', ' ', '\t', ':', '*'];
-        if prefix.chars().any(|c| dangerous_chars.contains(&c)) {
-            return Err(StorageError::InvalidInput("Cache prefix contains unsafe characters".to_string()));
-        }
-
-        Ok(CachePrefix(prefix))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CacheKey(String);
-
-impl CacheKey {
-    pub fn new(key: String) -> Result<Self, StorageError> {
-        if key.is_empty() {
-            return Err(StorageError::InvalidInput("Cache key cannot be empty".to_string()));
-        }
-
-        if key.len() > MAX_CACHE_KEY_LENGTH {
-            return Err(StorageError::InvalidInput(
-                format!("Cache key too long: {} bytes (max: {})", key.len(), MAX_CACHE_KEY_LENGTH)
-            ));
-        }
-
-        // Combined validation for all cache backends
-        let dangerous_chars = ['\n', '\r', ' ', '\t'];
-        if key.chars().any(|c| dangerous_chars.contains(&c)) {
-            return Err(StorageError::InvalidInput("Cache key contains unsafe characters".to_string()));
-        }
-
-        // Check for Redis command keywords
-        let key_upper = key.to_uppercase();
-        let redis_commands = ["SET", "GET", "DEL", "FLUSHDB", "FLUSHALL", "EVAL", "SCRIPT"];
-        for cmd in &redis_commands {
-            if key_upper.contains(cmd) {
-                return Err(StorageError::InvalidInput(
-                    format!("Cache key contains dangerous command keyword: '{}'", key)
-                ));
-            }
-        }
-
-        Ok(CacheKey(key))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
+let user_id = UserId::new("user_123".to_string());
+let user = get_user(session_id, user_id).await?;
 ```
 
-### Phase 3 Types (Comprehensive Coverage)
+#### `SessionCookie`
+Type-safe wrapper for HTTP session cookies with validation.
 
 ```rust
-// Session Types
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SessionCookie(String);
+use oauth2_passkey::SessionCookie;
 
-impl SessionCookie {
-    pub fn new(cookie: String) -> Result<Self, SessionError> {
-        if cookie.is_empty() {
-            return Err(SessionError::InvalidInput("Session cookie cannot be empty".to_string()));
-        }
-
-        if cookie.len() > 512 {
-            return Err(SessionError::InvalidInput(
-                format!("Session cookie too long: {} bytes (max: 512)", cookie.len())
-            ));
-        }
-
-        // Validate cookie format (base64url or similar)
-        if !cookie.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
-            return Err(SessionError::InvalidInput("Invalid characters in session cookie".to_string()));
-        }
-
-        Ok(SessionCookie(cookie))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-// WebAuthn Types
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Challenge(String);
-
-impl Challenge {
-    pub fn new(challenge: String) -> Result<Self, PasskeyError> {
-        if challenge.is_empty() {
-            return Err(PasskeyError::InvalidInput("Challenge cannot be empty".to_string()));
-        }
-
-        if challenge.len() > 512 {
-            return Err(PasskeyError::InvalidInput(
-                format!("Challenge too long: {} bytes (max: 512)", challenge.len())
-            ));
-        }
-
-        // Validate base64url encoding
-        if !is_valid_base64url(&challenge) {
-            return Err(PasskeyError::InvalidInput("Challenge must be valid base64url".to_string()));
-        }
-
-        Ok(Challenge(challenge))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UserHandle(String);
-
-impl UserHandle {
-    pub fn new(handle: String) -> Result<Self, PasskeyError> {
-        if handle.is_empty() {
-            return Err(PasskeyError::InvalidInput("User handle cannot be empty".to_string()));
-        }
-
-        if handle.len() > 128 {
-            return Err(PasskeyError::InvalidInput(
-                format!("User handle too long: {} bytes (max: 128)", handle.len())
-            ));
-        }
-
-        // WebAuthn user handles are typically base64url encoded
-        if !is_valid_base64url(&handle) {
-            return Err(PasskeyError::InvalidInput("User handle must be valid base64url".to_string()));
-        }
-
-        Ok(UserHandle(handle))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChallengeType(String);
-
-impl ChallengeType {
-    pub fn new(challenge_type: String) -> Result<Self, PasskeyError> {
-        // WebAuthn challenge types are specific values
-        match challenge_type.as_str() {
-            "webauthn.create" | "webauthn.get" => Ok(ChallengeType(challenge_type)),
-            _ => Err(PasskeyError::InvalidInput(
-                format!("Invalid challenge type: {}", challenge_type)
-            ))
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    pub fn create() -> Self {
-        ChallengeType("webauthn.create".to_string())
-    }
-
-    pub fn get() -> Self {
-        ChallengeType("webauthn.get".to_string())
-    }
-}
-
-// OAuth2 Types
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OAuth2State(String);
-
-impl OAuth2State {
-    pub fn new(state: String) -> Result<Self, OAuth2Error> {
-        if state.is_empty() {
-            return Err(OAuth2Error::InvalidInput("OAuth2 state cannot be empty".to_string()));
-        }
-
-        if state.len() > 256 {
-            return Err(OAuth2Error::InvalidInput(
-                format!("OAuth2 state too long: {} bytes (max: 256)", state.len())
-            ));
-        }
-
-        // OAuth2 state is typically base64url encoded
-        if !is_valid_base64url(&state) {
-            return Err(OAuth2Error::InvalidInput("OAuth2 state must be valid base64url".to_string()));
-        }
-
-        Ok(OAuth2State(state))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OAuthProvider(String);
-
-impl OAuthProvider {
-    pub fn new(provider: String) -> Result<Self, OAuth2Error> {
-        // Only allow known OAuth2 providers
-        match provider.as_str() {
-            "google" | "github" | "apple" | "microsoft" => Ok(OAuthProvider(provider)),
-            _ => Err(OAuth2Error::InvalidInput(
-                format!("Unknown OAuth2 provider: {}", provider)
-            ))
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    pub fn google() -> Self {
-        OAuthProvider("google".to_string())
-    }
-}
-
-// Cache Types
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CacheCategory(String);
-
-impl CacheCategory {
-    pub fn new(category: String) -> Result<Self, PasskeyError> {
-        // Cache categories should be predefined
-        match category.as_str() {
-            "challenge" | "session" | "jwks" | "user" | "credential" => {
-                Ok(CacheCategory(category))
-            }
-            _ => Err(PasskeyError::InvalidInput(
-                format!("Unknown cache category: {}", category)
-            ))
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    pub fn challenge() -> Self {
-        CacheCategory("challenge".to_string())
-    }
-}
+// Validates length (10-1024 chars) and safe characters
+let cookie = SessionCookie::new(cookie_value)?;
+let user = get_user_from_session(&cookie).await?;
 ```
+
+### WebAuthn/Passkey Types
+
+#### `CredentialId`
+Type-safe wrapper for passkey credential identifiers.
+
+```rust
+use oauth2_passkey::CredentialId;
+
+let cred_id = CredentialId::new("credential_abc".to_string());
+let result = delete_credential(session_id, cred_id).await?;
+```
+
+#### `UserHandle` 
+Type-safe wrapper for WebAuthn user handles.
+
+```rust
+use oauth2_passkey::UserHandle;
+
+let handle = UserHandle::new("user_handle_123".to_string());
+```
+
+#### `UserName`
+Type-safe wrapper for usernames.
+
+```rust
+use oauth2_passkey::UserName;
+
+let username = UserName::new("alice".to_string());
+```
+
+#### `ChallengeType`
+Type-safe wrapper for WebAuthn challenge types with validation.
+
+```rust
+use oauth2_passkey::ChallengeType;
+
+// Validates against known challenge types
+let challenge_type = ChallengeType::new("registration".to_string())?;
+
+// Or use convenience constructors
+let reg_challenge = ChallengeType::registration();
+let auth_challenge = ChallengeType::authentication();
+```
+
+#### `ChallengeId`
+Type-safe wrapper for challenge identifiers.
+
+```rust
+use oauth2_passkey::ChallengeId;
+
+let challenge_id = ChallengeId::new("challenge_xyz".to_string())?;
+```
+
+### OAuth2 Types
+
+#### `OAuth2State`
+Type-safe wrapper for OAuth2 state parameters with comprehensive validation.
+
+```rust
+use oauth2_passkey::OAuth2State;
+
+// Validates base64url encoding, JSON structure, length limits
+let state = OAuth2State::new(state_param)?;
+let decoded = decode_state(&state)?;
+```
+
+#### `AccountId`
+Type-safe wrapper for OAuth2 account identifiers.
+
+```rust
+use oauth2_passkey::AccountId;
+
+let account_id = AccountId::new("account_123".to_string());
+```
+
+#### `Provider`
+Type-safe wrapper for OAuth2 provider names.
+
+```rust
+use oauth2_passkey::Provider;
+
+let provider = Provider::new("google".to_string());
+```
+
+#### `ProviderUserId`
+Type-safe wrapper for provider-specific user identifiers.
+
+```rust
+use oauth2_passkey::ProviderUserId;
+
+let provider_user_id = ProviderUserId::new("google_123456".to_string());
+```
+
+#### `DisplayName`
+Type-safe wrapper for user display names.
+
+```rust
+use oauth2_passkey::DisplayName;
+
+let name = DisplayName::new("Alice Smith".to_string());
+```
+
+#### `Email`
+Type-safe wrapper for email addresses.
+
+```rust
+use oauth2_passkey::Email;
+
+let email = Email::new("alice@example.com".to_string());
+```
+
+### Cache & Storage Types
+
+#### `CachePrefix`
+Type-safe wrapper for cache namespace prefixes with validation.
+
+```rust
+use oauth2_passkey::CachePrefix;
+
+// Validates length, safe characters, prevents Redis injection
+let prefix = CachePrefix::new("session".to_string())?;
+
+// Or use convenience constructors
+let session_prefix = CachePrefix::session();
+let oauth2_prefix = CachePrefix::oauth2();
+```
+
+#### `CacheKey`
+Type-safe wrapper for cache entry keys with validation.
+
+```rust
+use oauth2_passkey::CacheKey;
+
+// Same validation as CachePrefix
+let key = CacheKey::new("user_123_token".to_string())?;
+```
+
+## Search Field Enums
+
+### `CredentialSearchField`
+Type-safe search operations for passkey credentials.
+
+```rust
+use oauth2_passkey::{CredentialSearchField, CredentialId, UserId, UserHandle, UserName};
+
+// Search by different field types - compile-time type safety
+let by_cred_id = CredentialSearchField::CredentialId(credential_id);
+let by_user_id = CredentialSearchField::UserId(user_id);  
+let by_handle = CredentialSearchField::UserHandle(user_handle);
+let by_name = CredentialSearchField::UserName(user_name);
+
+let credentials = PasskeyStore::get_credentials_by(by_user_id).await?;
+```
+
+### `AccountSearchField` 
+Type-safe search operations for OAuth2 accounts.
+
+```rust
+use oauth2_passkey::{AccountSearchField, AccountId, UserId, Provider, Email};
+
+let by_account_id = AccountSearchField::Id(account_id);
+let by_user_id = AccountSearchField::UserId(user_id);
+let by_provider = AccountSearchField::Provider(provider);
+let by_email = AccountSearchField::Email(email);
+
+let accounts = OAuth2Store::get_accounts_by(by_email).await?;
+```
+
+## Security Guarantees
+
+### Compile-Time Safety
+- **Parameter Confusion Prevention**: Cannot pass `UserId` where `CredentialId` expected
+- **Type Mixing Protection**: Compiler enforces correct parameter types
+- **API Consistency**: All functions use consistent typed interfaces
+
+### Runtime Validation
+- **Input Validation**: All types validate their input during construction
+- **Cache Security**: Prevents Redis command injection across all backends
+- **Length Limits**: Enforces reasonable bounds on all identifiers
+
+### Storage Backend Consistency
+- **Unified Validation**: Same security guarantees regardless of storage backend
+- **Memory vs Redis**: No deployment-specific vulnerabilities
+- **Centralized Logic**: Single validation point per type for easier maintenance
 
 ## Security vs Performance Tradeoff
 
-The type-safe validation approach adds database lookups for session validation but this is acceptable because:
+The type-safe validation system is designed for **zero runtime overhead**:
 
-- **User operations are infrequent**: Admin/user attribute modifications happen much less than simple page authentication
-- **Interactive context**: These operations involve user forms/interactions where milliseconds don't impact UX
-- **Security priority**: Correctness trumps micro-optimizations for critical authentication functions
-- **Defense-in-depth**: Multiple validation layers provide robust security
+- **Validation occurs once** at type construction
+- **No repeated validation** during function calls
+- **Compile-time guarantees** eliminate runtime checks
+- **Memory overhead** is minimal (single String wrapper per type)
 
-## Usage Examples
+This approach provides maximum security with optimal performance for authentication-critical code paths.
 
-### Phase 1: Secure Function Implementation
+## Usage Patterns
+
+### Coordination Layer Functions
+All coordination functions require typed parameters:
+
 ```rust
-// Before: Trusts session data
-pub async fn update_user_admin_status(
-    admin_user: &SessionUser,
-    user_id: &str,
-    is_admin: bool,
-) -> Result<User, CoordinationError> {
-    if !admin_user.is_admin {  // ❌ Trusts session data
-        return Err(Unauthorized);
+// Admin functions
+get_all_users(session_id: SessionId) -> Result<Vec<User>, CoordinationError>
+get_user(session_id: SessionId, user_id: UserId) -> Result<Option<User>, CoordinationError>
+delete_credential(session_id: SessionId, credential_id: CredentialId) -> Result<(), CoordinationError>
+
+// User functions  
+get_user_credentials(session_id: SessionId, user_id: UserId) -> Result<Vec<PasskeyCredential>, CoordinationError>
+```
+
+### Session Management
+```rust
+// Session validation
+get_user_from_session(session_cookie: &SessionCookie) -> Result<SessionUser, SessionError>
+
+// CSRF token handling uses typed SessionId internally
+get_csrf_token_from_session(session_cookie: &str) -> Result<CsrfToken, SessionError>
+```
+
+### OAuth2 Operations
+```rust
+// State parameter handling
+encode_state(params: StateParams) -> Result<OAuth2State, OAuth2Error>
+decode_state(state: &OAuth2State) -> Result<StateParams, OAuth2Error>
+
+// Account search with typed enums
+OAuth2Store::get_accounts_by(search_field: AccountSearchField) -> Result<Vec<OAuth2Account>, OAuth2Error>
+```
+
+### Cache Operations
+```rust
+// Unified cache operations with type safety
+store_cache_auto(prefix: CachePrefix, data: T, ttl: u64) -> Result<String, E>
+store_cache_keyed(prefix: CachePrefix, key: CacheKey, data: T, ttl: u64) -> Result<(), E>
+get_data(prefix: CachePrefix, key: CacheKey) -> Result<Option<T>, E>
+```
+
+## Error Handling
+
+All typed constructors can fail with validation errors:
+
+```rust
+// Handle validation errors
+match SessionCookie::new(cookie_value) {
+    Ok(cookie) => {
+        let user = get_user_from_session(&cookie).await?;
+        // Use validated cookie
     }
-    // ...
+    Err(SessionError::Cookie(msg)) => {
+        // Handle invalid cookie format
+    }
 }
 
-// After: Validates against database
-pub async fn update_user_admin_status(
-    session_id: SessionId,
-    user_id: UserId,
-    is_admin: bool,
-) -> Result<User, CoordinationError> {
-    let _admin_user = validate_admin_session(session_id).await?;  // ✅ Fresh DB lookup
-    // ...
+match OAuth2State::new(state_param) {
+    Ok(state) => {
+        let params = decode_state(&state)?;
+        // Use validated state
+    }
+    Err(OAuth2Error::DecodeState(msg)) => {
+        // Handle invalid state format
+    }
 }
 ```
 
-### Phase 2: Consistent Storage Interface
+## Benefits for Developers
+
+### IDE Support
+- **Auto-completion**: IDEs show exactly what types are expected
+- **Type Checking**: Immediate feedback on parameter mistakes
+- **Refactoring Safety**: Compiler catches all places needing updates
+
+### Code Clarity
+- **Self-Documenting**: Function signatures show validation requirements
+- **Intent Clear**: Type names indicate the purpose of each parameter
+- **Consistent APIs**: Same patterns across all modules
+
+### Security by Default
+- **No Bypass**: Impossible to accidentally use raw strings
+- **Validation Required**: Must construct types with proper validation
+- **Defense in Depth**: Multiple layers of protection
+
+## Migration from Raw Strings
+
+When updating code that uses raw strings:
+
 ```rust
-// Usage at API boundary
-let cache_prefix = CachePrefix::new("session".to_string())?;
-let cache_key = CacheKey::new(session_id.to_string())?;
-store.put(cache_prefix, cache_key, session_data).await?;  // Safe for all backends
+// Before (vulnerable to parameter confusion)
+let credentials = PasskeyStore::get_credentials_by(
+    CredentialSearchField::UserId(user_id.to_string())
+);
+
+// After (type-safe)
+let user_id = UserId::new(user_id_string);
+let credentials = PasskeyStore::get_credentials_by(
+    CredentialSearchField::UserId(user_id)
+);
 ```
-
-### Phase 3: Complete Type Safety
-```rust
-// Search operations with validated enums
-let search_field = CredentialSearchField::UserId(user_id);  // user_id is already UserId type
-let credentials = PasskeyStore::get_credentials_by(search_field).await?;
-
-// OAuth2 operations with validated parameters
-let oauth_state = OAuth2State::new(raw_state_string)?;
-let state_params = decode_state(oauth_state)?;
-```
-
-## Migration Strategy
-
-### Cross-Phase Coordination
-1. **Define common types first**: SessionId, UserId, etc. used across multiple phases
-2. **Implement phases incrementally**: Can work on multiple phases in parallel
-3. **Maintain backwards compatibility**: Add new functions alongside old ones initially
-4. **Update callers systematically**: One module at a time within each phase
-5. **Remove deprecated functions**: After all callers updated in that phase
-
-### Testing Strategy
-- **Unit tests for all type constructors**: Verify validation logic
-- **Integration tests**: Ensure no regressions in end-to-end flows
-- **Security tests**: Verify attack scenarios are properly blocked
-- **Performance tests**: Ensure no significant performance regression
-
-### Backwards Compatibility
-- **Non-breaking additions**: Add typed versions alongside string versions
-- **Deprecation warnings**: Mark old functions as deprecated with migration guidance
-- **Documentation**: Clear migration examples for each affected function
-- **Version planning**: Remove deprecated functions in next major version
 
 ## Benefits Summary
 
 ### Security Impact
-- **Eliminates privilege escalation**: Fresh database validation prevents session tampering attacks
-- **Prevents injection attacks**: Format validation blocks malicious input at construction
-- **Defense-in-depth**: Multiple validation layers throughout the stack
-- **Consistent protection**: Same security guarantees regardless of deployment configuration
+- **Eliminates privilege escalation attacks** through session validation
+- **Prevents parameter confusion vulnerabilities** 
+- **Provides consistent security** across all deployment configurations
+- **Defense-in-depth validation** at multiple architectural layers
 
-### Development Benefits
-- **Compile-time safety**: Invalid data cannot be constructed or passed to functions
-- **Clear contracts**: Function signatures explicitly show validation requirements
-- **Refactoring safety**: Compiler catches all places needing updates during changes
-- **Reduced bugs**: Centralized validation eliminates scattered validation logic
+### Development Benefits  
+- **Compile-time error detection** for authentication logic mistakes
+- **Self-documenting APIs** through descriptive type names
+- **IDE assistance** with auto-completion and type checking
+- **Refactoring safety** with compiler-verified updates
 
 ### Operational Benefits
-- **Predictable behavior**: Same validation everywhere, regardless of storage backend
-- **Performance**: Single validation point, zero overhead after construction
-- **Maintainability**: Changes to validation logic only need to happen in one place
-- **Debuggability**: Clear error messages from validation failures at construction time
+- **Predictable behavior** regardless of storage backend choice
+- **Centralized validation** logic for easier security auditing
+- **Future-proof architecture** for extending validation rules
+- **Professional-grade** authentication suitable for production systems
 
-This comprehensive type-safe validation strategy provides a robust foundation for secure, maintainable, and performant authentication throughout the oauth2-passkey library.
+The type system prevents mixing up parameters and ensures consistent validation across the entire codebase, providing robust security guarantees for authentication-critical operations.
