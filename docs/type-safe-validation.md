@@ -53,7 +53,7 @@ Type-safe wrapper for HTTP session cookies with validation.
 use oauth2_passkey::SessionCookie;
 
 // Validates length (10-1024 chars) and safe characters
-let cookie = SessionCookie::new(cookie_value)?;
+let cookie = SessionCookie::new(cookie_value.to_string())?;
 let user = get_user_from_session(&cookie).await?;
 ```
 
@@ -119,7 +119,7 @@ Type-safe wrapper for OAuth2 state parameters with comprehensive validation.
 use oauth2_passkey::OAuth2State;
 
 // Validates base64url encoding, JSON structure, length limits
-let state = OAuth2State::new(state_param)?;
+let state = OAuth2State::new(state_param.to_string())?;
 let decoded = decode_state(&state)?;
 ```
 
@@ -301,7 +301,7 @@ All typed constructors can fail with validation errors:
 
 ```rust
 // Handle validation errors
-match SessionCookie::new(cookie_value) {
+match SessionCookie::new(cookie_value.to_string()) {
     Ok(cookie) => {
         let user = get_user_from_session(&cookie).await?;
         // Use validated cookie
@@ -311,7 +311,7 @@ match SessionCookie::new(cookie_value) {
     }
 }
 
-match OAuth2State::new(state_param) {
+match OAuth2State::new(state_param.to_string()) {
     Ok(state) => {
         let params = decode_state(&state)?;
         // Use validated state
@@ -350,7 +350,7 @@ let credentials = PasskeyStore::get_credentials_by(
 );
 
 // After (type-safe)
-let user_id = UserId::new(user_id_string);
+let user_id = UserId::new(user_id_string.to_string());
 let credentials = PasskeyStore::get_credentials_by(
     CredentialSearchField::UserId(user_id)
 );
