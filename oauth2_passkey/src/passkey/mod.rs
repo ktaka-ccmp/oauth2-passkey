@@ -31,7 +31,7 @@ pub use main::{
     get_related_origin_json,
 };
 
-pub use types::{CredentialId, PasskeyCredential};
+pub use types::{ChallengeId, ChallengeType, CredentialId, PasskeyCredential};
 
 use crate::storage::CacheErrorConversion;
 pub(crate) use main::{

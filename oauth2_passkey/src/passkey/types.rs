@@ -198,3 +198,151 @@ impl UserName {
         &self.0
     }
 }
+
+/// Type-safe wrapper for WebAuthn challenge types.
+///
+/// This provides compile-time safety to prevent mixing up challenge types with other string types.
+/// Challenge types identify the kind of WebAuthn operation (registration, authentication) and are
+/// used as cache prefixes for storing challenge data.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChallengeType(String);
+
+impl ChallengeType {
+    /// Creates a new ChallengeType from a string with validation.
+    ///
+    /// This constructor validates the challenge type to ensure it meets
+    /// requirements for cache operations and WebAuthn flow identification.
+    ///
+    /// # Arguments
+    /// * `challenge_type` - The challenge type string
+    ///
+    /// # Returns
+    /// * `Ok(ChallengeType)` - If the challenge type is valid
+    /// * `Err(PasskeyError)` - If the challenge type is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only alphanumeric characters and underscores
+    /// * Must be reasonable length
+    pub fn new(challenge_type: String) -> Result<Self, super::errors::PasskeyError> {
+        use super::errors::PasskeyError;
+
+        // Validate challenge type is not empty
+        if challenge_type.is_empty() {
+            return Err(PasskeyError::Challenge(
+                "Challenge type cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate challenge type length (reasonable bounds)
+        if challenge_type.len() > 64 {
+            return Err(PasskeyError::Challenge(
+                "Challenge type too long".to_string(),
+            ));
+        }
+
+        // Validate challenge type contains only safe characters for cache prefixes
+        if !challenge_type
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            return Err(PasskeyError::Challenge(
+                "Challenge type contains invalid characters".to_string(),
+            ));
+        }
+
+        Ok(ChallengeType(challenge_type))
+    }
+
+    /// Returns the challenge type as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the challenge type
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Creates a registration challenge type.
+    ///
+    /// # Returns
+    /// * A ChallengeType for registration operations
+    pub fn registration() -> Self {
+        ChallengeType("registration".to_string())
+    }
+
+    /// Creates an authentication challenge type.
+    ///
+    /// # Returns
+    /// * A ChallengeType for authentication operations
+    pub fn authentication() -> Self {
+        ChallengeType("authentication".to_string())
+    }
+}
+
+/// Type-safe wrapper for WebAuthn challenge identifiers.
+///
+/// This provides compile-time safety to prevent mixing up challenge IDs with other string types.
+/// Challenge IDs are unique identifiers for specific WebAuthn challenge instances and are used
+/// as cache keys for storing and retrieving challenge data.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChallengeId(String);
+
+impl ChallengeId {
+    /// Creates a new ChallengeId from a string with validation.
+    ///
+    /// This constructor validates the challenge ID to ensure it meets
+    /// requirements for cache operations and uniqueness.
+    ///
+    /// # Arguments
+    /// * `id` - The challenge ID string
+    ///
+    /// # Returns
+    /// * `Ok(ChallengeId)` - If the challenge ID is valid
+    /// * `Err(PasskeyError)` - If the challenge ID is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only safe characters for cache keys
+    /// * Must be reasonable length
+    pub fn new(id: String) -> Result<Self, super::errors::PasskeyError> {
+        use super::errors::PasskeyError;
+
+        // Validate ID is not empty
+        if id.is_empty() {
+            return Err(PasskeyError::Challenge(
+                "Challenge ID cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate ID length (reasonable bounds)
+        if id.len() < 8 {
+            return Err(PasskeyError::Challenge(
+                "Challenge ID too short".to_string(),
+            ));
+        }
+
+        if id.len() > 256 {
+            return Err(PasskeyError::Challenge("Challenge ID too long".to_string()));
+        }
+
+        // Validate ID contains only safe characters for cache keys
+        if !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '+'))
+        {
+            return Err(PasskeyError::Challenge(
+                "Challenge ID contains invalid characters".to_string(),
+            ));
+        }
+
+        Ok(ChallengeId(id))
+    }
+
+    /// Returns the challenge ID as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the challenge ID
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}

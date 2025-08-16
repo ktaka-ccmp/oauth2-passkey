@@ -16,20 +16,30 @@ use crate::storage::{
 
 use crate::utils::gen_random_string_with_entropy_validation;
 
-pub(super) fn encode_state(state_params: StateParams) -> Result<String, OAuth2Error> {
+pub(super) fn encode_state(
+    state_params: StateParams,
+) -> Result<crate::oauth2::types::OAuth2State, OAuth2Error> {
     let state_json =
         serde_json::to_string(&state_params).map_err(|e| OAuth2Error::Serde(e.to_string()))?;
-    Ok(URL_SAFE_NO_PAD.encode(state_json))
+    let encoded = URL_SAFE_NO_PAD.encode(state_json);
+    crate::oauth2::types::OAuth2State::new(encoded)
 }
 
-pub(crate) fn decode_state(state: &str) -> Result<StateParams, OAuth2Error> {
+pub(crate) fn decode_state(
+    state: &crate::oauth2::types::OAuth2State,
+) -> Result<StateParams, OAuth2Error> {
+    // Since OAuth2State is validated during construction, we know these operations will succeed
+    // This is safe because validation in OAuth2State::new() already verified:
+    // 1. Valid base64url encoding
+    // 2. Valid UTF-8 content
+    // 3. Valid JSON structure
     let decoded_bytes = URL_SAFE_NO_PAD
-        .decode(state)
-        .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode base64: {e}")))?;
-    let decoded_state_string = String::from_utf8(decoded_bytes)
-        .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode UTF-8: {e}")))?;
-    let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)
-        .map_err(|e| OAuth2Error::Serde(e.to_string()))?;
+        .decode(state.as_str())
+        .expect("OAuth2State should contain valid base64url");
+    let decoded_state_string =
+        String::from_utf8(decoded_bytes).expect("OAuth2State should contain valid UTF-8");
+    let state_in_response: StateParams =
+        serde_json::from_str(&decoded_state_string).expect("OAuth2State should contain valid JSON");
     Ok(state_in_response)
 }
 
@@ -139,7 +149,9 @@ pub(crate) async fn get_uid_from_stored_session_by_state_param(
     // Clean up the misc session after use
     // remove_token_from_store("misc_session", misc_id).await?;
 
-    match get_user_from_session(&token.token).await {
+    let session_cookie = crate::SessionCookie::new(token.token.clone())
+        .map_err(|e| OAuth2Error::Storage(format!("Invalid session cookie: {e}")))?;
+    match get_user_from_session(&session_cookie).await {
         Ok(user) => {
             tracing::debug!("Found user ID: {}", user.id);
             Ok(Some(user))
@@ -305,16 +317,16 @@ mod tests {
         assert_eq!(decoded.mode_id, None);
     }
 
-    /// Test state decoding with invalid base64 input
+    /// Test OAuth2State validation with invalid base64 input
     ///
-    /// This test verifies that `decode_state` returns an appropriate OAuth2Error::DecodeState
-    /// when given a string that contains invalid base64 characters. It attempts to decode
-    /// an invalid base64 string and verifies that the correct error type is returned.
+    /// This test verifies that `OAuth2State::new` returns an appropriate error
+    /// when given a string that contains invalid base64 characters. This tests the validation
+    /// boundary where external data is converted to a type-safe OAuth2State.
     ///
     #[test]
-    fn test_decode_state_invalid_base64() {
-        // Try to decode an invalid base64 string
-        let result = decode_state("this is not base64!!!");
+    fn test_oauth2_state_validation_invalid_base64() {
+        // Try to create an OAuth2State from invalid base64 string
+        let result = crate::OAuth2State::new("this is not base64!!!".to_string());
 
         // Verify it returns an error
         assert!(result.is_err());
@@ -329,30 +341,30 @@ mod tests {
         }
     }
 
-    /// Test state decoding with invalid JSON payload
+    /// Test OAuth2State validation with invalid JSON payload
     ///
-    /// This test verifies that `decode_state` returns an appropriate OAuth2Error::DecodeState
-    /// when given valid base64 that contains invalid JSON. It encodes invalid JSON as base64,
-    /// attempts to decode it as state, and verifies that the correct error type is returned.
+    /// This test verifies that `OAuth2State::new` returns an appropriate error
+    /// when given valid base64 that contains invalid JSON. This tests the validation
+    /// boundary where external data is converted to a type-safe OAuth2State.
     ///
     #[test]
-    fn test_decode_state_invalid_json() {
+    fn test_oauth2_state_validation_invalid_json() {
         // Encode some invalid JSON
         let invalid_json = "not valid json";
         let encoded = URL_SAFE_NO_PAD.encode(invalid_json);
 
-        // Try to decode it
-        let result = decode_state(&encoded);
+        // Try to create OAuth2State from invalid JSON (valid base64)
+        let result = crate::OAuth2State::new(encoded);
 
         // Verify it returns an error
         assert!(result.is_err());
         match result {
-            Err(OAuth2Error::Serde(_)) => {}
+            Err(OAuth2Error::DecodeState(_)) => {}
             Ok(_) => {
-                unreachable!("Expected Serde error but got Ok");
+                unreachable!("Expected DecodeState error but got Ok");
             }
             Err(err) => {
-                unreachable!("Expected Serde error, got {:?}", err);
+                unreachable!("Expected DecodeState error, got {:?}", err);
             }
         }
     }

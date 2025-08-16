@@ -198,7 +198,8 @@ pub(crate) async fn get_idinfo_userinfo(
 }
 
 async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, OAuth2Error> {
-    let state_in_response = decode_state(&auth_response.state)?;
+    let oauth2_state = crate::OAuth2State::new(auth_response.state.clone())?;
+    let state_in_response = decode_state(&oauth2_state)?;
 
     let pkce_cache_key = CacheKey::new(state_in_response.pkce_id.clone())
         .map_err(OAuth2Error::convert_storage_error)?;
@@ -218,7 +219,8 @@ async fn verify_nonce(
     auth_response: &AuthResponse,
     idinfo: GoogleIdInfo,
 ) -> Result<(), OAuth2Error> {
-    let state_in_response = decode_state(&auth_response.state)?;
+    let oauth2_state = crate::OAuth2State::new(auth_response.state.clone())?;
+    let state_in_response = decode_state(&oauth2_state)?;
 
     let nonce_cache_key = CacheKey::new(state_in_response.nonce_id.clone())
         .map_err(OAuth2Error::convert_storage_error)?;
@@ -259,7 +261,8 @@ pub(crate) async fn csrf_checks(
             OAuth2Error::SecurityTokenNotFound("No CSRF session cookie found".to_string())
         })?;
 
-    let state_in_response = decode_state(&query.state)?;
+    let oauth2_state = crate::OAuth2State::new(query.state.clone())?;
+    let state_in_response = decode_state(&oauth2_state)?;
     tracing::debug!("State in response: {:#?}", state_in_response);
 
     // Get the csrf_id from the state parameter
@@ -596,15 +599,15 @@ mod tests {
         assert_eq!(original_state.mode_id, decoded.mode_id);
     }
 
-    /// Test state decoding with invalid base64 input
+    /// Test OAuth2State validation with invalid base64 input
     ///
-    /// This test verifies that `decode_state` returns an appropriate error when given
-    /// invalid base64 input that cannot be decoded.
+    /// This test verifies that `OAuth2State::new` returns an appropriate error when given
+    /// invalid base64 input that cannot be decoded. This tests the validation boundary
+    /// where external data is converted to a type-safe OAuth2State.
     ///
     #[tokio::test]
-    async fn test_state_decoding_invalid_base64() {
-        let invalid_state = "invalid_base64_@#$%";
-        let result = decode_state(invalid_state);
+    async fn test_state_validation_invalid_base64() {
+        let result = crate::OAuth2State::new("invalid_base64_@#$%".to_string());
 
         assert!(result.is_err());
         match result {
@@ -618,25 +621,26 @@ mod tests {
         }
     }
 
-    /// Test state decoding with invalid JSON payload
+    /// Test OAuth2State validation with invalid JSON payload
     ///
-    /// This test verifies that `decode_state` returns an appropriate error when given
-    /// valid base64 that contains invalid JSON that cannot be parsed.
+    /// This test verifies that `OAuth2State::new` returns an appropriate error when given
+    /// valid base64 that contains invalid JSON that cannot be parsed. This tests the validation
+    /// boundary where external data is converted to a type-safe OAuth2State.
     ///
     #[tokio::test]
-    async fn test_state_decoding_invalid_json() {
+    async fn test_state_validation_invalid_json() {
         // Create invalid JSON by encoding invalid data
         let invalid_json = base64url_encode(b"not valid json".to_vec()).unwrap();
-        let result = decode_state(&invalid_json);
+        let result = crate::OAuth2State::new(invalid_json);
 
         assert!(result.is_err());
         match result {
-            Err(OAuth2Error::Serde(_)) => {}
+            Err(OAuth2Error::DecodeState(_)) => {}
             Ok(_) => {
                 unreachable!("Unexpectedly got Ok");
             }
             Err(err) => {
-                unreachable!("Expected Serde error, got {:?}", err);
+                unreachable!("Expected DecodeState error, got {:?}", err);
             }
         }
     }

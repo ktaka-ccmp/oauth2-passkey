@@ -167,8 +167,13 @@ where
             AuthRedirect::new(method.clone())
         })?;
 
+        let session_cookie_typed = oauth2_passkey::SessionCookie::new(session_cookie.to_string())
+            .map_err(|_| {
+            tracing::error!("Invalid session cookie format");
+            AuthRedirect::new(method.clone())
+        })?;
         let (session_user, session_csrf_token_str) =
-            get_user_and_csrf_token_from_session(session_cookie)
+            get_user_and_csrf_token_from_session(&session_cookie_typed)
                 .await
                 .map_err(|_| {
                     tracing::error!("Failed to get user and csrf token from session");

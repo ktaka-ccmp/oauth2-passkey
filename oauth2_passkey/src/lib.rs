@@ -73,20 +73,21 @@ pub use config::O2P_ROUTE_PREFIX;
 
 // OAuth2 authentication types and functions
 pub use oauth2::{
-    AuthResponse, OAuth2Account, OAuth2Mode, Provider, ProviderUserId, prepare_oauth2_auth_request,
+    AuthResponse, OAuth2Account, OAuth2Mode, OAuth2State, Provider, ProviderUserId,
+    prepare_oauth2_auth_request,
 };
 
 // WebAuthn/Passkey types and functions
 pub use passkey::{
-    AuthenticationOptions, AuthenticatorInfo, AuthenticatorResponse, CredentialId,
-    PasskeyCredential, RegisterCredential, RegistrationOptions, get_authenticator_info,
-    get_authenticator_info_batch, get_related_origin_json,
+    AuthenticationOptions, AuthenticatorInfo, AuthenticatorResponse, ChallengeId, ChallengeType,
+    CredentialId, PasskeyCredential, RegisterCredential, RegistrationOptions,
+    get_authenticator_info, get_authenticator_info_batch, get_related_origin_json,
 };
 
 // Session management types and functions for authentication state
 pub use session::{
-    AuthenticationStatus, CsrfHeaderVerified, CsrfToken, SESSION_COOKIE_NAME, SessionError,
-    SessionId, User as SessionUser, UserId, generate_page_session_token,
+    AuthenticationStatus, CsrfHeaderVerified, CsrfToken, SESSION_COOKIE_NAME, SessionCookie,
+    SessionError, SessionId, User as SessionUser, UserId, generate_page_session_token,
     get_csrf_token_from_session, get_user_and_csrf_token_from_session, get_user_from_session,
     is_authenticated_basic, is_authenticated_basic_then_csrf,
     is_authenticated_basic_then_user_and_csrf, is_authenticated_strict,

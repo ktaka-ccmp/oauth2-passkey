@@ -362,13 +362,15 @@ mod tests {
         );
 
         // Test case 6: Attempt to access any session data should fail
-        let csrf_result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let csrf_result = get_csrf_token_from_session(&session_cookie).await;
         assert!(
             csrf_result.is_err(),
             "CSRF token retrieval should fail for invalidated session"
         );
 
-        let user_result = get_user_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let user_result = get_user_from_session(&session_cookie).await;
         assert!(
             user_result.is_err(),
             "User retrieval should fail for invalidated session"
@@ -460,8 +462,10 @@ mod tests {
         }
 
         // Test case 4: Session data isolation - verify sessions contain different data
-        let csrf_1_result = get_csrf_token_from_session(session_id_1).await;
-        let csrf_2_result = get_csrf_token_from_session(session_id_2).await;
+        let session_cookie_1 = crate::SessionCookie::new(session_id_1.to_string()).unwrap();
+        let csrf_1_result = get_csrf_token_from_session(&session_cookie_1).await;
+        let session_cookie_2 = crate::SessionCookie::new(session_id_2.to_string()).unwrap();
+        let csrf_2_result = get_csrf_token_from_session(&session_cookie_2).await;
 
         assert!(
             csrf_1_result.is_ok(),

@@ -32,10 +32,11 @@ type HmacSha256 = Hmac<Sha256>;
 ///
 /// # Example
 /// ```no_run
-/// use oauth2_passkey::{get_csrf_token_from_session, generate_page_session_token};
+/// use oauth2_passkey::{get_csrf_token_from_session, generate_page_session_token, SessionCookie};
 ///
 /// async fn create_secure_link(session_id: &str) -> Option<String> {
-///     match get_csrf_token_from_session(session_id).await {
+///     let session_cookie = SessionCookie::new(session_id.to_string()).ok()?;
+///     match get_csrf_token_from_session(&session_cookie).await {
 ///         Ok(csrf_token) => {
 ///             let page_token = generate_page_session_token(csrf_token.as_str());
 ///             Some(format!("/secure-page?token={}", page_token))

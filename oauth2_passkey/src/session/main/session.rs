@@ -116,21 +116,25 @@ pub(crate) async fn delete_session_from_store_by_session_id(
 ///
 /// # Example
 /// ```no_run
-/// use oauth2_passkey::get_user_from_session;
+/// use oauth2_passkey::{get_user_from_session, SessionCookie};
 ///
 /// async fn get_username(session_id: &str) -> Option<String> {
-///     match get_user_from_session(session_id).await {
+///     let session_cookie = SessionCookie::new(session_id.to_string()).ok()?;
+///     match get_user_from_session(&session_cookie).await {
 ///         Ok(user) => Some(user.account),
 ///         Err(_) => None
 ///     }
 /// }
 /// ```
-#[tracing::instrument(fields(session_cookie = %session_cookie, user_id))]
-pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, SessionError> {
+#[tracing::instrument(fields(session_cookie = %session_cookie.as_str(), user_id))]
+pub async fn get_user_from_session(
+    session_cookie: &crate::session::types::SessionCookie,
+) -> Result<SessionUser, SessionError> {
     tracing::debug!("Retrieving user from session");
     let stored_session = get_data::<StoredSession, SessionError>(
         CachePrefix::session(),
-        CacheKey::new(session_cookie.to_string()).map_err(SessionError::convert_storage_error)?,
+        CacheKey::new(session_cookie.as_str().to_string())
+            .map_err(SessionError::convert_storage_error)?,
     )
     .await?
     .ok_or(SessionError::SessionError)?;
@@ -570,21 +574,25 @@ pub async fn is_authenticated_basic_then_user_and_csrf(
 ///
 /// # Example
 /// ```no_run
-/// use oauth2_passkey::get_csrf_token_from_session;
+/// use oauth2_passkey::{get_csrf_token_from_session, SessionCookie};
 ///
 /// async fn get_token_for_form(session_id: &str) -> Option<String> {
-///     match get_csrf_token_from_session(session_id).await {
+///     let session_cookie = SessionCookie::new(session_id.to_string()).ok()?;
+///     match get_csrf_token_from_session(&session_cookie).await {
 ///         Ok(csrf_token) => Some(csrf_token.as_str().to_string()),
 ///         Err(_) => None
 ///     }
 /// }
 /// ```
-#[tracing::instrument(fields(session_id = %session_id))]
-pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, SessionError> {
+#[tracing::instrument(fields(session_cookie = %session_cookie.as_str()))]
+pub async fn get_csrf_token_from_session(
+    session_cookie: &crate::session::types::SessionCookie,
+) -> Result<CsrfToken, SessionError> {
     tracing::debug!("Retrieving CSRF token from session");
     let stored_session = get_data::<StoredSession, SessionError>(
         CachePrefix::session(),
-        CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?,
+        CacheKey::new(session_cookie.as_str().to_string())
+            .map_err(SessionError::convert_storage_error)?,
     )
     .await?
     .ok_or(SessionError::SessionError)?;
@@ -592,7 +600,7 @@ pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, 
     // Check if session is expired
     if stored_session.expires_at < Utc::now() {
         tracing::debug!("Session expired at {}", stored_session.expires_at);
-        delete_session_from_store_by_session_id(session_id).await?;
+        delete_session_from_store_by_session_id(session_cookie.as_str()).await?;
         return Err(SessionError::SessionExpiredError);
     }
 
@@ -614,21 +622,23 @@ pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, 
 ///
 /// # Example
 /// ```no_run
-/// use oauth2_passkey::get_user_and_csrf_token_from_session;
+/// use oauth2_passkey::{get_user_and_csrf_token_from_session, SessionCookie};
 ///
 /// async fn get_user_and_token(session_id: &str) -> Option<(String, String)> {
-///     match get_user_and_csrf_token_from_session(session_id).await {
+///     let session_cookie = SessionCookie::new(session_id.to_string()).ok()?;
+///     match get_user_and_csrf_token_from_session(&session_cookie).await {
 ///         Ok((user, csrf_token)) => Some((user.account, csrf_token.as_str().to_string())),
 ///         Err(_) => None
 ///     }
 /// }
 /// ```
 pub async fn get_user_and_csrf_token_from_session(
-    session_id: &str,
+    session_cookie: &crate::session::types::SessionCookie,
 ) -> Result<(SessionUser, CsrfToken), SessionError> {
     let stored_session = get_data::<StoredSession, SessionError>(
         CachePrefix::session(),
-        CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?,
+        CacheKey::new(session_cookie.as_str().to_string())
+            .map_err(SessionError::convert_storage_error)?,
     )
     .await?
     .ok_or(SessionError::SessionError)?;
@@ -636,7 +646,7 @@ pub async fn get_user_and_csrf_token_from_session(
     // Check if session is expired
     if stored_session.expires_at < Utc::now() {
         tracing::debug!("Session expired at {}", stored_session.expires_at);
-        delete_session_from_store_by_session_id(session_id).await?;
+        delete_session_from_store_by_session_id(session_cookie.as_str()).await?;
         return Err(SessionError::SessionExpiredError);
     }
 
@@ -826,7 +836,8 @@ mod tests {
             .unwrap();
 
         // Test getting CSRF token using global store
-        let result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
 
         assert!(result.is_ok());
         let token = result.unwrap();
@@ -847,7 +858,8 @@ mod tests {
         let session_id = "nonexistent_session";
 
         // Test getting CSRF token for nonexistent session using global store
-        let result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -895,7 +907,8 @@ mod tests {
             .unwrap();
 
         // Test the function using global store
-        let result = get_user_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_user_from_session(&session_cookie).await;
 
         // The function will fail at the UserStore::get_user call since the user doesn't exist
         assert!(result.is_err());
@@ -919,7 +932,8 @@ mod tests {
         let session_id = "nonexistent_session";
 
         // Test getting user for nonexistent session using global store
-        let result = get_user_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_user_from_session(&session_cookie).await;
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -1394,7 +1408,8 @@ mod tests {
             .unwrap();
 
         // Test getting user and CSRF token using global store
-        let result = get_user_and_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_user_and_csrf_token_from_session(&session_cookie).await;
 
         // With .env_test providing SQLite in-memory database, this should succeed
         // if the user exists in the database, or fail gracefully if the user doesn't exist
@@ -1429,7 +1444,8 @@ mod tests {
         let nonexistent_session_id = "nonexistent_session_combined";
 
         // Test getting user and CSRF token for nonexistent session using global store
-        let result = get_user_and_csrf_token_from_session(nonexistent_session_id).await;
+        let session_cookie = crate::SessionCookie::new(nonexistent_session_id.to_string()).unwrap();
+        let result = get_user_and_csrf_token_from_session(&session_cookie).await;
 
         // Should fail because session doesn't exist
         assert!(result.is_err());
@@ -1483,7 +1499,8 @@ mod tests {
             .unwrap();
 
         // Attempt to get user and CSRF token
-        let result = get_user_and_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_user_and_csrf_token_from_session(&session_cookie).await;
 
         // Should return an error for expired session
         assert!(result.is_err());
@@ -1551,7 +1568,8 @@ mod tests {
             .await
             .unwrap();
 
-        let result = get_user_and_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_user_and_csrf_token_from_session(&session_cookie).await;
 
         // Should return an error due to UserStore not being implemented
         assert!(result.is_err());
@@ -1689,7 +1707,8 @@ mod tests {
             .unwrap();
 
         // Test CSRF token retrieval
-        let csrf_result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let csrf_result = get_csrf_token_from_session(&session_cookie).await;
         assert!(csrf_result.is_ok());
 
         let csrf_token = csrf_result.unwrap();
@@ -1881,7 +1900,8 @@ mod tests {
         init_test_environment().await;
 
         // Test retrieving CSRF token from non-existent session
-        let result = get_csrf_token_from_session("non_existent_session").await;
+        let session_cookie = crate::SessionCookie::new("non_existent_session".to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
         assert!(result.is_err());
 
         match result {
@@ -2175,7 +2195,8 @@ mod tests {
         assert!(user.is_ok());
 
         // Now test getting the user from session
-        let user_result = get_user_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let user_result = get_user_from_session(&session_cookie).await;
 
         // Should succeed now that we have added the user to the database
         assert!(user_result.is_ok());

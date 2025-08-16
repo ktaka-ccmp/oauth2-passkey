@@ -30,7 +30,9 @@ pub async fn update_user_account(
     label: Option<String>,
 ) -> Result<DbUser, CoordinationError> {
     // Get user from session (already does fresh database lookup)
-    let session_user = get_user_from_session(session_id.as_str())
+    let session_cookie = crate::SessionCookie::new(session_id.as_str().to_string())
+        .map_err(|_| CoordinationError::Unauthorized.log())?;
+    let session_user = get_user_from_session(&session_cookie)
         .await
         .map_err(|_| CoordinationError::Unauthorized.log())?;
 
@@ -83,7 +85,9 @@ pub async fn delete_user_account(
     user_id: UserId,
 ) -> Result<Vec<String>, CoordinationError> {
     // Get user from session (already does fresh database lookup)
-    let session_user = get_user_from_session(session_id.as_str())
+    let session_cookie = crate::SessionCookie::new(session_id.as_str().to_string())
+        .map_err(|_| CoordinationError::Unauthorized.log())?;
+    let session_user = get_user_from_session(&session_cookie)
         .await
         .map_err(|_| CoordinationError::Unauthorized.log())?;
 

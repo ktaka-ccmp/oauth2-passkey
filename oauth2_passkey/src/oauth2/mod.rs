@@ -18,7 +18,7 @@ mod storage;
 mod types;
 
 pub use main::prepare_oauth2_auth_request;
-pub use types::{AuthResponse, OAuth2Account, OAuth2Mode, Provider, ProviderUserId};
+pub use types::{AuthResponse, OAuth2Account, OAuth2Mode, OAuth2State, Provider, ProviderUserId};
 
 use crate::storage::CacheErrorConversion;
 pub(crate) use config::{OAUTH2_CSRF_COOKIE_NAME, OAUTH2_RESPONSE_MODE, get_auth_url};

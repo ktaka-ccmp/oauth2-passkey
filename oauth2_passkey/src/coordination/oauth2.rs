@@ -191,7 +191,8 @@ async fn process_oauth2_authorization(
     // 9. Create a header for the session cookie
 
     // Decode the state from the auth response
-    let state_in_response = decode_state(&auth_response.state)?;
+    let oauth2_state = crate::OAuth2State::new(auth_response.state.clone())?;
+    let state_in_response = decode_state(&oauth2_state)?;
 
     // Extract user_id from the stored session if available
     let state_user = get_uid_from_stored_session_by_state_param(&state_in_response).await?;

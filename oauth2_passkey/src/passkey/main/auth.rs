@@ -88,7 +88,10 @@ pub(crate) async fn finish_authentication(
     );
 
     // Get stored challenge and verify auth
-    let stored_options = get_and_validate_options("auth_challenge", &auth_response.auth_id).await?;
+    let challenge_type = crate::passkey::types::ChallengeType::authentication();
+    let challenge_id = crate::passkey::types::ChallengeId::new(auth_response.auth_id.clone())
+        .map_err(|e| PasskeyError::Challenge(format!("Invalid auth ID: {e}")))?;
+    let stored_options = get_and_validate_options(&challenge_type, &challenge_id).await?;
 
     tracing::debug!(
         "Parsing client data: {}",
@@ -1043,7 +1046,7 @@ mod tests {
 
         // Verify that a challenge was stored in cache
         let auth_id = options.auth_id;
-        let cache_prefix = CachePrefix::new("auth_challenge".to_string()).unwrap();
+        let cache_prefix = CachePrefix::new("authentication".to_string()).unwrap();
         let cache_key = CacheKey::new(auth_id.clone()).unwrap();
         let cache_get = GENERIC_CACHE_STORE
             .lock()
@@ -1054,7 +1057,7 @@ mod tests {
         assert!(cache_get.unwrap().is_some(), "Challenge should be in cache");
 
         // Clean up
-        let cache_prefix = CachePrefix::new("auth_challenge".to_string()).unwrap();
+        let cache_prefix = CachePrefix::new("authentication".to_string()).unwrap();
         let cache_key = CacheKey::new(auth_id.clone()).unwrap();
         let remove_cache = passkey_test_utils::remove_from_cache(cache_prefix, cache_key).await;
         assert!(remove_cache.is_ok(), "Failed to clean up cache");

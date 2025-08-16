@@ -53,7 +53,8 @@ mod edge_cases {
             .unwrap();
 
         // Test expired session handling in get_csrf_token_from_session
-        let result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
         assert!(result.is_err());
         match result {
             Err(SessionError::SessionExpiredError) => {} // Expected error
@@ -100,7 +101,8 @@ mod edge_cases {
             .unwrap();
 
         // Test error handling for malformed data in get_csrf_token_from_session
-        let result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
         assert!(result.is_err());
         match result {
             Err(SessionError::Storage(_)) => {} // Expected error
@@ -140,7 +142,8 @@ mod edge_cases {
             .unwrap();
 
         // Test error handling for missing fields
-        let result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
         assert!(result.is_err());
         match result {
             Err(SessionError::Storage(_)) => {} // Expected error for missing fields

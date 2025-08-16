@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **CRITICAL FIX**: Fixed passkey registration vulnerability where users were created before challenge validation, preventing orphaned user records on validation failures
 - **BREAKING**: Enhanced admin function security by requiring session ID validation with fresh database lookups instead of trusting session data, preventing privilege escalation attacks
+- **BREAKING**: Implemented comprehensive type-safe validation system to eliminate ID confusion vulnerabilities and parameter mixing attacks at compile-time
 
 ### Changed
 
@@ -21,6 +22,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Database**: Enhanced SQLite connection with WAL journaling, memory temp storage, and optimized pragmas for better performance
 
 ### Breaking Changes
+
+- **Type-Safe Validation System**: Comprehensive implementation of compile-time type safety for all authentication operations:
+  - **New Type Wrappers**: Added type-safe wrappers for all identifier types:
+    - `UserId` - Database user identifiers (already existed, now consistently used)
+    - `CredentialId` - Passkey credential identifiers (already existed, now consistently used)
+    - `Provider` - OAuth2 provider names (e.g., "google", "github")
+    - `ProviderUserId` - External provider user identifiers
+    - `AccountId` - OAuth2 account identifiers
+    - `UserHandle` - WebAuthn user handles
+    - `UserName` - Username identifiers
+    - `DisplayName` - User display names
+    - `Email` - Email addresses
+  - **Core Function Signature Changes**: All core coordination functions now require typed parameters:
+    - `delete_oauth2_account_core(UserId, Provider, ProviderUserId)` - was `delete_oauth2_account_core(user_id: &str, provider: &str, provider_user_id: &str)`
+    - `list_accounts_core(UserId)` - was `list_accounts_core(user_id: &str)`
+    - `delete_passkey_credential_core(UserId, CredentialId)` - was `delete_passkey_credential_core(user_id: &str, credential_id: &str)`
+    - `list_credentials_core(UserId)` - was `list_credentials_core(user_id: &str)`
+    - `update_passkey_credential_core(CredentialId, ...)` - was `update_passkey_credential_core(credential_id: &str, ...)`
+  - **Search Field Enums**: All database search operations now use typed search fields:
+    - `CredentialSearchField::UserId(UserId)` - was `CredentialSearchField::UserId(String)`
+    - `AccountSearchField::Provider(Provider)` - was `AccountSearchField::Provider(String)`
+    - All search field variants now require appropriate typed wrappers instead of raw strings
+  - **Migration Guide**: Replace string parameters with typed constructors:
+    ```rust
+    // Before:
+    delete_oauth2_account_core("user123", "google", "google456")
+
+    // After:
+    delete_oauth2_account_core(
+        UserId::new("user123".to_string()),
+        Provider::new("google".to_string()),
+        ProviderUserId::new("google456".to_string())
+    )
+    ```
 
 - **Coordination Functions**: All coordination functions now use type-safe wrapper types and require session validation:
   - **Admin Functions**: Now require `SessionId` parameter instead of `SessionUser` object and use typed identifiers:

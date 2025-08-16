@@ -344,3 +344,70 @@ impl SessionId {
         &self.0
     }
 }
+
+/// Type-safe wrapper for session cookies.
+///
+/// This provides compile-time safety to prevent mixing up session cookies with other string types.
+/// Session cookies are HTTP cookie values used for user session identification and must be
+/// properly validated to prevent session hijacking and other security issues.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SessionCookie(String);
+
+impl SessionCookie {
+    /// Creates a new SessionCookie from a string with validation.
+    ///
+    /// This constructor validates the session cookie format to ensure it meets
+    /// security requirements for session identification.
+    ///
+    /// # Arguments
+    /// * `cookie` - The session cookie string
+    ///
+    /// # Returns
+    /// * `Ok(SessionCookie)` - If the cookie is valid
+    /// * `Err(SessionError)` - If the cookie is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only valid characters (alphanumeric + basic symbols)
+    /// * Must be reasonable length (not too short or too long)
+    pub fn new(cookie: String) -> Result<Self, crate::session::SessionError> {
+        use crate::session::SessionError;
+
+        // Validate cookie is not empty
+        if cookie.is_empty() {
+            return Err(SessionError::Cookie(
+                "Session cookie cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate cookie length (reasonable bounds)
+        if cookie.len() < 10 {
+            return Err(SessionError::Cookie("Session cookie too short".to_string()));
+        }
+
+        if cookie.len() > 1024 {
+            return Err(SessionError::Cookie("Session cookie too long".to_string()));
+        }
+
+        // Validate cookie contains only safe characters
+        // Allow alphanumeric, hyphens, underscores, equals signs, and basic URL-safe characters
+        if !cookie
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '=' | '.' | '+' | '/'))
+        {
+            return Err(SessionError::Cookie(
+                "Session cookie contains invalid characters".to_string(),
+            ));
+        }
+
+        Ok(SessionCookie(cookie))
+    }
+
+    /// Returns the session cookie as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the session cookie
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}

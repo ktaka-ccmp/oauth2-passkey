@@ -136,12 +136,12 @@ impl CachePrefix {
 
     /// Convenience constructor for authentication challenge prefix.
     pub fn auth_challenge() -> Self {
-        CachePrefix("auth_challenge".to_string())
+        CachePrefix("authentication".to_string())
     }
 
     /// Convenience constructor for registration challenge prefix.
     pub fn reg_challenge() -> Self {
-        CachePrefix("reg_challenge".to_string())
+        CachePrefix("registration".to_string())
     }
 
     /// Convenience constructor for session info prefix.

@@ -290,7 +290,10 @@ pub(crate) async fn validate_registration_challenge(
         .to_string();
 
     // Validate stored challenge options (this is the key security validation)
-    let stored_options = get_and_validate_options("reg_challenge", &user_handle).await?;
+    let challenge_type = crate::passkey::types::ChallengeType::registration();
+    let challenge_id = crate::passkey::types::ChallengeId::new(user_handle.clone())
+        .map_err(|e| PasskeyError::Challenge(format!("Invalid user handle: {e}")))?;
+    let stored_options = get_and_validate_options(&challenge_type, &challenge_id).await?;
     let stored_user = stored_options.user.clone();
 
     // Extract credential ID
@@ -687,7 +690,10 @@ async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), Passkey
         PasskeyError::ClientData("User handle is missing".to_string())
     })?;
 
-    let stored_options = get_and_validate_options("reg_challenge", user_handle).await?;
+    let challenge_type = crate::passkey::types::ChallengeType::registration();
+    let challenge_id = crate::passkey::types::ChallengeId::new(user_handle.to_string())
+        .map_err(|e| PasskeyError::Challenge(format!("Invalid user handle: {e}")))?;
+    let stored_options = get_and_validate_options(&challenge_type, &challenge_id).await?;
 
     // Step 8: Verify challenge using base64url encoding comparison
     if client_data.challenge != stored_options.challenge {
@@ -1368,7 +1374,10 @@ mod tests {
         assert_eq!(registration_options.user.display_name, "Test User 456");
 
         // Verify that a challenge was stored in the cache
-        let cache_result = super::get_and_validate_options("reg_challenge", user_handle).await;
+        let challenge_type = crate::passkey::types::ChallengeType::registration();
+        let challenge_id =
+            crate::passkey::types::ChallengeId::new(user_handle.to_string()).unwrap();
+        let cache_result = super::get_and_validate_options(&challenge_type, &challenge_id).await;
         assert!(
             cache_result.is_ok(),
             "Challenge was not stored in cache properly"

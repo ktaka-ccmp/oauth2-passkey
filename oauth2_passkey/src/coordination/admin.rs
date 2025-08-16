@@ -336,7 +336,9 @@ pub async fn update_user_admin_status(
 /// performs fresh database lookup to ensure current user state.
 async fn validate_admin_session(session_id: &str) -> Result<SessionUser, CoordinationError> {
     // Get user from session (this already does fresh database validation)
-    let session_user = get_user_from_session(session_id)
+    let session_cookie = crate::SessionCookie::new(session_id.to_string())
+        .map_err(|_| CoordinationError::Unauthorized.log())?;
+    let session_user = get_user_from_session(&session_cookie)
         .await
         .map_err(|_| CoordinationError::Unauthorized.log())?;
 

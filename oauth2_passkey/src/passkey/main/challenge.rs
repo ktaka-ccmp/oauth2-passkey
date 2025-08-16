@@ -12,12 +12,13 @@ use crate::storage::{CacheErrorConversion, CacheKey, CachePrefix, get_data, remo
 /// 2. Validates the challenge TTL (Time-To-Live)
 /// 3. Returns the validated StoredOptions if successful
 pub(super) async fn get_and_validate_options(
-    challenge_type: &str,
-    id: &str,
+    challenge_type: &crate::passkey::types::ChallengeType,
+    id: &crate::passkey::types::ChallengeId,
 ) -> Result<StoredOptions, PasskeyError> {
-    let cache_prefix = CachePrefix::new(challenge_type.to_string())
+    let cache_prefix = CachePrefix::new(challenge_type.as_str().to_string())
         .map_err(PasskeyError::convert_storage_error)?;
-    let cache_key = CacheKey::new(id.to_string()).map_err(PasskeyError::convert_storage_error)?;
+    let cache_key =
+        CacheKey::new(id.as_str().to_string()).map_err(PasskeyError::convert_storage_error)?;
 
     let stored_options: StoredOptions =
         get_data::<StoredOptions, PasskeyError>(cache_prefix, cache_key)
@@ -117,7 +118,7 @@ mod tests {
     async fn test_get_and_validate_options_success() {
         init_test_environment().await;
         let challenge_type = "registration";
-        let id = "test_id";
+        let id = "test_challenge_id_success";
         let stored_options = create_valid_stored_options();
 
         // Store the options first using simplified cache operations
@@ -135,7 +136,10 @@ mod tests {
         .expect("Failed to store options");
 
         // Test retrieval and validation
-        let result = get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let result = get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(result.is_ok());
         let retrieved_options = result.unwrap();
         assert_eq!(retrieved_options.challenge, stored_options.challenge);
@@ -150,7 +154,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_and_validate_options_not_found() {
         init_test_environment().await;
-        let result = get_and_validate_options("registration", "nonexistent").await;
+        let challenge_type_typed = crate::passkey::types::ChallengeType::registration();
+        let challenge_id_typed =
+            crate::passkey::types::ChallengeId::new("nonexistent".to_string()).unwrap();
+        let result = get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             PasskeyError::NotFound(msg) => assert_eq!(msg, "Challenge not found"),
@@ -167,7 +174,7 @@ mod tests {
     async fn test_get_and_validate_options_expired() {
         init_test_environment().await;
         let challenge_type = "registration";
-        let id = "expired_id";
+        let id = "expired_challenge_id_test";
         let expired_options = create_expired_stored_options();
 
         // Store the expired options
@@ -185,7 +192,10 @@ mod tests {
         .expect("Failed to store expired options");
 
         // Test retrieval - should fail due to expiration
-        let result = get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let result = get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             PasskeyError::Authentication(msg) => {
@@ -204,7 +214,7 @@ mod tests {
     async fn test_remove_options_success() {
         init_test_environment().await;
         let challenge_type = "authentication";
-        let id = "remove_test";
+        let id = "remove_challenge_test_id";
         let stored_options = create_valid_stored_options();
 
         // Store the options first
@@ -279,7 +289,7 @@ mod tests {
     async fn test_ttl_validation_with_passkey_timeout() {
         init_test_environment().await;
         let challenge_type = "registration";
-        let id = "ttl_test";
+        let id = "ttl_validation_test_id";
 
         // Create options with very long TTL but should be limited by PASSKEY_CHALLENGE_TIMEOUT
         let now = SystemTime::now()
@@ -312,7 +322,10 @@ mod tests {
         .expect("Failed to store options");
 
         // Should be expired due to PASSKEY_CHALLENGE_TIMEOUT limit
-        let result = get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let result = get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             PasskeyError::Authentication(msg) => {
@@ -410,7 +423,7 @@ mod tests {
 
         // 1. Create a test challenge
         let challenge_type = "test_challenge";
-        let id = "test_challenge_id_lifecycle";
+        let id = "test_challenge_lifecycle_id";
         let challenge_str = "test_challenge_123";
         let user_handle = "test_user_handle_challenge";
         let name = "Test User Challenge";
@@ -439,7 +452,11 @@ mod tests {
         assert!(exists, "Challenge should exist in cache");
 
         // 3. Validate the challenge
-        let validate_result = super::get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let validate_result =
+            super::get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(validate_result.is_ok(), "Challenge validation failed");
         let stored_options = validate_result.unwrap();
 
@@ -467,7 +484,11 @@ mod tests {
         assert!(!exists_after, "Challenge should be removed from cache");
 
         // 7. Try to validate again - should fail with NotFound
-        let validate_again = super::get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let validate_again =
+            super::get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(
             validate_again.is_err(),
             "Challenge should not exist anymore"
@@ -494,7 +515,7 @@ mod tests {
 
         // Create a challenge with very short TTL
         let challenge_type = "test_challenge";
-        let id = "test_challenge_id_expiration";
+        let id = "test_challenge_expiry_id";
         let challenge_str = "test_challenge_expiry";
         let user_handle = "test_user_handle_expiry";
         let name = "Test User Expiry";
@@ -517,7 +538,11 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         // Validate the challenge - should fail with expired error
-        let validate_result = super::get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let validate_result =
+            super::get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
 
         match validate_result {
             Err(crate::passkey::errors::PasskeyError::Authentication(msg)) => {

@@ -402,6 +402,99 @@ impl Email {
     }
 }
 
+/// Type-safe wrapper for OAuth2 state parameters.
+///
+/// This provides compile-time safety to prevent mixing up OAuth2 state strings with other string types.
+/// OAuth2 state parameters are base64url-encoded JSON that carries CSRF protection and flow parameters
+/// between authorization requests and callbacks. Proper validation is critical for security.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OAuth2State(String);
+
+impl std::fmt::Display for OAuth2State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl OAuth2State {
+    /// Creates a new OAuth2State from a string with validation.
+    ///
+    /// This constructor validates the OAuth2 state format to ensure it meets
+    /// security requirements for CSRF protection and parameter integrity.
+    ///
+    /// # Arguments
+    /// * `state` - The OAuth2 state string (should be base64url-encoded)
+    ///
+    /// # Returns
+    /// * `Ok(OAuth2State)` - If the state is valid
+    /// * `Err(OAuth2Error)` - If the state is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must be valid base64url encoding
+    /// * Must contain valid JSON when decoded
+    /// * Must be reasonable length
+    pub fn new(state: String) -> Result<Self, super::errors::OAuth2Error> {
+        use super::errors::OAuth2Error;
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+
+        // Validate state is not empty
+        if state.is_empty() {
+            return Err(OAuth2Error::DecodeState(
+                "OAuth2 state cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate state length (reasonable bounds)
+        if state.len() < 10 {
+            return Err(OAuth2Error::DecodeState(
+                "OAuth2 state too short".to_string(),
+            ));
+        }
+
+        if state.len() > 8192 {
+            return Err(OAuth2Error::DecodeState(
+                "OAuth2 state too long".to_string(),
+            ));
+        }
+
+        // Validate state is valid base64url
+        let decoded_bytes = URL_SAFE_NO_PAD
+            .decode(&state)
+            .map_err(|e| OAuth2Error::DecodeState(format!("Invalid base64url encoding: {e}")))?;
+
+        // Validate decoded content is valid UTF-8
+        let decoded_string = String::from_utf8(decoded_bytes).map_err(|e| {
+            OAuth2Error::DecodeState(format!("Invalid UTF-8 in decoded state: {e}"))
+        })?;
+
+        // Validate decoded content is valid JSON
+        let _: StateParams = serde_json::from_str(&decoded_string)
+            .map_err(|e| OAuth2Error::DecodeState(format!("Invalid JSON in decoded state: {e}")))?;
+
+        Ok(OAuth2State(state))
+    }
+
+    /// Returns the OAuth2 state as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the OAuth2 state
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Checks if the state contains a substring.
+    ///
+    /// # Arguments
+    /// * `needle` - The substring to search for
+    ///
+    /// # Returns
+    /// * `true` if the substring is found, `false` otherwise
+    pub fn contains(&self, needle: char) -> bool {
+        self.0.contains(needle)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
