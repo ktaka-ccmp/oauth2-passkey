@@ -140,12 +140,14 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
     };
 
     // Fetch passkey credentials using the public function from libauth
-    let stored_credentials = list_credentials_core(&user_id).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch credentials: {e:?}"),
-        )
-    })?;
+    let stored_credentials = list_credentials_core(UserId::new(user_id.clone()))
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to fetch credentials: {e:?}"),
+            )
+        })?;
 
     let unique_aaguids: HashSet<String> = stored_credentials
         .iter()
@@ -187,12 +189,14 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
 
     // Fetch OAuth2 accounts using the public function from libauth
     // let oauth2_accounts = list_accounts_core(Some(session_user)).await.map_err(|e| {
-    let oauth2_accounts = list_accounts_core(&user_id).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch accounts: {e:?}"),
-        )
-    })?;
+    let oauth2_accounts = list_accounts_core(UserId::new(user_id.to_string()))
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to fetch accounts: {e:?}"),
+            )
+        })?;
 
     // Convert OAuth2Account to TemplateAccount
     let oauth2_accounts = oauth2_accounts

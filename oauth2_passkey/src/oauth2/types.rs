@@ -6,6 +6,7 @@ use sqlx::FromRow;
 use super::errors::OAuth2Error;
 use super::main::IdInfo as GoogleIdInfo;
 
+use crate::session::UserId;
 use crate::storage::CacheData;
 
 /// Represents an OAuth2 account linked to a user
@@ -175,18 +176,18 @@ impl TryFrom<CacheData> for StoredToken {
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub(crate) enum AccountSearchField {
-    /// Search by ID
-    Id(String),
-    /// Search by user ID (database ID)
-    UserId(String),
-    /// Search by provider
-    Provider(String),
-    /// Search by provider user ID
-    ProviderUserId(String),
-    /// Search by name
-    Name(String),
-    /// Search by email
-    Email(String),
+    /// Search by ID (type-safe)
+    Id(AccountId),
+    /// Search by user ID (database ID, type-safe)
+    UserId(UserId),
+    /// Search by provider (type-safe)
+    Provider(Provider),
+    /// Search by provider user ID (type-safe)
+    ProviderUserId(ProviderUserId),
+    /// Search by name (type-safe)
+    Name(DisplayName),
+    /// Search by email (type-safe)
+    Email(Email),
 }
 
 /// Mode of OAuth2 operation to explicitly indicate user intent.
@@ -250,6 +251,154 @@ impl std::str::FromStr for OAuth2Mode {
             "create_user_or_login" => Ok(Self::CreateUserOrLogin),
             _ => Err(OAuth2Error::InvalidMode(s.to_string())),
         }
+    }
+}
+
+/// Type-safe wrapper for OAuth2 account identifiers.
+///
+/// This provides compile-time safety to prevent mixing up account IDs with other string types.
+/// Account IDs are database-specific identifiers for OAuth2 accounts.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AccountId(String);
+
+impl AccountId {
+    /// Creates a new AccountId from a string.
+    ///
+    /// # Arguments
+    /// * `id` - The account ID string
+    ///
+    /// # Returns
+    /// * A new AccountId instance
+    pub fn new(id: String) -> Self {
+        Self(id)
+    }
+
+    /// Returns the account ID as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the account ID
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for OAuth2 provider names.
+///
+/// This provides compile-time safety to prevent mixing up provider names with other string types.
+/// Provider names identify the OAuth2 service (e.g., "google", "github").
+#[derive(Debug, Clone, PartialEq)]
+pub struct Provider(String);
+
+impl Provider {
+    /// Creates a new Provider from a string.
+    ///
+    /// # Arguments
+    /// * `provider` - The provider name string
+    ///
+    /// # Returns
+    /// * A new Provider instance
+    pub fn new(provider: String) -> Self {
+        Self(provider)
+    }
+
+    /// Returns the provider name as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the provider name
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for provider-specific user identifiers.
+///
+/// This provides compile-time safety to prevent mixing up provider user IDs with database user IDs.
+/// Provider user IDs are external identifiers from OAuth2 providers (e.g., Google user ID).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProviderUserId(String);
+
+impl ProviderUserId {
+    /// Creates a new ProviderUserId from a string.
+    ///
+    /// # Arguments
+    /// * `id` - The provider user ID string
+    ///
+    /// # Returns
+    /// * A new ProviderUserId instance
+    pub fn new(id: String) -> Self {
+        Self(id)
+    }
+
+    /// Returns the provider user ID as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the provider user ID
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for user display names.
+///
+/// This provides compile-time safety to prevent mixing up display names with other string types.
+/// Display names are user-facing names from OAuth2 providers.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DisplayName(String);
+
+impl DisplayName {
+    /// Creates a new DisplayName from a string.
+    ///
+    /// This constructor is part of the public type-safe search API and is used
+    /// internally by the AccountSearchField enum for database queries.
+    ///
+    /// # Arguments
+    /// * `name` - The display name string
+    ///
+    /// # Returns
+    /// * A new DisplayName instance
+    #[allow(dead_code)] // Part of type-safe search API, used in tests but not by library's public interface
+    pub fn new(name: String) -> Self {
+        Self(name)
+    }
+
+    /// Returns the display name as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the display name
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for email addresses.
+///
+/// This provides compile-time safety to prevent mixing up email addresses with other string types.
+/// Email addresses are provided by OAuth2 providers for user identification.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Email(String);
+
+impl Email {
+    /// Creates a new Email from a string.
+    ///
+    /// This constructor is part of the public type-safe search API and is used
+    /// internally by the AccountSearchField enum for database queries.
+    ///
+    /// # Arguments
+    /// * `email` - The email address string
+    ///
+    /// # Returns
+    /// * A new Email instance
+    #[allow(dead_code)] // Part of type-safe search API, used in tests but not by library's public interface
+    pub fn new(email: String) -> Self {
+        Self(email)
+    }
+
+    /// Returns the email address as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the email address
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 

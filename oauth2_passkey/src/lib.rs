@@ -72,7 +72,9 @@ pub use coordination::{
 pub use config::O2P_ROUTE_PREFIX;
 
 // OAuth2 authentication types and functions
-pub use oauth2::{AuthResponse, OAuth2Account, OAuth2Mode, prepare_oauth2_auth_request};
+pub use oauth2::{
+    AuthResponse, OAuth2Account, OAuth2Mode, Provider, ProviderUserId, prepare_oauth2_auth_request,
+};
 
 // WebAuthn/Passkey types and functions
 pub use passkey::{

@@ -125,7 +125,7 @@ pub async fn delete_passkey_credential_admin(
     );
 
     let credential = PasskeyStore::get_credentials_by(CredentialSearchField::CredentialId(
-        credential_id.as_str().to_string(),
+        credential_id.clone(),
     ))
     .await?
     .into_iter()
@@ -141,9 +141,9 @@ pub async fn delete_passkey_credential_admin(
     // Should we verify a context token here?
 
     // Delete the credential using the raw credential ID format from the database
-    PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
+    PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(CredentialId::new(
         credential.credential_id.clone(),
-    ))
+    )))
     .await?;
 
     tracing::debug!("Successfully deleted credential");
@@ -193,7 +193,7 @@ pub async fn delete_oauth2_account_admin(
 
     // Delete the OAuth2 account
     OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::ProviderUserId(
-        provider_user_id.clone(),
+        crate::oauth2::ProviderUserId::new(provider_user_id.clone()),
     ))
     .await?;
 
@@ -252,14 +252,10 @@ pub async fn delete_user_account_admin(
     tracing::debug!("Deleting user account: {:#?}", user);
 
     // Delete all OAuth2 accounts for this user
-    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(
-        user_id.as_str().to_string(),
-    ))
-    .await?;
+    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.clone())).await?;
 
     // Delete all Passkey credentials for this user
-    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.as_str().to_string()))
-        .await?;
+    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.clone())).await?;
 
     // Finally, delete the user account
     UserStore::delete_user(user_id.as_str()).await?;

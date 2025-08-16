@@ -8,8 +8,9 @@ use axum::{
 };
 
 use oauth2_passkey::{
-    DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, delete_oauth2_account_core,
-    delete_passkey_credential_core, delete_user_account_admin, update_user_admin_status,
+    CredentialId, DbUser, O2P_ROUTE_PREFIX, Provider, ProviderUserId, SessionId, UserId,
+    delete_oauth2_account_core, delete_passkey_credential_core, delete_user_account_admin,
+    update_user_admin_status,
 };
 
 use super::super::error::IntoResponseError;
@@ -117,10 +118,13 @@ async fn delete_passkey_credential(
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    delete_passkey_credential_core(&payload.user_id, &credential_id)
-        .await
-        .map(|()| StatusCode::NO_CONTENT)
-        .into_response_error()
+    delete_passkey_credential_core(
+        UserId::new(payload.user_id.clone()),
+        CredentialId::new(credential_id),
+    )
+    .await
+    .map(|()| StatusCode::NO_CONTENT)
+    .into_response_error()
 }
 
 async fn delete_oauth2_account(
@@ -133,10 +137,14 @@ async fn delete_oauth2_account(
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    delete_oauth2_account_core(&payload.user_id, &provider, &provider_user_id)
-        .await
-        .map(|()| StatusCode::NO_CONTENT)
-        .into_response_error()
+    delete_oauth2_account_core(
+        UserId::new(payload.user_id.clone()),
+        Provider::new(provider),
+        ProviderUserId::new(provider_user_id),
+    )
+    .await
+    .map(|()| StatusCode::NO_CONTENT)
+    .into_response_error()
 }
 
 #[derive(serde::Deserialize)]

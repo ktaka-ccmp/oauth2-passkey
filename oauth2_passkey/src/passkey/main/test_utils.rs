@@ -116,7 +116,7 @@ pub async fn insert_test_user_and_credential(data: TestCredentialData) -> Result
 /// Delete a test credential by its ID
 pub async fn delete_test_credential(credential_id: &str) -> Result<(), PasskeyError> {
     PasskeyStore::delete_credential_by(crate::passkey::CredentialSearchField::CredentialId(
-        credential_id.to_string(),
+        crate::passkey::CredentialId::new(credential_id.to_string()),
     ))
     .await
 }

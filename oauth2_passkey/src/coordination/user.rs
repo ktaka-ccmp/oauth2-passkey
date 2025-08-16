@@ -119,24 +119,18 @@ pub async fn delete_user_account(
     tracing::debug!("Deleting user account: {:#?}", user);
 
     // Get all Passkey credentials for this user before deleting them
-    let credentials = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
-        user_id.as_str().to_string(),
-    ))
-    .await?;
+    let credentials =
+        PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.clone())).await?;
     let credential_ids: Vec<String> = credentials
         .iter()
         .map(|c| c.credential_id.clone())
         .collect();
 
     // Delete all OAuth2 accounts for this user
-    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(
-        user_id.as_str().to_string(),
-    ))
-    .await?;
+    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.clone())).await?;
 
     // Delete all Passkey credentials for this user
-    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.as_str().to_string()))
-        .await?;
+    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.clone())).await?;
 
     // Finally, delete the user account
     UserStore::delete_user(user_id.as_str()).await?;
@@ -445,7 +439,7 @@ mod tests {
 
         // 7. Verify passkeys are deleted
         let passkeys_from_db = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
-            user_id_to_delete.clone(),
+            UserId::new(user_id_to_delete.clone()),
         ))
         .await
         .expect("DB error getting passkeys");
@@ -453,7 +447,7 @@ mod tests {
 
         // 8. Verify OAuth2 accounts are deleted
         let oauth_accounts_from_db = OAuth2Store::get_oauth2_accounts_by(
-            AccountSearchField::UserId(user_id_to_delete.clone()),
+            AccountSearchField::UserId(UserId::new(user_id_to_delete.clone())),
         )
         .await
         .expect("DB error getting oauth accounts");

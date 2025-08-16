@@ -111,7 +111,8 @@ async fn test_combined_admin_operations() -> Result<(), Box<dyn std::error::Erro
         .find(|u| u.account == test_user.email)
         .expect("Should find the passkey test user");
 
-    let user_credentials = oauth2_passkey::list_credentials_core(&passkey_user.id).await?;
+    let user_credentials =
+        oauth2_passkey::list_credentials_core(UserId::new(passkey_user.id.clone())).await?;
     assert!(
         !user_credentials.is_empty(),
         "Passkey user should have at least one credential after registration"
@@ -199,7 +200,7 @@ async fn test_combined_admin_operations() -> Result<(), Box<dyn std::error::Erro
 
     // Use the remaining test user and try to delete one of their credentials
     let remaining_user_credentials =
-        oauth2_passkey::list_credentials_core(&passkey_user.id).await?;
+        oauth2_passkey::list_credentials_core(UserId::new(passkey_user.id.clone())).await?;
 
     if let Some(credential_to_delete) = remaining_user_credentials.first() {
         let delete_cred_result = oauth2_passkey::delete_passkey_credential_admin(
@@ -214,7 +215,8 @@ async fn test_combined_admin_operations() -> Result<(), Box<dyn std::error::Erro
         );
 
         // Verify credential was deleted
-        let updated_credentials = oauth2_passkey::list_credentials_core(&passkey_user.id).await?;
+        let updated_credentials =
+            oauth2_passkey::list_credentials_core(UserId::new(passkey_user.id.clone())).await?;
         assert!(
             updated_credentials.len() < remaining_user_credentials.len(),
             "Credential count should decrease after deletion"
@@ -272,7 +274,8 @@ async fn test_combined_admin_operations() -> Result<(), Box<dyn std::error::Erro
     let all_users_final =
         oauth2_passkey::get_all_users(SessionId::new(admin_session_id.clone())).await?;
     if let Some(some_user) = all_users_final.first() {
-        let some_credentials = oauth2_passkey::list_credentials_core(&some_user.id).await?;
+        let some_credentials =
+            oauth2_passkey::list_credentials_core(UserId::new(some_user.id.clone())).await?;
         if let Some(some_credential) = some_credentials.first() {
             // This should fail because _regular_session_id is not admin
             // Try to use the regular (non-admin) session to delete credentials

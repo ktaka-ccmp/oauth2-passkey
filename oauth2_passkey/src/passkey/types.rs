@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::errors::PasskeyError;
+use crate::session::UserId;
 use crate::storage::CacheData;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
@@ -65,19 +66,18 @@ pub(super) struct SessionInfo {
 ///
 /// This enum provides various ways to search for passkey credentials in storage,
 /// supporting different lookup strategies based on the available identifier.
-/// Each variant represents a different search parameter type.
+/// Each variant represents a different search parameter type with compile-time type safety.
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum CredentialSearchField {
-    /// Search by credential ID
-    // CredentialId(Vec<u8>),
-    CredentialId(String),
-    /// Search by user ID (database ID)
-    UserId(String),
-    /// Search by user handle (WebAuthn user handle)
-    UserHandle(String),
-    /// Search by username
-    UserName(String),
+    /// Search by credential ID (type-safe)
+    CredentialId(CredentialId),
+    /// Search by user ID (database ID, type-safe)
+    UserId(UserId),
+    /// Search by user handle (WebAuthn user handle, type-safe)
+    UserHandle(UserHandle),
+    /// Search by username (type-safe)
+    UserName(UserName),
 }
 
 /// Helper functions for cache store operations to improve code reuse and maintainability
@@ -119,7 +119,7 @@ impl TryFrom<CacheData> for StoredOptions {
 ///
 /// This provides compile-time safety to prevent mixing up credential IDs with other string types.
 /// It's used in passkey coordination functions to ensure type safety when passing credential identifiers.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CredentialId(String);
 
 impl CredentialId {
@@ -138,6 +138,62 @@ impl CredentialId {
     ///
     /// # Returns
     /// * A string slice containing the credential ID
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for WebAuthn user handles.
+///
+/// This provides compile-time safety to prevent mixing up user handles with other string types.
+/// User handles are WebAuthn-specific identifiers that may differ from usernames or display names.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UserHandle(String);
+
+impl UserHandle {
+    /// Creates a new UserHandle from a string.
+    ///
+    /// # Arguments
+    /// * `handle` - The user handle string
+    ///
+    /// # Returns
+    /// * A new UserHandle instance
+    pub fn new(handle: String) -> Self {
+        Self(handle)
+    }
+
+    /// Returns the user handle as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the user handle
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for usernames.
+///
+/// This provides compile-time safety to prevent mixing up usernames with other string types.
+/// Usernames are user-facing identifiers that may be used for display or authentication.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UserName(String);
+
+impl UserName {
+    /// Creates a new UserName from a string.
+    ///
+    /// # Arguments
+    /// * `name` - The username string
+    ///
+    /// # Returns
+    /// * A new UserName instance
+    pub fn new(name: String) -> Self {
+        Self(name)
+    }
+
+    /// Returns the username as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the username
     pub fn as_str(&self) -> &str {
         &self.0
     }

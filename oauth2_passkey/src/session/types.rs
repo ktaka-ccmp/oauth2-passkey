@@ -293,7 +293,7 @@ impl CsrfToken {
 ///
 /// This provides compile-time safety to prevent mixing up user IDs with other string types.
 /// It's used in coordination layer functions to ensure type safety when passing user identifiers.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UserId(String);
 
 impl UserId {

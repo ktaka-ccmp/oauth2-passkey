@@ -9,11 +9,12 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use oauth2_passkey::{
-    AuthenticationOptions, AuthenticatorResponse, O2P_ROUTE_PREFIX, PasskeyCredential,
-    RegisterCredential, RegistrationOptions, RegistrationStartRequest, SessionUser,
-    delete_passkey_credential_core, get_related_origin_json, handle_finish_authentication_core,
-    handle_finish_registration_core, handle_start_authentication_core,
-    handle_start_registration_core, list_credentials_core, update_passkey_credential_core,
+    AuthenticationOptions, AuthenticatorResponse, CredentialId, O2P_ROUTE_PREFIX,
+    PasskeyCredential, RegisterCredential, RegistrationOptions, RegistrationStartRequest,
+    SessionUser, UserId, delete_passkey_credential_core, get_related_origin_json,
+    handle_finish_authentication_core, handle_finish_registration_core,
+    handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
+    update_passkey_credential_core,
 };
 
 use super::error::IntoResponseError;
@@ -153,7 +154,7 @@ async fn serve_conditional_ui_js() -> Response {
 async fn list_passkey_credentials(
     auth_user: AuthUser,
 ) -> Result<Json<Vec<PasskeyCredential>>, (StatusCode, String)> {
-    let credentials = list_credentials_core(&auth_user.id)
+    let credentials = list_credentials_core(UserId::new(auth_user.id.clone()))
         .await
         .into_response_error()?;
     Ok(Json(credentials))
@@ -163,10 +164,13 @@ async fn delete_passkey_credential(
     auth_user: AuthUser,
     Path(credential_id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    delete_passkey_credential_core(&auth_user.id, &credential_id)
-        .await
-        .into_response_error()
-        .map(|()| StatusCode::NO_CONTENT)
+    delete_passkey_credential_core(
+        UserId::new(auth_user.id.clone()),
+        CredentialId::new(credential_id),
+    )
+    .await
+    .into_response_error()
+    .map(|()| StatusCode::NO_CONTENT)
 }
 
 async fn serve_related_origin() -> Response {
@@ -205,7 +209,7 @@ async fn update_passkey_credential(
 
     // Call the update function
     let response = update_passkey_credential_core(
-        &payload.credential_id,
+        CredentialId::new(payload.credential_id.clone()),
         &payload.name,
         &payload.display_name,
         Some(session_user),

@@ -5,13 +5,12 @@ use serde_json::Value;
 use std::{env, sync::LazyLock};
 
 use crate::passkey::{
-    AuthenticationOptions, AuthenticatorResponse, CredentialSearchField, PasskeyCredential,
-    PasskeyStore, RegisterCredential, RegistrationOptions, commit_registration,
+    AuthenticationOptions, AuthenticatorResponse, CredentialId, CredentialSearchField,
+    PasskeyCredential, PasskeyStore, RegisterCredential, RegistrationOptions, commit_registration,
     finish_authentication, prepare_registration_storage, start_authentication, start_registration,
     validate_registration_challenge, verify_session_then_finish_registration,
 };
-use crate::session::User as SessionUser;
-use crate::session::new_session_header;
+use crate::session::{User as SessionUser, UserId, new_session_header};
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
@@ -264,11 +263,11 @@ pub async fn handle_finish_authentication_core(
 /// associated with that user, or an error if the user is not logged in.
 #[tracing::instrument(fields(user_id))]
 pub async fn list_credentials_core(
-    user_id: &str,
+    user_id: UserId,
 ) -> Result<Vec<PasskeyCredential>, CoordinationError> {
     tracing::debug!("Listing passkey credentials for user");
     let credentials =
-        PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_owned())).await?;
+        PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id)).await?;
     tracing::info!(
         credential_count = credentials.len(),
         "Retrieved passkey credentials"
@@ -282,13 +281,13 @@ pub async fn list_credentials_core(
 /// before deleting it to prevent unauthorized deletions.
 #[tracing::instrument(fields(user_id, credential_id))]
 pub async fn delete_passkey_credential_core(
-    user_id: &str,
-    credential_id: &str,
+    user_id: UserId,
+    credential_id: CredentialId,
 ) -> Result<(), CoordinationError> {
     tracing::info!("Attempting to delete passkey credential");
 
     let credential = PasskeyStore::get_credentials_by(CredentialSearchField::CredentialId(
-        credential_id.to_owned(),
+        credential_id.clone(),
     ))
     .await?
     .into_iter()
@@ -296,21 +295,18 @@ pub async fn delete_passkey_credential_core(
     .ok_or(
         CoordinationError::ResourceNotFound {
             resource_type: "Passkey".to_string(),
-            resource_id: credential_id.to_string(),
+            resource_id: credential_id.as_str().to_string(),
         }
         .log(),
     )?;
 
     // Verify the credential belongs to the authenticated user
-    if credential.user_id != user_id {
+    if credential.user_id != user_id.as_str() {
         return Err(CoordinationError::Unauthorized.log());
     }
 
     // Delete the credential using the raw credential ID format from the database
-    PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-        credential.credential_id.clone(),
-    ))
-    .await?;
+    PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(credential_id)).await?;
 
     tracing::debug!("Successfully deleted credential");
 
@@ -332,7 +328,7 @@ pub async fn delete_passkey_credential_core(
 /// * The updated credential information in a Result
 #[tracing::instrument(skip(session_user), fields(user_id = session_user.as_ref().map(|u| u.id.as_str()), credential_id, name, display_name))]
 pub async fn update_passkey_credential_core(
-    credential_id: &str,
+    credential_id: CredentialId,
     name: &str,
     display_name: &str,
     session_user: Option<SessionUser>,
@@ -347,12 +343,12 @@ pub async fn update_passkey_credential_core(
     };
 
     // Get the credential to verify ownership
-    let credential = match PasskeyStore::get_credential(credential_id).await? {
+    let credential = match PasskeyStore::get_credential(credential_id.as_str()).await? {
         Some(cred) => cred,
         None => {
             return Err(CoordinationError::ResourceNotFound {
                 resource_type: "Passkey".to_string(),
-                resource_id: credential_id.to_string(),
+                resource_id: credential_id.as_str().to_string(),
             });
         }
     };
@@ -363,15 +359,15 @@ pub async fn update_passkey_credential_core(
     }
 
     // Update the credential in the database
-    PasskeyStore::update_credential(credential_id, name, display_name).await?;
+    PasskeyStore::update_credential(credential_id.as_str(), name, display_name).await?;
 
     // Get the updated credential
-    let updated_credential = match PasskeyStore::get_credential(credential_id).await? {
+    let updated_credential = match PasskeyStore::get_credential(credential_id.as_str()).await? {
         Some(cred) => cred,
         None => {
             return Err(CoordinationError::ResourceNotFound {
                 resource_type: "Passkey".to_string(),
-                resource_id: credential_id.to_string(),
+                resource_id: credential_id.as_str().to_string(),
             });
         }
     };
@@ -380,7 +376,7 @@ pub async fn update_passkey_credential_core(
 
     // Return the credential information in JSON format
     Ok(serde_json::json!({
-        "credentialId": credential_id,
+        "credentialId": credential_id.as_str(),
         "name": updated_credential.user.name,
         "displayName": updated_credential.user.display_name,
         "userHandle": updated_credential.user.user_handle,
@@ -463,7 +459,11 @@ mod tests {
         create_test_user_in_db(user_id).await?;
 
         // Try to delete a nonexistent passkey credential
-        let result = delete_passkey_credential_core(user_id, credential_id).await;
+        let result = delete_passkey_credential_core(
+            UserId::new(user_id.to_string()),
+            CredentialId::new(credential_id.to_string()),
+        )
+        .await;
         assert!(
             matches!(result, Err(CoordinationError::ResourceNotFound { .. })),
             "Expected ResourceNotFound error, got: {result:?}"
@@ -510,7 +510,7 @@ mod tests {
         let new_name = "Updated Name";
         let new_display_name = "Updated Display Name";
         let result = update_passkey_credential_core(
-            credential_id,
+            CredentialId::new(credential_id.to_string()),
             new_name,
             new_display_name,
             Some(session_user),
@@ -575,7 +575,7 @@ mod tests {
 
         // Try to update the passkey credential as a different user
         let result = update_passkey_credential_core(
-            credential_id,
+            CredentialId::new(credential_id.to_string()),
             "Updated Name",
             "Updated Display Name",
             Some(session_user),
@@ -615,7 +615,7 @@ mod tests {
 
         // Try to update the passkey credential without a session user
         let result = update_passkey_credential_core(
-            credential_id,
+            CredentialId::new(credential_id.to_string()),
             "Updated Name",
             "Updated Display Name",
             None,

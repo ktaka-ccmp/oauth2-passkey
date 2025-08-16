@@ -76,9 +76,10 @@ async fn get_or_create_user_handle(
         tracing::debug!("User is logged in: {:#?}", user);
 
         // Try to find existing credentials for this user
-        let existing_credentials =
-            PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user.id.clone()))
-                .await?;
+        let existing_credentials = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
+            crate::session::UserId::new(user.id.clone()),
+        ))
+        .await?;
 
         if !existing_credentials.is_empty() {
             // Reuse the existing user_handle from the first credential
@@ -358,28 +359,29 @@ pub(crate) async fn prepare_registration_storage(
         //
         // Current implementation will overwrite existing credentials for the same AAGUID regardless of difference in actual authenticator.
 
-        let credentials_with_matching_handle = match PasskeyStore::get_credentials_by(
-            CredentialSearchField::UserHandle(user_handle.to_string()),
-        )
-        .await
-        {
-            Ok(creds) => creds,
-            Err(e) => {
-                tracing::warn!(
-                    "Error getting credentials for user handle {}: {}",
-                    user_handle,
-                    e
-                );
-                // Continue with registration - don't fail just because we couldn't get existing credentials
-                vec![]
-            }
-        };
+        let credentials_with_matching_handle =
+            match PasskeyStore::get_credentials_by(CredentialSearchField::UserHandle(
+                crate::passkey::UserHandle::new(user_handle.to_string()),
+            ))
+            .await
+            {
+                Ok(creds) => creds,
+                Err(e) => {
+                    tracing::warn!(
+                        "Error getting credentials for user handle {}: {}",
+                        user_handle,
+                        e
+                    );
+                    // Continue with registration - don't fail just because we couldn't get existing credentials
+                    vec![]
+                }
+            };
 
         // Filter and delete credentials that match user_handle, user_id, and aaguid
         for cred in credentials_with_matching_handle {
             if cred.aaguid == aaguid && cred.user_id == user_id {
                 match PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-                    cred.credential_id.clone(),
+                    crate::passkey::CredentialId::new(cred.credential_id.clone()),
                 ))
                 .await
                 {

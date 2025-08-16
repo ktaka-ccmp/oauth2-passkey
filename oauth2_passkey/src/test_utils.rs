@@ -282,7 +282,10 @@ async fn ensure_first_user_has_passkey_credential(user_id: &str) {
     use crate::passkey::{CredentialSearchField, PasskeyStore};
 
     // Check if first user already has Passkey credentials
-    match PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_string())).await
+    match PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
+        crate::session::UserId::new(user_id.to_string()),
+    ))
+    .await
     {
         Ok(credentials) if credentials.is_empty() => {
             // No Passkey credentials exist for first user, create one
