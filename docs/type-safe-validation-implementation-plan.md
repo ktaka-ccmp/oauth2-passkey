@@ -266,7 +266,7 @@ PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id))  // ✅
 
 1. **Complete Typed Wrapper Coverage**:
    - ✅ **CredentialId** - Already existed, now properly integrated
-   - ✅ **UserId** - Already existed, now properly integrated  
+   - ✅ **UserId** - Already existed, now properly integrated
    - ✅ **UserHandle** - NEW: Type-safe wrapper for WebAuthn user handles
    - ✅ **UserName** - NEW: Type-safe wrapper for usernames
    - ✅ **AccountId** - NEW: Type-safe wrapper for OAuth2 account IDs
@@ -318,7 +318,7 @@ PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id))  // ✅
 - `oauth2_passkey/src/oauth2/storage/store_type.rs` - Updated + added proper test imports
 - `oauth2_passkey/src/passkey/storage/sqlite.rs` - Pattern matching for typed fields
 - `oauth2_passkey/src/passkey/storage/postgres.rs` - Pattern matching for typed fields
-- `oauth2_passkey/src/oauth2/storage/sqlite.rs` - Pattern matching for typed fields  
+- `oauth2_passkey/src/oauth2/storage/sqlite.rs` - Pattern matching for typed fields
 - `oauth2_passkey/src/oauth2/storage/postgres.rs` - Pattern matching for typed fields
 
 **Coordination Layer Updates:**
@@ -337,7 +337,7 @@ PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id))  // ✅
 **AUDIT METHODOLOGY**: Deep, paranoid-level investigation conducted by specialized security audit agent covering:
 - ✅ Complete execution path tracing from HTTP → Coordination → Storage → Database
 - ✅ Edge case and error path analysis
-- ✅ Hidden dependency and import chain investigation  
+- ✅ Hidden dependency and import chain investigation
 - ✅ Cross-cutting concern analysis (logging, serialization, caching)
 - ✅ Demo application and integration testing
 - ✅ Build artifact and generated code inspection
@@ -412,7 +412,7 @@ PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id))  // ✅
 
 **Code Quality**: **EXCELLENT**
 - Systematic approach ensured no gaps
-- Consistent patterns across all modules  
+- Consistent patterns across all modules
 - Proper separation of concerns maintained
 - Error handling preserved throughout
 
@@ -422,7 +422,7 @@ PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id))  // ✅
 - Compile-time guarantees implemented correctly
 - Runtime safety significantly improved
 
-**Test Coverage**: **COMPREHENSIVE**  
+**Test Coverage**: **COMPREHENSIVE**
 - All new types have test coverage
 - Edge cases and error conditions tested
 - Integration scenarios verified
@@ -566,7 +566,7 @@ Systematically update all callers to construct typed parameters.
 
 ### Phase 3a: Search Field Consistency ✅ COMPLETED
 - [x] Update CredentialSearchField enum - **COMPLETED**
-- [x] Update AccountSearchField enum - **COMPLETED** 
+- [x] Update AccountSearchField enum - **COMPLETED**
 - [x] Create all typed wrappers (UserHandle, UserName, AccountId, Provider, ProviderUserId, Email) - **COMPLETED**
 - [x] Update PasskeyStore implementation - **COMPLETED**
 - [x] Update OAuth2Store implementation - **COMPLETED**

@@ -34,12 +34,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `UserName` - Username identifiers
     - `DisplayName` - User display names
     - `Email` - Email addresses
+    - `SessionCookie` - Session cookie identifiers
+    - `OAuth2State` - OAuth2 state parameters
+    - `ChallengeType` - WebAuthn challenge types
+    - `ChallengeId` - WebAuthn challenge identifiers
   - **Core Function Signature Changes**: All core coordination functions now require typed parameters:
     - `delete_oauth2_account_core(UserId, Provider, ProviderUserId)` - was `delete_oauth2_account_core(user_id: &str, provider: &str, provider_user_id: &str)`
     - `list_accounts_core(UserId)` - was `list_accounts_core(user_id: &str)`
     - `delete_passkey_credential_core(UserId, CredentialId)` - was `delete_passkey_credential_core(user_id: &str, credential_id: &str)`
     - `list_credentials_core(UserId)` - was `list_credentials_core(user_id: &str)`
     - `update_passkey_credential_core(CredentialId, ...)` - was `update_passkey_credential_core(credential_id: &str, ...)`
+  - **Session Management Functions**: All session functions now require typed session cookie parameter:
+    - `get_user_from_session(&SessionCookie)` - was `get_user_from_session(session_cookie: &str)`
+    - `get_csrf_token_from_session(&SessionCookie)` - was `get_csrf_token_from_session(session_cookie: &str)`
+    - `get_user_and_csrf_token_from_session(&SessionCookie)` - was `get_user_and_csrf_token_from_session(session_cookie: &str)`
   - **Search Field Enums**: All database search operations now use typed search fields:
     - `CredentialSearchField::UserId(UserId)` - was `CredentialSearchField::UserId(String)`
     - `AccountSearchField::Provider(Provider)` - was `AccountSearchField::Provider(String)`
@@ -48,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     ```rust
     // Before:
     delete_oauth2_account_core("user123", "google", "google456")
+    get_user_from_session("session_cookie_value")
 
     // After:
     delete_oauth2_account_core(
@@ -55,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         Provider::new("google".to_string()),
         ProviderUserId::new("google456".to_string())
     )
+    get_user_from_session(&SessionCookie::new("session_cookie_value".to_string())?)
     ```
 
 - **Coordination Functions**: All coordination functions now use type-safe wrapper types and require session validation:
