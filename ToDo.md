@@ -4,16 +4,6 @@
 
 ### High Priority
 
-- **Type-Safe Validation Implementation**: Implement comprehensive type-safe validation throughout the codebase to eliminate security vulnerabilities, validation inconsistencies, and provide compile-time safety guarantees.
-  - **Phase 1 (High Priority - Security Critical)**: Coordination layer authentication functions - modify critical functions to receive session_id and validate against database instead of trusting session data. Prevents privilege escalation attacks.
-  - **Phase 2 (Medium Priority - Consistency)**: Storage layer interfaces - eliminate validation differences between Redis/Memory/PostgreSQL/SQLite backends, provide consistent behavior regardless of deployment configuration.
-  - **Phase 3 (Medium Priority - Completeness)**: Comprehensive coverage - complete type-safety for search field enums, session management, WebAuthn challenges, OAuth2 parameters, cache operations (~30+ additional functions).
-  - **Implementation Guide**: See `docs/type-safe-validation.md` for complete strategy, type implementations, and migration approach
-  - **Types**: SessionId, UserId, CredentialId, CsrfToken, CachePrefix, CacheKey, Challenge, OAuth2State, OAuthProvider, and others
-  - **Benefits**: Compile-time safety, zero runtime overhead, impossible to bypass validation, defense-in-depth security
-  - **Security Impact**: Eliminates privilege escalation vulnerabilities, prevents injection attacks, provides consistent validation across all layers
-
-- **Unify Cache Operations**: All modules (OAuth2, Passkey, Session, AAGUID) have different cache operation patterns that should be unified for consistency and maintainability. Differences include parameter types (u64 vs usize TTL), error handling (OAuth2Error vs PasskeyError vs SessionError), key generation strategies (auto-generated vs explicit), wrapper function usage (OAuth2/Passkey have wrappers, Session/AAGUID use direct GENERIC_CACHE_STORE), and return values. Unified API would provide single source of truth, consistent patterns, reduced duplication (~150+ lines), improved developer experience, and better testability. Session and AAGUID modules would benefit most from standardized wrapper functions. See comprehensive analysis in `docs/cache-operations-unification-study.md`.
 - **Simplify OAuth2 Account Linking API**: Current implementation requires understanding CSRF tokens, page session tokens, and coordinating multiple API calls (50+ lines of code). Need simpler, more intuitive API. See detailed analysis and proposed solutions in `docs/oauth2-account-linking-api-simplification.md`.
 - **Finalize Public API**: Review and document all public interfaces for 1.0 release
 
@@ -197,6 +187,15 @@ These improvements would enhance the maintainability, security, and user experie
 
 ## Done
 
+- ✅ **Type-Safe Validation Implementation**: Implement comprehensive type-safe validation throughout the codebase to eliminate security vulnerabilities, validation inconsistencies, and provide compile-time safety guarantees.
+  - ✅ **Phase 1 (High Priority - Security Critical)**: Coordination layer authentication functions - modify critical functions to receive session_id and validate against database instead of trusting session data. Prevents privilege escalation attacks.
+  - ✅ **Phase 2 (Medium Priority - Consistency)**: Storage layer interfaces - eliminate validation differences between Redis/Memory/PostgreSQL/SQLite backends, provide consistent behavior regardless of deployment configuration.
+  - ✅ **Phase 3 (Medium Priority - Completeness)**: Comprehensive coverage - complete type-safety for search field enums, session management, WebAuthn challenges, OAuth2 parameters, cache operations (~30+ additional functions).
+  - ✅ **Implementation Guide**: See `docs/type-safe-validation.md` for complete strategy, type implementations, and migration approach
+  - ✅ **Types**: SessionId, UserId, CredentialId, CsrfToken, CachePrefix, CacheKey, Challenge, OAuth2State, OAuthProvider, and others
+  - ✅ **Benefits**: Compile-time safety, zero runtime overhead, impossible to bypass validation, defense-in-depth security
+  - ✅ **Security Impact**: Eliminates privilege escalation vulnerabilities, prevents injection attacks, provides consistent validation across all layers
+- ✅ **Unify Cache Operations**: All modules (OAuth2, Passkey, Session, AAGUID) have different cache operation patterns that should be unified for consistency and maintainability. Differences include parameter types (u64 vs usize TTL), error handling (OAuth2Error vs PasskeyError vs SessionError), key generation strategies (auto-generated vs explicit), wrapper function usage (OAuth2/Passkey have wrappers, Session/AAGUID use direct GENERIC_CACHE_STORE), and return values. Unified API would provide single source of truth, consistent patterns, reduced duplication (~150+ lines), improved developer experience, and better testability. Session and AAGUID modules would benefit most from standardized wrapper functions. See comprehensive analysis in `docs/cache-operations-unification-study.md`.
 - ✅ **Fixed Security Flaw: User Creation Before Challenge Validation**: Eliminated critical security vulnerability in passkey registration flow where users were created before challenge validation, causing orphaned user records on validation failures.
   - **Root Cause Fixed**: Reordered operations to validate challenge first, then create user only if validation succeeds
   - **Architecture Improved**: Implemented clean 3-step flow using `finish_registration()`'s constituent functions:
