@@ -18,8 +18,9 @@ mod storage;
 mod types;
 
 pub use main::prepare_oauth2_auth_request;
-pub use types::{AuthResponse, OAuth2Account, OAuth2Mode};
+pub use types::{AuthResponse, OAuth2Account, OAuth2Mode, OAuth2State, Provider, ProviderUserId};
 
+use crate::storage::CacheErrorConversion;
 pub(crate) use config::{OAUTH2_CSRF_COOKIE_NAME, OAUTH2_RESPONSE_MODE, get_auth_url};
 pub(crate) use errors::OAuth2Error;
 pub(crate) use types::{StateParams, StoredToken};
@@ -31,7 +32,7 @@ pub(crate) use main::{
 
 // Internal utilities needed by test setup
 pub(crate) use storage::OAuth2Store;
-pub(crate) use types::AccountSearchField;
+pub(crate) use types::{AccountId, AccountSearchField};
 
 pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
     // Validate required environment variables early
@@ -42,7 +43,7 @@ pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
     // Initialize the storage layer
     crate::storage::init()
         .await
-        .map_err(|e| errors::OAuth2Error::Storage(e.to_string()))?;
+        .map_err(errors::OAuth2Error::convert_storage_error)?;
 
     // Initialize the OAuth2 database tables
     OAuth2Store::init().await?;

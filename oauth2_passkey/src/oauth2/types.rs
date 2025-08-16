@@ -6,6 +6,7 @@ use sqlx::FromRow;
 use super::errors::OAuth2Error;
 use super::main::IdInfo as GoogleIdInfo;
 
+use crate::session::UserId;
 use crate::storage::CacheData;
 
 /// Represents an OAuth2 account linked to a user
@@ -175,18 +176,18 @@ impl TryFrom<CacheData> for StoredToken {
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub(crate) enum AccountSearchField {
-    /// Search by ID
-    Id(String),
-    /// Search by user ID (database ID)
-    UserId(String),
-    /// Search by provider
-    Provider(String),
-    /// Search by provider user ID
-    ProviderUserId(String),
-    /// Search by name
-    Name(String),
-    /// Search by email
-    Email(String),
+    /// Search by ID (type-safe)
+    Id(AccountId),
+    /// Search by user ID (database ID, type-safe)
+    UserId(UserId),
+    /// Search by provider (type-safe)
+    Provider(Provider),
+    /// Search by provider user ID (type-safe)
+    ProviderUserId(ProviderUserId),
+    /// Search by name (type-safe)
+    Name(DisplayName),
+    /// Search by email (type-safe)
+    Email(Email),
 }
 
 /// Mode of OAuth2 operation to explicitly indicate user intent.
@@ -250,6 +251,247 @@ impl std::str::FromStr for OAuth2Mode {
             "create_user_or_login" => Ok(Self::CreateUserOrLogin),
             _ => Err(OAuth2Error::InvalidMode(s.to_string())),
         }
+    }
+}
+
+/// Type-safe wrapper for OAuth2 account identifiers.
+///
+/// This provides compile-time safety to prevent mixing up account IDs with other string types.
+/// Account IDs are database-specific identifiers for OAuth2 accounts.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AccountId(String);
+
+impl AccountId {
+    /// Creates a new AccountId from a string.
+    ///
+    /// # Arguments
+    /// * `id` - The account ID string
+    ///
+    /// # Returns
+    /// * A new AccountId instance
+    pub fn new(id: String) -> Self {
+        Self(id)
+    }
+
+    /// Returns the account ID as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the account ID
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for OAuth2 provider names.
+///
+/// This provides compile-time safety to prevent mixing up provider names with other string types.
+/// Provider names identify the OAuth2 service (e.g., "google", "github").
+#[derive(Debug, Clone, PartialEq)]
+pub struct Provider(String);
+
+impl Provider {
+    /// Creates a new Provider from a string.
+    ///
+    /// # Arguments
+    /// * `provider` - The provider name string
+    ///
+    /// # Returns
+    /// * A new Provider instance
+    pub fn new(provider: String) -> Self {
+        Self(provider)
+    }
+
+    /// Returns the provider name as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the provider name
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for provider-specific user identifiers.
+///
+/// This provides compile-time safety to prevent mixing up provider user IDs with database user IDs.
+/// Provider user IDs are external identifiers from OAuth2 providers (e.g., Google user ID).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProviderUserId(String);
+
+impl ProviderUserId {
+    /// Creates a new ProviderUserId from a string.
+    ///
+    /// # Arguments
+    /// * `id` - The provider user ID string
+    ///
+    /// # Returns
+    /// * A new ProviderUserId instance
+    pub fn new(id: String) -> Self {
+        Self(id)
+    }
+
+    /// Returns the provider user ID as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the provider user ID
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for user display names.
+///
+/// This provides compile-time safety to prevent mixing up display names with other string types.
+/// Display names are user-facing names from OAuth2 providers.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DisplayName(String);
+
+impl DisplayName {
+    /// Creates a new DisplayName from a string.
+    ///
+    /// This constructor is part of the public type-safe search API and is used
+    /// internally by the AccountSearchField enum for database queries.
+    ///
+    /// # Arguments
+    /// * `name` - The display name string
+    ///
+    /// # Returns
+    /// * A new DisplayName instance
+    #[allow(dead_code)] // Part of type-safe search API, used in tests but not by library's public interface
+    pub fn new(name: String) -> Self {
+        Self(name)
+    }
+
+    /// Returns the display name as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the display name
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for email addresses.
+///
+/// This provides compile-time safety to prevent mixing up email addresses with other string types.
+/// Email addresses are provided by OAuth2 providers for user identification.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Email(String);
+
+impl Email {
+    /// Creates a new Email from a string.
+    ///
+    /// This constructor is part of the public type-safe search API and is used
+    /// internally by the AccountSearchField enum for database queries.
+    ///
+    /// # Arguments
+    /// * `email` - The email address string
+    ///
+    /// # Returns
+    /// * A new Email instance
+    #[allow(dead_code)] // Part of type-safe search API, used in tests but not by library's public interface
+    pub fn new(email: String) -> Self {
+        Self(email)
+    }
+
+    /// Returns the email address as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the email address
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for OAuth2 state parameters.
+///
+/// This provides compile-time safety to prevent mixing up OAuth2 state strings with other string types.
+/// OAuth2 state parameters are base64url-encoded JSON that carries CSRF protection and flow parameters
+/// between authorization requests and callbacks. Proper validation is critical for security.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OAuth2State(String);
+
+impl std::fmt::Display for OAuth2State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl OAuth2State {
+    /// Creates a new OAuth2State from a string with validation.
+    ///
+    /// This constructor validates the OAuth2 state format to ensure it meets
+    /// security requirements for CSRF protection and parameter integrity.
+    ///
+    /// # Arguments
+    /// * `state` - The OAuth2 state string (should be base64url-encoded)
+    ///
+    /// # Returns
+    /// * `Ok(OAuth2State)` - If the state is valid
+    /// * `Err(OAuth2Error)` - If the state is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must be valid base64url encoding
+    /// * Must contain valid JSON when decoded
+    /// * Must be reasonable length
+    pub fn new(state: String) -> Result<Self, super::errors::OAuth2Error> {
+        use super::errors::OAuth2Error;
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+
+        // Validate state is not empty
+        if state.is_empty() {
+            return Err(OAuth2Error::DecodeState(
+                "OAuth2 state cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate state length (reasonable bounds)
+        if state.len() < 10 {
+            return Err(OAuth2Error::DecodeState(
+                "OAuth2 state too short".to_string(),
+            ));
+        }
+
+        if state.len() > 8192 {
+            return Err(OAuth2Error::DecodeState(
+                "OAuth2 state too long".to_string(),
+            ));
+        }
+
+        // Validate state is valid base64url
+        let decoded_bytes = URL_SAFE_NO_PAD
+            .decode(&state)
+            .map_err(|e| OAuth2Error::DecodeState(format!("Invalid base64url encoding: {e}")))?;
+
+        // Validate decoded content is valid UTF-8
+        let decoded_string = String::from_utf8(decoded_bytes).map_err(|e| {
+            OAuth2Error::DecodeState(format!("Invalid UTF-8 in decoded state: {e}"))
+        })?;
+
+        // Validate decoded content is valid JSON
+        let _: StateParams = serde_json::from_str(&decoded_string)
+            .map_err(|e| OAuth2Error::DecodeState(format!("Invalid JSON in decoded state: {e}")))?;
+
+        Ok(OAuth2State(state))
+    }
+
+    /// Returns the OAuth2 state as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the OAuth2 state
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Checks if the state contains a substring.
+    ///
+    /// # Arguments
+    /// * `needle` - The substring to search for
+    ///
+    /// # Returns
+    /// * `true` if the substring is found, `false` otherwise
+    pub fn contains(&self, needle: char) -> bool {
+        self.0.contains(needle)
     }
 }
 

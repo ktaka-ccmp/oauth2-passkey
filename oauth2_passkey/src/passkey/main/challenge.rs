@@ -1,9 +1,9 @@
 use std::time::SystemTime;
 
-use super::utils::{get_from_cache, remove_from_cache};
 use crate::passkey::config::PASSKEY_CHALLENGE_TIMEOUT;
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::StoredOptions;
+use crate::storage::{CacheErrorConversion, CacheKey, CachePrefix, get_data, remove_data};
 
 /// Retrieves and validates a stored challenge from the cache
 ///
@@ -12,12 +12,18 @@ use crate::passkey::types::StoredOptions;
 /// 2. Validates the challenge TTL (Time-To-Live)
 /// 3. Returns the validated StoredOptions if successful
 pub(super) async fn get_and_validate_options(
-    challenge_type: &str,
-    id: &str,
+    challenge_type: &crate::passkey::types::ChallengeType,
+    id: &crate::passkey::types::ChallengeId,
 ) -> Result<StoredOptions, PasskeyError> {
-    let stored_options: StoredOptions = get_from_cache(challenge_type, id)
-        .await?
-        .ok_or(PasskeyError::NotFound("Challenge not found".to_string()))?;
+    let cache_prefix = CachePrefix::new(challenge_type.as_str().to_string())
+        .map_err(PasskeyError::convert_storage_error)?;
+    let cache_key =
+        CacheKey::new(id.as_str().to_string()).map_err(PasskeyError::convert_storage_error)?;
+
+    let stored_options: StoredOptions =
+        get_data::<StoredOptions, PasskeyError>(cache_prefix, cache_key)
+            .await?
+            .ok_or(PasskeyError::NotFound("Challenge not found".to_string()))?;
 
     // Validate challenge TTL
     let now = SystemTime::now()
@@ -46,9 +52,12 @@ pub(super) async fn get_and_validate_options(
 ///
 /// This function is called after a successful registration or authentication
 /// to clean up the challenge data from the cache.
-pub(super) async fn remove_options(challenge_type: &str, id: &str) -> Result<(), PasskeyError> {
-    remove_from_cache(challenge_type, id).await?;
-    tracing::debug!("Removed {} options for ID: {}", challenge_type, id);
+pub(super) async fn remove_options(
+    cache_prefix: crate::storage::CachePrefix,
+    cache_key: crate::storage::CacheKey,
+) -> Result<(), PasskeyError> {
+    remove_data::<PasskeyError>(cache_prefix, cache_key).await?;
+    tracing::debug!("Removed challenge options for cache operation");
 
     Ok(())
 }
@@ -56,7 +65,7 @@ pub(super) async fn remove_options(challenge_type: &str, id: &str) -> Result<(),
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+    use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
     use crate::test_utils::init_test_environment;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -109,13 +118,17 @@ mod tests {
     async fn test_get_and_validate_options_success() {
         init_test_environment().await;
         let challenge_type = "registration";
-        let id = "test_id";
+        let id = "test_challenge_id_success";
         let stored_options = create_valid_stored_options();
 
-        // Store the options first using the utils function
-        super::super::utils::store_in_cache(
-            challenge_type,
-            id,
+        // Store the options first using simplified cache operations
+        use crate::storage::{CacheKey, CachePrefix, store_cache_keyed};
+        let cache_prefix =
+            CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
+        store_cache_keyed::<_, PasskeyError>(
+            cache_prefix,
+            cache_key,
             stored_options.clone(),
             300, // TTL in seconds
         )
@@ -123,7 +136,10 @@ mod tests {
         .expect("Failed to store options");
 
         // Test retrieval and validation
-        let result = get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let result = get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(result.is_ok());
         let retrieved_options = result.unwrap();
         assert_eq!(retrieved_options.challenge, stored_options.challenge);
@@ -138,7 +154,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_and_validate_options_not_found() {
         init_test_environment().await;
-        let result = get_and_validate_options("registration", "nonexistent").await;
+        let challenge_type_typed = crate::passkey::types::ChallengeType::registration();
+        let challenge_id_typed =
+            crate::passkey::types::ChallengeId::new("nonexistent".to_string()).unwrap();
+        let result = get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             PasskeyError::NotFound(msg) => assert_eq!(msg, "Challenge not found"),
@@ -155,13 +174,17 @@ mod tests {
     async fn test_get_and_validate_options_expired() {
         init_test_environment().await;
         let challenge_type = "registration";
-        let id = "expired_id";
+        let id = "expired_challenge_id_test";
         let expired_options = create_expired_stored_options();
 
         // Store the expired options
-        super::super::utils::store_in_cache(
-            challenge_type,
-            id,
+        use crate::storage::{CacheKey, CachePrefix, store_cache_keyed};
+        let cache_prefix =
+            CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
+        store_cache_keyed::<_, PasskeyError>(
+            cache_prefix,
+            cache_key,
             expired_options,
             300, // TTL in seconds
         )
@@ -169,7 +192,10 @@ mod tests {
         .expect("Failed to store expired options");
 
         // Test retrieval - should fail due to expiration
-        let result = get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let result = get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             PasskeyError::Authentication(msg) => {
@@ -188,13 +214,17 @@ mod tests {
     async fn test_remove_options_success() {
         init_test_environment().await;
         let challenge_type = "authentication";
-        let id = "remove_test";
+        let id = "remove_challenge_test_id";
         let stored_options = create_valid_stored_options();
 
         // Store the options first
-        super::super::utils::store_in_cache(
-            challenge_type,
-            id,
+        use crate::storage::{CacheKey, CachePrefix, store_cache_keyed};
+        let cache_prefix =
+            CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
+        store_cache_keyed::<_, PasskeyError>(
+            cache_prefix,
+            cache_key,
             stored_options,
             300, // TTL in seconds
         )
@@ -202,19 +232,32 @@ mod tests {
         .expect("Failed to store options");
 
         // Verify it exists
-        let before_removal =
-            super::super::utils::get_from_cache::<StoredOptions>(challenge_type, id)
+        let (cache_prefix_verify, cache_key_verify) = (
+            CachePrefix::new(challenge_type.to_string()).unwrap(),
+            CacheKey::new(id.to_string()).unwrap(),
+        );
+        use crate::storage::get_data;
+        let before_removal: Option<StoredOptions> =
+            get_data::<_, PasskeyError>(cache_prefix_verify, cache_key_verify)
                 .await
                 .expect("Failed to get from cache");
         assert!(before_removal.is_some());
 
         // Remove it
-        let result = remove_options(challenge_type, id).await;
+        let (cache_prefix_remove, cache_key_remove) = (
+            CachePrefix::new(challenge_type.to_string()).unwrap(),
+            CacheKey::new(id.to_string()).unwrap(),
+        );
+        let result = remove_options(cache_prefix_remove, cache_key_remove).await;
         assert!(result.is_ok());
 
         // Verify it's gone
-        let after_removal =
-            super::super::utils::get_from_cache::<StoredOptions>(challenge_type, id)
+        let (cache_prefix_after, cache_key_after) = (
+            CachePrefix::new(challenge_type.to_string()).unwrap(),
+            CacheKey::new(id.to_string()).unwrap(),
+        );
+        let after_removal: Option<StoredOptions> =
+            get_data::<_, PasskeyError>(cache_prefix_after, cache_key_after)
                 .await
                 .expect("Failed to get from cache");
         assert!(after_removal.is_none());
@@ -229,7 +272,11 @@ mod tests {
     async fn test_remove_options_nonexistent() {
         init_test_environment().await;
         // Removing a non-existent entry should not fail
-        let result = remove_options("authentication", "nonexistent").await;
+        let (cache_prefix, cache_key) = (
+            CachePrefix::new("authentication".to_string()).unwrap(),
+            CacheKey::new("nonexistent".to_string()).unwrap(),
+        );
+        let result = remove_options(cache_prefix, cache_key).await;
         assert!(result.is_ok());
     }
 
@@ -242,7 +289,7 @@ mod tests {
     async fn test_ttl_validation_with_passkey_timeout() {
         init_test_environment().await;
         let challenge_type = "registration";
-        let id = "ttl_test";
+        let id = "ttl_validation_test_id";
 
         // Create options with very long TTL but should be limited by PASSKEY_CHALLENGE_TIMEOUT
         let now = SystemTime::now()
@@ -261,9 +308,13 @@ mod tests {
             ttl: 86400, // 24 hours - should be ignored
         };
 
-        super::super::utils::store_in_cache(
-            challenge_type,
-            id,
+        use crate::storage::{CacheKey, CachePrefix, store_cache_keyed};
+        let cache_prefix =
+            CachePrefix::new(challenge_type.to_string()).expect("Failed to create cache prefix");
+        let cache_key = CacheKey::new(id.to_string()).expect("Failed to create cache key");
+        store_cache_keyed::<_, PasskeyError>(
+            cache_prefix,
+            cache_key,
             stored_options,
             300, // TTL in seconds
         )
@@ -271,7 +322,10 @@ mod tests {
         .expect("Failed to store options");
 
         // Should be expired due to PASSKEY_CHALLENGE_TIMEOUT limit
-        let result = get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let result = get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             PasskeyError::Authentication(msg) => {
@@ -302,18 +356,22 @@ mod tests {
         };
 
         // Store in cache
+        let cache_prefix = CachePrefix::new(test_category.to_string()).unwrap();
+        let cache_key = CacheKey::new(test_key.to_string()).unwrap();
         let result = GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl(test_category, test_key, cache_data, 300)
+            .put_with_ttl(cache_prefix, cache_key, cache_data, 300)
             .await;
         assert!(result.is_ok(), "Failed to put test data in cache");
 
         // Retrieve from cache
+        let cache_prefix = CachePrefix::new(test_category.to_string()).unwrap();
+        let cache_key = CacheKey::new(test_key.to_string()).unwrap();
         let get_result = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get(test_category, test_key)
+            .get(cache_prefix, cache_key)
             .await;
         assert!(get_result.is_ok(), "Failed to get test data from cache");
 
@@ -325,17 +383,24 @@ mod tests {
         assert_eq!(retrieved_data.unwrap().value, test_value);
 
         // Remove from cache
-        let remove_result = passkey_test_utils::remove_from_cache(test_category, test_key).await;
+        let (cache_prefix_remove, cache_key_remove) = (
+            CachePrefix::new(test_category.to_string()).unwrap(),
+            CacheKey::new(test_key.to_string()).unwrap(),
+        );
+        let remove_result =
+            passkey_test_utils::remove_from_cache(cache_prefix_remove, cache_key_remove).await;
         assert!(
             remove_result.is_ok(),
             "Failed to remove test data from cache"
         );
 
         // Verify it's removed
+        let cache_prefix = CachePrefix::new(test_category.to_string()).unwrap();
+        let cache_key = CacheKey::new(test_key.to_string()).unwrap();
         let final_result = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get(test_category, test_key)
+            .get(cache_prefix, cache_key)
             .await
             .unwrap();
         assert!(
@@ -358,7 +423,7 @@ mod tests {
 
         // 1. Create a test challenge
         let challenge_type = "test_challenge";
-        let id = "test_challenge_id_lifecycle";
+        let id = "test_challenge_lifecycle_id";
         let challenge_str = "test_challenge_123";
         let user_handle = "test_user_handle_challenge";
         let name = "Test User Challenge";
@@ -378,11 +443,20 @@ mod tests {
         assert!(create_result.is_ok(), "Failed to create test challenge");
 
         // 2. Verify the challenge exists in cache
-        let exists = passkey_test_utils::check_cache_exists(challenge_type, id).await;
+        let (cache_prefix_exists, cache_key_exists) = (
+            CachePrefix::new(challenge_type.to_string()).unwrap(),
+            CacheKey::new(id.to_string()).unwrap(),
+        );
+        let exists =
+            passkey_test_utils::check_cache_exists(cache_prefix_exists, cache_key_exists).await;
         assert!(exists, "Challenge should exist in cache");
 
         // 3. Validate the challenge
-        let validate_result = super::get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let validate_result =
+            super::get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(validate_result.is_ok(), "Challenge validation failed");
         let stored_options = validate_result.unwrap();
 
@@ -393,15 +467,28 @@ mod tests {
         assert_eq!(stored_options.user.display_name, display_name);
 
         // 5. Remove the challenge
-        let remove_result = super::remove_options(challenge_type, id).await;
+        let (cache_prefix_remove, cache_key_remove) = (
+            CachePrefix::new(challenge_type.to_string()).unwrap(),
+            CacheKey::new(id.to_string()).unwrap(),
+        );
+        let remove_result = super::remove_options(cache_prefix_remove, cache_key_remove).await;
         assert!(remove_result.is_ok(), "Failed to remove challenge");
 
         // 6. Verify it's gone
-        let exists_after = passkey_test_utils::check_cache_exists(challenge_type, id).await;
+        let (cache_prefix_check, cache_key_check) = (
+            CachePrefix::new(challenge_type.to_string()).unwrap(),
+            CacheKey::new(id.to_string()).unwrap(),
+        );
+        let exists_after =
+            passkey_test_utils::check_cache_exists(cache_prefix_check, cache_key_check).await;
         assert!(!exists_after, "Challenge should be removed from cache");
 
         // 7. Try to validate again - should fail with NotFound
-        let validate_again = super::get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let validate_again =
+            super::get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
         assert!(
             validate_again.is_err(),
             "Challenge should not exist anymore"
@@ -428,7 +515,7 @@ mod tests {
 
         // Create a challenge with very short TTL
         let challenge_type = "test_challenge";
-        let id = "test_challenge_id_expiration";
+        let id = "test_challenge_expiry_id";
         let challenge_str = "test_challenge_expiry";
         let user_handle = "test_user_handle_expiry";
         let name = "Test User Expiry";
@@ -451,7 +538,11 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         // Validate the challenge - should fail with expired error
-        let validate_result = super::get_and_validate_options(challenge_type, id).await;
+        let challenge_type_typed =
+            crate::passkey::types::ChallengeType::new(challenge_type.to_string()).unwrap();
+        let challenge_id_typed = crate::passkey::types::ChallengeId::new(id.to_string()).unwrap();
+        let validate_result =
+            super::get_and_validate_options(&challenge_type_typed, &challenge_id_typed).await;
 
         match validate_result {
             Err(crate::passkey::errors::PasskeyError::Authentication(msg)) => {

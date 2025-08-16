@@ -15,8 +15,8 @@
 #[cfg(test)]
 mod tests {
     use crate::coordination::{CoordinationError, get_all_users, update_user_admin_status};
-    use crate::session::{insert_test_session, insert_test_user};
-    use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+    use crate::session::{SessionId, UserId, insert_test_session, insert_test_user};
+    use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
     use crate::test_utils::init_test_environment;
     use crate::userdb::{User as DbUser, UserStore};
     use chrono::Utc;
@@ -135,8 +135,12 @@ mod tests {
             );
 
             // Test admin status update with injection in user ID
-            let update_result =
-                update_user_admin_status(&admin_session_id, malicious_id, true).await;
+            let update_result = update_user_admin_status(
+                SessionId::new(admin_session_id.clone()),
+                UserId::new(malicious_id.to_string()),
+                true,
+            )
+            .await;
             // This should fail gracefully (user not found) rather than causing injection
             if let Err(e) = update_result {
                 // Verify it's a normal application error, not a database error
@@ -218,7 +222,7 @@ mod tests {
         }
 
         // Test get_all_users operation to ensure it still works after injection attempts
-        let all_users_result = get_all_users(&admin_session_id).await;
+        let all_users_result = get_all_users(SessionId::new(admin_session_id.clone())).await;
         assert!(
             all_users_result.is_ok(),
             "get_all_users should work after SQL injection attempts"
@@ -257,11 +261,19 @@ mod tests {
             };
 
             // Test cache put operation
-            let put_result = GENERIC_CACHE_STORE
-                .lock()
-                .await
-                .put_with_ttl("test_prefix", malicious_key, cache_data.clone(), 300)
-                .await;
+            let cache_key_result = CacheKey::new(malicious_key.to_string());
+
+            let put_result = if let Ok(cache_key) = cache_key_result {
+                let cache_prefix = CachePrefix::new("test_prefix".to_string()).unwrap();
+                GENERIC_CACHE_STORE
+                    .lock()
+                    .await
+                    .put_with_ttl(cache_prefix, cache_key, cache_data.clone(), 300)
+                    .await
+            } else {
+                // Key validation failed as expected for malicious input
+                Ok(())
+            };
 
             assert!(
                 put_result.is_ok(),
@@ -269,11 +281,17 @@ mod tests {
             );
 
             // Test cache get operation
-            let get_result = GENERIC_CACHE_STORE
-                .lock()
-                .await
-                .get("test_prefix", malicious_key)
-                .await;
+            let get_result = if let Ok(cache_key) = CacheKey::new(malicious_key.to_string()) {
+                let cache_prefix = CachePrefix::new("test_prefix".to_string()).unwrap();
+                GENERIC_CACHE_STORE
+                    .lock()
+                    .await
+                    .get(cache_prefix, cache_key)
+                    .await
+            } else {
+                // Key validation failed as expected for malicious input
+                Ok(None)
+            };
 
             assert!(
                 get_result.is_ok(),
@@ -281,12 +299,15 @@ mod tests {
             );
 
             // Clean up
-            GENERIC_CACHE_STORE
-                .lock()
-                .await
-                .remove("test_prefix", malicious_key)
-                .await
-                .ok();
+            if let Ok(cache_key) = CacheKey::new(malicious_key.to_string()) {
+                let cache_prefix = CachePrefix::new("test_prefix".to_string()).unwrap();
+                GENERIC_CACHE_STORE
+                    .lock()
+                    .await
+                    .remove(cache_prefix, cache_key)
+                    .await
+                    .ok();
+            }
 
             assert!(
                 put_result.is_ok(),
@@ -311,10 +332,12 @@ mod tests {
 
             // Store malicious value
             let test_key = format!("safe_key_{timestamp}");
+            let cache_prefix = CachePrefix::new("test_prefix".to_string()).unwrap();
+            let cache_key = CacheKey::new(test_key.clone()).unwrap();
             let put_result = GENERIC_CACHE_STORE
                 .lock()
                 .await
-                .put_with_ttl("test_prefix", &test_key, cache_data.clone(), 300)
+                .put_with_ttl(cache_prefix, cache_key, cache_data.clone(), 300)
                 .await;
 
             assert!(
@@ -323,10 +346,12 @@ mod tests {
             );
 
             // Retrieve and verify
+            let cache_prefix = CachePrefix::new("test_prefix".to_string()).unwrap();
+            let cache_key = CacheKey::new(test_key.clone()).unwrap();
             if let Ok(Some(retrieved_data)) = GENERIC_CACHE_STORE
                 .lock()
                 .await
-                .get("test_prefix", &test_key)
+                .get(cache_prefix, cache_key)
                 .await
             {
                 assert_eq!(
@@ -336,10 +361,12 @@ mod tests {
             }
 
             // Clean up
+            let cache_prefix = CachePrefix::new("test_prefix".to_string()).unwrap();
+            let cache_key = CacheKey::new(test_key).unwrap();
             GENERIC_CACHE_STORE
                 .lock()
                 .await
-                .remove("test_prefix", &test_key)
+                .remove(cache_prefix, cache_key)
                 .await
                 .ok();
         }
@@ -359,11 +386,19 @@ mod tests {
             };
 
             // Test operations with malicious prefix
-            let put_result = GENERIC_CACHE_STORE
-                .lock()
-                .await
-                .put_with_ttl(malicious_prefix, "safe_key", cache_data, 300)
-                .await;
+            let cache_prefix_result = CachePrefix::new(malicious_prefix.to_string());
+            let cache_key = CacheKey::new("safe_key".to_string()).unwrap();
+
+            let put_result = if let Ok(cache_prefix) = cache_prefix_result {
+                GENERIC_CACHE_STORE
+                    .lock()
+                    .await
+                    .put_with_ttl(cache_prefix, cache_key, cache_data, 300)
+                    .await
+            } else {
+                // Prefix validation failed as expected for malicious input
+                Ok(())
+            };
 
             assert!(
                 put_result.is_ok(),
@@ -371,21 +406,31 @@ mod tests {
             );
 
             // Verify get works
-            let get_result = GENERIC_CACHE_STORE
-                .lock()
-                .await
-                .get(malicious_prefix, "safe_key")
-                .await;
+            let get_result =
+                if let Ok(cache_prefix) = CachePrefix::new(malicious_prefix.to_string()) {
+                    let cache_key = CacheKey::new("safe_key".to_string()).unwrap();
+                    GENERIC_CACHE_STORE
+                        .lock()
+                        .await
+                        .get(cache_prefix, cache_key)
+                        .await
+                } else {
+                    // Prefix validation failed as expected for malicious input
+                    Ok(None)
+                };
 
             assert!(get_result.is_ok(), "Get should work with stored prefix");
 
             // Clean up
-            GENERIC_CACHE_STORE
-                .lock()
-                .await
-                .remove(malicious_prefix, "safe_key")
-                .await
-                .ok();
+            if let Ok(cache_prefix) = CachePrefix::new(malicious_prefix.to_string()) {
+                let cache_key = CacheKey::new("safe_key".to_string()).unwrap();
+                GENERIC_CACHE_STORE
+                    .lock()
+                    .await
+                    .remove(cache_prefix, cache_key)
+                    .await
+                    .ok();
+            }
         }
     }
 
@@ -418,8 +463,12 @@ mod tests {
             // Now use the stored malicious ID in admin operations
             // This tests whether the system is vulnerable when the malicious data
             // comes from the database rather than direct user input
-            if let Ok(updated_user) =
-                update_user_admin_status(&admin_session_id, malicious_user_id, true).await
+            if let Ok(updated_user) = update_user_admin_status(
+                SessionId::new(admin_session_id.clone()),
+                UserId::new(malicious_user_id.to_string()),
+                true,
+            )
+            .await
             {
                 // Verify the operation worked correctly without SQL injection
                 assert_eq!(
@@ -458,7 +507,7 @@ mod tests {
         let create_result = UserStore::upsert_user(user_with_malicious_account).await;
         if create_result.is_ok() {
             // Now fetch all users - this should not execute the malicious account data
-            if let Ok(all_users) = get_all_users(&admin_session_id).await {
+            if let Ok(all_users) = get_all_users(SessionId::new(admin_session_id.clone())).await {
                 // Find our test user
                 if let Some(found_user) = all_users.iter().find(|u| u.id == cache_to_db_user_id) {
                     // Verify malicious data is stored as-is, not executed
@@ -478,18 +527,22 @@ mod tests {
         };
 
         let _cache_key = format!("second_order_{timestamp}");
+        let cache_prefix = CachePrefix::new("test".to_string()).unwrap();
+        let cache_key = CacheKey::new(cache_to_db_user_id.clone()).unwrap();
         if GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("test", &cache_to_db_user_id, malicious_cache_data, 300)
+            .put_with_ttl(cache_prefix, cache_key, malicious_cache_data, 300)
             .await
             .is_ok()
         {
             // Retrieve from cache
+            let cache_prefix = CachePrefix::new("test".to_string()).unwrap();
+            let cache_key = CacheKey::new(cache_to_db_user_id.clone()).unwrap();
             if let Ok(Some(cached_data)) = GENERIC_CACHE_STORE
                 .lock()
                 .await
-                .get("test", &cache_to_db_user_id)
+                .get(cache_prefix, cache_key)
                 .await
             {
                 // The cached data contains malicious content, but using it should be safe
@@ -523,16 +576,18 @@ mod tests {
             }
 
             // Clean up cache
+            let cache_prefix = CachePrefix::new("test".to_string()).unwrap();
+            let cache_key = CacheKey::new(cache_to_db_user_id.clone()).unwrap();
             GENERIC_CACHE_STORE
                 .lock()
                 .await
-                .remove("test", &cache_to_db_user_id)
+                .remove(cache_prefix, cache_key)
                 .await
                 .ok();
         }
 
         // Final verification that the system still works normally
-        let final_check = get_all_users(&admin_session_id).await;
+        let final_check = get_all_users(SessionId::new(admin_session_id.clone())).await;
         assert!(
             final_check.is_ok(),
             "System should still function normally after second-order injection tests"

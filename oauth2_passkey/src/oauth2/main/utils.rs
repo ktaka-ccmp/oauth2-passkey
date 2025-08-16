@@ -10,146 +10,37 @@ use crate::oauth2::{OAuth2Error, OAuth2Mode, StateParams, StoredToken};
 use crate::session::{
     User as SessionUser, delete_session_from_store_by_session_id, get_user_from_session,
 };
-use crate::storage::{CacheData, GENERIC_CACHE_STORE};
-use crate::utils::{gen_random_string, gen_random_string_with_entropy_validation};
+use crate::storage::{
+    CacheErrorConversion, CacheKey, CachePrefix, get_data, remove_data, store_cache_auto,
+};
 
-pub(super) fn encode_state(state_params: StateParams) -> Result<String, OAuth2Error> {
+use crate::utils::gen_random_string_with_entropy_validation;
+
+pub(super) fn encode_state(
+    state_params: StateParams,
+) -> Result<crate::oauth2::types::OAuth2State, OAuth2Error> {
     let state_json =
         serde_json::to_string(&state_params).map_err(|e| OAuth2Error::Serde(e.to_string()))?;
-    Ok(URL_SAFE_NO_PAD.encode(state_json))
+    let encoded = URL_SAFE_NO_PAD.encode(state_json);
+    crate::oauth2::types::OAuth2State::new(encoded)
 }
 
-pub(crate) fn decode_state(state: &str) -> Result<StateParams, OAuth2Error> {
+pub(crate) fn decode_state(
+    state: &crate::oauth2::types::OAuth2State,
+) -> Result<StateParams, OAuth2Error> {
+    // Since OAuth2State is validated during construction, we know these operations will succeed
+    // This is safe because validation in OAuth2State::new() already verified:
+    // 1. Valid base64url encoding
+    // 2. Valid UTF-8 content
+    // 3. Valid JSON structure
     let decoded_bytes = URL_SAFE_NO_PAD
-        .decode(state)
-        .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode base64: {e}")))?;
-    let decoded_state_string = String::from_utf8(decoded_bytes)
-        .map_err(|e| OAuth2Error::DecodeState(format!("Failed to decode UTF-8: {e}")))?;
-    let state_in_response: StateParams = serde_json::from_str(&decoded_state_string)
-        .map_err(|e| OAuth2Error::Serde(e.to_string()))?;
+        .decode(state.as_str())
+        .expect("OAuth2State should contain valid base64url");
+    let decoded_state_string =
+        String::from_utf8(decoded_bytes).expect("OAuth2State should contain valid UTF-8");
+    let state_in_response: StateParams =
+        serde_json::from_str(&decoded_state_string).expect("OAuth2State should contain valid JSON");
     Ok(state_in_response)
-}
-
-/// Store OAuth2-related tokens in the cache store
-///
-/// This function:
-/// 1. Generates a unique token ID
-/// 2. Creates a StoredToken struct with the token data and TTL
-/// 3. Stores the token in the cache using the provided token type and token ID
-///
-/// The token is stored with a TTL based on OAUTH2_CSRF_COOKIE_MAX_AGE
-/// and can be retrieved later using the token_type and token_id
-///
-/// # Arguments
-/// * `token_type` - Type identifier for the token (e.g., "access_token", "refresh_token")
-/// * `token` - The actual token string to store
-/// * `expires_at` - The expiration time of the token
-/// * `user_agent` - Optional user agent string for tracking
-///
-/// # Returns
-/// * `Ok(token_id)` - The generated token ID that can be used to retrieve the token
-/// * `Err(OAuth2Error)` - If token generation or storage fails
-pub(super) async fn store_token_in_cache(
-    token_type: &str,
-    token: &str,
-    ttl: u64,
-    expires_at: DateTime<Utc>,
-    user_agent: Option<String>,
-) -> Result<String, OAuth2Error> {
-    let token_id = gen_random_string(32)?;
-
-    let token_data = StoredToken {
-        token: token.to_string(),
-        expires_at,
-        user_agent,
-        ttl,
-    };
-
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        // .put(token_type, &token_id, token_data.into())
-        .put_with_ttl(
-            token_type,
-            &token_id,
-            token_data.into(),
-            ttl.try_into().unwrap(),
-        )
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-    Ok(token_id)
-}
-
-/// Store OAuth2-related tokens with atomic collision detection.
-///
-/// This function provides enhanced security by:
-/// 1. Using entropy-validated random generation
-/// 2. Atomic check-and-set operations to prevent race conditions
-/// 3. Multiple collision detection attempts
-///
-/// # Arguments
-/// * `token_type` - Type identifier for the token (e.g., "access_token", "refresh_token")
-/// * `token` - The actual token string to store
-/// * `ttl` - Time to live in seconds
-/// * `expires_at` - The expiration time of the token
-/// * `user_agent` - Optional user agent string for tracking
-///
-/// # Returns
-/// * `Ok(token_id)` - The generated token ID that can be used to retrieve the token
-/// * `Err(OAuth2Error)` - If token generation or storage fails after max attempts
-pub(super) async fn store_token_in_cache_atomic(
-    token_type: &str,
-    token: &str,
-    ttl: u64,
-    expires_at: DateTime<Utc>,
-    user_agent: Option<String>,
-) -> Result<String, OAuth2Error> {
-    const MAX_COLLISION_ATTEMPTS: usize = 20;
-
-    let token_data = StoredToken {
-        token: token.to_string(),
-        expires_at,
-        user_agent,
-        ttl,
-    };
-
-    for attempt in 1..=MAX_COLLISION_ATTEMPTS {
-        // Use enhanced entropy validation for token ID generation
-        let token_id = gen_random_string_with_entropy_validation(32)
-            .map_err(|e| OAuth2Error::Storage(format!("Token ID generation failed: {e}")))?;
-
-        // Attempt atomic insertion
-        let ttl_usize = ttl.try_into().map_err(|_| {
-            OAuth2Error::Storage("TTL value too large for storage backend".to_string())
-        })?;
-
-        let inserted = GENERIC_CACHE_STORE
-            .lock()
-            .await
-            .put_if_not_exists(token_type, &token_id, token_data.clone().into(), ttl_usize)
-            .await
-            .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-        if inserted {
-            tracing::debug!(
-                "Token stored successfully with atomic operation on attempt {}/{}",
-                attempt,
-                MAX_COLLISION_ATTEMPTS
-            );
-            return Ok(token_id);
-        }
-
-        tracing::warn!(
-            "Token ID collision detected on attempt {}/{}, retrying with new ID",
-            attempt,
-            MAX_COLLISION_ATTEMPTS
-        );
-    }
-
-    Err(OAuth2Error::Storage(format!(
-        "Failed to store token after {MAX_COLLISION_ATTEMPTS} collision detection attempts"
-    )))
 }
 
 pub(super) async fn generate_store_token(
@@ -159,41 +50,20 @@ pub(super) async fn generate_store_token(
     user_agent: Option<String>,
 ) -> Result<(String, String), OAuth2Error> {
     let token = gen_random_string_with_entropy_validation(32)?;
-    let token_id =
-        store_token_in_cache_atomic(token_type, &token, ttl, expires_at, user_agent).await?;
+
+    let stored_token = StoredToken {
+        token: token.clone(),
+        expires_at,
+        user_agent,
+        ttl,
+    };
+
+    let cache_prefix =
+        CachePrefix::new(token_type.to_string()).map_err(OAuth2Error::convert_storage_error)?;
+
+    let token_id = store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await?;
 
     Ok((token, token_id))
-}
-
-pub(super) async fn get_token_from_store<T>(
-    token_type: &str,
-    token_id: &str,
-) -> Result<T, OAuth2Error>
-where
-    T: TryFrom<CacheData, Error = OAuth2Error>,
-{
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get(token_type, token_id)
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?
-        .ok_or_else(|| {
-            OAuth2Error::SecurityTokenNotFound(format!("{token_type}-session not found"))
-        })?
-        .try_into()
-}
-
-pub(super) async fn remove_token_from_store(
-    token_type: &str,
-    token_id: &str,
-) -> Result<(), OAuth2Error> {
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .remove(token_type, token_id)
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))
 }
 
 pub(crate) async fn validate_origin(
@@ -260,7 +130,16 @@ pub(crate) async fn get_uid_from_stored_session_by_state_param(
 
     tracing::debug!("misc_id: {:#?}", misc_id);
 
-    let Ok(token) = get_token_from_store::<StoredToken>("misc_session", misc_id).await else {
+    let misc_cache_key = match CacheKey::new(misc_id.clone()) {
+        Ok(key) => key,
+        Err(e) => {
+            tracing::debug!("Failed to create cache key: {}", e);
+            return Ok(None);
+        }
+    };
+    let Ok(Some(token)) =
+        get_data::<StoredToken, OAuth2Error>(CachePrefix::misc_session(), misc_cache_key).await
+    else {
         tracing::debug!("Failed to get session from cache");
         return Ok(None);
     };
@@ -270,7 +149,9 @@ pub(crate) async fn get_uid_from_stored_session_by_state_param(
     // Clean up the misc session after use
     // remove_token_from_store("misc_session", misc_id).await?;
 
-    match get_user_from_session(&token.token).await {
+    let session_cookie = crate::SessionCookie::new(token.token.clone())
+        .map_err(|e| OAuth2Error::Storage(format!("Invalid session cookie: {e}")))?;
+    match get_user_from_session(&session_cookie).await {
         Ok(user) => {
             tracing::debug!("Found user ID: {}", user.id);
             Ok(Some(user))
@@ -286,7 +167,19 @@ pub(crate) async fn delete_session_and_misc_token_from_store(
     state_params: &StateParams,
 ) -> Result<(), OAuth2Error> {
     if let Some(misc_id) = &state_params.misc_id {
-        let Ok(token) = get_token_from_store::<StoredToken>("misc_session", misc_id).await else {
+        let misc_cache_key = match CacheKey::new(misc_id.clone()) {
+            Ok(key) => key,
+            Err(e) => {
+                tracing::debug!("Failed to create cache key: {}", e);
+                return Ok(());
+            }
+        };
+        let Ok(Some(token)) = get_data::<StoredToken, OAuth2Error>(
+            CachePrefix::misc_session(),
+            misc_cache_key.clone(),
+        )
+        .await
+        else {
             tracing::debug!("Failed to get session from cache");
             return Ok(());
         };
@@ -295,7 +188,7 @@ pub(crate) async fn delete_session_and_misc_token_from_store(
             .await
             .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
-        remove_token_from_store("misc_session", misc_id).await?;
+        remove_data::<OAuth2Error>(CachePrefix::misc_session(), misc_cache_key).await?;
     }
 
     Ok(())
@@ -304,7 +197,16 @@ pub(crate) async fn delete_session_and_misc_token_from_store(
 pub(crate) async fn get_mode_from_stored_session(
     mode_id: &str,
 ) -> Result<Option<OAuth2Mode>, OAuth2Error> {
-    let Ok(token) = get_token_from_store::<StoredToken>("mode", mode_id).await else {
+    let mode_cache_key = match CacheKey::new(mode_id.to_string()) {
+        Ok(key) => key,
+        Err(e) => {
+            tracing::debug!("Failed to create cache key: {}", e);
+            return Ok(None);
+        }
+    };
+    let Ok(Some(token)) =
+        get_data::<StoredToken, OAuth2Error>(CachePrefix::mode(), mode_cache_key).await
+    else {
         tracing::debug!("Failed to get mode from cache");
         return Ok(None);
     };
@@ -322,7 +224,29 @@ pub(crate) async fn get_mode_from_stored_session(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::CacheData;
     use http::HeaderValue;
+
+    // Test helper function to replace the removed store_token_in_cache function
+    async fn store_token_in_cache(
+        token_type: &str,
+        token: &str,
+        ttl: u64,
+        expires_at: DateTime<Utc>,
+        user_agent: Option<String>,
+    ) -> Result<String, OAuth2Error> {
+        let stored_token = StoredToken {
+            token: token.to_string(),
+            expires_at,
+            user_agent,
+            ttl,
+        };
+
+        let cache_prefix =
+            CachePrefix::new(token_type.to_string()).map_err(OAuth2Error::convert_storage_error)?;
+
+        store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await
+    }
 
     /// Test state parameter encoding and decoding roundtrip
     ///
@@ -393,16 +317,16 @@ mod tests {
         assert_eq!(decoded.mode_id, None);
     }
 
-    /// Test state decoding with invalid base64 input
+    /// Test OAuth2State validation with invalid base64 input
     ///
-    /// This test verifies that `decode_state` returns an appropriate OAuth2Error::DecodeState
-    /// when given a string that contains invalid base64 characters. It attempts to decode
-    /// an invalid base64 string and verifies that the correct error type is returned.
+    /// This test verifies that `OAuth2State::new` returns an appropriate error
+    /// when given a string that contains invalid base64 characters. This tests the validation
+    /// boundary where external data is converted to a type-safe OAuth2State.
     ///
     #[test]
-    fn test_decode_state_invalid_base64() {
-        // Try to decode an invalid base64 string
-        let result = decode_state("this is not base64!!!");
+    fn test_oauth2_state_validation_invalid_base64() {
+        // Try to create an OAuth2State from invalid base64 string
+        let result = crate::OAuth2State::new("this is not base64!!!".to_string());
 
         // Verify it returns an error
         assert!(result.is_err());
@@ -417,30 +341,30 @@ mod tests {
         }
     }
 
-    /// Test state decoding with invalid JSON payload
+    /// Test OAuth2State validation with invalid JSON payload
     ///
-    /// This test verifies that `decode_state` returns an appropriate OAuth2Error::DecodeState
-    /// when given valid base64 that contains invalid JSON. It encodes invalid JSON as base64,
-    /// attempts to decode it as state, and verifies that the correct error type is returned.
+    /// This test verifies that `OAuth2State::new` returns an appropriate error
+    /// when given valid base64 that contains invalid JSON. This tests the validation
+    /// boundary where external data is converted to a type-safe OAuth2State.
     ///
     #[test]
-    fn test_decode_state_invalid_json() {
+    fn test_oauth2_state_validation_invalid_json() {
         // Encode some invalid JSON
         let invalid_json = "not valid json";
         let encoded = URL_SAFE_NO_PAD.encode(invalid_json);
 
-        // Try to decode it
-        let result = decode_state(&encoded);
+        // Try to create OAuth2State from invalid JSON (valid base64)
+        let result = crate::OAuth2State::new(encoded);
 
         // Verify it returns an error
         assert!(result.is_err());
         match result {
-            Err(OAuth2Error::Serde(_)) => {}
+            Err(OAuth2Error::DecodeState(_)) => {}
             Ok(_) => {
-                unreachable!("Expected Serde error but got Ok");
+                unreachable!("Expected DecodeState error but got Ok");
             }
             Err(err) => {
-                unreachable!("Expected Serde error, got {:?}", err);
+                unreachable!("Expected DecodeState error, got {:?}", err);
             }
         }
     }
@@ -585,7 +509,15 @@ mod tests {
         );
 
         // Retrieve the token
-        let retrieved_result = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key = CacheKey::new(token_id.clone()).unwrap();
+        let retrieved_result = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key)
+            .await
+            .and_then(|opt| {
+                opt.ok_or_else(|| {
+                    OAuth2Error::SecurityTokenNotFound("test_type-session not found".to_string())
+                })
+            });
         assert!(
             retrieved_result.is_ok(),
             "Should successfully retrieve token"
@@ -614,13 +546,21 @@ mod tests {
         init_test_environment().await;
 
         // Try to get a token that doesn't exist
-        let result = get_token_from_store::<StoredToken>("test_type", "nonexistent_id").await;
+        let cache_prefix = CachePrefix::new("test_type".to_string()).unwrap();
+        let cache_key = CacheKey::new("nonexistent_id".to_string()).unwrap();
+        let result = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key)
+            .await
+            .and_then(|opt| {
+                opt.ok_or_else(|| {
+                    OAuth2Error::SecurityTokenNotFound("test-session not found".to_string())
+                })
+            });
 
         // Verify it returns SecurityTokenNotFound error
         assert!(result.is_err());
         match result {
             Err(OAuth2Error::SecurityTokenNotFound(msg)) => {
-                assert!(msg.contains("test_type-session not found"));
+                assert!(msg.contains("test-session not found"));
             }
             Ok(_) => {
                 unreachable!("Expected SecurityTokenNotFound error but got Ok");
@@ -631,9 +571,9 @@ mod tests {
         }
     }
 
-    /// Test token removal from cache store
+    /// Test token removal from cache store using direct cache API
     ///
-    /// This test verifies that `remove_token_from_store` can successfully remove a token
+    /// This test verifies that `remove_data` can successfully remove a token
     /// from the cache. It configures an in-memory cache, stores a token, verifies it exists,
     /// removes it, and then confirms the token is no longer retrievable, returning the
     /// appropriate SecurityTokenNotFound error.
@@ -656,17 +596,30 @@ mod tests {
                 .unwrap();
 
         // Verify the token was stored
-        let stored_token = get_token_from_store::<StoredToken>(token_type, &token_id)
+        let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key = CacheKey::new(token_id.clone()).unwrap();
+        let stored_token = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key)
             .await
+            .unwrap()
             .unwrap();
         assert_eq!(stored_token.token, token_value);
 
         // Remove the token
-        let result = remove_token_from_store(token_type, &token_id).await;
+        let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key = CacheKey::new(token_id.clone()).unwrap();
+        let result = remove_data::<OAuth2Error>(cache_prefix, cache_key).await;
         assert!(result.is_ok());
 
         // Verify the token is no longer available
-        let get_result = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key = CacheKey::new(token_id.clone()).unwrap();
+        let get_result = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key)
+            .await
+            .and_then(|opt| {
+                opt.ok_or_else(|| {
+                    OAuth2Error::SecurityTokenNotFound("test-session not found".to_string())
+                })
+            });
         assert!(get_result.is_err());
         match get_result {
             Err(OAuth2Error::SecurityTokenNotFound(_)) => {}
@@ -721,8 +674,11 @@ mod tests {
         assert_ne!(token, token_id, "Token and token_id should be different");
 
         // Verify the token can be retrieved from storage
-        let stored_token = get_token_from_store::<StoredToken>(token_type, &token_id)
+        let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key = CacheKey::new(token_id.clone()).unwrap();
+        let stored_token = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key)
             .await
+            .unwrap()
             .unwrap();
         assert_eq!(stored_token.token, token);
         assert_eq!(stored_token.user_agent, user_agent);
@@ -768,11 +724,17 @@ mod tests {
         );
 
         // Verify both tokens can be retrieved independently
-        let stored_token1 = get_token_from_store::<StoredToken>(token_type, &token_id1)
+        let cache_prefix1 = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key1 = CacheKey::new(token_id1.clone()).unwrap();
+        let cache_prefix2 = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key2 = CacheKey::new(token_id2.clone()).unwrap();
+        let stored_token1 = get_data::<StoredToken, OAuth2Error>(cache_prefix1, cache_key1)
             .await
+            .unwrap()
             .unwrap();
-        let stored_token2 = get_token_from_store::<StoredToken>(token_type, &token_id2)
+        let stored_token2 = get_data::<StoredToken, OAuth2Error>(cache_prefix2, cache_key2)
             .await
+            .unwrap()
             .unwrap();
 
         assert_eq!(stored_token1.token, token1);
@@ -1012,13 +974,14 @@ mod tests {
         let token_id = result.unwrap();
 
         // Should still be able to retrieve it immediately (cache doesn't enforce TTL for memory store)
-        let stored_token = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key = CacheKey::new(token_id.clone()).unwrap();
+        let stored_token = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key).await;
         assert!(
             stored_token.is_ok(),
             "Should be able to retrieve token with zero TTL"
         );
-
-        let token_data = stored_token.unwrap();
+        let token_data = stored_token.unwrap().unwrap();
         assert_eq!(token_data.ttl, 0);
         assert_eq!(token_data.token, token);
     }
@@ -1048,9 +1011,11 @@ mod tests {
         assert!(result.is_ok(), "Should handle realistic large TTL values");
 
         let token_id = result.unwrap();
-        let stored_token = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key = CacheKey::new(token_id.clone()).unwrap();
+        let stored_token = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key).await;
         assert!(stored_token.is_ok(), "Should retrieve token with large TTL");
-        assert_eq!(stored_token.unwrap().ttl, ttl);
+        assert_eq!(stored_token.unwrap().unwrap().ttl, ttl);
     }
 
     /// Test concurrent token operations and thread safety
@@ -1101,10 +1066,12 @@ mod tests {
 
         // Verify all tokens are unique and can be retrieved
         for (i, token_id) in token_ids.iter().enumerate() {
-            let stored_token = get_token_from_store::<StoredToken>(token_type, token_id).await;
+            let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+            let cache_key = CacheKey::new(token_id.clone()).unwrap();
+            let stored_token = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key).await;
             assert!(stored_token.is_ok());
 
-            let token_data = stored_token.unwrap();
+            let token_data = stored_token.unwrap().unwrap();
             assert_eq!(token_data.token, format!("token-{i}"));
             assert_eq!(token_data.user_agent, Some(format!("agent-{i}")));
         }
@@ -1154,13 +1121,15 @@ mod tests {
 
         // Verify each token can be retrieved with its respective prefix
         for (prefix, token_id) in &stored_tokens {
-            let retrieved = get_token_from_store::<StoredToken>(prefix, token_id).await;
+            let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
+            let cache_key = CacheKey::new(token_id.clone()).unwrap();
+            let retrieved = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key).await;
             assert!(
                 retrieved.is_ok(),
                 "Should retrieve token for prefix: {prefix}"
             );
 
-            let token_data = retrieved.unwrap();
+            let token_data = retrieved.unwrap().unwrap();
             assert_eq!(token_data.token, same_token_content);
             assert_eq!(token_data.user_agent, user_agent);
         }
@@ -1170,8 +1139,18 @@ mod tests {
             for (prefix2, _) in &stored_tokens {
                 if prefix1 != prefix2 {
                     // Trying to get token with wrong prefix should fail
+                    let cache_prefix = CachePrefix::new(prefix2.to_string()).unwrap();
+                    let cache_key = CacheKey::new(token_id1.clone()).unwrap();
                     let wrong_retrieval =
-                        get_token_from_store::<StoredToken>(prefix2, token_id1).await;
+                        get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key)
+                            .await
+                            .and_then(|opt| {
+                                opt.ok_or_else(|| {
+                                    OAuth2Error::SecurityTokenNotFound(
+                                        "token not found".to_string(),
+                                    )
+                                })
+                            });
                     assert!(
                         wrong_retrieval.is_err(),
                         "Should not retrieve token for {prefix2} with {prefix1}'s token_id"
@@ -1204,9 +1183,11 @@ mod tests {
         );
 
         if let Ok(token_id) = empty_token_result {
-            let retrieved = get_token_from_store::<StoredToken>("test", &token_id).await;
+            let cache_prefix = CachePrefix::new("test".to_string()).unwrap();
+            let cache_key = CacheKey::new(token_id.clone()).unwrap();
+            let retrieved = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key).await;
             assert!(retrieved.is_ok());
-            assert_eq!(retrieved.unwrap().token, "");
+            assert_eq!(retrieved.unwrap().unwrap().token, "");
         }
 
         // Test with very long token content
@@ -1219,9 +1200,11 @@ mod tests {
         );
 
         if let Ok(token_id) = long_token_result {
-            let retrieved = get_token_from_store::<StoredToken>("test_long", &token_id).await;
+            let cache_prefix = CachePrefix::new("test_long".to_string()).unwrap();
+            let cache_key = CacheKey::new(token_id.clone()).unwrap();
+            let retrieved = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key).await;
             assert!(retrieved.is_ok());
-            assert_eq!(retrieved.unwrap().token, long_token);
+            assert_eq!(retrieved.unwrap().unwrap().token, long_token);
         }
 
         // Test with special characters in token
@@ -1234,9 +1217,11 @@ mod tests {
         );
 
         if let Ok(token_id) = special_result {
-            let retrieved = get_token_from_store::<StoredToken>("test_special", &token_id).await;
+            let cache_prefix = CachePrefix::new("test_special".to_string()).unwrap();
+            let cache_key = CacheKey::new(token_id.clone()).unwrap();
+            let retrieved = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key).await;
             assert!(retrieved.is_ok());
-            assert_eq!(retrieved.unwrap().token, special_token);
+            assert_eq!(retrieved.unwrap().unwrap().token, special_token);
         }
     }
 
@@ -1279,11 +1264,17 @@ mod tests {
             "Different tokens should have different IDs"
         );
 
-        let retrieved1 = get_token_from_store::<StoredToken>(token_type, &token_id1)
+        let cache_prefix1 = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key1 = CacheKey::new(token_id1.clone()).unwrap();
+        let cache_prefix2 = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key2 = CacheKey::new(token_id2.clone()).unwrap();
+        let retrieved1 = get_data::<StoredToken, OAuth2Error>(cache_prefix1, cache_key1)
             .await
+            .unwrap()
             .unwrap();
-        let retrieved2 = get_token_from_store::<StoredToken>(token_type, &token_id2)
+        let retrieved2 = get_data::<StoredToken, OAuth2Error>(cache_prefix2, cache_key2)
             .await
+            .unwrap()
             .unwrap();
 
         assert_eq!(retrieved1.token, token1);
@@ -1314,19 +1305,31 @@ mod tests {
             .unwrap();
 
         // Verify token exists
-        let retrieved = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key = CacheKey::new(token_id.clone()).unwrap();
+        let retrieved = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key).await;
         assert!(retrieved.is_ok());
 
         // Remove the token
-        let remove_result1 = remove_token_from_store(token_type, &token_id).await;
+        let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key = CacheKey::new(token_id.clone()).unwrap();
+        let remove_result1 = remove_data::<OAuth2Error>(cache_prefix, cache_key).await;
         assert!(remove_result1.is_ok());
 
         // Verify token is gone
-        let get_after_remove = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key = CacheKey::new(token_id.clone()).unwrap();
+        let get_after_remove = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key)
+            .await
+            .and_then(|opt| {
+                opt.ok_or_else(|| OAuth2Error::SecurityTokenNotFound("token not found".to_string()))
+            });
         assert!(get_after_remove.is_err());
 
         // Try to remove the same token again (should handle gracefully)
-        let remove_result2 = remove_token_from_store(token_type, &token_id).await;
+        let cache_prefix2 = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key2 = CacheKey::new(token_id.clone()).unwrap();
+        let remove_result2 = remove_data::<OAuth2Error>(cache_prefix2, cache_key2).await;
         assert!(remove_result2.is_ok(), "Second removal should not fail");
 
         // Try multiple concurrent removals of the same token
@@ -1335,7 +1338,11 @@ mod tests {
                 let token_id_clone = token_id.clone();
                 let token_type_clone = token_type;
                 tokio::spawn(async move {
-                    remove_token_from_store(token_type_clone, &token_id_clone).await
+                    let (cache_prefix, cache_key) = (
+                        CachePrefix::new(token_type_clone.to_string()).unwrap(),
+                        CacheKey::new(token_id_clone.clone()).unwrap(),
+                    );
+                    remove_data::<OAuth2Error>(cache_prefix, cache_key).await
                 })
             })
             .collect::<Vec<_>>();
@@ -1375,10 +1382,12 @@ mod tests {
             .unwrap();
 
         // Should still be able to retrieve it (cache doesn't automatically expire in memory store)
-        let retrieved = get_token_from_store::<StoredToken>(token_type, &token_id).await;
+        let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
+        let cache_key = CacheKey::new(token_id.clone()).unwrap();
+        let retrieved = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key).await;
         assert!(retrieved.is_ok());
 
-        let token_data = retrieved.unwrap();
+        let token_data = retrieved.unwrap().unwrap();
         assert_eq!(token_data.token, "expired_token");
         // Verify the past expiration time is preserved
         assert!(token_data.expires_at < Utc::now());
@@ -1464,10 +1473,12 @@ mod tests {
             assert_ne!(token, token_id, "Token and token ID should be different");
 
             // Verify storage and retrieval
-            let retrieved =
-                get_token_from_store::<StoredToken>(&format!("{token_type}-{i}"), &token_id)
-                    .await
-                    .unwrap();
+            let cache_prefix = CachePrefix::new(format!("{token_type}-{i}")).unwrap();
+            let cache_key = CacheKey::new(token_id.clone()).unwrap();
+            let retrieved = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key)
+                .await
+                .unwrap()
+                .unwrap();
 
             assert_eq!(retrieved.token, token);
             assert_eq!(retrieved.user_agent, user_agent);

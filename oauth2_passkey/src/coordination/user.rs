@@ -3,7 +3,7 @@ use crate::passkey::{CredentialSearchField, PasskeyStore};
 use crate::userdb::{User as DbUser, UserStore};
 
 use super::errors::CoordinationError;
-use crate::session::get_user_from_session;
+use crate::session::{SessionId, UserId, get_user_from_session};
 
 /// Update a user's account and label
 ///
@@ -24,21 +24,23 @@ use crate::session::get_user_from_session;
 /// * `Err(CoordinationError::ResourceNotFound)` - If the target user doesn't exist
 /// * `Err(CoordinationError)` - If another error occurs during the update
 pub async fn update_user_account(
-    session_id: &str,
-    user_id: &str,
+    session_id: SessionId,
+    user_id: UserId,
     account: Option<String>,
     label: Option<String>,
 ) -> Result<DbUser, CoordinationError> {
     // Get user from session (already does fresh database lookup)
-    let session_user = get_user_from_session(session_id)
+    let session_cookie = crate::SessionCookie::new(session_id.as_str().to_string())
+        .map_err(|_| CoordinationError::Unauthorized.log())?;
+    let session_user = get_user_from_session(&session_cookie)
         .await
         .map_err(|_| CoordinationError::Unauthorized.log())?;
 
     // Validate owner session - user can only update their own account
-    if session_user.id != user_id {
+    if session_user.id != user_id.as_str() {
         tracing::debug!(
             session_user_id = %session_user.id,
-            target_user_id = %user_id,
+            target_user_id = %user_id.as_str(),
             "User is not authorized (not resource owner)"
         );
         return Err(CoordinationError::Unauthorized.log());
@@ -79,19 +81,21 @@ pub async fn update_user_account(
 ///
 /// Returns a list of deleted passkey credential IDs for client-side notification
 pub async fn delete_user_account(
-    session_id: &str,
-    user_id: &str,
+    session_id: SessionId,
+    user_id: UserId,
 ) -> Result<Vec<String>, CoordinationError> {
     // Get user from session (already does fresh database lookup)
-    let session_user = get_user_from_session(session_id)
+    let session_cookie = crate::SessionCookie::new(session_id.as_str().to_string())
+        .map_err(|_| CoordinationError::Unauthorized.log())?;
+    let session_user = get_user_from_session(&session_cookie)
         .await
         .map_err(|_| CoordinationError::Unauthorized.log())?;
 
     // Validate admin or owner session - admin can delete any user, user can delete their own account
-    if !session_user.has_admin_privileges() && session_user.id != user_id {
+    if !session_user.has_admin_privileges() && session_user.id != user_id.as_str() {
         tracing::debug!(
             session_user_id = %session_user.id,
-            target_user_id = %user_id,
+            target_user_id = %user_id.as_str(),
             has_admin_privileges = %session_user.has_admin_privileges(),
             "User is not authorized (neither admin nor resource owner)"
         );
@@ -100,39 +104,40 @@ pub async fn delete_user_account(
 
     // For owner deletion, use session user data (no second DB query needed)
     // For admin deletion of other user, we need to fetch the target user
-    let user = if session_user.id == user_id {
+    let user = if session_user.id == user_id.as_str() {
         // Self-deletion: convert SessionUser to DbUser
         DbUser::from(session_user)
     } else {
         // Admin deleting another user: fetch target user
-        UserStore::get_user(user_id).await?.ok_or_else(|| {
-            CoordinationError::ResourceNotFound {
-                resource_type: "User".to_string(),
-                resource_id: user_id.to_string(),
-            }
-            .log()
-        })?
+        UserStore::get_user(user_id.as_str())
+            .await?
+            .ok_or_else(|| {
+                CoordinationError::ResourceNotFound {
+                    resource_type: "User".to_string(),
+                    resource_id: user_id.as_str().to_string(),
+                }
+                .log()
+            })?
     };
 
     tracing::debug!("Deleting user account: {:#?}", user);
 
     // Get all Passkey credentials for this user before deleting them
     let credentials =
-        PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_string()))
-            .await?;
+        PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.clone())).await?;
     let credential_ids: Vec<String> = credentials
         .iter()
         .map(|c| c.credential_id.clone())
         .collect();
 
     // Delete all OAuth2 accounts for this user
-    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.to_string())).await?;
+    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.clone())).await?;
 
     // Delete all Passkey credentials for this user
-    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.to_string())).await?;
+    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.clone())).await?;
 
     // Finally, delete the user account
-    UserStore::delete_user(user_id).await?;
+    UserStore::delete_user(user_id.as_str()).await?;
 
     // Returns a list of deleted passkey credential IDs for client-side notification
     Ok(credential_ids)
@@ -173,7 +178,7 @@ mod tests {
 
     use crate::oauth2::OAuth2Store;
     use crate::passkey::{PasskeyCredential, PasskeyStore};
-    use crate::session::{insert_test_session, insert_test_user};
+    use crate::session::{SessionId, UserId, insert_test_session, insert_test_user};
     use crate::userdb::{User as DbUser, UserStore};
 
     // Helper function to create a test user
@@ -259,8 +264,8 @@ mod tests {
 
         // 2. Call the actual function from the parent module
         let result = super::update_user_account(
-            session_id, // session_id with valid session
-            user_id,    // user_id
+            SessionId::new(session_id.to_string()), // session_id with valid session
+            UserId::new(user_id.to_string()),       // user_id
             Some("new-account".to_string()),
             Some("New Label".to_string()),
         )
@@ -315,8 +320,8 @@ mod tests {
 
         // Call the actual function with a non-existent target user
         let result = super::update_user_account(
-            session_id,          // session_id (valid session)
-            nonexistent_user_id, // user_id (non-existent)
+            SessionId::new(session_id.to_string()), // session_id (valid session)
+            UserId::new(nonexistent_user_id.to_string()), // user_id (non-existent)
             Some("new-account".to_string()),
             Some("New Label".to_string()),
         )
@@ -408,7 +413,11 @@ mod tests {
             .expect("Failed to create session");
 
         // 4. Call the actual function
-        let result = super::delete_user_account(&session_id, &user_id_to_delete).await;
+        let result = super::delete_user_account(
+            SessionId::new(session_id.clone()),
+            UserId::new(user_id_to_delete.clone()),
+        )
+        .await;
 
         // 5. Verify returned credential IDs
         assert!(
@@ -434,7 +443,7 @@ mod tests {
 
         // 7. Verify passkeys are deleted
         let passkeys_from_db = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
-            user_id_to_delete.clone(),
+            UserId::new(user_id_to_delete.clone()),
         ))
         .await
         .expect("DB error getting passkeys");
@@ -442,7 +451,7 @@ mod tests {
 
         // 8. Verify OAuth2 accounts are deleted
         let oauth_accounts_from_db = OAuth2Store::get_oauth2_accounts_by(
-            AccountSearchField::UserId(user_id_to_delete.clone()),
+            AccountSearchField::UserId(UserId::new(user_id_to_delete.clone())),
         )
         .await
         .expect("DB error getting oauth accounts");
@@ -482,7 +491,11 @@ mod tests {
             .await
             .expect("Failed to create session");
 
-        let result = super::delete_user_account(session_id, nonexistent_user_id).await;
+        let result = super::delete_user_account(
+            SessionId::new(session_id.to_string()),
+            UserId::new(nonexistent_user_id.to_string()),
+        )
+        .await;
 
         assert!(result.is_err());
         match result {

@@ -4,9 +4,9 @@ use std::{env, sync::LazyLock};
 
 use crate::oauth2::{
     AccountSearchField, AuthResponse, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_RESPONSE_MODE, OAuth2Account,
-    OAuth2Mode, OAuth2Store, csrf_checks, decode_state, delete_session_and_misc_token_from_store,
-    get_auth_url, get_idinfo_userinfo, get_mode_from_stored_session,
-    get_uid_from_stored_session_by_state_param, validate_origin,
+    OAuth2Mode, OAuth2Store, Provider, ProviderUserId, csrf_checks, decode_state,
+    delete_session_and_misc_token_from_store, get_auth_url, get_idinfo_userinfo,
+    get_mode_from_stored_session, get_uid_from_stored_session_by_state_param, validate_origin,
 };
 
 use crate::userdb::{User as DbUser, UserStore};
@@ -15,7 +15,7 @@ use crate::utils::header_set_cookie;
 use super::errors::CoordinationError;
 use super::user::gen_new_user_id;
 
-use crate::session::new_session_header;
+use crate::session::{UserId, new_session_header};
 
 /// OAuth2 user account field mapping configuration
 static OAUTH2_USER_ACCOUNT_FIELD: LazyLock<String> =
@@ -191,7 +191,8 @@ async fn process_oauth2_authorization(
     // 9. Create a header for the session cookie
 
     // Decode the state from the auth response
-    let state_in_response = decode_state(&auth_response.state)?;
+    let oauth2_state = crate::OAuth2State::new(auth_response.state.clone())?;
+    let state_in_response = decode_state(&oauth2_state)?;
 
     // Extract user_id from the stored session if available
     let state_user = get_uid_from_stored_session_by_state_param(&state_in_response).await?;
@@ -382,9 +383,9 @@ fn get_oauth2_field_mappings() -> (String, String) {
 /// before deleting it to prevent unauthorized deletions.
 #[tracing::instrument(fields(user_id, provider, provider_user_id))]
 pub async fn delete_oauth2_account_core(
-    user_id: &str,
-    provider: &str,
-    provider_user_id: &str,
+    user_id: UserId,
+    provider: Provider,
+    provider_user_id: ProviderUserId,
 ) -> Result<(), CoordinationError> {
     tracing::info!("Attempting to delete OAuth2 account");
     // Ensure user is authenticated
@@ -392,7 +393,7 @@ pub async fn delete_oauth2_account_core(
 
     // Get the OAuth2 account to verify it belongs to the user
     let accounts = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::ProviderUserId(
-        provider_user_id.to_string(),
+        provider_user_id.clone(),
     ))
     .await?;
 
@@ -400,33 +401,32 @@ pub async fn delete_oauth2_account_core(
     let account = accounts
         .into_iter()
         .find(|account| {
-            account.provider == provider && account.provider_user_id == provider_user_id
+            account.provider == provider.as_str()
+                && account.provider_user_id == provider_user_id.as_str()
         })
         .ok_or(
             CoordinationError::ResourceNotFound {
                 resource_type: "OAuth2Account".to_string(),
-                resource_id: format!("{provider}/{provider_user_id}"),
+                resource_id: format!("{}/{}", provider.as_str(), provider_user_id.as_str()),
             }
             .log(),
         )?;
 
     // Verify the account belongs to the authenticated user
-    if account.user_id != user_id {
+    if account.user_id != user_id.as_str() {
         return Err(CoordinationError::Unauthorized.log());
     }
 
-    // Delete the OAuth2 account
-    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::ProviderUserId(
-        provider_user_id.to_string(),
-    ))
-    .await?;
-
     tracing::info!(
         "Successfully deleted OAuth2 account {}/{} for user {}",
-        provider,
-        provider_user_id,
-        user_id
+        provider.as_str(),
+        provider_user_id.as_str(),
+        user_id.as_str()
     );
+
+    // Delete the OAuth2 account
+    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::ProviderUserId(provider_user_id))
+        .await?;
     Ok(())
 }
 
@@ -448,19 +448,19 @@ pub async fn delete_oauth2_account_core(
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::list_accounts_core;
+/// use oauth2_passkey::{list_accounts_core, UserId};
 ///
 /// async fn get_connected_services(user_id: &str) -> Vec<String> {
-///     match list_accounts_core(user_id).await {
+///     match list_accounts_core(UserId::new(user_id.to_string())).await {
 ///         Ok(accounts) => accounts.into_iter().map(|acc| acc.provider).collect(),
 ///         Err(_) => Vec::new()
 ///     }
 /// }
 /// ```
 #[tracing::instrument(fields(user_id))]
-pub async fn list_accounts_core(user_id: &str) -> Result<Vec<OAuth2Account>, CoordinationError> {
+pub async fn list_accounts_core(user_id: UserId) -> Result<Vec<OAuth2Account>, CoordinationError> {
     tracing::debug!("Listing OAuth2 accounts for user");
-    let accounts = OAuth2Store::get_oauth2_accounts(user_id).await?;
+    let accounts = OAuth2Store::get_oauth2_accounts(user_id.as_str()).await?;
     tracing::info!(account_count = accounts.len(), "Retrieved OAuth2 accounts");
     Ok(accounts)
 }
@@ -606,7 +606,7 @@ mod tests {
             create_test_oauth2_account_in_db(&user_id, provider2, provider_user_id2).await?;
 
         // List the OAuth2 accounts
-        let accounts = list_accounts_core(&user_id).await?;
+        let accounts = list_accounts_core(UserId::new(user_id.clone())).await?;
         assert_eq!(
             accounts.len(),
             2,
@@ -648,7 +648,12 @@ mod tests {
             create_test_oauth2_account_in_db(user_id, provider, provider_user_id).await?;
 
         // Delete the OAuth2 account
-        let result = delete_oauth2_account_core(user_id, provider, &unique_provider_user_id).await;
+        let result = delete_oauth2_account_core(
+            UserId::new(user_id.to_string()),
+            Provider::new(provider.to_string()),
+            ProviderUserId::new(unique_provider_user_id.clone()),
+        )
+        .await;
         assert!(
             result.is_ok(),
             "Failed to delete OAuth2 account: {result:?}"
@@ -656,7 +661,7 @@ mod tests {
 
         // Verify the account was deleted
         let accounts = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::ProviderUserId(
-            unique_provider_user_id,
+            crate::oauth2::ProviderUserId::new(unique_provider_user_id),
         ))
         .await?;
         assert!(accounts.is_empty(), "OAuth2 account was not deleted");
@@ -690,8 +695,12 @@ mod tests {
             create_test_oauth2_account_in_db(&user_id, provider, &provider_user_id).await?;
 
         // Try to delete the OAuth2 account as a different user
-        let result =
-            delete_oauth2_account_core(&other_user_id, provider, &unique_provider_user_id).await;
+        let result = delete_oauth2_account_core(
+            UserId::new(other_user_id),
+            Provider::new(provider.to_string()),
+            ProviderUserId::new(unique_provider_user_id),
+        )
+        .await;
         assert!(
             matches!(result, Err(CoordinationError::Unauthorized)),
             "Expected Unauthorized error, got: {result:?}"

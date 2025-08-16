@@ -17,7 +17,11 @@ impl OAuth2Store {
             let id = uuid::Uuid::new_v4().to_string();
 
             // Check if an account with this ID already exists
-            match Self::get_oauth2_accounts_by(AccountSearchField::Id(id.clone())).await {
+            match Self::get_oauth2_accounts_by(AccountSearchField::Id(
+                crate::oauth2::AccountId::new(id.clone()),
+            ))
+            .await
+            {
                 Ok(accounts) if accounts.is_empty() => return Ok(id), // ID is unique, return it
                 Ok(_) => continue,                                    // ID exists, try again
                 Err(e) => {
@@ -65,14 +69,14 @@ impl OAuth2Store {
         if let Some(pool) = store.as_sqlite() {
             get_oauth2_accounts_by_field_sqlite(
                 pool,
-                &AccountSearchField::UserId(user_id.to_string()),
+                &AccountSearchField::UserId(crate::session::UserId::new(user_id.to_string())),
             )
             .await
             // get_oauth2_accounts_sqlite(pool, user_id).await
         } else if let Some(pool) = store.as_postgres() {
             get_oauth2_accounts_by_field_postgres(
                 pool,
-                &AccountSearchField::UserId(user_id.to_string()),
+                &AccountSearchField::UserId(crate::session::UserId::new(user_id.to_string())),
             )
             .await
             // get_oauth2_accounts_postgres(pool, user_id).await
@@ -165,7 +169,7 @@ impl OAuth2Store {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::oauth2::types::{AccountSearchField, OAuth2Account};
+    use crate::oauth2::types::{AccountSearchField, DisplayName, Email, OAuth2Account, Provider};
     use crate::test_utils::init_test_environment;
     use crate::userdb::{User, UserStore};
     use serial_test::serial;
@@ -325,9 +329,11 @@ mod tests {
         assert_eq!(inserted_account.picture, test_account.picture);
 
         // Clean up
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id))
-            .await
-            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(inserted_account.id),
+        ))
+        .await
+        .unwrap();
     }
 
     /// Test OAuth2 account upsert validation with empty user ID
@@ -371,7 +377,9 @@ mod tests {
     async fn test_upsert_oauth2_account_update() {
         init_test_environment().await;
 
-        let test_account = create_test_user_and_account("user123", "google", "google123").await;
+        let user_id = generate_unique_test_id("user");
+        let provider_id = generate_unique_test_id("google");
+        let test_account = create_test_user_and_account(&user_id, "google", &provider_id).await;
 
         // Insert the account
         let mut inserted_account = OAuth2Store::upsert_oauth2_account(test_account)
@@ -394,9 +402,11 @@ mod tests {
         assert_eq!(updated_account.email, "updated@example.com".to_string());
 
         // Clean up
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(updated_account.id))
-            .await
-            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(updated_account.id),
+        ))
+        .await
+        .unwrap();
     }
 
     /// Test retrieving OAuth2 accounts by user ID
@@ -450,12 +460,16 @@ mod tests {
         assert!(found_github, "Should find GitHub account");
 
         // Clean up
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted1.id))
-            .await
-            .unwrap();
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted2.id))
-            .await
-            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(inserted1.id),
+        ))
+        .await
+        .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(inserted2.id),
+        ))
+        .await
+        .unwrap();
     }
 
     /// Test retrieving OAuth2 accounts by account ID
@@ -470,11 +484,13 @@ mod tests {
     async fn test_get_oauth2_accounts_by_id() {
         init_test_environment().await;
 
-        let inserted_account = create_test_user_and_account("user123", "google", "google123").await;
+        let user_id = generate_unique_test_id("user");
+        let provider_id = generate_unique_test_id("google");
+        let inserted_account = create_test_user_and_account(&user_id, "google", &provider_id).await;
 
         // Search by ID
         let accounts = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Id(
-            inserted_account.id.clone(),
+            crate::oauth2::AccountId::new(inserted_account.id.clone()),
         ))
         .await
         .unwrap();
@@ -484,9 +500,11 @@ mod tests {
         assert_eq!(accounts[0].provider, "google");
 
         // Clean up
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id))
-            .await
-            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(inserted_account.id),
+        ))
+        .await
+        .unwrap();
     }
 
     /// Test retrieving OAuth2 accounts by provider name
@@ -510,13 +528,16 @@ mod tests {
             .expect("Failed to initialize OAuth2Store");
 
         // Clean up any existing Google accounts from other tests to ensure test isolation
-        let existing_google_accounts =
-            OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Provider("google".to_string()))
-                .await
-                .unwrap_or_default();
+        let existing_google_accounts = OAuth2Store::get_oauth2_accounts_by(
+            AccountSearchField::Provider(Provider::new("google".to_string())),
+        )
+        .await
+        .unwrap_or_default();
         for account in existing_google_accounts {
-            let _ =
-                OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(account.id)).await;
+            let _ = OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+                crate::oauth2::AccountId::new(account.id),
+            ))
+            .await;
         }
 
         let provider1_id = generate_unique_test_id("google");
@@ -543,26 +564,46 @@ mod tests {
         .await;
 
         // Search by provider
-        let google_accounts =
-            OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Provider("google".to_string()))
-                .await
-                .unwrap();
+        let google_accounts = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Provider(
+            Provider::new("google".to_string()),
+        ))
+        .await
+        .unwrap();
 
-        assert_eq!(google_accounts.len(), 2, "Should find 2 Google accounts");
+        assert!(
+            google_accounts.len() >= 2,
+            "Should find at least 2 Google accounts"
+        );
         for account in &google_accounts {
             assert_eq!(account.provider, "google");
         }
 
+        // Verify that our specific test accounts are found
+        let test_account_ids: std::collections::HashSet<_> =
+            [&inserted1.id, &inserted2.id].into_iter().collect();
+        let found_account_ids: std::collections::HashSet<_> =
+            google_accounts.iter().map(|acc| &acc.id).collect();
+        assert!(
+            test_account_ids.is_subset(&found_account_ids),
+            "Should find both test accounts we created"
+        );
+
         // Clean up
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted1.id))
-            .await
-            .unwrap();
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted2.id))
-            .await
-            .unwrap();
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted3.id))
-            .await
-            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(inserted1.id),
+        ))
+        .await
+        .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(inserted2.id),
+        ))
+        .await
+        .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(inserted3.id),
+        ))
+        .await
+        .unwrap();
     }
 
     /// Test retrieving specific OAuth2 account by provider and provider user ID
@@ -577,10 +618,12 @@ mod tests {
     async fn test_get_oauth2_account_by_provider() {
         init_test_environment().await;
 
-        let inserted_account = create_test_user_and_account("user123", "google", "google123").await;
+        let user_id = generate_unique_test_id("user");
+        let provider_id = generate_unique_test_id("google");
+        let inserted_account = create_test_user_and_account(&user_id, "google", &provider_id).await;
 
         // Find by provider and provider_user_id
-        let found_account = OAuth2Store::get_oauth2_account_by_provider("google", "google123")
+        let found_account = OAuth2Store::get_oauth2_account_by_provider("google", &provider_id)
             .await
             .unwrap();
 
@@ -588,7 +631,7 @@ mod tests {
         let found_account = found_account.unwrap();
         assert_eq!(found_account.id, inserted_account.id);
         assert_eq!(found_account.provider, "google");
-        assert_eq!(found_account.provider_user_id, "google123");
+        assert_eq!(found_account.provider_user_id, provider_id);
 
         // Try to find non-existent account
         let not_found = OAuth2Store::get_oauth2_account_by_provider("google", "nonexistent")
@@ -597,9 +640,11 @@ mod tests {
         assert!(not_found.is_none(), "Should not find non-existent account");
 
         // Clean up
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id))
-            .await
-            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(inserted_account.id),
+        ))
+        .await
+        .unwrap();
     }
 
     /// Test OAuth2 account deletion by account ID
@@ -621,7 +666,7 @@ mod tests {
 
         // Verify account exists
         let accounts_before = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Id(
-            inserted_account.id.clone(),
+            crate::oauth2::AccountId::new(inserted_account.id.clone()),
         ))
         .await
         .unwrap();
@@ -632,15 +677,18 @@ mod tests {
         );
 
         // Delete account
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id.clone()))
-            .await
-            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(inserted_account.id.clone()),
+        ))
+        .await
+        .unwrap();
 
         // Verify account is deleted
-        let accounts_after =
-            OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id))
-                .await
-                .unwrap();
+        let accounts_after = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(inserted_account.id),
+        ))
+        .await
+        .unwrap();
         assert_eq!(accounts_after.len(), 0, "Account should be deleted");
     }
 
@@ -683,9 +731,11 @@ mod tests {
         );
 
         // Delete all accounts for user
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.clone()))
-            .await
-            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(
+            crate::session::UserId::new(user_id.clone()),
+        ))
+        .await
+        .unwrap();
 
         // Verify accounts are deleted
         let accounts_after = OAuth2Store::get_oauth2_accounts(&user_id).await.unwrap();
@@ -742,38 +792,50 @@ mod tests {
 
         // Test search by ID
         let by_id = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Id(
-            inserted_account.id.clone(),
+            crate::oauth2::AccountId::new(inserted_account.id.clone()),
         ))
         .await
         .unwrap();
         assert_eq!(by_id.len(), 1);
 
         // Test search by UserId
-        let by_user_id =
-            OAuth2Store::get_oauth2_accounts_by(AccountSearchField::UserId(user_id.clone()))
-                .await
-                .unwrap();
+        let by_user_id = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::UserId(
+            crate::session::UserId::new(user_id.clone()),
+        ))
+        .await
+        .unwrap();
         assert_eq!(by_user_id.len(), 1);
 
         // Test search by Provider
-        let by_provider =
-            OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Provider("google".to_string()))
-                .await
-                .unwrap();
+        let by_provider = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Provider(
+            Provider::new("google".to_string()),
+        ))
+        .await
+        .unwrap();
         assert!(!by_provider.is_empty());
 
         // Test search by Email
-        let by_email = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Email(
+        let by_email = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Email(Email::new(
             inserted_account.email.clone(),
-        ))
+        )))
         .await
         .unwrap();
         assert!(!by_email.is_empty());
 
+        // Test search by Name (DisplayName)
+        let by_name = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::Name(
+            DisplayName::new(inserted_account.name.clone()),
+        ))
+        .await
+        .unwrap();
+        assert!(!by_name.is_empty());
+
         // Clean up
-        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(inserted_account.id))
-            .await
-            .unwrap();
+        OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+            crate::oauth2::AccountId::new(inserted_account.id),
+        ))
+        .await
+        .unwrap();
     }
 
     /// Test concurrent OAuth2 account operations and thread safety
@@ -840,9 +902,23 @@ mod tests {
 
         // Clean up
         for account in inserted_accounts {
-            OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(account.id))
-                .await
-                .unwrap();
+            OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::Id(
+                crate::oauth2::AccountId::new(account.id),
+            ))
+            .await
+            .unwrap();
         }
+    }
+
+    /// Test type constructor functions for dead code elimination
+    #[test]
+    fn test_type_constructors() {
+        // Test DisplayName constructor
+        let display_name = DisplayName::new("Test User".to_string());
+        assert_eq!(display_name.as_str(), "Test User");
+
+        // Test Email constructor
+        let email = Email::new("test@example.com".to_string());
+        assert_eq!(email.as_str(), "test@example.com");
     }
 }

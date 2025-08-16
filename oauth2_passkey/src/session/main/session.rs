@@ -12,7 +12,9 @@ use crate::session::types::{
 use crate::userdb::UserStore;
 use crate::utils::{gen_random_string_with_entropy_validation, header_set_cookie};
 
-use crate::storage::GENERIC_CACHE_STORE;
+use crate::storage::{
+    CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE, get_data, remove_data,
+};
 
 /// Prepare a logout response by removing the session cookie and deleting the session from storage
 ///
@@ -39,12 +41,7 @@ pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderM
 #[tracing::instrument(fields(user_id, session_id))]
 pub(super) async fn create_new_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {
     tracing::info!("Creating new session for user");
-    let session_id = gen_random_string_with_entropy_validation(32)?;
-
-    // Record session_id in the tracing span
-    tracing::Span::current().record("session_id", &session_id);
     let expires_at = Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64);
-
     let csrf_token = gen_random_string_with_entropy_validation(32)?;
 
     let stored_session = StoredSession {
@@ -54,17 +51,16 @@ pub(super) async fn create_new_session_with_uid(user_id: &str) -> Result<HeaderM
         ttl: *SESSION_COOKIE_MAX_AGE,
     };
 
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .put_with_ttl(
-            "session",
-            &session_id,
-            stored_session.into(),
-            *SESSION_COOKIE_MAX_AGE as usize,
-        )
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?;
+    // Use simplified cache API for auto-generated session keys
+    let session_id = crate::storage::store_cache_auto::<_, SessionError>(
+        CachePrefix::session(),
+        stored_session,
+        *SESSION_COOKIE_MAX_AGE,
+    )
+    .await?;
+
+    // Record session_id in the tracing span
+    tracing::Span::current().record("session_id", &session_id);
 
     let mut headers = HeaderMap::new();
     header_set_cookie(
@@ -84,12 +80,11 @@ async fn delete_session_from_store(
     cookie_name: String,
 ) -> Result<(), SessionError> {
     if let Some(cookie) = cookies.get(&cookie_name) {
-        GENERIC_CACHE_STORE
-            .lock()
-            .await
-            .remove("session", cookie)
-            .await
-            .map_err(|e| SessionError::Storage(e.to_string()))?;
+        remove_data::<SessionError>(
+            CachePrefix::session(),
+            CacheKey::new(cookie.to_string()).map_err(SessionError::convert_storage_error)?,
+        )
+        .await?;
     };
     Ok(())
 }
@@ -97,12 +92,11 @@ async fn delete_session_from_store(
 pub(crate) async fn delete_session_from_store_by_session_id(
     session_id: &str,
 ) -> Result<(), SessionError> {
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .remove("session", session_id)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?;
+    remove_data::<SessionError>(
+        CachePrefix::session(),
+        CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?,
+    )
+    .await?;
     Ok(())
 }
 
@@ -122,27 +116,28 @@ pub(crate) async fn delete_session_from_store_by_session_id(
 ///
 /// # Example
 /// ```no_run
-/// use oauth2_passkey::get_user_from_session;
+/// use oauth2_passkey::{get_user_from_session, SessionCookie};
 ///
 /// async fn get_username(session_id: &str) -> Option<String> {
-///     match get_user_from_session(session_id).await {
+///     let session_cookie = SessionCookie::new(session_id.to_string()).ok()?;
+///     match get_user_from_session(&session_cookie).await {
 ///         Ok(user) => Some(user.account),
 ///         Err(_) => None
 ///     }
 /// }
 /// ```
-#[tracing::instrument(fields(session_cookie = %session_cookie, user_id))]
-pub async fn get_user_from_session(session_cookie: &str) -> Result<SessionUser, SessionError> {
+#[tracing::instrument(fields(session_cookie = %session_cookie.as_str(), user_id))]
+pub async fn get_user_from_session(
+    session_cookie: &crate::session::types::SessionCookie,
+) -> Result<SessionUser, SessionError> {
     tracing::debug!("Retrieving user from session");
-    let cached_session = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get("session", session_cookie)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
-        .ok_or(SessionError::SessionError)?;
-
-    let stored_session: StoredSession = cached_session.try_into()?;
+    let stored_session = get_data::<StoredSession, SessionError>(
+        CachePrefix::session(),
+        CacheKey::new(session_cookie.as_str().to_string())
+            .map_err(SessionError::convert_storage_error)?,
+    )
+    .await?
+    .ok_or(SessionError::SessionError)?;
 
     let user = UserStore::get_user(&stored_session.user_id)
         .await
@@ -244,12 +239,15 @@ async fn is_authenticated(
     };
 
     // Use atomic get-and-delete-if-expired to prevent race conditions and ensure expired sessions are rejected
+    let cache_key =
+        CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?;
+
     let stored_session: StoredSession = match GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_and_delete_if_expired("session", session_id)
+        .get_and_delete_if_expired(CachePrefix::session(), cache_key)
         .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
+        .map_err(SessionError::convert_storage_error)?
     {
         Some(fresh_session_data) => {
             // Session exists and is not expired
@@ -576,32 +574,33 @@ pub async fn is_authenticated_basic_then_user_and_csrf(
 ///
 /// # Example
 /// ```no_run
-/// use oauth2_passkey::get_csrf_token_from_session;
+/// use oauth2_passkey::{get_csrf_token_from_session, SessionCookie};
 ///
 /// async fn get_token_for_form(session_id: &str) -> Option<String> {
-///     match get_csrf_token_from_session(session_id).await {
+///     let session_cookie = SessionCookie::new(session_id.to_string()).ok()?;
+///     match get_csrf_token_from_session(&session_cookie).await {
 ///         Ok(csrf_token) => Some(csrf_token.as_str().to_string()),
 ///         Err(_) => None
 ///     }
 /// }
 /// ```
-#[tracing::instrument(fields(session_id = %session_id))]
-pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, SessionError> {
+#[tracing::instrument(fields(session_cookie = %session_cookie.as_str()))]
+pub async fn get_csrf_token_from_session(
+    session_cookie: &crate::session::types::SessionCookie,
+) -> Result<CsrfToken, SessionError> {
     tracing::debug!("Retrieving CSRF token from session");
-    let cached_session = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get("session", session_id)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
-        .ok_or(SessionError::SessionError)?;
-
-    let stored_session: StoredSession = cached_session.try_into()?;
+    let stored_session = get_data::<StoredSession, SessionError>(
+        CachePrefix::session(),
+        CacheKey::new(session_cookie.as_str().to_string())
+            .map_err(SessionError::convert_storage_error)?,
+    )
+    .await?
+    .ok_or(SessionError::SessionError)?;
 
     // Check if session is expired
     if stored_session.expires_at < Utc::now() {
         tracing::debug!("Session expired at {}", stored_session.expires_at);
-        delete_session_from_store_by_session_id(session_id).await?;
+        delete_session_from_store_by_session_id(session_cookie.as_str()).await?;
         return Err(SessionError::SessionExpiredError);
     }
 
@@ -623,32 +622,31 @@ pub async fn get_csrf_token_from_session(session_id: &str) -> Result<CsrfToken, 
 ///
 /// # Example
 /// ```no_run
-/// use oauth2_passkey::get_user_and_csrf_token_from_session;
+/// use oauth2_passkey::{get_user_and_csrf_token_from_session, SessionCookie};
 ///
 /// async fn get_user_and_token(session_id: &str) -> Option<(String, String)> {
-///     match get_user_and_csrf_token_from_session(session_id).await {
+///     let session_cookie = SessionCookie::new(session_id.to_string()).ok()?;
+///     match get_user_and_csrf_token_from_session(&session_cookie).await {
 ///         Ok((user, csrf_token)) => Some((user.account, csrf_token.as_str().to_string())),
 ///         Err(_) => None
 ///     }
 /// }
 /// ```
 pub async fn get_user_and_csrf_token_from_session(
-    session_id: &str,
+    session_cookie: &crate::session::types::SessionCookie,
 ) -> Result<(SessionUser, CsrfToken), SessionError> {
-    let cached_session = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get("session", session_id)
-        .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
-        .ok_or(SessionError::SessionError)?;
-
-    let stored_session: StoredSession = cached_session.try_into()?;
+    let stored_session = get_data::<StoredSession, SessionError>(
+        CachePrefix::session(),
+        CacheKey::new(session_cookie.as_str().to_string())
+            .map_err(SessionError::convert_storage_error)?,
+    )
+    .await?
+    .ok_or(SessionError::SessionError)?;
 
     // Check if session is expired
     if stored_session.expires_at < Utc::now() {
         tracing::debug!("Session expired at {}", stored_session.expires_at);
-        delete_session_from_store_by_session_id(session_id).await?;
+        delete_session_from_store_by_session_id(session_cookie.as_str()).await?;
         return Err(SessionError::SessionExpiredError);
     }
 
@@ -828,15 +826,18 @@ mod tests {
         };
 
         // Store the session in the global cache store
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(cache_prefix, cache_key, cache_data, 3600)
             .await
             .unwrap();
 
         // Test getting CSRF token using global store
-        let result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
 
         assert!(result.is_ok());
         let token = result.unwrap();
@@ -857,7 +858,8 @@ mod tests {
         let session_id = "nonexistent_session";
 
         // Test getting CSRF token for nonexistent session using global store
-        let result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -895,15 +897,18 @@ mod tests {
         };
 
         // Store the session in the global cache store
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(cache_prefix, cache_key, cache_data, 3600)
             .await
             .unwrap();
 
         // Test the function using global store
-        let result = get_user_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_user_from_session(&session_cookie).await;
 
         // The function will fail at the UserStore::get_user call since the user doesn't exist
         assert!(result.is_err());
@@ -927,7 +932,8 @@ mod tests {
         let session_id = "nonexistent_session";
 
         // Test getting user for nonexistent session using global store
-        let result = get_user_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_user_from_session(&session_cookie).await;
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -977,7 +983,10 @@ mod tests {
         let session_result = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await;
 
         assert!(session_result.is_ok());
@@ -1022,7 +1031,12 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
@@ -1036,7 +1050,10 @@ mod tests {
         let verify_result = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await;
 
         assert!(verify_result.is_ok());
@@ -1074,7 +1091,12 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
@@ -1188,7 +1210,12 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
@@ -1211,7 +1238,10 @@ mod tests {
         let verify_result = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await;
         assert!(verify_result.is_ok());
         assert!(verify_result.unwrap().is_none()); // Session should be deleted
@@ -1248,7 +1278,12 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
@@ -1303,7 +1338,12 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
@@ -1358,12 +1398,18 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
         // Test getting user and CSRF token using global store
-        let result = get_user_and_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_user_and_csrf_token_from_session(&session_cookie).await;
 
         // With .env_test providing SQLite in-memory database, this should succeed
         // if the user exists in the database, or fail gracefully if the user doesn't exist
@@ -1398,7 +1444,8 @@ mod tests {
         let nonexistent_session_id = "nonexistent_session_combined";
 
         // Test getting user and CSRF token for nonexistent session using global store
-        let result = get_user_and_csrf_token_from_session(nonexistent_session_id).await;
+        let session_cookie = crate::SessionCookie::new(nonexistent_session_id.to_string()).unwrap();
+        let result = get_user_and_csrf_token_from_session(&session_cookie).await;
 
         // Should fail because session doesn't exist
         assert!(result.is_err());
@@ -1442,12 +1489,18 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
         // Attempt to get user and CSRF token
-        let result = get_user_and_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_user_and_csrf_token_from_session(&session_cookie).await;
 
         // Should return an error for expired session
         assert!(result.is_err());
@@ -1460,7 +1513,10 @@ mod tests {
         let cached_session = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await
             .unwrap();
         assert!(cached_session.is_none()); // Expired session should be deleted
@@ -1503,11 +1559,17 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
-        let result = get_user_and_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_user_and_csrf_token_from_session(&session_cookie).await;
 
         // Should return an error due to UserStore not being implemented
         assert!(result.is_err());
@@ -1516,7 +1578,10 @@ mod tests {
         let cached_session = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await
             .unwrap();
         assert!(cached_session.is_some());
@@ -1565,7 +1630,10 @@ mod tests {
         let cached_session = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await
             .unwrap();
 
@@ -1629,12 +1697,18 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
         // Test CSRF token retrieval
-        let csrf_result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let csrf_result = get_csrf_token_from_session(&session_cookie).await;
         assert!(csrf_result.is_ok());
 
         let csrf_token = csrf_result.unwrap();
@@ -1644,7 +1718,10 @@ mod tests {
         let cached_session = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await
             .unwrap();
         assert!(cached_session.is_some());
@@ -1688,7 +1765,12 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
@@ -1759,7 +1841,12 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
@@ -1767,7 +1854,10 @@ mod tests {
         let cached_session_before = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await
             .unwrap();
         assert!(cached_session_before.is_some());
@@ -1780,7 +1870,10 @@ mod tests {
         let cached_session_after = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await
             .unwrap();
         assert!(cached_session_after.is_none());
@@ -1807,7 +1900,8 @@ mod tests {
         init_test_environment().await;
 
         // Test retrieving CSRF token from non-existent session
-        let result = get_csrf_token_from_session("non_existent_session").await;
+        let session_cookie = crate::SessionCookie::new("non_existent_session".to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
         assert!(result.is_err());
 
         match result {
@@ -1854,7 +1948,12 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
@@ -1862,7 +1961,10 @@ mod tests {
         let cached_session_before = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await
             .unwrap();
         assert!(cached_session_before.is_some());
@@ -1879,7 +1981,10 @@ mod tests {
         let cached_session_after = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await
             .unwrap();
         assert!(cached_session_after.is_none());
@@ -1923,7 +2028,12 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
@@ -1992,7 +2102,12 @@ mod tests {
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+                cache_data,
+                3600,
+            )
             .await
             .unwrap();
 
@@ -2000,7 +2115,10 @@ mod tests {
         let cached_session_before = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await
             .unwrap();
         assert!(cached_session_before.is_some());
@@ -2035,7 +2153,10 @@ mod tests {
         let cached_session_after = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(
+                CachePrefix::session(),
+                CacheKey::new(session_id.to_string()).unwrap(),
+            )
             .await
             .unwrap();
         assert!(cached_session_after.is_none());
@@ -2074,7 +2195,8 @@ mod tests {
         assert!(user.is_ok());
 
         // Now test getting the user from session
-        let user_result = get_user_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let user_result = get_user_from_session(&session_cookie).await;
 
         // Should succeed now that we have added the user to the database
         assert!(user_result.is_ok());

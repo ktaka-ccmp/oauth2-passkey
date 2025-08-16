@@ -1,4 +1,5 @@
 use crate::session::SessionError;
+use crate::storage::{CacheErrorConversion, StorageError};
 use crate::utils::UtilError;
 use thiserror::Error;
 
@@ -81,6 +82,12 @@ pub enum OAuth2Error {
     /// Error from OIDC discovery operations
     #[error("OIDC discovery error: {0}")]
     Discovery(#[from] super::discovery::OidcDiscoveryError),
+}
+
+impl CacheErrorConversion<OAuth2Error> for OAuth2Error {
+    fn convert_storage_error(error: StorageError) -> OAuth2Error {
+        OAuth2Error::Storage(error.to_string())
+    }
 }
 
 #[cfg(test)]

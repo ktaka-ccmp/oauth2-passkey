@@ -15,7 +15,8 @@ use super::types::{
     AllowCredential, AuthenticationOptions, AuthenticatorData, AuthenticatorResponse,
     ParsedClientData,
 };
-use super::utils::{name2cid_str_vec, store_in_cache};
+use super::utils::name2cid_str_vec;
+use crate::storage::{CacheErrorConversion, CacheKey, CachePrefix, store_cache_keyed};
 
 pub(crate) async fn start_authentication(
     username: Option<String>,
@@ -54,11 +55,13 @@ pub(crate) async fn start_authentication(
         ttl: *PASSKEY_CHALLENGE_TIMEOUT as u64,
     };
 
-    store_in_cache(
-        "auth_challenge",
-        &auth_id,
+    let cache_prefix = CachePrefix::auth_challenge();
+    let cache_key = CacheKey::new(auth_id.clone()).map_err(PasskeyError::convert_storage_error)?;
+    store_cache_keyed::<_, PasskeyError>(
+        cache_prefix,
+        cache_key,
         stored_options,
-        *PASSKEY_CHALLENGE_TIMEOUT as usize,
+        (*PASSKEY_CHALLENGE_TIMEOUT).into(),
     )
     .await?;
 
@@ -85,7 +88,10 @@ pub(crate) async fn finish_authentication(
     );
 
     // Get stored challenge and verify auth
-    let stored_options = get_and_validate_options("auth_challenge", &auth_response.auth_id).await?;
+    let challenge_type = crate::passkey::types::ChallengeType::authentication();
+    let challenge_id = crate::passkey::types::ChallengeId::new(auth_response.auth_id.clone())
+        .map_err(|e| PasskeyError::Challenge(format!("Invalid auth ID: {e}")))?;
+    let stored_options = get_and_validate_options(&challenge_type, &challenge_id).await?;
 
     tracing::debug!(
         "Parsing client data: {}",
@@ -156,7 +162,10 @@ pub(crate) async fn finish_authentication(
     PasskeyStore::update_credential_last_used_at(&auth_response.id, Utc::now()).await?;
 
     // Remove challenge from cache
-    remove_options("auth_challenge", &auth_response.auth_id).await?;
+    let cache_prefix = CachePrefix::auth_challenge();
+    let cache_key = CacheKey::new(auth_response.auth_id.clone())
+        .map_err(PasskeyError::convert_storage_error)?;
+    remove_options(cache_prefix, cache_key).await?;
     let user_name = stored_credential.user.name.clone();
     let user_id = stored_credential.user_id.clone();
 
@@ -308,6 +317,7 @@ async fn verify_signature(
 mod tests {
     use super::*;
     use crate::passkey::main::types;
+    use crate::storage::{CacheKey, CachePrefix};
     use crate::test_utils::init_test_environment;
 
     // Create a module alias for our test utils
@@ -1036,16 +1046,20 @@ mod tests {
 
         // Verify that a challenge was stored in cache
         let auth_id = options.auth_id;
+        let cache_prefix = CachePrefix::new("authentication".to_string()).unwrap();
+        let cache_key = CacheKey::new(auth_id.clone()).unwrap();
         let cache_get = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("auth_challenge", &auth_id)
+            .get(cache_prefix, cache_key)
             .await;
         assert!(cache_get.is_ok());
         assert!(cache_get.unwrap().is_some(), "Challenge should be in cache");
 
         // Clean up
-        let remove_cache = passkey_test_utils::remove_from_cache("auth_challenge", &auth_id).await;
+        let cache_prefix = CachePrefix::new("authentication".to_string()).unwrap();
+        let cache_key = CacheKey::new(auth_id.clone()).unwrap();
+        let remove_cache = passkey_test_utils::remove_from_cache(cache_prefix, cache_key).await;
         assert!(remove_cache.is_ok(), "Failed to clean up cache");
 
         let remove_credential = passkey_test_utils::cleanup_test_credential(credential_id).await;

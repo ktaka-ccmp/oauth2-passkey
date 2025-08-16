@@ -6,7 +6,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 use crate::oauth2::config::get_jwks_url;
-use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+use crate::storage::{
+    CacheData, CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE, StorageError,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Jwks {
@@ -89,6 +91,14 @@ pub enum TokenVerificationError {
     JwksFetch(String),
     #[error("OIDC Discovery error: {0}")]
     OidcDiscovery(#[from] crate::oauth2::discovery::OidcDiscoveryError),
+    #[error("Storage error: {0}")]
+    Storage(String),
+}
+
+impl CacheErrorConversion<TokenVerificationError> for TokenVerificationError {
+    fn convert_storage_error(error: StorageError) -> TokenVerificationError {
+        TokenVerificationError::Storage(error.to_string())
+    }
 }
 
 const CACHE_MODE: &str = "cached";
@@ -134,14 +144,16 @@ impl TryFrom<CacheData> for JwksCache {
 }
 
 async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
-    // Try to get from cache first
-    let prefix = "jwks";
-    let cache_key = jwks_url;
+    // Create cache keys once for the entire function with earliest possible conversion
+    let cache_prefix = CachePrefix::jwks();
+    let cache_key = CacheKey::new(jwks_url.to_string())
+        .map_err(TokenVerificationError::convert_storage_error)?;
 
+    // Try to get from cache first
     if let Some(cached) = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get(prefix, cache_key)
+        .get(cache_prefix.clone(), cache_key.clone())
         .await
         .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?
     {
@@ -157,7 +169,7 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .remove(prefix, cache_key)
+            .remove(cache_prefix.clone(), cache_key.clone())
             .await
             .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?;
     }
@@ -177,9 +189,8 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
     GENERIC_CACHE_STORE
         .lock()
         .await
-        // .put(prefix, cache_key, jwks_cache.into())
         .put_with_ttl(
-            prefix,
+            cache_prefix,
             cache_key,
             jwks_cache.into(),
             CACHE_EXPIRATION.as_secs() as usize,

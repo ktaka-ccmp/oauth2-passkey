@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use crate::storage::{CacheErrorConversion, StorageError};
 use crate::userdb::UserError;
 use crate::utils::UtilError;
 
@@ -48,4 +49,10 @@ pub enum SessionError {
     /// Error from user database operations
     #[error("User error: {0}")]
     User(#[from] UserError),
+}
+
+impl CacheErrorConversion<SessionError> for SessionError {
+    fn convert_storage_error(error: StorageError) -> SessionError {
+        SessionError::Storage(error.to_string())
+    }
 }

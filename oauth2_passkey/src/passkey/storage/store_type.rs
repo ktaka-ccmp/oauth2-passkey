@@ -246,7 +246,7 @@ mod tests {
 
         // Cleanup
         let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-            credential_id.to_string(),
+            crate::passkey::CredentialId::new(credential_id.to_string()),
         ))
         .await;
         let _ = UserStore::delete_user(user_id).await;
@@ -300,9 +300,10 @@ mod tests {
         let _ = PasskeyStore::store_credential("cred_002".to_string(), credential2).await;
 
         // Get credentials by user ID
-        let result =
-            PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_string()))
-                .await;
+        let result = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
+            crate::session::UserId::new(user_id.to_string()),
+        ))
+        .await;
         assert!(
             result.is_ok(),
             "Failed to get credentials by user ID: {:?}",
@@ -324,9 +325,10 @@ mod tests {
         assert!(credential_ids.contains(&"cred_002".to_string()));
 
         // Cleanup
-        let _ =
-            PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.to_string()))
-                .await;
+        let _ = PasskeyStore::delete_credential_by(CredentialSearchField::UserId(
+            crate::session::UserId::new(user_id.to_string()),
+        ))
+        .await;
         let _ = UserStore::delete_user(user_id).await;
     }
 
@@ -357,7 +359,7 @@ mod tests {
 
         // Get by user handle
         let result = PasskeyStore::get_credentials_by(CredentialSearchField::UserHandle(
-            user_handle.to_string(),
+            crate::passkey::UserHandle::new(user_handle.to_string()),
         ))
         .await;
         assert!(
@@ -376,7 +378,7 @@ mod tests {
 
         // Cleanup
         let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-            "cred_handle_test".to_string(),
+            crate::passkey::CredentialId::new("cred_handle_test".to_string()),
         ))
         .await;
         let _ = UserStore::delete_user(user_id).await;
@@ -411,9 +413,10 @@ mod tests {
                 .await;
 
         // Get by username
-        let result =
-            PasskeyStore::get_credentials_by(CredentialSearchField::UserName(username.to_string()))
-                .await;
+        let result = PasskeyStore::get_credentials_by(CredentialSearchField::UserName(
+            crate::passkey::UserName::new(username.to_string()),
+        ))
+        .await;
         assert!(
             result.is_ok(),
             "Failed to get credentials by username: {:?}",
@@ -430,7 +433,7 @@ mod tests {
 
         // Cleanup
         let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-            "cred_username_test".to_string(),
+            crate::passkey::CredentialId::new("cred_username_test".to_string()),
         ))
         .await;
         let _ = UserStore::delete_user(user_id).await;
@@ -482,7 +485,7 @@ mod tests {
 
         // Cleanup
         let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-            credential_id.to_string(),
+            crate::passkey::CredentialId::new(credential_id.to_string()),
         ))
         .await;
         let _ = UserStore::delete_user(user_id).await;
@@ -533,7 +536,7 @@ mod tests {
 
         // Cleanup
         let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-            credential_id.to_string(),
+            crate::passkey::CredentialId::new(credential_id.to_string()),
         ))
         .await;
         let _ = UserStore::delete_user(user_id).await;
@@ -594,7 +597,7 @@ mod tests {
 
         // Cleanup
         let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-            credential_id.to_string(),
+            crate::passkey::CredentialId::new(credential_id.to_string()),
         ))
         .await;
         let _ = UserStore::delete_user(user_id).await;
@@ -634,10 +637,11 @@ mod tests {
         );
 
         // Delete credential
-        let delete_result = PasskeyStore::delete_credential_by(
-            CredentialSearchField::CredentialId(credential_id.to_string()),
-        )
-        .await;
+        let delete_result =
+            PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
+                crate::passkey::CredentialId::new(credential_id.to_string()),
+            ))
+            .await;
         assert!(
             delete_result.is_ok(),
             "Failed to delete credential: {:?}",
@@ -683,10 +687,11 @@ mod tests {
         let _ = PasskeyStore::store_credential("cred_del_002".to_string(), credential2).await;
 
         // Verify they exist
-        let get_result =
-            PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_string()))
-                .await
-                .unwrap();
+        let get_result = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
+            crate::session::UserId::new(user_id.to_string()),
+        ))
+        .await
+        .unwrap();
         assert_eq!(
             get_result.len(),
             2,
@@ -694,9 +699,10 @@ mod tests {
         );
 
         // Delete all credentials for user
-        let delete_result =
-            PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.to_string()))
-                .await;
+        let delete_result = PasskeyStore::delete_credential_by(CredentialSearchField::UserId(
+            crate::session::UserId::new(user_id.to_string()),
+        ))
+        .await;
         assert!(
             delete_result.is_ok(),
             "Failed to delete credentials by user ID: {:?}",
@@ -704,10 +710,11 @@ mod tests {
         );
 
         // Verify they're gone
-        let get_result_after =
-            PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_string()))
-                .await
-                .unwrap();
+        let get_result_after = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
+            crate::session::UserId::new(user_id.to_string()),
+        ))
+        .await
+        .unwrap();
         assert_eq!(
             get_result_after.len(),
             0,
@@ -750,14 +757,16 @@ mod tests {
         let _ = PasskeyStore::store_credential("cred_iso_002".to_string(), credential2).await;
 
         // Get credentials by different search fields
-        let creds_user1 =
-            PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id_1.to_string()))
-                .await
-                .unwrap();
-        let creds_user2 =
-            PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id_2.to_string()))
-                .await
-                .unwrap();
+        let creds_user1 = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
+            crate::session::UserId::new(user_id_1.to_string()),
+        ))
+        .await
+        .unwrap();
+        let creds_user2 = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
+            crate::session::UserId::new(user_id_2.to_string()),
+        ))
+        .await
+        .unwrap();
 
         // Verify isolation
         assert_eq!(
@@ -775,11 +784,11 @@ mod tests {
 
         // Cleanup
         let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-            "cred_iso_001".to_string(),
+            crate::passkey::CredentialId::new("cred_iso_001".to_string()),
         ))
         .await;
         let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-            "cred_iso_002".to_string(),
+            crate::passkey::CredentialId::new("cred_iso_002".to_string()),
         ))
         .await;
         let _ = UserStore::delete_user(user_id_1).await;
@@ -828,10 +837,11 @@ mod tests {
                     );
 
                     // Clean up
-                    let _ = PasskeyStore::delete_credential_by(
-                        CredentialSearchField::CredentialId(credential_id),
-                    )
-                    .await;
+                    let _ =
+                        PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
+                            crate::passkey::CredentialId::new(credential_id),
+                        ))
+                        .await;
                     let _ = UserStore::delete_user(&user_id).await;
                 })
             })

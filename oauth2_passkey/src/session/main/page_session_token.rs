@@ -11,7 +11,7 @@ use sha2::Sha256;
 
 use crate::{
     session::{config::AUTH_SERVER_SECRET, errors::SessionError, types::StoredSession},
-    storage::GENERIC_CACHE_STORE,
+    storage::{CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE},
 };
 
 use super::session::get_session_id_from_headers;
@@ -32,10 +32,11 @@ type HmacSha256 = Hmac<Sha256>;
 ///
 /// # Example
 /// ```no_run
-/// use oauth2_passkey::{get_csrf_token_from_session, generate_page_session_token};
+/// use oauth2_passkey::{get_csrf_token_from_session, generate_page_session_token, SessionCookie};
 ///
 /// async fn create_secure_link(session_id: &str) -> Option<String> {
-///     match get_csrf_token_from_session(session_id).await {
+///     let session_cookie = SessionCookie::new(session_id.to_string()).ok()?;
+///     match get_csrf_token_from_session(&session_cookie).await {
 ///         Ok(csrf_token) => {
 ///             let page_token = generate_page_session_token(csrf_token.as_str());
 ///             Some(format!("/secure-page?token={}", page_token))
@@ -91,9 +92,12 @@ pub async fn verify_page_session_token(
     let cached_session = GENERIC_CACHE_STORE
         .lock()
         .await
-        .get("session", session_id)
+        .get(
+            CachePrefix::session(),
+            CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?,
+        )
         .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?
+        .map_err(SessionError::convert_storage_error)?
         .ok_or(SessionError::SessionError)?;
 
     let stored_session: StoredSession = cached_session.try_into()?;
@@ -241,10 +245,12 @@ mod tests {
         };
 
         // Store the session in the global cache store
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(cache_prefix, cache_key, cache_data, 3600)
             .await
             .unwrap();
 
@@ -294,10 +300,12 @@ mod tests {
         };
 
         // Store the session in the global cache store
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(cache_prefix, cache_key, cache_data, 3600)
             .await
             .unwrap();
 
@@ -352,10 +360,12 @@ mod tests {
         };
 
         // Store the session in the global cache store
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put_with_ttl("session", session_id, cache_data, 3600)
+            .put_with_ttl(cache_prefix, cache_key, cache_data, 3600)
             .await
             .unwrap();
 
