@@ -1,4 +1,4 @@
-use crate::oauth2::{AccountSearchField, OAuth2Store};
+use crate::oauth2::{AccountSearchField, OAuth2Store, ProviderUserId};
 use crate::passkey::{CredentialId, CredentialSearchField, PasskeyStore};
 use crate::userdb::{User, UserStore};
 
@@ -35,7 +35,7 @@ use crate::session::{SessionId, User as SessionUser, UserId, get_user_from_sessi
 /// ```
 pub async fn get_all_users(session_id: SessionId) -> Result<Vec<User>, CoordinationError> {
     // Validate admin session with fresh database lookup
-    let _admin_user = validate_admin_session(session_id.as_str()).await?;
+    let _admin_user = validate_admin_session(session_id).await?;
 
     UserStore::get_all_users()
         .await
@@ -77,9 +77,9 @@ pub async fn get_user(
     user_id: UserId,
 ) -> Result<Option<User>, CoordinationError> {
     // Validate admin session with fresh database lookup
-    let _admin_user = validate_admin_session(session_id.as_str()).await?;
+    let _admin_user = validate_admin_session(session_id).await?;
 
-    UserStore::get_user(user_id.as_str())
+    UserStore::get_user(user_id)
         .await
         .map_err(|e| CoordinationError::Database(e.to_string()))
 }
@@ -116,7 +116,7 @@ pub async fn delete_passkey_credential_admin(
     credential_id: CredentialId,
 ) -> Result<(), CoordinationError> {
     // Validate admin session with fresh database lookup
-    let admin_user = validate_admin_session(session_id.as_str()).await?;
+    let admin_user = validate_admin_session(session_id).await?;
 
     tracing::debug!(
         "Admin user: {} is deleting credential with ID: {}",
@@ -172,34 +172,34 @@ pub async fn delete_passkey_credential_admin(
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::{delete_oauth2_account_admin, SessionId};
+/// use oauth2_passkey::{delete_oauth2_account_admin, SessionId, ProviderUserId};
 ///
 /// async fn remove_oauth2_account(session_id: &str, provider_id: &str) -> bool {
-///     delete_oauth2_account_admin(SessionId::new(session_id.to_string()), provider_id.to_string()).await.is_ok()
+///     delete_oauth2_account_admin(SessionId::new(session_id.to_string()), ProviderUserId::new(provider_id.to_string())).await.is_ok()
 /// }
 /// ```
 pub async fn delete_oauth2_account_admin(
     session_id: SessionId,
-    provider_user_id: String,
+    provider_user_id: ProviderUserId,
 ) -> Result<(), CoordinationError> {
     // Validate admin session with fresh database lookup
-    let admin_user = validate_admin_session(session_id.as_str()).await?;
+    let admin_user = validate_admin_session(session_id).await?;
 
     tracing::debug!(
         "Admin user: {} is deleting OAuth2 account with ID: {}",
         admin_user.id,
-        &provider_user_id
+        provider_user_id.as_str()
     );
 
     // Delete the OAuth2 account
     OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::ProviderUserId(
-        crate::oauth2::ProviderUserId::new(provider_user_id.clone()),
+        provider_user_id.clone(),
     ))
     .await?;
 
     tracing::info!(
         "Successfully deleted OAuth2 account {} for user {}",
-        &provider_user_id,
+        provider_user_id.as_str(),
         admin_user.id
     );
     Ok(())
@@ -237,17 +237,15 @@ pub async fn delete_user_account_admin(
     user_id: UserId,
 ) -> Result<(), CoordinationError> {
     // Validate admin session with fresh database lookup
-    let _admin_user = validate_admin_session(session_id.as_str()).await?;
+    let _admin_user = validate_admin_session(session_id).await?;
     // Check if the user exists
-    let user = UserStore::get_user(user_id.as_str())
-        .await?
-        .ok_or_else(|| {
-            CoordinationError::ResourceNotFound {
-                resource_type: "User".to_string(),
-                resource_id: user_id.as_str().to_string(),
-            }
-            .log()
-        })?;
+    let user = UserStore::get_user(user_id.clone()).await?.ok_or_else(|| {
+        CoordinationError::ResourceNotFound {
+            resource_type: "User".to_string(),
+            resource_id: user_id.as_str().to_string(),
+        }
+        .log()
+    })?;
 
     tracing::debug!("Deleting user account: {:#?}", user);
 
@@ -258,7 +256,7 @@ pub async fn delete_user_account_admin(
     PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.clone())).await?;
 
     // Finally, delete the user account
-    UserStore::delete_user(user_id.as_str()).await?;
+    UserStore::delete_user(user_id).await?;
 
     Ok(())
 }
@@ -298,18 +296,16 @@ pub async fn update_user_admin_status(
     is_admin: bool,
 ) -> Result<User, CoordinationError> {
     // Validate admin session with fresh database lookup
-    let _admin_user = validate_admin_session(session_id.as_str()).await?;
+    let _admin_user = validate_admin_session(session_id).await?;
 
     // Get the current user
-    let user = UserStore::get_user(user_id.as_str())
-        .await?
-        .ok_or_else(|| {
-            CoordinationError::ResourceNotFound {
-                resource_type: "User".to_string(),
-                resource_id: user_id.as_str().to_string(),
-            }
-            .log()
-        })?;
+    let user = UserStore::get_user(user_id.clone()).await?.ok_or_else(|| {
+        CoordinationError::ResourceNotFound {
+            resource_type: "User".to_string(),
+            resource_id: user_id.as_str().to_string(),
+        }
+        .log()
+    })?;
 
     // Prevent changing admin status of the first user (sequence_number = 1)
     if user.sequence_number == Some(1) {
@@ -334,9 +330,9 @@ pub async fn update_user_admin_status(
 /// This is a private helper function used only within the admin module.
 /// It validates session data using get_user_from_session which already
 /// performs fresh database lookup to ensure current user state.
-async fn validate_admin_session(session_id: &str) -> Result<SessionUser, CoordinationError> {
+async fn validate_admin_session(session_id: SessionId) -> Result<SessionUser, CoordinationError> {
     // Get user from session (this already does fresh database validation)
-    let session_cookie = crate::SessionCookie::new(session_id.to_string())
+    let session_cookie = crate::SessionCookie::new(session_id.as_str().to_string())
         .map_err(|_| CoordinationError::Unauthorized.log())?;
     let session_user = get_user_from_session(&session_cookie)
         .await
@@ -369,12 +365,18 @@ mod tests {
         label: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
         // Create admin user in database
-        insert_test_user(user_id, account, label, true).await?;
+        insert_test_user(UserId::new(user_id.to_string()), account, label, true).await?;
 
         // Create session for the admin user
         let session_id = format!("test-session-{user_id}");
         let csrf_token = "test-csrf-token";
-        insert_test_session(&session_id, user_id, csrf_token, 3600).await?;
+        insert_test_session(
+            SessionId::new(session_id.clone()),
+            UserId::new(user_id.to_string()),
+            csrf_token,
+            3600,
+        )
+        .await?;
 
         Ok(session_id)
     }
@@ -404,10 +406,10 @@ mod tests {
 
     async fn delete_user_if_exists_and_not_first(user_id: &str) -> Result<(), CoordinationError> {
         // Only proceed if the user exists
-        if let Ok(Some(user)) = UserStore::get_user(user_id).await {
+        if let Ok(Some(user)) = UserStore::get_user(UserId::new(user_id.to_string())).await {
             // Only delete if sequence_number is not 1
             if user.sequence_number != Some(1) {
-                UserStore::delete_user(user_id).await?;
+                UserStore::delete_user(UserId::new(user_id.to_string())).await?;
             }
         }
 
@@ -756,7 +758,7 @@ mod tests {
 
         // Create a non-admin user with session
         insert_test_user(
-            &non_admin_user_id,
+            UserId::new(non_admin_user_id.clone()),
             &format!("{non_admin_user_id}@example.com"),
             "Non Admin",
             false,
@@ -766,8 +768,8 @@ mod tests {
 
         let non_admin_session_id = format!("test-session-{non_admin_user_id}");
         insert_test_session(
-            &non_admin_session_id,
-            &non_admin_user_id,
+            SessionId::new(non_admin_session_id.clone()),
+            UserId::new(non_admin_user_id.clone()),
             "csrf-token",
             3600,
         )
@@ -898,7 +900,7 @@ mod tests {
 
         // Create a non-admin user with session
         insert_test_user(
-            &non_admin_user_id,
+            UserId::new(non_admin_user_id.clone()),
             &format!("{non_admin_user_id}@example.com"),
             "Non Admin",
             false,
@@ -908,8 +910,8 @@ mod tests {
 
         let non_admin_session_id = format!("test-session-{non_admin_user_id}");
         insert_test_session(
-            &non_admin_session_id,
-            &non_admin_user_id,
+            SessionId::new(non_admin_session_id.clone()),
+            UserId::new(non_admin_user_id.clone()),
             "csrf-token",
             3600,
         )
@@ -950,7 +952,7 @@ mod tests {
 
         // Create a non-admin user with session
         insert_test_user(
-            &non_admin_user_id,
+            UserId::new(non_admin_user_id.clone()),
             &format!("{non_admin_user_id}@example.com"),
             "Non Admin",
             false,
@@ -960,8 +962,8 @@ mod tests {
 
         let non_admin_session_id = format!("test-session-{non_admin_user_id}");
         insert_test_session(
-            &non_admin_session_id,
-            &non_admin_user_id,
+            SessionId::new(non_admin_session_id.clone()),
+            UserId::new(non_admin_user_id.clone()),
             "csrf-token",
             3600,
         )
@@ -971,7 +973,7 @@ mod tests {
         // Attempt to delete an OAuth2 account (authorization should fail before account lookup)
         let result = delete_oauth2_account_admin(
             SessionId::new(non_admin_session_id.clone()),
-            "provider_user_id".to_string(),
+            ProviderUserId::new("provider_user_id".to_string()),
         )
         .await;
 

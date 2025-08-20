@@ -1,3 +1,4 @@
+use crate::session::UserId;
 use crate::storage::GENERIC_DATA_STORE;
 use crate::userdb::{
     errors::UserError,
@@ -42,9 +43,9 @@ impl UserStore {
     }
 
     /// Get a user by their ID
-    #[tracing::instrument(fields(user_id = %id))]
-    pub(crate) async fn get_user(id: &str) -> Result<Option<User>, UserError> {
-        Self::get_user_by(UserSearchField::Id(id.to_string())).await
+    #[tracing::instrument(fields(user_id = %id.as_str()))]
+    pub(crate) async fn get_user(id: UserId) -> Result<Option<User>, UserError> {
+        Self::get_user_by(UserSearchField::Id(id.as_str().to_string())).await
     }
 
     #[tracing::instrument(fields(user_field = %field))]
@@ -124,7 +125,7 @@ impl UserStore {
         final_result
     }
 
-    pub(crate) async fn delete_user(id: &str) -> Result<(), UserError> {
+    pub(crate) async fn delete_user(id: UserId) -> Result<(), UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {
@@ -203,7 +204,7 @@ mod tests {
         );
 
         // Clean up
-        let _ = UserStore::delete_user(&created_user.id).await;
+        let _ = UserStore::delete_user(UserId::new(created_user.id)).await;
     }
 
     /// Test that the first user created by init_test_environment is an admin
@@ -269,7 +270,7 @@ mod tests {
         assert_eq!(final_user.sequence_number, created_user.sequence_number);
 
         // Clean up
-        let _ = UserStore::delete_user(&final_user.id).await;
+        let _ = UserStore::delete_user(UserId::new(final_user.id)).await;
     }
 
     /// Test UserStore get_user functionality
@@ -294,7 +295,7 @@ mod tests {
             .expect("Failed to create user");
 
         // Test getting an existing user
-        let result = UserStore::get_user(&created_user.id).await;
+        let result = UserStore::get_user(UserId::new(created_user.id.clone())).await;
         assert!(result.is_ok(), "Getting existing user should succeed");
 
         let retrieved_user = result.expect("Getting user should succeed");
@@ -306,7 +307,7 @@ mod tests {
         assert_eq!(user.label, created_user.label);
 
         // Test getting a non-existent user
-        let result = UserStore::get_user("non-existent-user-id").await;
+        let result = UserStore::get_user(UserId::new("non-existent-user-id".to_string())).await;
         assert!(result.is_ok(), "Query for non-existent user should succeed");
         assert!(
             result
@@ -316,7 +317,7 @@ mod tests {
         );
 
         // Clean up
-        let _ = UserStore::delete_user(&created_user.id).await;
+        let _ = UserStore::delete_user(UserId::new(created_user.id)).await;
     }
 
     /// Test UserStore get_all_users functionality
@@ -380,9 +381,9 @@ mod tests {
         );
 
         // Clean up
-        let _ = UserStore::delete_user(&created1.id).await;
-        let _ = UserStore::delete_user(&created2.id).await;
-        let _ = UserStore::delete_user(&created3.id).await;
+        let _ = UserStore::delete_user(UserId::new(created1.id)).await;
+        let _ = UserStore::delete_user(UserId::new(created2.id)).await;
+        let _ = UserStore::delete_user(UserId::new(created3.id)).await;
     }
 
     /// Test UserStore delete_user functionality
@@ -407,23 +408,23 @@ mod tests {
             .expect("Failed to create user");
 
         // Verify user exists
-        let user_before = UserStore::get_user(&created_user.id)
+        let user_before = UserStore::get_user(UserId::new(created_user.id.clone()))
             .await
             .expect("Failed to get user");
         assert!(user_before.is_some(), "User should exist before deletion");
 
         // Delete the user
-        let result = UserStore::delete_user(&created_user.id).await;
+        let result = UserStore::delete_user(UserId::new(created_user.id.clone())).await;
         assert!(result.is_ok(), "Deleting user should succeed");
 
         // Verify user no longer exists
-        let user_after = UserStore::get_user(&created_user.id)
+        let user_after = UserStore::get_user(UserId::new(created_user.id))
             .await
             .expect("Failed to get user after deletion");
         assert!(user_after.is_none(), "User should not exist after deletion");
 
         // Deleting a non-existent user should not error
-        let result = UserStore::delete_user("non-existent-user-id").await;
+        let result = UserStore::delete_user(UserId::new("non-existent-user-id".to_string())).await;
         assert!(result.is_ok(), "Deleting non-existent user should succeed");
     }
 
@@ -442,7 +443,7 @@ mod tests {
             .expect("Failed to initialize UserStore");
 
         // Test with empty string ID (should handle gracefully)
-        let result = UserStore::get_user("").await;
+        let result = UserStore::get_user(UserId::new("".to_string())).await;
         assert!(result.is_ok(), "Empty ID query should not panic");
         assert!(
             result.expect("Empty ID query should succeed").is_none(),
@@ -451,12 +452,12 @@ mod tests {
 
         // Test with very long ID
         let long_id = "a".repeat(1000);
-        let result = UserStore::get_user(&long_id).await;
+        let result = UserStore::get_user(UserId::new(long_id)).await;
         assert!(result.is_ok(), "Long ID query should not panic");
 
         // Test with special characters in ID
         let special_id = "user@#$%^&*()_+-=[]{}|;':\",./<>?";
-        let result = UserStore::get_user(special_id).await;
+        let result = UserStore::get_user(UserId::new(special_id.to_string())).await;
         assert!(
             result.is_ok(),
             "Special character ID query should not panic"
@@ -506,8 +507,8 @@ mod tests {
         );
 
         // Clean up
-        let _ = UserStore::delete_user(&created1.id).await;
-        let _ = UserStore::delete_user(&created2.id).await;
+        let _ = UserStore::delete_user(UserId::new(created1.id)).await;
+        let _ = UserStore::delete_user(UserId::new(created2.id)).await;
     }
 
     /// Test UserStore error handling for non-existent users
@@ -526,7 +527,7 @@ mod tests {
 
         // Test getting a non-existent user
         let nonexistent_id = format!("nonexistent-{}", Utc::now().timestamp_millis());
-        let result = UserStore::get_user(&nonexistent_id).await;
+        let result = UserStore::get_user(UserId::new(nonexistent_id.clone())).await;
 
         // Should return Ok(None), not an error
         assert!(result.is_ok(), "Getting non-existent user should not error");
@@ -540,7 +541,7 @@ mod tests {
         // Note: The current implementation of delete_user doesn't check if the user exists
         // before attempting to delete, so it doesn't return NotFound for non-existent users.
         // This is a potential improvement for the implementation.
-        let result = UserStore::delete_user(&nonexistent_id).await;
+        let result = UserStore::delete_user(UserId::new(nonexistent_id)).await;
         assert!(
             result.is_ok(),
             "Current implementation doesn't check existence before deletion"
@@ -595,7 +596,7 @@ mod tests {
         );
 
         // Clean up
-        let _ = UserStore::delete_user(&created_user.id).await;
+        let _ = UserStore::delete_user(UserId::new(created_user.id)).await;
     }
 
     /// Test UserStore admin user operations
@@ -691,8 +692,8 @@ mod tests {
         );
 
         // Clean up
-        let _ = UserStore::delete_user(&created_first.id).await;
-        let _ = UserStore::delete_user(&created_admin.id).await;
-        let _ = UserStore::delete_user(&created_regular.id).await;
+        let _ = UserStore::delete_user(UserId::new(created_first.id)).await;
+        let _ = UserStore::delete_user(UserId::new(created_admin.id)).await;
+        let _ = UserStore::delete_user(UserId::new(created_regular.id)).await;
     }
 }

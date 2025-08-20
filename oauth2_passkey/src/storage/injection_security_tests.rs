@@ -29,12 +29,18 @@ mod tests {
         label: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
         // Create admin user in database
-        insert_test_user(user_id, account, label, true).await?;
+        insert_test_user(UserId::new(user_id.to_string()), account, label, true).await?;
 
         // Create session for the admin user
         let session_id = format!("test-session-{user_id}");
         let csrf_token = "test-csrf-token";
-        insert_test_session(&session_id, user_id, csrf_token, 3600).await?;
+        insert_test_session(
+            SessionId::new(session_id.clone()),
+            UserId::new(user_id.to_string()),
+            csrf_token,
+            3600,
+        )
+        .await?;
 
         Ok(session_id)
     }
@@ -65,9 +71,13 @@ mod tests {
 
     // Helper function to cleanup test users (avoid deleting sequence_number 1)
     async fn cleanup_test_user(user_id: &str) {
-        if let Ok(Some(user)) = UserStore::get_user(user_id).await {
+        if let Ok(Some(user)) =
+            UserStore::get_user(crate::session::UserId::new(user_id.to_string())).await
+        {
             if user.sequence_number != Some(1) {
-                UserStore::delete_user(user_id).await.ok();
+                UserStore::delete_user(crate::session::UserId::new(user_id.to_string()))
+                    .await
+                    .ok();
             }
         }
     }
@@ -124,11 +134,14 @@ mod tests {
                 );
 
                 // Clean up
-                UserStore::delete_user(malicious_id).await.ok();
+                UserStore::delete_user(crate::session::UserId::new(malicious_id.to_string()))
+                    .await
+                    .ok();
             }
 
             // Test get operation with injection attempt
-            let get_result = UserStore::get_user(malicious_id).await;
+            let get_result =
+                UserStore::get_user(crate::session::UserId::new(malicious_id.to_string())).await;
             assert!(
                 get_result.is_ok(),
                 "Get user operation should not fail due to SQL injection: {malicious_id}"
@@ -185,7 +198,9 @@ mod tests {
                 );
 
                 // Clean up
-                UserStore::delete_user(&test_user_id).await.ok();
+                UserStore::delete_user(crate::session::UserId::new(test_user_id.clone()))
+                    .await
+                    .ok();
             }
         }
 
@@ -217,7 +232,9 @@ mod tests {
                 );
 
                 // Clean up
-                UserStore::delete_user(&test_user_id).await.ok();
+                UserStore::delete_user(crate::session::UserId::new(test_user_id.clone()))
+                    .await
+                    .ok();
             }
         }
 
@@ -484,7 +501,9 @@ mod tests {
             }
 
             // Clean up
-            UserStore::delete_user(malicious_user_id).await.ok();
+            UserStore::delete_user(crate::session::UserId::new(malicious_user_id.to_string()))
+                .await
+                .ok();
         }
 
         // Test case 2: Store user with malicious data in database, then fetch all users
@@ -516,7 +535,9 @@ mod tests {
             }
 
             // Clean up
-            UserStore::delete_user(&cache_to_db_user_id).await.ok();
+            UserStore::delete_user(crate::session::UserId::new(cache_to_db_user_id.clone()))
+                .await
+                .ok();
         }
 
         // Test case 3: Cache-to-database injection scenario
@@ -571,7 +592,9 @@ mod tests {
                     );
 
                     // Clean up
-                    UserStore::delete_user(&stored_user.id).await.ok();
+                    UserStore::delete_user(crate::session::UserId::new(stored_user.id.clone()))
+                        .await
+                        .ok();
                 }
             }
 

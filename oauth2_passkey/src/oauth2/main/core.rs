@@ -10,7 +10,7 @@ use crate::oauth2::config::{
     OAUTH2_QUERY_STRING, OAUTH2_REDIRECT_URI, OAUTH2_RESPONSE_MODE, get_auth_url,
 };
 use crate::oauth2::errors::OAuth2Error;
-use crate::oauth2::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken};
+use crate::oauth2::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken, TokenType};
 use crate::session::get_session_id_from_headers;
 use crate::utils::base64url_encode;
 
@@ -79,9 +79,11 @@ async fn prepare_oauth2_auth_request_with_params(
         .to_string();
 
     let (csrf_token, csrf_id) =
-        generate_store_token("csrf", ttl, expires_at, Some(user_agent)).await?;
-    let (nonce_token, nonce_id) = generate_store_token("nonce", ttl, expires_at, None).await?;
-    let (pkce_token, pkce_id) = generate_store_token("pkce", ttl, expires_at, None).await?;
+        generate_store_token(TokenType::Csrf, ttl, expires_at, Some(user_agent)).await?;
+    let (nonce_token, nonce_id) =
+        generate_store_token(TokenType::Nonce, ttl, expires_at, None).await?;
+    let (pkce_token, pkce_id) =
+        generate_store_token(TokenType::Pkce, ttl, expires_at, None).await?;
 
     let misc_id = if let Some(session_id) = get_session_id_from_headers(&headers)? {
         tracing::info!("Session ID found: {}", session_id);

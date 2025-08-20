@@ -1,5 +1,6 @@
 use crate::oauth2::errors::OAuth2Error;
-use crate::oauth2::types::{AccountSearchField, OAuth2Account};
+use crate::oauth2::types::{AccountSearchField, OAuth2Account, Provider, ProviderUserId};
+use crate::session::UserId;
 use crate::storage::GENERIC_DATA_STORE;
 
 use super::postgres::*;
@@ -62,23 +63,15 @@ impl OAuth2Store {
 
     /// Get all OAuth2 accounts for a user
     pub(crate) async fn get_oauth2_accounts(
-        user_id: &str,
+        user_id: UserId,
     ) -> Result<Vec<OAuth2Account>, OAuth2Error> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {
-            get_oauth2_accounts_by_field_sqlite(
-                pool,
-                &AccountSearchField::UserId(crate::session::UserId::new(user_id.to_string())),
-            )
-            .await
+            get_oauth2_accounts_by_field_sqlite(pool, &AccountSearchField::UserId(user_id)).await
             // get_oauth2_accounts_sqlite(pool, user_id).await
         } else if let Some(pool) = store.as_postgres() {
-            get_oauth2_accounts_by_field_postgres(
-                pool,
-                &AccountSearchField::UserId(crate::session::UserId::new(user_id.to_string())),
-            )
-            .await
+            get_oauth2_accounts_by_field_postgres(pool, &AccountSearchField::UserId(user_id)).await
             // get_oauth2_accounts_postgres(pool, user_id).await
         } else {
             Err(OAuth2Error::Storage(
@@ -104,8 +97,8 @@ impl OAuth2Store {
 
     /// Get OAuth2 account by provider and provider_user_id
     pub(crate) async fn get_oauth2_account_by_provider(
-        provider: &str,
-        provider_user_id: &str,
+        provider: Provider,
+        provider_user_id: ProviderUserId,
     ) -> Result<Option<OAuth2Account>, OAuth2Error> {
         let store = GENERIC_DATA_STORE.lock().await;
 
@@ -440,7 +433,9 @@ mod tests {
         let inserted2 = OAuth2Store::upsert_oauth2_account(account2).await.unwrap();
 
         // Retrieve accounts
-        let accounts = OAuth2Store::get_oauth2_accounts(&user_id).await.unwrap();
+        let accounts = OAuth2Store::get_oauth2_accounts(UserId::new(user_id.to_string()))
+            .await
+            .unwrap();
 
         assert_eq!(accounts.len(), 2, "Should have 2 accounts for the user");
 
@@ -623,9 +618,12 @@ mod tests {
         let inserted_account = create_test_user_and_account(&user_id, "google", &provider_id).await;
 
         // Find by provider and provider_user_id
-        let found_account = OAuth2Store::get_oauth2_account_by_provider("google", &provider_id)
-            .await
-            .unwrap();
+        let found_account = OAuth2Store::get_oauth2_account_by_provider(
+            Provider::new("google".to_string()),
+            ProviderUserId::new(provider_id.clone()),
+        )
+        .await
+        .unwrap();
 
         assert!(found_account.is_some(), "Should find the account");
         let found_account = found_account.unwrap();
@@ -634,9 +632,12 @@ mod tests {
         assert_eq!(found_account.provider_user_id, provider_id);
 
         // Try to find non-existent account
-        let not_found = OAuth2Store::get_oauth2_account_by_provider("google", "nonexistent")
-            .await
-            .unwrap();
+        let not_found = OAuth2Store::get_oauth2_account_by_provider(
+            Provider::new("google".to_string()),
+            ProviderUserId::new("nonexistent".to_string()),
+        )
+        .await
+        .unwrap();
         assert!(not_found.is_none(), "Should not find non-existent account");
 
         // Clean up
@@ -723,7 +724,9 @@ mod tests {
         let _inserted2 = OAuth2Store::upsert_oauth2_account(account2).await.unwrap();
 
         // Verify accounts exist
-        let accounts_before = OAuth2Store::get_oauth2_accounts(&user_id).await.unwrap();
+        let accounts_before = OAuth2Store::get_oauth2_accounts(UserId::new(user_id.to_string()))
+            .await
+            .unwrap();
         assert_eq!(
             accounts_before.len(),
             2,
@@ -738,7 +741,9 @@ mod tests {
         .unwrap();
 
         // Verify accounts are deleted
-        let accounts_after = OAuth2Store::get_oauth2_accounts(&user_id).await.unwrap();
+        let accounts_after = OAuth2Store::get_oauth2_accounts(UserId::new(user_id.to_string()))
+            .await
+            .unwrap();
         assert_eq!(accounts_after.len(), 0, "All accounts should be deleted");
     }
 
@@ -755,9 +760,10 @@ mod tests {
         init_test_environment().await;
 
         // Try to get accounts for non-existent user
-        let accounts = OAuth2Store::get_oauth2_accounts("nonexistent_user")
-            .await
-            .unwrap();
+        let accounts =
+            OAuth2Store::get_oauth2_accounts(UserId::new("nonexistent_user".to_string()))
+                .await
+                .unwrap();
         assert_eq!(
             accounts.len(),
             0,

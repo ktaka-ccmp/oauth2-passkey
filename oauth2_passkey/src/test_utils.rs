@@ -10,6 +10,9 @@
 
 use std::sync::Once;
 
+use crate::passkey::CredentialId;
+use crate::session::UserId;
+
 /// Centralized test initialization for all tests across the entire crate
 ///
 /// This function ensures that:
@@ -193,7 +196,7 @@ async fn ensure_first_user_has_oauth2_account(user_id: &str) {
     use crate::oauth2::OAuth2Store;
 
     // Check if first user already has OAuth2 accounts
-    match OAuth2Store::get_oauth2_accounts(user_id).await {
+    match OAuth2Store::get_oauth2_accounts(UserId::new(user_id.to_string())).await {
         Ok(accounts) if accounts.is_empty() => {
             // No OAuth2 accounts exist for first user, create one
             println!("ℹ️ First user exists but has no OAuth2 account, creating one...");
@@ -245,7 +248,7 @@ async fn create_first_user_passkey_credential(user_id: &str) {
     };
 
     match PasskeyStore::store_credential(
-        "first-user-test-passkey-credential".to_string(),
+        CredentialId::new("first-user-test-passkey-credential".to_string()),
         test_passkey_credential,
     )
     .await

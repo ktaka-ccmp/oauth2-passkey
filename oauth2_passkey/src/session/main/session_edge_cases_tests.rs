@@ -6,7 +6,7 @@ mod edge_cases {
     use super::super::test_utils::*;
     use crate::SESSION_COOKIE_NAME;
     use crate::session::errors::SessionError;
-    use crate::session::types::StoredSession;
+    use crate::session::types::{SessionId, StoredSession, UserId};
     use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
     use crate::test_utils::init_test_environment;
     use chrono::{Duration, Utc};
@@ -110,7 +110,7 @@ mod edge_cases {
         }
 
         // Clean up
-        let _ = delete_test_session(session_id).await;
+        let _ = delete_test_session(SessionId::new(session_id.to_string())).await;
     }
 
     /// Test missing fields in session data
@@ -151,7 +151,7 @@ mod edge_cases {
         }
 
         // Clean up
-        let _ = delete_test_session(session_id).await;
+        let _ = delete_test_session(SessionId::new(session_id.to_string())).await;
     }
 
     /// Test is_authenticated with CSRF protection - POST with missing CSRF token
@@ -170,11 +170,11 @@ mod edge_cases {
         let session_id = "session_missing_csrf";
 
         let _ = create_test_user_and_session(
-            user_id,
+            UserId::new(user_id.to_string()),
             "missing_csrf@example.com",
             "Missing CSRF",
             false,
-            session_id,
+            SessionId::new(session_id.to_string()),
             csrf_token,
             3600,
         )
@@ -199,7 +199,11 @@ mod edge_cases {
         }
 
         // Clean up
-        let _ = cleanup_test_resources(user_id, session_id).await;
+        let _ = cleanup_test_resources(
+            UserId::new(user_id.to_string()),
+            SessionId::new(session_id.to_string()),
+        )
+        .await;
     }
 
     /// Test is_authenticated_strict_then_csrf
@@ -219,11 +223,11 @@ mod edge_cases {
         let session_id = "session_strict_csrf";
 
         let _ = create_test_user_and_session(
-            user_id,
+            UserId::new(user_id.to_string()),
             "strict_csrf@example.com",
             "Strict CSRF Test",
             false,
-            session_id,
+            SessionId::new(session_id.to_string()),
             csrf_token,
             3600,
         )
@@ -264,7 +268,11 @@ mod edge_cases {
         }
 
         // Clean up
-        let _ = cleanup_test_resources(user_id, session_id).await;
+        let _ = cleanup_test_resources(
+            UserId::new(user_id.to_string()),
+            SessionId::new(session_id.to_string()),
+        )
+        .await;
     }
 
     /// Test is_authenticated_basic_then_user_and_csrf
@@ -286,7 +294,13 @@ mod edge_cases {
         let session_id = "basic_user_csrf_session";
 
         let _ = create_test_user_and_session(
-            user_id, account, label, false, session_id, csrf_token, 3600,
+            UserId::new(user_id.to_string()),
+            account,
+            label,
+            false,
+            SessionId::new(session_id.to_string()),
+            csrf_token,
+            3600,
         )
         .await;
 
@@ -312,6 +326,10 @@ mod edge_cases {
         assert!(csrf_header_verified.0);
 
         // Clean up
-        let _ = cleanup_test_resources(user_id, session_id).await;
+        let _ = cleanup_test_resources(
+            UserId::new(user_id.to_string()),
+            SessionId::new(session_id.to_string()),
+        )
+        .await;
     }
 }

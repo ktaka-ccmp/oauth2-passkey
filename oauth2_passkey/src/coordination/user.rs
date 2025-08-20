@@ -1,4 +1,6 @@
 use crate::oauth2::{AccountSearchField, OAuth2Store};
+#[cfg(test)]
+use crate::passkey::CredentialId;
 use crate::passkey::{CredentialSearchField, PasskeyStore};
 use crate::userdb::{User as DbUser, UserStore};
 
@@ -109,15 +111,13 @@ pub async fn delete_user_account(
         DbUser::from(session_user)
     } else {
         // Admin deleting another user: fetch target user
-        UserStore::get_user(user_id.as_str())
-            .await?
-            .ok_or_else(|| {
-                CoordinationError::ResourceNotFound {
-                    resource_type: "User".to_string(),
-                    resource_id: user_id.as_str().to_string(),
-                }
-                .log()
-            })?
+        UserStore::get_user(user_id.clone()).await?.ok_or_else(|| {
+            CoordinationError::ResourceNotFound {
+                resource_type: "User".to_string(),
+                resource_id: user_id.as_str().to_string(),
+            }
+            .log()
+        })?
     };
 
     tracing::debug!("Deleting user account: {:#?}", user);
@@ -137,7 +137,7 @@ pub async fn delete_user_account(
     PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.clone())).await?;
 
     // Finally, delete the user account
-    UserStore::delete_user(user_id.as_str()).await?;
+    UserStore::delete_user(user_id).await?;
 
     // Returns a list of deleted passkey credential IDs for client-side notification
     Ok(credential_ids)
@@ -151,7 +151,7 @@ pub(super) async fn gen_new_user_id() -> Result<String, CoordinationError> {
         // let id = crate::utils::gen_random_string(32)?;
 
         // Check if a user with this ID already exists
-        match UserStore::get_user(&id).await {
+        match UserStore::get_user(UserId::new(id.clone())).await {
             Ok(None) => return Ok(id), // ID is unique, return it
             Ok(Some(_)) => continue,   // ID exists, try again
             Err(e) => {
@@ -255,12 +255,22 @@ mod tests {
         let session_id = "test-session-user";
 
         // 1. Create user and session using test utilities
-        insert_test_user(user_id, "old-account", "Old Label", false)
-            .await
-            .expect("Failed to create test user");
-        insert_test_session(session_id, user_id, "test-csrf", 3600)
-            .await
-            .expect("Failed to create test session");
+        insert_test_user(
+            UserId::new(user_id.to_string()),
+            "old-account",
+            "Old Label",
+            false,
+        )
+        .await
+        .expect("Failed to create test user");
+        insert_test_session(
+            SessionId::new(session_id.to_string()),
+            UserId::new(user_id.to_string()),
+            "test-csrf",
+            3600,
+        )
+        .await
+        .expect("Failed to create test session");
 
         // 2. Call the actual function from the parent module
         let result = super::update_user_account(
@@ -283,7 +293,7 @@ mod tests {
         assert_eq!(updated_user_from_func.label, "New Label");
 
         // 4. Verify directly from DB for extra confidence
-        let user_from_db = UserStore::get_user(user_id)
+        let user_from_db = UserStore::get_user(UserId::new(user_id.to_string()))
             .await
             .expect("DB error getting user")
             .expect("User not found in DB after update");
@@ -307,16 +317,21 @@ mod tests {
 
         // Create a session user (who will try to update a non-existent user)
         insert_test_user(
-            session_user_id,
+            UserId::new(session_user_id.to_string()),
             "session@example.com",
             "Session User",
             false,
         )
         .await
         .expect("Failed to create session user");
-        insert_test_session(session_id, session_user_id, "test-csrf", 3600)
-            .await
-            .expect("Failed to create session");
+        insert_test_session(
+            SessionId::new(session_id.to_string()),
+            UserId::new(session_user_id.to_string()),
+            "test-csrf",
+            3600,
+        )
+        .await
+        .expect("Failed to create session");
 
         // Call the actual function with a non-existent target user
         let result = super::update_user_account(
@@ -379,12 +394,18 @@ mod tests {
             create_test_credential(&format!("credential-1-{timestamp}"), &user_id_to_delete);
         let cred2 =
             create_test_credential(&format!("credential-2-{timestamp}"), &user_id_to_delete);
-        PasskeyStore::store_credential(cred1.credential_id.clone(), cred1.clone())
-            .await
-            .expect("Failed to store cred1");
-        PasskeyStore::store_credential(cred2.credential_id.clone(), cred2.clone())
-            .await
-            .expect("Failed to store cred2");
+        PasskeyStore::store_credential(
+            CredentialId::new(cred1.credential_id.clone()),
+            cred1.clone(),
+        )
+        .await
+        .expect("Failed to store cred1");
+        PasskeyStore::store_credential(
+            CredentialId::new(cred2.credential_id.clone()),
+            cred2.clone(),
+        )
+        .await
+        .expect("Failed to store cred2");
 
         // 3. Create OAuth2 accounts
         let oauth_acc1 = create_test_oauth2_account(
@@ -408,9 +429,14 @@ mod tests {
 
         // Create session for the user (user deleting their own account)
         let session_id = format!("test-session-{timestamp}");
-        insert_test_session(&session_id, &user_id_to_delete, "test-csrf", 3600)
-            .await
-            .expect("Failed to create session");
+        insert_test_session(
+            SessionId::new(session_id.clone()),
+            UserId::new(user_id_to_delete.clone()),
+            "test-csrf",
+            3600,
+        )
+        .await
+        .expect("Failed to create session");
 
         // 4. Call the actual function
         let result = super::delete_user_account(
@@ -436,7 +462,7 @@ mod tests {
         assert_eq!(returned_credential_ids, expected_sorted);
 
         // 6. Verify user is deleted
-        let user_from_db = UserStore::get_user(&user_id_to_delete)
+        let user_from_db = UserStore::get_user(UserId::new(user_id_to_delete.clone()))
             .await
             .expect("DB error getting user");
         assert!(user_from_db.is_none(), "User was not deleted from DB");
@@ -480,16 +506,21 @@ mod tests {
 
         // Create a session user (who will try to delete a non-existent user)
         insert_test_user(
-            session_user_id,
+            UserId::new(session_user_id.to_string()),
             "session@example.com",
             "Session User",
             false,
         )
         .await
         .expect("Failed to create session user");
-        insert_test_session(session_id, session_user_id, "test-csrf", 3600)
-            .await
-            .expect("Failed to create session");
+        insert_test_session(
+            SessionId::new(session_id.to_string()),
+            UserId::new(session_user_id.to_string()),
+            "test-csrf",
+            3600,
+        )
+        .await
+        .expect("Failed to create session");
 
         let result = super::delete_user_account(
             SessionId::new(session_id.to_string()),
@@ -538,7 +569,7 @@ mod tests {
         assert!(!generated_id.is_empty(), "Generated ID is empty");
 
         // Verify the ID is indeed not in the DB (gen_new_user_id should ensure this)
-        let user_from_db = UserStore::get_user(&generated_id)
+        let user_from_db = UserStore::get_user(UserId::new(generated_id.clone()))
             .await
             .expect("DB error checking generated ID");
         assert!(
@@ -640,9 +671,15 @@ mod tests {
         }
 
         // Clean up
-        UserStore::delete_user(&test_user1.id).await.ok();
-        UserStore::delete_user(&test_user2.id).await.ok();
-        UserStore::delete_user(&test_user3.id).await.ok();
+        UserStore::delete_user(UserId::new(test_user1.id))
+            .await
+            .ok();
+        UserStore::delete_user(UserId::new(test_user2.id))
+            .await
+            .ok();
+        UserStore::delete_user(UserId::new(test_user3.id))
+            .await
+            .ok();
     }
 
     // Helper function to mock UUID generation with fixed values
@@ -658,7 +695,7 @@ mod tests {
             let id = uuids[uuid_index].to_string();
 
             // Check if a user with this ID already exists
-            match UserStore::get_user(&id).await {
+            match UserStore::get_user(UserId::new(id.clone())).await {
                 Ok(None) => return Ok(id), // ID is unique, return it
                 Ok(Some(_)) => continue,   // ID exists, try again
                 Err(e) => {

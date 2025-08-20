@@ -15,6 +15,7 @@
 mod tests {
     use crate::session::config::SESSION_COOKIE_NAME;
     use crate::session::main::session::*;
+    use crate::session::types::{SessionId, UserId};
     use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
     use crate::test_utils::init_test_environment;
     use chrono::{Duration, Utc};
@@ -95,7 +96,8 @@ mod tests {
 
         // Create multiple sessions to check for uniqueness
         for i in 0..100 {
-            let headers_result = create_new_session_with_uid(&format!("{user_id}_{i}")).await;
+            let headers_result =
+                create_new_session_with_uid(UserId::new(format!("{user_id}_{i}"))).await;
             assert!(headers_result.is_ok(), "Session creation should succeed");
 
             let headers = headers_result.unwrap();
@@ -326,7 +328,8 @@ mod tests {
         );
 
         // Test case 2: Invalidate the session
-        let delete_result = delete_session_from_store_by_session_id(session_id).await;
+        let delete_result =
+            delete_session_from_store_by_session_id(SessionId::new(session_id.to_string())).await;
         assert!(delete_result.is_ok(), "Session deletion should succeed");
 
         // Test case 3: Session should be invalid after invalidation
@@ -355,7 +358,8 @@ mod tests {
         );
 
         // Test case 5: Multiple invalidation attempts should be safe
-        let delete_result_2 = delete_session_from_store_by_session_id(session_id).await;
+        let delete_result_2 =
+            delete_session_from_store_by_session_id(SessionId::new(session_id.to_string())).await;
         assert!(
             delete_result_2.is_ok(),
             "Multiple deletion attempts should not error"
@@ -697,7 +701,8 @@ mod tests {
         for i in 0..5 {
             let session_id = session_id.to_string();
             let handle = tokio::spawn(async move {
-                let result = delete_session_from_store_by_session_id(&session_id).await;
+                let result =
+                    delete_session_from_store_by_session_id(SessionId::new(session_id)).await;
                 (format!("delete_{i}"), result)
             });
             deletion_handles.push(handle);

@@ -5,10 +5,10 @@ use std::str::FromStr;
 use std::time::Duration;
 use url::Url;
 
-use crate::oauth2::{OAuth2Error, OAuth2Mode, StateParams, StoredToken};
+use crate::oauth2::{OAuth2Error, OAuth2Mode, StateParams, StoredToken, TokenType};
 
 use crate::session::{
-    User as SessionUser, delete_session_from_store_by_session_id, get_user_from_session,
+    SessionId, User as SessionUser, delete_session_from_store_by_session_id, get_user_from_session,
 };
 use crate::storage::{
     CacheErrorConversion, CacheKey, CachePrefix, get_data, remove_data, store_cache_auto,
@@ -44,7 +44,7 @@ pub(crate) fn decode_state(
 }
 
 pub(super) async fn generate_store_token(
-    token_type: &str,
+    token_type: TokenType,
     ttl: u64,
     expires_at: DateTime<Utc>,
     user_agent: Option<String>,
@@ -184,7 +184,7 @@ pub(crate) async fn delete_session_and_misc_token_from_store(
             return Ok(());
         };
 
-        delete_session_from_store_by_session_id(&token.token)
+        delete_session_from_store_by_session_id(SessionId::new(token.token))
             .await
             .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
@@ -647,7 +647,7 @@ mod tests {
         use crate::test_utils::init_test_environment;
         init_test_environment().await;
 
-        let token_type = "test_generate";
+        let token_type = TokenType::Csrf;
         let ttl = 600; // 10 minutes
         let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
         let user_agent = Some("test-generate-agent".to_string());
@@ -701,7 +701,7 @@ mod tests {
         use crate::test_utils::init_test_environment;
         init_test_environment().await;
 
-        let token_type = "test_randomness";
+        let token_type = TokenType::Nonce;
         let ttl = 300;
         let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
         let user_agent = None;
@@ -1447,21 +1447,17 @@ mod tests {
         use crate::test_utils::init_test_environment;
         init_test_environment().await;
 
-        let token_type = "test_consistency";
+        let token_type = TokenType::Pkce;
         let ttl = 600;
         let expires_at = Utc::now() + chrono::Duration::seconds(ttl as i64);
         let user_agent = Some("consistency-test-agent".to_string());
 
         // Generate multiple tokens and verify consistency
-        for i in 0..10 {
-            let (token, token_id) = generate_store_token(
-                &format!("{token_type}-{i}"),
-                ttl,
-                expires_at,
-                user_agent.clone(),
-            )
-            .await
-            .unwrap();
+        for _i in 0..10 {
+            let (token, token_id) =
+                generate_store_token(token_type, ttl, expires_at, user_agent.clone())
+                    .await
+                    .unwrap();
 
             // Verify token characteristics
             assert_eq!(token.len(), 43, "Generated token should be 43 characters");
@@ -1473,7 +1469,7 @@ mod tests {
             assert_ne!(token, token_id, "Token and token ID should be different");
 
             // Verify storage and retrieval
-            let cache_prefix = CachePrefix::new(format!("{token_type}-{i}")).unwrap();
+            let cache_prefix = CachePrefix::new(token_type.to_string()).unwrap();
             let cache_key = CacheKey::new(token_id.clone()).unwrap();
             let retrieved = get_data::<StoredToken, OAuth2Error>(cache_prefix, cache_key)
                 .await

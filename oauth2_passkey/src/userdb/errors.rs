@@ -118,7 +118,10 @@ mod tests {
         init_test_environment().await;
 
         // Try to get a user that doesn't exist
-        let result = UserStore::get_user("nonexistent_user_id").await;
+        let result = UserStore::get_user(crate::session::UserId::new(
+            "nonexistent_user_id".to_string(),
+        ))
+        .await;
 
         // This should succeed with None, not error
         assert!(result.is_ok());
@@ -130,7 +133,7 @@ mod tests {
 
         // Now let's create a function that expects the user to exist
         async fn get_existing_user(id: &str) -> Result<crate::userdb::User, UserError> {
-            match UserStore::get_user(id).await? {
+            match UserStore::get_user(crate::session::UserId::new(id.to_string())).await? {
                 Some(user) => Ok(user),
                 None => Err(UserError::NotFound),
             }

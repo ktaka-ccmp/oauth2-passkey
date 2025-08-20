@@ -204,8 +204,8 @@ async fn process_oauth2_authorization(
 
     // Check if the OAuth2 account exists
     let existing_account = OAuth2Store::get_oauth2_account_by_provider(
-        &oauth2_account.provider,
-        &oauth2_account.provider_user_id,
+        Provider::new(oauth2_account.provider.clone()),
+        ProviderUserId::new(oauth2_account.provider_user_id.clone()),
     )
     .await?;
 
@@ -315,7 +315,7 @@ async fn process_oauth2_authorization(
     tracing::Span::current().record("user_id", &user_id);
     tracing::info!(user_id = %user_id, "OAuth2 authorization completed successfully");
 
-    let mut headers = new_session_header(user_id).await?;
+    let mut headers = new_session_header(UserId::new(user_id)).await?;
 
     let _ = header_set_cookie(
         &mut headers,
@@ -460,7 +460,7 @@ pub async fn delete_oauth2_account_core(
 #[tracing::instrument(fields(user_id))]
 pub async fn list_accounts_core(user_id: UserId) -> Result<Vec<OAuth2Account>, CoordinationError> {
     tracing::debug!("Listing OAuth2 accounts for user");
-    let accounts = OAuth2Store::get_oauth2_accounts(user_id.as_str()).await?;
+    let accounts = OAuth2Store::get_oauth2_accounts(user_id).await?;
     tracing::info!(account_count = accounts.len(), "Retrieved OAuth2 accounts");
     Ok(accounts)
 }

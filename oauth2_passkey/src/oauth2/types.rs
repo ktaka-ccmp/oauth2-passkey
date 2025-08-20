@@ -495,6 +495,40 @@ impl OAuth2State {
     }
 }
 
+/// Type-safe wrapper for OAuth2 token types.
+///
+/// This enum provides compile-time safety to prevent mixing up different types of OAuth2 tokens.
+/// It ensures that token types are clearly defined and prevents typos in token type strings.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TokenType {
+    /// CSRF protection token for OAuth2 authorization flow
+    Csrf,
+    /// Nonce token for OpenID Connect
+    Nonce,
+    /// PKCE (Proof Key for Code Exchange) verifier token
+    Pkce,
+}
+
+impl std::fmt::Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl TokenType {
+    /// Returns the token type as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the token type name
+    pub fn as_str(&self) -> &str {
+        match self {
+            TokenType::Csrf => "csrf",
+            TokenType::Nonce => "nonce",
+            TokenType::Pkce => "pkce",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

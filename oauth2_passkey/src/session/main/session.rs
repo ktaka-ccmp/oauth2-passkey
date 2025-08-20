@@ -7,7 +7,8 @@ use subtle::ConstantTimeEq;
 use crate::session::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
 use crate::session::errors::SessionError;
 use crate::session::types::{
-    AuthenticationStatus, CsrfHeaderVerified, CsrfToken, StoredSession, User as SessionUser, UserId,
+    AuthenticationStatus, CsrfHeaderVerified, CsrfToken, SessionId, StoredSession,
+    User as SessionUser, UserId,
 };
 use crate::userdb::UserStore;
 use crate::utils::{gen_random_string_with_entropy_validation, header_set_cookie};
@@ -38,14 +39,16 @@ pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderM
     Ok(headers)
 }
 
-#[tracing::instrument(fields(user_id, session_id))]
-pub(super) async fn create_new_session_with_uid(user_id: &str) -> Result<HeaderMap, SessionError> {
+#[tracing::instrument(fields(user_id = %user_id.as_str(), session_id))]
+pub(super) async fn create_new_session_with_uid(
+    user_id: UserId,
+) -> Result<HeaderMap, SessionError> {
     tracing::info!("Creating new session for user");
     let expires_at = Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64);
     let csrf_token = gen_random_string_with_entropy_validation(32)?;
 
     let stored_session = StoredSession {
-        user_id: user_id.to_string(),
+        user_id: user_id.as_str().to_string(),
         csrf_token: csrf_token.to_string(),
         expires_at,
         ttl: *SESSION_COOKIE_MAX_AGE,
@@ -90,11 +93,12 @@ async fn delete_session_from_store(
 }
 
 pub(crate) async fn delete_session_from_store_by_session_id(
-    session_id: &str,
+    session_id: SessionId,
 ) -> Result<(), SessionError> {
     remove_data::<SessionError>(
         CachePrefix::session(),
-        CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?,
+        CacheKey::new(session_id.as_str().to_string())
+            .map_err(SessionError::convert_storage_error)?,
     )
     .await?;
     Ok(())
@@ -139,7 +143,7 @@ pub async fn get_user_from_session(
     .await?
     .ok_or(SessionError::SessionError)?;
 
-    let user = UserStore::get_user(&stored_session.user_id)
+    let user = UserStore::get_user(UserId::new(stored_session.user_id.clone()))
         .await
         .map_err(|_| SessionError::SessionError)?
         .ok_or(SessionError::SessionError)?;
@@ -339,7 +343,7 @@ async fn is_authenticated(
     }
 
     if verify_user_exists {
-        let user_exists = UserStore::get_user(&stored_session.user_id)
+        let user_exists = UserStore::get_user(UserId::new(stored_session.user_id.clone()))
             .await
             .map_err(|e| {
                 tracing::error!("Error checking user existence: {}", e);
@@ -549,7 +553,7 @@ pub async fn is_authenticated_basic_then_user_and_csrf(
     match is_authenticated(headers, method, false).await? {
         (AuthenticationStatus(true), Some(user_id), Some(csrf_token), csrf_via_header_verified) => {
             // Retrieve the user details from the database
-            let user = UserStore::get_user(user_id.as_str()).await?;
+            let user = UserStore::get_user(user_id).await?;
             if let Some(user) = user {
                 Ok((user.into(), csrf_token, csrf_via_header_verified))
             } else {
@@ -600,7 +604,10 @@ pub async fn get_csrf_token_from_session(
     // Check if session is expired
     if stored_session.expires_at < Utc::now() {
         tracing::debug!("Session expired at {}", stored_session.expires_at);
-        delete_session_from_store_by_session_id(session_cookie.as_str()).await?;
+        delete_session_from_store_by_session_id(SessionId::new(
+            session_cookie.as_str().to_string(),
+        ))
+        .await?;
         return Err(SessionError::SessionExpiredError);
     }
 
@@ -646,11 +653,14 @@ pub async fn get_user_and_csrf_token_from_session(
     // Check if session is expired
     if stored_session.expires_at < Utc::now() {
         tracing::debug!("Session expired at {}", stored_session.expires_at);
-        delete_session_from_store_by_session_id(session_cookie.as_str()).await?;
+        delete_session_from_store_by_session_id(SessionId::new(
+            session_cookie.as_str().to_string(),
+        ))
+        .await?;
         return Err(SessionError::SessionExpiredError);
     }
 
-    let user = UserStore::get_user(&stored_session.user_id)
+    let user = UserStore::get_user(UserId::new(stored_session.user_id.clone()))
         .await
         .map_err(|e| {
             tracing::error!("Error checking user existence: {}", e);
@@ -667,6 +677,7 @@ pub async fn get_user_and_csrf_token_from_session(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::session::types::SessionId;
     use crate::test_utils::init_test_environment;
     use headers::HeaderMapExt;
     use http::header::{HeaderMap, HeaderValue};
@@ -956,7 +967,7 @@ mod tests {
         let user_id = "test_user_123";
 
         // Create a new session using global store
-        let result = create_new_session_with_uid(user_id).await;
+        let result = create_new_session_with_uid(UserId::new(user_id.to_string())).await;
 
         // Should succeed and return headers with cookie
         assert!(result.is_ok());
@@ -1041,7 +1052,8 @@ mod tests {
             .unwrap();
 
         // Delete the session by session ID using global store
-        let delete_result = delete_session_from_store_by_session_id(session_id).await;
+        let delete_result =
+            delete_session_from_store_by_session_id(SessionId::new(session_id.to_string())).await;
 
         // Deletion should succeed
         assert!(delete_result.is_ok());
@@ -1608,7 +1620,7 @@ mod tests {
         let user_id = "test_user_session_creation";
 
         // Create a new session
-        let result = create_new_session_with_uid(user_id).await;
+        let result = create_new_session_with_uid(UserId::new(user_id.to_string())).await;
         assert!(result.is_ok());
 
         let headers = result.unwrap();
@@ -1863,7 +1875,8 @@ mod tests {
         assert!(cached_session_before.is_some());
 
         // Delete the session
-        let delete_result = delete_session_from_store_by_session_id(session_id).await;
+        let delete_result =
+            delete_session_from_store_by_session_id(SessionId::new(session_id.to_string())).await;
         assert!(delete_result.is_ok());
 
         // Verify session was actually removed from cache
@@ -1879,8 +1892,10 @@ mod tests {
         assert!(cached_session_after.is_none());
 
         // Test deleting non-existent session (should not error)
-        let delete_nonexistent =
-            delete_session_from_store_by_session_id("non_existent_session").await;
+        let delete_nonexistent = delete_session_from_store_by_session_id(SessionId::new(
+            "non_existent_session".to_string(),
+        ))
+        .await;
         assert!(delete_nonexistent.is_ok());
     }
 
@@ -2189,7 +2204,13 @@ mod tests {
 
         // Insert test user and session
         let user = create_test_user_and_session(
-            user_id, account, label, is_admin, session_id, csrf_token, ttl,
+            UserId::new(user_id.to_string()),
+            account,
+            label,
+            is_admin,
+            SessionId::new(session_id.to_string()),
+            csrf_token,
+            ttl,
         )
         .await;
         assert!(user.is_ok());
@@ -2209,7 +2230,11 @@ mod tests {
         assert_eq!(session_user.is_admin, is_admin);
 
         // Clean up test resources
-        let _ = cleanup_test_resources(user_id, session_id).await;
+        let _ = cleanup_test_resources(
+            UserId::new(user_id.to_string()),
+            SessionId::new(session_id.to_string()),
+        )
+        .await;
     }
 
     /// Test is_authenticated_strict_requires_database
@@ -2238,7 +2263,13 @@ mod tests {
 
         // Insert test user and session
         let user = create_test_user_and_session(
-            user_id, account, label, is_admin, session_id, csrf_token, ttl,
+            UserId::new(user_id.to_string()),
+            account,
+            label,
+            is_admin,
+            SessionId::new(session_id.to_string()),
+            csrf_token,
+            ttl,
         )
         .await;
         assert!(user.is_ok());
@@ -2259,8 +2290,8 @@ mod tests {
 
         // Create session but don't create the user in database
         let _ = crate::session::main::test_utils::insert_test_session(
-            nonexistent_session_id,
-            nonexistent_user_id,
+            SessionId::new(nonexistent_session_id.to_string()),
+            UserId::new(nonexistent_user_id.to_string()),
             nonexistent_csrf,
             ttl,
         )
@@ -2275,8 +2306,15 @@ mod tests {
         assert!(!auth_result.unwrap().0); // Should NOT be authenticated
 
         // Clean up test resources
-        let _ = cleanup_test_resources(user_id, session_id).await;
-        let _ = crate::session::main::test_utils::delete_test_session(nonexistent_session_id).await;
+        let _ = cleanup_test_resources(
+            UserId::new(user_id.to_string()),
+            SessionId::new(session_id.to_string()),
+        )
+        .await;
+        let _ = crate::session::main::test_utils::delete_test_session(SessionId::new(
+            nonexistent_session_id.to_string(),
+        ))
+        .await;
     }
 
     /// Test get_session_id_from_headers_multiple_cookie_headers

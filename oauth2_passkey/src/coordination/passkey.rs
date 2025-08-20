@@ -134,7 +134,7 @@ pub async fn handle_finish_registration_core(
             match result {
                 Ok((message, stored_user_id)) => {
                     // Create session with the user_id
-                    let headers = new_session_header(stored_user_id).await?;
+                    let headers = new_session_header(UserId::new(stored_user_id)).await?;
 
                     Ok((headers, message))
                 }
@@ -173,7 +173,8 @@ async fn create_user_then_finish_registration(
     let stored_user = UserStore::upsert_user(new_user).await?;
 
     // Step 3: Prepare credential storage (cleanup existing credentials)
-    let credential = prepare_registration_storage(&stored_user.id, validated_data).await?;
+    let credential =
+        prepare_registration_storage(UserId::new(stored_user.id.clone()), validated_data).await?;
 
     // Step 4: Atomic commit (store credential + cleanup challenge)
     let message = commit_registration(credential, &user_handle).await?;
@@ -252,7 +253,7 @@ pub async fn handle_finish_authentication_core(
     tracing::debug!("User ID: {:#?}", uid);
 
     // Create a session for the authenticated user
-    let headers = new_session_header(uid.clone()).await?;
+    let headers = new_session_header(UserId::new(uid.clone())).await?;
 
     Ok((uid, name, headers))
 }
@@ -343,7 +344,7 @@ pub async fn update_passkey_credential_core(
     };
 
     // Get the credential to verify ownership
-    let credential = match PasskeyStore::get_credential(credential_id.as_str()).await? {
+    let credential = match PasskeyStore::get_credential(credential_id.clone()).await? {
         Some(cred) => cred,
         None => {
             return Err(CoordinationError::ResourceNotFound {
@@ -359,10 +360,10 @@ pub async fn update_passkey_credential_core(
     }
 
     // Update the credential in the database
-    PasskeyStore::update_credential(credential_id.as_str(), name, display_name).await?;
+    PasskeyStore::update_credential(credential_id.clone(), name, display_name).await?;
 
     // Get the updated credential
-    let updated_credential = match PasskeyStore::get_credential(credential_id.as_str()).await? {
+    let updated_credential = match PasskeyStore::get_credential(credential_id.clone()).await? {
         Some(cred) => cred,
         None => {
             return Err(CoordinationError::ResourceNotFound {
@@ -431,7 +432,11 @@ mod tests {
             last_used_at: Utc::now(),
         };
 
-        PasskeyStore::store_credential(credential.credential_id.clone(), credential).await?;
+        PasskeyStore::store_credential(
+            CredentialId::new(credential.credential_id.clone()),
+            credential,
+        )
+        .await?;
         Ok(())
     }
 
@@ -523,7 +528,10 @@ mod tests {
         );
 
         // Verify the credential was updated
-        let updated_credential = PasskeyStore::get_credential(credential_id).await?.unwrap();
+        let updated_credential =
+            PasskeyStore::get_credential(CredentialId::new(credential_id.to_string()))
+                .await?
+                .unwrap();
         assert_eq!(
             updated_credential.user.name, new_name,
             "Name was not updated"

@@ -1,7 +1,8 @@
 use chrono::Utc;
 use ciborium::value::{Integer, Value as CborValue};
 
-use crate::session::User as SessionUser;
+use crate::passkey::CredentialId;
+use crate::session::{User as SessionUser, UserId};
 
 use super::aaguid::{AuthenticatorInfo, get_authenticator_info};
 use super::attestation::{extract_aaguid, verify_attestation};
@@ -232,7 +233,7 @@ pub(crate) async fn verify_session_then_finish_registration(
         return Err(PasskeyError::Format("User ID mismatch".to_string()));
     }
 
-    finish_registration(&session_user.id, &reg_data).await?;
+    finish_registration(UserId::new(session_user.id), &reg_data).await?;
 
     Ok("Registration successful".to_string())
 }
@@ -244,7 +245,7 @@ pub(crate) async fn verify_session_then_finish_registration(
 /// 3. Commits the registration (store credential + cleanup challenge)
 ///
 pub(crate) async fn finish_registration(
-    user_id: &str,
+    user_id: UserId,
     reg_data: &RegisterCredential,
 ) -> Result<String, PasskeyError> {
     // Step 1: Pure validation
@@ -337,10 +338,13 @@ pub(crate) async fn validate_registration_challenge(
 ///
 /// This requires user_id and may modify the database (credential cleanup).
 pub(crate) async fn prepare_registration_storage(
-    user_id: &str,
+    user_id: UserId,
     validated_data: ValidatedRegistrationData,
 ) -> Result<PasskeyCredential, PasskeyError> {
-    tracing::debug!("prepare_registration_storage for user_id: {}", user_id);
+    tracing::debug!(
+        "prepare_registration_storage for user_id: {}",
+        user_id.as_str()
+    );
 
     let ValidatedRegistrationData {
         public_key,
@@ -382,7 +386,7 @@ pub(crate) async fn prepare_registration_storage(
 
         // Filter and delete credentials that match user_handle, user_id, and aaguid
         for cred in credentials_with_matching_handle {
-            if cred.aaguid == aaguid && cred.user_id == user_id {
+            if cred.aaguid == aaguid && cred.user_id == user_id.as_str() {
                 match PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
                     crate::passkey::CredentialId::new(cred.credential_id.clone()),
                 ))
@@ -410,7 +414,7 @@ pub(crate) async fn prepare_registration_storage(
     // Create the credential object ready for storage
     let credential = PasskeyCredential {
         credential_id: credential_id.clone(),
-        user_id: user_id.to_string(),
+        user_id: user_id.as_str().to_string(),
         public_key,
         counter: 0,
         user: stored_user,
@@ -440,7 +444,7 @@ pub(crate) async fn commit_registration(
     let credential_id = credential.credential_id.clone();
 
     // Store the credential in the database
-    PasskeyStore::store_credential(credential_id, credential).await?;
+    PasskeyStore::store_credential(CredentialId::new(credential_id), credential).await?;
 
     // Clean up the used challenge (best effort - don't fail registration if this fails)
     if let Ok(cache_key) = CacheKey::new(user_handle.to_string()) {
@@ -729,6 +733,7 @@ async fn verify_client_data(reg_data: &RegisterCredential) -> Result<(), Passkey
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::passkey::CredentialId;
     use crate::passkey::main::types::AuthenticatorAttestationResponse;
     use crate::storage::{CacheKey, CachePrefix};
     use ciborium::value::Value as CborValue;
@@ -1473,7 +1478,10 @@ mod tests {
         assert!(second_handle_result.is_ok());
 
         // Clean up
-        let cleanup_result = passkey_test_utils::cleanup_test_credential(credential_id).await;
+        let cleanup_result = passkey_test_utils::cleanup_test_credential(CredentialId::new(
+            credential_id.to_string(),
+        ))
+        .await;
         assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
     }
 
@@ -1657,7 +1665,10 @@ mod tests {
         );
 
         // Cleanup
-        let cleanup_result = passkey_test_utils::cleanup_test_credential(credential_id).await;
+        let cleanup_result = passkey_test_utils::cleanup_test_credential(CredentialId::new(
+            credential_id.to_string(),
+        ))
+        .await;
         assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
         if let Ok(cache_key) = CacheKey::new(user_handle.to_string()) {
             let cache_prefix = CachePrefix::reg_challenge();
