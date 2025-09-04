@@ -7,13 +7,13 @@ The oauth2-passkey library implements comprehensive type-safe validation through
 The type-safe validation system was implemented to address critical security and consistency issues:
 
 1. **Security Vulnerabilities**: Functions were trusting session data without database validation, enabling privilege escalation attacks
-2. **Backend Inconsistency**: Redis deployments had validation while Memory deployments didn't, creating deployment-specific vulnerabilities  
+2. **Backend Inconsistency**: Redis deployments had validation while Memory deployments didn't, creating deployment-specific vulnerabilities
 3. **Parameter Confusion**: Raw string parameters could be mixed up, leading to authentication logic errors
 
 ## Core Benefits
 
 - ✅ **Compile-time safety**: Impossible to construct invalid values or mix up parameter types
-- ✅ **Single validation point**: Validate once at construction, never again  
+- ✅ **Single validation point**: Validate once at construction, never again
 - ✅ **Consistent behavior**: Same validation rules regardless of backend/deployment
 - ✅ **Defense-in-depth**: Multiple layers of validation protection
 - ✅ **Performance**: Zero runtime overhead after construction
@@ -36,7 +36,7 @@ let session_id = SessionId::new("session_abc123".to_string());
 let users = get_all_users(session_id).await?;
 ```
 
-#### `UserId` 
+#### `UserId`
 Type-safe wrapper for user identifiers to prevent mixing up with other ID types.
 
 ```rust
@@ -69,7 +69,7 @@ let cred_id = CredentialId::new("credential_abc".to_string());
 let result = delete_credential(session_id, cred_id).await?;
 ```
 
-#### `UserHandle` 
+#### `UserHandle`
 Type-safe wrapper for WebAuthn user handles.
 
 ```rust
@@ -204,14 +204,14 @@ use oauth2_passkey::{CredentialSearchField, CredentialId, UserId, UserHandle, Us
 
 // Search by different field types - compile-time type safety
 let by_cred_id = CredentialSearchField::CredentialId(credential_id);
-let by_user_id = CredentialSearchField::UserId(user_id);  
+let by_user_id = CredentialSearchField::UserId(user_id);
 let by_handle = CredentialSearchField::UserHandle(user_handle);
 let by_name = CredentialSearchField::UserName(user_name);
 
 let credentials = PasskeyStore::get_credentials_by(by_user_id).await?;
 ```
 
-### `AccountSearchField` 
+### `AccountSearchField`
 Type-safe search operations for OAuth2 accounts.
 
 ```rust
@@ -264,7 +264,7 @@ get_all_users(session_id: SessionId) -> Result<Vec<User>, CoordinationError>
 get_user(session_id: SessionId, user_id: UserId) -> Result<Option<User>, CoordinationError>
 delete_credential(session_id: SessionId, credential_id: CredentialId) -> Result<(), CoordinationError>
 
-// User functions  
+// User functions
 get_user_credentials(session_id: SessionId, user_id: UserId) -> Result<Vec<PasskeyCredential>, CoordinationError>
 ```
 
@@ -360,11 +360,11 @@ let credentials = PasskeyStore::get_credentials_by(
 
 ### Security Impact
 - **Eliminates privilege escalation attacks** through session validation
-- **Prevents parameter confusion vulnerabilities** 
+- **Prevents parameter confusion vulnerabilities**
 - **Provides consistent security** across all deployment configurations
 - **Defense-in-depth validation** at multiple architectural layers
 
-### Development Benefits  
+### Development Benefits
 - **Compile-time error detection** for authentication logic mistakes
 - **Self-documenting APIs** through descriptive type names
 - **IDE assistance** with auto-completion and type checking
