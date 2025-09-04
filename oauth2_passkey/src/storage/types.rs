@@ -7,7 +7,7 @@ use crate::storage::errors::StorageError;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheData {
     pub value: String,
-    #[serde(default = "default_expires_at")]
+    #[serde(default = "default_expires_at", with = "timestamp_serde")]
     pub expires_at: DateTime<Utc>,
 }
 
@@ -220,6 +220,28 @@ impl CacheKey {
     /// Returns the key as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+/// Custom serde module to serialize DateTime<Utc> as Unix timestamp
+mod timestamp_serde {
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        date.timestamp().serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let timestamp = i64::deserialize(deserializer)?;
+        DateTime::from_timestamp(timestamp, 0)
+            .ok_or_else(|| serde::de::Error::custom("Invalid timestamp"))
     }
 }
 

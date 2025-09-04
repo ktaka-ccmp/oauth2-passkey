@@ -121,8 +121,30 @@ impl CacheStore for RedisCacheStore {
                 return nil
             end
 
-            local data = cjson.decode(value)
+            -- Safe JSON parsing with error handling
+            local data_ok, data = pcall(cjson.decode, value)
+            if not data_ok then
+                -- Invalid JSON, delete the corrupted entry
+                redis.call('DEL', key)
+                return nil
+            end
+
+            -- Check if expires_at field exists
+            if not data.expires_at then
+                -- Missing expires_at, delete the entry
+                redis.call('DEL', key)
+                return nil
+            end
+
+            -- Convert RFC3339 timestamp to Unix timestamp
+            -- Redis doesn't have built-in date parsing, so we need to convert on the Rust side
+            -- For now, we'll pass the expires_at as Unix timestamp from Rust
             local expires_at = tonumber(data.expires_at)
+            if not expires_at then
+                -- Invalid expires_at format, delete the entry
+                redis.call('DEL', key)
+                return nil
+            end
 
             if expires_at < current_time then
                 redis.call('DEL', key)
@@ -133,11 +155,16 @@ impl CacheStore for RedisCacheStore {
         "#;
 
         let current_timestamp = Utc::now().timestamp();
+
         let result: Option<String> = redis::Script::new(lua_script)
             .key(&key)
             .arg(current_timestamp)
             .invoke_async(&mut conn)
-            .await?;
+            .await
+            .map_err(|e| {
+                tracing::error!("Redis Lua script execution failed: {:?}", e);
+                e
+            })?;
 
         match result {
             Some(v) => Ok(Some(serde_json::from_str(&v)?)),
