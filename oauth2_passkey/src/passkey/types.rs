@@ -123,15 +123,52 @@ impl TryFrom<CacheData> for StoredOptions {
 pub struct CredentialId(String);
 
 impl CredentialId {
-    /// Creates a new CredentialId from a string.
+    /// Creates a new CredentialId from a string with validation.
     ///
     /// # Arguments
     /// * `id` - The credential ID string
     ///
     /// # Returns
-    /// * A new CredentialId instance
-    pub fn new(id: String) -> Self {
-        Self(id)
+    /// * `Ok(CredentialId)` - If the ID is valid
+    /// * `Err(PasskeyError)` - If the ID is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only safe characters (alphanumeric + URL-safe symbols)
+    /// * Must not contain control characters or dangerous sequences
+    pub fn new(id: String) -> Result<Self, crate::passkey::PasskeyError> {
+        use crate::passkey::PasskeyError;
+
+        // Validate ID is not empty
+        if id.is_empty() {
+            return Err(PasskeyError::Validation(
+                "Credential ID cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate ID length (credential IDs need sufficient entropy and can be substantial)
+        if id.len() < 10 {
+            return Err(PasskeyError::Validation(
+                "Credential ID too short".to_string(),
+            ));
+        }
+
+        if id.len() > 1024 {
+            return Err(PasskeyError::Validation(
+                "Credential ID too long".to_string(),
+            ));
+        }
+
+        // Validate ID contains only URL-safe characters
+        if !id.chars().all(|c| {
+            c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~' | '=' | '+' | '/')
+        }) {
+            return Err(PasskeyError::Validation(
+                "Credential ID contains invalid characters".to_string(),
+            ));
+        }
+
+        Ok(CredentialId(id))
     }
 
     /// Returns the credential ID as a string slice.
@@ -179,15 +216,49 @@ impl UserHandle {
 pub struct UserName(String);
 
 impl UserName {
-    /// Creates a new UserName from a string.
+    /// Creates a new UserName from a string with validation.
     ///
     /// # Arguments
     /// * `name` - The username string
     ///
     /// # Returns
-    /// * A new UserName instance
-    pub fn new(name: String) -> Self {
-        Self(name)
+    /// * `Ok(UserName)` - If the name is valid
+    /// * `Err(PasskeyError)` - If the name is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must not contain dangerous sequences
+    /// * Must not consist only of whitespace
+    pub fn new(name: String) -> Result<Self, crate::passkey::PasskeyError> {
+        use crate::passkey::PasskeyError;
+
+        // Validate name is not empty
+        if name.is_empty() {
+            return Err(PasskeyError::Validation(
+                "Username cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate name length (WebAuthn username limits)
+        if name.len() > 64 {
+            return Err(PasskeyError::Validation("Username too long".to_string()));
+        }
+
+        // Validate name doesn't consist only of whitespace
+        if name.trim().is_empty() {
+            return Err(PasskeyError::Validation(
+                "Username cannot consist only of whitespace".to_string(),
+            ));
+        }
+
+        // Check for dangerous sequences
+        if name.contains("..") || name.contains("--") || name.contains("__") {
+            return Err(PasskeyError::Validation(
+                "Username contains dangerous character sequences".to_string(),
+            ));
+        }
+
+        Ok(UserName(name))
     }
 
     /// Returns the username as a string slice.

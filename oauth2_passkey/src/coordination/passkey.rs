@@ -134,7 +134,10 @@ pub async fn handle_finish_registration_core(
             match result {
                 Ok((message, stored_user_id)) => {
                     // Create session with the user_id
-                    let headers = new_session_header(UserId::new(stored_user_id)).await?;
+                    let user_id = UserId::new(stored_user_id).map_err(|e| {
+                        CoordinationError::Validation(format!("Invalid user ID: {e}"))
+                    })?;
+                    let headers = new_session_header(user_id).await?;
 
                     Ok((headers, message))
                 }
@@ -173,8 +176,9 @@ async fn create_user_then_finish_registration(
     let stored_user = UserStore::upsert_user(new_user).await?;
 
     // Step 3: Prepare credential storage (cleanup existing credentials)
-    let credential =
-        prepare_registration_storage(UserId::new(stored_user.id.clone()), validated_data).await?;
+    let user_id = UserId::new(stored_user.id.clone())
+        .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
+    let credential = prepare_registration_storage(user_id, validated_data).await?;
 
     // Step 4: Atomic commit (store credential + cleanup challenge)
     let message = commit_registration(credential, &user_handle).await?;
@@ -253,7 +257,9 @@ pub async fn handle_finish_authentication_core(
     tracing::debug!("User ID: {:#?}", uid);
 
     // Create a session for the authenticated user
-    let headers = new_session_header(UserId::new(uid.clone())).await?;
+    let user_id = UserId::new(uid.clone())
+        .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
+    let headers = new_session_header(user_id).await?;
 
     Ok((uid, name, headers))
 }

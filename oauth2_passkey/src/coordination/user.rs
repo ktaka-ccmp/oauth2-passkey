@@ -151,7 +151,10 @@ pub(super) async fn gen_new_user_id() -> Result<String, CoordinationError> {
         // let id = crate::utils::gen_random_string(32)?;
 
         // Check if a user with this ID already exists
-        match UserStore::get_user(UserId::new(id.clone())).await {
+        let user_id = UserId::new(id.clone()).map_err(|e| {
+            CoordinationError::Internal(format!("Failed to create user ID from UUID: {e}"))
+        })?;
+        match UserStore::get_user(user_id).await {
             Ok(None) => return Ok(id), // ID is unique, return it
             Ok(Some(_)) => continue,   // ID exists, try again
             Err(e) => {

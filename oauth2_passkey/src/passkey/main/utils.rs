@@ -22,7 +22,7 @@ pub(super) async fn name2cid_str_vec(
     name: &str,
 ) -> Result<Vec<UserIdCredentialIdStr>, PasskeyError> {
     get_credential_id_strs_by(CredentialSearchField::UserName(
-        crate::passkey::UserName::new(name.to_string()),
+        crate::passkey::UserName::new(name.to_string()).expect("Valid username"),
     ))
     .await
 }

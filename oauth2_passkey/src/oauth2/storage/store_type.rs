@@ -18,11 +18,10 @@ impl OAuth2Store {
             let id = uuid::Uuid::new_v4().to_string();
 
             // Check if an account with this ID already exists
-            match Self::get_oauth2_accounts_by(AccountSearchField::Id(
-                crate::oauth2::AccountId::new(id.clone()),
-            ))
-            .await
-            {
+            let account_id = crate::oauth2::AccountId::new(id.clone()).map_err(|e| {
+                OAuth2Error::Internal(format!("Failed to create account ID from UUID: {e}"))
+            })?;
+            match Self::get_oauth2_accounts_by(AccountSearchField::Id(account_id)).await {
                 Ok(accounts) if accounts.is_empty() => return Ok(id), // ID is unique, return it
                 Ok(_) => continue,                                    // ID exists, try again
                 Err(e) => {

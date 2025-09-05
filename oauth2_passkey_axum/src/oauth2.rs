@@ -71,7 +71,7 @@ async fn google_auth(
     let mode = params.get("mode").cloned();
     let context = params.get("context").cloned();
 
-    if mode.is_some() && mode.as_ref().unwrap() == "add_to_user" {
+    if mode.as_deref() == Some("add_to_user") {
         if context.is_none() {
             return Err((StatusCode::BAD_REQUEST, "Missing Context".to_string()));
         }
@@ -81,9 +81,11 @@ async fn google_auth(
         }
 
         // Verify that received page_session_token (obfuscated csrf_token) as a part of query param is same as the one in the current user's session cache.
-        verify_page_session_token(&headers, Some(&context.unwrap()))
-            .await
-            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        if let Some(context_value) = &context {
+            verify_page_session_token(&headers, Some(context_value))
+                .await
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        }
     }
 
     let (auth_url, headers) = prepare_oauth2_auth_request(headers, mode.as_deref())
@@ -148,9 +150,13 @@ async fn list_oauth2_accounts(
 
     // Call the core function with the extracted data
     // let accounts = list_accounts_core(session_user)
-    let accounts = list_accounts_core(UserId::new(auth_user.id.clone()))
-        .await
-        .into_response_error()?;
+    let user_id = UserId::new(auth_user.id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let accounts = list_accounts_core(user_id).await.into_response_error()?;
     Ok(Json(accounts))
 }
 
@@ -162,14 +168,25 @@ async fn delete_oauth2_account(
     auth_user: AuthUser,
     Path((provider, provider_user_id)): Path<(String, String)>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    delete_oauth2_account_core(
-        UserId::new(auth_user.id.clone()),
-        Provider::new(provider),
-        ProviderUserId::new(provider_user_id),
-    )
-    .await
-    .map(|()| StatusCode::NO_CONTENT)
-    .into_response_error()
+    let user_id = UserId::new(auth_user.id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let provider_enum = Provider::new(provider)
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid provider: {e}")))?;
+    let provider_user_id_enum = ProviderUserId::new(provider_user_id).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid provider user ID: {e}"),
+        )
+    })?;
+
+    delete_oauth2_account_core(user_id, provider_enum, provider_user_id_enum)
+        .await
+        .map(|()| StatusCode::NO_CONTENT)
+        .into_response_error()
 }
 
 #[cfg(test)]

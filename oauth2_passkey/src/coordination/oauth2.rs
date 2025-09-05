@@ -203,11 +203,12 @@ async fn process_oauth2_authorization(
     };
 
     // Check if the OAuth2 account exists
-    let existing_account = OAuth2Store::get_oauth2_account_by_provider(
-        Provider::new(oauth2_account.provider.clone()),
-        ProviderUserId::new(oauth2_account.provider_user_id.clone()),
-    )
-    .await?;
+    let provider = Provider::new(oauth2_account.provider.clone())
+        .map_err(|e| CoordinationError::Validation(format!("Invalid provider: {e}")))?;
+    let provider_user_id = ProviderUserId::new(oauth2_account.provider_user_id.clone())
+        .map_err(|e| CoordinationError::Validation(format!("Invalid provider user ID: {e}")))?;
+    let existing_account =
+        OAuth2Store::get_oauth2_account_by_provider(provider, provider_user_id).await?;
 
     // Extract mode_id from the stored session if available
     let mode = match &state_in_response.mode_id {
@@ -315,7 +316,9 @@ async fn process_oauth2_authorization(
     tracing::Span::current().record("user_id", &user_id);
     tracing::info!(user_id = %user_id, "OAuth2 authorization completed successfully");
 
-    let mut headers = new_session_header(UserId::new(user_id)).await?;
+    let user_id_validated = UserId::new(user_id)
+        .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
+    let mut headers = new_session_header(user_id_validated).await?;
 
     let _ = header_set_cookie(
         &mut headers,

@@ -216,15 +216,52 @@ impl CsrfToken {
 pub struct UserId(String);
 
 impl UserId {
-    /// Creates a new UserId from a string.
+    /// Creates a new UserId from a string with validation.
     ///
     /// # Arguments
     /// * `id` - The user ID string
     ///
     /// # Returns
-    /// * A new UserId instance
-    pub fn new(id: String) -> Self {
-        Self(id)
+    /// * `Ok(UserId)` - If the ID is valid
+    /// * `Err(SessionError)` - If the ID is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only safe characters (alphanumeric + basic symbols)
+    /// * Must not contain control characters or dangerous sequences
+    pub fn new(id: String) -> Result<Self, crate::session::SessionError> {
+        use crate::session::SessionError;
+
+        // Validate ID is not empty
+        if id.is_empty() {
+            return Err(SessionError::Validation(
+                "User ID cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate ID length (reasonable bounds)
+        if id.len() > 255 {
+            return Err(SessionError::Validation("User ID too long".to_string()));
+        }
+
+        // Validate ID contains only safe characters
+        if !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '+'))
+        {
+            return Err(SessionError::Validation(
+                "User ID contains invalid characters".to_string(),
+            ));
+        }
+
+        // Check for dangerous sequences
+        if id.contains("..") || id.contains("--") || id.contains("__") {
+            return Err(SessionError::Validation(
+                "User ID contains dangerous character sequences".to_string(),
+            ));
+        }
+
+        Ok(UserId(id))
     }
 
     /// Returns the user ID as a string slice.
@@ -244,15 +281,49 @@ impl UserId {
 pub struct SessionId(String);
 
 impl SessionId {
-    /// Creates a new SessionId from a string.
+    /// Creates a new SessionId from a string with validation.
     ///
     /// # Arguments
     /// * `id` - The session ID string
     ///
     /// # Returns
-    /// * A new SessionId instance
-    pub fn new(id: String) -> Self {
-        Self(id)
+    /// * `Ok(SessionId)` - If the ID is valid
+    /// * `Err(SessionError)` - If the ID is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only safe characters (alphanumeric + URL-safe symbols)
+    /// * Must not contain control characters or whitespace
+    pub fn new(id: String) -> Result<Self, crate::session::SessionError> {
+        use crate::session::SessionError;
+
+        // Validate ID is not empty
+        if id.is_empty() {
+            return Err(SessionError::Validation(
+                "Session ID cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate ID length (session IDs need sufficient entropy)
+        if id.len() < 10 {
+            return Err(SessionError::Validation("Session ID too short".to_string()));
+        }
+
+        if id.len() > 256 {
+            return Err(SessionError::Validation("Session ID too long".to_string()));
+        }
+
+        // Validate ID contains only URL-safe characters (no whitespace)
+        if !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~'))
+        {
+            return Err(SessionError::Validation(
+                "Session ID contains invalid characters".to_string(),
+            ));
+        }
+
+        Ok(SessionId(id))
     }
 
     /// Returns the session ID as a string slice.

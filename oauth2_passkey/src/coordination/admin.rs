@@ -141,10 +141,9 @@ pub async fn delete_passkey_credential_admin(
     // Should we verify a context token here?
 
     // Delete the credential using the raw credential ID format from the database
-    PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(CredentialId::new(
-        credential.credential_id.clone(),
-    )))
-    .await?;
+    let credential_id = CredentialId::new(credential.credential_id.clone())
+        .map_err(|e| CoordinationError::Validation(format!("Invalid credential ID: {e}")))?;
+    PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(credential_id)).await?;
 
     tracing::debug!("Successfully deleted credential");
 

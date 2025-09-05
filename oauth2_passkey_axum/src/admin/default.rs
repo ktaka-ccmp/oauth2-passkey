@@ -48,7 +48,13 @@ async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, St
     };
 
     // Fetch users from storage using session ID
-    let users = oauth2_passkey::get_all_users(SessionId::new(auth_user.session_id.clone()))
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+    let users = oauth2_passkey::get_all_users(session_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -86,12 +92,17 @@ pub(super) async fn delete_user_account_handler(
 
     // Call the core function to delete the user account and all associated data
     // Using the imported function from libauth
-    delete_user_account_admin(
-        SessionId::new(auth_user.session_id.clone()),
-        UserId::new(payload.user_id.clone()),
-    )
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+    let user_id = UserId::new(payload.user_id.clone())
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
+    delete_user_account_admin(session_id, user_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::debug!(
         "User account deleted: {} by {}",
@@ -118,13 +129,19 @@ async fn delete_passkey_credential(
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    delete_passkey_credential_core(
-        UserId::new(payload.user_id.clone()),
-        CredentialId::new(credential_id),
-    )
-    .await
-    .map(|()| StatusCode::NO_CONTENT)
-    .into_response_error()
+    let user_id = UserId::new(payload.user_id.clone())
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
+    let credential_id_enum = CredentialId::new(credential_id).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid credential ID: {e}"),
+        )
+    })?;
+
+    delete_passkey_credential_core(user_id, credential_id_enum)
+        .await
+        .map(|()| StatusCode::NO_CONTENT)
+        .into_response_error()
 }
 
 async fn delete_oauth2_account(
@@ -137,14 +154,21 @@ async fn delete_oauth2_account(
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    delete_oauth2_account_core(
-        UserId::new(payload.user_id.clone()),
-        Provider::new(provider),
-        ProviderUserId::new(provider_user_id),
-    )
-    .await
-    .map(|()| StatusCode::NO_CONTENT)
-    .into_response_error()
+    let user_id = UserId::new(payload.user_id.clone())
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
+    let provider_enum = Provider::new(provider)
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid provider: {e}")))?;
+    let provider_user_id_enum = ProviderUserId::new(provider_user_id).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid provider user ID: {e}"),
+        )
+    })?;
+
+    delete_oauth2_account_core(user_id, provider_enum, provider_user_id_enum)
+        .await
+        .map(|()| StatusCode::NO_CONTENT)
+        .into_response_error()
 }
 
 #[derive(serde::Deserialize)]
@@ -167,13 +191,17 @@ pub(super) async fn update_admin_status_handler(
     }
 
     // Call the core function to update the user's admin status
-    update_user_admin_status(
-        SessionId::new(auth_user.session_id.clone()),
-        UserId::new(payload.user_id.clone()),
-        payload.is_admin,
-    )
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+    let user_id = UserId::new(payload.user_id.clone())
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
+    update_user_admin_status(session_id, user_id, payload.is_admin)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::debug!(
         "User admin status updated: {} is_admin={} by {}",

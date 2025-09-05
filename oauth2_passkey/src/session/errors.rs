@@ -38,6 +38,10 @@ pub enum SessionError {
     #[error("Session expired error")]
     SessionExpiredError,
 
+    /// Error when input validation fails for session-related data
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     /// Error from utility operations
     #[error("Utils error: {0}")]
     Utils(#[from] UtilError),

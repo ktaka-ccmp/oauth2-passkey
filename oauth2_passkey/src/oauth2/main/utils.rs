@@ -184,7 +184,9 @@ pub(crate) async fn delete_session_and_misc_token_from_store(
             return Ok(());
         };
 
-        delete_session_from_store_by_session_id(SessionId::new(token.token))
+        let session_id = SessionId::new(token.token)
+            .map_err(|e| OAuth2Error::Storage(format!("Invalid session ID: {e}")))?;
+        delete_session_from_store_by_session_id(session_id)
             .await
             .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 

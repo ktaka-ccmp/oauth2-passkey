@@ -79,6 +79,10 @@ pub enum OAuth2Error {
     #[error("Invalid mode: {0}")]
     InvalidMode(String),
 
+    /// Error in input validation
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     /// Error from OIDC discovery operations
     #[error("OIDC discovery error: {0}")]
     Discovery(#[from] super::discovery::OidcDiscoveryError),

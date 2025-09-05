@@ -65,6 +65,10 @@ pub enum PasskeyError {
     #[error("{0}")]
     Other(String),
 
+    /// Error in input validation
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     /// Error from utility operations
     #[error("Utils error: {0}")]
     Utils(#[from] UtilError),

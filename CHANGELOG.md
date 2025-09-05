@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CRITICAL FIX**: Fixed passkey registration vulnerability where users were created before challenge validation, preventing orphaned user records on validation failures
 - **BREAKING**: Enhanced admin function security by requiring session ID validation with fresh database lookups instead of trusting session data, preventing privilege escalation attacks
 - **BREAKING**: Implemented comprehensive type-safe validation system to eliminate ID confusion vulnerabilities and parameter mixing attacks at compile-time
+- **Error Handling**: Eliminated all `unwrap()` and `expect()` calls from production code, replacing them with proper error handling and HTTP status codes
 
 ### Changed
 
@@ -20,11 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Passkey Registration**: Refactored to validate challenges before user creation, eliminating double validation and optimizing cleanup timing
 - **BREAKING**: `SessionUser.sequence_number` field changed from `i64` to `Option<i64>` for database consistency
 - **Database**: Enhanced SQLite connection with WAL journaling, memory temp storage, and optimized pragmas for better performance
+- **Template Safety**: Improved Jinja2 templates to use defensive pattern matching instead of `unwrap()` calls, preventing runtime panics
 
 ### Breaking Changes
 
 - **Type-Safe Validation System**: Comprehensive implementation of compile-time type safety for all authentication operations:
-  - **New Type Wrappers**: Added type-safe wrappers for all identifier types:
+  - **New Type Wrappers**: Added type-safe wrappers for all identifier types with validation (constructors now return `Result<T, Error>`):
     - `UserId` - Database user identifiers (already existed, now consistently used)
     - `CredentialId` - Passkey credential identifiers (already existed, now consistently used)
     - `Provider` - OAuth2 provider names (e.g., "google", "github")
@@ -60,9 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     // After:
     delete_oauth2_account_core(
-        UserId::new("user123".to_string()),
-        Provider::new("google".to_string()),
-        ProviderUserId::new("google456".to_string())
+        UserId::new("user123".to_string())?,
+        Provider::new("google".to_string())?,
+        ProviderUserId::new("google456".to_string())?
     )
     get_user_from_session(&SessionCookie::new("session_cookie_value".to_string())?)
     ```

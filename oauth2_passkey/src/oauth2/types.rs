@@ -262,15 +262,52 @@ impl std::str::FromStr for OAuth2Mode {
 pub struct AccountId(String);
 
 impl AccountId {
-    /// Creates a new AccountId from a string.
+    /// Creates a new AccountId from a string with validation.
     ///
     /// # Arguments
     /// * `id` - The account ID string
     ///
     /// # Returns
-    /// * A new AccountId instance
-    pub fn new(id: String) -> Self {
-        Self(id)
+    /// * `Ok(AccountId)` - If the ID is valid
+    /// * `Err(OAuth2Error)` - If the ID is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only safe characters (alphanumeric + basic symbols)
+    /// * Must not contain control characters or dangerous sequences
+    pub fn new(id: String) -> Result<Self, crate::oauth2::OAuth2Error> {
+        use crate::oauth2::OAuth2Error;
+
+        // Validate ID is not empty
+        if id.is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Account ID cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate ID length (reasonable bounds)
+        if id.len() > 255 {
+            return Err(OAuth2Error::Validation("Account ID too long".to_string()));
+        }
+
+        // Validate ID contains only safe characters
+        if !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '+'))
+        {
+            return Err(OAuth2Error::Validation(
+                "Account ID contains invalid characters".to_string(),
+            ));
+        }
+
+        // Check for dangerous sequences
+        if id.contains("..") || id.contains("--") || id.contains("__") {
+            return Err(OAuth2Error::Validation(
+                "Account ID contains dangerous character sequences".to_string(),
+            ));
+        }
+
+        Ok(AccountId(id))
     }
 
     /// Returns the account ID as a string slice.
@@ -290,15 +327,54 @@ impl AccountId {
 pub struct Provider(String);
 
 impl Provider {
-    /// Creates a new Provider from a string.
+    /// Creates a new Provider from a string with validation.
     ///
     /// # Arguments
     /// * `provider` - The provider name string
     ///
     /// # Returns
-    /// * A new Provider instance
-    pub fn new(provider: String) -> Self {
-        Self(provider)
+    /// * `Ok(Provider)` - If the provider name is valid
+    /// * `Err(OAuth2Error)` - If the provider name is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only safe characters (alphanumeric, hyphens, underscores, periods)
+    /// * Must not start with special characters
+    pub fn new(provider: String) -> Result<Self, crate::oauth2::OAuth2Error> {
+        use crate::oauth2::OAuth2Error;
+
+        // Validate provider is not empty
+        if provider.is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Provider name cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate provider length (reasonable bounds for provider names)
+        if provider.len() > 50 {
+            return Err(OAuth2Error::Validation(
+                "Provider name too long".to_string(),
+            ));
+        }
+
+        // Validate provider contains only safe characters (alphanumeric, hyphens, underscores, periods)
+        // Must not start with special characters
+        if !provider
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        {
+            return Err(OAuth2Error::Validation(
+                "Provider name contains invalid characters".to_string(),
+            ));
+        }
+
+        if provider.starts_with('-') || provider.starts_with('_') || provider.starts_with('.') {
+            return Err(OAuth2Error::Validation(
+                "Provider name cannot start with special characters".to_string(),
+            ));
+        }
+
+        Ok(Provider(provider))
     }
 
     /// Returns the provider name as a string slice.
@@ -318,15 +394,54 @@ impl Provider {
 pub struct ProviderUserId(String);
 
 impl ProviderUserId {
-    /// Creates a new ProviderUserId from a string.
+    /// Creates a new ProviderUserId from a string with validation.
     ///
     /// # Arguments
     /// * `id` - The provider user ID string
     ///
     /// # Returns
-    /// * A new ProviderUserId instance
-    pub fn new(id: String) -> Self {
-        Self(id)
+    /// * `Ok(ProviderUserId)` - If the ID is valid
+    /// * `Err(OAuth2Error)` - If the ID is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only safe characters (alphanumeric + basic symbols)
+    /// * Must not contain control characters or dangerous sequences
+    pub fn new(id: String) -> Result<Self, crate::oauth2::OAuth2Error> {
+        use crate::oauth2::OAuth2Error;
+
+        // Validate ID is not empty
+        if id.is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Provider user ID cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate ID length (provider IDs can be long but reasonable bounds)
+        if id.len() > 512 {
+            return Err(OAuth2Error::Validation(
+                "Provider user ID too long".to_string(),
+            ));
+        }
+
+        // Validate ID contains only safe characters
+        if !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '+' | '='))
+        {
+            return Err(OAuth2Error::Validation(
+                "Provider user ID contains invalid characters".to_string(),
+            ));
+        }
+
+        // Check for dangerous sequences
+        if id.contains("..") || id.contains("--") || id.contains("__") {
+            return Err(OAuth2Error::Validation(
+                "Provider user ID contains dangerous character sequences".to_string(),
+            ));
+        }
+
+        Ok(ProviderUserId(id))
     }
 
     /// Returns the provider user ID as a string slice.
@@ -346,7 +461,7 @@ impl ProviderUserId {
 pub struct DisplayName(String);
 
 impl DisplayName {
-    /// Creates a new DisplayName from a string.
+    /// Creates a new DisplayName from a string with validation.
     ///
     /// This constructor is part of the public type-safe search API and is used
     /// internally by the AccountSearchField enum for database queries.
@@ -355,10 +470,44 @@ impl DisplayName {
     /// * `name` - The display name string
     ///
     /// # Returns
-    /// * A new DisplayName instance
+    /// * `Ok(DisplayName)` - If the name is valid
+    /// * `Err(OAuth2Error)` - If the name is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must not consist only of whitespace
+    /// * Must not contain dangerous sequences
     #[allow(dead_code)] // Part of type-safe search API, used in tests but not by library's public interface
-    pub fn new(name: String) -> Self {
-        Self(name)
+    pub fn new(name: String) -> Result<Self, crate::oauth2::OAuth2Error> {
+        use crate::oauth2::OAuth2Error;
+
+        // Validate name is not empty
+        if name.is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Display name cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate name length (reasonable bounds for display names)
+        if name.len() > 100 {
+            return Err(OAuth2Error::Validation("Display name too long".to_string()));
+        }
+
+        // Validate name doesn't consist only of whitespace
+        if name.trim().is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Display name cannot consist only of whitespace".to_string(),
+            ));
+        }
+
+        // Check for dangerous sequences
+        if name.contains("..") || name.contains("--") || name.contains("__") {
+            return Err(OAuth2Error::Validation(
+                "Display name contains dangerous character sequences".to_string(),
+            ));
+        }
+
+        Ok(DisplayName(name))
     }
 
     /// Returns the display name as a string slice.
@@ -378,7 +527,7 @@ impl DisplayName {
 pub struct Email(String);
 
 impl Email {
-    /// Creates a new Email from a string.
+    /// Creates a new Email from a string with validation.
     ///
     /// This constructor is part of the public type-safe search API and is used
     /// internally by the AccountSearchField enum for database queries.
@@ -387,10 +536,46 @@ impl Email {
     /// * `email` - The email address string
     ///
     /// # Returns
-    /// * A new Email instance
+    /// * `Ok(Email)` - If the email is valid
+    /// * `Err(OAuth2Error)` - If the email is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain @ symbol
+    /// * Must have reasonable length
     #[allow(dead_code)] // Part of type-safe search API, used in tests but not by library's public interface
-    pub fn new(email: String) -> Self {
-        Self(email)
+    pub fn new(email: String) -> Result<Self, crate::oauth2::OAuth2Error> {
+        use crate::oauth2::OAuth2Error;
+
+        // Validate email is not empty
+        if email.is_empty() {
+            return Err(OAuth2Error::Validation("Email cannot be empty".to_string()));
+        }
+
+        // Validate email length (RFC 5321 limits: maximum 254 characters)
+        if email.len() < 3 {
+            return Err(OAuth2Error::Validation("Email too short".to_string()));
+        }
+
+        if email.len() > 254 {
+            return Err(OAuth2Error::Validation("Email too long".to_string()));
+        }
+
+        // Basic email format validation (must contain @ and reasonable structure)
+        if !email.contains('@') {
+            return Err(OAuth2Error::Validation(
+                "Email must contain @ symbol".to_string(),
+            ));
+        }
+
+        let parts: Vec<&str> = email.split('@').collect();
+        if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Email format is invalid".to_string(),
+            ));
+        }
+
+        Ok(Email(email))
     }
 
     /// Returns the email address as a string slice.

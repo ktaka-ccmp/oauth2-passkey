@@ -114,12 +114,15 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    let user = match get_user(
-        SessionId::new(auth_user.session_id.clone()),
-        UserId::new(user_id.0.clone()),
-    )
-    .await
-    {
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+    let user_id_enum = UserId::new(user_id.0.clone())
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
+    let user = match get_user(session_id, user_id_enum).await {
         Ok(user) => user,
         Err(e) => {
             tracing::error!("Failed to fetch user: {:?}", e);
@@ -140,14 +143,18 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
     };
 
     // Fetch passkey credentials using the public function from libauth
-    let stored_credentials = list_credentials_core(UserId::new(user_id.clone()))
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch credentials: {e:?}"),
-            )
-        })?;
+    let user_id_enum2 = UserId::new(user_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let stored_credentials = list_credentials_core(user_id_enum2).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to fetch credentials: {e:?}"),
+        )
+    })?;
 
     let unique_aaguids: HashSet<String> = stored_credentials
         .iter()
@@ -189,14 +196,18 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
 
     // Fetch OAuth2 accounts using the public function from libauth
     // let oauth2_accounts = list_accounts_core(Some(session_user)).await.map_err(|e| {
-    let oauth2_accounts = list_accounts_core(UserId::new(user_id.to_string()))
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch accounts: {e:?}"),
-            )
-        })?;
+    let user_id_enum3 = UserId::new(user_id.to_string()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let oauth2_accounts = list_accounts_core(user_id_enum3).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to fetch accounts: {e:?}"),
+        )
+    })?;
 
     // Convert OAuth2Account to TemplateAccount
     let oauth2_accounts = oauth2_accounts
@@ -245,7 +256,7 @@ async fn serve_admin_user_js() -> Response {
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.to_string().into())
-        .unwrap()
+        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
 async fn serve_admin_user_css() -> Response {
@@ -254,19 +265,54 @@ async fn serve_admin_user_css() -> Response {
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "text/css")
         .body(css_content.to_string().into())
-        .unwrap()
+        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
 static TIMEZONE_MAP: LazyLock<HashMap<&'static str, Tz>> = LazyLock::new(|| {
     let mut map = HashMap::new();
-    map.insert("JST", "Asia/Tokyo".parse::<Tz>().unwrap());
-    map.insert("EST", "America/New_York".parse::<Tz>().unwrap());
-    map.insert("CST", "America/Chicago".parse::<Tz>().unwrap());
-    map.insert("MST", "America/Denver".parse::<Tz>().unwrap());
-    map.insert("PST", "America/Los_Angeles".parse::<Tz>().unwrap());
-    map.insert("CET", "Europe/Paris".parse::<Tz>().unwrap());
-    map.insert("EET", "Europe/Helsinki".parse::<Tz>().unwrap());
-    map.insert("UTC", "Etc/UTC".parse::<Tz>().unwrap());
+    // These timezone strings are hardcoded and should always be valid
+    map.insert(
+        "JST",
+        "Asia/Tokyo".parse::<Tz>().expect("Valid timezone string"),
+    );
+    map.insert(
+        "EST",
+        "America/New_York"
+            .parse::<Tz>()
+            .expect("Valid timezone string"),
+    );
+    map.insert(
+        "CST",
+        "America/Chicago"
+            .parse::<Tz>()
+            .expect("Valid timezone string"),
+    );
+    map.insert(
+        "MST",
+        "America/Denver"
+            .parse::<Tz>()
+            .expect("Valid timezone string"),
+    );
+    map.insert(
+        "PST",
+        "America/Los_Angeles"
+            .parse::<Tz>()
+            .expect("Valid timezone string"),
+    );
+    map.insert(
+        "CET",
+        "Europe/Paris".parse::<Tz>().expect("Valid timezone string"),
+    );
+    map.insert(
+        "EET",
+        "Europe/Helsinki"
+            .parse::<Tz>()
+            .expect("Valid timezone string"),
+    );
+    map.insert(
+        "UTC",
+        "Etc/UTC".parse::<Tz>().expect("Valid timezone string"),
+    );
     map
 });
 

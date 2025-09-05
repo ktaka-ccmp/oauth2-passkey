@@ -120,13 +120,14 @@ pub(crate) async fn finish_authentication(
     auth_data.verify()?;
 
     // Get credential then public key
-    let stored_credential =
-        PasskeyStore::get_credential(CredentialId::new(auth_response.id.clone()))
-            .await?
-            .ok_or_else(|| {
-                tracing::error!("Credential not found");
-                PasskeyError::NotFound("Credential not found".into())
-            })?;
+    let credential_id = CredentialId::new(auth_response.id.clone())
+        .map_err(|e| PasskeyError::Validation(format!("Invalid credential ID: {e}")))?;
+    let stored_credential = PasskeyStore::get_credential(credential_id.clone())
+        .await?
+        .ok_or_else(|| {
+            tracing::error!("Credential not found");
+            PasskeyError::NotFound("Credential not found".into())
+        })?;
 
     tracing::debug!(
         "finish_authentication: Credential &id: {:?}, id: {}",
@@ -156,22 +157,13 @@ pub(crate) async fn finish_authentication(
         &stored_credential,
         auth_data.is_discoverable(),
     )?;
-    verify_counter(
-        CredentialId::new(auth_response.id.clone()),
-        &auth_data,
-        &stored_credential,
-    )
-    .await?;
+    verify_counter(credential_id.clone(), &auth_data, &stored_credential).await?;
 
     // Verify signature and cleanup
     verify_signature(&auth_response, &client_data, &auth_data, &stored_credential).await?;
 
     // Update last used at
-    PasskeyStore::update_credential_last_used_at(
-        CredentialId::new(auth_response.id.clone()),
-        Utc::now(),
-    )
-    .await?;
+    PasskeyStore::update_credential_last_used_at(credential_id, Utc::now()).await?;
 
     // Remove challenge from cache
     let cache_prefix = CachePrefix::auth_challenge();

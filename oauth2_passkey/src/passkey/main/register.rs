@@ -77,10 +77,10 @@ async fn get_or_create_user_handle(
         tracing::debug!("User is logged in: {:#?}", user);
 
         // Try to find existing credentials for this user
-        let existing_credentials = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
-            crate::session::UserId::new(user.id.clone()),
-        ))
-        .await?;
+        let user_id = crate::session::UserId::new(user.id.clone())
+            .map_err(|e| PasskeyError::Validation(format!("Invalid user ID: {e}")))?;
+        let existing_credentials =
+            PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id)).await?;
 
         if !existing_credentials.is_empty() {
             // Reuse the existing user_handle from the first credential
@@ -233,7 +233,9 @@ pub(crate) async fn verify_session_then_finish_registration(
         return Err(PasskeyError::Format("User ID mismatch".to_string()));
     }
 
-    finish_registration(UserId::new(session_user.id), &reg_data).await?;
+    let user_id = UserId::new(session_user.id)
+        .map_err(|e| PasskeyError::Validation(format!("Invalid user ID: {e}")))?;
+    finish_registration(user_id, &reg_data).await?;
 
     Ok("Registration successful".to_string())
 }
@@ -387,8 +389,12 @@ pub(crate) async fn prepare_registration_storage(
         // Filter and delete credentials that match user_handle, user_id, and aaguid
         for cred in credentials_with_matching_handle {
             if cred.aaguid == aaguid && cred.user_id == user_id.as_str() {
+                let credential_id = crate::passkey::CredentialId::new(cred.credential_id.clone())
+                    .map_err(|e| {
+                    PasskeyError::Validation(format!("Invalid credential ID: {e}"))
+                })?;
                 match PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-                    crate::passkey::CredentialId::new(cred.credential_id.clone()),
+                    credential_id,
                 ))
                 .await
                 {
@@ -444,7 +450,9 @@ pub(crate) async fn commit_registration(
     let credential_id = credential.credential_id.clone();
 
     // Store the credential in the database
-    PasskeyStore::store_credential(CredentialId::new(credential_id), credential).await?;
+    let credential_id_validated = CredentialId::new(credential_id)
+        .map_err(|e| PasskeyError::Validation(format!("Invalid credential ID: {e}")))?;
+    PasskeyStore::store_credential(credential_id_validated, credential).await?;
 
     // Clean up the used challenge (best effort - don't fail registration if this fails)
     if let Ok(cache_key) = CacheKey::new(user_handle.to_string()) {

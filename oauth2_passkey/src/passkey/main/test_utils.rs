@@ -95,7 +95,11 @@ pub async fn insert_test_credential(data: TestCredentialData) -> Result<(), Pass
         last_used_at: now,
     };
 
-    PasskeyStore::store_credential(CredentialId::new(data.credential_id), credential).await
+    PasskeyStore::store_credential(
+        CredentialId::new(data.credential_id).expect("Valid credential ID"),
+        credential,
+    )
+    .await
 }
 
 /// Insert a test user and then a test passkey credential
@@ -109,7 +113,7 @@ pub async fn insert_test_user_and_credential(data: TestCredentialData) -> Result
 
     // First create the user
     insert_test_user(
-        UserId::new(data.user_id.clone()),
+        UserId::new(data.user_id.clone().expect("Valid user ID")),
         &data.name,
         &data.display_name,
         false,

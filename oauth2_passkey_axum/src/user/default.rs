@@ -97,14 +97,21 @@ pub(super) async fn update_user_account_handler(
     );
 
     // Call the core function to update the user account
-    let updated_user = update_user_account(
-        SessionId::new(auth_user.session_id.clone()),
-        UserId::new(session_user_id.clone()),
-        payload.account,
-        payload.label,
-    )
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+    let user_id = UserId::new(session_user_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let updated_user = update_user_account(session_id, user_id, payload.account, payload.label)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Return the updated user information
     let user_data = json!({
@@ -158,12 +165,21 @@ pub(super) async fn delete_user_account_handler(
 
     // Call the core function to delete the user account and all associated data
     // Using the imported function from oauth2_passkey
-    let credential_ids = delete_user_account(
-        SessionId::new(auth_user.session_id.clone()),
-        UserId::new(session_user_id.clone()),
-    )
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+    let user_id = UserId::new(session_user_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let credential_ids = delete_user_account(session_id, user_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Return the credential IDs in the response for client-side notification
     Ok(Json(json!({

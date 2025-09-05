@@ -143,7 +143,9 @@ pub async fn get_user_from_session(
     .await?
     .ok_or(SessionError::SessionError)?;
 
-    let user = UserStore::get_user(UserId::new(stored_session.user_id.clone()))
+    let user_id =
+        UserId::new(stored_session.user_id.clone()).map_err(|_| SessionError::SessionError)?;
+    let user = UserStore::get_user(user_id)
         .await
         .map_err(|_| SessionError::SessionError)?
         .ok_or(SessionError::SessionError)?;
@@ -343,7 +345,11 @@ async fn is_authenticated(
     }
 
     if verify_user_exists {
-        let user_exists = UserStore::get_user(UserId::new(stored_session.user_id.clone()))
+        let user_id = UserId::new(stored_session.user_id.clone()).map_err(|e| {
+            tracing::error!("Error validating user ID from session: {}", e);
+            SessionError::SessionError
+        })?;
+        let user_exists = UserStore::get_user(user_id)
             .await
             .map_err(|e| {
                 tracing::error!("Error checking user existence: {}", e);
@@ -361,9 +367,14 @@ async fn is_authenticated(
         }
     }
 
+    let user_id = UserId::new(stored_session.user_id).map_err(|e| {
+        tracing::error!("Error validating user ID from session: {}", e);
+        SessionError::SessionError
+    })?;
+
     Ok((
         AuthenticationStatus(true), // Authenticated if we reached here
-        Some(UserId::new(stored_session.user_id)),
+        Some(user_id),
         Some(CsrfToken::new(stored_session.csrf_token)),
         CsrfHeaderVerified(csrf_via_header_verified),
     ))
@@ -604,9 +615,10 @@ pub async fn get_csrf_token_from_session(
     // Check if session is expired
     if stored_session.expires_at < Utc::now() {
         tracing::debug!("Session expired at {}", stored_session.expires_at);
-        delete_session_from_store_by_session_id(SessionId::new(
-            session_cookie.as_str().to_string(),
-        ))
+        delete_session_from_store_by_session_id(
+            SessionId::new(session_cookie.as_str().to_string())
+                .map_err(|_| SessionError::SessionError)?,
+        )
         .await?;
         return Err(SessionError::SessionExpiredError);
     }
@@ -653,14 +665,19 @@ pub async fn get_user_and_csrf_token_from_session(
     // Check if session is expired
     if stored_session.expires_at < Utc::now() {
         tracing::debug!("Session expired at {}", stored_session.expires_at);
-        delete_session_from_store_by_session_id(SessionId::new(
-            session_cookie.as_str().to_string(),
-        ))
+        delete_session_from_store_by_session_id(
+            SessionId::new(session_cookie.as_str().to_string())
+                .map_err(|_| SessionError::SessionError)?,
+        )
         .await?;
         return Err(SessionError::SessionExpiredError);
     }
 
-    let user = UserStore::get_user(UserId::new(stored_session.user_id.clone()))
+    let user_id = UserId::new(stored_session.user_id.clone()).map_err(|e| {
+        tracing::error!("Error validating user ID from session: {}", e);
+        SessionError::SessionError
+    })?;
+    let user = UserStore::get_user(user_id)
         .await
         .map_err(|e| {
             tracing::error!("Error checking user existence: {}", e);

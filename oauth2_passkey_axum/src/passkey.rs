@@ -126,7 +126,7 @@ async fn serve_passkey_js() -> Response {
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.to_string().into())
-        .unwrap()
+        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
 #[derive(Template)]
@@ -139,7 +139,14 @@ async fn conditional_ui() -> impl IntoResponse {
     let template = ConditionalUiTemplate {
         o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
     };
-    (StatusCode::OK, Html(template.render().unwrap_or_default())).into_response()
+    match template.render() {
+        Ok(html) => (StatusCode::OK, Html(html)).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Template error: {e}"),
+        )
+            .into_response(),
+    }
 }
 
 async fn serve_conditional_ui_js() -> Response {
@@ -148,15 +155,19 @@ async fn serve_conditional_ui_js() -> Response {
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.to_string().into())
-        .unwrap()
+        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
 async fn list_passkey_credentials(
     auth_user: AuthUser,
 ) -> Result<Json<Vec<PasskeyCredential>>, (StatusCode, String)> {
-    let credentials = list_credentials_core(UserId::new(auth_user.id.clone()))
-        .await
-        .into_response_error()?;
+    let user_id = UserId::new(auth_user.id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let credentials = list_credentials_core(user_id).await.into_response_error()?;
     Ok(Json(credentials))
 }
 
@@ -164,13 +175,23 @@ async fn delete_passkey_credential(
     auth_user: AuthUser,
     Path(credential_id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    delete_passkey_credential_core(
-        UserId::new(auth_user.id.clone()),
-        CredentialId::new(credential_id),
-    )
-    .await
-    .into_response_error()
-    .map(|()| StatusCode::NO_CONTENT)
+    let user_id = UserId::new(auth_user.id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let credential_id_enum = CredentialId::new(credential_id).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid credential ID: {e}"),
+        )
+    })?;
+
+    delete_passkey_credential_core(user_id, credential_id_enum)
+        .await
+        .into_response_error()
+        .map(|()| StatusCode::NO_CONTENT)
 }
 
 async fn serve_related_origin() -> Response {
@@ -208,8 +229,14 @@ async fn update_passkey_credential(
     let session_user = SessionUser::from(&auth_user);
 
     // Call the update function
+    let credential_id = CredentialId::new(payload.credential_id.clone()).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid credential ID: {e}"),
+        )
+    })?;
     let response = update_passkey_credential_core(
-        CredentialId::new(payload.credential_id.clone()),
+        credential_id,
         &payload.name,
         &payload.display_name,
         Some(session_user),
