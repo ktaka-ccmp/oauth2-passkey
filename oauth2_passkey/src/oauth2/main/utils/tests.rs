@@ -20,7 +20,12 @@ async fn store_token_in_cache(
     let cache_prefix =
         CachePrefix::new(token_type.to_string()).map_err(OAuth2Error::convert_storage_error)?;
 
-    store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await
+    Ok(
+        store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl)
+            .await?
+            .as_str()
+            .to_string(),
+    )
 }
 
 /// Test state parameter encoding and decoding roundtrip

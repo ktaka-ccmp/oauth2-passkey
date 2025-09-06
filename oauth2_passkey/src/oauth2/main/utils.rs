@@ -63,7 +63,7 @@ pub(super) async fn generate_store_token(
 
     let token_id = store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await?;
 
-    Ok((token, token_id))
+    Ok((token, token_id.as_str().to_string()))
 }
 
 pub(crate) async fn validate_origin(

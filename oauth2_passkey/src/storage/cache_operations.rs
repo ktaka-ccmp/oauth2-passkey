@@ -79,14 +79,14 @@ where
 /// * `ttl` - Time to live in seconds
 ///
 /// # Returns
-/// * `Ok(String)` - Generated key for later retrieval
+/// * `Ok(CacheKey)` - Generated key for later retrieval
 /// * `Err(E)` - Storage error converted to module-specific error type
 ///
 /// # Common Usage Patterns
 /// - Session storage: Store user session data with auto-generated session ID
 /// - OAuth2 token storage: Store temporary tokens (CSRF, nonce, PKCE) with auto-generated IDs  
 /// - Passkey challenge storage: Store WebAuthn challenges with auto-generated challenge IDs
-pub async fn store_cache_auto<T, E>(prefix: CachePrefix, data: T, ttl: u64) -> Result<String, E>
+pub async fn store_cache_auto<T, E>(prefix: CachePrefix, data: T, ttl: u64) -> Result<CacheKey, E>
 where
     T: Into<CacheData>,
     E: CacheErrorConversion<E>,
@@ -120,7 +120,8 @@ where
             .map_err(E::convert_storage_error)?;
 
         if inserted {
-            return Ok(generated_key_str);
+            let cache_key = CacheKey::new(generated_key_str).map_err(E::convert_storage_error)?;
+            return Ok(cache_key);
         }
 
         tracing::debug!(

@@ -60,7 +60,9 @@ pub(super) async fn create_new_session_with_uid(
         stored_session,
         *SESSION_COOKIE_MAX_AGE,
     )
-    .await?;
+    .await?
+    .as_str()
+    .to_string();
 
     // Record session_id in the tracing span
     tracing::Span::current().record("session_id", &session_id);

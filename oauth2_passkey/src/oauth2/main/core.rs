@@ -94,7 +94,12 @@ async fn prepare_oauth2_auth_request_with_params(
             ttl,
         };
         let cache_prefix = CachePrefix::misc_session();
-        Some(store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await?)
+        Some(
+            store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl)
+                .await?
+                .as_str()
+                .to_string(),
+        )
     } else {
         tracing::debug!("No session ID found");
         None
@@ -108,7 +113,12 @@ async fn prepare_oauth2_auth_request_with_params(
             ttl,
         };
         let cache_prefix = CachePrefix::mode();
-        Some(store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl).await?)
+        Some(
+            store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, ttl)
+                .await?
+                .as_str()
+                .to_string(),
+        )
     } else {
         None
     };

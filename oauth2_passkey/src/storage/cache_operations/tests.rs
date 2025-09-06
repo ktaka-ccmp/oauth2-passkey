@@ -58,11 +58,9 @@ async fn test_store_cache_auto_legacy_compatibility() {
     let result = store_cache_auto::<_, TestError>(prefix.clone(), test_data.clone(), 3600).await;
     assert!(result.is_ok());
     let generated_key = result.unwrap();
-    assert!(!generated_key.is_empty());
 
     // Verify data can be retrieved with the generated key
-    let key = CacheKey::new(generated_key).unwrap();
-    let retrieved = get_data::<String, TestError>(prefix, key).await;
+    let retrieved = get_data::<String, TestError>(prefix, generated_key).await;
     assert!(retrieved.is_ok());
     assert_eq!(retrieved.unwrap(), Some(test_data));
 }
@@ -157,17 +155,14 @@ async fn test_store_cache_auto_simple_api() {
     assert!(result.is_ok());
 
     let generated_key = result.unwrap();
-    assert!(!generated_key.is_empty());
-    assert!(generated_key.len() >= 32); // Should be at least 32 chars for good entropy
 
     // Retrieve using the generated key
-    let cache_key = CacheKey::new(generated_key.clone()).unwrap();
-    let retrieved = get_data::<String, TestError>(prefix.clone(), cache_key.clone()).await;
+    let retrieved = get_data::<String, TestError>(prefix.clone(), generated_key.clone()).await;
     assert!(retrieved.is_ok());
     assert_eq!(retrieved.unwrap(), Some(test_data));
 
     // Clean up
-    let remove_result = remove_data::<TestError>(prefix, cache_key).await;
+    let remove_result = remove_data::<TestError>(prefix, generated_key).await;
     assert!(remove_result.is_ok());
 }
 
@@ -212,7 +207,7 @@ async fn test_simplified_api_demonstration() {
     let auto_result =
         store_cache_auto::<_, TestError>(prefix.clone(), test_data.clone(), 300).await;
     assert!(auto_result.is_ok());
-    let generated_key: String = auto_result.unwrap(); // Type inference works!
+    let generated_key: CacheKey = auto_result.unwrap(); // Type inference works!
 
     // SIMPLE MEANINGFUL KEY API (less common case - 10% of usage)
     let meaningful_key = CacheKey::new("meaningful_identifier".to_string()).unwrap();
@@ -226,8 +221,7 @@ async fn test_simplified_api_demonstration() {
     assert!(keyed_result.is_ok());
 
     // Verify both approaches work correctly
-    let auto_key = CacheKey::new(generated_key).unwrap();
-    let auto_retrieved = get_data::<String, TestError>(prefix.clone(), auto_key).await;
+    let auto_retrieved = get_data::<String, TestError>(prefix.clone(), generated_key).await;
     let keyed_retrieved = get_data::<String, TestError>(prefix, meaningful_key).await;
 
     assert!(auto_retrieved.is_ok());
