@@ -15,8 +15,8 @@ use std::{
 use serde_json::{Value, json};
 
 use oauth2_passkey::{
-    AuthenticatorInfo, O2P_ROUTE_PREFIX, generate_page_session_token, get_authenticator_info_batch,
-    list_accounts_core, list_credentials_core,
+    AuthenticatorInfo, O2P_ROUTE_PREFIX, UserId, generate_page_session_token,
+    get_authenticator_info_batch, list_accounts_core, list_credentials_core,
 };
 
 use crate::config::O2P_REDIRECT_ANON;
@@ -148,7 +148,13 @@ async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCo
         Some(user) => {
             // Get passkey credentials count for the user
             // let stored_credentials = list_credentials_core(Some(&user)).await.map_err(|e| {
-            let stored_credentials = list_credentials_core(&user.id).await.map_err(|e| {
+            let user_id = UserId::new(user.id.clone()).map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Invalid user ID: {e}"),
+                )
+            })?;
+            let stored_credentials = list_credentials_core(user_id).await.map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     format!("Failed to fetch credentials: {e:?}"),
@@ -189,7 +195,13 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
 
     // Fetch passkey credentials using the public function from libauth
     // let stored_credentials = list_credentials_core(Some(session_user))
-    let stored_credentials = list_credentials_core(user_id).await.map_err(|e| {
+    let user_id_enum = UserId::new(user_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let stored_credentials = list_credentials_core(user_id_enum).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to fetch credentials: {e:?}"),
@@ -237,7 +249,13 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
 
     // Fetch OAuth2 accounts using the public function from libauth
     // let oauth2_accounts = list_accounts_core(Some(session_user)).await.map_err(|e| {
-    let oauth2_accounts = list_accounts_core(user_id).await.map_err(|e| {
+    let user_id_enum2 = UserId::new(user_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let oauth2_accounts = list_accounts_core(user_id_enum2).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to fetch accounts: {e:?}"),
@@ -292,7 +310,7 @@ async fn serve_summary_js() -> Response {
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.to_string().into())
-        .unwrap()
+        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
 async fn serve_summary_css() -> Response {
@@ -301,19 +319,54 @@ async fn serve_summary_css() -> Response {
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "text/css")
         .body(css_content.to_string().into())
-        .unwrap()
+        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
 static TIMEZONE_MAP: LazyLock<HashMap<&'static str, Tz>> = LazyLock::new(|| {
     let mut map = HashMap::new();
-    map.insert("JST", "Asia/Tokyo".parse::<Tz>().unwrap());
-    map.insert("EST", "America/New_York".parse::<Tz>().unwrap());
-    map.insert("CST", "America/Chicago".parse::<Tz>().unwrap());
-    map.insert("MST", "America/Denver".parse::<Tz>().unwrap());
-    map.insert("PST", "America/Los_Angeles".parse::<Tz>().unwrap());
-    map.insert("CET", "Europe/Paris".parse::<Tz>().unwrap());
-    map.insert("EET", "Europe/Helsinki".parse::<Tz>().unwrap());
-    map.insert("UTC", "Etc/UTC".parse::<Tz>().unwrap());
+    // These timezone strings are hardcoded and should always be valid
+    map.insert(
+        "JST",
+        "Asia/Tokyo".parse::<Tz>().expect("Valid timezone string"),
+    );
+    map.insert(
+        "EST",
+        "America/New_York"
+            .parse::<Tz>()
+            .expect("Valid timezone string"),
+    );
+    map.insert(
+        "CST",
+        "America/Chicago"
+            .parse::<Tz>()
+            .expect("Valid timezone string"),
+    );
+    map.insert(
+        "MST",
+        "America/Denver"
+            .parse::<Tz>()
+            .expect("Valid timezone string"),
+    );
+    map.insert(
+        "PST",
+        "America/Los_Angeles"
+            .parse::<Tz>()
+            .expect("Valid timezone string"),
+    );
+    map.insert(
+        "CET",
+        "Europe/Paris".parse::<Tz>().expect("Valid timezone string"),
+    );
+    map.insert(
+        "EET",
+        "Europe/Helsinki"
+            .parse::<Tz>()
+            .expect("Valid timezone string"),
+    );
+    map.insert(
+        "UTC",
+        "Etc/UTC".parse::<Tz>().expect("Valid timezone string"),
+    );
     map
 });
 
@@ -334,62 +387,4 @@ fn format_date_tz(date: &DateTime<Utc>, timezone_name: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_format_date_tz_jst() {
-        // Create a fixed UTC datetime for testing
-        let utc_date = DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
-            .unwrap()
-            .with_timezone(&Utc);
-
-        // Format with JST timezone
-        let formatted = format_date_tz(&utc_date, "JST");
-
-        // JST is UTC+9, so 00:00 UTC becomes 09:00 JST
-        assert_eq!(formatted, "2023-01-01 09:00 JST");
-    }
-
-    #[test]
-    fn test_format_date_tz_pst() {
-        // Create a fixed UTC datetime for testing
-        let utc_date = DateTime::parse_from_rfc3339("2023-01-01T08:00:00Z")
-            .unwrap()
-            .with_timezone(&Utc);
-
-        // Format with PST timezone (UTC-8)
-        let formatted = format_date_tz(&utc_date, "PST");
-
-        // PST is UTC-8, so 08:00 UTC becomes 00:00 PST
-        assert_eq!(formatted, "2023-01-01 00:00 PST");
-    }
-
-    #[test]
-    fn test_format_date_tz_utc() {
-        // Create a fixed UTC datetime for testing
-        let utc_date = DateTime::parse_from_rfc3339("2023-01-01T12:30:45Z")
-            .unwrap()
-            .with_timezone(&Utc);
-
-        // Format with UTC timezone
-        let formatted = format_date_tz(&utc_date, "UTC");
-
-        // UTC time should remain the same
-        assert_eq!(formatted, "2023-01-01 12:30 UTC");
-    }
-
-    #[test]
-    fn test_format_date_tz_unknown_timezone() {
-        // Create a fixed UTC datetime for testing
-        let utc_date = DateTime::parse_from_rfc3339("2023-01-01T12:00:00Z")
-            .unwrap()
-            .with_timezone(&Utc);
-
-        // Format with an unknown timezone (should default to UTC)
-        let formatted = format_date_tz(&utc_date, "UNKNOWN");
-
-        // Should default to UTC but display the requested timezone name
-        assert_eq!(formatted, "2023-01-01 12:00 UNKNOWN");
-    }
-}
+mod tests;

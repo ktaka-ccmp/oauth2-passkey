@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use crate::storage::{CacheErrorConversion, StorageError};
 use crate::userdb::UserError;
 use crate::utils::UtilError;
 
@@ -37,6 +38,10 @@ pub enum SessionError {
     #[error("Session expired error")]
     SessionExpiredError,
 
+    /// Error when input validation fails for session-related data
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     /// Error from utility operations
     #[error("Utils error: {0}")]
     Utils(#[from] UtilError),
@@ -48,4 +53,10 @@ pub enum SessionError {
     /// Error from user database operations
     #[error("User error: {0}")]
     User(#[from] UserError),
+}
+
+impl CacheErrorConversion<SessionError> for SessionError {
+    fn convert_storage_error(error: StorageError) -> SessionError {
+        SessionError::Storage(error.to_string())
+    }
 }

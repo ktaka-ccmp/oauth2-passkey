@@ -1,8 +1,8 @@
 //! Test utilities for session module tests
 
 use crate::session::errors::SessionError;
-use crate::session::types::StoredSession;
-use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+use crate::session::types::{SessionId, StoredSession, UserId};
+use crate::storage::{CacheData, CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
 use crate::userdb::User;
 use crate::userdb::UserStore;
 use chrono::{Duration, Utc};
@@ -10,14 +10,14 @@ use chrono::{Duration, Utc};
 /// Insert a test user in the database for testing
 #[cfg(test)]
 pub(crate) async fn insert_test_user(
-    user_id: &str,
+    user_id: UserId,
     account: &str,
     label: &str,
     is_admin: bool,
 ) -> Result<User, SessionError> {
     let user = User {
         sequence_number: None,
-        id: user_id.to_string(),
+        id: user_id.as_str().to_string(),
         account: account.to_string(),
         label: label.to_string(),
         is_admin,
@@ -33,15 +33,15 @@ pub(crate) async fn insert_test_user(
 /// Insert a test session in the cache for testing
 #[cfg(test)]
 pub(crate) async fn insert_test_session(
-    session_id: &str,
-    user_id: &str,
+    session_id: SessionId,
+    user_id: UserId,
     csrf_token: &str,
     ttl: u64,
 ) -> Result<(), SessionError> {
     let expires_at = Utc::now() + Duration::seconds(ttl as i64);
 
     let stored_session = StoredSession {
-        user_id: user_id.to_string(),
+        user_id: user_id.as_str().to_string(),
         csrf_token: csrf_token.to_string(),
         expires_at,
         ttl,
@@ -53,12 +53,15 @@ pub(crate) async fn insert_test_session(
         expires_at: chrono::Utc::now() + chrono::Duration::seconds(ttl as i64),
     };
 
+    let cache_key = CacheKey::new(session_id.as_str().to_string())
+        .map_err(SessionError::convert_storage_error)?;
+
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .put_with_ttl("session", session_id, cache_data, ttl as usize)
+        .put_with_ttl(CachePrefix::session(), cache_key, cache_data, ttl as usize)
         .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?;
+        .map_err(SessionError::convert_storage_error)?;
 
     Ok(())
 }
@@ -66,34 +69,37 @@ pub(crate) async fn insert_test_session(
 /// Create a test user and session for testing
 #[cfg(test)]
 pub(crate) async fn create_test_user_and_session(
-    user_id: &str,
+    user_id: UserId,
     account: &str,
     label: &str,
     is_admin: bool,
-    session_id: &str,
+    session_id: SessionId,
     csrf_token: &str,
     ttl: u64,
 ) -> Result<(User, ()), SessionError> {
-    let user = insert_test_user(user_id, account, label, is_admin).await?;
+    let user = insert_test_user(user_id.clone(), account, label, is_admin).await?;
     insert_test_session(session_id, user_id, csrf_token, ttl).await?;
     Ok((user, ()))
 }
 
 /// Delete a test session from cache for cleanup
 #[cfg(test)]
-pub(crate) async fn delete_test_session(session_id: &str) -> Result<(), SessionError> {
+pub(crate) async fn delete_test_session(session_id: SessionId) -> Result<(), SessionError> {
+    let cache_key = CacheKey::new(session_id.as_str().to_string())
+        .map_err(SessionError::convert_storage_error)?;
+
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .remove("session", session_id)
+        .remove(CachePrefix::session(), cache_key)
         .await
-        .map_err(|e| SessionError::Storage(e.to_string()))?;
+        .map_err(SessionError::convert_storage_error)?;
     Ok(())
 }
 
 /// Delete a test user from database for cleanup
 #[cfg(test)]
-pub(crate) async fn delete_test_user(user_id: &str) -> Result<(), SessionError> {
+pub(crate) async fn delete_test_user(user_id: UserId) -> Result<(), SessionError> {
     UserStore::delete_user(user_id)
         .await
         .map_err(|e| SessionError::Storage(e.to_string()))?;
@@ -103,8 +109,8 @@ pub(crate) async fn delete_test_user(user_id: &str) -> Result<(), SessionError> 
 /// Clean up test resources (user and session) for testing
 #[cfg(test)]
 pub(crate) async fn cleanup_test_resources(
-    user_id: &str,
-    session_id: &str,
+    user_id: UserId,
+    session_id: SessionId,
 ) -> Result<(), SessionError> {
     // Delete session first, then user (order matters for referential integrity)
     delete_test_session(session_id).await.ok(); // Ignore errors since session might not exist

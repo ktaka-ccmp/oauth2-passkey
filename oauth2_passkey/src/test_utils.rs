@@ -10,6 +10,9 @@
 
 use std::sync::Once;
 
+use crate::passkey::CredentialId;
+use crate::session::UserId;
+
 /// Centralized test initialization for all tests across the entire crate
 ///
 /// This function ensures that:
@@ -193,7 +196,15 @@ async fn ensure_first_user_has_oauth2_account(user_id: &str) {
     use crate::oauth2::OAuth2Store;
 
     // Check if first user already has OAuth2 accounts
-    match OAuth2Store::get_oauth2_accounts(user_id).await {
+    let user_id_typed = match UserId::new(user_id.to_string()) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("Warning: Failed to create UserId for '{user_id}': {e}");
+            return;
+        }
+    };
+
+    match OAuth2Store::get_oauth2_accounts(user_id_typed).await {
         Ok(accounts) if accounts.is_empty() => {
             // No OAuth2 accounts exist for first user, create one
             println!("ℹ️ First user exists but has no OAuth2 account, creating one...");
@@ -245,7 +256,8 @@ async fn create_first_user_passkey_credential(user_id: &str) {
     };
 
     match PasskeyStore::store_credential(
-        "first-user-test-passkey-credential".to_string(),
+        CredentialId::new("first-user-test-passkey-credential".to_string())
+            .expect("Valid credential ID"),
         test_passkey_credential,
     )
     .await
@@ -282,8 +294,15 @@ async fn ensure_first_user_has_passkey_credential(user_id: &str) {
     use crate::passkey::{CredentialSearchField, PasskeyStore};
 
     // Check if first user already has Passkey credentials
-    match PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.to_string())).await
-    {
+    let user_id_typed = match crate::session::UserId::new(user_id.to_string()) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("Warning: Failed to create UserId for '{user_id}': {e}");
+            return;
+        }
+    };
+
+    match PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id_typed)).await {
         Ok(credentials) if credentials.is_empty() => {
             // No Passkey credentials exist for first user, create one
             println!("ℹ️ First user exists but has no Passkey credential, creating one...");
@@ -348,71 +367,4 @@ pub fn get_test_origin() -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_extract_sqlite_file_path_from_url() {
-        // Test sqlite: with absolute path
-        assert_eq!(
-            extract_sqlite_file_path_from_url("sqlite:/tmp/test.db"),
-            Some("/tmp/test.db".to_string())
-        );
-
-        // Test sqlite: with relative path
-        assert_eq!(
-            extract_sqlite_file_path_from_url("sqlite:./test.db"),
-            Some("./test.db".to_string())
-        );
-
-        // Test sqlite:file: format
-        assert_eq!(
-            extract_sqlite_file_path_from_url("sqlite:file:/tmp/test.db"),
-            Some("/tmp/test.db".to_string())
-        );
-
-        // Test sqlite:file: with query parameters
-        assert_eq!(
-            extract_sqlite_file_path_from_url("sqlite:file:/tmp/test.db?mode=rwc&cache=shared"),
-            Some("/tmp/test.db".to_string())
-        );
-
-        // Test in-memory database with query parameter (should still extract path)
-        assert_eq!(
-            extract_sqlite_file_path_from_url("sqlite:file:test?mode=memory&cache=shared"),
-            Some("test".to_string())
-        );
-
-        // Test :memory: database (should return None)
-        assert_eq!(extract_sqlite_file_path_from_url("sqlite::memory:"), None);
-
-        // Test file:memory: database (should return None)
-        assert_eq!(
-            extract_sqlite_file_path_from_url(
-                "sqlite:file:test_integrated?mode=memory&cache=shared"
-            ),
-            Some("test_integrated".to_string())
-        );
-
-        // Test actual :memory: in path (should return None)
-        assert_eq!(
-            extract_sqlite_file_path_from_url("sqlite:file::memory:?cache=shared"),
-            None
-        );
-
-        // Test non-SQLite URL (should return None)
-        assert_eq!(
-            extract_sqlite_file_path_from_url("postgresql://localhost/test"),
-            None
-        );
-
-        // Test empty string (should return None)
-        assert_eq!(extract_sqlite_file_path_from_url(""), None);
-
-        // Test sqlite with double slash format
-        assert_eq!(
-            extract_sqlite_file_path_from_url("sqlite:///tmp/test.db"),
-            Some("/tmp/test.db".to_string())
-        );
-    }
-}
+mod tests;

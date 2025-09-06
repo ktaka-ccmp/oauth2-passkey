@@ -32,7 +32,7 @@
                     <td><a href="{{o2p_route_prefix}}/admin/user/{{ user.id }}">{{ user.id }}</a></td>
                     <td>{{ user.account }}</td>
                     <td>{{ user.label }}</td>
-                    {% if user.sequence_number.is_some() && user.sequence_number.unwrap() == 1 %}
+                    {% if user.sequence_number.is_some() && user.sequence_number.unwrap_or(0) == 1 %}
                         <td>
                             <span>{{ user.is_admin }}</span>
                         </td>

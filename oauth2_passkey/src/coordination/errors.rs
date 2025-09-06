@@ -15,6 +15,14 @@ pub enum CoordinationError {
     #[error("Coordination error: {0}")]
     Coordination(String),
 
+    /// Validation error
+    #[error("Validation error: {0}")]
+    Validation(String),
+
+    /// Internal error
+    #[error("Internal error: {0}")]
+    Internal(String),
+
     /// Database error
     #[error("Database error: {0}")]
     Database(String),
@@ -98,6 +106,8 @@ impl CoordinationError {
     pub fn log(self) -> Self {
         match &self {
             Self::Coordination(msg) => tracing::error!("Coordination error: {}", msg),
+            Self::Validation(msg) => tracing::error!("Validation error: {}", msg),
+            Self::Internal(msg) => tracing::error!("Internal error: {}", msg),
             Self::Database(msg) => tracing::error!("Database error: {}", msg),
             Self::Authentication(msg) => tracing::error!("Authentication error: {}", msg),
             Self::SessionMismatch(msg) => tracing::error!("Session mismatch: {}", msg),
@@ -132,6 +142,12 @@ impl CoordinationError {
         match &self {
             Self::Coordination(msg) => {
                 tracing::error!(error = %self, message = %msg, "Coordination error with context");
+            }
+            Self::Validation(msg) => {
+                tracing::error!(error = %self, message = %msg, "Validation error with context");
+            }
+            Self::Internal(msg) => {
+                tracing::error!(error = %self, message = %msg, "Internal error with context");
             }
             Self::Database(msg) => {
                 tracing::error!(error = %self, message = %msg, "Database error with context");
@@ -266,25 +282,4 @@ impl From<UtilError> for CoordinationError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_error_is_sync_and_send() {
-        fn assert_sync_send<T: Sync + Send>() {}
-        assert_sync_send::<CoordinationError>();
-    }
-
-    #[test]
-    fn test_error_log() {
-        // Test that the log method returns self and works correctly
-        let err = CoordinationError::Coordination("test error".to_string());
-        let logged_err = err.log();
-
-        if let CoordinationError::Coordination(msg) = logged_err {
-            assert_eq!(msg, "test error");
-        } else {
-            panic!("Wrong error type after logging");
-        }
-    }
-}
+mod tests;

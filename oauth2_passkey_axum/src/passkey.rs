@@ -9,11 +9,12 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use oauth2_passkey::{
-    AuthenticationOptions, AuthenticatorResponse, O2P_ROUTE_PREFIX, PasskeyCredential,
-    RegisterCredential, RegistrationOptions, RegistrationStartRequest, SessionUser,
-    delete_passkey_credential_core, get_related_origin_json, handle_finish_authentication_core,
-    handle_finish_registration_core, handle_start_authentication_core,
-    handle_start_registration_core, list_credentials_core, update_passkey_credential_core,
+    AuthenticationOptions, AuthenticatorResponse, CredentialId, O2P_ROUTE_PREFIX,
+    PasskeyCredential, RegisterCredential, RegistrationOptions, RegistrationStartRequest,
+    SessionUser, UserId, delete_passkey_credential_core, get_related_origin_json,
+    handle_finish_authentication_core, handle_finish_registration_core,
+    handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
+    update_passkey_credential_core,
 };
 
 use super::error::IntoResponseError;
@@ -125,7 +126,7 @@ async fn serve_passkey_js() -> Response {
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.to_string().into())
-        .unwrap()
+        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
 #[derive(Template)]
@@ -138,7 +139,14 @@ async fn conditional_ui() -> impl IntoResponse {
     let template = ConditionalUiTemplate {
         o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
     };
-    (StatusCode::OK, Html(template.render().unwrap_or_default())).into_response()
+    match template.render() {
+        Ok(html) => (StatusCode::OK, Html(html)).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Template error: {e}"),
+        )
+            .into_response(),
+    }
 }
 
 async fn serve_conditional_ui_js() -> Response {
@@ -147,15 +155,19 @@ async fn serve_conditional_ui_js() -> Response {
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.to_string().into())
-        .unwrap()
+        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
 async fn list_passkey_credentials(
     auth_user: AuthUser,
 ) -> Result<Json<Vec<PasskeyCredential>>, (StatusCode, String)> {
-    let credentials = list_credentials_core(&auth_user.id)
-        .await
-        .into_response_error()?;
+    let user_id = UserId::new(auth_user.id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let credentials = list_credentials_core(user_id).await.into_response_error()?;
     Ok(Json(credentials))
 }
 
@@ -163,7 +175,20 @@ async fn delete_passkey_credential(
     auth_user: AuthUser,
     Path(credential_id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    delete_passkey_credential_core(&auth_user.id, &credential_id)
+    let user_id = UserId::new(auth_user.id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid user ID: {e}"),
+        )
+    })?;
+    let credential_id_enum = CredentialId::new(credential_id).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid credential ID: {e}"),
+        )
+    })?;
+
+    delete_passkey_credential_core(user_id, credential_id_enum)
         .await
         .into_response_error()
         .map(|()| StatusCode::NO_CONTENT)
@@ -204,8 +229,14 @@ async fn update_passkey_credential(
     let session_user = SessionUser::from(&auth_user);
 
     // Call the update function
+    let credential_id = CredentialId::new(payload.credential_id.clone()).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid credential ID: {e}"),
+        )
+    })?;
     let response = update_passkey_credential_core(
-        &payload.credential_id,
+        credential_id,
         &payload.name,
         &payload.display_name,
         Some(session_user),
@@ -217,127 +248,4 @@ async fn update_passkey_credential(
 }
 
 #[cfg(test)]
-mod tests {
-    use axum::Json;
-    use http::StatusCode;
-
-    use super::*;
-
-    /// Test the list_passkey_credentials handler with mocked dependencies
-    /// This test checks:
-    /// 1. Handler returns credentials for authenticated user
-    /// 2. Returned credentials have correct user ID and fields
-    /// 3. Mock functions are called as expected
-    #[tokio::test]
-    async fn test_list_passkey_credentials_handler() {
-        use crate::test_utils::{core_mocks, mocks};
-
-        // Initialize test environment
-        let _ = crate::test_utils::env::origin();
-
-        // Reset mock tracking
-        core_mocks::reset_mock_calls();
-
-        // Create a mock AuthUser
-        let auth_user = mocks::mock_auth_user("test-user-id", "test@example.com");
-
-        let result = async {
-            // Simulate what list_passkey_credentials would do with mocked dependencies
-            let credentials = core_mocks::mock_list_credentials_core(&auth_user.id, false)
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-            Ok(Json(credentials))
-        }
-        .await;
-
-        // Verify the result
-        match &result {
-            Ok(Json(credentials)) => {
-                // Verify we have at least one credential
-                assert!(!credentials.is_empty(), "Expected at least one credential");
-
-                // Verify user ID of the first credential
-                assert_eq!(
-                    credentials[0].user_id, "test-user-id",
-                    "First credential user ID mismatch"
-                );
-
-                // Verify user fields of the first credential
-                assert_eq!(
-                    credentials[0].user.name, "user_test-user-id",
-                    "First credential user name mismatch"
-                );
-                assert_eq!(
-                    credentials[0].user.display_name, "Test User test-user-id",
-                    "First credential display name mismatch"
-                );
-            }
-            Err((status, message)) => {
-                panic!(
-                    "Expected successful result with credentials, got error: {status} - {message}"
-                );
-            }
-        }
-
-        // Verify that our mock function was called
-        assert!(
-            core_mocks::was_list_credentials_called(),
-            "Mock list_credentials_core function was not called"
-        );
-    }
-
-    /// Test the update_passkey_credential handler with mocked dependencies
-    /// This test checks:
-    /// 1. Handler updates credential details for authenticated user
-    /// 2. Returns updated credential data in JSON format
-    /// 3. Mock functions are called as expected
-    #[tokio::test]
-    async fn test_update_passkey_credential_handler() {
-        use crate::test_utils::{core_mocks, mocks};
-
-        // Initialize test environment with required environment variables
-        let _ = crate::test_utils::env::origin();
-
-        // Create a mock AuthUser
-        let auth_user = mocks::mock_auth_user("test-user-id", "test@example.com");
-
-        // Create a mock request payload
-        let payload = UpdateCredentialUserDetailsRequest {
-            credential_id: "test-credential-id".to_string(),
-            name: "Test Credential".to_string(),
-            display_name: "Test User's Credential".to_string(),
-        };
-
-        // Simulate the handler function with our mocks
-        let result: Result<Json<serde_json::Value>, (StatusCode, String)> = async {
-            // This simulates what update_passkey_credential would do
-            let response = core_mocks::mock_update_passkey_credential_core(
-                &auth_user.id,
-                &payload.credential_id,
-                &payload.name,
-                &payload.display_name,
-            )
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-            Ok(Json(response))
-        }
-        .await;
-
-        // Now we expect this to succeed with our mock
-        assert!(
-            result.is_ok(),
-            "Expected successful result, got: {result:?}"
-        );
-
-        // Check that the response contains the expected data
-        if let Ok(Json(value)) = result {
-            assert!(value.is_object());
-            // Verify the response contains the expected fields
-            assert!(
-                value.get("credential").is_some(),
-                "Response should contain credential field"
-            );
-        }
-    }
-}
+mod tests;

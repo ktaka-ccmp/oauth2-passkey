@@ -6,8 +6,8 @@ mod edge_cases {
     use super::super::test_utils::*;
     use crate::SESSION_COOKIE_NAME;
     use crate::session::errors::SessionError;
-    use crate::session::types::StoredSession;
-    use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+    use crate::session::types::{SessionId, StoredSession, UserId};
+    use crate::storage::{CacheData, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
     use crate::test_utils::init_test_environment;
     use chrono::{Duration, Utc};
     use http::{HeaderMap, Method};
@@ -43,15 +43,18 @@ mod edge_cases {
             expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put("session", session_id, cache_data)
+            .put(cache_prefix, cache_key, cache_data)
             .await
             .unwrap();
 
         // Test expired session handling in get_csrf_token_from_session
-        let result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
         assert!(result.is_err());
         match result {
             Err(SessionError::SessionExpiredError) => {} // Expected error
@@ -59,10 +62,12 @@ mod edge_cases {
         }
 
         // Verify the expired session was removed
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         let check_session = GENERIC_CACHE_STORE
             .lock()
             .await
-            .get("session", session_id)
+            .get(cache_prefix, cache_key)
             .await
             .unwrap();
         assert!(check_session.is_none());
@@ -86,15 +91,18 @@ mod edge_cases {
             expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put("session", session_id, cache_data)
+            .put(cache_prefix, cache_key, cache_data)
             .await
             .unwrap();
 
         // Test error handling for malformed data in get_csrf_token_from_session
-        let result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
         assert!(result.is_err());
         match result {
             Err(SessionError::Storage(_)) => {} // Expected error
@@ -102,7 +110,9 @@ mod edge_cases {
         }
 
         // Clean up
-        let _ = delete_test_session(session_id).await;
+        let _ =
+            delete_test_session(SessionId::new(session_id.to_string()).expect("Valid session ID"))
+                .await;
     }
 
     /// Test missing fields in session data
@@ -124,15 +134,18 @@ mod edge_cases {
             expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
         };
 
+        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
+        let cache_key = CacheKey::new(session_id.to_string()).unwrap();
         GENERIC_CACHE_STORE
             .lock()
             .await
-            .put("session", session_id, cache_data)
+            .put(cache_prefix, cache_key, cache_data)
             .await
             .unwrap();
 
         // Test error handling for missing fields
-        let result = get_csrf_token_from_session(session_id).await;
+        let session_cookie = crate::SessionCookie::new(session_id.to_string()).unwrap();
+        let result = get_csrf_token_from_session(&session_cookie).await;
         assert!(result.is_err());
         match result {
             Err(SessionError::Storage(_)) => {} // Expected error for missing fields
@@ -140,7 +153,9 @@ mod edge_cases {
         }
 
         // Clean up
-        let _ = delete_test_session(session_id).await;
+        let _ =
+            delete_test_session(SessionId::new(session_id.to_string()).expect("Valid session ID"))
+                .await;
     }
 
     /// Test is_authenticated with CSRF protection - POST with missing CSRF token
@@ -159,11 +174,11 @@ mod edge_cases {
         let session_id = "session_missing_csrf";
 
         let _ = create_test_user_and_session(
-            user_id,
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
             "missing_csrf@example.com",
             "Missing CSRF",
             false,
-            session_id,
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
             csrf_token,
             3600,
         )
@@ -188,7 +203,11 @@ mod edge_cases {
         }
 
         // Clean up
-        let _ = cleanup_test_resources(user_id, session_id).await;
+        let _ = cleanup_test_resources(
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
+        )
+        .await;
     }
 
     /// Test is_authenticated_strict_then_csrf
@@ -208,11 +227,11 @@ mod edge_cases {
         let session_id = "session_strict_csrf";
 
         let _ = create_test_user_and_session(
-            user_id,
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
             "strict_csrf@example.com",
             "Strict CSRF Test",
             false,
-            session_id,
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
             csrf_token,
             3600,
         )
@@ -253,7 +272,11 @@ mod edge_cases {
         }
 
         // Clean up
-        let _ = cleanup_test_resources(user_id, session_id).await;
+        let _ = cleanup_test_resources(
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
+        )
+        .await;
     }
 
     /// Test is_authenticated_basic_then_user_and_csrf
@@ -275,7 +298,13 @@ mod edge_cases {
         let session_id = "basic_user_csrf_session";
 
         let _ = create_test_user_and_session(
-            user_id, account, label, false, session_id, csrf_token, 3600,
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
+            account,
+            label,
+            false,
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
+            csrf_token,
+            3600,
         )
         .await;
 
@@ -301,6 +330,10 @@ mod edge_cases {
         assert!(csrf_header_verified.0);
 
         // Clean up
-        let _ = cleanup_test_resources(user_id, session_id).await;
+        let _ = cleanup_test_resources(
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
+        )
+        .await;
     }
 }

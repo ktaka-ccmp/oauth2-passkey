@@ -5,7 +5,7 @@ use sqlx::{Pool, Postgres};
 
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::{
-    CredentialSearchField, PasskeyCredential, PublicKeyCredentialUserEntity,
+    CredentialId, CredentialSearchField, PasskeyCredential, PublicKeyCredentialUserEntity,
 };
 
 use super::config::DB_TABLE_PASSKEY_CREDENTIALS;
@@ -94,7 +94,7 @@ pub(super) async fn validate_passkey_tables_postgres(
 
 pub(super) async fn store_credential_postgres(
     pool: &Pool<Postgres>,
-    credential_id: &str,
+    credential_id: CredentialId,
     credential: &PasskeyCredential,
 ) -> Result<(), PasskeyError> {
     let counter_i32 = credential.counter as i32;
@@ -119,7 +119,7 @@ pub(super) async fn store_credential_postgres(
         RETURNING 1
         "#
     ))
-    .bind(credential_id)
+    .bind(credential_id.as_str())
     .bind(user_id)
     .bind(public_key)
     .bind(counter_i32)
@@ -139,14 +139,14 @@ pub(super) async fn store_credential_postgres(
 
 pub(super) async fn get_credential_postgres(
     pool: &Pool<Postgres>,
-    credential_id: &str,
+    credential_id: CredentialId,
 ) -> Result<Option<PasskeyCredential>, PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
     sqlx::query_as::<_, PasskeyCredential>(&format!(
         r#"SELECT * FROM {passkey_table} WHERE credential_id = $1"#
     ))
-    .bind(credential_id)
+    .bind(credential_id.as_str())
     .fetch_optional(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))
@@ -185,7 +185,7 @@ pub(super) async fn get_credentials_by_field_postgres(
 
 pub(super) async fn update_credential_counter_postgres(
     pool: &Pool<Postgres>,
-    credential_id: &str,
+    credential_id: CredentialId,
     counter: u32,
 ) -> Result<(), PasskeyError> {
     let counter_i32 = counter as i32;
@@ -200,7 +200,7 @@ pub(super) async fn update_credential_counter_postgres(
         "#
     ))
     .bind(counter_i32)
-    .bind(credential_id)
+    .bind(credential_id.as_str())
     .fetch_optional(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -243,7 +243,7 @@ pub(super) async fn delete_credential_by_field_postgres(
 
 pub(super) async fn update_credential_user_details_postgres(
     pool: &Pool<Postgres>,
-    credential_id: &str,
+    credential_id: CredentialId,
     name: &str,
     display_name: &str,
 ) -> Result<(), PasskeyError> {
@@ -254,7 +254,7 @@ pub(super) async fn update_credential_user_details_postgres(
     ))
     .bind(name)
     .bind(display_name)
-    .bind(credential_id)
+    .bind(credential_id.as_str())
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -332,7 +332,7 @@ impl<'r> FromRow<'r, PgRow> for PasskeyCredential {
 
 pub(super) async fn update_credential_last_used_at_postgres(
     pool: &Pool<Postgres>,
-    credential_id: &str,
+    credential_id: CredentialId,
     last_used_at: DateTime<Utc>,
 ) -> Result<(), PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
@@ -341,7 +341,7 @@ pub(super) async fn update_credential_last_used_at_postgres(
         r#"UPDATE {passkey_table} SET last_used_at = $1 WHERE credential_id = $2"#
     ))
     .bind(last_used_at)
-    .bind(credential_id)
+    .bind(credential_id.as_str())
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;

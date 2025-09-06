@@ -72,23 +72,26 @@ pub use coordination::{
 pub use config::O2P_ROUTE_PREFIX;
 
 // OAuth2 authentication types and functions
-pub use oauth2::{AuthResponse, OAuth2Account, OAuth2Mode, prepare_oauth2_auth_request};
+pub use oauth2::{
+    AuthResponse, OAuth2Account, OAuth2Mode, OAuth2State, Provider, ProviderUserId,
+    prepare_oauth2_auth_request,
+};
 
 // WebAuthn/Passkey types and functions
 pub use passkey::{
-    AuthenticationOptions, AuthenticatorInfo, AuthenticatorResponse, PasskeyCredential,
-    RegisterCredential, RegistrationOptions, get_authenticator_info, get_authenticator_info_batch,
-    get_related_origin_json,
+    AuthenticationOptions, AuthenticatorInfo, AuthenticatorResponse, ChallengeId, ChallengeType,
+    CredentialId, PasskeyCredential, RegisterCredential, RegistrationOptions,
+    get_authenticator_info, get_authenticator_info_batch, get_related_origin_json,
 };
 
 // Session management types and functions for authentication state
 pub use session::{
-    AuthenticationStatus, CsrfHeaderVerified, CsrfToken, SESSION_COOKIE_NAME, SessionError,
-    User as SessionUser, generate_page_session_token, get_csrf_token_from_session,
-    get_user_and_csrf_token_from_session, get_user_from_session, is_authenticated_basic,
-    is_authenticated_basic_then_csrf, is_authenticated_basic_then_user_and_csrf,
-    is_authenticated_strict, is_authenticated_strict_then_csrf, prepare_logout_response,
-    verify_page_session_token,
+    AuthenticationStatus, CsrfHeaderVerified, CsrfToken, SESSION_COOKIE_NAME, SessionCookie,
+    SessionError, SessionId, User as SessionUser, UserId, generate_page_session_token,
+    get_csrf_token_from_session, get_user_and_csrf_token_from_session, get_user_from_session,
+    is_authenticated_basic, is_authenticated_basic_then_csrf,
+    is_authenticated_basic_then_user_and_csrf, is_authenticated_strict,
+    is_authenticated_strict_then_csrf, prepare_logout_response, verify_page_session_token,
 };
 
 // User database representation of a user account

@@ -6,6 +6,7 @@ use sqlx::FromRow;
 use super::errors::OAuth2Error;
 use super::main::IdInfo as GoogleIdInfo;
 
+use crate::session::UserId;
 use crate::storage::CacheData;
 
 /// Represents an OAuth2 account linked to a user
@@ -175,18 +176,18 @@ impl TryFrom<CacheData> for StoredToken {
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub(crate) enum AccountSearchField {
-    /// Search by ID
-    Id(String),
-    /// Search by user ID (database ID)
-    UserId(String),
-    /// Search by provider
-    Provider(String),
-    /// Search by provider user ID
-    ProviderUserId(String),
-    /// Search by name
-    Name(String),
-    /// Search by email
-    Email(String),
+    /// Search by ID (type-safe)
+    Id(AccountId),
+    /// Search by user ID (database ID, type-safe)
+    UserId(UserId),
+    /// Search by provider (type-safe)
+    Provider(Provider),
+    /// Search by provider user ID (type-safe)
+    ProviderUserId(ProviderUserId),
+    /// Search by name (type-safe)
+    Name(DisplayName),
+    /// Search by email (type-safe)
+    Email(Email),
 }
 
 /// Mode of OAuth2 operation to explicitly indicate user intent.
@@ -253,135 +254,464 @@ impl std::str::FromStr for OAuth2Mode {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chrono::{Duration, Utc};
-    use serde_json::json;
+/// Type-safe wrapper for OAuth2 account identifiers.
+///
+/// This provides compile-time safety to prevent mixing up account IDs with other string types.
+/// Account IDs are database-specific identifiers for OAuth2 accounts.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AccountId(String);
 
-    /// Test conversion from GoogleUserInfo to OAuth2Account
+impl AccountId {
+    /// Creates a new AccountId from a string with validation.
     ///
-    /// This test verifies that a GoogleUserInfo struct can be correctly converted into
-    /// an OAuth2Account using the From trait implementation. It creates a GoogleUserInfo
-    /// object in memory with sample data and validates that all fields are properly
-    /// mapped to the resulting OAuth2Account structure.
+    /// # Arguments
+    /// * `id` - The account ID string
     ///
-    #[test]
-    fn test_from_google_user_info() {
-        let google_user = GoogleUserInfo {
-            sub: "12345".to_string(),
-            family_name: "Doe".to_string(),
-            name: "John Doe".to_string(),
-            picture: Some("https://example.com/pic.jpg".to_string()),
-            email: "john@example.com".to_string(),
-            given_name: "John".to_string(),
-            hd: Some("example.com".to_string()),
-            email_verified: true,
-        };
+    /// # Returns
+    /// * `Ok(AccountId)` - If the ID is valid
+    /// * `Err(OAuth2Error)` - If the ID is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only safe characters (alphanumeric + basic symbols)
+    /// * Must not contain control characters or dangerous sequences
+    pub fn new(id: String) -> Result<Self, crate::oauth2::OAuth2Error> {
+        use crate::oauth2::OAuth2Error;
 
-        let account = OAuth2Account::from(google_user.clone());
+        // Validate ID is not empty
+        if id.is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Account ID cannot be empty".to_string(),
+            ));
+        }
 
-        // Check that fields are correctly mapped
-        assert_eq!(account.name, "John Doe");
-        assert_eq!(account.email, "john@example.com");
-        assert_eq!(
-            account.picture,
-            Some("https://example.com/pic.jpg".to_string())
-        );
-        assert_eq!(account.provider, "google");
-        assert_eq!(account.provider_user_id, "google_12345");
+        // Validate ID length (reasonable bounds)
+        if id.len() > 255 {
+            return Err(OAuth2Error::Validation("Account ID too long".to_string()));
+        }
 
-        // Check metadata
-        let metadata = account.metadata.as_object().unwrap();
-        assert_eq!(metadata["family_name"], json!("Doe"));
-        assert_eq!(metadata["given_name"], json!("John"));
-        assert_eq!(metadata["hd"], json!("example.com"));
-        assert_eq!(metadata["email_verified"], json!(true));
+        // Validate ID contains only safe characters
+        if !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '+'))
+        {
+            return Err(OAuth2Error::Validation(
+                "Account ID contains invalid characters".to_string(),
+            ));
+        }
+
+        // Check for dangerous sequences
+        if id.contains("..") || id.contains("--") || id.contains("__") {
+            return Err(OAuth2Error::Validation(
+                "Account ID contains dangerous character sequences".to_string(),
+            ));
+        }
+
+        Ok(AccountId(id))
     }
 
-    /// Test conversion from GoogleIdInfo to OAuth2Account
+    /// Returns the account ID as a string slice.
     ///
-    /// This test verifies that a GoogleIdInfo struct can be correctly converted into
-    /// an OAuth2Account using the From trait implementation. It creates a GoogleIdInfo
-    /// object in memory with ID token claims and validates that all fields are properly
-    /// mapped to the resulting OAuth2Account structure.
-    ///
-    #[test]
-    fn test_from_google_id_info() {
-        // Create a mock GoogleIdInfo
-        let id_info = GoogleIdInfo {
-            iss: "https://accounts.google.com".to_string(),
-            azp: "client_id".to_string(),
-            aud: "client_id".to_string(),
-            sub: "12345".to_string(),
-            email: "john@example.com".to_string(),
-            email_verified: true,
-            at_hash: Some("hash".to_string()),
-            name: "John Doe".to_string(),
-            picture: Some("https://example.com/pic.jpg".to_string()),
-            given_name: "John".to_string(),
-            family_name: "Doe".to_string(),
-            locale: Some("en".to_string()),
-            iat: 0,
-            exp: 0,
-            nbf: Some(0),
-            jti: Some("jti_value".to_string()),
-            nonce: Some("nonce_value".to_string()),
-            hd: Some("example.com".to_string()),
-        };
-
-        let account = OAuth2Account::from(id_info.clone());
-
-        // Check that fields are correctly mapped
-        assert_eq!(account.name, "John Doe");
-        assert_eq!(account.email, "john@example.com");
-        assert_eq!(
-            account.picture,
-            Some("https://example.com/pic.jpg".to_string())
-        );
-        assert_eq!(account.provider, "google");
-        assert_eq!(account.provider_user_id, "google_12345");
-
-        // Check metadata
-        let metadata = account.metadata.as_object().unwrap();
-        assert_eq!(metadata["family_name"], json!("Doe"));
-        assert_eq!(metadata["given_name"], json!("John"));
-        assert_eq!(metadata["hd"], json!("example.com"));
-        assert_eq!(metadata["verified_email"], json!(true));
-    }
-
-    /// Test StoredToken to CacheData conversion roundtrip
-    ///
-    /// This test verifies that StoredToken can be converted to CacheData and back while
-    /// preserving all field values. It creates a StoredToken in memory, converts it to
-    /// CacheData, then back to StoredToken, and validates that all fields including
-    /// timestamps are preserved correctly through the conversion process.
-    ///
-    #[test]
-    fn test_stored_token_cache_data_conversion() {
-        // Create a StoredToken
-        let now = Utc::now();
-        let expires_at = now + Duration::seconds(3600);
-        let stored_token = StoredToken {
-            token: "test_token".to_string(),
-            expires_at,
-            user_agent: Some("test_agent".to_string()),
-            ttl: 3600,
-        };
-
-        // Convert to CacheData
-        let cache_data = CacheData::from(stored_token.clone());
-
-        // Convert back to StoredToken
-        let recovered_token = StoredToken::try_from(cache_data).unwrap();
-
-        // Verify all fields match
-        assert_eq!(recovered_token.token, stored_token.token);
-        assert_eq!(
-            recovered_token.expires_at.timestamp(),
-            stored_token.expires_at.timestamp()
-        );
-        assert_eq!(recovered_token.user_agent, stored_token.user_agent);
-        assert_eq!(recovered_token.ttl, stored_token.ttl);
+    /// # Returns
+    /// * A string slice containing the account ID
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
+
+/// Type-safe wrapper for OAuth2 provider names.
+///
+/// This provides compile-time safety to prevent mixing up provider names with other string types.
+/// Provider names identify the OAuth2 service (e.g., "google", "github").
+#[derive(Debug, Clone, PartialEq)]
+pub struct Provider(String);
+
+impl Provider {
+    /// Creates a new Provider from a string with validation.
+    ///
+    /// # Arguments
+    /// * `provider` - The provider name string
+    ///
+    /// # Returns
+    /// * `Ok(Provider)` - If the provider name is valid
+    /// * `Err(OAuth2Error)` - If the provider name is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only safe characters (alphanumeric, hyphens, underscores, periods)
+    /// * Must not start with special characters
+    pub fn new(provider: String) -> Result<Self, crate::oauth2::OAuth2Error> {
+        use crate::oauth2::OAuth2Error;
+
+        // Validate provider is not empty
+        if provider.is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Provider name cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate provider length (reasonable bounds for provider names)
+        if provider.len() > 50 {
+            return Err(OAuth2Error::Validation(
+                "Provider name too long".to_string(),
+            ));
+        }
+
+        // Validate provider contains only safe characters (alphanumeric, hyphens, underscores, periods)
+        // Must not start with special characters
+        if !provider
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        {
+            return Err(OAuth2Error::Validation(
+                "Provider name contains invalid characters".to_string(),
+            ));
+        }
+
+        if provider.starts_with('-') || provider.starts_with('_') || provider.starts_with('.') {
+            return Err(OAuth2Error::Validation(
+                "Provider name cannot start with special characters".to_string(),
+            ));
+        }
+
+        Ok(Provider(provider))
+    }
+
+    /// Returns the provider name as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the provider name
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for provider-specific user identifiers.
+///
+/// This provides compile-time safety to prevent mixing up provider user IDs with database user IDs.
+/// Provider user IDs are external identifiers from OAuth2 providers (e.g., Google user ID).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProviderUserId(String);
+
+impl ProviderUserId {
+    /// Creates a new ProviderUserId from a string with validation.
+    ///
+    /// # Arguments
+    /// * `id` - The provider user ID string
+    ///
+    /// # Returns
+    /// * `Ok(ProviderUserId)` - If the ID is valid
+    /// * `Err(OAuth2Error)` - If the ID is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain only safe characters (alphanumeric + basic symbols)
+    /// * Must not contain control characters or dangerous sequences
+    pub fn new(id: String) -> Result<Self, crate::oauth2::OAuth2Error> {
+        use crate::oauth2::OAuth2Error;
+
+        // Validate ID is not empty
+        if id.is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Provider user ID cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate ID length (provider IDs can be long but reasonable bounds)
+        if id.len() > 512 {
+            return Err(OAuth2Error::Validation(
+                "Provider user ID too long".to_string(),
+            ));
+        }
+
+        // Validate ID contains only safe characters
+        if !id.chars().all(|c| {
+            c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '+' | '=' | '(' | ')')
+        }) {
+            return Err(OAuth2Error::Validation(
+                "Provider user ID contains invalid characters".to_string(),
+            ));
+        }
+
+        // Check for dangerous sequences
+        if id.contains("..") || id.contains("--") || id.contains("__") {
+            return Err(OAuth2Error::Validation(
+                "Provider user ID contains dangerous character sequences".to_string(),
+            ));
+        }
+
+        Ok(ProviderUserId(id))
+    }
+
+    /// Returns the provider user ID as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the provider user ID
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for user display names.
+///
+/// This provides compile-time safety to prevent mixing up display names with other string types.
+/// Display names are user-facing names from OAuth2 providers.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DisplayName(String);
+
+impl DisplayName {
+    /// Creates a new DisplayName from a string with validation.
+    ///
+    /// This constructor is part of the public type-safe search API and is used
+    /// internally by the AccountSearchField enum for database queries.
+    ///
+    /// # Arguments
+    /// * `name` - The display name string
+    ///
+    /// # Returns
+    /// * `Ok(DisplayName)` - If the name is valid
+    /// * `Err(OAuth2Error)` - If the name is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must not consist only of whitespace
+    /// * Must not contain dangerous sequences
+    #[allow(dead_code)] // Part of type-safe search API, used in tests but not by library's public interface
+    pub fn new(name: String) -> Result<Self, crate::oauth2::OAuth2Error> {
+        use crate::oauth2::OAuth2Error;
+
+        // Validate name is not empty
+        if name.is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Display name cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate name length (reasonable bounds for display names)
+        if name.len() > 100 {
+            return Err(OAuth2Error::Validation("Display name too long".to_string()));
+        }
+
+        // Validate name doesn't consist only of whitespace
+        if name.trim().is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Display name cannot consist only of whitespace".to_string(),
+            ));
+        }
+
+        // Check for dangerous sequences
+        if name.contains("..") || name.contains("--") || name.contains("__") {
+            return Err(OAuth2Error::Validation(
+                "Display name contains dangerous character sequences".to_string(),
+            ));
+        }
+
+        Ok(DisplayName(name))
+    }
+
+    /// Returns the display name as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the display name
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for email addresses.
+///
+/// This provides compile-time safety to prevent mixing up email addresses with other string types.
+/// Email addresses are provided by OAuth2 providers for user identification.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Email(String);
+
+impl Email {
+    /// Creates a new Email from a string with validation.
+    ///
+    /// This constructor is part of the public type-safe search API and is used
+    /// internally by the AccountSearchField enum for database queries.
+    ///
+    /// # Arguments
+    /// * `email` - The email address string
+    ///
+    /// # Returns
+    /// * `Ok(Email)` - If the email is valid
+    /// * `Err(OAuth2Error)` - If the email is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must contain @ symbol
+    /// * Must have reasonable length
+    #[allow(dead_code)] // Part of type-safe search API, used in tests but not by library's public interface
+    pub fn new(email: String) -> Result<Self, crate::oauth2::OAuth2Error> {
+        use crate::oauth2::OAuth2Error;
+
+        // Validate email is not empty
+        if email.is_empty() {
+            return Err(OAuth2Error::Validation("Email cannot be empty".to_string()));
+        }
+
+        // Validate email length (RFC 5321 limits: maximum 254 characters)
+        if email.len() < 3 {
+            return Err(OAuth2Error::Validation("Email too short".to_string()));
+        }
+
+        if email.len() > 254 {
+            return Err(OAuth2Error::Validation("Email too long".to_string()));
+        }
+
+        // Basic email format validation (must contain @ and reasonable structure)
+        if !email.contains('@') {
+            return Err(OAuth2Error::Validation(
+                "Email must contain @ symbol".to_string(),
+            ));
+        }
+
+        let parts: Vec<&str> = email.split('@').collect();
+        if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+            return Err(OAuth2Error::Validation(
+                "Email format is invalid".to_string(),
+            ));
+        }
+
+        Ok(Email(email))
+    }
+
+    /// Returns the email address as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the email address
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for OAuth2 state parameters.
+///
+/// This provides compile-time safety to prevent mixing up OAuth2 state strings with other string types.
+/// OAuth2 state parameters are base64url-encoded JSON that carries CSRF protection and flow parameters
+/// between authorization requests and callbacks. Proper validation is critical for security.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OAuth2State(String);
+
+impl std::fmt::Display for OAuth2State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl OAuth2State {
+    /// Creates a new OAuth2State from a string with validation.
+    ///
+    /// This constructor validates the OAuth2 state format to ensure it meets
+    /// security requirements for CSRF protection and parameter integrity.
+    ///
+    /// # Arguments
+    /// * `state` - The OAuth2 state string (should be base64url-encoded)
+    ///
+    /// # Returns
+    /// * `Ok(OAuth2State)` - If the state is valid
+    /// * `Err(OAuth2Error)` - If the state is invalid
+    ///
+    /// # Validation Rules
+    /// * Must not be empty
+    /// * Must be valid base64url encoding
+    /// * Must contain valid JSON when decoded
+    /// * Must be reasonable length
+    pub fn new(state: String) -> Result<Self, super::errors::OAuth2Error> {
+        use super::errors::OAuth2Error;
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+
+        // Validate state is not empty
+        if state.is_empty() {
+            return Err(OAuth2Error::DecodeState(
+                "OAuth2 state cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate state length (reasonable bounds)
+        if state.len() < 10 {
+            return Err(OAuth2Error::DecodeState(
+                "OAuth2 state too short".to_string(),
+            ));
+        }
+
+        if state.len() > 8192 {
+            return Err(OAuth2Error::DecodeState(
+                "OAuth2 state too long".to_string(),
+            ));
+        }
+
+        // Validate state is valid base64url
+        let decoded_bytes = URL_SAFE_NO_PAD
+            .decode(&state)
+            .map_err(|e| OAuth2Error::DecodeState(format!("Invalid base64url encoding: {e}")))?;
+
+        // Validate decoded content is valid UTF-8
+        let decoded_string = String::from_utf8(decoded_bytes).map_err(|e| {
+            OAuth2Error::DecodeState(format!("Invalid UTF-8 in decoded state: {e}"))
+        })?;
+
+        // Validate decoded content is valid JSON
+        let _: StateParams = serde_json::from_str(&decoded_string)
+            .map_err(|e| OAuth2Error::DecodeState(format!("Invalid JSON in decoded state: {e}")))?;
+
+        Ok(OAuth2State(state))
+    }
+
+    /// Returns the OAuth2 state as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the OAuth2 state
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Checks if the state contains a substring.
+    ///
+    /// # Arguments
+    /// * `needle` - The substring to search for
+    ///
+    /// # Returns
+    /// * `true` if the substring is found, `false` otherwise
+    pub fn contains(&self, needle: char) -> bool {
+        self.0.contains(needle)
+    }
+}
+
+/// Type-safe wrapper for OAuth2 token types.
+///
+/// This enum provides compile-time safety to prevent mixing up different types of OAuth2 tokens.
+/// It ensures that token types are clearly defined and prevents typos in token type strings.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TokenType {
+    /// CSRF protection token for OAuth2 authorization flow
+    Csrf,
+    /// Nonce token for OpenID Connect
+    Nonce,
+    /// PKCE (Proof Key for Code Exchange) verifier token
+    Pkce,
+}
+
+impl std::fmt::Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl TokenType {
+    /// Returns the token type as a string slice.
+    ///
+    /// # Returns
+    /// * A string slice containing the token type name
+    pub fn as_str(&self) -> &str {
+        match self {
+            TokenType::Csrf => "csrf",
+            TokenType::Nonce => "nonce",
+            TokenType::Pkce => "pkce",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests;

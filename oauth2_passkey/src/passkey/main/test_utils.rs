@@ -5,9 +5,10 @@
 //! GENERIC_CACHE_STORE to create isolated test environments.
 
 use crate::passkey::errors::PasskeyError;
-use crate::passkey::types::{PublicKeyCredentialUserEntity, StoredOptions};
+use crate::passkey::types::{CredentialId, PublicKeyCredentialUserEntity, StoredOptions};
 use crate::passkey::{PasskeyCredential, PasskeyStore};
-use crate::storage::{CacheData, GENERIC_CACHE_STORE};
+use crate::session::UserId;
+use crate::storage::{CacheData, CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
 use crate::userdb::{User, UserStore};
 use chrono::Utc;
 use std::time::SystemTime;
@@ -54,14 +55,14 @@ impl TestCredentialData {
 
 /// Insert a test user in the database for testing
 pub async fn insert_test_user(
-    user_id: &str,
+    user_id: UserId,
     account: &str,
     label: &str,
     is_admin: bool,
 ) -> Result<User, PasskeyError> {
     let user = User {
         sequence_number: None,
-        id: user_id.to_string(),
+        id: user_id.as_str().to_string(),
         account: account.to_string(),
         label: label.to_string(),
         is_admin,
@@ -94,7 +95,11 @@ pub async fn insert_test_credential(data: TestCredentialData) -> Result<(), Pass
         last_used_at: now,
     };
 
-    PasskeyStore::store_credential(data.credential_id, credential).await
+    PasskeyStore::store_credential(
+        CredentialId::new(data.credential_id).expect("Valid credential ID"),
+        credential,
+    )
+    .await
 }
 
 /// Insert a test user and then a test passkey credential
@@ -107,34 +112,45 @@ pub async fn insert_test_user_and_credential(data: TestCredentialData) -> Result
     PasskeyStore::init().await?;
 
     // First create the user
-    insert_test_user(&data.user_id, &data.name, &data.display_name, false)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    insert_test_user(
+        UserId::new(data.user_id.clone()).expect("Valid user ID"),
+        &data.name,
+        &data.display_name,
+        false,
+    )
+    .await?;
 
     // Then create the credential
     insert_test_credential(data).await
 }
 
 /// Delete a test credential by its ID
-pub async fn delete_test_credential(credential_id: &str) -> Result<(), PasskeyError> {
+pub async fn delete_test_credential(
+    credential_id: crate::passkey::CredentialId,
+) -> Result<(), PasskeyError> {
     PasskeyStore::delete_credential_by(crate::passkey::CredentialSearchField::CredentialId(
-        credential_id.to_string(),
+        credential_id,
     ))
     .await
 }
 
 /// Remove a key from the cache store
-pub async fn remove_from_cache(category: &str, key: &str) -> Result<(), PasskeyError> {
+pub async fn remove_from_cache(
+    cache_prefix: CachePrefix,
+    cache_key: CacheKey,
+) -> Result<(), PasskeyError> {
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .remove(category, key)
+        .remove(cache_prefix, cache_key)
         .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))
+        .map_err(PasskeyError::convert_storage_error)
 }
 
 /// Clean up test credential data
-pub async fn cleanup_test_credential(credential_id: &str) -> Result<(), PasskeyError> {
+pub async fn cleanup_test_credential(
+    credential_id: crate::passkey::CredentialId,
+) -> Result<(), PasskeyError> {
     delete_test_credential(credential_id).await
 }
 
@@ -170,18 +186,26 @@ pub async fn create_test_challenge(
         expires_at: chrono::Utc::now() + chrono::Duration::seconds(ttl as i64),
     };
 
+    let cache_prefix = CachePrefix::new(challenge_type.to_string())
+        .map_err(PasskeyError::convert_storage_error)?;
+    let cache_key = CacheKey::new(id.to_string()).map_err(PasskeyError::convert_storage_error)?;
+
     GENERIC_CACHE_STORE
         .lock()
         .await
-        .put_with_ttl(challenge_type, id, cache_data, ttl as usize)
+        .put_with_ttl(cache_prefix, cache_key, cache_data, ttl as usize)
         .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))
+        .map_err(PasskeyError::convert_storage_error)
 }
 
 /// Check cache store for a specific key
-pub async fn check_cache_exists(category: &str, key: &str) -> bool {
+pub async fn check_cache_exists(cache_prefix: CachePrefix, cache_key: CacheKey) -> bool {
     matches!(
-        GENERIC_CACHE_STORE.lock().await.get(category, key).await,
+        GENERIC_CACHE_STORE
+            .lock()
+            .await
+            .get(cache_prefix, cache_key)
+            .await,
         Ok(Some(_))
     )
 }

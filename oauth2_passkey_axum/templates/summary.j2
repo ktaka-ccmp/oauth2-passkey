@@ -82,13 +82,14 @@
                     -->
                     <div class="item-detail has-icon">
                         {% if credential.authenticator_info.is_some() %}
-                            {% let auth_info = credential.authenticator_info.as_ref().unwrap() %}
-                            <strong>{{ auth_info.name }}</strong>
-                            {% if auth_info.icon_light.is_some() %}
-                                <img src="{{ auth_info.icon_light.as_ref().unwrap() }}"
-                                     alt="{{ auth_info.name }}"
-                                     class="authenticator-icon"
-                                     title="{{ auth_info.name }}">
+                            {% if let Some(auth_info) = credential.authenticator_info.as_ref() %}
+                                <strong>{{ auth_info.name }}</strong>
+                                {% if let Some(icon_url) = auth_info.icon_light.as_ref() %}
+                                    <img src="{{ icon_url }}"
+                                         alt="{{ auth_info.name }}"
+                                         class="authenticator-icon"
+                                         title="{{ auth_info.name }}">
+                                {% endif %}
                             {% endif %}
                         {% endif %}
                     </div>

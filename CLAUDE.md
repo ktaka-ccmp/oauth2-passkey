@@ -165,3 +165,5 @@ Environment variables (see `dot.env.example`):
    - This ensures commit messages can be easily copied and pasted across all environments
 
 - Investigation should never be superficial, should always be deep and thorough.
+
+- Be critical about declaring tasks complete. I’ve seen you claim completion and highlight progress while substantial work was still pending.
