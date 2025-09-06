@@ -425,10 +425,9 @@ impl ProviderUserId {
         }
 
         // Validate ID contains only safe characters
-        if !id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '+' | '='))
-        {
+        if !id.chars().all(|c| {
+            c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '+' | '=' | '(' | ')')
+        }) {
             return Err(OAuth2Error::Validation(
                 "Provider user ID contains invalid characters".to_string(),
             ));

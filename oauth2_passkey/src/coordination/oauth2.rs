@@ -454,7 +454,8 @@ pub async fn delete_oauth2_account_core(
 /// use oauth2_passkey::{list_accounts_core, UserId};
 ///
 /// async fn get_connected_services(user_id: &str) -> Vec<String> {
-///     match list_accounts_core(UserId::new(user_id.to_string())).await {
+///     let user_id = UserId::new(user_id.to_string()).expect("Valid user ID");
+///     match list_accounts_core(user_id).await {
 ///         Ok(accounts) => accounts.into_iter().map(|acc| acc.provider).collect(),
 ///         Err(_) => Vec::new()
 ///     }

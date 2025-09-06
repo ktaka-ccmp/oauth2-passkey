@@ -27,7 +27,8 @@ use crate::session::{SessionId, User as SessionUser, UserId, get_user_from_sessi
 /// use oauth2_passkey::{get_all_users, SessionId};
 ///
 /// async fn list_all_users(session_id: &str) -> Vec<String> {
-///     match get_all_users(SessionId::new(session_id.to_string())).await {
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     match get_all_users(session_id).await {
 ///         Ok(users) => users.iter().map(|user| user.account.clone()).collect(),
 ///         Err(_) => Vec::new()
 ///     }
@@ -66,7 +67,9 @@ pub async fn get_all_users(session_id: SessionId) -> Result<Vec<User>, Coordinat
 /// use oauth2_passkey::{get_user, SessionId, UserId};
 ///
 /// async fn fetch_user_profile(session_id: &str, id: &str) -> Option<String> {
-///     match get_user(SessionId::new(session_id.to_string()), UserId::new(id.to_string())).await {
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     let user_id = UserId::new(id.to_string()).expect("Valid user ID");
+///     match get_user(session_id, user_id).await {
 ///         Ok(Some(user)) => Some(user.account),
 ///         _ => None
 ///     }
@@ -108,7 +111,9 @@ pub async fn get_user(
 /// use oauth2_passkey::{delete_passkey_credential_admin, SessionId, CredentialId};
 ///
 /// async fn remove_credential(session_id: &str, credential_id: &str) -> bool {
-///     delete_passkey_credential_admin(SessionId::new(session_id.to_string()), CredentialId::new(credential_id.to_string())).await.is_ok()
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     let credential_id = CredentialId::new(credential_id.to_string()).expect("Valid credential ID");
+///     delete_passkey_credential_admin(session_id, credential_id).await.is_ok()
 /// }
 /// ```
 pub async fn delete_passkey_credential_admin(
@@ -174,7 +179,9 @@ pub async fn delete_passkey_credential_admin(
 /// use oauth2_passkey::{delete_oauth2_account_admin, SessionId, ProviderUserId};
 ///
 /// async fn remove_oauth2_account(session_id: &str, provider_id: &str) -> bool {
-///     delete_oauth2_account_admin(SessionId::new(session_id.to_string()), ProviderUserId::new(provider_id.to_string())).await.is_ok()
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     let provider_id = ProviderUserId::new(provider_id.to_string()).expect("Valid provider ID");
+///     delete_oauth2_account_admin(session_id, provider_id).await.is_ok()
 /// }
 /// ```
 pub async fn delete_oauth2_account_admin(
@@ -228,7 +235,9 @@ pub async fn delete_oauth2_account_admin(
 /// use oauth2_passkey::{delete_user_account_admin, SessionId, UserId};
 ///
 /// async fn purge_account(session_id: &str, user_id: &str) -> Result<(), String> {
-///     delete_user_account_admin(SessionId::new(session_id.to_string()), UserId::new(user_id.to_string())).await.map_err(|e| e.to_string())
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     let user_id = UserId::new(user_id.to_string()).expect("Valid user ID");
+///     delete_user_account_admin(session_id, user_id).await.map_err(|e| e.to_string())
 /// }
 /// ```
 pub async fn delete_user_account_admin(
@@ -286,7 +295,9 @@ pub async fn delete_user_account_admin(
 /// use oauth2_passkey::{update_user_admin_status, SessionId, UserId};
 ///
 /// async fn make_user_admin(session_id: &str, user_id: &str) -> bool {
-///     update_user_admin_status(SessionId::new(session_id.to_string()), UserId::new(user_id.to_string()), true).await.is_ok()
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     let user_id = UserId::new(user_id.to_string()).expect("Valid user ID");
+///     update_user_admin_status(session_id, user_id, true).await.is_ok()
 /// }
 /// ```
 pub async fn update_user_admin_status(
