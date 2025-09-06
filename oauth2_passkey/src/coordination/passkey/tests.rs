@@ -45,7 +45,7 @@ async fn insert_test_passkey_credential(
     };
 
     PasskeyStore::store_credential(
-        CredentialId::new(credential.credential_id.clone()),
+        CredentialId::new(credential.credential_id.clone()).expect("Valid test credential ID"),
         credential,
     )
     .await?;
@@ -76,8 +76,8 @@ async fn test_delete_passkey_credential_core_not_found() -> Result<(), Box<dyn s
 
     // Try to delete a nonexistent passkey credential
     let result = delete_passkey_credential_core(
-        UserId::new(user_id.to_string()),
-        CredentialId::new(credential_id.to_string()),
+        UserId::new(user_id.to_string()).expect("Valid user ID"),
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
     )
     .await;
     assert!(
@@ -125,7 +125,7 @@ async fn test_update_passkey_credential_core_success() -> Result<(), Box<dyn std
     let new_name = "Updated Name";
     let new_display_name = "Updated Display Name";
     let result = update_passkey_credential_core(
-        CredentialId::new(credential_id.to_string()),
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
         new_name,
         new_display_name,
         Some(session_user),
@@ -138,10 +138,11 @@ async fn test_update_passkey_credential_core_success() -> Result<(), Box<dyn std
     );
 
     // Verify the credential was updated
-    let updated_credential =
-        PasskeyStore::get_credential(CredentialId::new(credential_id.to_string()))
-            .await?
-            .unwrap();
+    let updated_credential = PasskeyStore::get_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await?
+    .unwrap();
     assert_eq!(
         updated_credential.user.name, new_name,
         "Name was not updated"
@@ -193,7 +194,7 @@ async fn test_update_passkey_credential_core_unauthorized() -> Result<(), Box<dy
 
     // Try to update the passkey credential as a different user
     let result = update_passkey_credential_core(
-        CredentialId::new(credential_id.to_string()),
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
         "Updated Name",
         "Updated Display Name",
         Some(session_user),
@@ -233,7 +234,7 @@ async fn test_update_passkey_credential_core_no_session() -> Result<(), Box<dyn 
 
     // Try to update the passkey credential without a session user
     let result = update_passkey_credential_core(
-        CredentialId::new(credential_id.to_string()),
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
         "Updated Name",
         "Updated Display Name",
         None,

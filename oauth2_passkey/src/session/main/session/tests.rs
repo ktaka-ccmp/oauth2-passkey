@@ -289,7 +289,8 @@ async fn test_create_new_session_with_uid() {
     let user_id = "test_user_123";
 
     // Create a new session using global store
-    let result = create_new_session_with_uid(UserId::new(user_id.to_string())).await;
+    let result =
+        create_new_session_with_uid(UserId::new(user_id.to_string()).expect("Valid user ID")).await;
 
     // Should succeed and return headers with cookie
     assert!(result.is_ok());
@@ -374,8 +375,10 @@ async fn test_delete_session_from_store_by_session_id() {
         .unwrap();
 
     // Delete the session by session ID using global store
-    let delete_result =
-        delete_session_from_store_by_session_id(SessionId::new(session_id.to_string())).await;
+    let delete_result = delete_session_from_store_by_session_id(
+        SessionId::new(session_id.to_string()).expect("Valid session ID"),
+    )
+    .await;
 
     // Deletion should succeed
     assert!(delete_result.is_ok());
@@ -942,7 +945,8 @@ async fn test_create_new_session_with_uid_success() {
     let user_id = "test_user_session_creation";
 
     // Create a new session
-    let result = create_new_session_with_uid(UserId::new(user_id.to_string())).await;
+    let result =
+        create_new_session_with_uid(UserId::new(user_id.to_string()).expect("Valid user ID")).await;
     assert!(result.is_ok());
 
     let headers = result.unwrap();
@@ -1197,8 +1201,10 @@ async fn test_delete_session_from_store_by_session_id_success() {
     assert!(cached_session_before.is_some());
 
     // Delete the session
-    let delete_result =
-        delete_session_from_store_by_session_id(SessionId::new(session_id.to_string())).await;
+    let delete_result = delete_session_from_store_by_session_id(
+        SessionId::new(session_id.to_string()).expect("Valid session ID"),
+    )
+    .await;
     assert!(delete_result.is_ok());
 
     // Verify session was actually removed from cache
@@ -1214,9 +1220,10 @@ async fn test_delete_session_from_store_by_session_id_success() {
     assert!(cached_session_after.is_none());
 
     // Test deleting non-existent session (should not error)
-    let delete_nonexistent =
-        delete_session_from_store_by_session_id(SessionId::new("non_existent_session".to_string()))
-            .await;
+    let delete_nonexistent = delete_session_from_store_by_session_id(
+        SessionId::new("non_existent_session".to_string()).expect("Valid session ID"),
+    )
+    .await;
     assert!(delete_nonexistent.is_ok());
 }
 
@@ -1522,11 +1529,11 @@ async fn test_get_user_from_session_requires_database() {
 
     // Insert test user and session
     let user = create_test_user_and_session(
-        UserId::new(user_id.to_string()),
+        UserId::new(user_id.to_string()).expect("Valid user ID"),
         account,
         label,
         is_admin,
-        SessionId::new(session_id.to_string()),
+        SessionId::new(session_id.to_string()).expect("Valid session ID"),
         csrf_token,
         ttl,
     )
@@ -1549,8 +1556,8 @@ async fn test_get_user_from_session_requires_database() {
 
     // Clean up test resources
     let _ = cleanup_test_resources(
-        UserId::new(user_id.to_string()),
-        SessionId::new(session_id.to_string()),
+        UserId::new(user_id.to_string()).expect("Valid user ID"),
+        SessionId::new(session_id.to_string()).expect("Valid session ID"),
     )
     .await;
 }
@@ -1579,11 +1586,11 @@ async fn test_is_authenticated_strict_requires_database() {
 
     // Insert test user and session
     let user = create_test_user_and_session(
-        UserId::new(user_id.to_string()),
+        UserId::new(user_id.to_string()).expect("Valid user ID"),
         account,
         label,
         is_admin,
-        SessionId::new(session_id.to_string()),
+        SessionId::new(session_id.to_string()).expect("Valid session ID"),
         csrf_token,
         ttl,
     )
@@ -1606,8 +1613,8 @@ async fn test_is_authenticated_strict_requires_database() {
 
     // Create session but don't create the user in database
     let _ = crate::session::main::test_utils::insert_test_session(
-        SessionId::new(nonexistent_session_id.to_string()),
-        UserId::new(nonexistent_user_id.to_string()),
+        SessionId::new(nonexistent_session_id.to_string()).expect("Valid session ID"),
+        UserId::new(nonexistent_user_id.to_string()).expect("Valid user ID"),
         nonexistent_csrf,
         ttl,
     )
@@ -1623,13 +1630,13 @@ async fn test_is_authenticated_strict_requires_database() {
 
     // Clean up test resources
     let _ = cleanup_test_resources(
-        UserId::new(user_id.to_string()),
-        SessionId::new(session_id.to_string()),
+        UserId::new(user_id.to_string()).expect("Valid user ID"),
+        SessionId::new(session_id.to_string()).expect("Valid session ID"),
     )
     .await;
-    let _ = crate::session::main::test_utils::delete_test_session(SessionId::new(
-        nonexistent_session_id.to_string(),
-    ))
+    let _ = crate::session::main::test_utils::delete_test_session(
+        SessionId::new(nonexistent_session_id.to_string()).expect("Valid session ID"),
+    )
     .await;
 }
 

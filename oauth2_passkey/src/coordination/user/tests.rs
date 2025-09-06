@@ -82,7 +82,7 @@ async fn test_update_user_account_success() {
 
     // 1. Create user and session using test utilities
     insert_test_user(
-        UserId::new(user_id.to_string()),
+        UserId::new(user_id.to_string()).expect("Valid test user ID"),
         "old-account",
         "Old Label",
         false,
@@ -90,8 +90,8 @@ async fn test_update_user_account_success() {
     .await
     .expect("Failed to create test user");
     insert_test_session(
-        SessionId::new(session_id.to_string()),
-        UserId::new(user_id.to_string()),
+        SessionId::new(session_id.to_string()).expect("Valid test session ID"),
+        UserId::new(user_id.to_string()).expect("Valid test user ID"),
         "test-csrf",
         3600,
     )
@@ -100,8 +100,8 @@ async fn test_update_user_account_success() {
 
     // 2. Call the actual function from the parent module
     let result = super::update_user_account(
-        SessionId::new(session_id.to_string()), // session_id with valid session
-        UserId::new(user_id.to_string()),       // user_id
+        SessionId::new(session_id.to_string()).expect("Valid session ID"), // session_id with valid session
+        UserId::new(user_id.to_string()).expect("Valid user ID"),          // user_id
         Some("new-account".to_string()),
         Some("New Label".to_string()),
     )
@@ -119,10 +119,11 @@ async fn test_update_user_account_success() {
     assert_eq!(updated_user_from_func.label, "New Label");
 
     // 4. Verify directly from DB for extra confidence
-    let user_from_db = UserStore::get_user(UserId::new(user_id.to_string()))
-        .await
-        .expect("DB error getting user")
-        .expect("User not found in DB after update");
+    let user_from_db =
+        UserStore::get_user(UserId::new(user_id.to_string()).expect("Valid user ID"))
+            .await
+            .expect("DB error getting user")
+            .expect("User not found in DB after update");
     assert_eq!(user_from_db.account, "new-account");
     assert_eq!(user_from_db.label, "New Label");
 }
@@ -143,7 +144,7 @@ async fn test_update_user_account_not_found() {
 
     // Create a session user (who will try to update a non-existent user)
     insert_test_user(
-        UserId::new(session_user_id.to_string()),
+        UserId::new(session_user_id.to_string()).expect("Valid session user ID"),
         "session@example.com",
         "Session User",
         false,
@@ -151,8 +152,8 @@ async fn test_update_user_account_not_found() {
     .await
     .expect("Failed to create session user");
     insert_test_session(
-        SessionId::new(session_id.to_string()),
-        UserId::new(session_user_id.to_string()),
+        SessionId::new(session_id.to_string()).expect("Valid session ID"),
+        UserId::new(session_user_id.to_string()).expect("Valid session user ID"),
         "test-csrf",
         3600,
     )
@@ -161,8 +162,8 @@ async fn test_update_user_account_not_found() {
 
     // Call the actual function with a non-existent target user
     let result = super::update_user_account(
-        SessionId::new(session_id.to_string()), // session_id (valid session)
-        UserId::new(nonexistent_user_id.to_string()), // user_id (non-existent)
+        SessionId::new(session_id.to_string()).expect("Valid session ID"), // session_id (valid session)
+        UserId::new(nonexistent_user_id.to_string()).expect("Valid nonexistent user ID"), // user_id (non-existent)
         Some("new-account".to_string()),
         Some("New Label".to_string()),
     )
@@ -219,13 +220,13 @@ async fn test_delete_user_account_success() {
     let cred1 = create_test_credential(&format!("credential-1-{timestamp}"), &user_id_to_delete);
     let cred2 = create_test_credential(&format!("credential-2-{timestamp}"), &user_id_to_delete);
     PasskeyStore::store_credential(
-        CredentialId::new(cred1.credential_id.clone()),
+        CredentialId::new(cred1.credential_id.clone()).expect("Valid credential ID"),
         cred1.clone(),
     )
     .await
     .expect("Failed to store cred1");
     PasskeyStore::store_credential(
-        CredentialId::new(cred2.credential_id.clone()),
+        CredentialId::new(cred2.credential_id.clone()).expect("Valid credential ID"),
         cred2.clone(),
     )
     .await
@@ -254,8 +255,8 @@ async fn test_delete_user_account_success() {
     // Create session for the user (user deleting their own account)
     let session_id = format!("test-session-{timestamp}");
     insert_test_session(
-        SessionId::new(session_id.clone()),
-        UserId::new(user_id_to_delete.clone()),
+        SessionId::new(session_id.clone()).expect("Valid session ID"),
+        UserId::new(user_id_to_delete.clone()).expect("Valid user ID"),
         "test-csrf",
         3600,
     )
@@ -264,8 +265,8 @@ async fn test_delete_user_account_success() {
 
     // 4. Call the actual function
     let result = super::delete_user_account(
-        SessionId::new(session_id.clone()),
-        UserId::new(user_id_to_delete.clone()),
+        SessionId::new(session_id.clone()).expect("Valid session ID"),
+        UserId::new(user_id_to_delete.clone()).expect("Valid user ID"),
     )
     .await;
 
@@ -286,14 +287,15 @@ async fn test_delete_user_account_success() {
     assert_eq!(returned_credential_ids, expected_sorted);
 
     // 6. Verify user is deleted
-    let user_from_db = UserStore::get_user(UserId::new(user_id_to_delete.clone()))
-        .await
-        .expect("DB error getting user");
+    let user_from_db =
+        UserStore::get_user(UserId::new(user_id_to_delete.clone()).expect("Valid user ID"))
+            .await
+            .expect("DB error getting user");
     assert!(user_from_db.is_none(), "User was not deleted from DB");
 
     // 7. Verify passkeys are deleted
     let passkeys_from_db = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
-        UserId::new(user_id_to_delete.clone()),
+        UserId::new(user_id_to_delete.clone()).expect("Valid user ID"),
     ))
     .await
     .expect("DB error getting passkeys");
@@ -301,7 +303,7 @@ async fn test_delete_user_account_success() {
 
     // 8. Verify OAuth2 accounts are deleted
     let oauth_accounts_from_db = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::UserId(
-        UserId::new(user_id_to_delete.clone()),
+        UserId::new(user_id_to_delete.clone()).expect("Valid user ID"),
     ))
     .await
     .expect("DB error getting oauth accounts");
@@ -330,7 +332,7 @@ async fn test_delete_user_account_not_found() {
 
     // Create a session user (who will try to delete a non-existent user)
     insert_test_user(
-        UserId::new(session_user_id.to_string()),
+        UserId::new(session_user_id.to_string()).expect("Valid session user ID"),
         "session@example.com",
         "Session User",
         false,
@@ -338,8 +340,8 @@ async fn test_delete_user_account_not_found() {
     .await
     .expect("Failed to create session user");
     insert_test_session(
-        SessionId::new(session_id.to_string()),
-        UserId::new(session_user_id.to_string()),
+        SessionId::new(session_id.to_string()).expect("Valid session ID"),
+        UserId::new(session_user_id.to_string()).expect("Valid session user ID"),
         "test-csrf",
         3600,
     )
@@ -347,8 +349,8 @@ async fn test_delete_user_account_not_found() {
     .expect("Failed to create session");
 
     let result = super::delete_user_account(
-        SessionId::new(session_id.to_string()),
-        UserId::new(nonexistent_user_id.to_string()),
+        SessionId::new(session_id.to_string()).expect("Valid session ID"),
+        UserId::new(nonexistent_user_id.to_string()).expect("Valid nonexistent user ID"),
     )
     .await;
 
@@ -393,9 +395,10 @@ async fn test_gen_new_user_id_success() {
     assert!(!generated_id.is_empty(), "Generated ID is empty");
 
     // Verify the ID is indeed not in the DB (gen_new_user_id should ensure this)
-    let user_from_db = UserStore::get_user(UserId::new(generated_id.clone()))
-        .await
-        .expect("DB error checking generated ID");
+    let user_from_db =
+        UserStore::get_user(UserId::new(generated_id.clone()).expect("Valid user ID"))
+            .await
+            .expect("DB error checking generated ID");
     assert!(
         user_from_db.is_none(),
         "Generated ID was found in DB, but should be unique"
@@ -495,13 +498,13 @@ async fn test_gen_new_user_id_max_retries() {
     }
 
     // Clean up
-    UserStore::delete_user(UserId::new(test_user1.id))
+    UserStore::delete_user(UserId::new(test_user1.id).expect("Valid user ID"))
         .await
         .ok();
-    UserStore::delete_user(UserId::new(test_user2.id))
+    UserStore::delete_user(UserId::new(test_user2.id).expect("Valid user ID"))
         .await
         .ok();
-    UserStore::delete_user(UserId::new(test_user3.id))
+    UserStore::delete_user(UserId::new(test_user3.id).expect("Valid user ID"))
         .await
         .ok();
 }
@@ -519,7 +522,7 @@ async fn gen_new_user_id_with_mock(uuids: &[&str]) -> Result<String, Coordinatio
         let id = uuids[uuid_index].to_string();
 
         // Check if a user with this ID already exists
-        match UserStore::get_user(UserId::new(id.clone())).await {
+        match UserStore::get_user(UserId::new(id.clone()).expect("Valid user ID")).await {
             Ok(None) => return Ok(id), // ID is unique, return it
             Ok(Some(_)) => continue,   // ID exists, try again
             Err(e) => {

@@ -739,9 +739,10 @@ async fn test_get_or_create_user_handle() {
     assert!(second_handle_result.is_ok());
 
     // Clean up
-    let cleanup_result =
-        passkey_test_utils::cleanup_test_credential(CredentialId::new(credential_id.to_string()))
-            .await;
+    let cleanup_result = passkey_test_utils::cleanup_test_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await;
     assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
 }
 
@@ -924,9 +925,10 @@ async fn test_verify_session_then_finish_registration_success() {
     );
 
     // Cleanup
-    let cleanup_result =
-        passkey_test_utils::cleanup_test_credential(CredentialId::new(credential_id.to_string()))
-            .await;
+    let cleanup_result = passkey_test_utils::cleanup_test_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await;
     assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
     if let Ok(cache_key) = CacheKey::new(user_handle.to_string()) {
         let cache_prefix = CachePrefix::reg_challenge();

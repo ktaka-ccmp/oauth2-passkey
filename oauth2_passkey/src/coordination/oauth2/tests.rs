@@ -137,7 +137,7 @@ async fn test_list_accounts_core() -> Result<(), Box<dyn std::error::Error>> {
         create_test_oauth2_account_in_db(&user_id, provider2, provider_user_id2).await?;
 
     // List the OAuth2 accounts
-    let accounts = list_accounts_core(UserId::new(user_id.clone())).await?;
+    let accounts = list_accounts_core(UserId::new(user_id.clone()).expect("Valid user ID")).await?;
     assert_eq!(
         accounts.len(),
         2,
@@ -180,9 +180,9 @@ async fn test_delete_oauth2_account_core_success() -> Result<(), Box<dyn std::er
 
     // Delete the OAuth2 account
     let result = delete_oauth2_account_core(
-        UserId::new(user_id.to_string()),
-        Provider::new(provider.to_string()),
-        ProviderUserId::new(unique_provider_user_id.clone()),
+        UserId::new(user_id.to_string()).expect("Valid user ID"),
+        Provider::new(provider.to_string()).expect("Valid provider"),
+        ProviderUserId::new(unique_provider_user_id.clone()).expect("Valid user ID"),
     )
     .await;
     assert!(
@@ -192,7 +192,7 @@ async fn test_delete_oauth2_account_core_success() -> Result<(), Box<dyn std::er
 
     // Verify the account was deleted
     let accounts = OAuth2Store::get_oauth2_accounts_by(AccountSearchField::ProviderUserId(
-        crate::oauth2::ProviderUserId::new(unique_provider_user_id),
+        crate::oauth2::ProviderUserId::new(unique_provider_user_id).expect("Valid user ID"),
     ))
     .await?;
     assert!(accounts.is_empty(), "OAuth2 account was not deleted");
@@ -226,9 +226,9 @@ async fn test_delete_oauth2_account_core_unauthorized() -> Result<(), Box<dyn st
 
     // Try to delete the OAuth2 account as a different user
     let result = delete_oauth2_account_core(
-        UserId::new(other_user_id),
-        Provider::new(provider.to_string()),
-        ProviderUserId::new(unique_provider_user_id),
+        UserId::new(other_user_id).expect("Valid user ID"),
+        Provider::new(provider.to_string()).expect("Valid provider"),
+        ProviderUserId::new(unique_provider_user_id).expect("Valid user ID"),
     )
     .await;
     assert!(

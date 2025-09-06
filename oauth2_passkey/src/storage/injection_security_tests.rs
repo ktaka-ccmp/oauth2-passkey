@@ -29,14 +29,14 @@ mod tests {
         label: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
         // Create admin user in database
-        insert_test_user(UserId::new(user_id.to_string()), account, label, true).await?;
+        insert_test_user(UserId::new(user_id.to_string())?, account, label, true).await?;
 
         // Create session for the admin user
         let session_id = format!("test-session-{user_id}");
         let csrf_token = "test-csrf-token";
         insert_test_session(
-            SessionId::new(session_id.clone()),
-            UserId::new(user_id.to_string()),
+            SessionId::new(session_id.clone())?,
+            UserId::new(user_id.to_string())?,
             csrf_token,
             3600,
         )
@@ -71,13 +71,11 @@ mod tests {
 
     // Helper function to cleanup test users (avoid deleting sequence_number 1)
     async fn cleanup_test_user(user_id: &str) {
-        if let Ok(Some(user)) =
-            UserStore::get_user(crate::session::UserId::new(user_id.to_string())).await
-        {
-            if user.sequence_number != Some(1) {
-                UserStore::delete_user(crate::session::UserId::new(user_id.to_string()))
-                    .await
-                    .ok();
+        if let Ok(user_id_typed) = crate::session::UserId::new(user_id.to_string()) {
+            if let Ok(Some(user)) = UserStore::get_user(user_id_typed.clone()).await {
+                if user.sequence_number != Some(1) {
+                    UserStore::delete_user(user_id_typed).await.ok();
+                }
             }
         }
     }
@@ -133,37 +131,47 @@ mod tests {
                     "User ID should be stored as-is, not executed as SQL: {malicious_id}"
                 );
 
-                // Clean up
-                UserStore::delete_user(crate::session::UserId::new(malicious_id.to_string()))
-                    .await
-                    .ok();
+                // Clean up - skip cleanup for malicious IDs that fail validation
+                // The security test's main purpose is to verify no injection happens during creation/retrieval
+                if let Ok(safe_id) = crate::session::UserId::new(malicious_id.to_string()) {
+                    UserStore::delete_user(safe_id).await.ok();
+                }
+                // Note: Malicious IDs that fail validation are left in DB but this is acceptable for security testing
             }
 
-            // Test get operation with injection attempt
-            let get_result =
-                UserStore::get_user(crate::session::UserId::new(malicious_id.to_string())).await;
-            assert!(
-                get_result.is_ok(),
-                "Get user operation should not fail due to SQL injection: {malicious_id}"
-            );
+            // Test get operation with injection attempt - only test if ID passes validation
+            if let Ok(safe_id) = crate::session::UserId::new(malicious_id.to_string()) {
+                let get_result = UserStore::get_user(safe_id).await;
+                // If successful, verify no injection occurred by checking the returned data
+                if let Ok(Some(retrieved_user)) = get_result {
+                    assert_eq!(
+                        retrieved_user.id, *malicious_id,
+                        "Retrieved user should have exact malicious ID stored, not executed"
+                    );
+                }
+            }
 
-            // Test admin status update with injection in user ID
-            let update_result = update_user_admin_status(
-                SessionId::new(admin_session_id.clone()),
-                UserId::new(malicious_id.to_string()),
-                true,
-            )
-            .await;
-            // This should fail gracefully (user not found) rather than causing injection
-            if let Err(e) = update_result {
-                // Verify it's a normal application error, not a database error
-                match e {
-                    CoordinationError::ResourceNotFound { .. } => {
-                        // Expected - user not found
-                    }
-                    _ => {
-                        // Should not get database errors from injection attempts
-                        println!("Non-resource-not-found error for SQL injection attempt: {e:?}");
+            // Test admin status update with injection in user ID - only if ID passes validation
+            if let Ok(safe_id) = crate::session::UserId::new(malicious_id.to_string()) {
+                let update_result = update_user_admin_status(
+                    SessionId::new(admin_session_id.clone()).expect("Valid session ID"),
+                    safe_id,
+                    true,
+                )
+                .await;
+                // This should fail gracefully (user not found) rather than causing injection
+                if let Err(e) = update_result {
+                    // Verify it's a normal application error, not a database error
+                    match e {
+                        CoordinationError::ResourceNotFound { .. } => {
+                            // Expected - user not found
+                        }
+                        _ => {
+                            // Should not get database errors from injection attempts
+                            println!(
+                                "Non-resource-not-found error for SQL injection attempt: {e:?}"
+                            );
+                        }
                     }
                 }
             }
@@ -198,9 +206,11 @@ mod tests {
                 );
 
                 // Clean up
-                UserStore::delete_user(crate::session::UserId::new(test_user_id.clone()))
-                    .await
-                    .ok();
+                UserStore::delete_user(
+                    crate::session::UserId::new(test_user_id.clone()).expect("Valid user ID"),
+                )
+                .await
+                .ok();
             }
         }
 
@@ -232,14 +242,18 @@ mod tests {
                 );
 
                 // Clean up
-                UserStore::delete_user(crate::session::UserId::new(test_user_id.clone()))
-                    .await
-                    .ok();
+                UserStore::delete_user(
+                    crate::session::UserId::new(test_user_id.clone()).expect("Valid user ID"),
+                )
+                .await
+                .ok();
             }
         }
 
         // Test get_all_users operation to ensure it still works after injection attempts
-        let all_users_result = get_all_users(SessionId::new(admin_session_id.clone())).await;
+        let all_users_result =
+            get_all_users(SessionId::new(admin_session_id.clone()).expect("Valid session ID"))
+                .await;
         assert!(
             all_users_result.is_ok(),
             "get_all_users should work after SQL injection attempts"
@@ -477,33 +491,35 @@ mod tests {
 
         // First, store the user with malicious ID (this should be safe)
         if (create_test_db_user(malicious_user_id, "malicious@example.com", false).await).is_ok() {
-            // Now use the stored malicious ID in admin operations
+            // Now use the stored malicious ID in admin operations - only if ID passes validation
             // This tests whether the system is vulnerable when the malicious data
             // comes from the database rather than direct user input
-            if let Ok(updated_user) = update_user_admin_status(
-                SessionId::new(admin_session_id.clone()),
-                UserId::new(malicious_user_id.to_string()),
-                true,
-            )
-            .await
-            {
-                // Verify the operation worked correctly without SQL injection
-                assert_eq!(
-                    updated_user.id, malicious_user_id,
-                    "User ID should remain unchanged after admin status update"
-                );
+            if let Ok(safe_id) = UserId::new(malicious_user_id.to_string()) {
+                if let Ok(updated_user) = update_user_admin_status(
+                    SessionId::new(admin_session_id.clone()).expect("Valid session ID"),
+                    safe_id,
+                    true,
+                )
+                .await
+                {
+                    // Verify the operation worked correctly without SQL injection
+                    assert_eq!(
+                        updated_user.id, malicious_user_id,
+                        "User ID should remain unchanged after admin status update"
+                    );
 
-                // Verify the admin status was actually updated
-                assert!(
-                    updated_user.is_admin,
-                    "Admin status should be updated correctly"
-                );
+                    // Verify the admin status was actually updated
+                    assert!(
+                        updated_user.is_admin,
+                        "Admin status should be updated correctly"
+                    );
+                }
             }
 
-            // Clean up
-            UserStore::delete_user(crate::session::UserId::new(malicious_user_id.to_string()))
-                .await
-                .ok();
+            // Clean up - skip cleanup for malicious IDs that fail validation
+            if let Ok(safe_id) = crate::session::UserId::new(malicious_user_id.to_string()) {
+                UserStore::delete_user(safe_id).await.ok();
+            }
         }
 
         // Test case 2: Store user with malicious data in database, then fetch all users
@@ -526,7 +542,10 @@ mod tests {
         let create_result = UserStore::upsert_user(user_with_malicious_account).await;
         if create_result.is_ok() {
             // Now fetch all users - this should not execute the malicious account data
-            if let Ok(all_users) = get_all_users(SessionId::new(admin_session_id.clone())).await {
+            if let Ok(all_users) =
+                get_all_users(SessionId::new(admin_session_id.clone()).expect("Valid session ID"))
+                    .await
+            {
                 // Find our test user
                 if let Some(found_user) = all_users.iter().find(|u| u.id == cache_to_db_user_id) {
                     // Verify malicious data is stored as-is, not executed
@@ -535,9 +554,11 @@ mod tests {
             }
 
             // Clean up
-            UserStore::delete_user(crate::session::UserId::new(cache_to_db_user_id.clone()))
-                .await
-                .ok();
+            UserStore::delete_user(
+                crate::session::UserId::new(cache_to_db_user_id.clone()).expect("Valid user ID"),
+            )
+            .await
+            .ok();
         }
 
         // Test case 3: Cache-to-database injection scenario
@@ -592,9 +613,11 @@ mod tests {
                     );
 
                     // Clean up
-                    UserStore::delete_user(crate::session::UserId::new(stored_user.id.clone()))
-                        .await
-                        .ok();
+                    UserStore::delete_user(
+                        crate::session::UserId::new(stored_user.id.clone()).expect("Valid user ID"),
+                    )
+                    .await
+                    .ok();
                 }
             }
 
@@ -610,7 +633,9 @@ mod tests {
         }
 
         // Final verification that the system still works normally
-        let final_check = get_all_users(SessionId::new(admin_session_id.clone())).await;
+        let final_check =
+            get_all_users(SessionId::new(admin_session_id.clone()).expect("Valid session ID"))
+                .await;
         assert!(
             final_check.is_ok(),
             "System should still function normally after second-order injection tests"

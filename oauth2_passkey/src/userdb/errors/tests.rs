@@ -89,9 +89,9 @@ async fn test_not_found_error_in_context() {
     init_test_environment().await;
 
     // Try to get a user that doesn't exist
-    let result = UserStore::get_user(crate::session::UserId::new(
-        "nonexistent_user_id".to_string(),
-    ))
+    let result = UserStore::get_user(
+        crate::session::UserId::new("nonexistent_user_id".to_string()).expect("Valid user ID"),
+    )
     .await;
 
     // This should succeed with None, not error
@@ -104,7 +104,11 @@ async fn test_not_found_error_in_context() {
 
     // Now let's create a function that expects the user to exist
     async fn get_existing_user(id: &str) -> Result<crate::userdb::User, UserError> {
-        match UserStore::get_user(crate::session::UserId::new(id.to_string())).await? {
+        match UserStore::get_user(
+            crate::session::UserId::new(id.to_string()).expect("Valid user ID"),
+        )
+        .await?
+        {
             Some(user) => Ok(user),
             None => Err(UserError::NotFound),
         }

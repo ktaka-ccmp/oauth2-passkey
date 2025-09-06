@@ -79,7 +79,7 @@ async fn test_store_and_get_credential() {
 
     // Store credential
     let store_result = PasskeyStore::store_credential(
-        CredentialId::new(credential_id.to_string()),
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
         credential.clone(),
     )
     .await;
@@ -90,8 +90,10 @@ async fn test_store_and_get_credential() {
     );
 
     // Get credential
-    let get_result =
-        PasskeyStore::get_credential(CredentialId::new(credential_id.to_string())).await;
+    let get_result = PasskeyStore::get_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await;
     assert!(
         get_result.is_ok(),
         "Failed to get credential: {:?}",
@@ -110,10 +112,13 @@ async fn test_store_and_get_credential() {
 
     // Cleanup
     let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-        crate::passkey::CredentialId::new(credential_id.to_string()),
+        crate::passkey::CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
     ))
     .await;
-    let _ = UserStore::delete_user(crate::session::UserId::new(user_id.to_string())).await;
+    let _ = UserStore::delete_user(
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
+    )
+    .await;
 }
 
 /// Test retrieving a nonexistent passkey credential
@@ -127,8 +132,10 @@ async fn test_get_nonexistent_credential() {
     init_test_environment().await;
     let _ = PasskeyStore::init().await;
 
-    let result =
-        PasskeyStore::get_credential(CredentialId::new("nonexistent_credential".to_string())).await;
+    let result = PasskeyStore::get_credential(
+        CredentialId::new("nonexistent_credential".to_string()).expect("Valid credential ID"),
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Getting nonexistent credential should not error"
@@ -152,8 +159,8 @@ async fn test_get_credentials_by_user_id() {
     let _ = UserStore::init().await;
 
     let user_id = "test_user_multi";
-    let credential1 = create_test_credential("cred_001", user_id, "handle_001");
-    let credential2 = create_test_credential("cred_002", user_id, "handle_002");
+    let credential1 = create_test_credential("cred_001_test", user_id, "handle_001");
+    let credential2 = create_test_credential("cred_002_test", user_id, "handle_002");
 
     // Create user first
     let _ = create_test_user(user_id)
@@ -161,14 +168,20 @@ async fn test_get_credentials_by_user_id() {
         .expect("Failed to create test user");
 
     // Store multiple credentials for same user
-    let _ = PasskeyStore::store_credential(CredentialId::new("cred_001".to_string()), credential1)
-        .await;
-    let _ = PasskeyStore::store_credential(CredentialId::new("cred_002".to_string()), credential2)
-        .await;
+    let _ = PasskeyStore::store_credential(
+        CredentialId::new("cred_001_test".to_string()).expect("Valid credential ID"),
+        credential1,
+    )
+    .await;
+    let _ = PasskeyStore::store_credential(
+        CredentialId::new("cred_002_test".to_string()).expect("Valid credential ID"),
+        credential2,
+    )
+    .await;
 
     // Get credentials by user ID
     let result = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
-        crate::session::UserId::new(user_id.to_string()),
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
     ))
     .await;
     assert!(
@@ -188,15 +201,18 @@ async fn test_get_credentials_by_user_id() {
         .iter()
         .map(|c| c.credential_id.clone())
         .collect();
-    assert!(credential_ids.contains(&"cred_001".to_string()));
-    assert!(credential_ids.contains(&"cred_002".to_string()));
+    assert!(credential_ids.contains(&"cred_001_test".to_string()));
+    assert!(credential_ids.contains(&"cred_002_test".to_string()));
 
     // Cleanup
     let _ = PasskeyStore::delete_credential_by(CredentialSearchField::UserId(
-        crate::session::UserId::new(user_id.to_string()),
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
     ))
     .await;
-    let _ = UserStore::delete_user(crate::session::UserId::new(user_id.to_string())).await;
+    let _ = UserStore::delete_user(
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
+    )
+    .await;
 }
 
 /// Test retrieving credentials by user handle
@@ -222,7 +238,7 @@ async fn test_get_credentials_by_user_handle() {
 
     // Store credential
     let _ = PasskeyStore::store_credential(
-        CredentialId::new("cred_handle_test".to_string()),
+        CredentialId::new("cred_handle_test".to_string()).expect("Valid credential ID"),
         credential.clone(),
     )
     .await;
@@ -248,10 +264,14 @@ async fn test_get_credentials_by_user_handle() {
 
     // Cleanup
     let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-        crate::passkey::CredentialId::new("cred_handle_test".to_string()),
+        crate::passkey::CredentialId::new("cred_handle_test".to_string())
+            .expect("Valid credential ID"),
     ))
     .await;
-    let _ = UserStore::delete_user(crate::session::UserId::new(user_id.to_string())).await;
+    let _ = UserStore::delete_user(
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
+    )
+    .await;
 }
 
 /// Test retrieving credentials by username
@@ -278,14 +298,14 @@ async fn test_get_credentials_by_username() {
 
     // Store credential
     let _ = PasskeyStore::store_credential(
-        CredentialId::new("cred_username_test".to_string()),
+        CredentialId::new("cred_username_test".to_string()).expect("Valid credential ID"),
         credential.clone(),
     )
     .await;
 
     // Get by username
     let result = PasskeyStore::get_credentials_by(CredentialSearchField::UserName(
-        crate::passkey::UserName::new(username.to_string()),
+        crate::passkey::UserName::new(username.to_string()).expect("Valid user name"),
     ))
     .await;
     assert!(
@@ -304,10 +324,14 @@ async fn test_get_credentials_by_username() {
 
     // Cleanup
     let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-        crate::passkey::CredentialId::new("cred_username_test".to_string()),
+        crate::passkey::CredentialId::new("cred_username_test".to_string())
+            .expect("Valid credential ID"),
     ))
     .await;
-    let _ = UserStore::delete_user(crate::session::UserId::new(user_id.to_string())).await;
+    let _ = UserStore::delete_user(
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
+    )
+    .await;
 }
 
 /// Test updating credential counter for replay attack prevention
@@ -332,14 +356,16 @@ async fn test_update_credential_counter() {
         .expect("Failed to create test user");
 
     // Store credential with initial counter = 1
-    let _ =
-        PasskeyStore::store_credential(CredentialId::new(credential_id.to_string()), credential)
-            .await;
+    let _ = PasskeyStore::store_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+        credential,
+    )
+    .await;
 
     // Update counter
     let new_counter = 42;
     let update_result = PasskeyStore::update_credential_counter(
-        CredentialId::new(credential_id.to_string()),
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
         new_counter,
     )
     .await;
@@ -350,10 +376,12 @@ async fn test_update_credential_counter() {
     );
 
     // Verify counter was updated
-    let get_result = PasskeyStore::get_credential(CredentialId::new(credential_id.to_string()))
-        .await
-        .unwrap()
-        .unwrap();
+    let get_result = PasskeyStore::get_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await
+    .unwrap()
+    .unwrap();
     assert_eq!(
         get_result.counter, new_counter,
         "Counter should be updated to new value"
@@ -361,10 +389,13 @@ async fn test_update_credential_counter() {
 
     // Cleanup
     let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-        crate::passkey::CredentialId::new(credential_id.to_string()),
+        crate::passkey::CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
     ))
     .await;
-    let _ = UserStore::delete_user(crate::session::UserId::new(user_id.to_string())).await;
+    let _ = UserStore::delete_user(
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
+    )
+    .await;
 }
 
 /// Test updating credential user details
@@ -389,15 +420,17 @@ async fn test_update_credential_user_details() {
         .expect("Failed to create test user");
 
     // Store credential
-    let _ =
-        PasskeyStore::store_credential(CredentialId::new(credential_id.to_string()), credential)
-            .await;
+    let _ = PasskeyStore::store_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+        credential,
+    )
+    .await;
 
     // Update user details
     let new_name = "updated_name";
     let new_display_name = "Updated Display Name";
     let update_result = PasskeyStore::update_credential(
-        CredentialId::new(credential_id.to_string()),
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
         new_name,
         new_display_name,
     )
@@ -409,19 +442,24 @@ async fn test_update_credential_user_details() {
     );
 
     // Verify details were updated
-    let get_result = PasskeyStore::get_credential(CredentialId::new(credential_id.to_string()))
-        .await
-        .unwrap()
-        .unwrap();
+    let get_result = PasskeyStore::get_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await
+    .unwrap()
+    .unwrap();
     assert_eq!(get_result.user.name, new_name);
     assert_eq!(get_result.user.display_name, new_display_name);
 
     // Cleanup
     let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-        crate::passkey::CredentialId::new(credential_id.to_string()),
+        crate::passkey::CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
     ))
     .await;
-    let _ = UserStore::delete_user(crate::session::UserId::new(user_id.to_string())).await;
+    let _ = UserStore::delete_user(
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
+    )
+    .await;
 }
 
 /// Test updating credential last used at
@@ -449,15 +487,17 @@ async fn test_update_credential_last_used_at() {
         .expect("Failed to create test user");
 
     // Store credential
-    let _ =
-        PasskeyStore::store_credential(CredentialId::new(credential_id.to_string()), credential)
-            .await;
+    let _ = PasskeyStore::store_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+        credential,
+    )
+    .await;
 
     // Wait a moment then update last_used_at
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     let new_last_used = Utc::now();
     let update_result = PasskeyStore::update_credential_last_used_at(
-        CredentialId::new(credential_id.to_string()),
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
         new_last_used,
     )
     .await;
@@ -468,10 +508,12 @@ async fn test_update_credential_last_used_at() {
     );
 
     // Verify timestamp was updated
-    let get_result = PasskeyStore::get_credential(CredentialId::new(credential_id.to_string()))
-        .await
-        .unwrap()
-        .unwrap();
+    let get_result = PasskeyStore::get_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await
+    .unwrap()
+    .unwrap();
     assert_ne!(
         get_result.last_used_at, original_last_used,
         "last_used_at should be different"
@@ -484,10 +526,13 @@ async fn test_update_credential_last_used_at() {
 
     // Cleanup
     let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-        crate::passkey::CredentialId::new(credential_id.to_string()),
+        crate::passkey::CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
     ))
     .await;
-    let _ = UserStore::delete_user(crate::session::UserId::new(user_id.to_string())).await;
+    let _ = UserStore::delete_user(
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
+    )
+    .await;
 }
 
 /// Test deleting a credential by credential ID
@@ -514,14 +559,18 @@ async fn test_delete_credential_by_credential_id() {
         .expect("Failed to create test user");
 
     // Store credential
-    let _ =
-        PasskeyStore::store_credential(CredentialId::new(credential_id.to_string()), credential)
-            .await;
+    let _ = PasskeyStore::store_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+        credential,
+    )
+    .await;
 
     // Verify it exists
-    let get_result = PasskeyStore::get_credential(CredentialId::new(credential_id.to_string()))
-        .await
-        .unwrap();
+    let get_result = PasskeyStore::get_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await
+    .unwrap();
     assert!(
         get_result.is_some(),
         "Credential should exist before deletion"
@@ -529,7 +578,7 @@ async fn test_delete_credential_by_credential_id() {
 
     // Delete credential
     let delete_result = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-        crate::passkey::CredentialId::new(credential_id.to_string()),
+        crate::passkey::CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
     ))
     .await;
     assert!(
@@ -539,17 +588,21 @@ async fn test_delete_credential_by_credential_id() {
     );
 
     // Verify it's gone
-    let get_result_after =
-        PasskeyStore::get_credential(CredentialId::new(credential_id.to_string()))
-            .await
-            .unwrap();
+    let get_result_after = PasskeyStore::get_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await
+    .unwrap();
     assert!(
         get_result_after.is_none(),
         "Credential should not exist after deletion"
     );
 
     // Cleanup user
-    let _ = UserStore::delete_user(crate::session::UserId::new(user_id.to_string())).await;
+    let _ = UserStore::delete_user(
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
+    )
+    .await;
 }
 
 /// Test deleting credentials by user ID
@@ -567,8 +620,8 @@ async fn test_delete_credentials_by_user_id() {
     let _ = UserStore::init().await;
 
     let user_id = "user_delete_multi";
-    let credential1 = create_test_credential("cred_del_001", user_id, "handle_del_001");
-    let credential2 = create_test_credential("cred_del_002", user_id, "handle_del_002");
+    let credential1 = create_test_credential("cred_del_001_test", user_id, "handle_del_001");
+    let credential2 = create_test_credential("cred_del_002_test", user_id, "handle_del_002");
 
     // Create user first
     let _ = create_test_user(user_id)
@@ -576,16 +629,20 @@ async fn test_delete_credentials_by_user_id() {
         .expect("Failed to create test user");
 
     // Store multiple credentials for same user
-    let _ =
-        PasskeyStore::store_credential(CredentialId::new("cred_del_001".to_string()), credential1)
-            .await;
-    let _ =
-        PasskeyStore::store_credential(CredentialId::new("cred_del_002".to_string()), credential2)
-            .await;
+    let _ = PasskeyStore::store_credential(
+        CredentialId::new("cred_del_001_test".to_string()).expect("Valid credential ID"),
+        credential1,
+    )
+    .await;
+    let _ = PasskeyStore::store_credential(
+        CredentialId::new("cred_del_002_test".to_string()).expect("Valid credential ID"),
+        credential2,
+    )
+    .await;
 
     // Verify they exist
     let get_result = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
-        crate::session::UserId::new(user_id.to_string()),
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
     ))
     .await
     .unwrap();
@@ -597,7 +654,7 @@ async fn test_delete_credentials_by_user_id() {
 
     // Delete all credentials for user
     let delete_result = PasskeyStore::delete_credential_by(CredentialSearchField::UserId(
-        crate::session::UserId::new(user_id.to_string()),
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
     ))
     .await;
     assert!(
@@ -608,7 +665,7 @@ async fn test_delete_credentials_by_user_id() {
 
     // Verify they're gone
     let get_result_after = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
-        crate::session::UserId::new(user_id.to_string()),
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
     ))
     .await
     .unwrap();
@@ -619,7 +676,10 @@ async fn test_delete_credentials_by_user_id() {
     );
 
     // Cleanup user
-    let _ = UserStore::delete_user(crate::session::UserId::new(user_id.to_string())).await;
+    let _ = UserStore::delete_user(
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
+    )
+    .await;
 }
 
 /// Test credential isolation
@@ -638,8 +698,8 @@ async fn test_credential_isolation() {
 
     let user_id_1 = "user_iso_001";
     let user_id_2 = "user_iso_002";
-    let credential1 = create_test_credential("cred_iso_001", user_id_1, "handle_iso_001");
-    let credential2 = create_test_credential("cred_iso_002", user_id_2, "handle_iso_002");
+    let credential1 = create_test_credential("cred_iso_001_test", user_id_1, "handle_iso_001");
+    let credential2 = create_test_credential("cred_iso_002_test", user_id_2, "handle_iso_002");
 
     // Create users first
     let _ = create_test_user(user_id_1)
@@ -650,21 +710,25 @@ async fn test_credential_isolation() {
         .expect("Failed to create test user 2");
 
     // Store credentials for different users
-    let _ =
-        PasskeyStore::store_credential(CredentialId::new("cred_iso_001".to_string()), credential1)
-            .await;
-    let _ =
-        PasskeyStore::store_credential(CredentialId::new("cred_iso_002".to_string()), credential2)
-            .await;
+    let _ = PasskeyStore::store_credential(
+        CredentialId::new("cred_iso_001_test".to_string()).expect("Valid credential ID"),
+        credential1,
+    )
+    .await;
+    let _ = PasskeyStore::store_credential(
+        CredentialId::new("cred_iso_002_test".to_string()).expect("Valid credential ID"),
+        credential2,
+    )
+    .await;
 
     // Get credentials by different search fields
     let creds_user1 = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
-        crate::session::UserId::new(user_id_1.to_string()),
+        crate::session::UserId::new(user_id_1.to_string()).expect("Valid user ID"),
     ))
     .await
     .unwrap();
     let creds_user2 = PasskeyStore::get_credentials_by(CredentialSearchField::UserId(
-        crate::session::UserId::new(user_id_2.to_string()),
+        crate::session::UserId::new(user_id_2.to_string()).expect("Valid user ID"),
     ))
     .await
     .unwrap();
@@ -680,20 +744,28 @@ async fn test_credential_isolation() {
         1,
         "User 2 should have exactly 1 credential"
     );
-    assert_eq!(creds_user1[0].credential_id, "cred_iso_001");
-    assert_eq!(creds_user2[0].credential_id, "cred_iso_002");
+    assert_eq!(creds_user1[0].credential_id, "cred_iso_001_test");
+    assert_eq!(creds_user2[0].credential_id, "cred_iso_002_test");
 
     // Cleanup
     let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-        crate::passkey::CredentialId::new("cred_iso_001".to_string()),
+        crate::passkey::CredentialId::new("cred_iso_001_test".to_string())
+            .expect("Valid credential ID"),
     ))
     .await;
     let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-        crate::passkey::CredentialId::new("cred_iso_002".to_string()),
+        crate::passkey::CredentialId::new("cred_iso_002_test".to_string())
+            .expect("Valid credential ID"),
     ))
     .await;
-    let _ = UserStore::delete_user(crate::session::UserId::new(user_id_1.to_string())).await;
-    let _ = UserStore::delete_user(crate::session::UserId::new(user_id_2.to_string())).await;
+    let _ = UserStore::delete_user(
+        crate::session::UserId::new(user_id_1.to_string()).expect("Valid user ID"),
+    )
+    .await;
+    let _ = UserStore::delete_user(
+        crate::session::UserId::new(user_id_2.to_string()).expect("Valid user ID"),
+    )
+    .await;
 }
 
 /// Test concurrent operations
@@ -727,16 +799,17 @@ async fn test_concurrent_operations() {
 
                 // Store credential
                 let store_result = PasskeyStore::store_credential(
-                    CredentialId::new(credential_id.clone()),
+                    CredentialId::new(credential_id.clone()).expect("Valid credential ID"),
                     credential,
                 )
                 .await;
                 assert!(store_result.is_ok(), "Concurrent store should succeed");
 
                 // Get credential
-                let get_result =
-                    PasskeyStore::get_credential(CredentialId::new(credential_id.to_string()))
-                        .await;
+                let get_result = PasskeyStore::get_credential(
+                    CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+                )
+                .await;
                 assert!(
                     get_result.is_ok() && get_result.unwrap().is_some(),
                     "Concurrent get should succeed"
@@ -744,10 +817,13 @@ async fn test_concurrent_operations() {
 
                 // Clean up
                 let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-                    crate::passkey::CredentialId::new(credential_id),
+                    crate::passkey::CredentialId::new(credential_id).expect("Valid credential ID"),
                 ))
                 .await;
-                let _ = UserStore::delete_user(crate::session::UserId::new(user_id.clone())).await;
+                let _ = UserStore::delete_user(
+                    crate::session::UserId::new(user_id.clone()).expect("Valid user ID"),
+                )
+                .await;
             })
         })
         .collect::<Vec<_>>();

@@ -113,7 +113,7 @@ pub async fn insert_test_user_and_credential(data: TestCredentialData) -> Result
 
     // First create the user
     insert_test_user(
-        UserId::new(data.user_id.clone().expect("Valid user ID")),
+        UserId::new(data.user_id.clone()).expect("Valid user ID"),
         &data.name,
         &data.display_name,
         false,

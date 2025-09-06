@@ -253,7 +253,7 @@ async fn test_verify_counter_authenticator_no_counter_support() {
     let auth_data = create_test_authenticator_data(0);
 
     let result = verify_counter(
-        CredentialId::new(passkey.credential_id.clone()),
+        CredentialId::new(passkey.credential_id.clone()).expect("Valid credential ID"),
         &auth_data,
         &passkey,
     )
@@ -275,7 +275,7 @@ async fn test_verify_counter_replay_attack_detection() {
     let auth_data = create_test_authenticator_data(5);
 
     let result = verify_counter(
-        CredentialId::new(passkey.credential_id.clone()),
+        CredentialId::new(passkey.credential_id.clone()).expect("Valid credential ID"),
         &auth_data,
         &passkey,
     )
@@ -302,7 +302,7 @@ async fn test_verify_counter_equal_counter_replay_attack() {
     let auth_data = create_test_authenticator_data(10);
 
     let result = verify_counter(
-        CredentialId::new(passkey.credential_id.clone()),
+        CredentialId::new(passkey.credential_id.clone()).expect("Valid credential ID"),
         &auth_data,
         &passkey,
     )
@@ -329,7 +329,7 @@ async fn test_verify_counter_valid_increment() {
     let auth_data = create_test_authenticator_data(15);
 
     let result = verify_counter_with_mock(
-        CredentialId::new(passkey.credential_id.clone()),
+        CredentialId::new(passkey.credential_id.clone()).expect("Valid credential ID"),
         &auth_data,
         &passkey,
         true,
@@ -352,7 +352,7 @@ async fn test_verify_counter_zero_to_positive() {
     let auth_data = create_test_authenticator_data(1); // Now receiving counter value 1
 
     let result = verify_counter_with_mock(
-        CredentialId::new(passkey.credential_id.clone()),
+        CredentialId::new(passkey.credential_id.clone()).expect("Valid credential ID"),
         &auth_data,
         &passkey,
         true,
@@ -375,7 +375,7 @@ async fn test_verify_counter_large_increment() {
     let auth_data = create_test_authenticator_data(1000);
 
     let result = verify_counter_with_mock(
-        CredentialId::new(passkey.credential_id.clone()),
+        CredentialId::new(passkey.credential_id.clone()).expect("Valid credential ID"),
         &auth_data,
         &passkey,
         true,
@@ -681,8 +681,10 @@ async fn test_finish_authentication_integration_test() {
     );
 
     // Verify that the credential was inserted correctly
-    let get_result =
-        PasskeyStore::get_credential(CredentialId::new(credential_id.to_string())).await;
+    let get_result = PasskeyStore::get_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await;
     assert!(get_result.is_ok(), "Failed to retrieve test credential");
     let credential_option = get_result.unwrap();
     assert!(credential_option.is_some(), "Credential should exist");
@@ -692,14 +694,17 @@ async fn test_finish_authentication_integration_test() {
     assert_eq!(credential.user.user_handle, user_handle);
 
     // Clean up test data
-    let cleanup_result =
-        passkey_test_utils::cleanup_test_credential(CredentialId::new(credential_id.to_string()))
-            .await;
+    let cleanup_result = passkey_test_utils::cleanup_test_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await;
     assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
 
     // Verify credential was deleted
-    let verify_deleted =
-        PasskeyStore::get_credential(CredentialId::new(credential_id.to_string())).await;
+    let verify_deleted = PasskeyStore::get_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await;
     assert!(
         verify_deleted.unwrap().is_none(),
         "Credential should be deleted after cleanup"
@@ -772,9 +777,10 @@ async fn test_start_authentication_integration() {
     let remove_cache = passkey_test_utils::remove_from_cache(cache_prefix, cache_key).await;
     assert!(remove_cache.is_ok(), "Failed to clean up cache");
 
-    let remove_credential =
-        passkey_test_utils::cleanup_test_credential(CredentialId::new(credential_id.to_string()))
-            .await;
+    let remove_credential = passkey_test_utils::cleanup_test_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await;
     assert!(remove_credential.is_ok(), "Failed to clean up credential");
 }
 
@@ -810,18 +816,19 @@ async fn test_verify_counter_and_update() {
     assert!(insert_result.is_ok(), "Failed to insert test credential");
 
     // Get the credential to pass to counter verification
-    let credential =
-        crate::passkey::PasskeyStore::get_credential(CredentialId::new(credential_id.to_string()))
-            .await
-            .expect("Failed to get credential")
-            .expect("Credential not found");
+    let credential = crate::passkey::PasskeyStore::get_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await
+    .expect("Failed to get credential")
+    .expect("Credential not found");
 
     // Create authenticator data using the existing test helper
     let auth_data = create_test_authenticator_data(initial_counter + 5);
 
     // Verify counter - should pass and update
     let verify_result = super::verify_counter(
-        CredentialId::new(credential_id.to_string()),
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
         &auth_data,
         &credential,
     )
@@ -829,11 +836,12 @@ async fn test_verify_counter_and_update() {
     assert!(verify_result.is_ok(), "Counter verification failed");
 
     // Check that counter was updated in the store
-    let updated_credential =
-        crate::passkey::PasskeyStore::get_credential(CredentialId::new(credential_id.to_string()))
-            .await
-            .expect("Failed to get credential")
-            .expect("Credential not found");
+    let updated_credential = crate::passkey::PasskeyStore::get_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await
+    .expect("Failed to get credential")
+    .expect("Credential not found");
 
     assert_eq!(
         updated_credential.counter,
@@ -845,7 +853,7 @@ async fn test_verify_counter_and_update() {
     let auth_data_same = create_test_authenticator_data(initial_counter);
 
     let verify_result_2 = super::verify_counter(
-        CredentialId::new(credential_id.to_string()),
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
         &auth_data_same,
         &updated_credential,
     )
@@ -856,9 +864,10 @@ async fn test_verify_counter_and_update() {
     );
 
     // Clean up
-    let cleanup =
-        passkey_test_utils::cleanup_test_credential(CredentialId::new(credential_id.to_string()))
-            .await;
+    let cleanup = passkey_test_utils::cleanup_test_credential(
+        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+    )
+    .await;
     assert!(cleanup.is_ok(), "Failed to clean up test credential");
 }
 

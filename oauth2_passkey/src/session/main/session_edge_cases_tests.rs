@@ -110,7 +110,9 @@ mod edge_cases {
         }
 
         // Clean up
-        let _ = delete_test_session(SessionId::new(session_id.to_string())).await;
+        let _ =
+            delete_test_session(SessionId::new(session_id.to_string()).expect("Valid session ID"))
+                .await;
     }
 
     /// Test missing fields in session data
@@ -151,7 +153,9 @@ mod edge_cases {
         }
 
         // Clean up
-        let _ = delete_test_session(SessionId::new(session_id.to_string())).await;
+        let _ =
+            delete_test_session(SessionId::new(session_id.to_string()).expect("Valid session ID"))
+                .await;
     }
 
     /// Test is_authenticated with CSRF protection - POST with missing CSRF token
@@ -170,11 +174,11 @@ mod edge_cases {
         let session_id = "session_missing_csrf";
 
         let _ = create_test_user_and_session(
-            UserId::new(user_id.to_string()),
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
             "missing_csrf@example.com",
             "Missing CSRF",
             false,
-            SessionId::new(session_id.to_string()),
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
             csrf_token,
             3600,
         )
@@ -200,8 +204,8 @@ mod edge_cases {
 
         // Clean up
         let _ = cleanup_test_resources(
-            UserId::new(user_id.to_string()),
-            SessionId::new(session_id.to_string()),
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
         )
         .await;
     }
@@ -223,11 +227,11 @@ mod edge_cases {
         let session_id = "session_strict_csrf";
 
         let _ = create_test_user_and_session(
-            UserId::new(user_id.to_string()),
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
             "strict_csrf@example.com",
             "Strict CSRF Test",
             false,
-            SessionId::new(session_id.to_string()),
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
             csrf_token,
             3600,
         )
@@ -269,8 +273,8 @@ mod edge_cases {
 
         // Clean up
         let _ = cleanup_test_resources(
-            UserId::new(user_id.to_string()),
-            SessionId::new(session_id.to_string()),
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
         )
         .await;
     }
@@ -294,11 +298,11 @@ mod edge_cases {
         let session_id = "basic_user_csrf_session";
 
         let _ = create_test_user_and_session(
-            UserId::new(user_id.to_string()),
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
             account,
             label,
             false,
-            SessionId::new(session_id.to_string()),
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
             csrf_token,
             3600,
         )
@@ -327,8 +331,8 @@ mod edge_cases {
 
         // Clean up
         let _ = cleanup_test_resources(
-            UserId::new(user_id.to_string()),
-            SessionId::new(session_id.to_string()),
+            UserId::new(user_id.to_string()).expect("Valid user ID"),
+            SessionId::new(session_id.to_string()).expect("Valid session ID"),
         )
         .await;
     }

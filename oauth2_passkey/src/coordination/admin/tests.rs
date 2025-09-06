@@ -12,14 +12,20 @@ async fn create_test_admin_with_session(
     label: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
     // Create admin user in database
-    insert_test_user(UserId::new(user_id.to_string()), account, label, true).await?;
+    insert_test_user(
+        UserId::new(user_id.to_string()).expect("Valid user ID"),
+        account,
+        label,
+        true,
+    )
+    .await?;
 
     // Create session for the admin user
     let session_id = format!("test-session-{user_id}");
     let csrf_token = "test-csrf-token";
     insert_test_session(
-        SessionId::new(session_id.clone()),
-        UserId::new(user_id.to_string()),
+        SessionId::new(session_id.clone()).expect("Valid session ID"),
+        UserId::new(user_id.to_string()).expect("Valid user ID"),
         csrf_token,
         3600,
     )
@@ -53,10 +59,13 @@ async fn create_test_user_in_db(
 
 async fn delete_user_if_exists_and_not_first(user_id: &str) -> Result<(), CoordinationError> {
     // Only proceed if the user exists
-    if let Ok(Some(user)) = UserStore::get_user(UserId::new(user_id.to_string())).await {
+    if let Ok(Some(user)) =
+        UserStore::get_user(UserId::new(user_id.to_string()).expect("Valid user ID")).await
+    {
         // Only delete if sequence_number is not 1
         if user.sequence_number != Some(1) {
-            UserStore::delete_user(UserId::new(user_id.to_string())).await?;
+            UserStore::delete_user(UserId::new(user_id.to_string()).expect("Valid user ID"))
+                .await?;
         }
     }
 
@@ -98,9 +107,10 @@ async fn test_get_all_users() {
         .expect("Failed to create test user 2");
 
     // Get all users using admin session
-    let users = get_all_users(SessionId::new(admin_session_id.clone()))
-        .await
-        .expect("Failed to get all users");
+    let users =
+        get_all_users(SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"))
+            .await
+            .expect("Failed to get all users");
 
     // Verify that our test users are in the results
     let user_ids: Vec<String> = users.iter().map(|u| u.id.clone()).collect();
@@ -157,8 +167,8 @@ async fn test_get_user() {
 
     // Get the user using admin session
     let user_option = get_user(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(target_user_id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
     )
     .await
     .expect("Failed to get user");
@@ -183,8 +193,8 @@ async fn test_get_user() {
     // Try to get a non-existent user
     let non_existent_user_id = format!("non-existent-user-{timestamp}");
     let non_existent_user_option = get_user(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(non_existent_user_id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(non_existent_user_id.clone()).expect("Valid non-existent user ID"),
     )
     .await
     .expect("Failed to get non-existent user");
@@ -236,8 +246,8 @@ async fn test_delete_user_account_admin() {
 
     // Verify the user exists before deletion
     let user_before = get_user(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(user_to_delete_id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(user_to_delete_id.clone()).expect("Valid user to delete ID"),
     )
     .await
     .expect("Failed to get user");
@@ -245,16 +255,16 @@ async fn test_delete_user_account_admin() {
 
     // Delete the user using admin session
     let result = delete_user_account_admin(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(user_to_delete_id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(user_to_delete_id.clone()).expect("Valid user to delete ID"),
     )
     .await;
     assert!(result.is_ok(), "Expected successful user deletion");
 
     // Verify the user no longer exists
     let user_after = get_user(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(user_to_delete_id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(user_to_delete_id.clone()).expect("Valid user to delete ID"),
     )
     .await
     .expect("Failed to get user after deletion");
@@ -263,8 +273,8 @@ async fn test_delete_user_account_admin() {
     // Try to delete a non-existent user
     let non_existent_user_id = format!("non-existent-user-{timestamp}");
     let result = delete_user_account_admin(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(non_existent_user_id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(non_existent_user_id.clone()).expect("Valid non-existent user ID"),
     )
     .await;
 
@@ -326,8 +336,8 @@ async fn test_update_user_admin_status_success() {
 
     // Verify the target user is not an admin initially
     let user_before = get_user(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(target_user_id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
     )
     .await
     .expect("Failed to get target user")
@@ -339,8 +349,8 @@ async fn test_update_user_admin_status_success() {
 
     // Update the user's admin status to true
     let updated_user = update_user_admin_status(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(target_user_id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
         true,
     )
     .await
@@ -354,8 +364,8 @@ async fn test_update_user_admin_status_success() {
 
     // Verify the change was persisted in the database
     let user_after = get_user(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(target_user_id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
     )
     .await
     .expect("Failed to get target user after update")
@@ -367,8 +377,8 @@ async fn test_update_user_admin_status_success() {
 
     // Update the user's admin status back to false
     let updated_user = update_user_admin_status(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(target_user_id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
         false,
     )
     .await
@@ -405,7 +415,7 @@ async fn test_update_user_admin_status_requires_admin() {
 
     // Create a non-admin user with session
     insert_test_user(
-        UserId::new(non_admin_user_id.clone()),
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
         &format!("{non_admin_user_id}@example.com"),
         "Non Admin",
         false,
@@ -415,8 +425,8 @@ async fn test_update_user_admin_status_requires_admin() {
 
     let non_admin_session_id = format!("test-session-{non_admin_user_id}");
     insert_test_session(
-        SessionId::new(non_admin_session_id.clone()),
-        UserId::new(non_admin_user_id.clone()),
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
         "csrf-token",
         3600,
     )
@@ -430,8 +440,8 @@ async fn test_update_user_admin_status_requires_admin() {
 
     // Attempt to update the user's admin status as a non-admin
     let result = update_user_admin_status(
-        SessionId::new(non_admin_session_id.clone()),
-        UserId::new(target_user_id.clone()),
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
         true,
     )
     .await;
@@ -458,8 +468,8 @@ async fn test_update_user_admin_status_requires_admin() {
 
     // Verify the target user's admin status was not changed
     let user_after = get_user(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(target_user_id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
     )
     .await
     .expect("Failed to get target user after failed update")
@@ -509,8 +519,8 @@ async fn test_update_user_admin_status_protect_first_user() {
 
     // Attempt to change the admin status of the first user (should fail)
     let result = update_user_admin_status(
-        SessionId::new(admin_session_id.clone()),
-        UserId::new(first_user.id.clone()),
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(first_user.id.clone()).expect("Valid first user ID"),
         false,
     )
     .await;
@@ -547,7 +557,7 @@ async fn test_delete_passkey_credential_admin_requires_admin() {
 
     // Create a non-admin user with session
     insert_test_user(
-        UserId::new(non_admin_user_id.clone()),
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
         &format!("{non_admin_user_id}@example.com"),
         "Non Admin",
         false,
@@ -557,8 +567,8 @@ async fn test_delete_passkey_credential_admin_requires_admin() {
 
     let non_admin_session_id = format!("test-session-{non_admin_user_id}");
     insert_test_session(
-        SessionId::new(non_admin_session_id.clone()),
-        UserId::new(non_admin_user_id.clone()),
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
         "csrf-token",
         3600,
     )
@@ -567,8 +577,8 @@ async fn test_delete_passkey_credential_admin_requires_admin() {
 
     // Attempt to delete a passkey credential (authorization should fail before credential lookup)
     let result = delete_passkey_credential_admin(
-        SessionId::new(non_admin_session_id.clone()),
-        CredentialId::new("credential1".to_string()),
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+        CredentialId::new("credential1".to_string()).expect("Valid test credential ID"),
     )
     .await;
 
@@ -599,7 +609,7 @@ async fn test_delete_oauth2_account_admin_requires_admin() {
 
     // Create a non-admin user with session
     insert_test_user(
-        UserId::new(non_admin_user_id.clone()),
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
         &format!("{non_admin_user_id}@example.com"),
         "Non Admin",
         false,
@@ -609,8 +619,8 @@ async fn test_delete_oauth2_account_admin_requires_admin() {
 
     let non_admin_session_id = format!("test-session-{non_admin_user_id}");
     insert_test_session(
-        SessionId::new(non_admin_session_id.clone()),
-        UserId::new(non_admin_user_id.clone()),
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
         "csrf-token",
         3600,
     )
@@ -619,8 +629,8 @@ async fn test_delete_oauth2_account_admin_requires_admin() {
 
     // Attempt to delete an OAuth2 account (authorization should fail before account lookup)
     let result = delete_oauth2_account_admin(
-        SessionId::new(non_admin_session_id.clone()),
-        ProviderUserId::new("provider_user_id".to_string()),
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+        ProviderUserId::new("provider_user_id".to_string()).expect("Valid test provider user ID"),
     )
     .await;
 
