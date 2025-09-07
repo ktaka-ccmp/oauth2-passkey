@@ -363,7 +363,6 @@ async fn test_get_authenticator_info_corrupted_cache() {
     // Manually insert invalid JSON into cache
     let corrupted_data = CacheData {
         value: "invalid json data".to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     let mut cache = GENERIC_CACHE_STORE.lock().await;

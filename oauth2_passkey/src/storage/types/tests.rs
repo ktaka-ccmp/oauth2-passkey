@@ -194,27 +194,20 @@ fn test_validation_happens_at_caller_boundary() {
 }
 
 #[test]
-fn test_cache_data_timestamp_serialization() {
+fn test_cache_data_serialization() {
     let cache_data = CacheData {
         value: "test_value".to_string(),
-        expires_at: Utc::now() + chrono::Duration::hours(1),
     };
 
     // Serialize to JSON
     let json = serde_json::to_string(&cache_data).unwrap();
     println!("Serialized: {json}");
 
-    // Should contain timestamp as number, not RFC3339 string
-    assert!(json.contains("\"expires_at\":"));
-    assert!(!json.contains("T")); // No 'T' character means it's not RFC3339
-    assert!(!json.contains("Z")); // No 'Z' character means it's not RFC3339
+    // Should only contain the value field (no expires_at)
+    assert!(json.contains("\"value\":\"test_value\""));
+    assert!(!json.contains("expires_at")); // No longer included
 
     // Deserialize back
     let deserialized: CacheData = serde_json::from_str(&json).unwrap();
-
-    // Should be approximately equal (within 1 second due to timestamp precision)
-    let time_diff = (deserialized.expires_at - cache_data.expires_at)
-        .num_seconds()
-        .abs();
-    assert!(time_diff <= 1);
+    assert_eq!(deserialized.value, cache_data.value);
 }

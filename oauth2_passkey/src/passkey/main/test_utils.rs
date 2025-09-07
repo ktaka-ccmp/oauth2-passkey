@@ -183,7 +183,6 @@ pub async fn create_test_challenge(
     let cache_data = CacheData {
         value: serde_json::to_string(&stored_options)
             .map_err(|e| PasskeyError::Storage(e.to_string()))?,
-        expires_at: chrono::Utc::now() + chrono::Duration::seconds(ttl as i64),
     };
 
     let cache_prefix = CachePrefix::new(challenge_type.to_string())

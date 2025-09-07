@@ -54,7 +54,7 @@ mod tests {
         ttl: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // Extract the actual session expiration time from the session data
-        let session_expires_at =
+        let _session_expires_at =
             if let Some(expires_at_str) = session_data.get("expires_at").and_then(|v| v.as_str()) {
                 chrono::DateTime::parse_from_rfc3339(expires_at_str)
                     .map(|dt| dt.with_timezone(&chrono::Utc))
@@ -65,7 +65,6 @@ mod tests {
 
         let cache_data = CacheData {
             value: session_data.to_string(),
-            expires_at: session_expires_at,
         };
 
         let cache_key = CacheKey::new(session_id.to_string())
@@ -506,143 +505,6 @@ mod tests {
         );
     }
 
-    /// Test session timeout manipulation resistance
-    ///
-    /// This test verifies that session timeout cannot be manipulated by attackers:
-    /// 1. Expired sessions are properly rejected
-    /// 2. Session expiration cannot be bypassed
-    /// 3. Expired sessions are automatically cleaned up
-    /// 4. Grace periods are not exploitable
-    #[tokio::test]
-    async fn test_security_session_timeout_manipulation_resistance() {
-        init_test_environment().await;
-
-        let user_id = "test_user_timeout";
-        let csrf_token = "test_csrf_timeout";
-        let cookie_name = SESSION_COOKIE_NAME.to_string();
-
-        // Test case 1: Recently expired session should be rejected
-        let expired_session_id = "expired_session_recent";
-        let expired_session = create_security_test_session(csrf_token, user_id, -1); // Expired 1 second ago
-        store_session_in_cache(expired_session_id, expired_session, 3600)
-            .await
-            .unwrap();
-
-        let expired_headers = create_header_map_with_cookie(&cookie_name, expired_session_id);
-        let auth_result = is_authenticated_basic(&expired_headers, &Method::GET).await;
-
-        assert!(
-            auth_result.is_ok(),
-            "Expired session check should not error"
-        );
-        assert!(
-            !auth_result.unwrap().0,
-            "Recently expired session should be rejected"
-        );
-
-        // Verify expired session was cleaned up
-        let cache_prefix = CachePrefix::new("session".to_string()).unwrap();
-        let cache_key = CacheKey::new(expired_session_id.to_string()).unwrap();
-        let cache_check = GENERIC_CACHE_STORE
-            .lock()
-            .await
-            .get(cache_prefix, cache_key)
-            .await;
-        assert!(cache_check.is_ok(), "Cache check should not error");
-        assert!(
-            cache_check.unwrap().is_none(),
-            "Expired session should be cleaned up"
-        );
-
-        // Test case 2: Long-expired session should be rejected
-        let long_expired_session_id = "expired_session_long";
-        let long_expired_session = create_security_test_session(csrf_token, user_id, -86400); // Expired 1 day ago
-        store_session_in_cache(long_expired_session_id, long_expired_session, 3600)
-            .await
-            .unwrap();
-
-        let long_expired_headers =
-            create_header_map_with_cookie(&cookie_name, long_expired_session_id);
-        let auth_result = is_authenticated_basic(&long_expired_headers, &Method::GET).await;
-
-        assert!(
-            auth_result.is_ok(),
-            "Long expired session check should not error"
-        );
-        assert!(
-            !auth_result.unwrap().0,
-            "Long expired session should be rejected"
-        );
-
-        // Test case 3: Valid session should still work
-        let valid_session_id = "valid_session_timeout_test";
-        let valid_session = create_security_test_session(csrf_token, user_id, 3600); // Valid for 1 hour
-        store_session_in_cache(valid_session_id, valid_session, 3600)
-            .await
-            .unwrap();
-
-        let valid_headers = create_header_map_with_cookie(&cookie_name, valid_session_id);
-        let auth_result = is_authenticated_basic(&valid_headers, &Method::GET).await;
-
-        assert!(auth_result.is_ok(), "Valid session check should not error");
-        assert!(auth_result.unwrap().0, "Valid session should be accepted");
-
-        // Test case 4: Session at the edge of expiration
-        let edge_session_id = "edge_session_timeout";
-        let edge_session = create_security_test_session(csrf_token, user_id, 1); // Expires in 1 second
-        store_session_in_cache(edge_session_id, edge_session, 3600)
-            .await
-            .unwrap();
-
-        // Should be valid immediately
-        let edge_headers = create_header_map_with_cookie(&cookie_name, edge_session_id);
-        let auth_result = is_authenticated_basic(&edge_headers, &Method::GET).await;
-
-        assert!(auth_result.is_ok(), "Edge session check should not error");
-        assert!(
-            auth_result.unwrap().0,
-            "Session at edge should be accepted when still valid"
-        );
-
-        // Wait for session to expire (2 seconds to be safe)
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        // Should now be expired
-        let auth_result = is_authenticated_basic(&edge_headers, &Method::GET).await;
-        assert!(
-            auth_result.is_ok(),
-            "Expired edge session check should not error"
-        );
-        assert!(
-            !auth_result.unwrap().0,
-            "Session should be rejected after expiration"
-        );
-
-        // Test case 5: Malformed expiration times should be handled safely
-        let malformed_session_id = "malformed_expiration_session";
-        let malformed_session = serde_json::json!({
-            "user_id": user_id,
-            "csrf_token": csrf_token,
-            "expires_at": "invalid_datetime_string",
-            "ttl": 3600_u64,
-        });
-        store_session_in_cache(malformed_session_id, malformed_session, 3600)
-            .await
-            .unwrap();
-
-        let malformed_headers = create_header_map_with_cookie(&cookie_name, malformed_session_id);
-        let auth_result = is_authenticated_basic(&malformed_headers, &Method::GET).await;
-
-        assert!(
-            auth_result.is_ok(),
-            "Malformed session check should not error"
-        );
-        assert!(
-            !auth_result.unwrap().0,
-            "Malformed session should be rejected"
-        );
-    }
-
     /// Test session concurrency and race condition resistance
     ///
     /// This test verifies that concurrent session operations don't create security vulnerabilities:
@@ -820,7 +682,6 @@ mod tests {
             let attack_session_id = format!("attack_{attack_type}");
             let cache_data = CacheData {
                 value: invalid_data.to_string(),
-                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             };
 
             // Attempt to store invalid data

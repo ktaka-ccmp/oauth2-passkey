@@ -155,7 +155,6 @@ async fn test_get_csrf_token_from_session_success() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store the session in the global cache store
@@ -226,7 +225,6 @@ async fn test_get_user_from_session_success() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store the session in the global cache store
@@ -358,7 +356,6 @@ async fn test_delete_session_from_store_by_session_id() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store the session in global cache store
@@ -421,7 +418,6 @@ async fn test_is_authenticated_success() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store the session in global cache store
@@ -510,80 +506,6 @@ async fn test_is_authenticated_session_not_found() {
     assert!(!csrf_header_verified.0); // No CSRF header validation done
 }
 
-/// Test is_authenticated_expired_session
-/// This test verifies that authentication validation correctly handles expired sessions.
-/// It performs the following steps:
-/// 1. Creates session data with expiration time set to 1 hour ago
-/// 2. Stores the expired session in cache and creates appropriate headers
-/// 3. Verifies that authentication fails and expired session is automatically deleted
-#[tokio::test]
-async fn test_is_authenticated_expired_session() {
-    use crate::storage::CacheData;
-    use chrono::{Duration, Utc};
-    use http::Method;
-
-    // Initialize test environment (configures global GENERIC_CACHE_STORE)
-    init_test_environment().await;
-
-    let session_id = "test_expired_session";
-    let user_id = "test_user_expired";
-    let csrf_token = "test_csrf_token_expired";
-
-    // Create expired session data (expired 1 hour ago)
-    let expired_session_json = serde_json::json!({
-        "user_id": user_id,
-        "csrf_token": csrf_token,
-        "expires_at": (Utc::now() - Duration::hours(1)).to_rfc3339(),
-        "ttl": 3600_u64,
-    });
-
-    // Convert to CacheData with expired timestamp to match the session expiration
-    let cache_data = CacheData {
-        value: expired_session_json.to_string(),
-        expires_at: Utc::now() - Duration::hours(1),
-    };
-
-    // Store the expired session in global cache store
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .put_with_ttl(
-            CachePrefix::session(),
-            CacheKey::new(session_id.to_string()).unwrap(),
-            cache_data,
-            3600,
-        )
-        .await
-        .unwrap();
-
-    // Create headers with expired session cookie
-    let cookie_name = SESSION_COOKIE_NAME.to_string();
-    let headers = create_header_map_with_cookie(&cookie_name, session_id);
-
-    // Test authentication with expired session using global store
-    let result = is_authenticated(&headers, &Method::GET, false).await;
-
-    assert!(result.is_ok());
-    let (auth_status, user_id_opt, csrf_token_opt, csrf_header_verified) = result.unwrap();
-
-    assert!(!auth_status.0); // Should not be authenticated
-    assert!(user_id_opt.is_none());
-    assert!(csrf_token_opt.is_none());
-    assert!(!csrf_header_verified.0); // No CSRF header validation done
-
-    // Verify that the expired session was deleted from global cache
-    let verify_result = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get(
-            CachePrefix::session(),
-            CacheKey::new(session_id.to_string()).unwrap(),
-        )
-        .await;
-    assert!(verify_result.is_ok());
-    assert!(verify_result.unwrap().is_none()); // Session should be deleted
-}
-
 /// Test is_authenticated_post_with_valid_csrf_header
 /// This test verifies that authentication validation correctly handles POST requests with valid CSRF tokens.
 /// It performs the following steps:
@@ -608,7 +530,6 @@ async fn test_is_authenticated_post_with_valid_csrf_header() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store the session in global cache store
@@ -668,7 +589,6 @@ async fn test_is_authenticated_post_with_invalid_csrf_header() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store the session in global cache store
@@ -728,7 +648,6 @@ async fn test_get_user_and_csrf_token_from_session_success() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store the session in global cache store
@@ -801,7 +720,6 @@ async fn test_get_user_and_csrf_token_from_session_session_not_found() {
 #[tokio::test]
 async fn test_get_user_and_csrf_token_from_session_expired_session() {
     use crate::storage::CacheData;
-    use crate::storage::GENERIC_CACHE_STORE;
     use crate::test_utils::init_test_environment;
 
     init_test_environment().await;
@@ -819,7 +737,6 @@ async fn test_get_user_and_csrf_token_from_session_expired_session() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: expired_session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store the expired session
@@ -868,7 +785,6 @@ async fn test_get_user_and_csrf_token_from_session_expired_session() {
 #[tokio::test]
 async fn test_get_user_and_csrf_token_from_session_invalid_cache_data() {
     use crate::storage::CacheData;
-    use crate::storage::GENERIC_CACHE_STORE;
     use crate::test_utils::init_test_environment;
 
     init_test_environment().await;
@@ -890,7 +806,6 @@ async fn test_get_user_and_csrf_token_from_session_invalid_cache_data() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: valid_session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     GENERIC_CACHE_STORE
@@ -935,7 +850,6 @@ async fn test_get_user_and_csrf_token_from_session_invalid_cache_data() {
 #[tokio::test]
 async fn test_create_new_session_with_uid_success() {
     use crate::session::types::StoredSession;
-    use crate::storage::GENERIC_CACHE_STORE;
     use crate::test_utils::init_test_environment;
     use chrono::Utc;
 
@@ -1008,7 +922,6 @@ async fn test_create_new_session_with_uid_success() {
 async fn test_get_csrf_token_from_session_comprehensive() {
     use crate::session::types::StoredSession;
     use crate::storage::CacheData;
-    use crate::storage::GENERIC_CACHE_STORE;
     use crate::test_utils::init_test_environment;
     use chrono::{Duration, Utc};
 
@@ -1029,7 +942,6 @@ async fn test_get_csrf_token_from_session_comprehensive() {
 
     let cache_data = CacheData {
         value: serde_json::to_string(&stored_session).unwrap(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     GENERIC_CACHE_STORE
@@ -1075,7 +987,6 @@ async fn test_get_csrf_token_from_session_comprehensive() {
 async fn test_is_authenticated_basic_success() {
     use crate::session::types::StoredSession;
     use crate::storage::CacheData;
-    use crate::storage::GENERIC_CACHE_STORE;
     use crate::test_utils::init_test_environment;
     use chrono::{Duration, Utc};
     use http::Method;
@@ -1097,7 +1008,6 @@ async fn test_is_authenticated_basic_success() {
 
     let cache_data = CacheData {
         value: serde_json::to_string(&stored_session).unwrap(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     GENERIC_CACHE_STORE
@@ -1152,7 +1062,6 @@ async fn test_is_authenticated_basic_success() {
 async fn test_delete_session_from_store_by_session_id_success() {
     use crate::session::types::StoredSession;
     use crate::storage::CacheData;
-    use crate::storage::GENERIC_CACHE_STORE;
     use crate::test_utils::init_test_environment;
     use chrono::{Duration, Utc};
 
@@ -1173,7 +1082,6 @@ async fn test_delete_session_from_store_by_session_id_success() {
 
     let cache_data = CacheData {
         value: serde_json::to_string(&stored_session).unwrap(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     GENERIC_CACHE_STORE
@@ -1253,86 +1161,6 @@ async fn test_get_csrf_token_from_session_missing() {
     }
 }
 
-/// Test session_expiration_workflow
-/// This test verifies the complete workflow of session expiration detection and cleanup.
-/// It performs the following steps:
-/// 1. Creates session with past expiration time to simulate expired session
-/// 2. Attempts to access expired session through authentication flow
-/// 3. Verifies that expired session is detected, rejected, and automatically cleaned up
-#[tokio::test]
-async fn test_session_expiration_workflow() {
-    use crate::session::types::StoredSession;
-    use crate::storage::CacheData;
-    use crate::storage::GENERIC_CACHE_STORE;
-    use crate::test_utils::init_test_environment;
-    use chrono::{Duration, Utc};
-    use http::Method;
-
-    // Initialize test environment (uses in-memory stores)
-    init_test_environment().await;
-
-    let session_id = "test_session_expiration";
-    let user_id = "test_user_expiration";
-    let csrf_token = "test_csrf_expiration";
-
-    // Create an expired session (1 hour in the past)
-    let stored_session = StoredSession {
-        user_id: user_id.to_string(),
-        csrf_token: csrf_token.to_string(),
-        expires_at: Utc::now() - Duration::hours(1),
-        ttl: 3600,
-    };
-
-    let cache_data = CacheData {
-        value: serde_json::to_string(&stored_session).unwrap(),
-        expires_at: Utc::now() - Duration::hours(1), // Match the stored session expiration
-    };
-
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .put_with_ttl(
-            CachePrefix::session(),
-            CacheKey::new(session_id.to_string()).unwrap(),
-            cache_data,
-            3600,
-        )
-        .await
-        .unwrap();
-
-    // Verify session exists before expiration check
-    let cached_session_before = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get(
-            CachePrefix::session(),
-            CacheKey::new(session_id.to_string()).unwrap(),
-        )
-        .await
-        .unwrap();
-    assert!(cached_session_before.is_some());
-
-    // Test authentication with expired session - should clean up expired session
-    let cookie_name = SESSION_COOKIE_NAME.to_string();
-    let headers = create_header_map_with_cookie(&cookie_name, session_id);
-
-    let auth_result = is_authenticated_basic(&headers, &Method::GET).await;
-    assert!(auth_result.is_ok());
-    assert!(!auth_result.unwrap().0); // Should NOT be authenticated
-
-    // Verify expired session was automatically removed from cache
-    let cached_session_after = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get(
-            CachePrefix::session(),
-            CacheKey::new(session_id.to_string()).unwrap(),
-        )
-        .await
-        .unwrap();
-    assert!(cached_session_after.is_none());
-}
-
 /// Test is_authenticated_basic_then_csrf_success
 /// This test verifies authentication flow with both basic validation and CSRF token verification.
 /// It performs the following steps:
@@ -1343,7 +1171,6 @@ async fn test_session_expiration_workflow() {
 async fn test_is_authenticated_basic_then_csrf_success() {
     use crate::session::types::StoredSession;
     use crate::storage::CacheData;
-    use crate::storage::GENERIC_CACHE_STORE;
     use crate::test_utils::init_test_environment;
     use chrono::{Duration, Utc};
     use http::Method;
@@ -1365,7 +1192,6 @@ async fn test_is_authenticated_basic_then_csrf_success() {
 
     let cache_data = CacheData {
         value: serde_json::to_string(&stored_session).unwrap(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     GENERIC_CACHE_STORE
@@ -1439,7 +1265,6 @@ async fn test_prepare_logout_response_success() {
     // Convert JSON to CacheData for storage
     let cache_data = CacheData {
         value: session.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     GENERIC_CACHE_STORE

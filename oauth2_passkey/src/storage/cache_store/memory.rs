@@ -23,10 +23,6 @@ impl InMemoryCacheStore {
 
 #[async_trait]
 impl CacheStore for InMemoryCacheStore {
-    async fn init(&self) -> Result<(), StorageError> {
-        Ok(()) // Nothing to initialize for in-memory store
-    }
-
     async fn put(
         &mut self,
         prefix: CachePrefix,
@@ -82,31 +78,6 @@ impl CacheStore for InMemoryCacheStore {
             Ok(true) // Successfully inserted
         } else {
             Ok(false) // Key already exists
-        }
-    }
-
-    async fn get_and_delete_if_expired(
-        &mut self,
-        prefix: CachePrefix,
-        key: CacheKey,
-    ) -> Result<Option<CacheData>, StorageError> {
-        use chrono::Utc;
-
-        let key = Self::make_key(prefix, key);
-
-        // Get the entry to check expiration
-        if let Some(cache_data) = self.entry.get(&key) {
-            // Check if expired
-            if cache_data.expires_at < Utc::now() {
-                // Atomically remove the expired entry
-                self.entry.remove(&key);
-                Ok(None) // Return None for expired entries
-            } else {
-                // Return a clone of the non-expired entry (don't remove it)
-                Ok(Some(cache_data.clone()))
-            }
-        } else {
-            Ok(None) // Entry doesn't exist
         }
     }
 }

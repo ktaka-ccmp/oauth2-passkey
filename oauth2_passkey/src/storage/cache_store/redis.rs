@@ -17,12 +17,6 @@ impl RedisCacheStore {
 
 #[async_trait]
 impl CacheStore for RedisCacheStore {
-    async fn init(&self) -> Result<(), StorageError> {
-        // Verify the connection works
-        let _conn = self.client.get_multiplexed_async_connection().await?;
-        Ok(())
-    }
-
     async fn put(
         &mut self,
         prefix: CachePrefix,
@@ -99,76 +93,5 @@ impl CacheStore for RedisCacheStore {
         }
 
         Ok(result)
-    }
-
-    async fn get_and_delete_if_expired(
-        &mut self,
-        prefix: CachePrefix,
-        key: CacheKey,
-    ) -> Result<Option<CacheData>, StorageError> {
-        use chrono::Utc;
-
-        let mut conn = self.client.get_multiplexed_async_connection().await?;
-        let key = Self::make_key(prefix, key);
-
-        // Use Redis Lua script for atomic get-and-delete-if-expired operation
-        let lua_script = r#"
-            local key = KEYS[1]
-            local current_time = tonumber(ARGV[1])
-
-            local value = redis.call('GET', key)
-            if not value then
-                return nil
-            end
-
-            -- Safe JSON parsing with error handling
-            local data_ok, data = pcall(cjson.decode, value)
-            if not data_ok then
-                -- Invalid JSON, delete the corrupted entry
-                redis.call('DEL', key)
-                return nil
-            end
-
-            -- Check if expires_at field exists
-            if not data.expires_at then
-                -- Missing expires_at, delete the entry
-                redis.call('DEL', key)
-                return nil
-            end
-
-            -- Convert RFC3339 timestamp to Unix timestamp
-            -- Redis doesn't have built-in date parsing, so we need to convert on the Rust side
-            -- For now, we'll pass the expires_at as Unix timestamp from Rust
-            local expires_at = tonumber(data.expires_at)
-            if not expires_at then
-                -- Invalid expires_at format, delete the entry
-                redis.call('DEL', key)
-                return nil
-            end
-
-            if expires_at < current_time then
-                redis.call('DEL', key)
-                return nil
-            else
-                return value
-            end
-        "#;
-
-        let current_timestamp = Utc::now().timestamp();
-
-        let result: Option<String> = redis::Script::new(lua_script)
-            .key(&key)
-            .arg(current_timestamp)
-            .invoke_async(&mut conn)
-            .await
-            .map_err(|e| {
-                tracing::error!("Redis Lua script execution failed: {:?}", e);
-                e
-            })?;
-
-        match result {
-            Some(v) => Ok(Some(serde_json::from_str(&v)?)),
-            None => Ok(None),
-        }
     }
 }

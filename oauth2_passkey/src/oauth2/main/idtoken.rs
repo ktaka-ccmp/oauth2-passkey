@@ -129,7 +129,6 @@ impl From<JwksCache> for CacheData {
     fn from(cache: JwksCache) -> Self {
         Self {
             value: serde_json::to_string(&cache).unwrap_or_default(),
-            expires_at: cache.expires_at,
         }
     }
 }

@@ -159,7 +159,6 @@ impl From<StoredToken> for CacheData {
     fn from(data: StoredToken) -> Self {
         Self {
             value: serde_json::to_string(&data).expect("Failed to serialize StoredToken"),
-            expires_at: data.expires_at,
         }
     }
 }

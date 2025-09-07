@@ -286,7 +286,6 @@ async fn test_options_cache_basics() {
     // Put a simple string value in the cache
     let cache_data = CacheData {
         value: test_value.clone(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store in cache
