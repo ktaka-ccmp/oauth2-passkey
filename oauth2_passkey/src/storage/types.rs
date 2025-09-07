@@ -1,19 +1,15 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::storage::errors::StorageError;
 
 /// Data stored in the cache
+///
+/// Simplified structure that relies on Redis TTL for expiration instead of
+/// application-level expires_at validation. This eliminates redundancy and
+/// improves performance by leveraging Redis's native expiration mechanism.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheData {
     pub value: String,
-    #[serde(default = "default_expires_at", with = "timestamp_serde")]
-    pub expires_at: DateTime<Utc>,
-}
-
-/// Default expiration time for cache entries (far future)
-fn default_expires_at() -> DateTime<Utc> {
-    DateTime::from_timestamp(4102444800, 0).unwrap_or_else(Utc::now) // Year 2100
 }
 
 /// Type-safe wrapper for cache prefixes.
@@ -220,28 +216,6 @@ impl CacheKey {
     /// Returns the key as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
-    }
-}
-
-/// Custom serde module to serialize DateTime<Utc> as Unix timestamp
-mod timestamp_serde {
-    use chrono::{DateTime, Utc};
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    pub fn serialize<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        date.timestamp().serialize(serializer)
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let timestamp = i64::deserialize(deserializer)?;
-        DateTime::from_timestamp(timestamp, 0)
-            .ok_or_else(|| serde::de::Error::custom("Invalid timestamp"))
     }
 }
 

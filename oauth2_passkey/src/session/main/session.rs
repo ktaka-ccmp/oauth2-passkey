@@ -246,20 +246,20 @@ async fn is_authenticated(
         } // Not authenticated, no CSRF check done
     };
 
-    // Use atomic get-and-delete-if-expired to prevent race conditions and ensure expired sessions are rejected
+    // Get session data - Redis TTL handles expiration automatically
     let cache_key =
         CacheKey::new(session_id.to_string()).map_err(SessionError::convert_storage_error)?;
 
     let stored_session: StoredSession = match GENERIC_CACHE_STORE
         .lock()
         .await
-        .get_and_delete_if_expired(CachePrefix::session(), cache_key)
+        .get(CachePrefix::session(), cache_key)
         .await
         .map_err(SessionError::convert_storage_error)?
     {
-        Some(fresh_session_data) => {
-            // Session exists and is not expired
-            match fresh_session_data.try_into() {
+        Some(session_data) => {
+            // Session exists (Redis TTL ensures it's not expired)
+            match session_data.try_into() {
                 Ok(session) => session,
                 Err(_) => {
                     return Ok((

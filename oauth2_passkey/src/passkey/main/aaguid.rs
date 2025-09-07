@@ -34,10 +34,7 @@ impl Default for AuthenticatorInfo {
 impl From<AuthenticatorInfo> for CacheData {
     fn from(info: AuthenticatorInfo) -> Self {
         let value = serde_json::to_string(&info).unwrap_or_else(|_| "{}".to_string()); // Fallback to empty JSON on serialization error
-        CacheData {
-            value,
-            expires_at: chrono::Utc::now() + chrono::Duration::days(365), // 1 year, effectively permanent
-        }
+        CacheData { value }
     }
 }
 

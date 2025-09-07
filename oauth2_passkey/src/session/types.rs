@@ -130,7 +130,6 @@ impl From<StoredSession> for CacheData {
     fn from(data: StoredSession) -> Self {
         Self {
             value: serde_json::to_string(&data).expect("Failed to serialize StoredSession"),
-            expires_at: data.expires_at,
         }
     }
 }
