@@ -1,7 +1,6 @@
 use super::*;
 use crate::storage::CacheData;
 use crate::test_utils::init_test_environment;
-use chrono::Utc;
 
 #[derive(Debug, PartialEq)]
 pub struct TestError(String);
@@ -22,10 +21,7 @@ impl TryFrom<CacheData> for String {
 
 impl From<String> for CacheData {
     fn from(value: String) -> Self {
-        CacheData {
-            value,
-            expires_at: Utc::now() + chrono::Duration::hours(1),
-        }
+        CacheData { value }
     }
 }
 

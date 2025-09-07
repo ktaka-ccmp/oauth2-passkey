@@ -288,7 +288,6 @@ mod tests {
         for malicious_key in malicious_keys.iter() {
             let cache_data = CacheData {
                 value: "test_value".to_string(),
-                expires_at: Utc::now() + chrono::Duration::seconds(300),
             };
 
             // Test cache put operation
@@ -358,7 +357,6 @@ mod tests {
         for malicious_value in malicious_values.iter() {
             let cache_data = CacheData {
                 value: malicious_value.to_string(),
-                expires_at: Utc::now() + chrono::Duration::seconds(300),
             };
 
             // Store malicious value
@@ -413,7 +411,6 @@ mod tests {
         for malicious_prefix in malicious_prefixes.iter() {
             let cache_data = CacheData {
                 value: "safe_value".to_string(),
-                expires_at: Utc::now() + chrono::Duration::seconds(300),
             };
 
             // Test operations with malicious prefix
@@ -565,7 +562,6 @@ mod tests {
         // Store malicious data in cache first
         let malicious_cache_data = CacheData {
             value: "'; DELETE FROM users; --".to_string(),
-            expires_at: Utc::now() + chrono::Duration::seconds(300),
         };
 
         let _cache_key = format!("second_order_{timestamp}");

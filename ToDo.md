@@ -4,7 +4,6 @@
 
 ### High Priority
 
-- **Eliminate Redundant Cache Expiration System**: Current implementation has two conflicting expiration mechanisms - Redis native TTL (via `EXPIRE` commands) and application-level `expires_at` field validation with complex Lua script. This creates unnecessary complexity, potential race conditions, and maintenance burden. The custom 40+ line atomic Lua script exists solely to handle redundant expiration logic that Redis already provides natively. Eliminating the application-level expiration would simplify the codebase by ~100+ lines while maintaining identical functionality and better performance. See detailed analysis in `docs/cache-expiration-system-simplification.md`. **Risk Level**: Medium (requires thorough testing of session flows).
 - **Simplify OAuth2 Account Linking API**: Current implementation requires understanding CSRF tokens, page session tokens, and coordinating multiple API calls (50+ lines of code). Need simpler, more intuitive API. See detailed analysis and proposed solutions in `docs/oauth2-account-linking-api-simplification.md`.
 - **Finalize Public API**: Review and document all public interfaces for 1.0 release
 

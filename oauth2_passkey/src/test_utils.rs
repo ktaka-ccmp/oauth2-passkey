@@ -38,7 +38,9 @@ pub async fn init_test_environment() {
     ENV_INIT.call_once(|| {
         // All tests now use .env_test - unit tests inject URLs directly to avoid HTTP requests
         println!("🧪 Loading test environment (.env_test)");
-        if dotenvy::from_filename(".env_test").is_err() {
+
+        // Use override method to force .env_test values to override existing environment
+        if dotenvy::from_filename_override(".env_test").is_err() {
             dotenvy::dotenv().ok();
         }
 

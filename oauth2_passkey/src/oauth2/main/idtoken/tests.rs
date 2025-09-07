@@ -577,7 +577,6 @@ fn test_jwks_cache_conversion() {
 fn test_jwks_cache_invalid_json() {
     let invalid_cache_data = CacheData {
         value: "invalid json".to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     let result: Result<JwksCache, TokenVerificationError> = invalid_cache_data.try_into();

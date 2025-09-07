@@ -115,7 +115,6 @@ async fn test_verify_page_session_token_success() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store the session in the global cache store
@@ -169,7 +168,6 @@ async fn test_verify_page_session_token_invalid_token() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store the session in the global cache store
@@ -228,7 +226,6 @@ async fn test_verify_page_session_token_missing_token() {
     // Convert to CacheData
     let cache_data = CacheData {
         value: session_json.to_string(),
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
     };
 
     // Store the session in the global cache store
