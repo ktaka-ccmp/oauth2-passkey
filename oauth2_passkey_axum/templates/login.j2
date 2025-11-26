@@ -6,13 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Index Page</title>
 
-    <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
-    <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
-
     <script>
         const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
         const csrfToken = "_NOT_SET_";
     </script>
+
+    <style>
+        /* Fix for iOS Safari onclick issue */
+        button {
+            cursor: pointer;
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0.3);
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* Ensure body doesn't block touches */
+        body {
+            touch-action: manipulation;
+        }
+    </style>
 
 </head>
 
@@ -24,21 +37,372 @@
         Google OAuth2:
     </div>
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="oauth2.openPopup('create_user')">Create User</button>
-        <button onclick="oauth2.openPopup('login')">Sign in</button>
-        <button onclick="oauth2.openPopup('create_user_or_login')">Either way</button>
+        <button id="oauth2-create-user">Create User</button>
+        <button id="oauth2-login">Sign in</button>
+        <button id="oauth2-either">Either way</button>
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 10px;">
         Passkey:
     </div>
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="showRegistrationModal('create_user')">
-            Create User
-        </button>
-        <button onclick="startAuthentication(false)">Sign in</button>
+        <button id="passkey-create-user">Create User</button>
+        <button id="passkey-login">Sign in</button>
         or <a href="{{o2p_route_prefix}}/passkey/conditional_ui">try conditional UI</a>
     </div>
+
+    <!-- Inline scripts as workaround for iOS loading issues -->
+    <script>
+        // Inline OAuth2 module
+        const oauth2 = (function() {
+            let popupWindow;
+            let isReloading = false;
+
+            function isIOSSafari() {
+                const ua = navigator.userAgent;
+                const iOS = /iPad|iPhone|iPod/.test(ua);
+                const webkit = /WebKit/.test(ua);
+                const notChrome = !/CriOS/.test(ua);
+                return iOS && webkit && notChrome;
+            }
+
+            function openPopup(mode=null, page_context=null) {
+                if (mode !== 'add_to_user' && mode !== 'create_user' && mode !== 'login' && mode !== 'create_user_or_login') {
+                    console.log('Invalid or missing mode parameter');
+                    return;
+                }
+
+                console.log('openPopup called with mode:', mode);
+
+                let url;
+                if (mode === 'add_to_user') {
+                    url = `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}&context=${page_context}`;
+                } else {
+                    url = `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}`;
+                }
+
+                console.log('Opening URL:', url);
+                console.log('Is iOS Safari:', isIOSSafari());
+
+                if (isIOSSafari()) {
+                    console.log('Using full-page redirect for iOS Safari');
+                    window.location.href = url;
+                    return;
+                }
+
+                popupWindow = window.open(url, "PopupWindow", "width=550,height=640,resizable=yes,scrollbars=yes");
+
+                if (!popupWindow || popupWindow.closed || typeof popupWindow.closed === 'undefined') {
+                    console.error('Popup was blocked by browser!');
+                    alert('Popup blocked! Redirecting...');
+                    setTimeout(() => { window.location.href = url; }, 1000);
+                    return;
+                }
+
+                window.addEventListener('message', function(event) {
+                    if (event.data === 'auth_complete') {
+                        handlePopupClosed();
+                    }
+                });
+            }
+
+            function handlePopupClosed() {
+                if (isReloading) return;
+                isReloading = true;
+                setTimeout(() => { window.location.reload(); }, 10);
+            }
+
+            return { openPopup: openPopup };
+        })();
+
+        console.log('OAuth2 module loaded inline');
+    </script>
+
+    <script>
+        // Inline Passkey module - embedded due to iOS loading issues
+        // Base64 utility functions
+        function arrayBufferToBase64URL(buffer) {
+            if (!buffer) return null;
+            const bytes = new Uint8Array(buffer);
+            let str = '';
+            for (const byte of bytes) {
+                str += String.fromCharCode(byte);
+            }
+            return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        function base64URLToUint8Array(base64URL) {
+            if (!base64URL) return null;
+            const padding = '='.repeat((4 - base64URL.length % 4) % 4);
+            const base64 = base64URL.replace(/-/g, '+').replace(/_/g, '/') + padding;
+            const rawData = atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        async function startAuthentication() {
+            try {
+                const startResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/auth/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: "{}"
+                });
+
+                if (!startResponse.ok) {
+                    const errorText = await startResponse.text();
+                    alert('Authentication failed: ' + errorText);
+                    return;
+                }
+
+                const options = await startResponse.json();
+                options.challenge = base64URLToUint8Array(options.challenge);
+                if (options.allowCredentials && Array.isArray(options.allowCredentials)) {
+                    options.allowCredentials = options.allowCredentials.map(credential => ({
+                        type: 'public-key',
+                        id: base64URLToUint8Array(credential.id),
+                        transports: credential.transports
+                    }));
+                } else {
+                    options.allowCredentials = [];
+                }
+
+                const credential = await navigator.credentials.get({ publicKey: options });
+
+                const authResponse = {
+                    auth_id: options.authId,
+                    id: credential.id,
+                    raw_id: arrayBufferToBase64URL(credential.rawId),
+                    type: credential.type,
+                    authenticator_attachment: credential.authenticatorAttachment,
+                    response: {
+                        authenticator_data: arrayBufferToBase64URL(credential.response.authenticatorData),
+                        client_data_json: arrayBufferToBase64URL(credential.response.clientDataJSON),
+                        signature: arrayBufferToBase64URL(credential.response.signature),
+                        user_handle: arrayBufferToBase64URL(credential.response.userHandle)
+                    },
+                };
+
+                const verifyResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/auth/finish', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(authResponse)
+                });
+
+                if (!verifyResponse.ok) {
+                    const errorText = await verifyResponse.text();
+                    alert('Authentication failed: ' + errorText);
+                    return;
+                }
+
+                setTimeout(() => { window.location.reload(); }, 100);
+            } catch (error) {
+                console.error('Error during authentication:', error);
+                alert('Authentication failed: ' + error.message);
+            }
+        }
+
+        function createRegistrationModal() {
+            let modal = document.getElementById('registration-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'registration-modal';
+                modal.className = 'modal';
+                modal.style.cssText = 'display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1001; touch-action: manipulation;';
+                modal.innerHTML = `
+                    <h3>Register New Passkey</h3>
+                    <div style="margin: 10px 0;">
+                        <input type="text" id="reg-username" placeholder="Username" style="width: 100%; margin-bottom: 10px; padding: 5px;">
+                        <input type="text" id="reg-displayname" placeholder="Display Name" style="width: 100%; padding: 5px;">
+                    </div>
+                    <div style="text-align: right;">
+                        <button onclick="closeRegistrationModal()">Cancel</button>
+                        <button onclick="submitRegistration(document.getElementById('registration-modal').dataset.mode)">Register</button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+            return modal;
+        }
+
+        function showRegistrationModal(mode) {
+            const modal = createRegistrationModal();
+            modal.style.display = 'block';
+            modal.dataset.mode = mode;
+            document.getElementById('reg-username').value = 'username';
+            document.getElementById('reg-displayname').value = 'displayname';
+
+            fetch(O2P_ROUTE_PREFIX + '/user/info', { method: 'GET', credentials: 'same-origin' })
+                .then(response => response.ok ? response.json() : null)
+                .then(userData => {
+                    if (userData) {
+                        document.getElementById('reg-username').value = userData.account ? `${userData.account}#${userData.passkey_count + 1}` : 'username';
+                        document.getElementById('reg-displayname').value = userData.label ? `${userData.label}#${userData.passkey_count + 1}` : 'displayname';
+                    }
+                })
+                .catch(error => console.error('Error fetching user data:', error));
+        }
+
+        function closeRegistrationModal() {
+            const modal = document.getElementById('registration-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function submitRegistration(mode) {
+            const username = document.getElementById('reg-username').value.trim();
+            const displayname = document.getElementById('reg-displayname').value.trim();
+            if (!username || !displayname) {
+                alert('Both username and display name are required');
+                return;
+            }
+            closeRegistrationModal();
+            await startRegistration(mode, username, displayname);
+        }
+
+        async function startRegistration(mode, username = null, displayname = null) {
+            try {
+                const request = { username, displayname, mode: mode };
+                const startResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/start', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(request)
+                });
+
+                if (!startResponse.ok) {
+                    const errorText = await startResponse.text();
+                    alert('Registration failed: ' + errorText);
+                    return;
+                }
+
+                const options = await startResponse.json();
+                let userHandle = options.user.user_handle;
+                options.challenge = base64URLToUint8Array(options.challenge);
+                options.user.id = base64URLToUint8Array(userHandle);
+
+                const credential = await navigator.credentials.create({ publicKey: options });
+
+                const credentialResponse = {
+                    id: credential.id,
+                    raw_id: arrayBufferToBase64URL(credential.rawId),
+                    type: credential.type,
+                    response: {
+                        attestation_object: arrayBufferToBase64URL(credential.response.attestationObject),
+                        client_data_json: arrayBufferToBase64URL(credential.response.clientDataJSON)
+                    },
+                    user_handle: userHandle,
+                    mode: mode,
+                };
+
+                const finishResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/finish', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(credentialResponse)
+                });
+
+                if (finishResponse.ok) {
+                    location.reload();
+                } else {
+                    const errorText = await finishResponse.text();
+                    throw new Error('Registration verification failed: ' + errorText);
+                }
+            } catch (error) {
+                console.error('Error during registration:', error);
+                alert('Registration failed: ' + error.message);
+            }
+        }
+
+        console.log('Passkey module loaded inline');
+    </script>
+
+    <script>
+        // Fix for iOS Safari - use proper event listeners instead of inline onclick
+        // This runs immediately after scripts are loaded (scripts are loaded synchronously before this)
+        (function() {
+            console.log('=== Script Loading Debug ===');
+            console.log('O2P_ROUTE_PREFIX:', O2P_ROUTE_PREFIX);
+            console.log('Expected oauth2.js URL:', O2P_ROUTE_PREFIX + '/oauth2/oauth2.js');
+            console.log('Expected passkey.js URL:', O2P_ROUTE_PREFIX + '/passkey/passkey.js');
+            console.log('oauth2 available:', typeof oauth2);
+            console.log('showRegistrationModal available:', typeof showRegistrationModal);
+            console.log('startAuthentication available:', typeof startAuthentication);
+            console.log('window.oauth2:', window.oauth2);
+            console.log('=== End Debug ===');
+
+            // OAuth2 buttons
+            const oauth2CreateBtn = document.getElementById('oauth2-create-user');
+            const oauth2LoginBtn = document.getElementById('oauth2-login');
+            const oauth2EitherBtn = document.getElementById('oauth2-either');
+
+            console.log('Found OAuth2 buttons:', {
+                oauth2CreateBtn: !!oauth2CreateBtn,
+                oauth2LoginBtn: !!oauth2LoginBtn,
+                oauth2EitherBtn: !!oauth2EitherBtn
+            });
+
+            if (oauth2CreateBtn) {
+                oauth2CreateBtn.addEventListener('click', function(e) {
+                    console.log('OAuth2 Create User clicked');
+                    if (typeof oauth2 !== 'undefined' && oauth2.openPopup) {
+                        oauth2.openPopup('create_user');
+                    } else {
+                        console.error('oauth2.openPopup not available!');
+                        alert('OAuth2 not loaded. Please refresh the page.');
+                    }
+                });
+            }
+
+            if (oauth2LoginBtn) {
+                oauth2LoginBtn.addEventListener('click', function(e) {
+                    console.log('OAuth2 Login clicked');
+                    if (typeof oauth2 !== 'undefined' && oauth2.openPopup) {
+                        oauth2.openPopup('login');
+                    } else {
+                        console.error('oauth2.openPopup not available!');
+                        alert('OAuth2 not loaded. Please refresh the page.');
+                    }
+                });
+            }
+
+            if (oauth2EitherBtn) {
+                oauth2EitherBtn.addEventListener('click', function(e) {
+                    console.log('OAuth2 Either clicked');
+                    if (typeof oauth2 !== 'undefined' && oauth2.openPopup) {
+                        oauth2.openPopup('create_user_or_login');
+                    } else {
+                        console.error('oauth2.openPopup not available!');
+                        alert('OAuth2 not loaded. Please refresh the page.');
+                    }
+                });
+            }
+
+            // Passkey buttons
+            const passkeyCreateBtn = document.getElementById('passkey-create-user');
+            const passkeyLoginBtn = document.getElementById('passkey-login');
+
+            console.log('Found Passkey buttons:', {
+                passkeyCreateBtn: !!passkeyCreateBtn,
+                passkeyLoginBtn: !!passkeyLoginBtn
+            });
+
+            if (passkeyCreateBtn) {
+                passkeyCreateBtn.addEventListener('click', function(e) {
+                    console.log('Passkey Create User clicked');
+                    showRegistrationModal('create_user');
+                });
+            }
+
+            if (passkeyLoginBtn) {
+                passkeyLoginBtn.addEventListener('click', function(e) {
+                    console.log('Passkey Login clicked');
+                    startAuthentication(false);
+                });
+            }
+        })();
+    </script>
 
 </body>
 

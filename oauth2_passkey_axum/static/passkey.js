@@ -115,7 +115,8 @@ function createRegistrationModal() {
         modal = document.createElement('div');
         modal.id = 'registration-modal';
         modal.className = 'modal';
-        modal.style.cssText = 'display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);';
+        // Updated styles with z-index and touch-action
+        modal.style.cssText = 'display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1001; touch-action: manipulation;';
 
         modal.innerHTML = `
             <h3>Register New Passkey</h3>
@@ -131,13 +132,15 @@ function createRegistrationModal() {
 
         document.body.appendChild(modal);
     }
+
     return modal;
 }
 
 function showRegistrationModal(mode) {
     const modal = createRegistrationModal();
+
     modal.style.display = 'block';
-    
+
     // Store the mode in the modal for later use
     modal.dataset.mode = mode;
 
@@ -172,6 +175,7 @@ function showRegistrationModal(mode) {
 
 function closeRegistrationModal() {
     const modal = document.getElementById('registration-modal');
+
     if (modal) {
         modal.style.display = 'none';
     }
