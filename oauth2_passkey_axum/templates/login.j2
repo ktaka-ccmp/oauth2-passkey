@@ -6,13 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Index Page</title>
 
-    <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
-    <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
-
     <script>
         const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
         const csrfToken = "_NOT_SET_";
     </script>
+
+    <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
+    <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
+
+    <style>
+        /* Fix for iOS Safari: make buttons clickable */
+        button {
+            cursor: pointer;
+        }
+    </style>
 
 </head>
 
@@ -24,21 +31,38 @@
         Google OAuth2:
     </div>
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="oauth2.openPopup('create_user')">Create User</button>
-        <button onclick="oauth2.openPopup('login')">Sign in</button>
-        <button onclick="oauth2.openPopup('create_user_or_login')">Either way</button>
+        <button id="oauth2-create-user">Create User</button>
+        <button id="oauth2-login">Sign in</button>
+        <button id="oauth2-either">Either way</button>
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 10px;">
         Passkey:
     </div>
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="showRegistrationModal('create_user')">
-            Create User
-        </button>
-        <button onclick="startAuthentication(false)">Sign in</button>
+        <button id="passkey-create-user">Create User</button>
+        <button id="passkey-login">Sign in</button>
         or <a href="{{o2p_route_prefix}}/passkey/conditional_ui">try conditional UI</a>
     </div>
+
+    <script>
+        // Set up event listeners (iOS Safari fix: avoid inline onclick)
+        document.getElementById('oauth2-create-user').addEventListener('click', function() {
+            oauth2.openPopup('create_user');
+        });
+        document.getElementById('oauth2-login').addEventListener('click', function() {
+            oauth2.openPopup('login');
+        });
+        document.getElementById('oauth2-either').addEventListener('click', function() {
+            oauth2.openPopup('create_user_or_login');
+        });
+        document.getElementById('passkey-create-user').addEventListener('click', function() {
+            showRegistrationModal('create_user');
+        });
+        document.getElementById('passkey-login').addEventListener('click', function() {
+            startAuthentication();
+        });
+    </script>
 
 </body>
 
