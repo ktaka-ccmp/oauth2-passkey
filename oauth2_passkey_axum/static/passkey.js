@@ -272,3 +272,9 @@ async function startRegistration(mode, username = null, displayname = null) {
         alert('Registration failed: ' + error.message);
     }
 }
+
+// Signal that passkey.js is loaded
+window.passkeyReady = true;
+if (typeof window.onScriptsReady === 'function') {
+    window.onScriptsReady();
+}

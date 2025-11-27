@@ -11,13 +11,16 @@
         const csrfToken = "_NOT_SET_";
     </script>
 
-    <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
-    <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
+    <script src="{{o2p_route_prefix}}/oauth2/oauth2.js" defer></script>
+    <script src="{{o2p_route_prefix}}/passkey/passkey.js" defer></script>
 
     <style>
-        /* Fix for iOS Safari: make buttons clickable */
         button {
             cursor: pointer;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
     </style>
 
@@ -31,37 +34,47 @@
         Google OAuth2:
     </div>
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button id="oauth2-create-user">Create User</button>
-        <button id="oauth2-login">Sign in</button>
-        <button id="oauth2-either">Either way</button>
+        <button id="oauth2-create-user" disabled>Create User</button>
+        <button id="oauth2-login" disabled>Sign in</button>
+        <button id="oauth2-either" disabled>Either way</button>
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 10px;">
         Passkey:
     </div>
     <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button id="passkey-create-user">Create User</button>
-        <button id="passkey-login">Sign in</button>
+        <button id="passkey-create-user" disabled>Create User</button>
+        <button id="passkey-login" disabled>Sign in</button>
         or <a href="{{o2p_route_prefix}}/passkey/conditional_ui">try conditional UI</a>
     </div>
 
     <script>
-        // Set up event listeners (iOS Safari fix: avoid inline onclick)
-        document.getElementById('oauth2-create-user').addEventListener('click', function() {
-            oauth2.openPopup('create_user');
-        });
-        document.getElementById('oauth2-login').addEventListener('click', function() {
-            oauth2.openPopup('login');
-        });
-        document.getElementById('oauth2-either').addEventListener('click', function() {
-            oauth2.openPopup('create_user_or_login');
-        });
-        document.getElementById('passkey-create-user').addEventListener('click', function() {
-            showRegistrationModal('create_user');
-        });
-        document.getElementById('passkey-login').addEventListener('click', function() {
-            startAuthentication();
-        });
+        function enableButtons() {
+            if (window.oauth2Ready && window.passkeyReady) {
+                document.getElementById('oauth2-create-user').disabled = false;
+                document.getElementById('oauth2-login').disabled = false;
+                document.getElementById('oauth2-either').disabled = false;
+                document.getElementById('passkey-create-user').disabled = false;
+                document.getElementById('passkey-login').disabled = false;
+
+                document.getElementById('oauth2-create-user').addEventListener('click', function() {
+                    oauth2.openPopup('create_user');
+                });
+                document.getElementById('oauth2-login').addEventListener('click', function() {
+                    oauth2.openPopup('login');
+                });
+                document.getElementById('oauth2-either').addEventListener('click', function() {
+                    oauth2.openPopup('create_user_or_login');
+                });
+                document.getElementById('passkey-create-user').addEventListener('click', function() {
+                    showRegistrationModal('create_user');
+                });
+                document.getElementById('passkey-login').addEventListener('click', function() {
+                    startAuthentication();
+                });
+            }
+        }
+        window.onScriptsReady = enableButtons;
     </script>
 
 </body>

@@ -2,13 +2,10 @@ const oauth2 = (function() {
     let popupWindow;
     let isReloading = false;
 
-    // Detect iOS Safari (blocks popups aggressively)
-    function isIOSSafari() {
+    // Detect iOS WebKit (blocks popups aggressively)
+    function isIOSWebKit() {
         const ua = navigator.userAgent;
-        const iOS = /iPad|iPhone|iPod/.test(ua);
-        const webkit = /WebKit/.test(ua);
-        const notChrome = !/CriOS/.test(ua);
-        return iOS && webkit && notChrome;
+        return /iPad|iPhone|iPod/.test(ua) && /WebKit/.test(ua);
     }
 
     // mode: add_to_user, create_user, login
@@ -26,8 +23,8 @@ const oauth2 = (function() {
             url = `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}`;
         }
 
-        // iOS Safari blocks popups, use full-page redirect instead
-        if (isIOSSafari()) {
+        // iOS WebKit blocks popups, use full-page redirect instead
+        if (isIOSWebKit()) {
             window.location.href = url;
             return;
         }
@@ -86,3 +83,9 @@ const oauth2 = (function() {
         openPopup: openPopup
     };
 })();
+
+// Signal that oauth2.js is loaded
+window.oauth2Ready = true;
+if (typeof window.onScriptsReady === 'function') {
+    window.onScriptsReady();
+}
