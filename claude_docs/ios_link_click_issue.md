@@ -2,414 +2,350 @@
 
 ## Issue Description
 
-On the demo-both login page, links are not clickable for anonymous users on iPhone Safari, except for the "try conditional UI" link. The same page works correctly on Android and Chrome on Linux.
+On the demo-both login page, buttons are not clickable for anonymous users on iPhone Safari/Chrome when accessed through ngrok. The same page works correctly on Android and desktop browsers.
 
 **Affected page:** `/o2p/user/login` (demo-both application)
-**Affected device:** iPhone (Safari browser)
-**Working platforms:** Android, Chrome on Linux
+**Affected device:** iPhone (Safari and Chrome browsers)
+**Working platforms:** Android, Desktop browsers, iOS via direct nginx proxy
 
 ## Investigation Summary
 
-Date: 2025-10-13
+Date: 2025-11-27 (Updated)
 
-### Files Examined
+### Root Cause Analysis - Final
 
-1. `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/templates/login.j2` - Login page template
-2. `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/static/passkey.js` - Passkey authentication JavaScript
-3. `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/static/oauth2.js` - OAuth2 authentication JavaScript
-4. `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/static/summary.css` - CSS file with modal styles
+**Actual Root Cause:** ngrok's interstitial page blocking external JavaScript files
 
-### Root Cause Analysis - Updated
+When accessing the application through ngrok on iOS:
+1. The main HTML page loads successfully (user has clicked through ngrok's browser verification)
+2. External JavaScript files (`oauth2.js`, `passkey.js`) are requested
+3. ngrok returns its HTML interstitial page instead of the JavaScript files
+4. Browser receives `content-type: text/html` with `<!DOCTYPE html>` content instead of JavaScript
+5. Script loading fails, buttons remain disabled
 
-**Initial Hypothesis:** Modal overlay interference ❌ INCORRECT
-
-After implementation and testing, the modal fix did not resolve the issue. Further investigation revealed the actual root cause:
-
-**Actual Root Cause:** iOS Safari inline onclick handler incompatibility ✅ CORRECT
-
-**Location:** `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/templates/login.j2`
-
-iOS Safari has a known issue where inline `onclick` attributes on `<button>` elements do not trigger click events properly. This is why:
-
-- **ALL buttons with onclick handlers (lines 27-29, 36-39) are NOT clickable**
-- **The plain `<a href>` link (line 40) WORKS** because it doesn't use onclick
-
-#### Code Analysis (login.j2:27-40)
-
-```html
-<div style="display: flex; gap: 10px; margin-top: 10px;">
-    <button onclick="oauth2.openPopup('create_user')">Create User</button>
-    <button onclick="oauth2.openPopup('login')">Sign in</button>
-    <button onclick="oauth2.openPopup('create_user_or_login')">Either way</button>
-</div>
-
-<div style="display: flex; gap: 10px; margin-top: 10px;">
-    Passkey:
-</div>
-<div style="display: flex; gap: 10px; margin-top: 10px;">
-    <button onclick="showRegistrationModal('create_user')">
-        Create User
-    </button>
-    <button onclick="startAuthentication(false)">Sign in</button>
-    or <a href="{{o2p_route_prefix}}/passkey/conditional_ui">try conditional UI</a>
-</div>
+**Evidence from debugging:**
+```
+fetch oauth2.js status=200
+fetch oauth2.js content-type=text/html
+fetch oauth2.js length=2780 starts=<!DOCTYPE html><html class="h
+oauth2.js LOAD ERROR
 ```
 
-#### Problems Identified
-
-**Primary Issue**: iOS Safari does not properly handle `onclick` attributes on `<button>` elements
-
-According to iOS Safari behavior documented in multiple sources:
-1. iOS Safari will not fire a click event if it doesn't consider the element "clickable"
-2. iOS Safari really doesn't want you clicking anything that's not an `<a>` tag
-3. Buttons with inline `onclick` handlers need special CSS treatment to work on iOS
-
-**Secondary Issue (Fixed but not the root cause)**: The modal implementation was improved but this wasn't causing the button click issues
-
-### Why "Try Conditional UI" Works
-
-The "try conditional UI" link (line 40 in `login.j2`) works because:
-```html
-<a href="{{o2p_route_prefix}}/passkey/conditional_ui">try conditional UI</a>
+When using nginx proxy directly (bypassing ngrok):
+```
+fetch oauth2.js status=200
+fetch oauth2.js content-type=application/javascript
+fetch oauth2.js length=3054 starts=const oauth2 = (function() {
+oauth2.js onload fired
 ```
 
-This is a simple HTML anchor tag without any JavaScript onclick handlers, so it doesn't interact with the modal system or JavaScript event handling at all.
+### Previous Hypotheses (Incorrect)
 
-### Comparison with Working Modal Implementation
+Several hypotheses were investigated before identifying the actual cause:
 
-The working modal in `summary.css:178-189` includes:
-
-```css
-/* Modal styles */
-.credential-modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;              /* Explicit z-index */
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0, 0, 0, 0.4);  /* Semi-transparent backdrop */
-}
-```
-
-This implementation has:
-- Explicit `z-index: 1000`
-- Full-screen backdrop (`width: 100%; height: 100%`)
-- Semi-transparent background to block clicks
+1. **Modal overlay interference** - INCORRECT
+2. **iOS Safari inline onclick handler incompatibility** - INCORRECT (worked fine via nginx)
+3. **CSS cursor:pointer requirement** - INCORRECT (not the root cause)
+4. **iOS Safari popup blocking** - PARTIALLY CORRECT (separate issue, handled with redirect fallback)
 
 ## Solution
 
-### Actual Fix (Applied)
+### Current Implementation
 
-Add CSS styling to make buttons clickable on iOS Safari by adding `cursor: pointer` and tap highlight properties.
+The solution uses external JavaScript files with a robust loading mechanism:
 
-**File Modified:** `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/templates/login.j2`
-
-### Changes Applied
-
-Added CSS in the `<head>` section:
-
+**File: `login.j2`**
 ```html
-<style>
-    /* Fix for iOS Safari onclick issue */
-    button {
-        cursor: pointer;
-        -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
-    }
-</style>
-```
+<head>
+    <script>
+        const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
+        const csrfToken = "_NOT_SET_";
+    </script>
 
-### Why This Works
+    <script src="{{o2p_route_prefix}}/oauth2/oauth2.js" defer></script>
+    <script src="{{o2p_route_prefix}}/passkey/passkey.js" defer></script>
 
-1. **`cursor: pointer`**: Even though cursors aren't visible on touchscreens, this CSS property signals to iOS Safari that the element is intended to be clickable, enabling proper touch event handling
-2. **`-webkit-tap-highlight-color`**: Provides visual feedback when tapping on iOS Safari, which helps iOS recognize the element as interactive
-
----
-
-## Previous Investigation (Incorrect Hypothesis)
-
-The initial hypothesis was that the modal overlay was causing issues. While the modal implementation was improved, this was NOT the root cause of the button click issues.
-
-### Modal Changes (Applied but not the fix)
-
-#### 1. Update `createRegistrationModal()` function
-
-Add proper modal styling and create a backdrop:
-
-```javascript
-function createRegistrationModal() {
-    // Create modal container if it doesn't exist
-    let modal = document.getElementById('registration-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'registration-modal';
-        modal.className = 'modal';
-        // Updated styles with z-index and touch-action
-        modal.style.cssText = 'display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1001; touch-action: manipulation;';
-
-        modal.innerHTML = `
-            <h3>Register New Passkey</h3>
-            <div style="margin: 10px 0;">
-                <input type="text" id="reg-username" placeholder="Username" style="width: 100%; margin-bottom: 10px; padding: 5px;">
-                <input type="text" id="reg-displayname" placeholder="Display Name" style="width: 100%; padding: 5px;">
-            </div>
-            <div style="text-align: right;">
-                <button onclick="closeRegistrationModal()">Cancel</button>
-                <button onclick="submitRegistration(document.getElementById('registration-modal').dataset.mode)">Register</button>
-            </div>
-        `;
-
-        document.body.appendChild(modal);
-    }
-
-    // Create backdrop if it doesn't exist
-    let backdrop = document.getElementById('registration-modal-backdrop');
-    if (!backdrop) {
-        backdrop = document.createElement('div');
-        backdrop.id = 'registration-modal-backdrop';
-        backdrop.style.cssText = 'display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0, 0, 0, 0.4); touch-action: none;';
-        backdrop.onclick = closeRegistrationModal;
-        document.body.appendChild(backdrop);
-    }
-
-    return modal;
-}
-```
-
-#### 2. Update `showRegistrationModal()` function
-
-Show both modal and backdrop:
-
-```javascript
-function showRegistrationModal(mode) {
-    const modal = createRegistrationModal();
-    const backdrop = document.getElementById('registration-modal-backdrop');
-
-    modal.style.display = 'block';
-    if (backdrop) {
-        backdrop.style.display = 'block';
-    }
-
-    // Store the mode in the modal for later use
-    modal.dataset.mode = mode;
-
-    // Set default values immediately
-    document.getElementById('reg-username').value = 'username';
-    document.getElementById('reg-displayname').value = 'displayname';
-
-    // Try to get current user info to pre-fill the form
-    fetch(O2P_ROUTE_PREFIX + '/user/info', {
-        method: 'GET',
-        credentials: 'same-origin'
-    })
-    .then(response => {
-        if (response.ok) {
-            return response.json();
+    <style>
+        button {
+            cursor: pointer;
         }
-        return null;
-    })
-    .then(userData => {
-        if (userData) {
-            document.getElementById('reg-username').value = userData.account ? `${userData.account}#${userData.passkey_count + 1}` : 'username';
-            document.getElementById('reg-displayname').value = userData.label ? `${userData.label}#${userData.passkey_count + 1}` : 'displayname';
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
-    })
-    .catch(error => {
-        console.error('Error fetching user data:', error);
-    });
+    </style>
+</head>
+
+<body>
+    <!-- Buttons start disabled -->
+    <button id="oauth2-create-user" disabled>Create User</button>
+    <!-- ... other buttons ... -->
+
+    <script>
+        function enableButtons() {
+            if (window.oauth2Ready && window.passkeyReady) {
+                // Enable all buttons
+                document.getElementById('oauth2-create-user').disabled = false;
+                // ... enable other buttons ...
+
+                // Attach event listeners
+                document.getElementById('oauth2-create-user').addEventListener('click', function() {
+                    oauth2.openPopup('create_user');
+                });
+                // ... attach other listeners ...
+            }
+        }
+        window.onScriptsReady = enableButtons;
+    </script>
+</body>
+```
+
+**File: `oauth2.js` and `passkey.js`**
+
+Each external script signals when it's loaded:
+```javascript
+// At end of oauth2.js
+window.oauth2Ready = true;
+if (typeof window.onScriptsReady === 'function') {
+    window.onScriptsReady();
+}
+
+// At end of passkey.js
+window.passkeyReady = true;
+if (typeof window.onScriptsReady === 'function') {
+    window.onScriptsReady();
 }
 ```
 
-#### 3. Update `closeRegistrationModal()` function
+### How It Works
 
-Hide both modal and backdrop:
+1. External scripts load with `defer` attribute (parallel download, execute after HTML parsing)
+2. Buttons start `disabled` to prevent clicks before scripts are ready
+3. Each script sets a ready flag and calls `onScriptsReady()` callback
+4. When both scripts are ready, buttons are enabled and event listeners attached
+5. Visual feedback: disabled buttons show at 50% opacity
+
+### iOS Safari Popup Handling
+
+The `oauth2.js` file also handles iOS Safari's popup blocking:
 
 ```javascript
-function closeRegistrationModal() {
-    const modal = document.getElementById('registration-modal');
-    const backdrop = document.getElementById('registration-modal-backdrop');
+function isIOSWebKit() {
+    const ua = navigator.userAgent;
+    return /iPad|iPhone|iPod/.test(ua) && /WebKit/.test(ua);
+}
 
-    if (modal) {
-        modal.style.display = 'none';
+function openPopup(mode, page_context) {
+    // iOS WebKit blocks popups, use full-page redirect instead
+    if (isIOSWebKit()) {
+        window.location.href = url;
+        return;
     }
-    if (backdrop) {
-        backdrop.style.display = 'none';
+
+    // Desktop/other browsers: use popup
+    popupWindow = window.open(url, "PopupWindow", "width=550,height=640,...");
+
+    // Fallback if popup was blocked
+    if (!popupWindow || popupWindow.closed) {
+        window.location.href = url;
+        return;
     }
 }
 ```
 
-### Key Improvements
+## Key Learnings
 
-1. **Explicit z-index values**: Modal at 1001, backdrop at 1000
-2. **Modal backdrop**: Full-screen semi-transparent overlay that blocks all background interactions
-3. **Touch event handling**:
-   - `touch-action: manipulation` on modal for proper iOS interaction
-   - `touch-action: none` on backdrop to block all background touches
-4. **Click handler on backdrop**: Clicking outside modal closes it (better UX)
-5. **Proper layering**: Ensures iOS Safari correctly handles touch events
+1. **ngrok's interstitial** can interfere with external resource loading on mobile browsers
+2. **External scripts with `defer`** work correctly on iOS when served properly
+3. **Button disabling until scripts load** provides a robust user experience
+4. **Event listeners** (via `addEventListener`) are more reliable than inline `onclick` attributes
+5. **Popup fallback to redirect** is essential for iOS Safari compatibility
 
-## Testing Plan
+## ngrok Workarounds
 
-After implementing the fix, test on:
+ngrok shows an interstitial page for free accounts to prevent phishing attacks. This page blocks external JavaScript file loading because browsers can't add custom headers to `<script src="...">` tags.
 
-1. iPhone Safari - Verify all links are clickable on login page
-2. Android Chrome - Ensure no regression
-3. Desktop Chrome/Firefox - Ensure no regression
-4. Test modal functionality:
-   - Opening modal blocks background clicks
-   - Clicking backdrop closes modal
-   - Modal form inputs work correctly
-   - Cancel and Register buttons work
+### Why iOS Fails but Android Works
 
-## Related Files
+**Root Cause: iOS Safari's Intelligent Tracking Prevention (ITP)**
 
-- `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/templates/login.j2` - Login page that loads passkey.js
-- `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/static/summary.css` - Reference implementation for modal styles
-- `/home/ktaka/GitHub/oauth2-passkey/demo-both/src/main.rs` - Demo application entry point
+1. **ngrok's interstitial sets a cookie** - When you click "Visit" on the interstitial page, ngrok sets a cookie to remember you've passed the check (valid for 7 days).
 
-## Technical Details
+2. **iOS Safari blocks/partitions this cookie** - Safari's ITP (Intelligent Tracking Prevention) is enabled by default on iOS and:
+   - Blocks third-party cookies by default
+   - Partitions cookies between contexts
+   - May treat the ngrok cookie as a tracking cookie and block it
 
-### iOS Safari Touch Event Behavior
+3. **Subresource requests fail** - When the browser requests `oauth2.js` or `passkey.js`:
+   - The ngrok cookie isn't sent (blocked by ITP)
+   - ngrok thinks it's a new session and returns the interstitial HTML
+   - Script loading fails
 
-iOS Safari has unique characteristics in how it handles touch events:
-- Fixed positioned elements without proper z-index can interfere with touch events
-- Hidden elements (`display: none`) may still affect touch event propagation in some cases
-- Touch events bubble differently than mouse events
-- Explicit `touch-action` CSS property helps iOS handle touches correctly
+4. **Android Chrome allows the cookie** - Chrome doesn't block third-party cookies by default, so the ngrok session cookie works normally.
 
-### Modal Pattern Best Practices
+5. **iOS Chrome also fails** - All browsers on iOS must use WebKit (Apple's engine), so iOS Chrome has the same ITP restrictions as Safari.
 
-Standard modal pattern should include:
-1. Modal content container (higher z-index)
-2. Backdrop/overlay (lower z-index, full screen)
-3. Proper display toggling for both elements
-4. Click handlers to close modal
-5. Touch event management for mobile devices
+| Browser | Third-party cookies | ngrok works? |
+|---------|---------------------|--------------|
+| Android Chrome | Allowed by default | Yes |
+| Desktop Chrome | Allowed by default | Yes |
+| iOS Safari | Blocked by ITP | No |
+| iOS Chrome | Blocked by ITP (uses WebKit) | No |
+
+**Conclusion**: It's a combination of ngrok's cookie-based interstitial bypass + iOS Safari's strict privacy controls. There's no workaround for free ngrok on iOS.
+
+#### References
+- [Full Third-Party Cookie Blocking and More - WebKit](https://webkit.org/blog/10218/full-third-party-cookie-blocking-and-more/)
+- [Third party cookies disabled in Chrome on iOS - Stack Overflow](https://stackoverflow.com/questions/64539850/third-party-cookies-disabled-in-chrome-on-ios)
+- [ngrok Free Plan Limits](https://ngrok.com/docs/pricing-limits/free-plan-limits)
+- [Ngrok interstitial page blocks requests - Atlassian Developer Community](https://community.developer.atlassian.com/t/ngrok-interstitial-page-blocks-requests/61146)
+
+### Options to Bypass ngrok's Browser Warning
+
+#### 1. Add `ngrok-skip-browser-warning` Header
+The client must send a header with any value:
+```javascript
+fetch(url, {
+  headers: {
+    'ngrok-skip-browser-warning': '1'
+  }
+})
+```
+
+**Limitation**: This works for `fetch()` requests but **NOT for `<script src="...">` tags** - browsers don't allow custom headers on script tags.
+
+#### 2. Change User-Agent Header
+Use a browser extension to change the User-Agent to something non-standard (e.g., `MyApp/0.0.1`).
+
+**Limitation**: Requires installing an extension on the iOS device, which is impractical.
+
+#### 3. Use a Proxy that Adds the Header
+Run a Docker proxy like [ngrok-skip-browser-warning](https://github.com/igops/ngrok-skip-browser-warning) that automatically adds the header:
+```bash
+docker run -d --rm -p 8443:443 -p 8080:80 \
+  -e NGROK_HOST=https://your-ngrok-domain.ngrok.io \
+  igops/ngrok-skip-browser-warning:latest
+```
+
+**Limitation**: Adds complexity to the setup.
+
+#### 4. Upgrade to ngrok Paid Plan
+Any paid plan removes the interstitial page entirely.
+
+#### 5. Inline the Scripts
+Inline the JavaScript directly in the HTML so there are no external script requests.
+
+**Limitation**: Requires `unsafe-inline` in CSP, less maintainable.
+
+### Recommended Solution
+
+**For `<script src="...">` tags specifically, there's no good free ngrok workaround** because you can't add custom headers to script tags.
+
+Best options:
+1. **Use nginx/direct proxy** - Best solution for development and production
+2. **Upgrade ngrok to paid plan** - Removes the issue entirely
+3. **Inline the scripts** - Works but has CSP implications
+
+### Why nginx Works Perfectly
+
+With nginx (or any direct reverse proxy), there is no issue on any browser including iOS Safari:
+
+1. **No interstitial page** - nginx forwards requests directly to your app
+2. **No cookie dependency** - there's no "session cookie" needed to bypass anything
+3. **Proper Content-Type** - your app returns `application/javascript` for `.js` files
+4. **Works on all browsers** - iOS Safari, iOS Chrome, Android, desktop all work identically
+
+**The issue is entirely ngrok-specific**, not an iOS Safari or code limitation. The application code works correctly; ngrok's free tier anti-phishing mechanism combined with iOS's strict cookie policies (ITP) causes the problem.
+
+### References
+- [How to Bypass Ngrok Browser Warning - Stack Overflow](https://stackoverflow.com/questions/73017353/how-to-bypass-ngrok-browser-warning)
+- [ngrok - Combating abuse](https://ngrok.com/abuse)
+- [ngrok-skip-browser-warning GitHub](https://github.com/igops/ngrok-skip-browser-warning)
+
+## ngrok Alternatives
+
+If you need to expose your local development server for testing on mobile devices, consider these alternatives that don't have ngrok's interstitial page issue:
+
+### 1. Cloudflare Tunnel (Recommended)
+- **Free** for up to 50 users
+- **No interstitial page** - direct tunneling, no cookie dependency
+- Supports custom domains (point your own domain to localhost)
+- Auto HTTPS included
+- Works with iOS Safari (no ITP issues)
+
+```bash
+# Install cloudflared, then:
+cloudflared tunnel --url http://localhost:3001
+```
+
+### 2. Localtunnel
+- **Completely free**, no paid tier
+- No sign-up required
+- Simple npm-based tool
+
+```bash
+npm install -g localtunnel
+lt --port 3001
+```
+
+### 3. Pinggy
+- No download required (SSH-based)
+- No sign-up needed
+- Free tier has 60-minute timeout
+
+```bash
+ssh -p 443 -R0:localhost:3001 a.pinggy.io
+```
+
+### 4. localhost.run
+- SSH-based, no installation needed
+- Simple and quick
+
+```bash
+ssh -R 80:localhost:3001 localhost.run
+```
+
+### Which to Choose?
+
+**Cloudflare Tunnel** is the best choice for iOS testing because:
+- No interstitial or warning pages
+- No cookie-based session tracking
+- Works with iOS Safari (no ITP issues)
+- Free custom domain support
+
+### References
+- [awesome-tunneling - GitHub](https://github.com/anderspitman/awesome-tunneling)
+- [Top 10 Ngrok alternatives - Pinggy](https://pinggy.io/blog/best_ngrok_alternatives/)
+- [ngrok Alternatives - Tailscale](https://tailscale.com/learn/ngrok-alternatives)
+- [Cloudflare Tunnel: a free ngrok alternative](https://kyrylo.org/rails/2024/03/31/cloudflare-tunnel-a-free-ngrok-alternative-for-developing-rails-apps-locally.html)
+
+## Testing Recommendations
+
+When testing iOS compatibility:
+
+1. **Use a direct proxy** (nginx, Apache) instead of ngrok for accurate results
+2. **If using ngrok**, ensure the browser has passed through the interstitial for all resource types
+3. **Verify JavaScript Content-Type** - must be `application/javascript` not `text/html`
+4. **Check browser console** for script loading errors
+
+## Files Modified
+
+1. `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/templates/login.j2`
+   - External script loading with `defer`
+   - Buttons start disabled, enabled when scripts ready
+   - Event listeners attached via JavaScript (not inline onclick)
+
+2. `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/static/oauth2.js`
+   - iOS WebKit detection
+   - Popup fallback to redirect
+   - Script ready signaling
+
+3. `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/static/passkey.js`
+   - Script ready signaling
 
 ## Implementation Status
 
-**Investigation:** ✅ Complete (2025-10-13)
-**Root Cause #1 Identified:** ✅ Correct (2025-10-13) - iOS Safari onclick incompatibility
-**Root Cause #2 Identified:** ✅ Correct (2025-10-13) - iOS Safari popup blocking
-**Solution Implementation:** ✅ Complete (2025-10-13)
-**Testing:** ⏳ Pending (Awaiting iOS Safari test results)
-
-### Implementation Summary
-
-**Two iOS Safari Issues Fixed:**
-
-**Issue #1: Buttons Not Clickable**
-- Root Cause: iOS Safari doesn't handle inline `onclick` attributes properly
-- Solution: Replaced all inline onclick with proper `addEventListener` event handlers
-- Files Modified:
-  - `login.j2`: Removed onclick attributes, added button IDs, added DOMContentLoaded event listeners
-  - Status: ✅ FIXED - Buttons now clickable on iOS Safari
-
-**Issue #2: OAuth2 Popups Blocked**
-- Root Cause: iOS Safari aggressively blocks `window.open()` popups
-- Solution: Detect iOS Safari and use full-page redirects instead of popups
-- Files Modified:
-  - `oauth2.js`: Added iOS detection, automatic redirect for iOS Safari, fallback for blocked popups
-  - Status: ✅ FIXED - OAuth2 now uses redirects on iOS Safari
-
-**Additional Improvements:**
-- `login.j2`: Added CSS with `cursor: pointer`, `touch-action: manipulation`, and webkit tap highlight
-- `passkey.js`: Modal backdrop improvements (later reverted as not needed for primary issue)
-
-### Root Cause Discovery Process
-
-1. **Initial hypothesis**: Modal overlay blocking clicks ❌
-   - Implemented modal fixes in `passkey.js`
-   - Testing showed buttons still not clickable
-
-2. **Critical insight from user**: ALL buttons not clickable, but `<a href>` link works ✅
-   - This revealed the issue was with onclick handlers, not overlays
-   - Research confirmed iOS Safari's known issue with inline onclick on buttons
-
-3. **First attempted fix**: Add CSS to make buttons "clickable" ⚠️ Insufficient
-   - Applied `cursor: pointer` styling
-   - Added webkit tap highlight and touch-action
-   - Still didn't work
-
-4. **Correct solution #1**: Remove inline onclick, use addEventListener ✅
-   - Replaced all inline onclick with proper event listeners in DOMContentLoaded
-   - Buttons became clickable!
-
-5. **New problem discovered**: OAuth2 popups blocked ❌
-   - Buttons clickable but `window.open()` blocked by iOS Safari
-   - User reported: "buttons click but popups don't open"
-
-6. **Correct solution #2**: Use full-page redirects on iOS Safari ✅
-   - Added iOS Safari detection
-   - Automatic redirect instead of popup for iOS
-   - Fallback redirect for other browsers if popup blocked
-
-### Files Modified
-
-1. `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/templates/login.j2`
-   - Removed inline onclick attributes from all buttons
-   - Added button IDs for targeting
-   - Added DOMContentLoaded event listeners
-   - Added CSS for touch handling
-
-2. `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/static/oauth2.js`
-   - Added `isIOSSafari()` detection function
-   - Modified `openPopup()` to use `window.location.href` redirect on iOS
-   - Added fallback redirect for popup-blocked browsers
-   - Added debugging console.log statements
-
-3. `/home/ktaka/GitHub/oauth2-passkey/oauth2_passkey_axum/static/passkey.js`
-   - Modal backdrop code added then reverted (not needed for primary issue)
-
-### Next Steps
-
-1. ✅ **Implementation**: Event listener fix applied to login.j2
-2. ✅ **Implementation**: iOS Safari redirect fix applied to oauth2.js
-3. ⏳ **Testing**: Verify OAuth2 redirects work on iOS Safari
-4. ⏳ **Testing**: Verify Passkey authentication works on iOS Safari
-5. ⏳ **Verification**: Test on Android and desktop to ensure no regression
-6. ⏳ **Documentation**: Update CHANGELOG.md with bug fix details
-
-## Additional Considerations
-
-### Alternative Solutions Considered
-
-1. **CSS-only solution**: Could move modal styles to `summary.css` instead of inline styles
-   - **Pros**: Better separation of concerns, easier to maintain
-   - **Cons**: Requires coordination between CSS and JS, more files to modify
-   - **Decision**: Keep inline styles for now to minimize changes and maintain encapsulation
-
-2. **Framework-based modal**: Use a modal library or framework
-   - **Pros**: More robust, battle-tested
-   - **Cons**: Adds external dependency, overkill for this simple use case
-   - **Decision**: Stick with vanilla JavaScript solution
-
-3. **Viewport meta tag adjustment**: Modify viewport settings in HTML
-   - **Pros**: Single line change
-   - **Cons**: Doesn't address root cause, may affect other functionality
-   - **Decision**: Not recommended, doesn't fix the actual modal issue
-
-### Performance Impact
-
-The proposed solution adds:
-
-- One additional DOM element (backdrop div)
-- Minimal JavaScript overhead (one additional element to show/hide)
-- No measurable impact on page load or runtime performance
-
-### Browser Compatibility
-
-The proposed solution uses standard CSS and JavaScript features supported by:
-
-- iOS Safari 10+
-- Android Chrome 60+
-- Desktop Chrome, Firefox, Safari, Edge (all recent versions)
-- No polyfills required
-
-## References
-
-- [iOS Safari touch-action documentation](https://developer.mozilla.org/en-US/docs/Web/CSS/touch-action)
-- [Modal dialog pattern best practices](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
-- WebAuthn specification regarding user interaction requirements
+**Investigation:** Complete (2025-11-27)
+**Root Cause Identified:** ngrok interstitial blocking JS files
+**Solution Implementation:** Complete
+**Testing:** Verified working on iOS Safari/Chrome via nginx proxy
