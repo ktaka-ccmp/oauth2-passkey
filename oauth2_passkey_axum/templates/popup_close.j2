@@ -8,18 +8,23 @@
     <script>
         window.onload = function () {
             if (window.opener) {
+                // Popup mode: notify parent and close
                 window.opener.postMessage('auth_complete', window.location.origin);
+                setTimeout(function () {
+                    window.close();
+                }, 10);
+            } else {
+                // Full-page redirect mode (iOS): redirect to summary page
+                setTimeout(function () {
+                    window.location.href = '{{ o2p_route_prefix }}/user/summary';
+                }, 100);
             }
-            setTimeout(function () {
-                window.close();
-            }, 10);
         }
     </script>
 </head>
 
 <body>
     <h3>{{ message }}</h3>
-    {# <p>This window will close automatically within a few seconds...</p> #}
 </body>
 
 </html>
