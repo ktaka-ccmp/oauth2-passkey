@@ -4,48 +4,28 @@ This document covers iOS Safari compatibility issues with OAuth2 authentication 
 
 ## Overview
 
-iOS Safari has two characteristics that affect OAuth2 authentication:
+iOS Safari has one main characteristic that affects OAuth2 authentication:
 
-1. **Popup blocking** - iOS WebKit aggressively blocks popup windows
-2. **Intelligent Tracking Prevention (ITP)** - Blocks/partitions third-party cookies
+1. **Intelligent Tracking Prevention (ITP)** - Blocks/partitions third-party cookies
 
-This library handles both issues automatically, but understanding them helps with debugging and configuration.
+This affects development testing with certain tunneling services (like ngrok) and OAuth2 response modes. Understanding these issues helps with debugging and configuration.
 
-## OAuth2 Popup Blocking
+**Note**: OAuth2 popups work correctly on iOS Safari when triggered by user interaction and when using a proper tunneling solution like Cloudflare Tunnel.
 
-### The Problem
+## OAuth2 Popup Behavior on iOS
 
-iOS WebKit blocks popup windows more aggressively than desktop browsers. When `window.open()` is called for OAuth2 authentication, iOS may block it even with user interaction.
+### Summary
 
-### The Solution
+**iOS Safari popups work correctly** when:
 
-The library automatically detects iOS WebKit and uses full-page redirect instead of popup:
+- The popup is triggered by a direct user action (click event)
+- The application is accessed via Cloudflare Tunnel or direct proxy (not ngrok)
 
-```javascript
-function isIOSWebKit() {
-    const ua = navigator.userAgent;
-    return /iPad|iPhone|iPod/.test(ua) && /WebKit/.test(ua);
-}
+The library uses standard `window.open()` popup behavior on all platforms, including iOS Safari. No special fallback is needed.
 
-function openPopup(mode, page_context) {
-    // iOS WebKit blocks popups, use full-page redirect instead
-    if (isIOSWebKit()) {
-        window.location.href = url;
-        return;
-    }
+### Historical Note
 
-    // Desktop/other browsers: use popup
-    popupWindow = window.open(url, "PopupWindow", "...");
-
-    // Fallback if popup was blocked
-    if (!popupWindow || popupWindow.closed) {
-        window.location.href = url;
-        return;
-    }
-}
-```
-
-After authentication completes, the completion page redirects to the summary page (instead of trying to close a non-existent popup).
+Earlier versions included iOS-specific redirect fallback code based on the assumption that iOS WebKit blocks popups aggressively. Testing with Cloudflare Tunnel confirmed that popups work fine on iOS Safari when triggered properly. The fallback code was removed in December 2025 as unnecessary complexity.
 
 ## OAuth2 Response Modes and Cookies
 
@@ -192,9 +172,10 @@ If you must use ngrok, upgrade to a **paid plan** which removes the interstitial
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| OAuth2 popup blocked | iOS WebKit popup blocking | Library auto-redirects on iOS |
 | `form_post` fails | iOS ITP blocks `SameSite=None` cookies | Use `OAUTH2_RESPONSE_MODE='query'` |
 | ngrok doesn't work on iOS | iOS ITP blocks ngrok's session cookie | Use Cloudflare Tunnel |
+
+**Note**: OAuth2 popups work correctly on iOS Safari when using Cloudflare Tunnel or direct proxy.
 
 ## References
 

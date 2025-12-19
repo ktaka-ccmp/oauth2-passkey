@@ -2,12 +2,6 @@ const oauth2 = (function() {
     let popupWindow;
     let isReloading = false;
 
-    // Detect iOS WebKit (blocks popups aggressively)
-    function isIOSWebKit() {
-        const ua = navigator.userAgent;
-        return /iPad|iPhone|iPod/.test(ua) && /WebKit/.test(ua);
-    }
-
     // mode: add_to_user, create_user, login
     function openPopup(mode=null, page_context=null) {
         // Only proceed if mode is one of the valid options
@@ -16,30 +10,18 @@ const oauth2 = (function() {
             return; // Exit the function early
         }
 
-        let url;
         if (mode === 'add_to_user') {
-            url = `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}&context=${page_context}`;
+            popupWindow = window.open(
+                `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}&context=${page_context}`,
+                "PopupWindow",
+                "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
+            );
         } else {
-            url = `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}`;
-        }
-
-        // iOS WebKit blocks popups, use full-page redirect instead
-        if (isIOSWebKit()) {
-            window.location.href = url;
-            return;
-        }
-
-        // Desktop/other browsers: use popup
-        popupWindow = window.open(
-            url,
-            "PopupWindow",
-            "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
-        );
-
-        // Check if popup was blocked, fallback to redirect
-        if (!popupWindow || popupWindow.closed || typeof popupWindow.closed === 'undefined') {
-            window.location.href = url;
-            return;
+            popupWindow = window.open(
+                `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}`,
+                "PopupWindow",
+                "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
+            );
         }
 
         // Listen for messages from the auth popup

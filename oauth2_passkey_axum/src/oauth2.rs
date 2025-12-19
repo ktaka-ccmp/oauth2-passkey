@@ -36,7 +36,6 @@ pub(super) fn router() -> Router {
 #[template(path = "popup_close.j2")]
 struct PopupCloseTemplate {
     message: String,
-    o2p_route_prefix: String,
 }
 
 async fn popup_close(
@@ -46,10 +45,7 @@ async fn popup_close(
         .get("message")
         .cloned()
         .unwrap_or_else(|| "Authentication completed".to_string());
-    let template = PopupCloseTemplate {
-        message,
-        o2p_route_prefix: O2P_ROUTE_PREFIX.to_string(),
-    };
+    let template = PopupCloseTemplate { message };
     let html = Html(
         template
             .render()
