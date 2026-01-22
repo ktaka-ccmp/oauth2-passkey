@@ -71,12 +71,11 @@ mod tests {
 
     // Helper function to cleanup test users (avoid deleting sequence_number 1)
     async fn cleanup_test_user(user_id: &str) {
-        if let Ok(user_id_typed) = crate::session::UserId::new(user_id.to_string()) {
-            if let Ok(Some(user)) = UserStore::get_user(user_id_typed.clone()).await {
-                if user.sequence_number != Some(1) {
-                    UserStore::delete_user(user_id_typed).await.ok();
-                }
-            }
+        if let Ok(user_id_typed) = crate::session::UserId::new(user_id.to_string())
+            && let Ok(Some(user)) = UserStore::get_user(user_id_typed.clone()).await
+            && user.sequence_number != Some(1)
+        {
+            UserStore::delete_user(user_id_typed).await.ok();
         }
     }
 
@@ -491,26 +490,25 @@ mod tests {
             // Now use the stored malicious ID in admin operations - only if ID passes validation
             // This tests whether the system is vulnerable when the malicious data
             // comes from the database rather than direct user input
-            if let Ok(safe_id) = UserId::new(malicious_user_id.to_string()) {
-                if let Ok(updated_user) = update_user_admin_status(
+            if let Ok(safe_id) = UserId::new(malicious_user_id.to_string())
+                && let Ok(updated_user) = update_user_admin_status(
                     SessionId::new(admin_session_id.clone()).expect("Valid session ID"),
                     safe_id,
                     true,
                 )
                 .await
-                {
-                    // Verify the operation worked correctly without SQL injection
-                    assert_eq!(
-                        updated_user.id, malicious_user_id,
-                        "User ID should remain unchanged after admin status update"
-                    );
+            {
+                // Verify the operation worked correctly without SQL injection
+                assert_eq!(
+                    updated_user.id, malicious_user_id,
+                    "User ID should remain unchanged after admin status update"
+                );
 
-                    // Verify the admin status was actually updated
-                    assert!(
-                        updated_user.is_admin,
-                        "Admin status should be updated correctly"
-                    );
-                }
+                // Verify the admin status was actually updated
+                assert!(
+                    updated_user.is_admin,
+                    "Admin status should be updated correctly"
+                );
             }
 
             // Clean up - skip cleanup for malicious IDs that fail validation

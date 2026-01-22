@@ -333,13 +333,13 @@ pub(super) async fn verify_idtoken_with_algorithm(
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let skew: u64 = 2; // allow 2 seconds of skew
 
-    if let Some(nbf) = idinfo.nbf {
-        if now + skew < (nbf as u64) {
-            // tolerate the system clock to be the skew seconds behind
-            return Err(TokenVerificationError::TokenNotYetValidNotBeFore(
-                now, nbf as u64,
-            ));
-        }
+    if let Some(nbf) = idinfo.nbf
+        && now + skew < (nbf as u64)
+    {
+        // tolerate the system clock to be the skew seconds behind
+        return Err(TokenVerificationError::TokenNotYetValidNotBeFore(
+            now, nbf as u64,
+        ));
     }
 
     if now + skew < (idinfo.iat as u64) {

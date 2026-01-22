@@ -346,25 +346,25 @@ async fn oauth2_token(
     };
 
     // Validate redirect_uri matches original request
-    if let Some(provided_redirect_uri) = redirect_uri {
-        if provided_redirect_uri != &auth_request.redirect_uri {
-            println!(
-                "❌ Redirect URI mismatch: expected {}, got {}",
-                auth_request.redirect_uri, provided_redirect_uri
-            );
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(provided_redirect_uri) = redirect_uri
+        && provided_redirect_uri != &auth_request.redirect_uri
+    {
+        println!(
+            "❌ Redirect URI mismatch: expected {}, got {}",
+            auth_request.redirect_uri, provided_redirect_uri
+        );
+        return Err(StatusCode::BAD_REQUEST);
     }
 
     // Validate client_id matches original request
-    if let Some(provided_client_id) = client_id {
-        if provided_client_id != &auth_request.client_id {
-            println!(
-                "❌ Client ID mismatch: expected {}, got {}",
-                auth_request.client_id, provided_client_id
-            );
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(provided_client_id) = client_id
+        && provided_client_id != &auth_request.client_id
+    {
+        println!(
+            "❌ Client ID mismatch: expected {}, got {}",
+            auth_request.client_id, provided_client_id
+        );
+        return Err(StatusCode::BAD_REQUEST);
     }
 
     // Validate response_type was "code" (OAuth2 security requirement)

@@ -261,9 +261,9 @@ mod tests {
 
             let auth_result = is_authenticated_basic(&malformed_headers, &Method::GET).await;
             // These should now cause errors due to cache key validation (which is good!)
-            if auth_result.is_ok() {
+            if let Ok(auth_status) = auth_result {
                 assert!(
-                    !auth_result.unwrap().0,
+                    !auth_status.0,
                     "If dangerous malformed session doesn't error, authentication should still fail: {dangerous_id}"
                 );
             }

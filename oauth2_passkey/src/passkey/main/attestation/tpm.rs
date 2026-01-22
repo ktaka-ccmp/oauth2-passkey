@@ -238,10 +238,10 @@ fn verify_aik_certificate_fallback(
             der_parser::ber::BerObjectContent::Sequence(ref items) => {
                 // Check if the TCG-KP-AIKCertificate OID is present in the sequence
                 for item in items {
-                    if let der_parser::ber::BerObjectContent::OID(ref oid) = item.content {
-                        if oid.as_bytes() == OID_TCG_KP_AIK_CERTIFICATE {
-                            return true;
-                        }
+                    if let der_parser::ber::BerObjectContent::OID(ref oid) = item.content
+                        && oid.as_bytes() == OID_TCG_KP_AIK_CERTIFICATE
+                    {
+                        return true;
                     }
                 }
                 false
@@ -303,12 +303,12 @@ fn extract_aaguid_from_extension(ext: &X509Extension) -> Result<[u8; 16], Passke
     };
 
     // Extract the octet string content
-    if let der_parser::ber::BerObjectContent::OctetString(content) = &parsed.content {
-        if content.len() == 16 {
-            let mut aaguid = [0u8; 16];
-            aaguid.copy_from_slice(content);
-            return Ok(aaguid);
-        }
+    if let der_parser::ber::BerObjectContent::OctetString(content) = &parsed.content
+        && content.len() == 16
+    {
+        let mut aaguid = [0u8; 16];
+        aaguid.copy_from_slice(content);
+        return Ok(aaguid);
     }
 
     Err(PasskeyError::Verification(

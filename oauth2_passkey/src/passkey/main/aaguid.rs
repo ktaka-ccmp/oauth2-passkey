@@ -149,14 +149,13 @@ pub async fn get_authenticator_info_batch(
     // Process each AAGUID using unified cache operations
     for aaguid in aaguids {
         let cache_prefix = CachePrefix::aaguid();
-        if let Ok(cache_key) = CacheKey::new(aaguid.clone()) {
-            if let Ok(Some(info)) =
+        if let Ok(cache_key) = CacheKey::new(aaguid.clone())
+            && let Ok(Some(info)) =
                 get_data::<AuthenticatorInfo, PasskeyError>(cache_prefix, cache_key).await
-            {
-                result.insert(aaguid.clone(), info);
-            }
-            // Silently ignore errors for individual entries to maintain batch operation behavior
+        {
+            result.insert(aaguid.clone(), info);
         }
+        // Silently ignore errors for individual entries to maintain batch operation behavior
     }
     Ok(result)
 }

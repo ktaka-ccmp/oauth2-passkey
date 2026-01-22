@@ -98,12 +98,11 @@ pub(super) fn verify_u2f_attestation(
         .extensions()
         .iter()
         .find(|ext| ext.oid.as_bytes() == oid_registry::OID_X509_EXT_BASIC_CONSTRAINTS.as_bytes())
+        && basic_constraints.value.contains(&0x01)
     {
-        if basic_constraints.value.contains(&0x01) {
-            return Err(PasskeyError::Verification(
-                "U2F certificate must not be a CA certificate".to_string(),
-            ));
-        }
+        return Err(PasskeyError::Verification(
+            "U2F certificate must not be a CA certificate".to_string(),
+        ));
     }
 
     // According to FIDO U2F spec, we need to verify the signature over:

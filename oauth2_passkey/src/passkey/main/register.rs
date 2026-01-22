@@ -631,10 +631,10 @@ fn extract_key_coordinates(credential_data: &[u8]) -> Result<(Vec<u8>, Vec<u8>),
                     if let CborValue::Bytes(x) = value {
                         x_coord = Some(x);
                     }
-                } else if i == Integer::from(-3) {
-                    if let CborValue::Bytes(y) = value {
-                        y_coord = Some(y);
-                    }
+                } else if i == Integer::from(-3)
+                    && let CborValue::Bytes(y) = value
+                {
+                    y_coord = Some(y);
                 }
             }
         }

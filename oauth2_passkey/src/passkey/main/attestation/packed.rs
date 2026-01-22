@@ -63,10 +63,10 @@ pub(super) fn verify_packed_attestation(
                     x5c_opt = Some(cert_chain);
                 }
             }
-        } else if let (CborValue::Text(key_str), CborValue::Bytes(id)) = (k, v) {
-            if key_str == "ecdaaKeyId" {
-                ecdaa_key_id = Some(id.clone());
-            }
+        } else if let (CborValue::Text(key_str), CborValue::Bytes(id)) = (k, v)
+            && key_str == "ecdaaKeyId"
+        {
+            ecdaa_key_id = Some(id.clone());
         }
     }
 
@@ -132,12 +132,11 @@ fn verify_packed_attestation_cert(
         .extensions()
         .iter()
         .find(|ext| ext.oid.as_bytes() == oid_registry::OID_X509_EXT_BASIC_CONSTRAINTS.as_bytes())
+        && basic_constraints.value.contains(&0x01)
     {
-        if basic_constraints.value.contains(&0x01) {
-            return Err(PasskeyError::Verification(
-                "Certificate must not be a CA certificate".to_string(),
-            ));
-        }
+        return Err(PasskeyError::Verification(
+            "Certificate must not be a CA certificate".to_string(),
+        ));
     }
 
     // Verify AAGUID if present
