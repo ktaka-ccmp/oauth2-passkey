@@ -19,7 +19,7 @@ user-ui = []
 
 [dependencies]
 # Changed from workspace dependency to published crate version
-oauth2-passkey = "0.2.0"
+oauth2-passkey = { path = "../oauth2_passkey" }
 #oauth2-passkey = { version = "0.1.x" }
 
 askama = { workspace = true }
