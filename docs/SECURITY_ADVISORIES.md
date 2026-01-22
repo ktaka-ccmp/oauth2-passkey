@@ -4,9 +4,9 @@
 
 ### RUSTSEC-2023-0071 - RSA Marvin Attack
 
-**Status:** Eliminated from Direct Dependencies  
-**Advisory:** [RUSTSEC-2023-0071](https://rustsec.org/advisories/RUSTSEC-2023-0071)  
-**Severity:** Medium (5.9)  
+**Status:** Eliminated from Direct Dependencies
+**Advisory:** [RUSTSEC-2023-0071](https://rustsec.org/advisories/RUSTSEC-2023-0071)
+**Severity:** Medium (5.9)
 **Date:** 2023-11-22
 
 #### Vulnerability Description
@@ -55,7 +55,7 @@ Ok(DecodingKey::from_rsa_components(n, e)?)
 #### Benefits of Migration
 
 1. **Security:** Eliminated direct RSA crate usage and vulnerability exposure
-2. **Simplicity:** Reduced code complexity and dependency count  
+2. **Simplicity:** Reduced code complexity and dependency count
 3. **Maintenance:** Relies on well-maintained `jsonwebtoken` crate for RSA handling
 4. **Performance:** Eliminated unnecessary base64 decode/encode cycles
 
@@ -71,5 +71,5 @@ Ok(DecodingKey::from_rsa_components(n, e)?)
 
 ---
 
-*Last Updated: June 22, 2025*  
+*Last Updated: June 22, 2025*
 *Review Frequency: Quarterly or upon new RSA crate releases*

@@ -121,4 +121,3 @@ It's important to understand that there are distinct CSRF protection mechanisms 
    - Used to verify that the user who loaded a page is the same one making a subsequent request
    - Implemented as a query parameter for certain actions
 These mechanisms work together but serve different purposes in the security architecture of the system.
-

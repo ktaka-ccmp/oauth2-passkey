@@ -1,5 +1,6 @@
 use sqlx::{Pool, Postgres};
 
+use crate::session::UserId;
 use crate::storage::validate_postgres_table_schema;
 use crate::userdb::{
     errors::UserError,
@@ -128,7 +129,10 @@ pub(super) async fn upsert_user_postgres(
     Ok(result)
 }
 
-pub(super) async fn delete_user_postgres(pool: &Pool<Postgres>, id: &str) -> Result<(), UserError> {
+pub(super) async fn delete_user_postgres(
+    pool: &Pool<Postgres>,
+    id: UserId,
+) -> Result<(), UserError> {
     let table_name = DB_TABLE_USERS.as_str();
 
     sqlx::query(&format!(
@@ -136,7 +140,7 @@ pub(super) async fn delete_user_postgres(pool: &Pool<Postgres>, id: &str) -> Res
         DELETE FROM {table_name} WHERE id = $1
         "#
     ))
-    .bind(id)
+    .bind(id.as_str())
     .execute(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;

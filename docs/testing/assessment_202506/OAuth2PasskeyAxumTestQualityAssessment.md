@@ -1,8 +1,8 @@
 # OAuth2 Passkey Axum Testing Assessment
 
-**Assessment Date:** June 13, 2025  
-**Crate:** `oauth2_passkey_axum`  
-**Total Tests:** 33  
+**Assessment Date:** June 13, 2025
+**Crate:** `oauth2_passkey_axum`
+**Total Tests:** 33
 **Status:** All tests passing
 
 ## Overview
@@ -89,7 +89,7 @@ Middleware tests:
 fn test_coordination_error_unauthorized() {
     let result: Result<(), CoordinationError> = Err(CoordinationError::Unauthorized);
     let response_error = result.into_response_error();
-    
+
     assert!(response_error.is_err());
     if let Err((status, _)) = response_error {
         assert_eq!(status, StatusCode::UNAUTHORIZED);
@@ -106,9 +106,9 @@ async fn test_delete_user_account_handler_unauthorized() {
         is_admin: false,  // Non-admin user
         // ... other fields
     };
-    
+
     let result = delete_user_account_handler(auth_user, payload).await;
-    
+
     assert!(result.is_err());
     if let Err((status, message)) = result {
         assert_eq!(status, StatusCode::UNAUTHORIZED);
@@ -124,9 +124,9 @@ async fn test_delete_user_account_handler_unauthorized() {
 fn test_handle_auth_error_csrf_error_with_redirect() {
     let request = Request::builder().method(Method::GET).build();
     let csrf_error = SessionError::CsrfToken("CSRF token mismatch");
-    
+
     let response = handle_auth_error(csrf_error, &request, true);
-    
+
     assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
 }
 ```

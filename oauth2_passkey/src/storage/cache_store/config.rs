@@ -31,16 +31,7 @@ pub static GENERIC_CACHE_STORE: LazyLock<Mutex<Box<dyn CacheStore>>> = LazyLock:
                     panic!("Failed to create Redis client: {e}");
                 }
             };
-            // Create the store and verify the connection immediately
-            let store = RedisCacheStore { client };
-            // Try to connect to verify the Redis server is available
-            if let Err(e) = tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async { store.init().await })
-            }) {
-                tracing::error!("Failed to connect to Redis: {}", e);
-                panic!("Failed to connect to Redis: {e}");
-            }
-            Box::new(store)
+            Box::new(RedisCacheStore { client })
         }
         t => panic!("Unsupported cache store type: {t}. Supported types are 'memory' and 'redis'"),
     };

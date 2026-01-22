@@ -1,33 +1,43 @@
-use crate::oauth2::{AccountSearchField, OAuth2Store};
-use crate::passkey::{CredentialSearchField, PasskeyStore};
-use crate::session::User as SessionUser;
+use crate::oauth2::{AccountSearchField, OAuth2Store, ProviderUserId};
+use crate::passkey::{CredentialId, CredentialSearchField, PasskeyStore};
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
+use crate::session::{SessionId, User as SessionUser, UserId, get_user_from_session};
 
 /// Retrieves a list of all users in the system.
 ///
 /// This admin-level function fetches all user accounts from the database.
 /// It provides a comprehensive view of all registered users and their details.
+/// Requires administrative privileges.
+///
+/// # Arguments
+///
+/// * `session_id` - The session ID of the administrator performing the action
 ///
 /// # Returns
 ///
 /// * `Ok(Vec<User>)` - A vector containing all user accounts
+/// * `Err(CoordinationError::Unauthorized)` - If the user doesn't have admin privileges
 /// * `Err(CoordinationError)` - If a database error occurs
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::get_all_users;
+/// use oauth2_passkey::{get_all_users, SessionId};
 ///
-/// async fn list_all_users() -> Vec<String> {
-///     match get_all_users().await {
+/// async fn list_all_users(session_id: &str) -> Vec<String> {
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     match get_all_users(session_id).await {
 ///         Ok(users) => users.iter().map(|user| user.account.clone()).collect(),
 ///         Err(_) => Vec::new()
 ///     }
 /// }
 /// ```
-pub async fn get_all_users() -> Result<Vec<User>, CoordinationError> {
+pub async fn get_all_users(session_id: SessionId) -> Result<Vec<User>, CoordinationError> {
+    // Validate admin session with fresh database lookup
+    let _admin_user = validate_admin_session(session_id).await?;
+
     UserStore::get_all_users()
         .await
         .map_err(|e| CoordinationError::Database(e.to_string()))
@@ -37,31 +47,41 @@ pub async fn get_all_users() -> Result<Vec<User>, CoordinationError> {
 ///
 /// This function fetches a user's account information from the database using their
 /// unique identifier. It's used for user profile viewing, account management,
-/// and administrative tasks.
+/// and administrative tasks. Requires administrative privileges.
 ///
 /// # Arguments
 ///
+/// * `session_id` - The session ID of the administrator performing the action
 /// * `user_id` - The unique identifier of the user to retrieve
 ///
 /// # Returns
 ///
 /// * `Ok(Some(User))` - The user's account information if found
 /// * `Ok(None)` - If no user exists with the provided ID
+/// * `Err(CoordinationError::Unauthorized)` - If the user doesn't have admin privileges
 /// * `Err(CoordinationError)` - If a database error occurs
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::get_user;
+/// use oauth2_passkey::{get_user, SessionId, UserId};
 ///
-/// async fn fetch_user_profile(id: &str) -> Option<String> {
-///     match get_user(id).await {
+/// async fn fetch_user_profile(session_id: &str, id: &str) -> Option<String> {
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     let user_id = UserId::new(id.to_string()).expect("Valid user ID");
+///     match get_user(session_id, user_id).await {
 ///         Ok(Some(user)) => Some(user.account),
 ///         _ => None
 ///     }
 /// }
 /// ```
-pub async fn get_user(user_id: &str) -> Result<Option<User>, CoordinationError> {
+pub async fn get_user(
+    session_id: SessionId,
+    user_id: UserId,
+) -> Result<Option<User>, CoordinationError> {
+    // Validate admin session with fresh database lookup
+    let _admin_user = validate_admin_session(session_id).await?;
+
     UserStore::get_user(user_id)
         .await
         .map_err(|e| CoordinationError::Database(e.to_string()))
@@ -76,7 +96,7 @@ pub async fn get_user(user_id: &str) -> Result<Option<User>, CoordinationError> 
 ///
 /// # Arguments
 ///
-/// * `user` - The administrator user performing the action (must have admin privileges)
+/// * `session_id` - The session ID of the administrator performing the action
 /// * `credential_id` - The ID of the passkey credential to delete
 ///
 /// # Returns
@@ -88,29 +108,29 @@ pub async fn get_user(user_id: &str) -> Result<Option<User>, CoordinationError> 
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::{delete_passkey_credential_admin, SessionUser};
+/// use oauth2_passkey::{delete_passkey_credential_admin, SessionId, CredentialId};
 ///
-/// async fn remove_credential(admin: &SessionUser, credential_id: &str) -> bool {
-///     delete_passkey_credential_admin(admin, credential_id).await.is_ok()
+/// async fn remove_credential(session_id: &str, credential_id: &str) -> bool {
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     let credential_id = CredentialId::new(credential_id.to_string()).expect("Valid credential ID");
+///     delete_passkey_credential_admin(session_id, credential_id).await.is_ok()
 /// }
 /// ```
 pub async fn delete_passkey_credential_admin(
-    user: &SessionUser,
-    credential_id: &str,
+    session_id: SessionId,
+    credential_id: CredentialId,
 ) -> Result<(), CoordinationError> {
-    if !user.is_admin {
-        tracing::debug!("User is not authorized to delete OAuth2 accounts");
-        return Err(CoordinationError::Unauthorized.log());
-    }
+    // Validate admin session with fresh database lookup
+    let admin_user = validate_admin_session(session_id).await?;
 
     tracing::debug!(
         "Admin user: {} is deleting credential with ID: {}",
-        user.id,
-        credential_id
+        admin_user.id,
+        credential_id.as_str()
     );
 
     let credential = PasskeyStore::get_credentials_by(CredentialSearchField::CredentialId(
-        credential_id.to_owned(),
+        credential_id.clone(),
     ))
     .await?
     .into_iter()
@@ -118,7 +138,7 @@ pub async fn delete_passkey_credential_admin(
     .ok_or_else(|| {
         CoordinationError::ResourceNotFound {
             resource_type: "Passkey".to_string(),
-            resource_id: credential_id.to_string(),
+            resource_id: credential_id.as_str().to_string(),
         }
         .log()
     })?;
@@ -126,10 +146,9 @@ pub async fn delete_passkey_credential_admin(
     // Should we verify a context token here?
 
     // Delete the credential using the raw credential ID format from the database
-    PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(
-        credential.credential_id.clone(),
-    ))
-    .await?;
+    let credential_id = CredentialId::new(credential.credential_id.clone())
+        .map_err(|e| CoordinationError::Validation(format!("Invalid credential ID: {e}")))?;
+    PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(credential_id)).await?;
 
     tracing::debug!("Successfully deleted credential");
 
@@ -145,7 +164,7 @@ pub async fn delete_passkey_credential_admin(
 ///
 /// # Arguments
 ///
-/// * `user` - The administrator user performing the action (must have admin privileges)
+/// * `session_id` - The session ID of the administrator performing the action
 /// * `provider_user_id` - The unique provider-specific user ID of the OAuth2 account to delete
 ///
 /// # Returns
@@ -157,37 +176,37 @@ pub async fn delete_passkey_credential_admin(
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::{delete_oauth2_account_admin, SessionUser};
+/// use oauth2_passkey::{delete_oauth2_account_admin, SessionId, ProviderUserId};
 ///
-/// async fn remove_oauth2_account(admin: &SessionUser, provider_id: &str) -> bool {
-///     delete_oauth2_account_admin(admin, provider_id).await.is_ok()
+/// async fn remove_oauth2_account(session_id: &str, provider_id: &str) -> bool {
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     let provider_id = ProviderUserId::new(provider_id.to_string()).expect("Valid provider ID");
+///     delete_oauth2_account_admin(session_id, provider_id).await.is_ok()
 /// }
 /// ```
 pub async fn delete_oauth2_account_admin(
-    user: &SessionUser,
-    provider_user_id: &str,
+    session_id: SessionId,
+    provider_user_id: ProviderUserId,
 ) -> Result<(), CoordinationError> {
-    if !user.is_admin {
-        tracing::debug!("User is not authorized to delete OAuth2 accounts");
-        return Err(CoordinationError::Unauthorized.log());
-    }
+    // Validate admin session with fresh database lookup
+    let admin_user = validate_admin_session(session_id).await?;
 
     tracing::debug!(
         "Admin user: {} is deleting OAuth2 account with ID: {}",
-        user.id,
-        provider_user_id
+        admin_user.id,
+        provider_user_id.as_str()
     );
 
     // Delete the OAuth2 account
     OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::ProviderUserId(
-        provider_user_id.to_string(),
+        provider_user_id.clone(),
     ))
     .await?;
 
     tracing::info!(
         "Successfully deleted OAuth2 account {} for user {}",
-        provider_user_id,
-        user.id
+        provider_user_id.as_str(),
+        admin_user.id
     );
     Ok(())
 }
@@ -196,33 +215,42 @@ pub async fn delete_oauth2_account_admin(
 ///
 /// This administrative function permanently removes a user account and all associated
 /// data (including OAuth2 accounts and passkey credentials). This is a destructive
-/// operation that cannot be undone.
+/// operation that cannot be undone. Requires administrative privileges.
 ///
 /// # Arguments
 ///
+/// * `session_id` - The session ID of the administrator performing the action
 /// * `user_id` - The unique identifier of the user account to delete
 ///
 /// # Returns
 ///
 /// * `Ok(())` - If the user account was successfully deleted
+/// * `Err(CoordinationError::Unauthorized)` - If the user doesn't have admin privileges
 /// * `Err(CoordinationError::ResourceNotFound)` - If the user doesn't exist
 /// * `Err(CoordinationError)` - If another error occurs during deletion
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::delete_user_account_admin;
+/// use oauth2_passkey::{delete_user_account_admin, SessionId, UserId};
 ///
-/// async fn purge_account(user_id: &str) -> Result<(), String> {
-///     delete_user_account_admin(user_id).await.map_err(|e| e.to_string())
+/// async fn purge_account(session_id: &str, user_id: &str) -> Result<(), String> {
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     let user_id = UserId::new(user_id.to_string()).expect("Valid user ID");
+///     delete_user_account_admin(session_id, user_id).await.map_err(|e| e.to_string())
 /// }
 /// ```
-pub async fn delete_user_account_admin(user_id: &str) -> Result<(), CoordinationError> {
+pub async fn delete_user_account_admin(
+    session_id: SessionId,
+    user_id: UserId,
+) -> Result<(), CoordinationError> {
+    // Validate admin session with fresh database lookup
+    let _admin_user = validate_admin_session(session_id).await?;
     // Check if the user exists
-    let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
+    let user = UserStore::get_user(user_id.clone()).await?.ok_or_else(|| {
         CoordinationError::ResourceNotFound {
             resource_type: "User".to_string(),
-            resource_id: user_id.to_string(),
+            resource_id: user_id.as_str().to_string(),
         }
         .log()
     })?;
@@ -230,10 +258,10 @@ pub async fn delete_user_account_admin(user_id: &str) -> Result<(), Coordination
     tracing::debug!("Deleting user account: {:#?}", user);
 
     // Delete all OAuth2 accounts for this user
-    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.to_string())).await?;
+    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.clone())).await?;
 
     // Delete all Passkey credentials for this user
-    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.to_string())).await?;
+    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.clone())).await?;
 
     // Finally, delete the user account
     UserStore::delete_user(user_id).await?;
@@ -249,7 +277,7 @@ pub async fn delete_user_account_admin(user_id: &str) -> Result<(), Coordination
 ///
 /// # Arguments
 ///
-/// * `admin_user` - The administrator performing the action (must have admin privileges)
+/// * `session_id` - The session ID of the administrator performing the action
 /// * `user_id` - The ID of the user whose admin status will be changed
 /// * `is_admin` - The new admin status (`true` = admin, `false` = regular user)
 ///
@@ -264,28 +292,27 @@ pub async fn delete_user_account_admin(user_id: &str) -> Result<(), Coordination
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::{update_user_admin_status, SessionUser};
+/// use oauth2_passkey::{update_user_admin_status, SessionId, UserId};
 ///
-/// async fn make_user_admin(admin: &SessionUser, user_id: &str) -> bool {
-///     update_user_admin_status(admin, user_id, true).await.is_ok()
+/// async fn make_user_admin(session_id: &str, user_id: &str) -> bool {
+///     let session_id = SessionId::new(session_id.to_string()).expect("Valid session ID");
+///     let user_id = UserId::new(user_id.to_string()).expect("Valid user ID");
+///     update_user_admin_status(session_id, user_id, true).await.is_ok()
 /// }
 /// ```
 pub async fn update_user_admin_status(
-    admin_user: &SessionUser,
-    user_id: &str,
+    session_id: SessionId,
+    user_id: UserId,
     is_admin: bool,
 ) -> Result<User, CoordinationError> {
-    // Verify that the user has admin privileges
-    if !admin_user.is_admin {
-        tracing::debug!("User is not authorized to update admin status");
-        return Err(CoordinationError::Unauthorized.log());
-    }
+    // Validate admin session with fresh database lookup
+    let _admin_user = validate_admin_session(session_id).await?;
 
     // Get the current user
-    let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
+    let user = UserStore::get_user(user_id.clone()).await?.ok_or_else(|| {
         CoordinationError::ResourceNotFound {
             resource_type: "User".to_string(),
-            resource_id: user_id.to_string(),
+            resource_id: user_id.as_str().to_string(),
         }
         .log()
     })?;
@@ -308,479 +335,29 @@ pub async fn update_user_admin_status(
     Ok(user)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::session::User as SessionUser;
-    use crate::test_utils::init_test_environment;
-    use crate::userdb::UserSearchField;
-    use chrono::Utc;
-    use serial_test::serial;
+/// Validates that a session belongs to an admin user.
+///
+/// This is a private helper function used only within the admin module.
+/// It validates session data using get_user_from_session which already
+/// performs fresh database lookup to ensure current user state.
+async fn validate_admin_session(session_id: SessionId) -> Result<SessionUser, CoordinationError> {
+    // Get user from session (this already does fresh database validation)
+    let session_cookie = crate::SessionCookie::new(session_id.as_str().to_string())
+        .map_err(|_| CoordinationError::Unauthorized.log())?;
+    let session_user = get_user_from_session(&session_cookie)
+        .await
+        .map_err(|_| CoordinationError::Unauthorized.log())?;
 
-    // Helper function to create a session user for testing
-    fn create_test_session_user(id: &str, is_admin: bool) -> SessionUser {
-        SessionUser {
-            id: id.to_string(),
-            account: format!("{id}@example.com"),
-            label: format!("Test User {id}"),
-            is_admin,
-            sequence_number: 1,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        }
+    // Check if user has admin privileges (session_user already has fresh database data)
+    if !session_user.has_admin_privileges() {
+        tracing::debug!(user_id = %session_user.id, "User is not authorized (not an admin)");
+        return Err(CoordinationError::Unauthorized.log());
     }
 
-    // Helper function to create a test user in the database
-    async fn create_test_user_in_db(
-        id: &str,
-        is_admin: bool,
-    ) -> Result<User, Box<dyn std::error::Error>> {
-        let now = Utc::now();
-        let user = User {
-            sequence_number: None,
-            id: id.to_string(),
-            account: format!("{id}@example.com"),
-            label: format!("Test User {id}"),
-            is_admin,
-            created_at: now,
-            updated_at: now,
-        };
+    tracing::debug!(user_id = %session_user.id, "Admin session validated successfully");
 
-        let saved_user = UserStore::upsert_user(user.clone())
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-
-        Ok(saved_user)
-    }
-
-    async fn delete_user_if_exists_and_not_first(user_id: &str) -> Result<(), CoordinationError> {
-        // Only proceed if the user exists
-        if let Ok(Some(user)) = UserStore::get_user(user_id).await {
-            // Only delete if sequence_number is not 1
-            if user.sequence_number != Some(1) {
-                UserStore::delete_user(user_id).await?;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Test retrieval of all users from the database
-    ///
-    /// This test verifies that `get_all_users` correctly retrieves all users and that newly
-    /// created users are included in the results. It creates test users in the database,
-    /// retrieves all users, and verifies the count and presence of created users.
-    ///
-    #[serial]
-    #[tokio::test]
-    async fn test_get_all_users() {
-        init_test_environment().await;
-
-        // Create unique test users with timestamp to avoid conflicts
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let user1_id = format!("test-admin-user-1-{timestamp}");
-        let user2_id = format!("test-admin-user-2-{timestamp}");
-        let user3_id = format!("test-admin-user-3-{timestamp}");
-
-        create_test_user_in_db(&user1_id, false)
-            .await
-            .expect("Failed to create test user 1");
-        create_test_user_in_db(&user2_id, true)
-            .await
-            .expect("Failed to create test user 2");
-        create_test_user_in_db(&user3_id, false)
-            .await
-            .expect("Failed to create test user 3");
-
-        // Get all users
-        let users = get_all_users().await.expect("Failed to get all users");
-
-        // Verify that our test users are in the results
-        let user_ids: Vec<String> = users.iter().map(|u| u.id.clone()).collect();
-        assert!(
-            user_ids.contains(&user1_id),
-            "User 1 should be in the result"
-        );
-        assert!(
-            user_ids.contains(&user2_id),
-            "User 2 should be in the result"
-        );
-        assert!(
-            user_ids.contains(&user3_id),
-            "User 3 should be in the result"
-        );
-
-        // Clean up - delete the test users we created
-        delete_user_if_exists_and_not_first(&user1_id).await.ok();
-        delete_user_if_exists_and_not_first(&user2_id).await.ok();
-        delete_user_if_exists_and_not_first(&user3_id).await.ok();
-    }
-
-    /// Test retrieval of a specific user by ID
-    ///
-    /// This test verifies that `get_user` correctly retrieves a specific user by ID
-    /// and that the user has the expected properties. It also verifies that trying
-    /// to retrieve a non-existent user returns None.
-    ///
-    #[serial]
-    #[tokio::test]
-    async fn test_get_user() {
-        init_test_environment().await;
-
-        // Create a unique test user
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let user_id = format!("test-get-user-{timestamp}");
-        let is_admin = true;
-        let _created_user = create_test_user_in_db(&user_id, is_admin)
-            .await
-            .expect("Failed to create test user");
-
-        // Get the user
-        let user_option = get_user(&user_id).await.expect("Failed to get user");
-
-        // Verify that the user is returned
-        assert!(user_option.is_some(), "User should be found");
-        let user = user_option.unwrap();
-
-        // Verify that the user has the correct properties
-        assert_eq!(user.id, user_id, "User ID should match");
-        assert_eq!(
-            user.account,
-            format!("{user_id}@example.com"),
-            "User account should match"
-        );
-        assert_eq!(
-            user.label,
-            format!("Test User {user_id}"),
-            "User label should match"
-        );
-        assert_eq!(user.is_admin, is_admin, "User admin status should match");
-
-        // Try to get a non-existent user
-        let non_existent_user_id = format!("non-existent-user-{timestamp}");
-        let non_existent_user_option = get_user(&non_existent_user_id)
-            .await
-            .expect("Failed to get non-existent user");
-
-        // Verify that no user is returned
-        assert!(
-            non_existent_user_option.is_none(),
-            "Non-existent user should not be found"
-        );
-
-        // Clean up
-        delete_user_if_exists_and_not_first(&user_id).await.ok();
-    }
-
-    /// Test admin user account deletion functionality
-    ///
-    /// This test verifies that an admin can delete a user account and that the user
-    /// is removed from the database. It also verifies that trying to delete a
-    /// non-existent user returns a ResourceNotFound error.
-    ///
-    #[serial]
-    #[tokio::test]
-    async fn test_delete_user_account_admin() {
-        init_test_environment().await;
-
-        // Create a unique test user to be deleted
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let user_id = format!("test-user-to-delete-{timestamp}");
-        create_test_user_in_db(&user_id, false)
-            .await
-            .expect("Failed to create test user");
-
-        // Verify the user exists before deletion
-        let user_before = get_user(&user_id).await.expect("Failed to get user");
-        assert!(user_before.is_some(), "User should exist before deletion");
-
-        // Delete the user
-        let result = delete_user_account_admin(&user_id).await;
-        assert!(result.is_ok(), "Expected successful user deletion");
-
-        // Verify the user no longer exists
-        let user_after = get_user(&user_id)
-            .await
-            .expect("Failed to get user after deletion");
-        assert!(user_after.is_none(), "User should not exist after deletion");
-
-        // Try to delete a non-existent user
-        let non_existent_user_id = format!("non-existent-user-{timestamp}");
-        let result = delete_user_account_admin(&non_existent_user_id).await;
-
-        // This should return a ResourceNotFound error
-        assert!(
-            result.is_err(),
-            "Deleting non-existent user should return an error"
-        );
-        match result {
-            Err(CoordinationError::ResourceNotFound {
-                resource_type,
-                resource_id,
-            }) => {
-                assert_eq!(
-                    resource_type, "User",
-                    "Error should indicate resource type as User"
-                );
-                assert_eq!(
-                    resource_id, non_existent_user_id,
-                    "Error should include the correct user ID"
-                );
-            }
-            _ => panic!("Expected ResourceNotFound error, got {result:?}"),
-        }
-    }
-
-    /// Test to ensure that we can update a user's admin status
-    /// and that the changes are persisted in the database.
-    /// This test creates a unique admin user, updates a target user's admin status,
-    /// and verifies that the target user's admin status is updated correctly.
-    /// It also checks that a non-admin user cannot update another user's admin status.
-    /// Finally, it cleans up by deleting the test users created during the test.
-    #[serial]
-    #[tokio::test]
-    async fn test_update_user_admin_status_success() {
-        init_test_environment().await;
-
-        // Create unique users with timestamp
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let admin_user_id = format!("admin-user-{timestamp}");
-        let target_user_id = format!("target-user-{timestamp}");
-
-        // Create an admin user who will perform the update
-        create_test_user_in_db(&admin_user_id, true)
-            .await
-            .expect("Failed to create admin user");
-        let admin_session_user = create_test_session_user(&admin_user_id, true);
-
-        // Create a regular user whose admin status will be updated
-        create_test_user_in_db(&target_user_id, false)
-            .await
-            .expect("Failed to create target user");
-
-        // Verify the target user is not an admin initially
-        let user_before = get_user(&target_user_id)
-            .await
-            .expect("Failed to get target user")
-            .expect("Target user should exist");
-        assert!(
-            !user_before.is_admin,
-            "Target user should not be an admin initially"
-        );
-
-        // Update the user's admin status to true
-        let updated_user = update_user_admin_status(&admin_session_user, &target_user_id, true)
-            .await
-            .expect("Failed to update user admin status");
-
-        // Verify the user is now an admin
-        assert!(
-            updated_user.is_admin,
-            "User should be an admin after update"
-        );
-
-        // Verify the change was persisted in the database
-        let user_after = get_user(&target_user_id)
-            .await
-            .expect("Failed to get target user after update")
-            .expect("Target user should still exist");
-        assert!(
-            user_after.is_admin,
-            "Target user should be an admin in the database"
-        );
-
-        // Update the user's admin status back to false
-        let updated_user = update_user_admin_status(&admin_session_user, &target_user_id, false)
-            .await
-            .expect("Failed to update user admin status back");
-
-        // Verify the user is no longer an admin
-        assert!(
-            !updated_user.is_admin,
-            "User should not be an admin after second update"
-        );
-
-        // Clean up
-        delete_user_if_exists_and_not_first(&admin_user_id)
-            .await
-            .ok();
-        delete_user_if_exists_and_not_first(&target_user_id)
-            .await
-            .ok();
-    }
-
-    /// Test to ensure that updating a user's admin status requires admin privileges.
-    /// This test creates a non-admin user who attempts to update another user's admin status,
-    /// and verifies that the operation fails with an Unauthorized error.
-    /// It also checks that the target user's admin status remains unchanged after the failed update.
-    #[serial]
-    #[tokio::test]
-    async fn test_update_user_admin_status_requires_admin() {
-        init_test_environment().await;
-
-        // Create unique users with timestamp
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let non_admin_user_id = format!("non-admin-user-{timestamp}");
-        let target_user_id = format!("target-user-2-{timestamp}");
-
-        // Create a non-admin user who will attempt the update
-        create_test_user_in_db(&non_admin_user_id, false)
-            .await
-            .expect("Failed to create non-admin user");
-        let non_admin_session_user = create_test_session_user(&non_admin_user_id, false);
-
-        // Create a target user whose admin status will be attempted to be updated
-        create_test_user_in_db(&target_user_id, false)
-            .await
-            .expect("Failed to create target user");
-
-        // Attempt to update the user's admin status as a non-admin
-        let result = update_user_admin_status(&non_admin_session_user, &target_user_id, true).await;
-
-        // Verify the operation fails with Unauthorized error
-        assert!(
-            result.is_err(),
-            "Non-admin should not be allowed to update admin status"
-        );
-        match result {
-            Err(CoordinationError::Unauthorized) => {}
-            _ => panic!("Expected Unauthorized error, got {result:?}"),
-        }
-
-        // Verify the target user's admin status was not changed
-        let user_after = get_user(&target_user_id)
-            .await
-            .expect("Failed to get target user after failed update")
-            .expect("Target user should still exist");
-        assert!(
-            !user_after.is_admin,
-            "Target user's admin status should not have changed"
-        );
-
-        // Clean up
-        delete_user_if_exists_and_not_first(&target_user_id)
-            .await
-            .ok();
-        delete_user_if_exists_and_not_first(&non_admin_user_id)
-            .await
-            .ok();
-    }
-
-    /// Test to ensure that updating the admin status of the first user (sequence_number = 1)
-    /// is protected and cannot be changed by any user, even an admin.
-    /// This test creates an admin user, retrieves or creates the first user,
-    /// and attempts to change the first user's admin status.
-    /// It verifies that the operation fails with a Coordination error indicating
-    /// that the first user's admin status cannot be changed.
-    /// It also checks that the first user remains unchanged in the database.
-    /// Finally, it cleans up by deleting the admin user and the first user if it was created during the test.
-    #[serial]
-    #[tokio::test]
-    async fn test_update_user_admin_status_protect_first_user() {
-        init_test_environment().await;
-
-        // Create unique users with timestamp
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let admin_user_id = format!("admin-user-protect-{timestamp}");
-
-        // Create an admin user
-        create_test_user_in_db(&admin_user_id, true)
-            .await
-            .expect("Failed to create admin user");
-        let admin_session_user = create_test_session_user(&admin_user_id, true);
-
-        let first_user = UserStore::get_user_by(UserSearchField::SequenceNumber(1))
-            .await
-            .expect("Failed to get first user")
-            .expect("Failed to get first user");
-
-        // Attempt to change the admin status of the first user (should fail)
-        let result = update_user_admin_status(&admin_session_user, &first_user.id, false).await;
-
-        // Verify the operation fails with Coordination error
-        assert!(
-            result.is_err(),
-            "Should not be able to change first user's admin status"
-        );
-        match result {
-            Err(CoordinationError::Coordination(msg)) => {
-                assert!(msg.contains("Cannot change admin status of the first user"));
-            }
-            _ => panic!("Expected Coordination error about first user, got {result:?}"),
-        }
-
-        // Clean up
-        delete_user_if_exists_and_not_first(&admin_user_id)
-            .await
-            .ok();
-    }
-
-    /// Test to ensure that deleting a passkey credential as an admin
-    /// requires admin privileges.
-    /// This test creates a non-admin user, attempts to delete a passkey credential,
-    /// and verifies that the operation fails with an Unauthorized error.
-    /// It also checks that the credential remains in the database after the failed deletion.
-    #[serial]
-    #[tokio::test]
-    async fn test_delete_passkey_credential_admin_requires_admin() {
-        init_test_environment().await;
-
-        // Create unique user with timestamp
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let non_admin_user_id = format!("non-admin-user-passkey-{timestamp}");
-
-        // Create a non-admin user
-        create_test_user_in_db(&non_admin_user_id, false)
-            .await
-            .expect("Failed to create non-admin user");
-        let non_admin_session_user = create_test_session_user(&non_admin_user_id, false);
-
-        // Attempt to delete a passkey credential
-        let result = delete_passkey_credential_admin(&non_admin_session_user, "credential1").await;
-
-        // Verify that the operation is rejected due to lack of admin privileges
-        assert!(result.is_err());
-        match result {
-            Err(CoordinationError::Unauthorized) => {}
-            _ => panic!("Expected Unauthorized error, got: {result:?}"),
-        }
-
-        // Clean up
-        delete_user_if_exists_and_not_first(&non_admin_user_id)
-            .await
-            .ok();
-    }
-
-    /// Test to ensure that deleting an OAuth2 account as an admin
-    /// requires admin privileges.
-    #[serial]
-    #[tokio::test]
-    async fn test_delete_oauth2_account_admin_requires_admin() {
-        init_test_environment().await;
-
-        // Create unique user with timestamp
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let non_admin_user_id = format!("non-admin-user-oauth2-{timestamp}");
-
-        // Create a non-admin user
-        create_test_user_in_db(&non_admin_user_id, false)
-            .await
-            .expect("Failed to create non-admin user");
-        let non_admin_session_user = create_test_session_user(&non_admin_user_id, false);
-
-        // Attempt to delete an OAuth2 account
-        let result = delete_oauth2_account_admin(&non_admin_session_user, "provider_user_id").await;
-
-        // Verify that the operation is rejected due to lack of admin privileges
-        assert!(result.is_err());
-        match result {
-            Err(CoordinationError::Unauthorized) => {}
-            _ => panic!("Expected Unauthorized error, got: {result:?}"),
-        }
-
-        // Clean up
-        delete_user_if_exists_and_not_first(&non_admin_user_id)
-            .await
-            .ok();
-    }
+    Ok(session_user)
 }
+
+#[cfg(test)]
+mod tests;

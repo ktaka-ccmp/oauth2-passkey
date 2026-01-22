@@ -81,7 +81,7 @@ auth_data.extend_from_slice(&[
 Always ensure test data consistency across:
 
 - Environment configuration (`.env_test`)
-- Test helper functions (origin URLs)  
+- Test helper functions (origin URLs)
 - Mock WebAuthn data (RP ID hashes, client data JSON)
 
 ## User Verification Flag Issues

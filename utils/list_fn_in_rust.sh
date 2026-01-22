@@ -12,12 +12,12 @@ first_file=true
 
 find "$SRCDIR" -name "*.rs" | sort | while read -r file; do
     output=$(awk -v filename="$file" '
-    BEGIN { 
+    BEGIN {
         collecting = 0
         signature = ""
         file_functions = ""
     }
-    
+
     # Enhanced pattern to match all function types including const, unsafe, extern
     /^[[:space:]]*((pub(\([^)]*\))?|const|async|unsafe|extern)[[:space:]]+)*fn[[:space:]]/ {
         # Start collecting a new function signature
@@ -25,7 +25,7 @@ find "$SRCDIR" -name "*.rs" | sort | while read -r file; do
         current_line = $0
         gsub(/^[[:space:]]+/, "", current_line)
         signature = current_line
-        
+
         # Check if this is a complete single-line function
         if ($0 ~ /[{;][[:space:]]*$/) {
             gsub(/[[:space:]]+/, " ", signature)
@@ -40,32 +40,32 @@ find "$SRCDIR" -name "*.rs" | sort | while read -r file; do
         }
         next
     }
-    
+
     # Only process lines when we are collecting a multi-line function
     collecting == 1 {
         current_line = $0
         gsub(/^[[:space:]]+/, "", current_line)
-        
+
         # Append this line to the signature
         signature = signature " " current_line
-        
+
         # Check if this line ends the function signature
         if ($0 ~ /[{;][[:space:]]*$/) {
             # Clean up spacing and finish the signature
             gsub(/[[:space:]]+/, " ", signature)
-            
+
             if ($0 ~ /;[[:space:]]*$/) {
                 gsub(/;.*$/, ";", signature)
             } else {
                 gsub(/\{.*$/, "{}", signature)
             }
-            
+
             file_functions = file_functions "  " signature "\n"
             collecting = 0
             signature = ""
         }
     }
-    
+
     END {
         if (length(file_functions) > 0) {
             print "**" filename ":**"
@@ -73,7 +73,7 @@ find "$SRCDIR" -name "*.rs" | sort | while read -r file; do
         }
     }
     ' "$file")
-    
+
     # Only print output if the file had functions
     if [[ -n "$output" ]]; then
         # Add blank line before output (except for the first file)

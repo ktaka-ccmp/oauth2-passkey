@@ -1,3 +1,22 @@
+//! Test fixtures and mock data generators for oauth2-passkey integration tests
+//!
+//! This module provides utilities for generating consistent test data including:
+//! - Mock WebAuthn credentials and responses with **cryptographically valid signatures**
+//! - OAuth2 user information and tokens  
+//! - Test users with various authentication scenarios
+//!
+//! ## Key Cryptographic Components
+//!
+//! **Fixed ECDSA P-256 Key Pair**: A mathematically related private/public key pair ensures
+//! that mock WebAuthn authentication produces valid signatures that can be verified by the
+//! stored credentials, enabling end-to-end testing of the cryptographic verification flow.
+//!
+//! - `first_user_key_pair()` → Private key for signing authentication challenges
+//! - `test_utils.rs::generate_first_user_public_key()` → Public key for signature verification
+//!
+//! All generated data is designed to work seamlessly with the authentication flows
+//! while providing deterministic behavior for reliable testing.
+
 use base64::{Engine as _, engine::general_purpose};
 use ciborium::value::{Integer, Value as CborValue};
 use ring::signature::KeyPair;
@@ -19,6 +38,25 @@ impl TestUsers {
         }
     }
 
+    /// Generate a unique OAuth2 test user for integration tests
+    /// This ensures each test gets a unique provider_user_id that won't collide with existing accounts
+    pub fn unique_oauth2_user(test_name: &str) -> TestUser {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+
+        let unique_id = format!("{test_name}-{timestamp}");
+        TestUser {
+            id: unique_id.clone(),
+            email: format!("oauth2-{timestamp}@example.com"),
+            name: format!("OAuth2 User {timestamp}"),
+            given_name: "OAuth2".to_string(),
+            family_name: format!("User-{timestamp}"),
+        }
+    }
+
     /// Get a standard test user for passkey flows
     pub fn passkey_user() -> TestUser {
         TestUser {
@@ -37,28 +75,6 @@ impl TestUsers {
             email: "admin@example.com".to_string(),
             name: "Admin Test User".to_string(),
             given_name: "Admin".to_string(),
-            family_name: "User".to_string(),
-        }
-    }
-
-    /// Get a second OAuth2 test user for linking scenarios
-    pub fn oauth2_user_second() -> TestUser {
-        TestUser {
-            id: "test_oauth2_user_second".to_string(),
-            email: "oauth2-second@example.com".to_string(),
-            name: "OAuth2 Second User".to_string(),
-            given_name: "OAuth2 Second".to_string(),
-            family_name: "User".to_string(),
-        }
-    }
-
-    /// Get a third OAuth2 test user for linking scenarios
-    pub fn oauth2_user_third() -> TestUser {
-        TestUser {
-            id: "test_oauth2_user_third".to_string(),
-            email: "oauth2-third@example.com".to_string(),
-            name: "OAuth2 Third User".to_string(),
-            given_name: "OAuth2 Third".to_string(),
             family_name: "User".to_string(),
         }
     }
@@ -97,6 +113,55 @@ impl MockWebAuthnCredentials {
     fn generate_unique_credential_id() -> String {
         let uuid = Uuid::new_v4().to_string().replace("-", "");
         format!("mock_cred_{}", &uuid[..16])
+    }
+
+    /// Get the fixed ECDSA P-256 key pair for the first user
+    ///
+    /// This ensures both the stored credential (public key) and mock authentication (private key)
+    /// use the same cryptographic key pair, enabling proper WebAuthn signature verification in tests.
+    ///
+    /// **Key Pair Relationship**: Public Key = Private Key × Generator Point (P-256 curve)
+    /// - Private Key: 32-byte scalar embedded in PKCS#8 DER structure below
+    /// - Public Key: Uncompressed point coordinates (X,Y) → base64url encoded for WebAuthn
+    /// - Verification: Private key signs challenge → Public key verifies signature
+    ///
+    /// **Generation Process**: Created using Ring cryptography library:
+    /// ```rust
+    /// use ring::{rand, signature};
+    /// let rng = rand::SystemRandom::new();
+    /// let pkcs8_bytes = signature::EcdsaKeyPair::generate_pkcs8(
+    ///     &signature::ECDSA_P256_SHA256_ASN1_SIGNING, &rng
+    /// ).expect("Failed to generate key pair");
+    /// // Then extracted the bytes and derived the public key
+    /// ```
+    ///
+    /// ⚠️ **TEST ONLY**: This private key is publicly visible - never use in production!
+    pub fn first_user_key_pair() -> Vec<u8> {
+        // Fixed ECDSA P-256 private key in PKCS#8 DER format (131 bytes)
+        // Generated with Ring cryptography library using proper entropy
+        // Corresponds to public key: "BBtOg4PEjnY2yQkrPjL832Obw0qJxiR-vIoUjjMmkKbyNjO4tT3blJAlPI5Y39nDiNkn7UnkCFZIS39cYp9nLPs"
+        /*
+         * ECDSA P-256 Private Key in PKCS#8 DER format (131 bytes total)
+         *
+         * Structure breakdown:
+         *   Bytes 0-5:    SEQUENCE header, version=0
+         *   Bytes 6-20:   Algorithm identifier (ecPublicKey + secp256r1)
+         *   Bytes 21-24:  Private key container header
+         *   Bytes 25-56:  32-byte private key scalar (the secret)
+         *   Bytes 57-61:  Public key section header
+         *   Bytes 62-126: 65-byte public key (0x04 + X coordinate + Y coordinate)
+         */
+        const FIRST_USER_PRIVATE_KEY: &[u8] = &[
+            48, 129, 135, 2, 1, 0, 48, 19, 6, 7, 42, 134, 72, 206, 61, 2, 1, 6, 8, 42, 134, 72,
+            206, 61, 3, 1, 7, 4, 109, 48, 107, 2, 1, 1, 4, 32, 139, 153, 75, 135, 130, 135, 200,
+            113, 147, 74, 215, 126, 194, 20, 14, 216, 17, 194, 26, 44, 245, 110, 139, 6, 6, 189,
+            51, 208, 44, 171, 153, 197, 161, 68, 3, 66, 0, 4, 27, 78, 131, 131, 196, 142, 118, 54,
+            201, 9, 43, 62, 50, 252, 223, 99, 155, 195, 74, 137, 198, 36, 126, 188, 138, 20, 142,
+            51, 38, 144, 166, 242, 54, 51, 184, 181, 61, 219, 148, 144, 37, 60, 142, 88, 223, 217,
+            195, 136, 217, 39, 237, 73, 228, 8, 86, 72, 75, 127, 92, 98, 159, 103, 44, 251,
+        ];
+
+        FIRST_USER_PRIVATE_KEY.to_vec()
     }
 
     /// Helper function to create a valid test attestation object with "none" format
@@ -652,8 +717,33 @@ impl MockWebAuthnCredentials {
         // Flags (1 byte) - UP (0x01) | UV (0x04) = 0x05 (no AT flag for authentication)
         auth_data.push(0x05);
 
-        // Signature counter (4 bytes) - should be incremented but using 1 for simplicity
-        auth_data.extend_from_slice(&[0x00, 0x00, 0x00, 0x01]);
+        // WebAuthn signature counter (4 bytes big-endian) - CRITICAL for security
+        //
+        // **Counter Rules**: Must always increase to prevent replay attacks and credential cloning
+        // **Test Problem**: Timestamp-based counters can have same value in rapid succession (CI/parallel tests)
+        // **Solution**: Use atomic counter with timestamp base to ensure monotonic increase
+        //
+        // Real authenticators increment this value on each use; we simulate this behavior in tests
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static COUNTER_BASE: AtomicU32 = AtomicU32::new(0);
+
+        // Get current timestamp as base counter value
+        let timestamp_base = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as u32;
+
+        // Use fetch_max to ensure counter is at least timestamp_base (handles initialization and growth)
+        // This is atomic and thread-safe - if multiple threads call this, all will get increasing values
+        // Use Relaxed ordering since we only need atomicity, not specific inter-thread ordering
+        COUNTER_BASE.fetch_max(timestamp_base, Ordering::Relaxed);
+
+        // Increment and get next counter value - guaranteed to be unique and increasing
+        // Note: fetch_add returns the OLD value, so we add 1 to get the NEW value
+        // Use wrapping_add to handle potential u32 overflow gracefully (though unlikely in tests)
+        // Use Relaxed ordering for consistency and performance - only atomicity needed, not strict ordering
+        let counter_value = COUNTER_BASE.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
+        auth_data.extend_from_slice(&counter_value.to_be_bytes());
 
         // No attested credential data for authentication
 
@@ -1132,6 +1222,27 @@ impl MockWebAuthnCredentials {
         })
     }
 
+    /// Generate a mock authentication assertion response with predictable credential for first user
+    pub fn authentication_response_with_predictable_credential(
+        credential_id: &str,
+        challenge: &str,
+        auth_id: &str,
+        user_handle: &str,
+    ) -> Value {
+        // Use the fixed key pair for the first user to ensure consistency
+        // between the stored credential and mock authentication
+        let key_pair_bytes = Self::first_user_key_pair();
+
+        // Use the existing method with the fixed key
+        Self::authentication_response_with_stored_credential(
+            credential_id,
+            challenge,
+            auth_id,
+            user_handle,
+            &key_pair_bytes,
+        )
+    }
+
     /// Generate a mock authentication assertion response with valid signature using stored key pair
     pub fn authentication_response_with_stored_credential(
         credential_id: &str,
@@ -1294,28 +1405,24 @@ impl MockOAuth2Responses {
     }
 }
 
-/// Common test state values
-pub struct TestConstants;
-
-impl TestConstants {
-    #[allow(dead_code)]
-    pub const MOCK_STATE: &'static str = "test_state_12345";
-    #[allow(dead_code)]
-    pub const MOCK_AUTH_CODE: &'static str = "mock_authorization_code";
-    #[allow(dead_code)]
-    pub const MOCK_CLIENT_ID: &'static str = "mock_client_id";
-    #[allow(dead_code)]
-    pub const MOCK_CLIENT_SECRET: &'static str = "mock_client_secret";
-    // #[allow(dead_code)]
-    // TEST_ORIGIN is now dynamically loaded from environment in test_server::get_test_origin()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// **CONSOLIDATED TEST**: Test Fixtures and Generation
+    ///
+    /// This test consolidates:
+    /// - test_user_fixtures
+    /// - test_oauth2_userinfo_conversion  
+    /// - test_webauthn_credential_generation
+    /// - test_oauth2_token_generation
     #[test]
-    fn test_user_fixtures() {
+    fn test_consolidated_fixtures_and_generation() {
+        println!("🧪 === CONSOLIDATED TEST FIXTURES AND GENERATION TEST ===");
+
+        // === SUBTEST 1: User Fixtures ===
+        println!("👤 SUBTEST 1: Testing user fixtures");
+
         let oauth2_user = TestUsers::oauth2_user();
         assert_eq!(oauth2_user.email, "oauth2@example.com");
 
@@ -1324,28 +1431,34 @@ mod tests {
 
         let admin_user = TestUsers::admin_user();
         assert_eq!(admin_user.email, "admin@example.com");
-    }
 
-    #[test]
-    fn test_oauth2_userinfo_conversion() {
+        println!("✅ SUBTEST 1 PASSED: User fixtures verified");
+
+        // === SUBTEST 2: OAuth2 UserInfo Conversion ===
+        println!("🌐 SUBTEST 2: Testing OAuth2 userinfo conversion");
+
         let user = TestUsers::oauth2_user();
         let userinfo = user.to_oauth2_userinfo();
 
         assert_eq!(userinfo["email"], "oauth2@example.com");
         assert_eq!(userinfo["name"], "OAuth2 Test User");
         assert!(userinfo["picture"].as_str().unwrap().contains(&user.id));
-    }
 
-    #[test]
-    fn test_webauthn_credential_generation() {
+        println!("✅ SUBTEST 2 PASSED: OAuth2 userinfo conversion verified");
+
+        // === SUBTEST 3: WebAuthn Credential Generation ===
+        println!("🔑 SUBTEST 3: Testing WebAuthn credential generation");
+
         let cred = MockWebAuthnCredentials::registration_response("testuser", "Test User");
         assert_eq!(cred["type"], "public-key");
         assert!(cred["id"].as_str().is_some());
         assert!(cred["response"]["client_data_json"].as_str().is_some());
-    }
 
-    #[test]
-    fn test_oauth2_token_generation() {
+        println!("✅ SUBTEST 3 PASSED: WebAuthn credential generation verified");
+
+        // === SUBTEST 4: OAuth2 Token Generation ===
+        println!("🎫 SUBTEST 4: Testing OAuth2 token generation");
+
         let user = TestUsers::oauth2_user();
         let token_response = MockOAuth2Responses::token_response(&user);
 
@@ -1357,5 +1470,9 @@ mod tests {
                 .unwrap()
                 .contains(&user.id)
         );
+
+        println!("✅ SUBTEST 4 PASSED: OAuth2 token generation verified");
+
+        println!("🎯 === CONSOLIDATED TEST FIXTURES AND GENERATION TEST COMPLETED ===");
     }
 }

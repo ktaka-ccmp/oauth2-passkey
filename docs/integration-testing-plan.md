@@ -22,7 +22,7 @@ oauth2_passkey/
 │   │   ├── combined_flows.rs          # ✅ Cross-method authentication (4 tests)
 │   │   ├── api_client_flows.rs        # ✅ API/JavaScript client flows (4 tests)
 │   └── common/
-│       ├── mod.rs                     # Common module exports  
+│       ├── mod.rs                     # Common module exports
 │       ├── test_server.rs             # ✅ Test server infrastructure (enhanced retry logic)
 │       ├── axum_mock_server.rs        # ✅ Persistent Axum mock OIDC provider
 │       ├── mock_browser.rs            # ✅ HTTP client with cookie handling (optimized)
@@ -124,7 +124,7 @@ oauth2_passkey_axum/
 tokio = { version = "1.0", features = ["full"] }
 serde_json = "1.0"
 serial_test = "3.0"      # ✅ Used for test isolation
-axum = "0.7"             # ✅ Persistent mock OIDC provider  
+axum = "0.7"             # ✅ Persistent mock OIDC provider
 reqwest = "0.12"         # ✅ HTTP client in MockBrowser
 url = "2.5"              # ✅ URL parsing for OAuth2 flows
 base64 = "0.22"          # ✅ WebAuthn credential encoding and PKCE

@@ -10,7 +10,7 @@ Please review and follow the complete guidelines in `CLAUDE.md`, which include:
 - Error handling with `thiserror` (not `anyhow` for libraries)
 - Minimal visibility and proper API design
 
-## Development Workflow  
+## Development Workflow
 - Minimal, targeted changes only
 - Explicit approval required for changes beyond immediate request
 - Meaningful commit messages reflecting actual changes

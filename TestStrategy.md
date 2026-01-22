@@ -126,15 +126,15 @@ We'll follow a bottom-up testing approach, starting with the most fundamental mo
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_function_behavior() {
         // Arrange
         let input = ...;
-        
+
         // Act
         let result = function_under_test(input);
-        
+
         // Assert
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), expected_value);
@@ -258,7 +258,7 @@ The plan should be revisited when:
 Do we have anything that needs unit tests here?
 
 
-I'd like you to identify the functions for which writing unit tests a more appropriate than leaving it to integration tests, first. 
+I'd like you to identify the functions for which writing unit tests a more appropriate than leaving it to integration tests, first.
 
 
 What do you think about unit tests in this module? Aren't there any meaningless tests that should be removed? Is there room for improvement?

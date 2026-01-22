@@ -8,8 +8,9 @@ use axum::{
 };
 
 use oauth2_passkey::{
-    DbUser, O2P_ROUTE_PREFIX, SessionUser, delete_oauth2_account_core,
-    delete_passkey_credential_core, delete_user_account_admin, update_user_admin_status,
+    CredentialId, DbUser, O2P_ROUTE_PREFIX, Provider, ProviderUserId, SessionId, UserId,
+    delete_oauth2_account_core, delete_passkey_credential_core, delete_user_account_admin,
+    update_user_admin_status,
 };
 
 use super::super::error::IntoResponseError;
@@ -42,12 +43,18 @@ struct UserListTemplate {
 
 async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
-    if !auth_user.is_admin {
+    if !auth_user.has_admin_privileges() {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     };
 
-    // Fetch users from storage
-    let users = oauth2_passkey::get_all_users()
+    // Fetch users from storage using session ID
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+    let users = oauth2_passkey::get_all_users(session_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -75,7 +82,7 @@ pub(super) async fn delete_user_account_handler(
     ExtractJson(payload): ExtractJson<DeleteUserRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Verify that the user has admin privileges
-    if !auth_user.is_admin {
+    if !auth_user.has_admin_privileges() {
         tracing::warn!(
             "User {} is not authorized to delete another user's account",
             auth_user.id
@@ -85,7 +92,15 @@ pub(super) async fn delete_user_account_handler(
 
     // Call the core function to delete the user account and all associated data
     // Using the imported function from libauth
-    delete_user_account_admin(&payload.user_id)
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+    let user_id = UserId::new(payload.user_id.clone())
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
+    delete_user_account_admin(session_id, user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -110,11 +125,20 @@ async fn delete_passkey_credential(
     ExtractJson(payload): ExtractJson<PageUserContext>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Check admin status
-    if !auth_user.is_admin {
+    if !auth_user.has_admin_privileges() {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    delete_passkey_credential_core(&payload.user_id, &credential_id)
+    let user_id = UserId::new(payload.user_id.clone())
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
+    let credential_id_enum = CredentialId::new(credential_id).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid credential ID: {e}"),
+        )
+    })?;
+
+    delete_passkey_credential_core(user_id, credential_id_enum)
         .await
         .map(|()| StatusCode::NO_CONTENT)
         .into_response_error()
@@ -126,11 +150,22 @@ async fn delete_oauth2_account(
     ExtractJson(payload): ExtractJson<PageUserContext>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Check admin status
-    if !auth_user.is_admin {
+    if !auth_user.has_admin_privileges() {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
-    delete_oauth2_account_core(&payload.user_id, &provider, &provider_user_id)
+    let user_id = UserId::new(payload.user_id.clone())
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
+    let provider_enum = Provider::new(provider)
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid provider: {e}")))?;
+    let provider_user_id_enum = ProviderUserId::new(provider_user_id).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid provider user ID: {e}"),
+        )
+    })?;
+
+    delete_oauth2_account_core(user_id, provider_enum, provider_user_id_enum)
         .await
         .map(|()| StatusCode::NO_CONTENT)
         .into_response_error()
@@ -146,20 +181,25 @@ pub(super) async fn update_admin_status_handler(
     auth_user: AuthUser,
     ExtractJson(payload): ExtractJson<UpdateAdminStatusRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // Convert AuthUser to SessionUser for the core function
-    let session_user = SessionUser::from(&auth_user);
-
     // Verify that the user has admin privileges
-    if !session_user.is_admin {
+    if !auth_user.has_admin_privileges() {
         tracing::warn!(
             "User {} is not authorized to update admin status",
-            session_user.id
+            auth_user.id
         );
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
 
     // Call the core function to update the user's admin status
-    update_user_admin_status(&session_user, &payload.user_id, payload.is_admin)
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+    let user_id = UserId::new(payload.user_id.clone())
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
+    update_user_admin_status(session_id, user_id, payload.is_admin)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -167,94 +207,11 @@ pub(super) async fn update_admin_status_handler(
         "User admin status updated: {} is_admin={} by {}",
         payload.user_id,
         payload.is_admin,
-        session_user.id
+        auth_user.id
     );
 
     Ok(StatusCode::OK)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Test that the delete_user_account_handler returns an error
-    /// when a non-admin user tries to delete another user's account.
-    /// This test checks:
-    /// 1. The handler returns an error status code (UNAUTHORIZED).
-    /// 2. The error message is "Not authorized".
-    #[tokio::test]
-    async fn test_delete_user_account_handler_unauthorized() {
-        // Create a non-admin user
-        let auth_user = AuthUser {
-            id: "user123".to_string(),
-            account: "test@example.com".to_string(),
-            label: "Test User".to_string(),
-            is_admin: false,
-            sequence_number: 1,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-            csrf_token: "token123".to_string(),
-            csrf_via_header_verified: true,
-        };
-
-        // Create a delete request
-        let payload = DeleteUserRequest {
-            user_id: "user456".to_string(),
-        };
-
-        // Call the handler
-        let result = delete_user_account_handler(auth_user, ExtractJson(payload)).await;
-
-        // Verify that it returns an unauthorized error
-        assert!(result.is_err());
-        if let Err((status, message)) = result {
-            assert_eq!(status, StatusCode::UNAUTHORIZED);
-            assert_eq!(message, "Not authorized".to_string());
-        } else {
-            panic!("Expected an error but got Ok");
-        }
-    }
-
-    /// Test that the update_admin_status_handler returns an error
-    /// when a non-admin user tries to update another user's admin status.
-    /// This test checks:
-    /// 1. The handler returns an error status code (UNAUTHORIZED).
-    /// 2. The error message is "Not authorized".
-    /// 3. The handler does not panic or return Ok when it should return an error.
-    #[tokio::test]
-    async fn test_update_admin_status_handler_unauthorized() {
-        // Create a non-admin user
-        let auth_user = AuthUser {
-            id: "user123".to_string(),
-            account: "test@example.com".to_string(),
-            label: "Test User".to_string(),
-            is_admin: false,
-            sequence_number: 1,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-            csrf_token: "token123".to_string(),
-            csrf_via_header_verified: true,
-        };
-
-        // Create an update request
-        let payload = UpdateAdminStatusRequest {
-            user_id: "user456".to_string(),
-            is_admin: true,
-        };
-
-        // Call the handler
-        let result = update_admin_status_handler(auth_user, ExtractJson(payload)).await;
-
-        // Verify that it returns an unauthorized error
-        assert!(result.is_err());
-        if let Err((status, message)) = result {
-            assert_eq!(status, StatusCode::UNAUTHORIZED);
-            assert_eq!(message, "Not authorized".to_string());
-        } else {
-            panic!("Expected an error but got Ok");
-        }
-    }
-
-    // Note: Removed meaningless tests that only validated basic struct creation
-    // These provided no validation value beyond testing basic Rust language features
-}
+mod tests;

@@ -1,5 +1,6 @@
 use sqlx::{Pool, Sqlite};
 
+use crate::session::UserId;
 use crate::storage::validate_sqlite_table_schema;
 use crate::userdb::{
     errors::UserError,
@@ -142,7 +143,7 @@ pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Resul
     .map_err(|e| UserError::Storage(e.to_string()))
 }
 
-pub(super) async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<(), UserError> {
+pub(super) async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: UserId) -> Result<(), UserError> {
     // Ensure tables exist before any operations - this is critical for in-memory databases
     create_tables_sqlite(pool).await?;
 
@@ -153,7 +154,7 @@ pub(super) async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: &str) -> Result<
         DELETE FROM {table_name} WHERE id = ?
         "#
     ))
-    .bind(id)
+    .bind(id.as_str())
     .execute(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;

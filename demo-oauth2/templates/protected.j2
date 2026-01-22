@@ -43,7 +43,7 @@
             </tr>
             <tr>
                 <td>Sequence Number</td>
-                <td>{{ user.sequence_number }}</td>
+                <td>{% if user.sequence_number.is_some() %}{{ user.sequence_number.unwrap() }}{% else %}None{% endif %}</td>
             </tr>
             <tr>
                 <td>Created At</td>

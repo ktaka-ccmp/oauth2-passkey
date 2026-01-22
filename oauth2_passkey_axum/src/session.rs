@@ -56,6 +56,7 @@ impl IntoResponse for AuthRedirect {
 /// * `updated_at` - When the user account was last updated
 /// * `csrf_token` - CSRF token associated with the user's session
 /// * `csrf_via_header_verified` - Whether CSRF token was verified via header
+/// * `session_id` - The session ID for making secure API calls
 ///
 /// # Example
 ///
@@ -80,8 +81,8 @@ pub struct AuthUser {
     pub label: String,
     /// Whether the user has admin privileges
     pub is_admin: bool,
-    /// User version for tracking account changes
-    pub sequence_number: i64,
+    /// Database-assigned sequence number (primary key), None for users not yet persisted
+    pub sequence_number: Option<i64>,
     /// When the user account was created
     pub created_at: DateTime<Utc>,
     /// When the user account was last updated
@@ -90,6 +91,8 @@ pub struct AuthUser {
     pub csrf_token: String,
     /// Whether CSRF token was verified via header
     pub csrf_via_header_verified: bool,
+    /// The session ID for making secure API calls
+    pub session_id: String,
 }
 
 impl From<&AuthUser> for SessionUser {
@@ -118,7 +121,26 @@ impl From<SessionUser> for AuthUser {
             updated_at: session_user.updated_at,
             csrf_token: String::new(),
             csrf_via_header_verified: false,
+            session_id: String::new(),
         }
+    }
+}
+
+impl AuthUser {
+    /// Determines if the user has administrative privileges.
+    ///
+    /// A user has admin privileges if:
+    /// 1. They have the `is_admin` flag set to true, OR
+    /// 2. They are the first user in the system (sequence_number = 1)
+    ///
+    /// IMPORTANT: This logic must stay in sync with DbUser::has_admin_privileges()
+    /// and SessionUser::has_admin_privileges() implementations.
+    ///
+    /// # Returns
+    /// * `true` if the user has administrative privileges
+    /// * `false` otherwise
+    pub fn has_admin_privileges(&self) -> bool {
+        self.is_admin || self.sequence_number == Some(1)
     }
 }
 
@@ -145,8 +167,13 @@ where
             AuthRedirect::new(method.clone())
         })?;
 
+        let session_cookie_typed = oauth2_passkey::SessionCookie::new(session_cookie.to_string())
+            .map_err(|_| {
+            tracing::error!("Invalid session cookie format");
+            AuthRedirect::new(method.clone())
+        })?;
         let (session_user, session_csrf_token_str) =
-            get_user_and_csrf_token_from_session(session_cookie)
+            get_user_and_csrf_token_from_session(&session_cookie_typed)
                 .await
                 .map_err(|_| {
                     tracing::error!("Failed to get user and csrf token from session");
@@ -155,6 +182,7 @@ where
 
         let mut auth_user = AuthUser::from(session_user);
         auth_user.csrf_token = session_csrf_token_str.as_str().to_string(); // Store the session's CSRF token
+        auth_user.session_id = session_cookie.to_string(); // Store the session ID for secure API calls
 
         // Verify CSRF token for state-changing methods
         if method == Method::POST
@@ -239,117 +267,4 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use chrono::Utc;
-
-    /// Test the conversion between SessionUser and AuthUser
-    /// This test verifies that all fields are correctly converted between the two types.
-    #[test]
-    fn test_from_session_user_to_auth_user() {
-        // Create a SessionUser instance
-        let now = Utc::now();
-        let session_user = SessionUser {
-            id: "user123".to_string(),
-            account: "test@example.com".to_string(),
-            label: "Test User".to_string(),
-            is_admin: true,
-            sequence_number: 42,
-            created_at: now,
-            updated_at: now,
-        };
-
-        // Convert to AuthUser
-        let auth_user = AuthUser::from(session_user);
-
-        // Verify all fields were correctly converted
-        assert_eq!(auth_user.id, "user123");
-        assert_eq!(auth_user.account, "test@example.com");
-        assert_eq!(auth_user.label, "Test User");
-        assert!(auth_user.is_admin);
-        assert_eq!(auth_user.sequence_number, 42);
-        assert_eq!(auth_user.created_at, now);
-        assert_eq!(auth_user.updated_at, now);
-
-        // Verify default values for AuthUser-specific fields
-        assert_eq!(auth_user.csrf_token, "");
-        assert!(!auth_user.csrf_via_header_verified);
-    }
-
-    /// Test the conversion from AuthUser to SessionUser
-    /// This test verifies that all fields are correctly converted from AuthUser to SessionUser.
-    #[test]
-    fn test_from_auth_user_to_session_user() {
-        // Create an AuthUser instance
-        let now = Utc::now();
-        let auth_user = AuthUser {
-            id: "user123".to_string(),
-            account: "test@example.com".to_string(),
-            label: "Test User".to_string(),
-            is_admin: true,
-            sequence_number: 42,
-            created_at: now,
-            updated_at: now,
-            csrf_token: "csrf-token-value".to_string(),
-            csrf_via_header_verified: true,
-        };
-
-        // Convert to SessionUser
-        let session_user = SessionUser::from(&auth_user);
-
-        // Verify all fields were correctly converted
-        assert_eq!(session_user.id, "user123");
-        assert_eq!(session_user.account, "test@example.com");
-        assert_eq!(session_user.label, "Test User");
-        assert!(session_user.is_admin);
-        assert_eq!(session_user.sequence_number, 42);
-        assert_eq!(session_user.created_at, now);
-        assert_eq!(session_user.updated_at, now);
-
-        // AuthUser-specific fields should not be present in SessionUser
-    }
-
-    /// Test the AuthRedirect struct's new method
-    /// This test verifies that the AuthRedirect can be created with different HTTP methods
-    #[test]
-    fn test_auth_redirect_new() {
-        // Test creating AuthRedirect with different HTTP methods
-        // We're just testing that the constructor doesn't panic with different methods
-        // The variables are prefixed with _ to indicate they're intentionally unused
-        let _get_redirect = AuthRedirect::new(Method::GET);
-        let _post_redirect = AuthRedirect::new(Method::POST);
-        let _put_redirect = AuthRedirect::new(Method::PUT);
-        let _delete_redirect = AuthRedirect::new(Method::DELETE);
-
-        // If we get here without panicking, the test passes
-        // assert!(true);
-    }
-
-    /// Test the AuthRedirect's into_response_with_method method
-    /// This test verifies that the method returns the correct response based on the HTTP method.
-    #[test]
-    fn test_auth_redirect_into_response_with_method() {
-        // Test with GET method
-        let auth_redirect = AuthRedirect::new(Method::GET);
-        let response = auth_redirect.into_response_with_method();
-        assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
-
-        // Test with POST method
-        let auth_redirect = AuthRedirect::new(Method::POST);
-        let response = auth_redirect.into_response_with_method();
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-
-        // Test with PUT method
-        let auth_redirect = AuthRedirect::new(Method::PUT);
-        let response = auth_redirect.into_response_with_method();
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-
-        // Test with DELETE method
-        let auth_redirect = AuthRedirect::new(Method::DELETE);
-        let response = auth_redirect.into_response_with_method();
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    }
-
-    // Note: These tests are marked as ignored because they require the core library's
-    // authentication functions which are difficult to mock in a unit test context
-}
+mod tests;

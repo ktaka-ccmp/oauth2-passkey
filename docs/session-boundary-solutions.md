@@ -6,10 +6,10 @@ Modern web applications that support authentication and multi-account workflows 
 
 Two common session boundary problems are:
 
-1. **Page-to-Request Desynchronization**: 
+1. **Page-to-Request Desynchronization**:
    A user loads a page while logged in as Account #1. Later, they log in as Account #2 in another tab or window. If they return to the original page and perform an action (e.g., add credentials), that action may be executed as Account #2, not Account #1-potentially linking credentials to the wrong user.
 
-2. **Process Start-to-Completion Desynchronization**: 
+2. **Process Start-to-Completion Desynchronization**:
    In multi-step processes (such as passkey or OAuth2 registration), a user might start the process with one account but complete it after switching sessions. This can result in credentials being registered to an unintended user or session.
 
 We address these risks by implementing specific protection mechanisms tailored to each phase of potential session desynchronization.
@@ -84,7 +84,7 @@ async fn google_auth(
     verify_page_session_token(&headers, Some(&context.unwrap()))
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-    
+
     // Only after verification passes do we proceed
     // ...
 }

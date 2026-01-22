@@ -64,7 +64,7 @@ The application will start on:
 Successful startup looks like:
 
 ```text
-$ cargo run 
+$ cargo run
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
      Running `/home/ktaka/GitHub/oauth2-passkey/target/debug/demo-both`
 2025-06-23T03:11:56.158375Z  INFO demo_both::server: Debug mode enabled - showing detailed logs by default
@@ -140,7 +140,7 @@ demo-both/
    - Clear browser data for localhost if needed
 
 4. **Database errors**
-   - The SQLite database will be created automatically  
+   - The SQLite database will be created automatically
    - Delete the database file to reset it (path depends on your configuration)
    - Use `touch` to recreate the database file if needed
    - Make sure the path specified by `GENERIC_DATA_STORE_URL` in your `.env` is writable (e.g., the directory for your SQLite file)

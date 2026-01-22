@@ -245,7 +245,7 @@ Before you can publish crates, you need to authenticate with crates.io:
    ```bash
    cargo login <your-token-here>
    ```
-   
+
    Or alternatively, set it as an environment variable:
 
    ```bash

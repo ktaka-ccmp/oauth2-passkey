@@ -9,4 +9,3 @@
  cargo fmt --all -- --check
 
  git status
-

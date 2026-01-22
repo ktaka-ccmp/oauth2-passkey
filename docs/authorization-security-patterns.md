@@ -39,8 +39,8 @@ Use middleware that wraps function logic, but adds complexity with closures.
 pub async fn validate_admin_session(session_id: &str) -> Result<User, CoordinationError> {
     let session = validate_session(session_id).await?;
     let user = UserStore::get_user(&session.user_id).await?.ok_or(NotFound)?;
-    if !user.is_admin { 
-        return Err(CoordinationError::Unauthorized.log()); 
+    if !user.is_admin {
+        return Err(CoordinationError::Unauthorized.log());
     }
     Ok(user)
 }
@@ -48,8 +48,8 @@ pub async fn validate_admin_session(session_id: &str) -> Result<User, Coordinati
 pub async fn validate_owner_session(session_id: &str, resource_user_id: &str) -> Result<User, CoordinationError> {
     let session = validate_session(session_id).await?;
     let user = UserStore::get_user(&session.user_id).await?.ok_or(NotFound)?;
-    if user.id != resource_user_id { 
-        return Err(CoordinationError::Unauthorized.log()); 
+    if user.id != resource_user_id {
+        return Err(CoordinationError::Unauthorized.log());
     }
     Ok(user)
 }
@@ -57,8 +57,8 @@ pub async fn validate_owner_session(session_id: &str, resource_user_id: &str) ->
 pub async fn validate_admin_or_owner_session(session_id: &str, resource_user_id: &str) -> Result<User, CoordinationError> {
     let session = validate_session(session_id).await?;
     let user = UserStore::get_user(&session.user_id).await?.ok_or(NotFound)?;
-    if !user.is_admin && user.id != resource_user_id { 
-        return Err(CoordinationError::Unauthorized.log()); 
+    if !user.is_admin && user.id != resource_user_id {
+        return Err(CoordinationError::Unauthorized.log());
     }
     Ok(user)
 }
@@ -93,8 +93,8 @@ where F: FnOnce(&User) -> Result<R, CoordinationError>
 {
     let session = validate_session(session_id).await?;
     let user = get_fresh_user(&session.user_id).await?;
-    if !user.is_admin && user.id != resource_user_id { 
-        return Err(Unauthorized); 
+    if !user.is_admin && user.id != resource_user_id {
+        return Err(Unauthorized);
     }
     operation(&user)
 }
@@ -113,7 +113,7 @@ pub async fn update_user_admin_status(
 ) -> Result<User, CoordinationError> {
     // Simple one-liner at the top
     let _admin_user = validate_admin_session(session_id).await?;
-    
+
     // Original function logic continues...
     let user = UserStore::get_user(user_id).await?.ok_or(NotFound)?;
     if user.sequence_number == Some(1) {
@@ -123,7 +123,7 @@ pub async fn update_user_admin_status(
     UserStore::upsert_user(updated_user).await
 }
 
-// Owner-only function  
+// Owner-only function
 pub async fn update_user_account(
     session_id: &str,
     user_id: &str,
@@ -132,7 +132,7 @@ pub async fn update_user_account(
 ) -> Result<User, CoordinationError> {
     // One-liner owner validation
     let _owner_user = validate_owner_session(session_id, user_id).await?;
-    
+
     // Original function logic...
     let user = UserStore::get_user(user_id).await?.ok_or(NotFound)?;
     let updated_user = User {
@@ -147,7 +147,7 @@ pub async fn update_user_account(
 pub async fn delete_user_account(session_id: &str, user_id: &str) -> Result<Vec<String>, CoordinationError> {
     // One-liner validation
     let _user = validate_admin_or_owner_session(session_id, user_id).await?;
-    
+
     // Original function logic...
     let user = UserStore::get_user(user_id).await?.ok_or(NotFound)?;
     // ... rest of delete logic
@@ -166,7 +166,7 @@ pub async fn delete_user_account_admin(session_id: &str, user_id: &str) -> Resul
     }).await
 }
 
-// Owner-only function  
+// Owner-only function
 pub async fn update_user_account(session_id: &str, user_id: &str, account: Option<String>, label: Option<String>) -> Result<User, CoordinationError> {
     with_owner_auth(session_id, user_id, |_owner_user| {
         // Original function logic here
@@ -215,7 +215,7 @@ This pattern eliminates the vulnerability where functions trust `SessionUser.is_
 ## Alternative Approaches Considered
 
 1. **Direct function modification**: Add session_id parameter to each function - requires changing many signatures
-2. **Capability-based security**: Use capability tokens - more complex, requires new infrastructure  
+2. **Capability-based security**: Use capability tokens - more complex, requires new infrastructure
 3. **Database-first authorization**: Always query DB in each function - repetitive, error-prone
 4. **Session validation helper**: Centralized validation function - still requires modifying each function
 

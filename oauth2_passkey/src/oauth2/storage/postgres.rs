@@ -3,7 +3,7 @@ use sqlx::{Pool, Postgres};
 
 use crate::oauth2::{
     errors::OAuth2Error,
-    types::{AccountSearchField, OAuth2Account},
+    types::{AccountSearchField, OAuth2Account, Provider, ProviderUserId},
 };
 use crate::storage::validate_postgres_table_schema;
 use crate::userdb::DB_TABLE_USERS;
@@ -117,8 +117,8 @@ pub(super) async fn get_oauth2_accounts_by_field_postgres(
 
 pub(super) async fn get_oauth2_account_by_provider_postgres(
     pool: &Pool<Postgres>,
-    provider: &str,
-    provider_user_id: &str,
+    provider: Provider,
+    provider_user_id: ProviderUserId,
 ) -> Result<Option<OAuth2Account>, OAuth2Error> {
     let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
 
@@ -128,8 +128,8 @@ pub(super) async fn get_oauth2_account_by_provider_postgres(
         WHERE provider = $1 AND provider_user_id = $2
         "#
     ))
-    .bind(provider)
-    .bind(provider_user_id)
+    .bind(provider.as_str())
+    .bind(provider_user_id.as_str())
     .fetch_optional(pool)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))

@@ -31,15 +31,16 @@ pub use main::{
     get_related_origin_json,
 };
 
-pub use types::PasskeyCredential;
+pub use types::{ChallengeId, ChallengeType, CredentialId, PasskeyCredential};
 
+use crate::storage::CacheErrorConversion;
 pub(crate) use main::{
     commit_registration, finish_authentication, prepare_registration_storage, start_authentication,
     start_registration, validate_registration_challenge, verify_session_then_finish_registration,
 };
 
 pub(crate) use storage::PasskeyStore;
-pub(crate) use types::CredentialSearchField;
+pub(crate) use types::{CredentialSearchField, UserHandle, UserName};
 
 pub(crate) async fn init() -> Result<(), PasskeyError> {
     // Validate required environment variables early
@@ -48,7 +49,7 @@ pub(crate) async fn init() -> Result<(), PasskeyError> {
 
     crate::storage::init()
         .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+        .map_err(PasskeyError::convert_storage_error)?;
 
     PasskeyStore::init().await?;
 
