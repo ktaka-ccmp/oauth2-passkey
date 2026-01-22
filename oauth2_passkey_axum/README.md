@@ -5,7 +5,7 @@
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey-axum.svg)](https://crates.io/crates/oauth2-passkey-axum)
 [![Docs.rs](https://docs.rs/oauth2-passkey-axum/badge.svg)](https://docs.rs/oauth2-passkey-axum)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
-[![MSRV](https://img.shields.io/badge/MSRV-1.85.1-blue)](https://blog.rust-lang.org/2024/11/21/Rust-1.85.0.html)
+[![MSRV](https://img.shields.io/badge/MSRV-1.88-blue)](https://blog.rust-lang.org/2025/02/20/Rust-1.88.0.html)
 
 Axum web framework integration for the [`oauth2-passkey`](../oauth2_passkey) authentication library.
 
@@ -13,7 +13,7 @@ This crate provides ready-to-use Axum handlers, middleware, and UI components fo
 
 ## Requirements
 
-- **Minimum Supported Rust Version (MSRV)**: 1.85.1
+- **Minimum Supported Rust Version (MSRV)**: 1.88
 - **Supported Platforms**: Linux, macOS, Windows (x86_64, ARM64)
 - **Dependencies**: Built on stable Rust with minimal dependency tree
 

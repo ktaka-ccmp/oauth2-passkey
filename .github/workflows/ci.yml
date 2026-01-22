@@ -119,10 +119,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Rust 1.85.1
+    - name: Install Rust 1.88
       uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: "1.85.1"
+        toolchain: "1.88"
 
     - name: Check MSRV compatibility
       run: |
