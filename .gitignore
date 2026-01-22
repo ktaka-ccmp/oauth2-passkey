@@ -4,3 +4,6 @@ utils/target
 .env.*
 .vscode
 
+# mdbook output
+docs/book/
+
