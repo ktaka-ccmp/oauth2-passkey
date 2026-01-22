@@ -16,8 +16,8 @@ Add the library as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-oauth2-passkey = "0.1"
-oauth2-passkey-axum = "0.1"
+oauth2-passkey = "0.2"
+oauth2-passkey-axum = "0.2"
 ```
 
 For building with all features (required for Axum integration):

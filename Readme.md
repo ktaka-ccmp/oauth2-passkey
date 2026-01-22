@@ -1,21 +1,20 @@
 # oauth2-passkey
 
-🔐 **Drop-in authentication for Rust web apps** - Add secure login with Google OAuth2 and/or Passkeys in minutes.
+🔐 **Passwordless authentication for Rust web apps** - No passwords, no 2FA implementation, better security.
 
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey.svg)](https://crates.io/crates/oauth2-passkey)
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey-axum.svg)](https://crates.io/crates/oauth2-passkey-axum)
 [![Docs.rs](https://docs.rs/oauth2-passkey/badge.svg)](https://docs.rs/oauth2-passkey)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
+**Password authentication is fundamentally flawed** - even strong, unique passwords are vulnerable to phishing, brute-force attacks, and server-side breaches. This library provides a better approach: users register with Google OAuth2, then add a Passkey for fast, phishing-resistant daily login. OAuth2 remains as a backup if the device is lost. After authentication, the library issues a secure session cookie to maintain login state.
+
 ## ✨ What You Get
 
-Users authenticate with OAuth2 or Passkey, then receive a secure session cookie to maintain their login status.
-
-- 🌐 **"Sign in with Google"** OAuth2/OIDC authentication that just works
-- 🔑 **Passwordless login** WebAuthn/Passkey support for modern devices
-- 🔗 **Account linking** Users can add multiple login methods to one account
-- 🛡️ **Security built-in** Sessions, CSRF protection, secure cookies
-- 📦 **Minimal setup** Works with SQLite out of the box, scales to PostgreSQL + Redis
+- 🔑 **Passkey** - Phishing-resistant login with biometrics, inherently multi-factor (no 2FA needed)
+- 🌐 **Google OAuth2** - One-click registration and backup authentication
+- 🔗 **Account linking** - Users can add multiple login methods to one account
+- 📦 **Minimal setup** - Works with SQLite out of the box, scales to PostgreSQL + Redis
 
 ## 🚀 5-Minute Setup
 
@@ -133,14 +132,6 @@ GENERIC_CACHE_STORE_TYPE=memory
 ```
 
 **OAuth2 Setup:** Get credentials from [Google API Console](https://console.cloud.google.com/auth/clients) and add redirect URI: `https://your-domain.com/o2p/oauth2/authorized`
-
-## 🎯 Why Choose This Library?
-
-- ✅ **Beginner-friendly** - Works out of the box with SQLite
-- ✅ **Production-ready** - Scales to PostgreSQL + Redis
-- ✅ **Modern auth methods** - OAuth2 + Passkeys in one package
-- ✅ **Security built-in** - CSRF, secure sessions, minimal dependencies
-- ✅ **Flexible** - Users can mix and match auth methods
 
 ## 📄 License
 

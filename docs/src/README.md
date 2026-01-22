@@ -1,43 +1,24 @@
 # oauth2-passkey Documentation
 
-Welcome to the oauth2-passkey documentation. This library provides OAuth2 and WebAuthn/Passkey authentication for Rust web applications.
+Drop-in OAuth2 and Passkey authentication for Rust web applications.
 
-## What is oauth2-passkey?
+## Why OAuth2 + Passkey?
 
-oauth2-passkey is a Rust authentication library that provides:
+**Password authentication is fundamentally flawed** - even strong, unique passwords are vulnerable to phishing, brute-force attacks, and server-side breaches. 2FA adds complexity without fixing the root cause.
 
-- **OAuth2/OpenID Connect** integration (Google, etc.)
-- **WebAuthn/Passkey** authentication for passwordless login
-- **Axum framework** integration via oauth2-passkey-axum
-- Built-in **security features**: CSRF protection, secure sessions, page session tokens
+**This library avoids passwords entirely:**
+
+1. **Register with Google OAuth2** - One-click signup, no password to create
+2. **Add a Passkey** - Register biometric authentication (fingerprint, face)
+3. **Login with Passkey** - Fast, phishing-resistant daily authentication
+4. **OAuth2 as backup** - Recovery option if device is lost
+
+After authentication, the library issues a secure session cookie to maintain login state. No password management. No 2FA implementation. Better security.
 
 ## Getting Started
 
 New to oauth2-passkey? Start here:
 
-1. [Introduction](getting-started/introduction.md) - Overview and use cases
+1. [Introduction](getting-started/introduction.md) - Why this approach works
 2. [Quick Start](getting-started/quick-start.md) - Prerequisites and running demos
 3. [Architecture](getting-started/architecture.md) - System components and data flow
-
-## Quick Links
-
-- [GitHub Repository](https://github.com/ktaka-ccmp/oauth2-passkey) - Source code
-- [CHANGELOG](https://github.com/ktaka-ccmp/oauth2-passkey/blob/master/CHANGELOG.md) - Release history
-- [CONTRIBUTING](https://github.com/ktaka-ccmp/oauth2-passkey/blob/master/CONTRIBUTING.md) - How to contribute
-
-## Demo Applications
-
-Working examples to get started quickly:
-
-- [demo-both](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-both) - Combined OAuth2 + Passkey
-- [demo-oauth2](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-oauth2) - OAuth2-only
-- [demo-passkey](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-passkey) - Passkey-only
-
-## API Documentation (docs.rs)
-
-- [docs.rs/oauth2-passkey](https://docs.rs/oauth2-passkey) - Core library API
-- [docs.rs/oauth2-passkey-axum](https://docs.rs/oauth2-passkey-axum) - Axum integration API
-
----
-
-Use the **sidebar** to navigate through the documentation.
