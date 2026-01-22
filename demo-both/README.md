@@ -151,6 +151,17 @@ demo-both/
 - **Logs**: Check console output for detailed error messages
 - **Self-signed certificates**: Browser will show security warning, click "Advanced" → "Proceed"
 
+### Using Cloudflared Tunnel
+
+For public HTTPS access without self-signed certificates:
+
+1. Set up a cloudflared tunnel pointing to `https://localhost:3443`
+2. Update `.env`:
+   ```bash
+   ORIGIN='https://your-tunnel-domain.example.com'
+   ```
+3. Update Google OAuth2 redirect URI to `https://your-tunnel-domain.example.com/o2p/oauth2/authorized`
+
 ## Configuration Options
 
 This demo supports all the same configuration options as the main library:

@@ -649,14 +649,14 @@ checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 
 [[package]]
 name = "demo-both"
-version = "0.1.4-dev"
+version = "0.2.1-dev"
 dependencies = [
  "askama",
  "axum",
  "axum-server",
  "dotenvy",
  "http",
- "oauth2-passkey-axum",
+ "oauth2-passkey-axum 0.2.0",
  "rustls",
  "serde",
  "subtle",
@@ -667,14 +667,14 @@ dependencies = [
 
 [[package]]
 name = "demo-oauth2"
-version = "0.1.4-dev"
+version = "0.2.1-dev"
 dependencies = [
  "askama",
  "axum",
  "axum-server",
  "dotenvy",
  "http",
- "oauth2-passkey-axum",
+ "oauth2-passkey-axum 0.2.1-dev",
  "rustls",
  "tokio",
  "tracing",
@@ -683,7 +683,7 @@ dependencies = [
 
 [[package]]
 name = "demo-passkey"
-version = "0.1.4-dev"
+version = "0.2.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -691,7 +691,7 @@ dependencies = [
  "axum-server",
  "dotenvy",
  "http",
- "oauth2-passkey-axum",
+ "oauth2-passkey-axum 0.2.1-dev",
  "rustls",
  "tokio",
  "tracing",
@@ -1776,7 +1776,40 @@ dependencies = [
 
 [[package]]
 name = "oauth2-passkey"
-version = "0.1.4-dev"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea3a4d27c1fb87b3dd85b71bb721ecd0806a46617494ee428c6fc2a06a1647dd"
+dependencies = [
+ "async-trait",
+ "base64",
+ "chrono",
+ "ciborium",
+ "dotenvy",
+ "headers",
+ "hmac",
+ "http",
+ "jsonwebtoken",
+ "oid-registry",
+ "redis",
+ "reqwest",
+ "ring",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "subtle",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "url",
+ "uuid",
+ "webpki",
+ "x509-parser",
+]
+
+[[package]]
+name = "oauth2-passkey"
+version = "0.2.1-dev"
 dependencies = [
  "async-trait",
  "axum",
@@ -1788,7 +1821,7 @@ dependencies = [
  "hmac",
  "http",
  "jsonwebtoken",
- "oauth2-passkey-axum",
+ "oauth2-passkey-axum 0.2.1-dev",
  "oid-registry",
  "proptest",
  "redis",
@@ -1813,7 +1846,27 @@ dependencies = [
 
 [[package]]
 name = "oauth2-passkey-axum"
-version = "0.1.4-dev"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f91bc1624493b96f7c5600987ab527079f476bb1e1fa46e1e9caa69a62ca0f1"
+dependencies = [
+ "askama",
+ "axum",
+ "axum-extra",
+ "chrono",
+ "chrono-tz",
+ "http",
+ "oauth2-passkey 0.2.0",
+ "serde",
+ "serde_json",
+ "subtle",
+ "tracing",
+ "urlencoding",
+]
+
+[[package]]
+name = "oauth2-passkey-axum"
+version = "0.2.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -1822,7 +1875,7 @@ dependencies = [
  "chrono-tz",
  "dotenvy",
  "http",
- "oauth2-passkey",
+ "oauth2-passkey 0.2.1-dev",
  "serde",
  "serde_json",
  "subtle",

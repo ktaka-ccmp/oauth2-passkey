@@ -145,8 +145,8 @@ If you're not using the `oauth2_passkey_axum` crate, you'll need to implement th
 
 ```rust
 use oauth2_passkey::{
-    coordination::oauth2::{oauth2_start_core, oauth2_callback_core},
-    session::main::page_session_token::verify_page_session_token,
+    prepare_oauth2_auth_request,
+    verify_page_session_token,
 };
 
 // OAuth2 start handler for account linking
@@ -159,15 +159,20 @@ async fn oauth2_start_linking(
     if params.get("mode") == Some(&"add_to_user".to_string()) {
 
         // Verify page session token for session boundary protection
-        let context = params.get("context");
+        let context = params.get("context");  // Option<&String>
         if let Err(e) = verify_page_session_token(&headers, context).await {
             return Err((StatusCode::BAD_REQUEST, format!("Invalid session context: {}", e)));
         }
 
         // Continue with OAuth2 flow in add_to_user mode
-        match oauth2_start_core(&headers, Some("google"), Some("add_to_user"), context).await {
-            Ok(redirect_url) => {
-                Ok(Redirect::to(&redirect_url))
+        // Use prepare_oauth2_auth_request to generate the authorization URL
+        // Returns (auth_url, response_headers) tuple
+        match prepare_oauth2_auth_request(headers, Some("add_to_user")).await {
+            Ok((auth_url, response_headers)) => {
+                // Build response with redirect and set cookies from response_headers
+                let mut response = Redirect::to(&auth_url).into_response();
+                response.headers_mut().extend(response_headers);
+                Ok(response)
             }
             Err(e) => {
                 Err((StatusCode::INTERNAL_SERVER_ERROR, format!("OAuth2 start failed: {}", e)))
@@ -179,6 +184,10 @@ async fn oauth2_start_linking(
     }
 }
 ```
+
+> **Note**: The callback is handled by `get_authorized_core()` (for GET requests with `response_mode=query`)
+> or `post_authorized_core()` (for POST requests with `response_mode=form_post`).
+> These are automatically routed by the `oauth2_passkey_axum` crate.
 
 ## Complete Example: User Settings Page
 
@@ -194,7 +203,7 @@ use axum::{
     response::{Html, Json},
     Extension,
 };
-use oauth2_passkey::{generate_page_session_token, list_accounts_core};
+use oauth2_passkey::{generate_page_session_token, list_accounts_core, UserId};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
@@ -211,7 +220,10 @@ async fn user_settings(auth_user: AuthUser) -> Result<Html<String>, (StatusCode,
     let page_session_token = generate_page_session_token(&auth_user.csrf_token);
 
     // Get user's linked OAuth2 accounts
-    let oauth2_accounts = list_accounts_core(&auth_user.id)
+    // UserId::new() returns Result, so we need to handle the error
+    let user_id = UserId::new(auth_user.id.clone())
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Invalid user ID: {}", e)))?;
+    let oauth2_accounts = list_accounts_core(user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to get accounts: {}", e)))?;
 

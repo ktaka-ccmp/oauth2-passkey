@@ -23,7 +23,7 @@ Users authenticate with OAuth2 or Passkey, then receive a secure session cookie 
 
 ```toml
 [dependencies]
-oauth2-passkey-axum = "0.1"
+oauth2-passkey-axum = "0.2"
 ```
 
 **2. Set your environment variables:**
