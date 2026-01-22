@@ -5,26 +5,7 @@ This guide walks you through running the demo applications to quickly experience
 ## Prerequisites
 
 - **Rust toolchain**: Latest stable version
-- **Docker** (optional): For PostgreSQL and Redis in production setups
-- **Google OAuth2 credentials**: Required for OAuth2 demos (demo-both, demo-oauth2)
-- **Modern web browser**: Chrome, Firefox, Safari, or Edge with WebAuthn support
-- **HTTPS**: Required for WebAuthn/Passkey functionality
-
-## Installation
-
-Add the library as a dependency in your `Cargo.toml`:
-
-```toml
-[dependencies]
-oauth2-passkey = "0.2"
-oauth2-passkey-axum = "0.2"
-```
-
-For building with all features (required for Axum integration):
-
-```bash
-cargo build --manifest-path oauth2_passkey_axum/Cargo.toml --all-features
-```
+- **Web browser**: Chrome (recommended, fewest issues), Android Chrome, or iOS Safari
 
 ## Running Demo Applications
 
@@ -42,7 +23,24 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
 
 #### Setup
 
-1. **Environment Setup**
+1. **Choose Your ORIGIN**
+
+   Decide how you'll access the application:
+   - **localhost** (default): `https://localhost:3443` - for local desktop testing
+   - **tunnel** (mobile testing): Use [Cloudflare Tunnel](../guides/tunneling.md) to get a public URL like `https://random-name.trycloudflare.com`
+
+   > **Note**: If using a tunnel, set it up first to get your URL before proceeding.
+
+2. **Get Google OAuth2 Credentials**
+
+   1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   2. Create OAuth2 credentials (Web application)
+   3. Add `{YOUR_ORIGIN}/o2p/oauth2/authorized` to "Authorized redirect URIs"
+      - For localhost: `https://localhost:3443/o2p/oauth2/authorized`
+      - For tunnel: `https://random-name.trycloudflare.com/o2p/oauth2/authorized`
+   4. Copy the Client ID and Client Secret
+
+3. **Environment Setup**
 
    ```bash
    cd demo-both
@@ -52,10 +50,10 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
    Edit `.env` with your configuration:
 
    ```bash
-   # Required: Base URL of your application
+   # Required: Base URL of your application (must match step 1)
    ORIGIN='https://localhost:3443'
 
-   # Required: Google OAuth2 credentials
+   # Required: Google OAuth2 credentials (from step 2)
    OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
    OAUTH2_GOOGLE_CLIENT_SECRET='your-client-secret'
 
@@ -68,13 +66,7 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
    GENERIC_CACHE_STORE_URL='memory'
    ```
 
-2. **Get Google OAuth2 Credentials**
-
-   1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   2. Create OAuth2 credentials (Web application)
-   3. Add `https://localhost:3443/o2p/oauth2/authorized` to "Authorized redirect URIs"
-
-3. **Run the Demo**
+4. **Run the Demo**
 
    ```bash
    cargo run
@@ -82,17 +74,17 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
 
    The application starts on:
    - **HTTPS**: Port 3443 (access as `https://localhost:3443`)
-   - **HTTP**: Port 3001 (for use behind HTTPS proxies)
+   - **HTTP**: Port 3001 (for use behind HTTPS proxies or tunnels)
 
-4. **Try the Demo**
+5. **Try the Demo**
 
-   1. Visit `https://localhost:3443`
+   1. Visit your ORIGIN URL (e.g., `https://localhost:3443` or your tunnel URL)
    2. Create a user with Google OAuth2 or Passkey
-   3. Navigate to the user summary page: `https://localhost:3443/o2p/user/summary`
+   3. Navigate to the user summary page: `{YOUR_ORIGIN}/o2p/user/summary`
    4. Add new Passkey or OAuth2 account
    5. Log out and sign in with a different method
    6. Explore credential linking and protected pages (p1-p6)
-   7. Admin features: The first user gets admin privileges at `https://localhost:3443/o2p/admin/list_users`
+   7. Admin features: The first user gets admin privileges at `{YOUR_ORIGIN}/o2p/admin/list_users`
 
 ### demo-oauth2 (OAuth2 Only)
 
@@ -105,20 +97,35 @@ A focused example demonstrating Google OAuth2 authentication.
 
 #### Setup
 
-1. **Environment Setup**
+1. **Choose Your ORIGIN**
+
+   Decide how you'll access the application:
+   - **localhost** (default): `https://localhost:3443` - for local desktop testing
+   - **tunnel** (mobile testing): Use [Cloudflare Tunnel](../guides/tunneling.md) to get a public URL
+
+   > **Note**: If using a tunnel, set it up first to get your URL before proceeding.
+
+2. **Get Google OAuth2 Credentials**
+
+   1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   2. Create OAuth2 credentials (Web application)
+   3. Add `{YOUR_ORIGIN}/o2p/oauth2/authorized` to "Authorized redirect URIs"
+   4. Copy the Client ID and Client Secret
+
+3. **Environment Setup**
 
    ```bash
    cd demo-oauth2
    cp ../dot.env.example .env
    ```
 
-   Edit `.env` with your Google OAuth2 credentials:
+   Edit `.env` with your configuration:
 
    ```bash
-   # Required: Base URL of your application
+   # Required: Base URL of your application (must match step 1)
    ORIGIN='https://localhost:3443'
 
-   # Required: Google OAuth2 credentials
+   # Required: Google OAuth2 credentials (from step 2)
    OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
    OAUTH2_GOOGLE_CLIENT_SECRET='your-client-secret'
 
@@ -131,23 +138,19 @@ A focused example demonstrating Google OAuth2 authentication.
    GENERIC_CACHE_STORE_URL='memory://demo'
    ```
 
-2. **Get Google OAuth2 Credentials**
-
-   1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   2. Create OAuth2 credentials (Web application)
-   3. Add `https://localhost:3443/o2p/oauth2/authorized` to "Authorized redirect URIs"
-
-3. **Run the Demo**
+4. **Run the Demo**
 
    ```bash
    cargo run
    ```
 
-   The application starts on `https://localhost:3443`
+   The application starts on:
+   - **HTTPS**: Port 3443 (access as `https://localhost:3443`)
+   - **HTTP**: Port 3001 (for use behind HTTPS proxies or tunnels)
 
-4. **Try the Demo**
+5. **Try the Demo**
 
-   1. Visit `https://localhost:3443`
+   1. Visit your ORIGIN URL (e.g., `https://localhost:3443` or your tunnel URL)
    2. Click "Sign in with Google"
    3. Navigate to protected pages and view your profile
 
@@ -162,7 +165,15 @@ A focused example demonstrating WebAuthn/Passkey (FIDO2) passwordless authentica
 
 #### Setup
 
-1. **Environment Setup**
+1. **Choose Your ORIGIN**
+
+   Decide how you'll access the application:
+   - **localhost** (default): `https://localhost:3443` - for local desktop testing
+   - **tunnel** (mobile testing): Use [Cloudflare Tunnel](../guides/tunneling.md) to get a public URL
+
+   > **Note**: If using a tunnel, set it up first to get your URL before proceeding.
+
+2. **Environment Setup**
 
    ```bash
    cd demo-passkey
@@ -172,7 +183,7 @@ A focused example demonstrating WebAuthn/Passkey (FIDO2) passwordless authentica
    Edit `.env` with your configuration:
 
    ```bash
-   # Required: Base URL of your application (MUST be HTTPS)
+   # Required: Base URL of your application (must match step 1)
    ORIGIN='https://localhost:3443'
 
    # Database (SQLite for easy setup)
@@ -182,23 +193,21 @@ A focused example demonstrating WebAuthn/Passkey (FIDO2) passwordless authentica
    # Cache (in-memory for demo)
    GENERIC_CACHE_STORE_TYPE=memory
    GENERIC_CACHE_STORE_URL='memory://demo'
-
-   # Optional: OAuth2 credentials (not used in this demo)
-   # OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
-   # OAUTH2_GOOGLE_CLIENT_SECRET='your-client-secret'
    ```
 
-2. **Run the Demo**
+3. **Run the Demo**
 
    ```bash
    cargo run
    ```
 
-   The application starts on `https://localhost:3443`
+   The application starts on:
+   - **HTTPS**: Port 3443 (access as `https://localhost:3443`)
+   - **HTTP**: Port 3001 (for use behind HTTPS proxies or tunnels)
 
-3. **Try the Demo**
+4. **Try the Demo**
 
-   1. Visit `https://localhost:3443`
+   1. Visit your ORIGIN URL (e.g., `https://localhost:3443` or your tunnel URL)
    2. Click "Register with Passkey"
       - Enter a username
       - Follow browser prompts to create a passkey
@@ -242,17 +251,6 @@ To start PostgreSQL and Redis with Docker:
 ```bash
 cd db && docker compose up -d
 ```
-
-### Using Cloudflared Tunnel
-
-For public HTTPS access without self-signed certificates:
-
-1. Set up a cloudflared tunnel pointing to `https://localhost:3443`
-2. Update `.env`:
-   ```bash
-   ORIGIN='https://your-tunnel-domain.example.com'
-   ```
-3. Update Google OAuth2 redirect URI to `https://your-tunnel-domain.example.com/o2p/oauth2/authorized`
 
 ## Troubleshooting
 

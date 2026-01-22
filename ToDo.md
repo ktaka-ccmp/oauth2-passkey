@@ -9,6 +9,7 @@
 
 ### Medium Priority
 
+- **Bearer Token Support**: Add configurable session authentication mode (`SESSION_AUTH_MODE`) supporting cookie-only, bearer-only, or both. Enables API/mobile client authentication alongside browser-based cookie auth. See detailed implementation plan in `docs/src/archived/design-proposals/bearer-token-support.md`.
 - **Expand OAuth2 Provider Support**: Add GitHub, Apple, Microsoft providers
 - **Add Database Support**: MySQL/MariaDB support for more deployment options
 - **Improve Demo Applications**: Custom login UI and user attribute extension examples

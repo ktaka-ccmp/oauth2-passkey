@@ -136,33 +136,7 @@ fetch oauth2.js starts=const oauth2 = (function()...
 - Works with iOS Safari - No ITP issues
 - Free - Quick tunnels require no account
 
-#### Cloudflare Tunnel Quick Start
-
-1. Install cloudflared:
-
-```bash
-# Ubuntu/Debian
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
-echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared jammy main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
-sudo apt update && sudo apt install cloudflared
-
-# macOS
-brew install cloudflared
-```
-
-1. Start your local server:
-
-```bash
-cd demo-both && cargo run
-```
-
-1. Create a quick tunnel:
-
-```bash
-cloudflared tunnel --url http://localhost:3001
-```
-
-1. Access the generated URL on your iOS device.
+For setup instructions, see [Development Tunneling Guide](../guides/tunneling.md).
 
 ### ngrok Workarounds
 

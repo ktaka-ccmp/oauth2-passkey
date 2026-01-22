@@ -59,7 +59,9 @@ cargo run
 The application will start on:
 
 - **HTTPS**: 3443 (access as <https://localhost:3443> for testing with self-signed certs)
-- **HTTP**: 3001 (for use behind HTTPS proxies like ngrok)
+- **HTTP**: 3001 (for use behind HTTPS proxies or tunnels)
+
+**For mobile testing**, see the [Development Tunneling Guide](../docs/src/guides/tunneling.md).
 
 Successful startup looks like:
 
@@ -150,17 +152,6 @@ demo-both/
 
 - **Logs**: Check console output for detailed error messages
 - **Self-signed certificates**: Browser will show security warning, click "Advanced" → "Proceed"
-
-### Using Cloudflared Tunnel
-
-For public HTTPS access without self-signed certificates:
-
-1. Set up a cloudflared tunnel pointing to `https://localhost:3443`
-2. Update `.env`:
-   ```bash
-   ORIGIN='https://your-tunnel-domain.example.com'
-   ```
-3. Update Google OAuth2 redirect URI to `https://your-tunnel-domain.example.com/o2p/oauth2/authorized`
 
 ## Configuration Options
 

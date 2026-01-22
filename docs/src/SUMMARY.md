@@ -18,6 +18,7 @@
 - [Configuration](integration/configuration.md)
 - [OAuth2 Implementation](integration/oauth2.md)
 - [Passkey Implementation](integration/passkey.md)
+- [Development Tunneling](guides/tunneling.md)
 
 ---
 
@@ -58,6 +59,7 @@
 # Part 7: Maintainer Guide
 
 - [Development](maintainer/development.md)
+- [CI/CD](maintainer/ci-cd.md)
 - [Release Process](maintainer/release.md)
 
 ---
@@ -90,6 +92,7 @@
       - [Comprehensive Assessment](archived/testing-assessments/assessment_202506/ComprehensiveAssessment.md)
       - [Axum Test Quality](archived/testing-assessments/assessment_202506/OAuth2PasskeyAxumTestQualityAssessment.md)
   - [Design Proposals]()
+    - [Bearer Token Support](archived/design-proposals/bearer-token-support.md)
     - [Cache Expiration Simplification](archived/design-proposals/cache-expiration-system-simplification.md)
     - [Implementing Tracing](archived/design-proposals/implementing-tracing.md)
     - [Integration Testing Plan](archived/design-proposals/integration-testing-plan.md)
