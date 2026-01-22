@@ -58,7 +58,6 @@ wait_for_crates_io() {
 
 get_latest_version() {
     local crate_name=$1
-#   echo "🔍 Fetching latest version of $crate_name from crates.io"
 
     latest_version=$(cargo search "$crate_name" | grep "^$crate_name " | awk '{print $3}' | tr -d '"')
 
@@ -67,11 +66,10 @@ get_latest_version() {
         exit 1
     fi
 
-#    echo "✅ Latest version of $crate_name is $latest_version"
     echo "$latest_version"
 }
 
-increment_version() {
+increment_patch_version() {
     local latest_version=$1
 
     if [[ "$latest_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
@@ -85,6 +83,30 @@ increment_version() {
         echo "$new_version"
     else
         echo "❌ Invalid version format: $latest_version"
+        exit 1
+    fi
+}
+
+increment_dev_version() {
+    local version=$1
+
+    if [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+        major=${BASH_REMATCH[1]}
+        minor=${BASH_REMATCH[2]}
+        patch=${BASH_REMATCH[3]}
+
+        new_patch=$((patch + 1))
+        echo "$major.$minor.$new_patch-dev"
+    else
+        echo "❌ Invalid version format: $version"
+        exit 1
+    fi
+}
+
+validate_version() {
+    local version=$1
+    if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "❌ Invalid version format: $version (expected: X.Y.Z)"
         exit 1
     fi
 }
@@ -106,7 +128,7 @@ set_workspace_version() {
 
 set_crate_version() {
     local version=$1
-    echo "📦 Setting crate version to $version"
+    echo "📦 Setting oauth2-passkey dependency to $version"
 
     # Set oauth2-passkey dependency to specific version for publishing
     sed -i "s/^oauth2-passkey = .*/oauth2-passkey = \"$version\"/" oauth2_passkey_axum/Cargo.toml || {
@@ -139,7 +161,7 @@ revert_crate_version() {
 
 update_tag() {
     local version=$1
-    echo "🔖 Updating tag to v$version"
+    echo "🔖 Creating tag v$version"
 
     if git rev-parse "v$version" >/dev/null 2>&1; then
         echo "❌ Tag v$version already exists. Please delete it first."
@@ -158,36 +180,76 @@ update_tag() {
     echo "📤 Pushed tag v$version to origin"
 }
 
-# Check if version is provided
-if [ -z "$1" ]; then
-    echo "Usage: $0 [--exec|-e|--dry-run|-d|-n]"
-    echo "Example: $0 -e"
+show_usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -e, --exec       Execute the release (publish to crates.io)"
+    echo "  -d, -n, --dry-run  Dry run mode (no changes pushed or published)"
+    echo "  -v, --version VERSION  Specify release version (e.g., 0.2.0)"
+    echo "                         If not specified, auto-increments patch version"
+    echo ""
+    echo "Examples:"
+    echo "  $0 -d              # Dry run with auto-incremented patch version"
+    echo "  $0 -d -v 0.2.0     # Dry run with version 0.2.0"
+    echo "  $0 -e -v 0.2.0     # Release version 0.2.0"
     exit 1
-fi
+}
 
-latest=$(get_latest_version oauth2-passkey-axum)
-release=$(increment_version $latest)
-next=$(increment_version $release)-dev
-
-VERSION=$release
+# Parse arguments
 DRY_RUN=false
-if [[ "$1" == "--dry-run" || "$1" == "-d" || "$1" == "-n" ]]; then
-    DRY_RUN=true
-    echo "🧪 Dry run mode enabled. No changes will be pushed or published."
-elif [[ "$1" == "--exec" || "$1" == "-e" ]]; then
-    DRY_RUN=false
-    echo "🚀 Execution mode enabled. Changes will be pushed and published."
+CUSTOM_VERSION=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -e|--exec)
+            DRY_RUN=false
+            shift
+            ;;
+        -d|-n|--dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        -v|--version)
+            CUSTOM_VERSION="$2"
+            shift 2
+            ;;
+        -h|--help)
+            show_usage
+            ;;
+        *)
+            echo "❌ Unknown option: $1"
+            show_usage
+            ;;
+    esac
+done
+
+# Determine version
+latest=$(get_latest_version oauth2-passkey-axum)
+echo "📊 Current crates.io version: $latest"
+
+if [ -n "$CUSTOM_VERSION" ]; then
+    validate_version "$CUSTOM_VERSION"
+    VERSION="$CUSTOM_VERSION"
+    echo "📋 Using specified version: $VERSION"
 else
-    echo "❌ Invalid option. Use --dry-run or --exec."
-    exit 1
+    VERSION=$(increment_patch_version "$latest")
+    echo "📋 Auto-incremented patch version: $VERSION"
 fi
 
-echo "📋 Releasing version: $VERSION"
+next=$(increment_dev_version "$VERSION")
+echo "📋 Next development version: $next"
+
+if [ "$DRY_RUN" = true ]; then
+    echo "🧪 Dry run mode enabled. No changes will be pushed or published."
+else
+    echo "🚀 Execution mode enabled. Changes will be pushed and published."
+fi
 
 check_git_clean
 check_branch
 
-git checkout "release-$VERSION" || {
+git checkout "release-$VERSION" 2>/dev/null || {
     echo "Creating new branch release-$VERSION"
     git checkout -b "release-$VERSION" || {
         echo "❌ Failed to create and switch to release branch release-$VERSION"
@@ -200,23 +262,36 @@ git rebase master || {
 }
 
 if [ "$DRY_RUN" = true ]; then
+    echo ""
     echo "🧪 Dry run:"
+    echo "==========="
 
     set_workspace_version "$VERSION"
 
-    echo "cargo publish -p oauth2-passkey -n"
-    cargo publish -p oauth2-passkey -n --allow-dirty
+    echo ""
+    echo "Step 1: cargo publish -p oauth2-passkey --dry-run"
+    cargo publish -p oauth2-passkey --dry-run --allow-dirty
 
-    set_crate_version "$latest"
-    echo "cargo publish -p oauth2-passkey-axum -n"
-    cargo publish -p oauth2-passkey-axum -n --allow-dirty
+    set_crate_version "$VERSION"
 
-    set_workspace_version "$release"-dev
+    echo ""
+    echo "Step 2: cargo publish -p oauth2-passkey-axum --dry-run"
+    cargo publish -p oauth2-passkey-axum --dry-run --allow-dirty
+
+    echo ""
+    echo "🔄 Reverting changes..."
+    set_workspace_version "$next"
     revert_crate_version
+
+    echo ""
+    echo "✅ Dry run completed successfully!"
+    echo ""
+    echo "To execute the release, run:"
+    echo "  $0 -e -v $VERSION"
 else
     set_workspace_version "$VERSION"
 
-    git add Cargo.toml && git commit -m "Set workspace version for release $VERSION" || {
+    git add Cargo.toml && git commit -m "chore: set version to $VERSION for release" || {
         echo "❌ Failed to stage or commit workspace version changes"
         exit 1
     }
@@ -242,8 +317,8 @@ else
 
     set_crate_version "$VERSION"
 
-    git add oauth2_passkey_axum/Cargo.toml && git commit -m "Set workspace version for release $VERSION" || {
-        echo "❌ Failed to stage or commit workspace version changes"
+    git add oauth2_passkey_axum/Cargo.toml && git commit -m "chore: set oauth2-passkey dependency to $VERSION" || {
+        echo "❌ Failed to stage or commit crate version changes"
         exit 1
     }
 
@@ -267,7 +342,7 @@ else
     set_workspace_version "$next"
     revert_crate_version
 
-    git add Cargo.toml oauth2_passkey_axum/Cargo.toml && git commit -m "Prepare for next development version $next" || {
+    git add Cargo.toml oauth2_passkey_axum/Cargo.toml && git commit -m "chore: prepare for next development version $next" || {
         echo "❌ Failed to stage or commit next development version changes"
         exit 1
     }

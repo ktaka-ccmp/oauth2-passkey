@@ -157,6 +157,36 @@ Environment variables (see `dot.env.example`):
 
 4. For debugging authentication issues, check the coordination layer logs first
 
+## Release Process
+
+### Quick Reference
+```bash
+# 1. Merge dev -> master via PR first, then:
+git checkout master
+git pull origin master
+
+# 2. Dry-run to verify
+./utils/release.sh -d -v 0.2.0
+
+# 3. Execute release
+./utils/release.sh -e -v 0.2.0
+```
+
+### What the Script Does
+- Creates `release-X.Y.Z` branch from master
+- Sets version in `Cargo.toml`
+- Publishes `oauth2-passkey` to crates.io
+- Waits for crates.io availability
+- Updates dependency, publishes `oauth2-passkey-axum`
+- Creates git tag `vX.Y.Z`
+- Sets next dev version (`X.Y.(Z+1)-dev`)
+- Creates PR back to master
+
+### Version Guidelines
+- **Patch** (0.1.3 -> 0.1.4): Bug fixes only
+- **Minor** (0.1.x -> 0.2.0): New features or breaking changes
+- **Major** (0.x -> 1.0): Stable API release
+
 ## Commit Message Guidelines
 
 1. **Use ASCII characters only** for better copy-paste compatibility:
