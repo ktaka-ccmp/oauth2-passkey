@@ -1,7 +1,7 @@
 # oauth2-passkey-axum
 
 [![CI](https://github.com/ktaka-ccmp/oauth2-passkey/workflows/CI/badge.svg)](https://github.com/ktaka-ccmp/oauth2-passkey/actions/workflows/ci.yml)
-[![Coverage](https://codecov.io/gh/ktaka-ccmp/oauth2-passkey/branch/main/graph/badge.svg)](https://codecov.io/gh/ktaka-ccmp/oauth2-passkey)
+[![Coverage](https://codecov.io/gh/ktaka-ccmp/oauth2-passkey/branch/master/graph/badge.svg)](https://codecov.io/gh/ktaka-ccmp/oauth2-passkey)
 [![Crates.io](https://img.shields.io/crates/v/oauth2-passkey-axum.svg)](https://crates.io/crates/oauth2-passkey-axum)
 [![Docs.rs](https://docs.rs/oauth2-passkey-axum/badge.svg)](https://docs.rs/oauth2-passkey-axum)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
@@ -42,7 +42,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-oauth2-passkey-axum = "0.1"
+oauth2-passkey-axum = "0.2"
 ```
 
 ### Prepare .env
@@ -135,7 +135,7 @@ Disable features you don't need:
 
 ```toml
 [dependencies]
-oauth2-passkey-axum = { version = "0.1", default-features = false, features = ["user-ui"] }
+oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["user-ui"] }
 ```
 
 ## Available Routes

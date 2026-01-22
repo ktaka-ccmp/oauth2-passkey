@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-01-22
+
 ### Security
 
 - **CRITICAL FIX**: Fixed passkey registration vulnerability where users were created before challenge validation, preventing orphaned user records on validation failures
@@ -130,7 +132,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full WebAuthn specification compliance
 - Comprehensive security documentation and best practices guide
 
-[Unreleased]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.1.3...v0.2.0
+[0.1.3]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ktaka-ccmp/oauth2-passkey/releases/tag/v0.1.0

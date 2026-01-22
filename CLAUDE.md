@@ -187,6 +187,40 @@ git pull origin master
 - **Minor** (0.1.x -> 0.2.0): New features or breaking changes
 - **Major** (0.x -> 1.0): Stable API release
 
+### Post-Release Steps
+
+After the release script completes:
+
+```bash
+# 1. Verify on crates.io
+#    - https://crates.io/crates/oauth2-passkey
+#    - https://crates.io/crates/oauth2-passkey-axum
+
+# 2. Merge release branch to master via GitHub PR
+#    - The script creates a PR automatically (requires gh CLI)
+#    - Or create manually: release-X.Y.Z -> master
+
+# 3. Update local master
+git checkout master
+git pull origin master
+
+# 4. Sync dev branch with master
+git checkout dev
+git rebase master
+
+# 5. Push dev branch (force required after rebase)
+git push origin dev --force-with-lease
+
+# 6. Clean up release branch (optional, if not auto-deleted)
+git branch -d release-X.Y.Z
+git push origin --delete release-X.Y.Z
+```
+
+**Note on `--force-with-lease`**:
+- Safer than `--force`: fails if remote has commits you haven't fetched
+- Required after rebase because commit history is rewritten
+- Prevents accidentally overwriting others' work on the branch
+
 ## Commit Message Guidelines
 
 1. **Use ASCII characters only** for better copy-paste compatibility:

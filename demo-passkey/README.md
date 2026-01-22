@@ -28,7 +28,7 @@ Edit `.env` with your configuration:
 
 ```bash
 # Required: Base URL of your application (MUST be HTTPS)
-ORIGIN='https://localhost:3000'
+ORIGIN='https://localhost:3443'
 
 # Database (SQLite for easy setup)
 GENERIC_DATA_STORE_TYPE=sqlite
@@ -53,7 +53,7 @@ The application will start on <https://localhost:3443>
 
 ### 3. Try the Demo
 
-1. **Visit**: <https://localhost:3000>
+1. **Visit**: <https://localhost:3443>
 2. **Register**: Click "Register with Passkey"
    - Enter a username
    - Follow browser prompts to create a passkey
@@ -98,7 +98,7 @@ demo-passkey/
 
 4. **"Origin mismatch" error**
    - Ensure `ORIGIN` in `.env` matches the URL exactly
-   - Use `https://localhost:3000` (not `127.0.0.1`)
+   - Use `https://localhost:3443` (not `127.0.0.1`)
 
 ### Development Tips
 
@@ -106,3 +106,14 @@ demo-passkey/
 - **Self-signed Certificates**: Browser will show security warning, proceed anyway
 - **Database**: SQLite file `auth.db` stores user credentials
 - **Reset**: Delete `auth.db` to clear all registered credentials
+
+### Using Cloudflared Tunnel
+
+For public HTTPS access without self-signed certificates:
+
+1. Set up a cloudflared tunnel pointing to `https://localhost:3443`
+2. Update `.env`:
+   ```bash
+   ORIGIN='https://your-tunnel-domain.example.com'
+   ```
+3. Access via your tunnel domain instead of localhost

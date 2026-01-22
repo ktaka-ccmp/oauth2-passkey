@@ -27,7 +27,7 @@ Edit `.env` with your Google OAuth2 credentials:
 
 ```bash
 # Required: Base URL of your application
-ORIGIN='https://localhost:3000'
+ORIGIN='https://localhost:3443'
 
 # Required: Google OAuth2 credentials
 OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
@@ -103,3 +103,14 @@ demo-oauth2/
 - **Logs**: Check console output for detailed error messages
 - **Database**: SQLite file `auth.db` stores user sessions
 - **Reset**: Delete `auth.db` and restart to clear all sessions
+
+### Using Cloudflared Tunnel
+
+For public HTTPS access without self-signed certificates:
+
+1. Set up a cloudflared tunnel pointing to `https://localhost:3443`
+2. Update `.env`:
+   ```bash
+   ORIGIN='https://your-tunnel-domain.example.com'
+   ```
+3. Update Google OAuth2 redirect URI to `https://your-tunnel-domain.example.com/o2p/oauth2/authorized`
