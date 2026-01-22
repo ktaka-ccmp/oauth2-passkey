@@ -2,15 +2,18 @@
 
 ## Overview
 
-The following is a blueprint of the architecture of this application. It reflects the current state of the application as of March 2025.
+The following is a blueprint of the architecture of this application. It reflects the current state of the application as of January 2026.
 
 ## Current Components
 
-- **demo-integrated**: Example Axum application that uses OAuth2 and passkey authentication
+- **demo-both**: Example Axum application that uses both OAuth2 and passkey authentication
+- **demo-oauth2**: Example Axum application using OAuth2-only authentication
+- **demo-passkey**: Example Axum application using passkey-only authentication
 - **oauth2_passkey_axum**: Provides OAuth2 and passkey authentication handlers for Axum applications
   - Includes routers for OAuth2, passkey, and user summary endpoints
   - Handles HTTP-specific concerns like request/response handling
 - **oauth2_passkey**: Core authentication coordination library
+  - **config**: Environment variable configuration management
   - **coordination**: Central coordination layer that orchestrates authentication flows
   - **oauth2**: OAuth2 authentication operations, stores OAuth2 accounts
   - **passkey**: Passkey/WebAuthn operations, stores passkey credentials

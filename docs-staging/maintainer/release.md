@@ -26,25 +26,33 @@ oauth2-passkey-axum = { path = "./oauth2_passkey_axum" }
 
 ```toml
 # oauth2-passkey-axum temporarily uses published version
-oauth2-passkey = "0.1.2"  # published version
+oauth2-passkey = "0.2.x"  # published version
 ```
 
 ## Release Methods
 
 We provide two methods for releasing: automated and manual.
 
-### Method 1: Automated Release (Recommended)
+### Automated Release (Recommended)
 
 Use the automated release script for a streamlined process:
 
 ```bash
-./utils/release.sh <version>
+# Dry-run to verify (recommended first)
+./utils/release.sh -d -v <version>
+
+# Execute the release
+./utils/release.sh -e -v <version>
 ```
 
 **Example:**
 
 ```bash
-./utils/release.sh 0.1.2
+# Verify first
+./utils/release.sh -d -v 0.2.1
+
+# Then execute
+./utils/release.sh -e -v 0.2.1
 ```
 
 **What it does:**
@@ -64,15 +72,9 @@ Use the automated release script for a streamlined process:
 - Valid `cargo` login credentials for crates.io
 - Internet connection for crates.io verification
 
-### Method 2: Manual Release Process
+### Manual Release Process (Alternative)
 
-For more control or troubleshooting, use the manual process:
-
-```bash
-./utils/release-manual.sh [version]
-```
-
-This script provides step-by-step instructions you can follow manually.
+For more control or troubleshooting, you can follow the manual process:
 
 **Manual Steps:**
 
@@ -104,7 +106,7 @@ This script provides step-by-step instructions you can follow manually.
    ```bash
    # Edit oauth2_passkey_axum/Cargo.toml
    # Change: oauth2-passkey = { workspace = true }
-   # To:     oauth2-passkey = "0.1.2"
+   # To:     oauth2-passkey = "0.2.x"  # Use the version you're releasing
    ```
 
 5. **Release oauth2-passkey-axum**
@@ -120,7 +122,7 @@ This script provides step-by-step instructions you can follow manually.
 
    ```bash
    # Edit oauth2_passkey_axum/Cargo.toml
-   # Change: oauth2-passkey = "0.1.2"
+   # Change: oauth2-passkey = "0.2.x"
    # Back to: oauth2-passkey = { workspace = true }
    ```
 
@@ -128,8 +130,8 @@ This script provides step-by-step instructions you can follow manually.
 
    ```bash
    git add .
-   git commit -m "chore: release v0.1.2"
-   git tag v0.1.2
+   git commit -m "chore: release vX.Y.Z"
+   git tag vX.Y.Z
    git push origin main --tags
    ```
 
@@ -286,8 +288,7 @@ cargo owner --list oauth2-passkey-axum
 
 ## Related Files
 
-- `utils/release.sh` - Automated release script
-- `utils/release-manual.sh` - Manual release guide
+- `utils/release.sh` - Automated release script (use `-d` for dry-run, `-e` for execute)
 - `oauth2_passkey/Cargo.toml` - Core library configuration
 - `oauth2_passkey_axum/Cargo.toml` - Axum integration configuration
 - `Cargo.toml` - Workspace configuration
