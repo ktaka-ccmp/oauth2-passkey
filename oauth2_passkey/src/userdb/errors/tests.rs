@@ -26,7 +26,7 @@ fn test_from_serde_json_error() {
 #[test]
 fn test_from_redis_error() {
     // Create a redis::RedisError
-    let redis_error = redis::RedisError::from((redis::ErrorKind::IoError, "Connection refused"));
+    let redis_error = redis::RedisError::from((redis::ErrorKind::Io, "Connection refused"));
 
     // Convert to UserError
     let user_error = UserError::from(redis_error);
