@@ -221,6 +221,10 @@ git push origin --delete release-X.Y.Z
 - Required after rebase because commit history is rewritten
 - Prevents accidentally overwriting others' work on the branch
 
+## Session Snapshots
+
+Session work snapshots are stored in `.claude/sessions/` for transferring context between machines.
+
 ## Commit Message Guidelines
 
 1. **Use ASCII characters only** for better copy-paste compatibility:
