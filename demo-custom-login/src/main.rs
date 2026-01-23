@@ -112,7 +112,7 @@ struct TemplatePasskey {
     credential_id: String,
     user_name: String,
     user_display_name: String,
-    user_handle: String,
+    // user_handle: String, // TODO: use in template later
     created_at: String,
 }
 
@@ -122,7 +122,7 @@ impl From<&PasskeyCredential> for TemplatePasskey {
             credential_id: cred.credential_id.clone(),
             user_name: cred.user.name.clone(),
             user_display_name: cred.user.display_name.clone(),
-            user_handle: cred.user.user_handle.clone(),
+            // user_handle: cred.user.user_handle.clone(),
             created_at: cred.created_at.format("%Y-%m-%d %H:%M").to_string(),
         }
     }

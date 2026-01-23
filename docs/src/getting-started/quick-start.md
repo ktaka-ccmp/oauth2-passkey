@@ -86,134 +86,15 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
    6. Explore credential linking and protected pages (p1-p6)
    7. Admin features: The first user gets admin privileges at `{YOUR_ORIGIN}/o2p/admin/list_users`
 
-### demo-oauth2 (OAuth2 Only)
+### Other Demo Applications
 
-A focused example demonstrating Google OAuth2 authentication.
+| Demo | Description | Notes |
+|------|-------------|-------|
+| **demo-oauth2** | OAuth2-only authentication | Simpler setup, no passkey |
+| **demo-passkey** | Passkey-only authentication | No Google credentials needed |
+| **demo-custom-login** | Custom login/summary pages | See [Custom Pages](../integration/custom-pages.md) |
 
-**Features:**
-- Google OAuth2/OIDC authentication flow
-- Session management with logout
-- Protected routes requiring authentication
-
-#### Setup
-
-1. **Choose Your ORIGIN**
-
-   Decide how you'll access the application:
-   - **localhost** (default): `https://localhost:3443` - for local desktop testing
-   - **tunnel** (mobile testing): Use [Cloudflare Tunnel](../guides/tunneling.md) to get a public URL
-
-   > **Note**: If using a tunnel, set it up first to get your URL before proceeding.
-
-2. **Get Google OAuth2 Credentials**
-
-   1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   2. Create OAuth2 credentials (Web application)
-   3. Add `{YOUR_ORIGIN}/o2p/oauth2/authorized` to "Authorized redirect URIs"
-   4. Copy the Client ID and Client Secret
-
-3. **Environment Setup**
-
-   ```bash
-   cd demo-oauth2
-   cp ../dot.env.example .env
-   ```
-
-   Edit `.env` with your configuration:
-
-   ```bash
-   # Required: Base URL of your application (must match step 1)
-   ORIGIN='https://localhost:3443'
-
-   # Required: Google OAuth2 credentials (from step 2)
-   OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
-   OAUTH2_GOOGLE_CLIENT_SECRET='your-client-secret'
-
-   # Database (SQLite for easy setup)
-   GENERIC_DATA_STORE_TYPE=sqlite
-   GENERIC_DATA_STORE_URL='sqlite:./auth.db'
-
-   # Cache (in-memory for demo)
-   GENERIC_CACHE_STORE_TYPE=memory
-   GENERIC_CACHE_STORE_URL='memory://demo'
-   ```
-
-4. **Run the Demo**
-
-   ```bash
-   cargo run
-   ```
-
-   The application starts on:
-   - **HTTPS**: Port 3443 (access as `https://localhost:3443`)
-   - **HTTP**: Port 3001 (for use behind HTTPS proxies or tunnels)
-
-5. **Try the Demo**
-
-   1. Visit your ORIGIN URL (e.g., `https://localhost:3443` or your tunnel URL)
-   2. Click "Sign in with Google"
-   3. Navigate to protected pages and view your profile
-
-### demo-passkey (Passkey Only)
-
-A focused example demonstrating WebAuthn/Passkey (FIDO2) passwordless authentication.
-
-**Features:**
-- WebAuthn/Passkey registration and credential creation
-- Passwordless authentication using biometrics, security keys, or device authentication
-- Credential management (list, view, delete)
-
-#### Setup
-
-1. **Choose Your ORIGIN**
-
-   Decide how you'll access the application:
-   - **localhost** (default): `https://localhost:3443` - for local desktop testing
-   - **tunnel** (mobile testing): Use [Cloudflare Tunnel](../guides/tunneling.md) to get a public URL
-
-   > **Note**: If using a tunnel, set it up first to get your URL before proceeding.
-
-2. **Environment Setup**
-
-   ```bash
-   cd demo-passkey
-   cp ../dot.env.example .env
-   ```
-
-   Edit `.env` with your configuration:
-
-   ```bash
-   # Required: Base URL of your application (must match step 1)
-   ORIGIN='https://localhost:3443'
-
-   # Database (SQLite for easy setup)
-   GENERIC_DATA_STORE_TYPE=sqlite
-   GENERIC_DATA_STORE_URL='sqlite:./auth.db'
-
-   # Cache (in-memory for demo)
-   GENERIC_CACHE_STORE_TYPE=memory
-   GENERIC_CACHE_STORE_URL='memory://demo'
-   ```
-
-3. **Run the Demo**
-
-   ```bash
-   cargo run
-   ```
-
-   The application starts on:
-   - **HTTPS**: Port 3443 (access as `https://localhost:3443`)
-   - **HTTP**: Port 3001 (for use behind HTTPS proxies or tunnels)
-
-4. **Try the Demo**
-
-   1. Visit your ORIGIN URL (e.g., `https://localhost:3443` or your tunnel URL)
-   2. Click "Register with Passkey"
-      - Enter a username
-      - Follow browser prompts to create a passkey
-   3. Click "Sign in with Passkey"
-      - Authenticate using your chosen method
-   4. Navigate protected pages and manage credentials
+Setup is similar to demo-both: copy `.env` from `dot.env.simple`, adjust for each demo's needs.
 
 ## Basic Configuration
 

@@ -70,7 +70,7 @@ case "$GENERIC_DATA_STORE_TYPE" in
             exit 1
         fi
 
-        DB_STRING="sqlite3 \"$DB_PATH\""
+        DB_STRING="sqlite3 $DB_PATH"
         echo "SQLite database path: $DB_PATH"
 
         # Check if database file exists

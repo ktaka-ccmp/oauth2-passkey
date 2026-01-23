@@ -280,3 +280,5 @@ cargo run
 |----------|---------|-------------|
 | `O2P_LOGIN_URL` | `/o2p/user/login` | Redirect destination for unauthenticated users |
 | `O2P_ROUTE_PREFIX` | `/o2p` | Prefix for all auth endpoints |
+
+> **Note**: `O2P_LOGIN_URL` is **required** for custom login pages to work. Although it doesn't appear in your application code, the library reads it internally to determine where to redirect unauthenticated users.

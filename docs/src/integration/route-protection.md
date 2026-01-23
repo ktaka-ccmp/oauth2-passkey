@@ -75,14 +75,18 @@ async fn dashboard_with_user(Extension(user): Extension<AuthUser>) -> String {
 }
 ```
 
-## Middleware Comparison
+### Middleware Comparison
 
-| Middleware | Unauthenticated | User Info |
-|------------|-----------------|-----------|
-| `is_authenticated_redirect` | Redirect to login | Use `Extension<CsrfToken>` |
-| `is_authenticated_user_redirect` | Redirect to login | Use `Extension<AuthUser>` |
-| `is_authenticated_401` | Return 401 | Use `Extension<CsrfToken>` |
-| `is_authenticated_user_401` | Return 401 | Use `Extension<AuthUser>` |
+| Middleware | Unauthenticated | Available in Handler |
+|------------|-----------------|----------------------|
+| `is_authenticated_redirect` | Redirect to login | `CsrfToken` |
+| `is_authenticated_user_redirect` | Redirect to login | `AuthUser` (includes csrf_token) |
+| `is_authenticated_401` | Return 401 | `CsrfToken` |
+| `is_authenticated_user_401` | Return 401 | `AuthUser` (includes csrf_token) |
+
+> **Note**: The `_user_` variants perform an additional database query to fetch user information. Use the non-user variants when you only need to verify authentication without accessing user details in your handler.
+
+> **Note**: Handlers receive the CSRF token to embed in rendered pages. See [CSRF Token Handling](csrf-handling.md) for details.
 
 ## When to Use Each Method
 
@@ -90,6 +94,5 @@ async fn dashboard_with_user(Extension(user): Extension<AuthUser>) -> String {
 |--------|----------|
 | `AuthUser` extractor | Simple protected routes where you need user info |
 | `Option<AuthUser>` | Pages that work for both authenticated and anonymous users |
-| `is_authenticated_redirect` | Protect routes without needing user info in handler |
-| `is_authenticated_user_redirect` | Protect routes and access user info via Extension |
-| `is_authenticated_401` | API endpoints that should return 401 instead of redirect |
+| `is_authenticated[_user]_redirect` | Protect routes with redirect to login for unauthenticated users |
+| `is_authenticated[_user]_401` | API endpoints that should return 401 instead of redirect |

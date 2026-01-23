@@ -1,4 +1,4 @@
-# Framework Integration
+# Basic Setup
 
 This chapter explains how to integrate oauth2-passkey into your Axum application.
 
@@ -8,25 +8,21 @@ This chapter explains how to integrate oauth2-passkey into your Axum application
 
 ```rust,ignore
 use axum::{Router, routing::get};
-use oauth2_passkey_axum::{init, oauth2_passkey_router, O2P_ROUTE_PREFIX, AuthUser};
+use oauth2_passkey_axum::{init, oauth2_passkey_router, O2P_ROUTE_PREFIX, AuthUser}; // [1]
 
-// Authenticated route example
-async fn protected(user: AuthUser) -> String {
+async fn protected(user: AuthUser) -> String { // [2]
     format!("Hello, {}!", user.label)
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize authentication (connects to database and cache)
-    init().await?;
+    init().await?; // [3]
 
-    // Create application router with auth routes
     let app = Router::new()
         .route("/", get(|| async { "Public page" }))
         .route("/protected", get(protected))
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router()); // [4]
 
-    // Start server
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
     axum::serve(listener, app).await?;
 
@@ -36,12 +32,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Key Components
 
-| Component | Description |
-|-----------|-------------|
-| `init()` | Initializes database and cache connections. Must be called before serving requests. |
-| `oauth2_passkey_router()` | Returns a router with all authentication endpoints (OAuth2, Passkey, user management). |
-| `O2P_ROUTE_PREFIX` | Route prefix for auth endpoints. Default: `/o2p`. |
-| `AuthUser` | Axum extractor for authenticated user information. |
+| | Component | Description |
+|-----|-----------|-------------|
+|[1]| `use` statement | Imports the necessary components from `oauth2_passkey_axum`. |
+|[2]| `AuthUser` | Axum extractor for authenticated user information. |
+|[3]| `init()` | Initializes database and cache connections. Must be called before serving requests. |
+|[4]| `O2P_ROUTE_PREFIX`, `oauth2_passkey_router()` | Mount auth routes at prefix (default: `/o2p`). |
 
 ### Protected Routes
 

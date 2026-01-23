@@ -1,41 +1,32 @@
 # CSRF Token Handling
 
-This guide explains how to implement CSRF protection for your custom pages.
+State-changing requests (POST, PUT, DELETE, PATCH) require a valid CSRF token. This guide explains how to implement CSRF protection for your custom pages.
 
 ## Overview
 
-| Method | Token Location | Verification |
-|--------|----------------|--------------|
-| **AJAX** | `X-CSRF-Token` header | Automatic (middleware) |
-| **Form** | Hidden field in body | Manual (your handler) |
+### Token Acquisition
 
-### Why the difference?
+| Client Type | Embedding | Response Header | Endpoint |
+|-------------|-----------|-----------------|----------|
+| JavaScript  | Optional  | Available       | Available |
+| HTML Form   | Required  | Not available   | Not available |
 
-```javascript
-// AJAX: Token in header → middleware verifies automatically
-fetch('/api/update', {
-    method: 'POST',
-    headers: { 'X-CSRF-Token': csrfToken },  // ← Middleware reads this
-    body: JSON.stringify(data)
-});
-```
+JavaScript clients can use response headers, the endpoint, or embedded values. HTML Forms must embed tokens at render time.
 
-```html
-<!-- Form: Token in body → you must verify in handler -->
-<form method="POST" action="/update">
-    <input type="hidden" name="csrf_token" value="...">  <!-- ← In body -->
-</form>
-```
+### Token Usage
 
-Middleware cannot read the request body (Axum consumes it only once), so form tokens require manual verification.
+| Client Type | Token Location | Verification |
+|-------------|----------------|--------------|
+| JavaScript  | `X-CSRF-Token` header | Automatic (middleware) |
+| HTML Form   | Hidden field in body | Manual (your handler) |
 
----
+Middleware can read headers but not the body, so form tokens require manual verification.
 
-## AJAX Requests (Automatic Verification)
+## JavaScript (Automatic Verification)
 
 ### 1. Get the Token
 
-Embed in your template from `AuthUser.csrf_token`:
+**Option A: Embed in template** from `AuthUser.csrf_token`:
 
 ```html
 <script>
@@ -43,7 +34,13 @@ Embed in your template from `AuthUser.csrf_token`:
 </script>
 ```
 
-Or fetch from the API:
+**Option B: Read from response header** of any authenticated request:
+
+```javascript
+const csrfToken = response.headers.get('X-CSRF-Token');
+```
+
+**Option C: Fetch from endpoint**:
 
 ```javascript
 const response = await fetch(`${O2P_ROUTE_PREFIX}/user/csrf_token`, {
@@ -72,7 +69,7 @@ fetch(`${O2P_ROUTE_PREFIX}/user/update`, {
 
 ---
 
-## Form Submissions (Manual Verification)
+## HTML Form (Manual Verification)
 
 ### Step 1: Get Token and Embed in Form
 
@@ -156,8 +153,8 @@ let app = Router::new()
 
 ## Key Points
 
-- **AJAX**: Include `X-CSRF-Token` header → automatic verification
-- **Form**: Embed token in hidden field → verify manually with `subtle::ConstantTimeEq`
+- **JavaScript**: Include `X-CSRF-Token` header → automatic verification
+- **HTML Form**: Embed token in hidden field → verify manually with `subtle::ConstantTimeEq`
 - Always use constant-time comparison (`ct_eq`) - never `==`
 - Add `subtle` to your `Cargo.toml`: `subtle = "2"`
 

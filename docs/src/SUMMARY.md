@@ -12,24 +12,34 @@
 
 ---
 
-# Part 2: Integration Guide
+# Part 2: Basic Integration
 
-- [Framework Integration](integration/framework.md)
+- [Basic Setup](integration/framework.md)
 - [Route Protection](integration/route-protection.md)
-- [Custom Pages](integration/custom-pages.md)
 - [CSRF Token Handling](integration/csrf-handling.md)
+- [Configuration](integration/configuration.md)
+- [Server Setup](integration/server-setup.md)
+
+---
+
+# Part 3: Customization
+
+- [Custom Pages](integration/custom-pages.md)
 - [OAuth2 JavaScript API](integration/oauth2-js.md)
 - [Passkey JavaScript API](integration/passkey-js.md)
 - [Askama Templates](integration/templates.md)
-- [Server Setup](integration/server-setup.md)
-- [Configuration](integration/configuration.md)
+
+---
+
+# Part 4: Internals
+
 - [OAuth2 Implementation](integration/oauth2.md)
 - [Passkey Implementation](integration/passkey.md)
 - [Development Tunneling](guides/tunneling.md)
 
 ---
 
-# Part 3: Security
+# Part 5: Security
 
 - [Security Model](security/model.md)
 - [CSRF Protection](security/csrf.md)
@@ -41,25 +51,16 @@
 
 ---
 
-# Part 4: WebAuthn Technical Reference
-
-- [Attestation Overview](webauthn/attestation-overview.md)
-- [None Attestation](webauthn/none.md)
-- [Packed Attestation](webauthn/packed.md)
-- [TPM Attestation](webauthn/tpm.md)
-
----
-
-# Part 5: Platform Compatibility
-
-- [iOS Safari](compatibility/ios-safari.md)
-
----
-
-# Part 6: API Reference
+# Part 6: Reference
 
 - [Core Library API](api/core.md)
 - [Axum Integration API](api/axum.md)
+- [iOS Safari Compatibility](compatibility/ios-safari.md)
+- [WebAuthn Attestation]()
+  - [Attestation Overview](webauthn/attestation-overview.md)
+  - [None Attestation](webauthn/none.md)
+  - [Packed Attestation](webauthn/packed.md)
+  - [TPM Attestation](webauthn/tpm.md)
 
 ---
 

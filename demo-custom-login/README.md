@@ -23,6 +23,8 @@ O2P_LOGIN_URL='/login'
 
 This tells the `AuthUser` extractor to redirect unauthenticated users to `/login` instead of the default `/o2p/user/login`.
 
+> **Note**: This environment variable is **required** for custom login pages to work. Although it doesn't appear in your application code, the library reads it internally to determine where to redirect unauthenticated users.
+
 3. Start the database and cache:
 
 ```bash
