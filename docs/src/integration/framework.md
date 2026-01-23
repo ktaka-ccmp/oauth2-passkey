@@ -1,24 +1,12 @@
-# Framework Integrations for oauth2-passkey
+# Framework Integration
 
-This document provides information on available framework integrations for the `oauth2-passkey` core library and guidance for creating new integrations.
+This chapter explains how to integrate oauth2-passkey into your Axum application.
 
-## Available Framework Integrations
+## Axum Integration
 
-### Axum Integration: oauth2-passkey-axum
+### Basic Setup
 
-The [oauth2-passkey-axum](https://crates.io/crates/oauth2-passkey-axum) crate provides ready-to-use Axum handlers, middleware, and components that integrate with the core library.
-
-**Key features:**
-
-* Drop-in Axum router with all authentication routes
-* Route protection middleware
-* CSRF token handling
-* Admin and user interfaces
-* Static assets for authentication pages
-
-**Usage:**
-
-```rust
+```rust,ignore
 use axum::{Router, routing::get};
 use oauth2_passkey_axum::{init, oauth2_passkey_router, O2P_ROUTE_PREFIX, AuthUser};
 
@@ -29,7 +17,7 @@ async fn protected(user: AuthUser) -> String {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize authentication
+    // Initialize authentication (connects to database and cache)
     init().await?;
 
     // Create application router with auth routes
@@ -46,33 +34,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-For complete examples, see:
+### Key Components
 
-- [OAuth2 Demo](../demo-oauth2/)
-- [Passkey Demo](../demo-passkey/)
-- [Combined Demo](../demo-both/)
+| Component | Description |
+|-----------|-------------|
+| `init()` | Initializes database and cache connections. Must be called before serving requests. |
+| `oauth2_passkey_router()` | Returns a router with all authentication endpoints (OAuth2, Passkey, user management). |
+| `O2P_ROUTE_PREFIX` | Route prefix for auth endpoints. Default: `/o2p`. |
+| `AuthUser` | Axum extractor for authenticated user information. |
 
-## Relationship Between Core and Framework Integration
+### Protected Routes
 
-The relationship between `oauth2-passkey` (core) and `oauth2-passkey-axum` (integration) follows a clear separation of concerns:
+Use `AuthUser` as an extractor to require authentication:
 
-| `oauth2-passkey` (Core) | `oauth2-passkey-axum` (Integration) |
-|------------------------|-----------------------------------|
-| Framework-agnostic authentication logic | Axum-specific handlers and middleware |
-| Database/cache operations | Route configuration and HTTP interface |
-| Security implementation | User interface components |
-| User identity management | Error handling and HTTP responses |
+```rust,ignore
+use oauth2_passkey_axum::AuthUser;
 
-This architecture allows the core authentication logic to remain decoupled from any specific web framework while providing convenient integration points.
+// Requires authentication - redirects to login if not authenticated
+async fn dashboard(user: AuthUser) -> String {
+    format!("Welcome, {}! (user_id: {})", user.label, user.user_id)
+}
 
-## Creating New Framework Integrations
+// AuthUser fields:
+// - user_id: Unique user identifier
+// - label: Display name
+// - account: Account identifier
+// - csrf_token: CSRF token for forms
+// - is_admin: Whether user has admin privileges
+```
 
-To create integrations for other web frameworks (Rocket, Actix, etc.), follow these guidelines:
+For more protection methods (optional authentication, middleware-based protection), see [Route Protection](route-protection.md).
 
-1. Use the core coordination functions from `oauth2-passkey`
-2. Create framework-specific handlers that call these functions
-3. Implement middleware for authentication and CSRF protection
-4. Add user interface components appropriate for the framework
-5. Provide clear examples and documentation
+### Available Endpoints
 
-For a complete example of creating a framework integration, see the [oauth2-passkey-axum source code](https://github.com/ktaka-ccmp/oauth2-passkey/tree/main/oauth2_passkey_axum).
+The `oauth2_passkey_router()` provides these endpoints under `O2P_ROUTE_PREFIX`:
+
+| Endpoint | Description |
+|----------|-------------|
+| `/oauth2/login` | Start Google OAuth2 login |
+| `/oauth2/authorized` | OAuth2 callback (redirect URI) |
+| `/passkey/register/start` | Start passkey registration |
+| `/passkey/register/finish` | Complete passkey registration |
+| `/passkey/auth/start` | Start passkey authentication |
+| `/passkey/auth/finish` | Complete passkey authentication |
+| `/user/summary` | User profile and credential management |
+| `/admin/list_users` | Admin user list (requires admin) |
+| `/logout` | End session |

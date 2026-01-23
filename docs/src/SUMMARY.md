@@ -15,6 +15,13 @@
 # Part 2: Integration Guide
 
 - [Framework Integration](integration/framework.md)
+- [Route Protection](integration/route-protection.md)
+- [Custom Pages](integration/custom-pages.md)
+- [CSRF Token Handling](integration/csrf-handling.md)
+- [OAuth2 JavaScript API](integration/oauth2-js.md)
+- [Passkey JavaScript API](integration/passkey-js.md)
+- [Askama Templates](integration/templates.md)
+- [Server Setup](integration/server-setup.md)
 - [Configuration](integration/configuration.md)
 - [OAuth2 Implementation](integration/oauth2.md)
 - [Passkey Implementation](integration/passkey.md)

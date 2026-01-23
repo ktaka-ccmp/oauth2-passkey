@@ -1,8 +1,8 @@
-# Architecture blueprint
+# Chapter 3: Architecture
 
 ## Overview
 
-The following is a blueprint of the architecture of this application. It reflects the current state of the application as of January 2026.
+This chapter describes the architecture of the oauth2-passkey library.
 
 ## Current Components
 
@@ -62,15 +62,6 @@ The following is a blueprint of the architecture of this application. It reflect
 - Translates between HTTP requests/responses and core library functions
 - Manages authentication middleware for Axum applications
 
-## Data Flow
-
-1. HTTP requests are received by the Axum application
-2. oauth2_passkey_axum handlers process the requests and call oauth2_passkey functions
-3. The coordination layer orchestrates the authentication flow
-4. Specific modules (oauth2, passkey, session) handle their respective operations
-5. User data is stored and retrieved through the storage layer
-6. Responses are returned through oauth2_passkey_axum to the client
-
 ## Security Considerations
 
 - Session tokens are securely managed with proper expiration
@@ -78,14 +69,77 @@ The following is a blueprint of the architecture of this application. It reflect
 - Passkey credentials follow WebAuthn security standards
 - OAuth2 implementation follows best practices for authorization flow
 
-## Dependency Structure
+## Data Flow
 
-The dependencies between components are implemented as follows:
+```
+                         ┌─────────────────┐
+                         │     Browser     │
+                         └────────┬────────┘
+                                  │ HTTP Request
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                        oauth2_passkey_axum                          │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────────┐  │
+│  │   Router    │───▶│  Handlers   │───▶│   Static Assets (UI)    │  │
+│  └─────────────┘    └──────┬──────┘    └─────────────────────────┘  │
+└────────────────────────────┼────────────────────────────────────────┘
+                             │ calls
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                          oauth2_passkey                             │
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                       coordination                            │  │
+│  │              (orchestrates authentication flows)              │  │
+│  └───────┬─────────────┬─────────────┬─────────────┬─────────────┘  │
+│          │             │             │             │                │
+│          ▼             ▼             ▼             ▼                │
+│    ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
+│    │  oauth2  │  │ passkey  │  │ session  │  │  userdb  │          │
+│    │          │  │          │  │          │  │          │          │
+│    │  Google  │  │ WebAuthn │  │ cookies  │  │ accounts │          │
+│    │  OIDC    │  │ FIDO2    │  │ tokens   │  │ linking  │          │
+│    └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘          │
+│         │             │             │             │                 │
+│         └─────────────┴──────┬──────┴─────────────┘                 │
+│                              ▼                                      │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                         storage                               │  │
+│  │  ┌─────────────────────┐    ┌──────────────────────────────┐  │  │
+│  │  │     cache_store     │    │         data_store           │  │  │
+│  │  │  (session, CSRF,    │    │  (users, credentials,        │  │  │
+│  │  │   WebAuthn state)   │    │   OAuth2 accounts)           │  │  │
+│  │  └──────────┬──────────┘    └───────────────┬──────────────┘  │  │
+│  └─────────────┼───────────────────────────────┼─────────────────┘  │
+└────────────────┼───────────────────────────────┼────────────────────┘
+                 │                               │
+                 ▼                               ▼
+        ┌────────────────┐              ┌────────────────┐
+        │ Memory / Redis │              │ SQLite / PgSQL │
+        └────────────────┘              └────────────────┘
+```
 
-- oauth2_passkey_axum depends on oauth2_passkey
-- oauth2_passkey depends on its internal modules (oauth2, passkey, session, storage, userdb)
-- oauth2 and passkey depend on storage but not on each other
-- userdb depends on storage but not on oauth2 or passkey
+### Request Flow Example (Passkey Authentication)
+
+1. Browser sends authentication request to `/o2p/passkey/auth/start`
+2. Router dispatches to passkey handler in `oauth2_passkey_axum`
+3. Handler calls `coordination` layer in `oauth2_passkey`
+4. Coordination orchestrates:
+   - `session` validates existing session state
+   - `passkey` generates WebAuthn challenge (stored in `cache_store`)
+5. Response returns to browser with challenge
+6. Browser completes WebAuthn ceremony, sends assertion
+7. `passkey` verifies assertion against stored credential (`data_store`)
+8. `session` creates authenticated session (stored in `cache_store`)
+9. `userdb` retrieves user information
+10. Response returns with session cookie
+
+### Key Design Points
+
+- **coordination** is the central orchestration layer - all auth flows go through it
+- **oauth2** and **passkey** modules are independent (no cross-dependencies)
+- **cache_store** handles temporary data (sessions, CSRF tokens, WebAuthn challenges)
+- **data_store** handles persistent data (users, credentials, OAuth2 accounts)
 
 ## Future Directions
 
