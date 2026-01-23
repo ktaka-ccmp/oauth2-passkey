@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Summary - Custom Login Demo</title>
+    <script>
+        const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
+        const userId = '{{user_id}}';
+        const csrfToken = '{{csrf_token}}';
+    </script>
+    <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
+    <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        h2 {
+            color: #555;
+            font-size: 18px;
+            margin-top: 32px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 24px;
+        }
+
+        .user-info {
+            background: #e8f5e9;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .user-info p {
+            margin: 8px 0;
+            color: #333;
+        }
+
+        .user-info strong {
+            color: #2e7d32;
+            min-width: 120px;
+            display: inline-block;
+        }
+
+        .user-info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .credential-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .credential-item {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .credential-item.oauth2 {
+            border-left-color: #4285f4;
+        }
+
+        .credential-item.passkey {
+            border-left-color: #34a853;
+        }
+
+        .credential-item p {
+            margin: 4px 0;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .credential-item .label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .credential-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .empty-message {
+            color: #888;
+            font-style: italic;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background 0.2s;
+            cursor: pointer;
+            border: none;
+            font-size: 14px;
+        }
+
+        .btn-large {
+            padding: 12px 24px;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd6;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-add {
+            background: #28a745;
+            color: white;
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+
+        .btn-add:hover {
+            background: #218838;
+        }
+
+        .btn-small {
+            font-size: 12px;
+            padding: 4px 10px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Edit Form */
+        .edit-form {
+            display: none;
+            background: #fff;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            margin-top: 16px;
+        }
+
+        .edit-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .ml-10 {
+            margin-left: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>User Summary</h1>
+        <p class="subtitle">Your account information and registered credentials</p>
+
+        <!-- User Information -->
+        <div class="user-info" id="user-info-display">
+            <div class="user-info-row">
+                <div>
+                    <p><strong>Account:</strong> <span id="display-account">{{user_account}}</span></p>
+                    <p><strong>Display Name:</strong> <span id="display-label">{{user_label}}</span></p>
+                    <p><strong>Created:</strong> {{created_at}}</p>
+                </div>
+                <button class="btn btn-secondary btn-small" onclick="toggleEditForm()">Edit</button>
+            </div>
+        </div>
+
+        <!-- Edit User Form -->
+        <div class="edit-form" id="edit-form">
+            <div class="form-group">
+                <label for="edit-account">Account:</label>
+                <input type="text" id="edit-account" value="{{user_account}}">
+            </div>
+            <div class="form-group">
+                <label for="edit-label">Display Name:</label>
+                <input type="text" id="edit-label" value="{{user_label}}">
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="updateUserAccount()">Save</button>
+                <button class="btn btn-secondary" onclick="toggleEditForm()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Passkey Credentials -->
+        <h2>
+            <span>Passkey Credentials</span>
+            <button class="btn btn-add" onclick="showRegistrationModal('add_to_user')">+ Add Passkey</button>
+        </h2>
+        {% if passkeys.is_empty() %}
+        <p class="empty-message">No passkeys registered</p>
+        {% else %}
+        <ul class="credential-list">
+            {% for passkey in passkeys %}
+            <li class="credential-item passkey">
+                <p><span class="label">Name:</span> {{passkey.user_name}}</p>
+                <p><span class="label">Display Name:</span> {{passkey.user_display_name}}</p>
+                <div class="credential-row">
+                    <span><span class="label">Created:</span> {{passkey.created_at}}</span>
+                    <button class="btn btn-danger btn-small" onclick="deletePasskey('{{passkey.credential_id}}')">Delete</button>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <!-- OAuth2 Accounts -->
+        <h2>
+            <span>OAuth2 Accounts</span>
+            <button class="btn btn-add" onclick="oauth2.openPopup('add_to_user')">+ Link Account</button>
+        </h2>
+        {% if oauth2_accounts.is_empty() %}
+        <p class="empty-message">No OAuth2 accounts linked</p>
+        {% else %}
+        <ul class="credential-list">
+            {% for account in oauth2_accounts %}
+            <li class="credential-item oauth2">
+                <p><span class="label">Provider:</span> {{account.provider}}</p>
+                <p><span class="label">Name:</span> {{account.name}}</p>
+                <div class="credential-row">
+                    <span><span class="label">Email:</span> {{account.email}}</span>
+                    <button class="btn btn-danger btn-small" onclick="unlinkOAuth2('{{account.provider}}', '{{account.provider_user_id}}')">Unlink</button>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <!-- Danger Zone -->
+        <h2 style="border-bottom-color: #dc3545;">
+            <span>Danger Zone</span>
+        </h2>
+        <p style="color: #666; margin-bottom: 16px;">Permanently delete your account and all associated data.</p>
+        <button class="btn btn-danger" onclick="deleteAccount()">Delete Account</button>
+
+        <!-- Navigation -->
+        <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #eee;">
+            <a href="/" class="btn btn-primary btn-large">Back to Home</a>
+            <button class="btn btn-secondary btn-large ml-10" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        // Toggle edit form
+        function toggleEditForm() {
+            const form = document.getElementById('edit-form');
+            form.classList.toggle('active');
+        }
+
+        // Update user account
+        function updateUserAccount() {
+            const account = document.getElementById('edit-account').value;
+            const label = document.getElementById('edit-label').value;
+
+            fetch(`${O2P_ROUTE_PREFIX}/user/update`, {
+                method: 'PUT',
+                headers: {
+                    'X-CSRF-Token': csrfToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    account: account,
+                    label: label
+                })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to update');
+                return response.json();
+            })
+            .then(data => {
+                document.getElementById('display-account').textContent = data.account;
+                document.getElementById('display-label').textContent = data.label;
+                toggleEditForm();
+                alert('Profile updated successfully');
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            });
+        }
+
+        // Delete passkey
+        function deletePasskey(credentialId) {
+            if (!confirm('Are you sure you want to delete this passkey?')) return;
+
+            fetch(`${O2P_ROUTE_PREFIX}/passkey/credentials/${credentialId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-Token': csrfToken,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    response.text().then(text => alert('Failed: ' + text));
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            });
+        }
+
+        // Unlink OAuth2 account
+        function unlinkOAuth2(provider, providerUserId) {
+            if (!confirm('Are you sure you want to unlink this OAuth2 account?')) return;
+
+            fetch(`${O2P_ROUTE_PREFIX}/oauth2/accounts/${provider}/${providerUserId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-Token': csrfToken,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    response.text().then(text => alert('Failed: ' + text));
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            });
+        }
+
+        // Delete account
+        function deleteAccount() {
+            if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
+            if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) return;
+
+            fetch(`${O2P_ROUTE_PREFIX}/user/delete`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-Token': csrfToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ user_id: userId })
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Account deleted. You will be logged out.');
+                    window.location.href = '/';
+                } else {
+                    response.text().then(text => alert('Failed: ' + text));
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            });
+        }
+
+        // Logout
+        function logout() {
+            window.location.href = O2P_ROUTE_PREFIX + "/user/logout?redirect=/";
+        }
+    </script>
+</body>
+
+</html>

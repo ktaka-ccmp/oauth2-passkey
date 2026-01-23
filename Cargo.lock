@@ -666,6 +666,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "demo-custom-login"
+version = "0.2.1-dev"
+dependencies = [
+ "askama",
+ "axum",
+ "axum-server",
+ "dotenvy",
+ "oauth2-passkey-axum 0.2.1-dev",
+ "rustls",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "demo-oauth2"
 version = "0.2.1-dev"
 dependencies = [
