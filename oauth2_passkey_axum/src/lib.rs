@@ -88,3 +88,8 @@ pub use session::AuthUser;
 
 // Re-export the route prefix and initialization function from oauth2_passkey crate
 pub use oauth2_passkey::{CsrfHeaderVerified, CsrfToken, O2P_ROUTE_PREFIX, init};
+
+// Re-export types and functions for custom summary pages
+pub use oauth2_passkey::{
+    OAuth2Account, PasskeyCredential, UserId, list_accounts_core, list_credentials_core,
+};
