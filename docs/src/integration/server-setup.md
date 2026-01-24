@@ -36,7 +36,14 @@ pub(crate) fn init_tracing(app_name: &str) {
 }
 ```
 
-Debug builds enable detailed logging by default. Override with `RUST_LOG`:
+### Default Log Levels
+
+| Build   | Command                 | Default Level                                |
+|---------|-------------------------|----------------------------------------------|
+| Debug   | `cargo run`             | oauth2_passkey=trace, app=trace, others=info |
+| Release | `cargo build --release` | info                                         |
+
+Override with `RUST_LOG`:
 
 ```bash
 RUST_LOG=debug cargo run
@@ -44,14 +51,14 @@ RUST_LOG=debug cargo run
 
 ## Self-Signed Certificate Setup
 
-Create a `self_signed_certs/` directory in your project with `cert.pem` and `key.pem`:
+Each demo includes a `gen_certs.sh` script that generates certificates with proper SANs:
 
 ```bash
-mkdir -p self_signed_certs
-openssl req -x509 -newkey rsa:4096 -keyout self_signed_certs/key.pem \
-    -out self_signed_certs/cert.pem -days 365 -nodes \
-    -subj "/CN=localhost"
+cd self_signed_certs
+./gen_certs.sh
 ```
+
+This creates `cert.pem` and `key.pem` valid for 10 years with localhost and 127.0.0.1 as SANs.
 
 Load certificates with `RustlsConfig`:
 
@@ -123,6 +130,12 @@ The HTTP server enables:
 4. **Container deployments**: Kubernetes ingress controllers manage TLS externally
 
 When using tunnels, set `ORIGIN` to the tunnel's HTTPS URL while the tunnel connects to your HTTP port.
+
+Example with cloudflared:
+
+- Tunnel URL: `https://myapp.trycloudflare.com`
+- Set `ORIGIN='https://myapp.trycloudflare.com'`
+- Tunnel forwards to `http://localhost:3001`
 
 ## Complete main.rs Example
 
