@@ -1,25 +1,20 @@
-use askama::Template;
 use axum::{
     Router,
     extract::{Json as ExtractJson, Path},
     http::StatusCode,
-    response::Html,
-    routing::{delete, get, put},
+    routing::{delete, put},
 };
 
 use oauth2_passkey::{
-    CredentialId, DbUser, O2P_ROUTE_PREFIX, Provider, ProviderUserId, SessionId, UserId,
-    delete_oauth2_account_core, delete_passkey_credential_core, delete_user_account_admin,
-    update_user_admin_status,
+    CredentialId, Provider, ProviderUserId, SessionId, UserId, delete_oauth2_account_core,
+    delete_passkey_credential_core, delete_user_account_admin, update_user_admin_status,
 };
 
 use super::super::error::IntoResponseError;
-use crate::config::{O2P_CUSTOM_CSS_URL, O2P_REDIRECT_ANON};
 use crate::session::AuthUser;
 
 pub(super) fn router() -> Router<()> {
     Router::new()
-        .route("/list_users", get(list_users))
         .route("/delete_user", delete(delete_user_account_handler))
         .route(
             "/delete_passkey_credential/{credential_id}",
@@ -30,48 +25,6 @@ pub(super) fn router() -> Router<()> {
             delete(delete_oauth2_account),
         )
         .route("/update_admin_status", put(update_admin_status_handler))
-}
-
-#[derive(Template)]
-#[template(path = "admin_user_list.j2")]
-struct UserListTemplate {
-    users: Vec<DbUser>,
-    o2p_route_prefix: String,
-    o2p_redirect_anon: String,
-    csrf_token: String,
-    custom_css_url: Option<String>,
-}
-
-async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
-    // Convert AuthUser to SessionUser for the core functions
-    if !auth_user.has_admin_privileges() {
-        return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
-    };
-
-    // Fetch users from storage using session ID
-    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Invalid session ID: {e}"),
-        )
-    })?;
-    let users = oauth2_passkey::get_all_users(session_id)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let csrf_token = auth_user.csrf_token.clone();
-
-    // Render the template
-    let template = UserListTemplate {
-        users,
-        o2p_route_prefix: O2P_ROUTE_PREFIX.to_string(),
-        o2p_redirect_anon: O2P_REDIRECT_ANON.to_string(),
-        csrf_token,
-        custom_css_url: O2P_CUSTOM_CSS_URL.clone(),
-    };
-    Ok(Html(template.render().map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-    })?))
 }
 
 #[derive(serde::Deserialize)]

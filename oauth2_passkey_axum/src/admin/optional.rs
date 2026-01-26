@@ -14,17 +14,64 @@ use std::{
 };
 
 use oauth2_passkey::{
-    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, get_authenticator_info_batch,
-    get_user, list_accounts_core, list_credentials_core,
+    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, get_all_users,
+    get_authenticator_info_batch, get_user, list_accounts_core, list_credentials_core,
 };
 
-use crate::{O2P_ADMIN_URL, config::O2P_CUSTOM_CSS_URL, session::AuthUser};
+use crate::{
+    O2P_ADMIN_URL,
+    config::{O2P_CUSTOM_CSS_URL, O2P_REDIRECT_ANON},
+    session::AuthUser,
+};
 
 pub(crate) fn router() -> Router<()> {
     Router::new()
+        .route("/list_users", get(list_users))
         .route("/user/{user_id}", get(user_summary))
         .route("/admin_user.js", get(serve_admin_user_js))
         .route("/admin_user.css", get(serve_admin_user_css))
+}
+
+#[derive(Template)]
+#[template(path = "admin_user_list.j2")]
+struct UserListTemplate {
+    users: Vec<DbUser>,
+    o2p_route_prefix: String,
+    o2p_redirect_anon: String,
+    csrf_token: String,
+    custom_css_url: Option<String>,
+}
+
+async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
+    // Convert AuthUser to SessionUser for the core functions
+    if !auth_user.has_admin_privileges() {
+        return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
+    };
+
+    // Fetch users from storage using session ID
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+    let users = get_all_users(session_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let csrf_token = auth_user.csrf_token.clone();
+
+    // Render the template
+    let template = UserListTemplate {
+        users,
+        o2p_route_prefix: O2P_ROUTE_PREFIX.to_string(),
+        o2p_redirect_anon: O2P_REDIRECT_ANON.to_string(),
+        csrf_token,
+        custom_css_url: O2P_CUSTOM_CSS_URL.clone(),
+    };
+    Ok(Html(template.render().map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?))
 }
 
 // Template-friendly version of StoredCredential for display
