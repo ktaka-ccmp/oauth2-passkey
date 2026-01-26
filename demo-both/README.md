@@ -99,7 +99,7 @@ $ cargo run
    2. Try accessing protected pages p1-p6
 8. **Admin** The first user is given admin privilege
    1. Create multiple users
-   2. Try accessing the admin interface at <https://localhost:3443/o2p/admin/list_users>
+   2. Try accessing the admin interface at <https://localhost:3443/o2p/admin/index>
    3. Manipulate other users
 
 ## Application Structure

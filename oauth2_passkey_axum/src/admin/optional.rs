@@ -26,15 +26,15 @@ use crate::{
 
 pub(crate) fn router() -> Router<()> {
     Router::new()
-        .route("/list_users", get(list_users))
-        .route("/user/{user_id}", get(user_summary))
+        .route("/index", get(admin_index))
+        .route("/user/{user_id}", get(admin_user_page))
         .route("/admin_user.js", get(serve_admin_user_js))
         .route("/admin_user.css", get(serve_admin_user_css))
 }
 
 #[derive(Template)]
-#[template(path = "admin_user_list.j2")]
-struct UserListTemplate {
+#[template(path = "admin_index.j2")]
+struct AdminIndexTemplate {
     users: Vec<DbUser>,
     o2p_route_prefix: String,
     o2p_redirect_anon: String,
@@ -42,7 +42,7 @@ struct UserListTemplate {
     custom_css_url: Option<String>,
 }
 
-async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
+async fn admin_index(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
     if !auth_user.has_admin_privileges() {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
@@ -62,7 +62,7 @@ async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, St
     let csrf_token = auth_user.csrf_token.clone();
 
     // Render the template
-    let template = UserListTemplate {
+    let template = AdminIndexTemplate {
         users,
         o2p_route_prefix: O2P_ROUTE_PREFIX.to_string(),
         o2p_redirect_anon: O2P_REDIRECT_ANON.to_string(),
@@ -116,8 +116,8 @@ struct TemplateUser {
 }
 
 #[derive(Template)]
-#[template(path = "admin_user.j2")]
-struct UserSummaryTemplate {
+#[template(path = "admin_user_page.j2")]
+struct AdminUserPageTemplate {
     pub user: TemplateUser,
     pub csrf_token: String,
     pub passkey_credentials: Vec<TemplateCredential>,
@@ -126,7 +126,7 @@ struct UserSummaryTemplate {
     pub custom_css_url: Option<String>,
 }
 
-impl UserSummaryTemplate {
+impl AdminUserPageTemplate {
     fn new(
         user: DbUser,
         csrf_token: String,
@@ -155,7 +155,7 @@ impl UserSummaryTemplate {
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
-async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoResponse {
+async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl IntoResponse {
     if !auth_user.has_admin_privileges() {
         tracing::warn!(
             "User {} is not authorized to view user summary",
@@ -281,7 +281,7 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
     let csrf_token = auth_user.csrf_token.clone();
 
     // Create template with all data
-    let template = UserSummaryTemplate::new(
+    let template = AdminUserPageTemplate::new(
         user,
         csrf_token,
         passkey_credentials,

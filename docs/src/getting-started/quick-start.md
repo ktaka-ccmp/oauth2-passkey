@@ -84,7 +84,7 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
    4. Add new Passkey or OAuth2 account
    5. Log out and sign in with a different method
    6. Explore credential linking and protected pages (p1-p6)
-   7. Admin features: The first user gets admin privileges at `{YOUR_ORIGIN}/o2p/admin/list_users`
+   7. Admin features: The first user gets admin privileges at `{YOUR_ORIGIN}/o2p/admin/index`
 
 ### Other Demo Applications
 

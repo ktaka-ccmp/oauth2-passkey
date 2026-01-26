@@ -17,11 +17,10 @@ pub static O2P_SUMMARY_URL: LazyLock<String> = LazyLock::new(|| {
         .unwrap_or_else(|_| format!("{}/user/summary", *O2P_ROUTE_PREFIX))
 });
 
-/// URL of the admin users list page
-/// Default: "/o2p/admin/list_users"
+/// URL of the admin index page
+/// Default: "/o2p/admin/index"
 pub static O2P_ADMIN_URL: LazyLock<String> = LazyLock::new(|| {
-    std::env::var("O2P_ADMIN_URL")
-        .unwrap_or_else(|_| format!("{}/admin/list_users", *O2P_ROUTE_PREFIX))
+    std::env::var("O2P_ADMIN_URL").unwrap_or_else(|_| format!("{}/admin/index", *O2P_ROUTE_PREFIX))
 });
 
 /// URL to redirect unauthenticated users to

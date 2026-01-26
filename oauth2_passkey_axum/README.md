@@ -167,7 +167,7 @@ You can change this prefix by setting the `O2P_ROUTE_PREFIX` environment variabl
 - `GET /o2p/ui/summary` - User dashboard
 
 **Admin Interface** (requires `admin-ui` feature):
-- `GET /o2p/admin/list_users` - User management (admin only)
+- `GET /o2p/admin/index` - User management (admin only)
 - `GET /o2p/admin/user/{user_id}` - User details (admin only)
 
 ### Management Endpoints

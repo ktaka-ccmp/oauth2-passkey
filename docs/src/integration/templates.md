@@ -235,7 +235,7 @@ Include the route prefix in authentication-related URLs:
 {% if user.is_admin %}
 <div class="admin-panel">
     <h3>Admin Controls</h3>
-    <a href="{{auth_route_prefix}}/admin/list_users">Manage Users</a>
+    <a href="{{auth_route_prefix}}/admin/index">Manage Users</a>
 </div>
 {% endif %}
 ```

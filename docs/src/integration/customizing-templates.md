@@ -4,7 +4,7 @@ This library provides built-in UI pages for login, account management, and admin
 
 - **Login** (`/o2p/user/login`) - Sign in and account creation
 - **Summary** (`/o2p/user/summary`) - User account management
-- **Admin List** (`/o2p/admin/list_users`) - User list for administrators
+- **Admin List** (`/o2p/admin/index`) - User list for administrators
 - **Admin User** (`/o2p/admin/user/{id}`) - User detail view for administrators
 
 You can customize these pages in two ways:
@@ -206,7 +206,7 @@ let app = Router::new()
 
 ## Custom Admin Page
 
-The library provides a built-in admin interface at `/o2p/admin/list_users` for managing users.
+The library provides a built-in admin interface at `/o2p/admin/index` for managing users.
 
 ### Disabling Built-in Admin UI
 
@@ -276,7 +276,7 @@ async fn admin_list(user: AuthUser) -> Result<impl IntoResponse, StatusCode> {
 <!DOCTYPE html>
 <html>
 <body>
-    <h1>Admin: User List</h1>
+    <h1>User Management</h1>
     <table>
         <tr>
             <th>Account</th>
@@ -443,7 +443,7 @@ cargo run
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `O2P_LOGIN_URL` | `/o2p/user/login` | Redirect destination for unauthenticated users |
-| `O2P_ADMIN_URL` | `/o2p/admin/list_users` | Admin panel URL (used in summary page) |
+| `O2P_ADMIN_URL` | `/o2p/admin/index` | Admin panel URL (used in summary page) |
 | `O2P_ROUTE_PREFIX` | `/o2p` | Prefix for all auth endpoints |
 
 > **Note**: `O2P_LOGIN_URL` is **required** for custom login pages to work. Although it doesn't appear in your application code, the library reads it internally to determine where to redirect unauthenticated users.

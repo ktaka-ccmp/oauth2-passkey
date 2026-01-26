@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: Admin route renamed from `/admin/list_users` to `/admin/index` for clarity
+- Admin page title changed from "User List" to "User Management"
+- Admin link text in summary page changed from "User List" to "Admin"
+- Internal refactoring: handler and template names aligned (`admin_index`, `admin_user_page`)
+
 ## [0.2.0] - 2026-01-22
 
 ### Security
