@@ -750,13 +750,89 @@ nav a:hover {
         align-items: flex-start;
     }
 
-    .user-table {
+    /* Transform table to card layout on mobile */
+    .user-table,
+    .user-table thead,
+    .user-table tbody,
+    .user-table th,
+    .user-table td,
+    .user-table tr {
+        display: block;
+    }
+
+    /* Hide table header on mobile */
+    .user-table thead {
+        display: none;
+    }
+
+    /* Style each row as a card */
+    .user-table tr.user-row {
+        background-color: var(--o2p-surface);
+        border: 1px solid var(--o2p-border);
+        border-radius: var(--o2p-radius-md);
+        margin-bottom: var(--o2p-space-md);
+        padding: var(--o2p-space-sm);
+        box-shadow: var(--o2p-shadow);
+    }
+
+    /* Style table cells */
+    .user-table td {
+        padding: var(--o2p-space-xs) var(--o2p-space-sm);
+        border: none;
+        position: relative;
+        padding-left: 30%;
+        text-align: left;
+        min-height: 32px;
+        display: block;
+        /* Truncate long content with ellipsis */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Add label before each cell */
+    .user-table td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: var(--o2p-space-sm);
+        width: 25%;
+        font-weight: 600;
+        color: var(--o2p-text);
+    }
+
+    /* Ensure links and buttons inside cells also truncate */
+    .user-table td a {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Actions cell */
+    .user-table td.actions-cell {
+        padding-left: var(--o2p-space-sm);
+        border-top: 1px solid var(--o2p-border-light);
+        margin-top: var(--o2p-space-xs);
+        padding-top: var(--o2p-space-sm);
+    }
+
+    .user-table td.actions-cell::before {
+        display: none;
+    }
+
+    /* Smaller buttons inside table cards */
+    .user-table .action-button,
+    .user-table .delete-button {
+        min-height: auto;
+        padding: var(--o2p-space-xs) var(--o2p-space-sm);
         font-size: 0.875rem;
     }
 
-    .user-table th,
-    .user-table td {
-        padding: var(--o2p-space-xs) var(--o2p-space-sm);
+    /* ID cell - first row with bottom border */
+    .user-table td.id-cell {
+        border-bottom: 1px solid var(--o2p-border-light);
+        padding-bottom: var(--o2p-space-sm);
+        margin-bottom: var(--o2p-space-xs);
     }
 
     .credential-modal-content {

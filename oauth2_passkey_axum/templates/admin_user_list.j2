@@ -33,22 +33,22 @@
             <tbody>
                 {% for user in users %}
                 <tr class="user-row">
-                    <td><a href="{{o2p_route_prefix}}/admin/user/{{ user.id }}">{{ user.id }}</a></td>
-                    <td>{{ user.account }}</td>
-                    <td>{{ user.label }}</td>
+                    <td class="id-cell" data-label="ID"><a href="{{o2p_route_prefix}}/admin/user/{{ user.id }}">{{ user.id }}</a></td>
+                    <td data-label="Account">{{ user.account }}</td>
+                    <td data-label="Label">{{ user.label }}</td>
                     {% if user.sequence_number.is_some() && user.sequence_number.unwrap_or(0) == 1 %}
-                        <td>
+                        <td data-label="Admin">
                             <span>{{ user.is_admin }}</span>
                         </td>
-                        <td>
+                        <td class="actions-cell">
                         </td>
                     {% else %}
-                        <td>
+                        <td data-label="Admin">
                             <button onclick="toggleAdminStatus('{{ user.id }}', {{ user.is_admin }})">
                                 <span id="admin-status-{{ user.id }}">{{ user.is_admin }}</span>
                             </button>
                         </td>
-                        <td>
+                        <td class="actions-cell">
                             <button onclick="DeleteAccount('{{ user.id }}')" class="action-button delete-button">Delete</button>
                         </td>
                     {% endif %}
