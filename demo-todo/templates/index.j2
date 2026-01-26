@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Todo - Home</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 40px 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+            text-align: center;
+        }
+        .welcome {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+        .add-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .add-form input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        .add-form input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .add-form button {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .add-form button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .todo-list {
+            list-style: none;
+            margin-bottom: 30px;
+        }
+        .todo-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .todo-item.completed .todo-title {
+            text-decoration: line-through;
+            color: #999;
+        }
+        .todo-title {
+            flex: 1;
+            font-size: 1rem;
+            color: #333;
+        }
+        .todo-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .todo-actions form {
+            display: inline;
+        }
+        .btn-toggle, .btn-delete {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-toggle {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .btn-toggle:hover {
+            background: #bbdefb;
+        }
+        .btn-delete {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .btn-delete:hover {
+            background: #ffcdd2;
+        }
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 30px;
+            font-style: italic;
+        }
+        .nav-links {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .nav-links a {
+            display: block;
+            padding: 14px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+        .btn-logout {
+            background: #ff6b6b;
+            color: white;
+        }
+        .btn-logout:hover {
+            background: #ee5a5a;
+        }
+        .btn-login {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .stats {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Demo Todo</h1>
+
+        {% if let Some(u) = user %}
+            <p class="welcome">Welcome, {{ u.label }}!</p>
+
+            <form class="add-form" action="/todos" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="text" name="title" placeholder="What needs to be done?" required>
+                <button type="submit">Add</button>
+            </form>
+
+            {% if todos.is_empty() %}
+                <div class="empty-state">No todos yet. Add one above!</div>
+            {% else %}
+                <div class="stats">{{ completed_count }} of {{ todos.len() }} completed</div>
+                <ul class="todo-list">
+                    {% for todo in todos %}
+                        <li class="todo-item{% if todo.completed %} completed{% endif %}">
+                            <span class="todo-title">{{ todo.title }}</span>
+                            <div class="todo-actions">
+                                <form action="/todos/{{ todo.id }}/toggle" method="POST">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <button type="submit" class="btn-toggle">
+                                        {% if todo.completed %}Undo{% else %}Done{% endif %}
+                                    </button>
+                                </form>
+                                <form action="/todos/{{ todo.id }}/delete" method="POST">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <button type="submit" class="btn-delete">Delete</button>
+                                </form>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            <div class="nav-links">
+                <a href="{{ prefix }}/user/summary" class="btn-secondary">Account Settings</a>
+                <a href="{{ prefix }}/user/logout?redirect=/" class="btn-logout">Logout</a>
+            </div>
+        {% else %}
+            <p class="welcome">Please log in to manage your todos</p>
+            <div class="nav-links">
+                <a href="{{ prefix }}/user/login" class="btn-login">Login</a>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
