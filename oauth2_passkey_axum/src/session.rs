@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use http::{Method, StatusCode, request::Parts};
 use subtle::ConstantTimeEq;
 
-use super::config::O2P_REDIRECT_ANON;
+use super::config::O2P_DEFAULT_REDIRECT;
 use oauth2_passkey::{SESSION_COOKIE_NAME, SessionUser, get_user_and_csrf_token_from_session};
 
 pub struct AuthRedirect {
@@ -22,8 +22,8 @@ impl AuthRedirect {
 
     fn into_response_with_method(self) -> Response {
         if self.method == Method::GET {
-            tracing::debug!("Redirecting to {}", O2P_REDIRECT_ANON.as_str());
-            Redirect::temporary(O2P_REDIRECT_ANON.as_str()).into_response()
+            tracing::debug!("Redirecting to {}", O2P_DEFAULT_REDIRECT.as_str());
+            Redirect::temporary(O2P_DEFAULT_REDIRECT.as_str()).into_response()
         } else {
             tracing::debug!("Unauthorized");
             (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()

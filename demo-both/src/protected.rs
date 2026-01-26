@@ -15,7 +15,7 @@ use oauth2_passkey_axum::{
     CsrfHeaderVerified,
     CsrfToken,
     O2P_ROUTE_PREFIX,
-    // Middleware, redirect to O2P_REDIRECT_ANON(default: /)
+    // Middleware, redirect to O2P_DEFAULT_REDIRECT (default: /)
     is_authenticated_redirect,
     is_authenticated_user_redirect,
 };

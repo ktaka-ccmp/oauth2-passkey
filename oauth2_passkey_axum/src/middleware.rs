@@ -7,7 +7,7 @@ use axum::{
 
 use http::header::HeaderValue;
 
-use super::config::{O2P_REDIRECT_ANON, O2P_RESPOND_WITH_X_CSRF_TOKEN};
+use super::config::{O2P_DEFAULT_REDIRECT, O2P_RESPOND_WITH_X_CSRF_TOKEN};
 use super::session::AuthUser;
 use oauth2_passkey::SessionError;
 
@@ -42,7 +42,7 @@ fn handle_auth_error(err: SessionError, req: &Request, redirect_on_error: bool) 
             // For CSRF errors, return 403 Forbidden with the message
             // For redirect middleware with GET requests, redirect instead
             if redirect_on_error && req.method() == http::Method::GET {
-                Redirect::temporary(O2P_REDIRECT_ANON.as_str()).into_response()
+                Redirect::temporary(O2P_DEFAULT_REDIRECT.as_str()).into_response()
             } else {
                 (StatusCode::FORBIDDEN, msg).into_response()
             }
@@ -50,7 +50,7 @@ fn handle_auth_error(err: SessionError, req: &Request, redirect_on_error: bool) 
         _ => {
             // For other authentication errors
             if redirect_on_error && req.method() == http::Method::GET {
-                Redirect::temporary(O2P_REDIRECT_ANON.as_str()).into_response()
+                Redirect::temporary(O2P_DEFAULT_REDIRECT.as_str()).into_response()
             } else {
                 (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
             }
@@ -95,7 +95,7 @@ pub async fn is_authenticated_401(mut req: Request, next: Next) -> Response {
 /// This middleware:
 /// 1. Verifies that the request has a valid session cookie
 /// 2. For state-changing methods (POST, PUT, DELETE, PATCH), verifies CSRF protection
-/// 3. Redirects unauthenticated GET requests to the login page (as defined in O2P_REDIRECT_ANON)
+/// 3. Redirects unauthenticated GET requests to the default redirect URL (as defined in O2P_DEFAULT_REDIRECT)
 /// 4. Returns 401 for unauthenticated non-GET requests
 /// 5. Adds the CSRF token to the response headers
 ///

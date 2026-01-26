@@ -19,7 +19,7 @@ use oauth2_passkey::{
     get_authenticator_info_batch, list_accounts_core, list_credentials_core,
 };
 
-use crate::config::{O2P_CUSTOM_CSS_URL, O2P_REDIRECT_ANON};
+use crate::config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT};
 use crate::session::AuthUser;
 
 pub(crate) fn router() -> Router<()> {
@@ -43,7 +43,7 @@ struct LoginTemplate<'a> {
 
 async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
     match user {
-        Some(_) => Ok(Redirect::to(O2P_REDIRECT_ANON.as_str()).into_response()),
+        Some(_) => Ok(Redirect::to(O2P_DEFAULT_REDIRECT.as_str()).into_response()),
         None => {
             let template = LoginTemplate {
                 message: "Sign in or create an account",
@@ -109,7 +109,7 @@ struct UserSummaryTemplate {
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
-    pub o2p_redirect_anon: String,
+    pub o2p_default_redirect: String,
     pub page_session_token: String,
     pub custom_css_url: Option<String>,
 }
@@ -120,7 +120,7 @@ impl UserSummaryTemplate {
         passkey_credentials: Vec<TemplateCredential>,
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
-        o2p_redirect_anon: String,
+        o2p_default_redirect: String,
         custom_css_url: Option<String>,
     ) -> Self {
         let page_session_token = generate_page_session_token(&user.csrf_token);
@@ -138,7 +138,7 @@ impl UserSummaryTemplate {
             passkey_credentials,
             oauth2_accounts,
             o2p_route_prefix,
-            o2p_redirect_anon,
+            o2p_default_redirect,
             page_session_token,
             custom_css_url,
         }
@@ -296,7 +296,7 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
         oauth2_accounts,
         // Pass owned String values to the template
         O2P_ROUTE_PREFIX.to_string(),
-        O2P_REDIRECT_ANON.to_string(),
+        O2P_DEFAULT_REDIRECT.to_string(),
         O2P_CUSTOM_CSS_URL.clone(),
     );
 

@@ -20,7 +20,7 @@ use oauth2_passkey::{
 
 use crate::{
     O2P_ADMIN_URL,
-    config::{O2P_CUSTOM_CSS_URL, O2P_REDIRECT_ANON},
+    config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT},
     session::AuthUser,
 };
 
@@ -37,7 +37,7 @@ pub(crate) fn router() -> Router<()> {
 struct AdminIndexTemplate {
     users: Vec<DbUser>,
     o2p_route_prefix: String,
-    o2p_redirect_anon: String,
+    o2p_default_redirect: String,
     csrf_token: String,
     custom_css_url: Option<String>,
 }
@@ -65,7 +65,7 @@ async fn admin_index(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, S
     let template = AdminIndexTemplate {
         users,
         o2p_route_prefix: O2P_ROUTE_PREFIX.to_string(),
-        o2p_redirect_anon: O2P_REDIRECT_ANON.to_string(),
+        o2p_default_redirect: O2P_DEFAULT_REDIRECT.to_string(),
         csrf_token,
         custom_css_url: O2P_CUSTOM_CSS_URL.clone(),
     };

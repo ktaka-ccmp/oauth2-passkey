@@ -124,14 +124,17 @@ Main route prefix for all authentication endpoints.
 O2P_ROUTE_PREFIX='/o2p'
 ```
 
-#### O2P_REDIRECT_ANON
+#### O2P_DEFAULT_REDIRECT
 
-Redirect path for anonymous (unauthenticated) users.
+Default redirect URL for authentication flows. Used when:
+- Unauthenticated users access protected routes
+- Authenticated users visit the login page
+- After logout
 
 - **Default**: `/`
 
 ```bash
-O2P_REDIRECT_ANON='/'
+O2P_DEFAULT_REDIRECT='/'
 ```
 
 #### O2P_LOGIN_URL

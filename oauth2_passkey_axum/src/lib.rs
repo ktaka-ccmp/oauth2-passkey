@@ -69,7 +69,7 @@ mod user;
 pub(crate) mod test_utils;
 
 // URL constants for different authentication-related pages
-pub use config::{O2P_ADMIN_URL, O2P_LOGIN_URL, O2P_REDIRECT_ANON, O2P_SUMMARY_URL};
+pub use config::{O2P_ADMIN_URL, O2P_DEFAULT_REDIRECT, O2P_LOGIN_URL, O2P_SUMMARY_URL};
 
 // Authentication middleware for protecting routes
 pub use middleware::{

@@ -23,10 +23,11 @@ pub static O2P_ADMIN_URL: LazyLock<String> = LazyLock::new(|| {
     std::env::var("O2P_ADMIN_URL").unwrap_or_else(|_| format!("{}/admin/index", *O2P_ROUTE_PREFIX))
 });
 
-/// URL to redirect unauthenticated users to
+/// Default redirect URL for authentication flows
+/// Used when: unauthenticated users access protected routes, authenticated users visit login page, after logout
 /// Default: "/"
-pub static O2P_REDIRECT_ANON: LazyLock<String> =
-    LazyLock::new(|| std::env::var("O2P_REDIRECT_ANON").unwrap_or_else(|_| "/".to_string()));
+pub static O2P_DEFAULT_REDIRECT: LazyLock<String> =
+    LazyLock::new(|| std::env::var("O2P_DEFAULT_REDIRECT").unwrap_or_else(|_| "/".to_string()));
 
 /// Whether to add X-CSRF-Token header to responses
 /// Default: true (can be disabled by setting O2P_RESPOND_WITH_X_CSRF_TOKEN=false)

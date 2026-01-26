@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: Renamed `O2P_REDIRECT_ANON` to `O2P_DEFAULT_REDIRECT` for clarity (env var, config, and template variable)
 - **BREAKING**: Admin route renamed from `/admin/list_users` to `/admin/index` for clarity
 - Admin page title changed from "User List" to "User Management"
 - Admin link text in summary page changed from "User List" to "Admin"
