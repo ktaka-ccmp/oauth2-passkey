@@ -3,7 +3,7 @@
 This library provides built-in UI pages for login, account management, and administration:
 
 - **Login** (`/o2p/user/login`) - Sign in and account creation
-- **Summary** (`/o2p/user/summary`) - User account management
+- **Account** (`/o2p/user/account`) - User account management
 - **Admin List** (`/o2p/admin/index`) - User list for administrators
 - **Admin User** (`/o2p/admin/user/{id}`) - User detail view for administrators
 

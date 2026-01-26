@@ -27,9 +27,9 @@ pub(crate) fn router() -> Router<()> {
         .route("/info", get(user_info))
         .route("/csrf_token", get(csrf_token))
         .route("/login", get(login))
-        .route("/summary", get(summary))
-        .route("/summary.js", get(serve_summary_js))
-        .route("/summary.css", get(serve_summary_css))
+        .route("/account", get(user_account))
+        .route("/account.js", get(serve_account_js))
+        .route("/account.css", get(serve_account_css))
         .route("/o2p-base.css", get(serve_base_css))
 }
 
@@ -103,8 +103,8 @@ struct TemplateAuthUser {
 }
 
 #[derive(Template)]
-#[template(path = "summary.j2")]
-struct UserSummaryTemplate {
+#[template(path = "user_account.j2")]
+struct UserAccountTemplate {
     pub user: TemplateAuthUser,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
@@ -114,7 +114,7 @@ struct UserSummaryTemplate {
     pub custom_css_url: Option<String>,
 }
 
-impl UserSummaryTemplate {
+impl UserAccountTemplate {
     fn new(
         user: AuthUser,
         passkey_credentials: Vec<TemplateCredential>,
@@ -193,8 +193,8 @@ async fn csrf_token(auth_user: AuthUser) -> Result<Json<Value>, (StatusCode, Str
     })))
 }
 
-/// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
-async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
+/// Display the user account management page with user info, passkey credentials, and OAuth2 accounts
+async fn user_account(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
     // let session_user: &SessionUser = &auth_user;
     let user_id = &auth_user.id;
@@ -290,7 +290,7 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
     // Create template with all data
     // Create the route strings first
 
-    let template = UserSummaryTemplate::new(
+    let template = UserAccountTemplate::new(
         auth_user,
         passkey_credentials,
         oauth2_accounts,
@@ -311,8 +311,8 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
     Ok(Html(html))
 }
 
-async fn serve_summary_js() -> Response {
-    let js_content = include_str!("../../static/summary.js");
+async fn serve_account_js() -> Response {
+    let js_content = include_str!("../../static/account.js");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
@@ -320,8 +320,8 @@ async fn serve_summary_js() -> Response {
         .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
-async fn serve_summary_css() -> Response {
-    let css_content = include_str!("../../static/summary.css");
+async fn serve_account_css() -> Response {
+    let css_content = include_str!("../../static/account.css");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "text/css")

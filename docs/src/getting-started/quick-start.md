@@ -80,7 +80,7 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
 
    1. Visit your ORIGIN URL (e.g., `https://localhost:3443` or your tunnel URL)
    2. Create a user with Google OAuth2 or Passkey
-   3. Navigate to the user summary page: `{YOUR_ORIGIN}/o2p/user/summary`
+   3. Navigate to the user account page: `{YOUR_ORIGIN}/o2p/user/account`
    4. Add new Passkey or OAuth2 account
    5. Log out and sign in with a different method
    6. Explore credential linking and protected pages (p1-p6)

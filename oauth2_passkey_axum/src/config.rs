@@ -10,11 +10,11 @@ pub static O2P_LOGIN_URL: LazyLock<String> = LazyLock::new(|| {
     std::env::var("O2P_LOGIN_URL").unwrap_or_else(|_| format!("{}/user/login", *O2P_ROUTE_PREFIX))
 });
 
-/// URL of supplementary summary page
-/// Default: "/o2p/user/summary"
-pub static O2P_SUMMARY_URL: LazyLock<String> = LazyLock::new(|| {
-    std::env::var("O2P_SUMMARY_URL")
-        .unwrap_or_else(|_| format!("{}/user/summary", *O2P_ROUTE_PREFIX))
+/// URL of the user account management page
+/// Default: "/o2p/user/account"
+pub static O2P_ACCOUNT_URL: LazyLock<String> = LazyLock::new(|| {
+    std::env::var("O2P_ACCOUNT_URL")
+        .unwrap_or_else(|_| format!("{}/user/account", *O2P_ROUTE_PREFIX))
 });
 
 /// URL of the admin index page

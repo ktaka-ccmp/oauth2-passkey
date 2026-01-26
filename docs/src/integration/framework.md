@@ -73,6 +73,6 @@ The `oauth2_passkey_router()` provides these endpoints under `O2P_ROUTE_PREFIX`:
 | `/passkey/register/finish` | Complete passkey registration |
 | `/passkey/auth/start` | Start passkey authentication |
 | `/passkey/auth/finish` | Complete passkey authentication |
-| `/user/summary` | User profile and credential management |
+| `/user/account` | User profile and credential management |
 | `/admin/index` | Admin user list (requires admin) |
 | `/logout` | End session |

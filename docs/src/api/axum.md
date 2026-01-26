@@ -192,7 +192,7 @@ async fn handler(user: Option<AuthUser>) -> String {
 | `O2P_ROUTE_PREFIX` | Route prefix for auth endpoints (default: `/o2p`) |
 | `O2P_LOGIN_URL` | Login page URL |
 | `O2P_ADMIN_URL` | Admin interface URL |
-| `O2P_SUMMARY_URL` | User summary page URL |
+| `O2P_ACCOUNT_URL` | User account management page URL |
 | `O2P_DEFAULT_REDIRECT` | Default redirect URL for auth flows |
 
 ## Re-exports from oauth2-passkey

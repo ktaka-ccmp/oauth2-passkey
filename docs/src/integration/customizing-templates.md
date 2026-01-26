@@ -3,7 +3,7 @@
 This library provides built-in UI pages for login, account management, and administration:
 
 - **Login** (`/o2p/user/login`) - Sign in and account creation
-- **Summary** (`/o2p/user/summary`) - User account management
+- **Account** (`/o2p/user/account`) - User account management
 - **Admin List** (`/o2p/admin/index`) - User list for administrators
 - **Admin User** (`/o2p/admin/user/{id}`) - User detail view for administrators
 
@@ -117,9 +117,9 @@ let app = Router::new()
     .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
 ```
 
-## Custom Summary Page
+## Custom Account Page
 
-The library provides a built-in summary page at `/o2p/user/summary`, but you can create your own.
+The library provides a built-in account management page at `/o2p/user/account`, but you can create your own.
 
 ### 1. Create Summary Handler
 

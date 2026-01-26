@@ -90,7 +90,7 @@ $ cargo run
 
 1. **Visit**: <https://localhost:3443>
 2. **Create User** with Google OAuth2 or Passkey
-3. **Navigate to** the user summary page: <https://localhost:3443/o2p/user/summary>
+3. **Navigate to** the user account page: <https://localhost:3443/o2p/user/account>
 4. **Add New Passkey** or **Add New OAuth2 Account**
 5. **Logout**
 6. **Sign in** with Google OAuth2 or Passkey

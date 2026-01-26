@@ -22,10 +22,10 @@ struct IndexTemplate<'a> {
     prefix: &'a str,
 }
 
-// O2P_LOGIN_URL is /o2p/user/login and O2P_SUMMARY_URL is /o2p/user/summary by default
+// O2P_LOGIN_URL is /o2p/user/login and O2P_ACCOUNT_URL is /o2p/user/account by default
 async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
     match user {
-        // Some(_) => Ok(Redirect::to(O2P_SUMMARY_URL.as_str()).into_response()),
+        // Some(_) => Ok(Redirect::to(O2P_ACCOUNT_URL.as_str()).into_response()),
         Some(_) => {
             let template = IndexTemplate {
                 message: "This is a protected page.",

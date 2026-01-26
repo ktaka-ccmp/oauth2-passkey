@@ -11,8 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING**: Renamed `O2P_REDIRECT_ANON` to `O2P_DEFAULT_REDIRECT` for clarity (env var, config, and template variable)
 - **BREAKING**: Admin route renamed from `/admin/list_users` to `/admin/index` for clarity
+- **BREAKING**: User account page renamed from `/user/summary` to `/user/account` for accuracy
+  - Route: `/summary` -> `/account`
+  - Env var: `O2P_SUMMARY_URL` -> `O2P_ACCOUNT_URL`
+  - Handler: `summary()` -> `user_account()`
+  - Template: `summary.j2` -> `user_account.j2`
+  - Static files: `summary.js` -> `account.js`, `summary.css` -> `account.css`
 - Admin page title changed from "User List" to "User Management"
-- Admin link text in summary page changed from "User List" to "Admin"
+- Admin link text in account page changed from "User List" to "Admin"
 - Internal refactoring: handler and template names aligned (`admin_index`, `admin_user_page`)
 
 ## [0.2.0] - 2026-01-22

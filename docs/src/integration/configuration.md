@@ -147,14 +147,14 @@ URL path for the login page.
 O2P_LOGIN_URL='/o2p/user/login'
 ```
 
-#### O2P_SUMMARY_URL
+#### O2P_ACCOUNT_URL
 
-URL path for the user summary page (shown after successful authentication).
+URL path for the user account management page.
 
-- **Default**: `/o2p/user/summary`
+- **Default**: `/o2p/user/account`
 
 ```bash
-O2P_SUMMARY_URL='/o2p/user/summary'
+O2P_ACCOUNT_URL='/o2p/user/account'
 ```
 
 #### O2P_RESPOND_WITH_X_CSRF_TOKEN
