@@ -16,7 +16,12 @@ You can customize these pages in two ways:
 
 ## Overview
 
-This page explains how to replace the built-in pages with your own templates. This gives you full control over the HTML structure and layout.
+This page explains how to create custom pages to replace the built-in UI. The process involves:
+
+1. Creating your custom pages (handlers + templates)
+2. Disabling the built-in UI via feature flags
+
+See [Disabling Built-in UI](#disabling-built-in-ui) for feature flag configuration.
 
 ## Custom Login Page
 
@@ -443,16 +448,30 @@ cargo run
 
 > **Note**: `O2P_LOGIN_URL` is **required** for custom login pages to work. Although it doesn't appear in your application code, the library reads it internally to determine where to redirect unauthenticated users.
 
-## Feature Flags
+## Disabling Built-in UI
 
-| Feature | Default | Description |
-|---------|---------|-------------|
-| `admin-ui` | Enabled | Built-in admin interface at `/o2p/admin/*` |
-| `user-ui` | Enabled | Built-in login/summary pages at `/o2p/user/*` |
+After creating your custom pages, disable the corresponding built-in UI to avoid shipping unused code.
 
-To disable a feature:
+The library provides two feature flags:
+
+| Feature | Default | Controls |
+| ------- | ------- | -------- |
+| `user-ui` | ON | Login and Summary pages |
+| `admin-ui` | ON | Admin List and Admin User pages |
+
+Configure these in your `Cargo.toml` based on which pages you're replacing:
 
 ```toml
-[dependencies]
+# Replace ALL pages with custom templates (recommended for full customization)
+oauth2-passkey-axum = { version = "0.2", default-features = false }
+
+# Replace only admin pages, keep built-in login/summary
 oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["user-ui"] }
+
+# Replace only user pages, keep built-in admin
+oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["admin-ui"] }
 ```
+
+**Note:** API endpoints (logout, delete account, admin operations, etc.) are always available regardless of feature flags. Only the HTML pages and their static assets are affected.
+
+See [demo-custom-login](https://github.com/anthropics/oauth2-passkey/tree/master/demo-custom-login) for a complete example with `default-features = false`.
