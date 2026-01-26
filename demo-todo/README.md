@@ -38,7 +38,7 @@ Both library and app share a single PostgreSQL database. This enables foreign ke
 ```env
 GENERIC_DATA_STORE_TYPE=postgresql
 GENERIC_DATA_STORE_URL='postgres://demo:demo@localhost:5432/demo'
-TODO_DATABASE_URL='postgres://demo:demo@localhost:5432/demo'
+APP_DATABASE_URL='postgres://demo:demo@localhost:5432/demo'
 ```
 
 ### Separate Databases
@@ -48,7 +48,7 @@ Library and app use independent databases. Useful for isolation or when using di
 ```env
 GENERIC_DATA_STORE_TYPE=sqlite
 GENERIC_DATA_STORE_URL='sqlite:/tmp/auth.db'
-TODO_DATABASE_URL='postgres://demo:demo@localhost:5432/demo'
+APP_DATABASE_URL='postgres://demo:demo@localhost:5432/demo'
 ```
 
 ## Setup

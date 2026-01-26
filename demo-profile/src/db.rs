@@ -30,7 +30,7 @@ impl Default for UserProfile {
 
 /// Initialize database connection pool and return it
 pub async fn init_db() -> Result<PgPool, Box<dyn std::error::Error>> {
-    let database_url = std::env::var("PROFILE_DATABASE_URL")
+    let database_url = std::env::var("APP_DATABASE_URL")
         .unwrap_or_else(|_| "postgres://demo:demo@localhost:5432/demo".to_string());
 
     let pool = PgPoolOptions::new()
