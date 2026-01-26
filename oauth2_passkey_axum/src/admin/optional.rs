@@ -18,7 +18,7 @@ use oauth2_passkey::{
     get_user, list_accounts_core, list_credentials_core,
 };
 
-use crate::{O2P_ADMIN_URL, session::AuthUser};
+use crate::{O2P_ADMIN_URL, config::O2P_CUSTOM_CSS_URL, session::AuthUser};
 
 pub(crate) fn router() -> Router<()> {
     Router::new()
@@ -76,6 +76,7 @@ struct UserSummaryTemplate {
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
+    pub custom_css_url: Option<String>,
 }
 
 impl UserSummaryTemplate {
@@ -85,6 +86,7 @@ impl UserSummaryTemplate {
         passkey_credentials: Vec<TemplateCredential>,
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
+        custom_css_url: Option<String>,
     ) -> Self {
         Self {
             user: TemplateUser {
@@ -100,6 +102,7 @@ impl UserSummaryTemplate {
             passkey_credentials,
             oauth2_accounts,
             o2p_route_prefix,
+            custom_css_url,
         }
     }
 }
@@ -237,6 +240,7 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
         passkey_credentials,
         oauth2_accounts,
         O2P_ROUTE_PREFIX.to_string(),
+        O2P_CUSTOM_CSS_URL.clone(),
     );
 
     // Render the template

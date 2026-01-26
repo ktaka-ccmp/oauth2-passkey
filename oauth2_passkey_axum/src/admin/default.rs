@@ -14,7 +14,7 @@ use oauth2_passkey::{
 };
 
 use super::super::error::IntoResponseError;
-use crate::config::O2P_REDIRECT_ANON;
+use crate::config::{O2P_CUSTOM_CSS_URL, O2P_REDIRECT_ANON};
 use crate::session::AuthUser;
 
 pub(super) fn router() -> Router<()> {
@@ -39,6 +39,7 @@ struct UserListTemplate {
     o2p_route_prefix: String,
     o2p_redirect_anon: String,
     csrf_token: String,
+    custom_css_url: Option<String>,
 }
 
 async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
@@ -66,6 +67,7 @@ async fn list_users(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, St
         o2p_route_prefix: O2P_ROUTE_PREFIX.to_string(),
         o2p_redirect_anon: O2P_REDIRECT_ANON.to_string(),
         csrf_token,
+        custom_css_url: O2P_CUSTOM_CSS_URL.clone(),
     };
     Ok(Html(template.render().map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())

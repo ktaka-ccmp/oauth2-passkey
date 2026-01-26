@@ -36,3 +36,9 @@ pub static O2P_RESPOND_WITH_X_CSRF_TOKEN: LazyLock<bool> = LazyLock::new(|| {
         .map(|val| val.to_lowercase() != "false")
         .unwrap_or(true)
 });
+
+/// Optional URL for custom CSS to override default styles
+/// Example: O2P_CUSTOM_CSS_URL=/static/my-theme.css
+/// Users can override CSS Custom Properties in their custom CSS file
+pub static O2P_CUSTOM_CSS_URL: LazyLock<Option<String>> =
+    LazyLock::new(|| std::env::var("O2P_CUSTOM_CSS_URL").ok());

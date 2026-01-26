@@ -4,42 +4,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Index Page</title>
-
+    <title>Login</title>
+    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
     <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
     <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
-
     <script>
         const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
         const csrfToken = "_NOT_SET_";
     </script>
-
 </head>
 
-<body>
-    <div>
-        <h1>{{message}}</h1>
-    </div>
-    <div style="display: flex; gap: 10px; margin-top: 10px;">
-        Google OAuth2:
-    </div>
-    <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="oauth2.openPopup('create_user')">Create User</button>
-        <button onclick="oauth2.openPopup('login')">Sign in</button>
-        <button onclick="oauth2.openPopup('create_user_or_login')">Either way</button>
-    </div>
+<body class="login-page">
+    <div class="login-card">
+        <h1>Welcome</h1>
+        <p class="subtitle">{{message}}</p>
 
-    <div style="display: flex; gap: 10px; margin-top: 10px;">
-        Passkey:
-    </div>
-    <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button onclick="showRegistrationModal('create_user')">
-            Create User
-        </button>
-        <button onclick="startAuthentication(false)">Sign in</button>
-        or <a href="{{o2p_route_prefix}}/passkey/conditional_ui">try conditional UI</a>
-    </div>
+        <div class="auth-section">
+            <span class="section-label">Sign In</span>
+            <div class="auth-buttons">
+                <button class="btn btn-oauth2 btn-block" onclick="oauth2.openPopup('login')">
+                    Sign in with Google
+                </button>
+                <button class="btn btn-passkey btn-block" onclick="startAuthentication(false)">
+                    Sign in with Passkey
+                </button>
+            </div>
+        </div>
 
+        <div class="divider"><span>or</span></div>
+
+        <div class="auth-section">
+            <span class="section-label">Create Account</span>
+            <div class="auth-buttons">
+                <button class="btn btn-oauth2 btn-block" onclick="oauth2.openPopup('create_user')">
+                    Create with Google
+                </button>
+                <button class="btn btn-passkey btn-block" onclick="showRegistrationModal('create_user')">
+                    Create with Passkey
+                </button>
+            </div>
+        </div>
+
+        <div class="divider"><span>or</span></div>
+
+        <div class="auth-section">
+            <span class="section-label">Auto (Create or Sign In)</span>
+            <div class="auth-buttons">
+                <button class="btn btn-oauth2 btn-block" onclick="oauth2.openPopup('create_user_or_login')">
+                    Google Account
+                </button>
+            </div>
+        </div>
+
+        <p class="login-link">
+            <a href="{{o2p_route_prefix}}/passkey/conditional_ui">Try Passkey Conditional UI</a>
+        </p>
+    </div>
 </body>
 
 </html>

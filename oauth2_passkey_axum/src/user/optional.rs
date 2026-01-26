@@ -19,7 +19,7 @@ use oauth2_passkey::{
     get_authenticator_info_batch, list_accounts_core, list_credentials_core,
 };
 
-use crate::config::O2P_REDIRECT_ANON;
+use crate::config::{O2P_CUSTOM_CSS_URL, O2P_REDIRECT_ANON};
 use crate::session::AuthUser;
 
 pub(crate) fn router() -> Router<()> {
@@ -30,6 +30,7 @@ pub(crate) fn router() -> Router<()> {
         .route("/summary", get(summary))
         .route("/summary.js", get(serve_summary_js))
         .route("/summary.css", get(serve_summary_css))
+        .route("/o2p-base.css", get(serve_base_css))
 }
 
 #[derive(Template)]
@@ -37,6 +38,7 @@ pub(crate) fn router() -> Router<()> {
 struct LoginTemplate<'a> {
     message: &'a str,
     o2p_route_prefix: &'a str,
+    custom_css_url: Option<&'a str>,
 }
 
 async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
@@ -44,8 +46,9 @@ async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
         Some(_) => Ok(Redirect::to(O2P_REDIRECT_ANON.as_str()).into_response()),
         None => {
             let template = LoginTemplate {
-                message: "Passkey/OAuth2 Login Page!",
+                message: "Sign in or create an account",
                 o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
+                custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
             };
             let html = Html(
                 template
@@ -108,6 +111,7 @@ struct UserSummaryTemplate {
     pub o2p_route_prefix: String,
     pub o2p_redirect_anon: String,
     pub page_session_token: String,
+    pub custom_css_url: Option<String>,
 }
 
 impl UserSummaryTemplate {
@@ -117,6 +121,7 @@ impl UserSummaryTemplate {
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
         o2p_redirect_anon: String,
+        custom_css_url: Option<String>,
     ) -> Self {
         let page_session_token = generate_page_session_token(&user.csrf_token);
 
@@ -135,6 +140,7 @@ impl UserSummaryTemplate {
             o2p_route_prefix,
             o2p_redirect_anon,
             page_session_token,
+            custom_css_url,
         }
     }
 }
@@ -291,6 +297,7 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
         // Pass owned String values to the template
         O2P_ROUTE_PREFIX.to_string(),
         O2P_REDIRECT_ANON.to_string(),
+        O2P_CUSTOM_CSS_URL.clone(),
     );
 
     // Render the template
@@ -315,6 +322,15 @@ async fn serve_summary_js() -> Response {
 
 async fn serve_summary_css() -> Response {
     let css_content = include_str!("../../static/summary.css");
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, "text/css")
+        .body(css_content.to_string().into())
+        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
+}
+
+async fn serve_base_css() -> Response {
+    let css_content = include_str!("../../static/o2p-base.css");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "text/css")

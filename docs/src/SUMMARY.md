@@ -25,7 +25,8 @@
 
 # Part 3: Customization
 
-- [Custom Pages](integration/custom-pages.md)
+- [Customizing Built-in Pages - CSS](integration/customizing-css.md)
+- [Customizing Built-in Pages - Templates](integration/customizing-templates.md)
 - [OAuth2 JavaScript API](integration/oauth2-js.md)
 - [Passkey JavaScript API](integration/passkey-js.md)
 - [Askama Templates](integration/templates.md)

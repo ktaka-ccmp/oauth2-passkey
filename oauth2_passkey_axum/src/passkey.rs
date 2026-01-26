@@ -17,6 +17,7 @@ use oauth2_passkey::{
     update_passkey_credential_core,
 };
 
+use super::config::O2P_CUSTOM_CSS_URL;
 use super::error::IntoResponseError;
 use super::session::AuthUser;
 
@@ -133,11 +134,13 @@ async fn serve_passkey_js() -> Response {
 #[template(path = "conditional_ui.j2")]
 struct ConditionalUiTemplate<'a> {
     o2p_route_prefix: &'a str,
+    custom_css_url: Option<&'a str>,
 }
 
 async fn conditional_ui() -> impl IntoResponse {
     let template = ConditionalUiTemplate {
         o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
     };
     match template.render() {
         Ok(html) => (StatusCode::OK, Html(html)).into_response(),

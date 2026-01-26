@@ -1,6 +1,22 @@
-# Custom Pages
+# Customizing Built-in Pages - Templates
 
-Create fully custom login, summary, and admin pages with your own design.
+This library provides built-in UI pages for login, account management, and administration:
+
+- **Login** (`/o2p/user/login`) - Sign in and account creation
+- **Summary** (`/o2p/user/summary`) - User account management
+- **Admin List** (`/o2p/admin/list_users`) - User list for administrators
+- **Admin User** (`/o2p/admin/user/{id}`) - User detail view for administrators
+
+You can customize these pages in two ways:
+
+| Method | Effort | When to Use |
+| ------ | ------ | ----------- |
+| [CSS](customizing-css.md) | Low | Change colors, fonts, spacing |
+| **Templates** (this page) | High | Replace page structure entirely |
+
+## Overview
+
+This page explains how to replace the built-in pages with your own templates. This gives you full control over the HTML structure and layout.
 
 ## Custom Login Page
 

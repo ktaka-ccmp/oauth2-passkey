@@ -3,9 +3,13 @@
 <head>
     <title>User List</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{o2p_route_prefix}}/admin/admin_user.css">
+    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
 </head>
 <body>
+<div class="container">
     <div class="page-header">
         <h1>User List</h1>
         <nav>
@@ -53,6 +57,7 @@
             </tbody>
         </table>
     </div>
+</div>
     <script src="{{o2p_route_prefix}}/admin/admin_user.js"></script>
     <script>
         const csrfToken = "{{csrf_token}}";
