@@ -4,14 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Summary - Custom Login Demo</title>
+    <title>Admin: User Detail - Custom Login Demo</title>
     <script>
         const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
-        const userId = '{{user_id}}';
         const csrfToken = '{{csrf_token}}';
+        const targetUserId = '{{target_user_id}}';
     </script>
-    <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
-    <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -50,8 +48,18 @@
             margin-bottom: 24px;
         }
 
+        .admin-badge {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
         .user-info {
-            background: #e8f5e9;
+            background: #e3f2fd;
             padding: 20px;
             border-radius: 8px;
             margin: 20px 0;
@@ -63,7 +71,7 @@
         }
 
         .user-info strong {
-            color: #2e7d32;
+            color: #1565c0;
             min-width: 120px;
             display: inline-block;
         }
@@ -136,7 +144,6 @@
         .btn-large {
             padding: 12px 24px;
             font-size: 16px;
-            margin-top: 20px;
         }
 
         .btn-primary {
@@ -166,15 +173,22 @@
             background: #c82333;
         }
 
-        .btn-add {
+        .btn-success {
             background: #28a745;
             color: white;
-            font-size: 12px;
-            padding: 6px 12px;
         }
 
-        .btn-add:hover {
+        .btn-success:hover {
             background: #218838;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
         }
 
         .btn-small {
@@ -187,89 +201,57 @@
             gap: 8px;
         }
 
-        /* Edit Form */
-        .edit-form {
-            display: none;
-            background: #fff;
-            padding: 16px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            margin-top: 16px;
-        }
-
-        .edit-form.active {
-            display: block;
-        }
-
-        .form-group {
-            margin-bottom: 12px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 4px;
-            font-weight: 500;
-            color: #333;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-
-        .form-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 16px;
-        }
-
         .ml-10 {
             margin-left: 10px;
+        }
+
+        .first-user-note {
+            font-size: 12px;
+            color: #888;
+            margin-left: 8px;
         }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>User Summary</h1>
-        <p class="subtitle">Your account information and registered credentials</p>
+        <h1>
+            Admin: User Detail
+            {% if target_is_admin %}
+            <span class="admin-badge">Admin</span>
+            {% if target_is_first_user %}
+            <span class="first-user-note">(First User - Protected)</span>
+            {% endif %}
+            {% endif %}
+        </h1>
+        <p class="subtitle">Manage user credentials and account</p>
 
         <!-- User Information -->
-        <div class="user-info" id="user-info-display">
+        <div class="user-info">
             <div class="user-info-row">
                 <div>
-                    <p><strong>Account:</strong> <span id="display-account">{{user_account}}</span></p>
-                    <p><strong>Display Name:</strong> <span id="display-label">{{user_label}}</span></p>
-                    <p><strong>Created:</strong> {{created_at}}</p>
+                    <p><strong>User ID:</strong> {{target_user_id}}</p>
+                    <p><strong>Account:</strong> {{target_user_account}}</p>
+                    <p><strong>Display Name:</strong> {{target_user_label}}</p>
+                    <p><strong>Created:</strong> {{target_created_at}}</p>
                 </div>
-                <button class="btn btn-secondary btn-small" onclick="toggleEditForm()">Edit</button>
-            </div>
-        </div>
-
-        <!-- Edit User Form -->
-        <div class="edit-form" id="edit-form">
-            <div class="form-group">
-                <label for="edit-account">Account:</label>
-                <input type="text" id="edit-account" value="{{user_account}}">
-            </div>
-            <div class="form-group">
-                <label for="edit-label">Display Name:</label>
-                <input type="text" id="edit-label" value="{{user_label}}">
-            </div>
-            <div class="form-actions">
-                <button class="btn btn-primary" onclick="updateUserAccount()">Save</button>
-                <button class="btn btn-secondary" onclick="toggleEditForm()">Cancel</button>
+                <div class="action-buttons">
+                    {% if target_is_first_user %}
+                    <!-- First user cannot be modified -->
+                    {% else %}
+                    {% if target_is_admin %}
+                    <button class="btn btn-warning" onclick="toggleAdmin(false)">Demote</button>
+                    {% else %}
+                    <button class="btn btn-success" onclick="toggleAdmin(true)">Promote</button>
+                    {% endif %}
+                    {% endif %}
+                </div>
             </div>
         </div>
 
         <!-- Passkey Credentials -->
         <h2>
             <span>Passkey Credentials</span>
-            <button class="btn btn-add" onclick="showRegistrationModal('add_to_user')">+ Add Passkey</button>
         </h2>
         {% if passkeys.is_empty() %}
         <p class="empty-message">No passkeys registered</p>
@@ -291,7 +273,6 @@
         <!-- OAuth2 Accounts -->
         <h2>
             <span>OAuth2 Accounts</span>
-            <button class="btn btn-add" onclick="oauth2.openPopup('add_to_user')">+ Link Account</button>
         </h2>
         {% if oauth2_accounts.is_empty() %}
         <p class="empty-message">No OAuth2 accounts linked</p>
@@ -311,66 +292,57 @@
         {% endif %}
 
         <!-- Danger Zone -->
+        {% if target_is_first_user %}
+        <!-- First user cannot be deleted -->
+        {% else %}
         <h2 style="border-bottom-color: #dc3545;">
             <span>Danger Zone</span>
         </h2>
-        <p style="color: #666; margin-bottom: 16px;">Permanently delete your account and all associated data.</p>
-        <button class="btn btn-danger" onclick="deleteAccount()">Delete Account</button>
+        <p style="color: #666; margin-bottom: 16px;">Permanently delete this user and all associated data.</p>
+        <button class="btn btn-danger" onclick="deleteUser()">Delete User</button>
+        {% endif %}
 
         <!-- Navigation -->
         <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #eee;">
-            <a href="/" class="btn btn-primary btn-large">Back to Home</a>
-            {% if is_admin %}
-            <a href="/admin" class="btn btn-large ml-10" style="background: #9c27b0; color: white;">Admin Panel</a>
-            {% endif %}
-            <button class="btn btn-secondary btn-large ml-10" onclick="logout()">Logout</button>
+            <a href="/admin" class="btn btn-primary btn-large">Back to User List</a>
+            <a href="/" class="btn btn-secondary btn-large ml-10">Home</a>
         </div>
     </div>
 
     <script>
-        // Toggle edit form
-        function toggleEditForm() {
-            const form = document.getElementById('edit-form');
-            form.classList.toggle('active');
-        }
+        // Toggle admin status
+        function toggleAdmin(makeAdmin) {
+            const action = makeAdmin ? 'promote to admin' : 'demote from admin';
+            if (!confirm(`Are you sure you want to ${action} this user?`)) return;
 
-        // Update user account
-        function updateUserAccount() {
-            const account = document.getElementById('edit-account').value;
-            const label = document.getElementById('edit-label').value;
-
-            fetch(`${O2P_ROUTE_PREFIX}/user/update`, {
+            fetch(`${O2P_ROUTE_PREFIX}/admin/update_admin_status`, {
                 method: 'PUT',
                 headers: {
                     'X-CSRF-Token': csrfToken,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    user_id: userId,
-                    account: account,
-                    label: label
+                    user_id: targetUserId,
+                    is_admin: makeAdmin
                 })
             })
             .then(response => {
-                if (!response.ok) throw new Error('Failed to update');
-                return response.json();
-            })
-            .then(data => {
-                document.getElementById('display-account').textContent = data.account;
-                document.getElementById('display-label').textContent = data.label;
-                toggleEditForm();
-                alert('Profile updated successfully');
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    response.text().then(text => alert('Failed: ' + text));
+                }
             })
             .catch(error => {
                 alert('Error: ' + error.message);
             });
         }
 
-        // Delete passkey
+        // Delete passkey (admin)
         function deletePasskey(credentialId) {
             if (!confirm('Are you sure you want to delete this passkey?')) return;
 
-            fetch(`${O2P_ROUTE_PREFIX}/passkey/credentials/${credentialId}`, {
+            fetch(`${O2P_ROUTE_PREFIX}/admin/delete_passkey_credential/${credentialId}`, {
                 method: 'DELETE',
                 headers: {
                     'X-CSRF-Token': csrfToken,
@@ -389,11 +361,11 @@
             });
         }
 
-        // Unlink OAuth2 account
+        // Unlink OAuth2 account (admin)
         function unlinkOAuth2(provider, providerUserId) {
             if (!confirm('Are you sure you want to unlink this OAuth2 account?')) return;
 
-            fetch(`${O2P_ROUTE_PREFIX}/oauth2/accounts/${provider}/${providerUserId}`, {
+            fetch(`${O2P_ROUTE_PREFIX}/admin/delete_oauth2_account/${provider}/${providerUserId}`, {
                 method: 'DELETE',
                 headers: {
                     'X-CSRF-Token': csrfToken,
@@ -412,23 +384,22 @@
             });
         }
 
-        // Delete account
-        function deleteAccount() {
-            if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
-            if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) return;
+        // Delete user (admin)
+        function deleteUser() {
+            if (!confirm('Are you sure you want to delete this user?')) return;
+            if (!confirm('This will permanently delete all their data. Are you absolutely sure?')) return;
 
-            fetch(`${O2P_ROUTE_PREFIX}/user/delete`, {
+            fetch(`${O2P_ROUTE_PREFIX}/admin/delete_user`, {
                 method: 'DELETE',
                 headers: {
                     'X-CSRF-Token': csrfToken,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ user_id: userId })
+                body: JSON.stringify({ user_id: targetUserId })
             })
             .then(response => {
                 if (response.ok) {
-                    alert('Account deleted. You will be logged out.');
-                    window.location.href = '/';
+                    window.location.href = '/admin';
                 } else {
                     response.text().then(text => alert('Failed: ' + text));
                 }
@@ -436,11 +407,6 @@
             .catch(error => {
                 alert('Error: ' + error.message);
             });
-        }
-
-        // Logout
-        function logout() {
-            window.location.href = O2P_ROUTE_PREFIX + "/user/logout?redirect=/";
         }
     </script>
 </body>

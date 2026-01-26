@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin: User List - Custom Login Demo</title>
+    <script>
+        const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
+        const csrfToken = '{{csrf_token}}';
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 24px;
+        }
+
+        .admin-badge {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .user-row td {
+            vertical-align: middle;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-account {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .user-label {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 6px 12px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background 0.2s;
+            cursor: pointer;
+            border: none;
+            font-size: 13px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd6;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .btn-large {
+            padding: 12px 24px;
+            font-size: 16px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .empty-message {
+            color: #888;
+            font-style: italic;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .ml-10 {
+            margin-left: 10px;
+        }
+
+        .first-user-note {
+            font-size: 11px;
+            color: #888;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Admin: User Management</h1>
+        <p class="subtitle">Manage all registered users</p>
+
+        {% if users.is_empty() %}
+        <p class="empty-message">No users found</p>
+        {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Created</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr class="user-row">
+                    <td>
+                        <div class="user-info">
+                            <span class="user-account">{{u.account}}</span>
+                            <span class="user-label">{{u.label}}</span>
+                        </div>
+                    </td>
+                    <td>{{u.created_at}}</td>
+                    <td>
+                        {% if u.is_admin %}
+                        <span class="admin-badge">Admin</span>
+                        {% if u.is_first_user %}
+                        <span class="first-user-note">(First User)</span>
+                        {% endif %}
+                        {% else %}
+                        <span style="color: #888;">User</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <a href="/admin/user/{{u.id}}" class="btn btn-primary">View</a>
+                            {% if u.is_first_user %}
+                            <!-- First user cannot be demoted -->
+                            {% else %}
+                            {% if u.is_admin %}
+                            <button class="btn btn-warning" onclick="toggleAdmin('{{u.id}}', false)">Demote</button>
+                            {% else %}
+                            <button class="btn btn-success" onclick="toggleAdmin('{{u.id}}', true)">Promote</button>
+                            {% endif %}
+                            <button class="btn btn-danger" onclick="deleteUser('{{u.id}}', '{{u.account}}')">Delete</button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <!-- Navigation -->
+        <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #eee;">
+            <a href="/" class="btn btn-primary btn-large">Back to Home</a>
+            <a href="/summary" class="btn btn-secondary btn-large ml-10">My Account</a>
+        </div>
+    </div>
+
+    <script>
+        // Toggle admin status
+        function toggleAdmin(userId, makeAdmin) {
+            const action = makeAdmin ? 'promote to admin' : 'demote from admin';
+            if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+
+            fetch(`${O2P_ROUTE_PREFIX}/admin/update_admin_status`, {
+                method: 'PUT',
+                headers: {
+                    'X-CSRF-Token': csrfToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    is_admin: makeAdmin
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    response.text().then(text => alert('Failed: ' + text));
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            });
+        }
+
+        // Delete user
+        function deleteUser(userId, account) {
+            if (!confirm(`Are you sure you want to delete user "${account}"?`)) return;
+            if (!confirm('This will permanently delete all their data. Are you absolutely sure?')) return;
+
+            fetch(`${O2P_ROUTE_PREFIX}/admin/delete_user`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-Token': csrfToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ user_id: userId })
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    response.text().then(text => alert('Failed: ' + text));
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            });
+        }
+    </script>
+</body>
+
+</html>

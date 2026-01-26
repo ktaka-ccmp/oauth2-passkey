@@ -93,3 +93,10 @@ pub use oauth2_passkey::{CsrfHeaderVerified, CsrfToken, O2P_ROUTE_PREFIX, init};
 pub use oauth2_passkey::{
     OAuth2Account, PasskeyCredential, UserId, list_accounts_core, list_credentials_core,
 };
+
+// Re-export types and functions for custom admin pages
+pub use oauth2_passkey::{
+    CredentialId, DbUser, ProviderUserId, SessionId, delete_oauth2_account_admin,
+    delete_passkey_credential_admin, delete_user_account_admin, get_all_users, get_user,
+    update_user_admin_status,
+};

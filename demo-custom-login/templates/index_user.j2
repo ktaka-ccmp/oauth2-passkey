@@ -86,6 +86,16 @@
         .summary-link:hover {
             background: #f57c00;
         }
+
+        .admin-link {
+            background: #9c27b0;
+            color: white;
+            margin-left: 10px;
+        }
+
+        .admin-link:hover {
+            background: #7b1fa2;
+        }
     </style>
 </head>
 
@@ -100,6 +110,9 @@
 
         <a href="/protected" class="btn protected-link">View Protected Page</a>
         <a href="/summary" class="btn summary-link">User Summary</a>
+        {% if is_admin %}
+        <a href="/admin" class="btn admin-link">Admin Panel</a>
+        {% endif %}
         <button class="btn logout-btn" onclick="logout()">Logout</button>
     </div>
 

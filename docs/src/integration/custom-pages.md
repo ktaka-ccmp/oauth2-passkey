@@ -1,6 +1,6 @@
 # Custom Pages
 
-Create fully custom login and summary pages with your own design.
+Create fully custom login, summary, and admin pages with your own design.
 
 ## Custom Login Page
 
@@ -183,6 +183,149 @@ let app = Router::new()
     .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
 ```
 
+## Custom Admin Page
+
+The library provides a built-in admin interface at `/o2p/admin/list_users` for managing users.
+
+### Disabling Built-in Admin UI
+
+To disable the built-in admin UI and create your own:
+
+```toml
+# Cargo.toml
+[dependencies]
+oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["user-ui"] }
+```
+
+### Admin Privilege Check
+
+The first registered user (sequence_number = 1) is automatically an admin. Other users can be granted admin status. Check admin privileges using `has_admin_privileges()`:
+
+```rust,ignore
+async fn admin_guard(user: AuthUser) -> Result<(), StatusCode> {
+    if !user.has_admin_privileges() {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    Ok(())
+}
+```
+
+### 1. Create Admin List Handler
+
+```rust,ignore
+use oauth2_passkey_axum::{
+    AuthUser, DbUser, SessionId, get_all_users,
+};
+
+#[derive(Template)]
+#[template(path = "admin_list.j2")]
+struct AdminListTemplate {
+    users: Vec<UserInfo>,
+}
+
+async fn admin_list(user: AuthUser) -> Result<impl IntoResponse, StatusCode> {
+    // Check admin privileges
+    if !user.has_admin_privileges() {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    // Fetch all users
+    let session_id = SessionId::new(user.session_id.clone())
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let users = get_all_users(session_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .iter()
+        .map(|u| UserInfo {
+            id: u.id.clone(),
+            account: u.account.clone(),
+            label: u.label.clone(),
+            is_admin: u.has_admin_privileges(),
+        })
+        .collect();
+
+    let template = AdminListTemplate { users };
+    Ok(Html(template.render().unwrap()))
+}
+```
+
+### 2. Create Admin List Template
+
+```html
+<!-- templates/admin_list.j2 -->
+<!DOCTYPE html>
+<html>
+<body>
+    <h1>Admin: User List</h1>
+    <table>
+        <tr>
+            <th>Account</th>
+            <th>Label</th>
+            <th>Admin</th>
+            <th>Actions</th>
+        </tr>
+        {% for user in users %}
+        <tr>
+            <td>{{user.account}}</td>
+            <td>{{user.label}}</td>
+            <td>{{user.is_admin}}</td>
+            <td><a href="/admin/user/{{user.id}}">View</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
+```
+
+### 3. Register Admin Routes
+
+```rust,ignore
+let app = Router::new()
+    .route("/admin/users", get(admin_list))
+    .route("/admin/user/:id", get(admin_user_detail))
+    .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+```
+
+### Admin API Functions
+
+The library exports functions for admin operations. All require admin privileges.
+
+| Function | Description |
+|----------|-------------|
+| `get_all_users(session_id)` | Fetch all users |
+| `get_user(session_id, user_id)` | Fetch a specific user |
+| `update_user_admin_status(session_id, user_id, is_admin)` | Grant/revoke admin status |
+| `delete_user_account_admin(session_id, user_id)` | Delete a user account |
+| `delete_passkey_credential_admin(session_id, credential_id)` | Delete a passkey credential |
+| `delete_oauth2_account_admin(session_id, provider_user_id)` | Unlink an OAuth2 account |
+
+```rust,ignore
+use oauth2_passkey_axum::{
+    SessionId, UserId, CredentialId, ProviderUserId,
+    get_all_users, get_user, update_user_admin_status,
+    delete_user_account_admin, delete_passkey_credential_admin,
+    delete_oauth2_account_admin,
+};
+
+// Example: Toggle admin status
+async fn toggle_admin(user: AuthUser, target_user_id: &str) -> Result<(), String> {
+    let session_id = SessionId::new(user.session_id).map_err(|e| e.to_string())?;
+    let user_id = UserId::new(target_user_id.to_string()).map_err(|e| e.to_string())?;
+
+    // Get current status
+    let target = get_user(session_id.clone(), user_id.clone()).await
+        .map_err(|e| e.to_string())?
+        .ok_or("User not found")?;
+
+    // Toggle (first user cannot be changed)
+    update_user_admin_status(session_id, user_id, !target.is_admin).await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+```
+
+> **Note**: The first user (sequence_number = 1) cannot have their admin status changed for security reasons.
+
 ## JavaScript API
 
 ### Authentication
@@ -279,6 +422,21 @@ cargo run
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `O2P_LOGIN_URL` | `/o2p/user/login` | Redirect destination for unauthenticated users |
+| `O2P_ADMIN_URL` | `/o2p/admin/list_users` | Admin panel URL (used in summary page) |
 | `O2P_ROUTE_PREFIX` | `/o2p` | Prefix for all auth endpoints |
 
 > **Note**: `O2P_LOGIN_URL` is **required** for custom login pages to work. Although it doesn't appear in your application code, the library reads it internally to determine where to redirect unauthenticated users.
+
+## Feature Flags
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `admin-ui` | Enabled | Built-in admin interface at `/o2p/admin/*` |
+| `user-ui` | Enabled | Built-in login/summary pages at `/o2p/user/*` |
+
+To disable a feature:
+
+```toml
+[dependencies]
+oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["user-ui"] }
+```
