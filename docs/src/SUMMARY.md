@@ -17,6 +17,7 @@
 - [Basic Setup](integration/framework.md)
 - [Route Protection](integration/route-protection.md)
 - [CSRF Token Handling](integration/csrf-handling.md)
+- [User Data Integration](integration/user-data.md)
 - [Configuration](integration/configuration.md)
 - [Server Setup](integration/server-setup.md)
 
@@ -76,6 +77,7 @@
 
 - [Security Advisories](appendix/security-advisories.md)
 - [Type-Safe Validation](appendix/type-safe.md)
+- [Storage Pattern](appendix/storage-pattern.md)
 - [Troubleshooting](appendix/troubleshooting.md)
 
 ---

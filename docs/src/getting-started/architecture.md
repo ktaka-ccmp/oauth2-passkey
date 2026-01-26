@@ -72,7 +72,7 @@ This chapter describes the architecture of the oauth2-passkey library.
 
 ## Data Flow
 
-```
+```text
                          ┌─────────────────┐
                          │     Browser     │
                          └────────┬────────┘
@@ -141,6 +141,24 @@ This chapter describes the architecture of the oauth2-passkey library.
 - **oauth2** and **passkey** modules are independent (no cross-dependencies)
 - **cache_store** handles temporary data (sessions, CSRF tokens, WebAuthn challenges)
 - **data_store** handles persistent data (users, credentials, OAuth2 accounts)
+
+## Why Singleton Pattern Instead of Axum State
+
+In typical Axum applications, shared resources (database pools, caches) are passed to handlers via the `State<T>` extractor. This library takes a different approach: it uses global static storage initialized by `init()`.
+
+This design means:
+
+- **For library users**: You don't need to manage state - just call `init().await?` and merge the router
+- **Internally**: Any function can access configuration and database connections without threading state through every function argument
+
+```rust,ignore
+oauth2_passkey_axum::init().await?;
+
+let app = Router::new()
+    .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+```
+
+This provides a simpler API at the cost of some flexibility. For a detailed comparison of both approaches and the trade-offs involved, see [Storage Pattern](../appendix/storage-pattern.md).
 
 ## Future Directions
 
