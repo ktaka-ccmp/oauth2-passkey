@@ -1,20 +1,6 @@
-# Customizing Built-in Pages - CSS
+# Customizing CSS
 
-This library provides built-in UI pages for login, account management, and administration:
-
-- **Login** (`/o2p/user/login`) - Sign in and account creation
-- **Account** (`/o2p/user/account`) - User account management
-- **Admin List** (`/o2p/admin/index`) - User list for administrators
-- **Admin User** (`/o2p/admin/user/{id}`) - User detail view for administrators
-
-You can customize these pages in two ways:
-
-| Method | Effort | When to Use |
-| ------ | ------ | ----------- |
-| **CSS** (this page) | Low | Change colors, fonts, spacing |
-| [Templates](customizing-templates.md) | High | Replace page structure entirely |
-
-## Overview
+This page explains how to create your own CSS theme for the built-in UI pages. If you just want to pick a ready-made theme, see [Built-in Themes](themes.md) first.
 
 The built-in pages use CSS Custom Properties (CSS variables) for theming. You can override these variables to change colors, fonts, spacing, and more without modifying the HTML structure.
 
@@ -30,14 +16,14 @@ The built-in pages use CSS Custom Properties (CSS variables) for theming. You ca
 }
 ```
 
-2. Set the environment variable:
+1. Serve the CSS file from your application (see [Serving Your CSS File](#serving-your-css-file)).
+
+1. Set the environment variable:
 
 ```bash
 # .env
 O2P_CUSTOM_CSS_URL=/static/my-theme.css
 ```
-
-3. Serve your CSS file from your application.
 
 ## CSS Custom Properties Reference
 
@@ -45,41 +31,42 @@ O2P_CUSTOM_CSS_URL=/static/my-theme.css
 
 | Property | Default | Description |
 | -------- | ------- | ----------- |
-| `--o2p-primary` | `#667eea` | Primary action buttons |
-| `--o2p-primary-hover` | `#5a6fd6` | Primary button hover state |
-| `--o2p-oauth2` | `#4285f4` | OAuth2 buttons and credential borders (blue) |
-| `--o2p-oauth2-hover` | `#3367d6` | OAuth2 button hover state |
-| `--o2p-passkey` | `#34a853` | Passkey buttons and credential borders (green) |
-| `--o2p-passkey-hover` | `#2d9248` | Passkey button hover state |
-| `--o2p-danger` | `#dc3545` | Delete/danger buttons |
-| `--o2p-danger-hover` | `#c82333` | Danger button hover state |
-| `--o2p-secondary` | `#6c757d` | Secondary/cancel buttons |
+| `--o2p-primary` | `#4f46e5` | Primary action buttons |
+| `--o2p-primary-hover` | `#4338ca` | Primary button hover state |
+| `--o2p-oauth2` | `#6366f1` | OAuth2 buttons |
+| `--o2p-oauth2-hover` | `#4f46e5` | OAuth2 button hover state |
+| `--o2p-passkey` | `#818cf8` | Passkey buttons |
+| `--o2p-passkey-hover` | `#6366f1` | Passkey button hover state |
+| `--o2p-danger` | `#dc2626` | Delete/danger buttons |
+| `--o2p-danger-hover` | `#b91c1c` | Danger button hover state |
+| `--o2p-secondary` | `#6b7280` | Secondary/cancel buttons |
+| `--o2p-secondary-hover` | `#4b5563` | Secondary button hover state |
 
 ### Text
 
 | Property | Default | Description |
 | -------- | ------- | ----------- |
-| `--o2p-text` | `#333` | Primary text color |
-| `--o2p-text-secondary` | `#666` | Secondary text color |
-| `--o2p-text-light` | `#999` | Light/muted text |
+| `--o2p-text` | `#111827` | Primary text color |
+| `--o2p-text-secondary` | `#4b5563` | Secondary text color |
+| `--o2p-text-light` | `#9ca3af` | Light/muted text |
 
 ### Backgrounds
 
 | Property | Default | Description |
 | -------- | ------- | ----------- |
-| `--o2p-background` | `#f5f5f5` | Page background |
+| `--o2p-background` | `#f9fafb` | Page background |
 | `--o2p-surface` | `#ffffff` | Card/container background |
-| `--o2p-surface-alt` | `#f9f9f9` | Alternate surface (items) |
+| `--o2p-surface-alt` | `#f3f4f6` | Alternate surface (items) |
 
 ### Borders & Radius
 
 | Property | Default | Description |
 | -------- | ------- | ----------- |
-| `--o2p-border` | `#ddd` | Border color |
-| `--o2p-border-light` | `#eee` | Light border color |
-| `--o2p-radius-sm` | `6px` | Small radius (inputs) |
-| `--o2p-radius-md` | `8px` | Medium radius (buttons) |
-| `--o2p-radius-lg` | `12px` | Large radius (cards) |
+| `--o2p-border` | `#e5e7eb` | Border color |
+| `--o2p-border-light` | `#f3f4f6` | Light border color |
+| `--o2p-radius-sm` | `4px` | Small radius (inputs) |
+| `--o2p-radius-md` | `6px` | Medium radius (buttons) |
+| `--o2p-radius-lg` | `8px` | Large radius (cards) |
 
 ### Spacing
 
@@ -103,8 +90,8 @@ O2P_CUSTOM_CSS_URL=/static/my-theme.css
 
 | Property | Default | Description |
 | -------- | ------- | ----------- |
-| `--o2p-shadow` | `0 2px 8px rgba(0,0,0,0.1)` | Standard shadow |
-| `--o2p-shadow-lg` | `0 4px 16px rgba(0,0,0,0.15)` | Large shadow |
+| `--o2p-shadow` | `0 1px 3px rgba(0,0,0,0.08)` | Standard shadow |
+| `--o2p-shadow-lg` | `0 4px 12px rgba(0,0,0,0.1)` | Large shadow |
 
 ## Serving Your CSS File
 
@@ -124,15 +111,15 @@ async fn serve_custom_css() -> Response {
 
 let app = Router::new()
     .route("/static/my-theme.css", get(serve_custom_css))
-    .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+    .merge(oauth2_passkey_full_router());
 ```
 
 ## Credential Type Styling
 
 Passkey and OAuth2 credentials are visually distinguished with colored left borders:
 
-- **Passkey credentials**: Green border (`--o2p-passkey`)
-- **OAuth2 accounts**: Blue border (`--o2p-oauth2`)
+- **Passkey credentials**: Uses `--o2p-passkey` color
+- **OAuth2 accounts**: Uses `--o2p-secondary` color
 
 These use CSS classes `.passkey` and `.oauth2` on credential items:
 
@@ -142,7 +129,7 @@ These use CSS classes `.passkey` and `.oauth2` on credential items:
 }
 
 .item.oauth2 {
-    border-left-color: var(--o2p-oauth2);
+    border-left-color: var(--o2p-secondary);
 }
 ```
 
@@ -181,9 +168,6 @@ These use CSS classes `.passkey` and `.oauth2` on credential items:
     /* Use your brand's primary color */
     --o2p-primary: #e91e63;
     --o2p-primary-hover: #c2185b;
-
-    /* Adjust the login page gradient */
-    /* (requires additional CSS, see below) */
 }
 
 /* Override the login page gradient */

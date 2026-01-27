@@ -11,6 +11,7 @@ You can customize these pages in two ways:
 
 | Method | Effort | When to Use |
 | ------ | ------ | ----------- |
+| [Built-in Themes](themes.md) | None | Pick a pre-built theme |
 | [CSS](customizing-css.md) | Low | Change colors, fonts, spacing |
 | **Templates** (this page) | High | Replace page structure entirely |
 
