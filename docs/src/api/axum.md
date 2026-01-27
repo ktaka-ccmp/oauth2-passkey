@@ -358,6 +358,22 @@ Complete list of all endpoints provided by `oauth2_passkey_router()`.
 | `/admin_user.js` | GET | JavaScript for admin pages* |
 | `/admin_user.css` | GET | CSS for admin pages* |
 
+### Theme Endpoints (`/themes`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/theme-zinc.css` | GET | Zinc theme (neutral gray) |
+| `/theme-slate.css` | GET | Slate theme (cool gray) |
+| `/theme-blue.css` | GET | Blue theme |
+| `/theme-violet.css` | GET | Violet theme |
+| `/theme-rose.css` | GET | Rose theme |
+| `/theme-neumorphism.css` | GET | Neumorphism style theme |
+| `/theme-material.css` | GET | Material Design theme |
+| `/theme-eco.css` | GET | Eco / nature theme |
+| `/theme-saas.css` | GET | SaaS dashboard theme |
+
+These are optional CSS theme files that override `o2p-base.css` variables. Set `O2P_CUSTOM_CSS_URL` to apply a theme. See [Themes](../integration/themes.md) for details.
+
 ### Feature Flags
 
 Endpoints marked with * are controlled by feature flags:
