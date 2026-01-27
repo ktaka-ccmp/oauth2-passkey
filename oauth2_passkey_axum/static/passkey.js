@@ -160,8 +160,9 @@ function showRegistrationModal(mode) {
     .then(userData => {
         if (userData) {
             // Pre-fill the form with user data
-            document.getElementById('reg-username').value = userData.account ? `${userData.account}#${userData.passkey_count + 1}` : 'username';
-            document.getElementById('reg-displayname').value = userData.label ? `${userData.label}#${userData.passkey_count + 1}` : 'displayname';
+            const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            document.getElementById('reg-username').value = userData.account ? `${userData.account}@${today}` : 'username';
+            document.getElementById('reg-displayname').value = userData.label || 'displayname';
         }
     })
     .catch(error => {

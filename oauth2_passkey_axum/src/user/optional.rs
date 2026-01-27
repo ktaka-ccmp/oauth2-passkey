@@ -152,27 +152,11 @@ impl UserAccountTemplate {
 async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCode, String)> {
     match auth_user {
         Some(user) => {
-            // Get passkey credentials count for the user
-            // let stored_credentials = list_credentials_core(Some(&user)).await.map_err(|e| {
-            let user_id = UserId::new(user.id.clone()).map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Invalid user ID: {e}"),
-                )
-            })?;
-            let stored_credentials = list_credentials_core(user_id).await.map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to fetch credentials: {e:?}"),
-                )
-            })?;
-
             // Return user information as JSON
             let user_data = json!({
                 "id": user.id,
                 "account": user.account,
                 "label": user.label,
-                "passkey_count": stored_credentials.len()
             });
 
             Ok(Json(user_data))
