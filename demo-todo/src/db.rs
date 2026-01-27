@@ -16,7 +16,7 @@ pub struct Todo {
 /// Initialize database connection pool and return it
 pub async fn init_db() -> Result<PgPool, Box<dyn std::error::Error>> {
     let database_url = std::env::var("APP_DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://demo:demo@localhost:5432/demo".to_string());
+        .expect("APP_DATABASE_URL environment variable must be set (see .env.example)");
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
