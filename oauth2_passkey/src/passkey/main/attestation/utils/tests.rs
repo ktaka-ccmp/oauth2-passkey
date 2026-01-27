@@ -153,18 +153,14 @@ fn test_integer_to_i64_common_values() {
 }
 
 #[test]
-fn test_integer_to_i64_fallback_case() {
-    // Test that large primes that aren't powers of 2 trigger fallback
-    // The function should return 0 and log a warning for unknown values
-    // We'll use a value that's definitely not a small value or power of 2
-    let weird_value = 1000000007; // Large prime
-
-    // Since the function returns 0 for unrecognized values, we expect 0
-    assert_eq!(integer_to_i64(&Integer::from(weird_value)), 0);
-
-    // Also test with a known non-power-of-2 that's not in our small values list
-    let another_value = 123456789;
-    assert_eq!(integer_to_i64(&Integer::from(another_value)), 0);
+fn test_integer_to_i64_arbitrary_values() {
+    // After the fix, arbitrary values convert correctly
+    assert_eq!(integer_to_i64(&Integer::from(1000000007)), 1000000007);
+    assert_eq!(integer_to_i64(&Integer::from(123456789)), 123456789);
+    assert_eq!(integer_to_i64(&Integer::from(-65535)), -65535); // RS1 algorithm
+    assert_eq!(integer_to_i64(&Integer::from(-259)), -259);
+    assert_eq!(integer_to_i64(&Integer::from(i64::MAX)), i64::MAX);
+    assert_eq!(integer_to_i64(&Integer::from(i64::MIN)), i64::MIN);
 }
 
 #[test]

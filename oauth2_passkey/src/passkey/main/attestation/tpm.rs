@@ -2,6 +2,7 @@ use super::utils::integer_to_i64;
 use crate::passkey::errors::PasskeyError;
 use ciborium::value::Value as CborValue;
 use der_parser::der::parse_der;
+use ring::signature::UnparsedPublicKey;
 use std::convert::TryFrom;
 use webpki::EndEntityCert;
 use x509_parser::{extensions::X509Extension, prelude::*};
@@ -122,8 +123,9 @@ pub(super) fn verify_tpm_attestation(
 
     // Verify the algorithm is supported before attempting certificate parsing
     let signature_alg = match alg {
-        -257 => &webpki::RSA_PKCS1_2048_8192_SHA256,
-        -7 => &webpki::ECDSA_P256_SHA256,
+        -257 => Some(&webpki::RSA_PKCS1_2048_8192_SHA256),
+        -7 => Some(&webpki::ECDSA_P256_SHA256),
+        -65535 => None, // RS1 (SHA-1 RSA) - handled via ring directly
         _ => {
             return Err(PasskeyError::Verification(format!(
                 "Unsupported algorithm for TPM attestation: {alg}"
@@ -136,37 +138,64 @@ pub(super) fn verify_tpm_attestation(
 
     // Parse the AIK certificate
     let aik_cert_bytes = &x5c[0];
-    let webpki_cert = EndEntityCert::try_from(aik_cert_bytes.as_ref());
 
     // Verify the signature over certInfo
-    if let Ok(ref aik_cert) = webpki_cert {
-        // Use the pre-validated signature algorithm
+    if let Some(webpki_alg) = signature_alg {
+        // RS256 / ES256: use webpki for signature verification
+        let webpki_cert = EndEntityCert::try_from(aik_cert_bytes.as_ref());
 
-        // Verify the signature
-        match aik_cert.verify_signature(signature_alg, &cert_info, &sig) {
-            Ok(_) => {
-                // Verify the AIK certificate meets WebAuthn requirements
-                verify_aik_certificate_fallback(aik_cert_bytes, auth_data)?
+        if let Ok(ref aik_cert) = webpki_cert {
+            match aik_cert.verify_signature(webpki_alg, &cert_info, &sig) {
+                Ok(_) => verify_aik_certificate_fallback(aik_cert_bytes, auth_data)?,
+                Err(e) => {
+                    return Err(PasskeyError::Verification(format!(
+                        "Failed to verify TPM signature: {e:?}"
+                    )));
+                }
             }
-            Err(e) => {
-                return Err(PasskeyError::Verification(format!(
-                    "Failed to verify TPM signature: {e:?}"
-                )));
-            }
+        } else {
+            tracing::warn!(
+                "webpki failed to parse AIK certificate: {:?}. Using fallback verification for TPM attestation",
+                webpki_cert.err()
+            );
+            verify_aik_certificate_fallback(aik_cert_bytes, auth_data)?
         }
     } else {
-        // Fall back to a more permissive verification
-        tracing::warn!(
-            "webpki failed to parse AIK certificate: {:?}. Using fallback signature verification for TPM attestation",
-            webpki_cert.err()
-        );
-        verify_aik_certificate_fallback(aik_cert_bytes, auth_data)?
+        // RS1: webpki doesn't support SHA-1 RSA, use ring directly
+        verify_rs1_signature(aik_cert_bytes, &cert_info, &sig)?;
+        verify_aik_certificate_fallback(aik_cert_bytes, auth_data)?;
     };
 
     // Verify the certInfo structure
     verify_cert_info(&cert_info, auth_data, client_data_hash, &pub_area)?;
 
     Ok(())
+}
+
+/// Verifies an RS1 (RSASSA-PKCS1-v1_5 with SHA-1) signature using ring directly.
+///
+/// webpki does not support SHA-1 RSA algorithms, so we extract the public key
+/// from the AIK certificate using x509-parser and verify with ring's legacy API.
+fn verify_rs1_signature(
+    cert_bytes: &[u8],
+    message: &[u8],
+    signature: &[u8],
+) -> Result<(), PasskeyError> {
+    let (_, cert) = X509Certificate::from_der(cert_bytes).map_err(|e| {
+        PasskeyError::Verification(format!("Failed to parse AIK certificate for RS1: {e}"))
+    })?;
+
+    let spki = cert.public_key();
+    let key_bytes = &spki.subject_public_key.data;
+
+    let public_key = UnparsedPublicKey::new(
+        &ring::signature::RSA_PKCS1_2048_8192_SHA1_FOR_LEGACY_USE_ONLY,
+        key_bytes,
+    );
+
+    public_key
+        .verify(message, signature)
+        .map_err(|e| PasskeyError::Verification(format!("Failed to verify RS1 TPM signature: {e}")))
 }
 
 /// Provides a fallback verification for AIK certificates that can't be parsed by webpki,

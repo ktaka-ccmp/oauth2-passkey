@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- TPM attestation verification failure with Windows Hello due to unsupported RS1 algorithm (`-65535`). The `integer_to_i64()` helper used hardcoded value comparisons that could not convert `-65535`, and the TPM verifier lacked RS1 support. Fixed by using proper `i128`-based conversion and adding RS1 signature verification via ring's legacy SHA-1 RSA API.
+
 ### Added
 
 - Session conflict policy via `SESSION_CONFLICT_POLICY` env var (`allow`/`replace`/`reject`) to control login behavior when a user already has active sessions
