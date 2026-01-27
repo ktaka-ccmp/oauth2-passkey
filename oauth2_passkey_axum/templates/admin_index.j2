@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>User Management</title>
+    <title>Admin Panel</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
     {% if let Some(css_url) = custom_css_url %}
@@ -11,9 +11,10 @@
 <body>
 <div class="container">
     <div class="page-header">
-        <h1>User Management</h1>
+        <h1>Admin Panel</h1>
         <nav>
-            <a href="{{o2p_route_prefix}}/user/account">Go Back</a>
+            <a href="/">Home</a>
+            <a href="{{o2p_route_prefix}}/user/account">My Account</a>
         </nav>
         <div class="header-buttons">
             <button onclick="Logout()" class="action-button">Logout</button>
