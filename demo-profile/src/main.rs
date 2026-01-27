@@ -7,7 +7,7 @@ use axum::{
     routing::get,
 };
 use dotenvy::dotenv;
-use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_router};
+use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_full_router};
 use sqlx::PgPool;
 
 mod db;
@@ -90,8 +90,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(handlers::router())
         .with_state(state);
 
-    // Combine with stateless oauth2-passkey routes
-    let app = app_routes.nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+    // Combine with oauth2-passkey routes
+    let app = app_routes.merge(oauth2_passkey_full_router());
 
     let http_server = spawn_http_server(3001, app.clone());
     let https_server = spawn_https_server(3443, app).await;

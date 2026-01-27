@@ -19,6 +19,7 @@
 - [CSRF Token Handling](integration/csrf-handling.md)
 - [User Data Integration](integration/user-data.md)
 - [Configuration](integration/configuration.md)
+- [Multi-Origin Passkey Setup](integration/multi-origin.md)
 - [Server Setup](integration/server-setup.md)
 
 ---

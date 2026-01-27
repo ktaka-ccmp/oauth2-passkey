@@ -7,7 +7,7 @@ use axum::{
 use axum_core::response::IntoResponse;
 use dotenvy::dotenv;
 
-use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_router};
+use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_full_router};
 
 mod server;
 use crate::server::{init_tracing, spawn_http_server, spawn_https_server};
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .route("/", get(index))
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+        .merge(oauth2_passkey_full_router());
 
     // spawn_http_server doesn't need await because it's synchronous - it immediately returns a JoinHandle
     let http_server = spawn_http_server(3001, app.clone());

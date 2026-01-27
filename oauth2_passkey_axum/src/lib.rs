@@ -80,8 +80,8 @@ pub use middleware::{
 // Router for WebAuthn/.well-known endpoints
 pub use passkey::passkey_well_known_router;
 
-// Main router that provides all authentication endpoints
-pub use router::oauth2_passkey_router;
+// Main routers that provide all authentication endpoints
+pub use router::{oauth2_passkey_full_router, oauth2_passkey_router};
 
 // Axum extractor for authenticated users
 pub use session::AuthUser;

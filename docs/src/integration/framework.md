@@ -8,7 +8,7 @@ This chapter explains how to integrate oauth2-passkey into your Axum application
 
 ```rust,ignore
 use axum::{Router, routing::get};
-use oauth2_passkey_axum::{init, oauth2_passkey_router, O2P_ROUTE_PREFIX, AuthUser}; // [1]
+use oauth2_passkey_axum::{init, oauth2_passkey_full_router, AuthUser}; // [1]
 
 async fn protected(user: AuthUser) -> String { // [2]
     format!("Hello, {}!", user.label)
@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/", get(|| async { "Public page" }))
         .route("/protected", get(protected))
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router()); // [4]
+        .merge(oauth2_passkey_full_router()); // [4]
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
     axum::serve(listener, app).await?;
@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 |[1]| `use` statement | Imports the necessary components from `oauth2_passkey_axum`. |
 |[2]| `AuthUser` | Axum extractor for authenticated user information. |
 |[3]| `init()` | Initializes database and cache connections. Must be called before serving requests. |
-|[4]| `O2P_ROUTE_PREFIX`, `oauth2_passkey_router()` | Mount auth routes at prefix (default: `/o2p`). |
+|[4]| `oauth2_passkey_full_router()` | Adds all auth routes under `/o2p` prefix. |
 
 ### Protected Routes
 
@@ -63,16 +63,13 @@ For more protection methods (optional authentication, middleware-based protectio
 
 ### Available Endpoints
 
-The `oauth2_passkey_router()` provides these endpoints under `O2P_ROUTE_PREFIX`:
+The `oauth2_passkey_full_router()` provides these endpoint groups under `O2P_ROUTE_PREFIX` (default: `/o2p`):
 
-| Endpoint | Description |
-|----------|-------------|
-| `/oauth2/login` | Start Google OAuth2 login |
-| `/oauth2/authorized` | OAuth2 callback (redirect URI) |
-| `/passkey/register/start` | Start passkey registration |
-| `/passkey/register/finish` | Complete passkey registration |
-| `/passkey/auth/start` | Start passkey authentication |
-| `/passkey/auth/finish` | Complete passkey authentication |
-| `/user/account` | User profile and credential management |
-| `/admin/index` | Admin user list (requires admin) |
-| `/logout` | End session |
+| Path | Description |
+|------|-------------|
+| `/oauth2/...` | OAuth2 authentication (login, callback) |
+| `/passkey/...` | WebAuthn/Passkey authentication (register, authenticate) |
+| `/user/...` | User pages (login, account, logout) |
+| `/admin/...` | Admin interface (user management) |
+
+For a complete list of all endpoints, see [Axum Integration API - Endpoint Reference](../api/axum.md#endpoint-reference).

@@ -10,7 +10,7 @@ use dotenvy::dotenv;
 
 use oauth2_passkey_axum::{
     AuthUser, O2P_ROUTE_PREFIX, OAuth2Account, PasskeyCredential, SessionId, UserId, get_all_users,
-    get_user, list_accounts_core, list_credentials_core, oauth2_passkey_router,
+    get_user, list_accounts_core, list_credentials_core, oauth2_passkey_full_router,
 };
 
 mod server;
@@ -367,7 +367,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/summary", get(summary)) // Custom summary page
         .route("/admin", get(admin_list)) // Custom admin list page
         .route("/admin/user/{id}", get(admin_user)) // Custom admin user detail page
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+        .merge(oauth2_passkey_full_router());
 
     let http_server = spawn_http_server(3001, app.clone());
     let https_server = spawn_https_server(3443, app).await;

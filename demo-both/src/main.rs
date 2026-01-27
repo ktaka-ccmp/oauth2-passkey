@@ -7,7 +7,7 @@ use axum::{
 
 use dotenvy::dotenv;
 
-use oauth2_passkey_axum::{AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, oauth2_passkey_router};
+use oauth2_passkey_axum::{AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router};
 
 mod protected;
 mod server;
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .route("/", get(index))
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
+        .merge(oauth2_passkey_full_router())
         .merge(protected::router());
 
     let http_server = spawn_http_server(3001, app.clone());

@@ -70,7 +70,7 @@ fn router_auth() -> Router {
 /// This will create a `/.well-known/webauthn` endpoint that returns the WebAuthn
 /// relying party configuration, including related origins.
 pub fn passkey_well_known_router() -> Router {
-    Router::new().route("/webauthn", get(serve_related_origin))
+    Router::new().route("/.well-known/webauthn", get(serve_related_origin))
 }
 
 async fn handle_start_registration(
