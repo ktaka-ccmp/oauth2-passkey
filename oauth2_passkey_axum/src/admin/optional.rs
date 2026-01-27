@@ -29,7 +29,6 @@ pub(crate) fn router() -> Router<()> {
         .route("/index", get(admin_index))
         .route("/user/{user_id}", get(admin_user_page))
         .route("/admin_user.js", get(serve_admin_user_js))
-        .route("/admin_user.css", get(serve_admin_user_css))
 }
 
 #[derive(Template)]
@@ -307,15 +306,6 @@ async fn serve_admin_user_js() -> Response {
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.to_string().into())
-        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
-}
-
-async fn serve_admin_user_css() -> Response {
-    let css_content = include_str!("../../static/admin_user.css");
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(CONTENT_TYPE, "text/css")
-        .body(css_content.to_string().into())
         .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 

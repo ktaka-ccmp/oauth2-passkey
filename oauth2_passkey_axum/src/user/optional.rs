@@ -29,7 +29,6 @@ pub(crate) fn router() -> Router<()> {
         .route("/login", get(login))
         .route("/account", get(user_account))
         .route("/account.js", get(serve_account_js))
-        .route("/account.css", get(serve_account_css))
         .route("/o2p-base.css", get(serve_base_css))
 }
 
@@ -317,15 +316,6 @@ async fn serve_account_js() -> Response {
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.to_string().into())
-        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
-}
-
-async fn serve_account_css() -> Response {
-    let css_content = include_str!("../../static/account.css");
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(CONTENT_TYPE, "text/css")
-        .body(css_content.to_string().into())
         .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
