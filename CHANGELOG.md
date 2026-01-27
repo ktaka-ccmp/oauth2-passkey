@@ -9,12 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Session conflict policy via `O2P_SESSION_CONFLICT_POLICY` env var (`allow`/`replace`/`reject`) to control login behavior when a user already has active sessions
+- User-to-session reverse index (`user_sessions` cache mapping) with lazy cleanup of stale entries
 - Built-in CSS theme system with 9 pre-built themes: Zinc, Slate, Blue, Violet, Rose, Neumorphism, Material, Eco, SaaS
 - `O2P_CUSTOM_CSS_URL` environment variable for custom CSS theme loading
 - Theme CSS files served at `{O2P_ROUTE_PREFIX}/themes/` (e.g., `/o2p/themes/theme-zinc.css`)
 - `oauth2_passkey_full_router()` unified router that automatically includes `/.well-known/webauthn` when multi-origin is configured
+- `rp_id` field in `PasskeyCredential` to store and display the Relying Party ID used during registration
 
 ### Changed
+
+- Passkey registration username prefill changed from `#N` sequential numbering to `@YYYYMMDD` date suffix
 
 - **BREAKING**: Renamed `O2P_REDIRECT_ANON` to `O2P_DEFAULT_REDIRECT` for clarity (env var, config, and template variable)
 - **BREAKING**: Admin route renamed from `/admin/list_users` to `/admin/index` for clarity
