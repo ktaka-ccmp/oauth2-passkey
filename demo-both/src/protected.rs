@@ -14,16 +14,27 @@ use oauth2_passkey_axum::{
     AuthUser,
     CsrfHeaderVerified,
     CsrfToken,
+    O2P_CUSTOM_CSS_URL,
     O2P_ROUTE_PREFIX,
     // Middleware, redirect to O2P_DEFAULT_REDIRECT (default: /)
     is_authenticated_redirect,
     is_authenticated_user_redirect,
 };
 
+fn custom_css() -> Option<&'static str> {
+    O2P_CUSTOM_CSS_URL.as_deref()
+}
+
 pub(super) fn router() -> Router<()> {
     Router::new()
+        // p1, p2: No middleware — protected by AuthUser extractor in the handler itself.
+        //   p1: AuthUser (required) — unauthenticated users get redirected automatically.
+        //   p2: Option<AuthUser> (optional) — anonymous access allowed, no redirect.
         .route("/p1", get(p1))
         .route("/p2", get(p2))
+        // p3-p6: Protected by middleware — handler doesn't need AuthUser argument.
+        //   is_authenticated_redirect: redirects to login, injects CsrfToken extension.
+        //   is_authenticated_user_redirect: same + injects AuthUser extension.
         .route(
             "/p3",
             get(p3)
@@ -44,6 +55,7 @@ pub(super) fn router() -> Router<()> {
                 .post(p6_post)
                 .route_layer(from_fn(is_authenticated_redirect)),
         )
+        // Nested routes: middleware applied to the entire group.
         .nest(
             "/nested",
             nested_router().route_layer(from_fn(is_authenticated_redirect)),
@@ -54,13 +66,18 @@ pub(super) fn nested_router() -> Router<()> {
     Router::new().route("/p3", get(p3))
 }
 
+// --- p1: AuthUser Extractor Demo ---
+
+#[derive(Template)]
+#[template(path = "p1.j2")]
+struct P1Template<'a> {
+    user: &'a AuthUser,
+    prefix: &'a str,
+    custom_css_url: Option<&'a str>,
+}
+
 // Having user as an argument causes redirect to O2P_LOGIN_URL for anonymous users by axum extractor
 pub(crate) async fn p1(user: AuthUser) -> impl IntoResponse {
-    let html_content = format!(
-        "Hey {}!<br/>Your CSRF Token is: {}",
-        user.account, user.csrf_token
-    );
-
     // DEMO: Manually adding CSRF token to response headers
     // When using AuthUser extractor (not middleware), you must deliver CSRF tokens via one of:
     // 1. Embed in page content (like showing token in HTML - see line above)
@@ -76,29 +93,51 @@ pub(crate) async fn p1(user: AuthUser) -> impl IntoResponse {
         }
         Err(e) => {
             tracing::warn!("Failed to create CSRF header value: {}", e);
-            // Continue without the header - client will need to use the token from page content
         }
     }
 
-    (headers, Html(html_content))
+    let template = P1Template {
+        user: &user,
+        prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: custom_css(),
+    };
+    match template.render() {
+        Ok(html) => (headers, Html(html)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+// --- p2: Optional Auth Demo ---
+
+#[derive(Template)]
+#[template(path = "p2.j2")]
+struct P2Template<'a> {
+    user: Option<&'a AuthUser>,
+    prefix: &'a str,
+    custom_css_url: Option<&'a str>,
 }
 
 // Having user as an optional argument prevents redirect by axum extractor
 pub(crate) async fn p2(user: Option<AuthUser>) -> impl IntoResponse {
-    match user {
-        Some(u) => Html(format!(
-            "Hey {}!<br/>Your CSRF Token is: {}",
-            u.account, u.csrf_token
-        )),
-        None => Html("Hey Anonymous User!".to_string()),
+    let template = P2Template {
+        user: user.as_ref(),
+        prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: custom_css(),
+    };
+    match template.render() {
+        Ok(html) => Html(html).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
+
+// --- p3: AJAX CSRF Demo ---
 
 #[derive(Template)]
 #[template(path = "p3.j2")]
 struct P3Template<'a> {
     message: &'a str,
     prefix: &'a str,
+    custom_css_url: Option<&'a str>,
 }
 
 // Protected page by middleware does not need user argument
@@ -106,6 +145,7 @@ pub(crate) async fn p3() -> impl IntoResponse {
     let template = P3Template {
         message: "This is a protected page.",
         prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: custom_css(),
     };
     match template.render() {
         Ok(html) => Html(html).into_response(),
@@ -117,11 +157,14 @@ pub(crate) async fn p3_post() -> impl IntoResponse {
     Html("POST request received").into_response()
 }
 
+// --- p4: User Details via Extension ---
+
 #[derive(Template)]
 #[template(path = "p4.j2")]
 struct P4Template<'a> {
     user: AuthUser,
     prefix: &'a str,
+    custom_css_url: Option<&'a str>,
 }
 
 // Extract user from extension inserted by is_authenticated_with_user middleware
@@ -129,6 +172,7 @@ pub(crate) async fn p4(Extension(user): Extension<AuthUser>) -> impl IntoRespons
     let template = P4Template {
         user,
         prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: custom_css(),
     };
     match template.render() {
         Ok(html) => Html(html).into_response(),
@@ -136,12 +180,15 @@ pub(crate) async fn p4(Extension(user): Extension<AuthUser>) -> impl IntoRespons
     }
 }
 
+// --- p5: CSRF Token in Template ---
+
 #[derive(Template)]
 #[template(path = "p5.j2")]
 struct P5Template<'a> {
     message: &'a str,
     csrf_token: &'a str,
     prefix: &'a str,
+    custom_css_url: Option<&'a str>,
 }
 
 // Protected page by middleware does not need user argument
@@ -150,6 +197,7 @@ pub(crate) async fn p5(Extension(csrf_token): Extension<CsrfToken>) -> impl Into
         message: "The CSRF token can also be embedded in a template.",
         csrf_token: csrf_token.as_str(),
         prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: custom_css(),
     };
     match template.render() {
         Ok(html) => Html(html).into_response(),
@@ -157,7 +205,8 @@ pub(crate) async fn p5(Extension(csrf_token): Extension<CsrfToken>) -> impl Into
     }
 }
 
-// New struct for p6 form data
+// --- p6: Form CSRF Validation ---
+
 #[derive(Deserialize, Debug)]
 pub(crate) struct P6FormData {
     message: String,
@@ -169,19 +218,17 @@ pub(crate) struct P6FormData {
 struct P6Template<'a> {
     csrf_token: &'a str,
     prefix: &'a str,
+    custom_css_url: Option<&'a str>,
     post_result_message: Option<String>,
     post_success: bool,
 }
 
 // GET handler for /p6
-pub(crate) async fn p6(
-    Extension(csrf_token): Extension<CsrfToken>,
-    // Extension(csrf_via_header_verified): Extension<CsrfHeaderVerified>,
-    // Extension(user): Extension<AuthUser>,
-) -> impl IntoResponse {
+pub(crate) async fn p6(Extension(csrf_token): Extension<CsrfToken>) -> impl IntoResponse {
     let template = P6Template {
         csrf_token: csrf_token.as_str(),
         prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: custom_css(),
         post_result_message: None,
         post_success: false,
     };
@@ -195,7 +242,6 @@ pub(crate) async fn p6(
 pub(crate) async fn p6_post(
     Extension(csrf_token): Extension<CsrfToken>,
     Extension(csrf_via_header_verified): Extension<CsrfHeaderVerified>,
-    // Extension(user): Extension<AuthUser>,
     Form(form_data): Form<P6FormData>,
 ) -> impl IntoResponse {
     let post_result_message_str: String;
@@ -208,7 +254,6 @@ pub(crate) async fn p6_post(
     );
 
     if csrf_via_header_verified.0 {
-        // This case should ideally not happen for a direct form post without X-CSRF-Token header.
         post_result_message_str = format!(
             "POST successful (CSRF token verified via X-CSRF-Token header). Message: {}",
             form_data.message
@@ -216,9 +261,6 @@ pub(crate) async fn p6_post(
         is_success = true;
         tracing::info!("{}", post_result_message_str);
     } else {
-        // X-CSRF-Token header was NOT present or not verified.
-        // Middleware allowed the request because Content-Type was form-like.
-        // We MUST manually verify the CSRF token from the form body.
         match &form_data.csrf_token {
             Some(token_from_form) => {
                 if token_from_form
@@ -239,7 +281,6 @@ pub(crate) async fn p6_post(
                         csrf_token.as_str(),
                         form_data.message
                     );
-                    // is_success remains false
                     tracing::warn!("{}", post_result_message_str);
                 }
             }
@@ -248,16 +289,15 @@ pub(crate) async fn p6_post(
                     "CSRF token missing from form! This request would typically be rejected. Message: {}",
                     form_data.message
                 );
-                // is_success remains false
                 tracing::warn!("{}", post_result_message_str);
             }
         }
     }
 
-    // Re-render the page with the result message
     let template = P6Template {
         csrf_token: csrf_token.as_str(),
         prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: custom_css(),
         post_result_message: Some(post_result_message_str),
         post_success: is_success,
     };

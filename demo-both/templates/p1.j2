@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demo: CSRF Token in Template</title>
+    <title>Demo: AuthUser Extractor</title>
     <link rel="stylesheet" href="{{prefix}}/user/o2p-base.css">
     {% if let Some(css_url) = custom_css_url %}
     <link rel="stylesheet" href="{{css_url}}">
@@ -22,7 +22,7 @@
 <body>
 <div class="container">
     <div class="page-header">
-        <h1>p5: CSRF Token in Template</h1>
+        <h1>p1: AuthUser Extractor</h1>
         <nav>
             <a href="/">Home</a>
             <a href="/p1">p1</a>
@@ -44,18 +44,19 @@
             <h2 class="section-title">About This Page</h2>
         </div>
         <p class="demo-description">
-            {{message}}
-            The CSRF token is extracted from the middleware <code>Extension&lt;CsrfToken&gt;</code>
-            and embedded directly in the template. Useful for server-rendered forms.
+            Route protection via <code>AuthUser</code> extractor parameter.
+            Unauthenticated users are automatically redirected to the login page.
+            CSRF token is delivered via <code>X-CSRF-Token</code> response header (check DevTools).
         </p>
     </div>
 
     <div class="section">
         <div class="section-header">
-            <h2 class="section-title">Embedded CSRF Token</h2>
+            <h2 class="section-title">User Info</h2>
         </div>
         <div class="item">
-            <div class="item-detail"><strong>CSRF Token:</strong> <span class="token-display">{{ csrf_token }}</span></div>
+            <div class="item-detail"><strong>Account:</strong> {{ user.account }}</div>
+            <div class="item-detail"><strong>CSRF Token:</strong> <span class="token-display">{{ user.csrf_token }}</span></div>
         </div>
     </div>
 </div>

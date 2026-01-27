@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demo: CSRF Token in Template</title>
+    <title>Demo: Optional Authentication</title>
     <link rel="stylesheet" href="{{prefix}}/user/o2p-base.css">
     {% if let Some(css_url) = custom_css_url %}
     <link rel="stylesheet" href="{{css_url}}">
@@ -17,12 +17,16 @@
             border-radius: var(--o2p-radius-sm);
             word-break: break-all;
         }
+        .anon-notice {
+            color: var(--o2p-text-secondary);
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="page-header">
-        <h1>p5: CSRF Token in Template</h1>
+        <h1>p2: Optional Authentication</h1>
         <nav>
             <a href="/">Home</a>
             <a href="/p1">p1</a>
@@ -44,18 +48,23 @@
             <h2 class="section-title">About This Page</h2>
         </div>
         <p class="demo-description">
-            {{message}}
-            The CSRF token is extracted from the middleware <code>Extension&lt;CsrfToken&gt;</code>
-            and embedded directly in the template. Useful for server-rendered forms.
+            Using <code>Option&lt;AuthUser&gt;</code> allows both authenticated and anonymous access.
+            No redirect occurs for anonymous users.
         </p>
     </div>
 
     <div class="section">
         <div class="section-header">
-            <h2 class="section-title">Embedded CSRF Token</h2>
+            <h2 class="section-title">User Info</h2>
         </div>
         <div class="item">
-            <div class="item-detail"><strong>CSRF Token:</strong> <span class="token-display">{{ csrf_token }}</span></div>
+            {% match user %}
+            {% when Some with (u) %}
+                <div class="item-detail"><strong>Account:</strong> {{ u.account }}</div>
+                <div class="item-detail"><strong>CSRF Token:</strong> <span class="token-display">{{ u.csrf_token }}</span></div>
+            {% when None %}
+                <div class="item-detail"><span class="anon-notice">Anonymous user - no authentication data available.</span></div>
+            {% endmatch %}
         </div>
     </div>
 </div>
