@@ -4,7 +4,9 @@ use http::Method;
 use http::header::{COOKIE, HeaderMap};
 use subtle::ConstantTimeEq;
 
-use crate::session::config::{SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME};
+use crate::session::config::{
+    O2P_SESSION_CONFLICT_POLICY, SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME, SessionConflictPolicy,
+};
 use crate::session::errors::SessionError;
 use crate::session::types::{
     AuthenticationStatus, CsrfHeaderVerified, CsrfToken, SessionId, StoredSession,
@@ -17,6 +19,10 @@ use crate::storage::{
     CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE, get_data, remove_data,
 };
 
+use super::user_sessions::{
+    add_session_to_user_mapping, cleanup_stale_sessions, remove_session_from_user_mapping,
+};
+
 /// Prepare a logout response by removing the session cookie and deleting the session from storage
 ///
 /// # Arguments
@@ -27,6 +33,23 @@ use crate::storage::{
 #[tracing::instrument(skip(cookies))]
 pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderMap, SessionError> {
     tracing::info!("Preparing logout response and clearing session");
+
+    // Before deleting, retrieve session data to get user_id for mapping cleanup
+    if let Some(cookie_value) = cookies.get(&SESSION_COOKIE_NAME) {
+        let session_id_str = cookie_value.to_string();
+
+        // Try to get user_id from the session before deleting it
+        if let Ok(cache_key) = CacheKey::new(session_id_str.clone())
+            && let Ok(Some(stored_session)) =
+                get_data::<StoredSession, SessionError>(CachePrefix::session(), cache_key).await
+        {
+            // Remove session from user's mapping
+            remove_session_from_user_mapping(&stored_session.user_id, &session_id_str)
+                .await
+                .ok();
+        }
+    }
+
     let mut headers = HeaderMap::new();
     header_set_cookie(
         &mut headers,
@@ -44,11 +67,52 @@ pub(super) async fn create_new_session_with_uid(
     user_id: UserId,
 ) -> Result<HeaderMap, SessionError> {
     tracing::info!("Creating new session for user");
+    let user_id_str = user_id.as_str();
+
+    // Clean up stale sessions and apply conflict policy
+    let active_sessions = cleanup_stale_sessions(user_id_str).await?;
+
+    if !active_sessions.is_empty() {
+        let policy = &*O2P_SESSION_CONFLICT_POLICY;
+        tracing::debug!(
+            "User {} has {} active session(s), policy: {:?}",
+            user_id_str,
+            active_sessions.len(),
+            policy
+        );
+
+        match policy {
+            SessionConflictPolicy::Allow => {
+                // Permit multiple concurrent sessions
+            }
+            SessionConflictPolicy::Replace => {
+                // Delete all existing sessions (also removes them from the mapping)
+                for sid in &active_sessions {
+                    tracing::info!(
+                        "Replacing existing session {} for user {}",
+                        sid,
+                        user_id_str
+                    );
+                    if let Ok(session_id) = SessionId::new(sid.clone()) {
+                        let _ = delete_session_from_store_by_session_id(session_id).await;
+                    }
+                }
+            }
+            SessionConflictPolicy::Reject => {
+                tracing::warn!(
+                    "Login rejected for user {}: active session exists (policy: reject)",
+                    user_id_str
+                );
+                return Err(SessionError::SessionConflictRejected);
+            }
+        }
+    }
+
     let expires_at = Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64);
     let csrf_token = gen_random_string_with_entropy_validation(32)?;
 
     let stored_session = StoredSession {
-        user_id: user_id.as_str().to_string(),
+        user_id: user_id_str.to_string(),
         csrf_token: csrf_token.to_string(),
         expires_at,
         ttl: *SESSION_COOKIE_MAX_AGE,
@@ -63,6 +127,9 @@ pub(super) async fn create_new_session_with_uid(
     .await?
     .as_str()
     .to_string();
+
+    // Add the new session to the user's mapping
+    add_session_to_user_mapping(user_id_str, &session_id).await?;
 
     // Record session_id in the tracing span
     tracing::Span::current().record("session_id", &session_id);
@@ -97,10 +164,21 @@ async fn delete_session_from_store(
 pub(crate) async fn delete_session_from_store_by_session_id(
     session_id: SessionId,
 ) -> Result<(), SessionError> {
+    let session_id_str = session_id.as_str().to_string();
+
+    // Try to get user_id from the session before deleting it for mapping cleanup
+    if let Ok(cache_key) = CacheKey::new(session_id_str.clone())
+        && let Ok(Some(stored_session)) =
+            get_data::<StoredSession, SessionError>(CachePrefix::session(), cache_key).await
+    {
+        remove_session_from_user_mapping(&stored_session.user_id, &session_id_str)
+            .await
+            .ok();
+    }
+
     remove_data::<SessionError>(
         CachePrefix::session(),
-        CacheKey::new(session_id.as_str().to_string())
-            .map_err(SessionError::convert_storage_error)?,
+        CacheKey::new(session_id_str).map_err(SessionError::convert_storage_error)?,
     )
     .await?;
     Ok(())

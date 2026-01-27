@@ -38,6 +38,10 @@ pub enum SessionError {
     #[error("Session expired error")]
     SessionExpiredError,
 
+    /// Error when login is rejected due to session conflict policy
+    #[error("Session conflict: active session already exists for this user")]
+    SessionConflictRejected,
+
     /// Error when input validation fails for session-related data
     #[error("Validation error: {0}")]
     Validation(String),
