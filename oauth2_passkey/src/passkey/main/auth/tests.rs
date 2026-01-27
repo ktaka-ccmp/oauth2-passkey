@@ -30,6 +30,7 @@ fn create_test_passkey_credential(user_handle: String) -> PasskeyCredential {
         user_id: "test_user_id".to_string(),
         public_key: "test_public_key".to_string(),
         aaguid: "test_aaguid".to_string(),
+        rp_id: "localhost".to_string(),
         counter: 1,
         user: PublicKeyCredentialUserEntity {
             user_handle,

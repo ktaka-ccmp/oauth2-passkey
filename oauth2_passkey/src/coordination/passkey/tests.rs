@@ -37,6 +37,7 @@ async fn insert_test_passkey_credential(
         user_id: user_id.to_string(),
         public_key: "test_public_key".to_string(),
         aaguid: "test-aaguid".to_string(),
+        rp_id: "localhost".to_string(),
         user: passkey_user,
         counter: 0,
         created_at: Utc::now(),

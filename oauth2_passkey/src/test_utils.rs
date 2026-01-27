@@ -245,6 +245,7 @@ async fn create_first_user_passkey_credential(user_id: &str) {
         user_id: user_id.to_string(),
         public_key,
         aaguid: "00000000-0000-0000-0000-000000000000".to_string(), // Test AAGUID
+        rp_id: "localhost".to_string(),
         counter: 0,
         user: serde_json::from_value(serde_json::json!({
             "user_handle": "first-user-handle",

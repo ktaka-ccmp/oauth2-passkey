@@ -24,6 +24,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
             user_name TEXT NOT NULL,
             user_display_name TEXT NOT NULL,
             aaguid TEXT NOT NULL,
+            rp_id TEXT NOT NULL DEFAULT '',
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -52,6 +53,33 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
     Ok(())
 }
 
+/// Migrates the passkey credentials table to add the rp_id column if it doesn't exist.
+/// This is needed for existing databases that were created before rp_id was added.
+pub(super) async fn migrate_passkey_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), PasskeyError> {
+    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
+
+    // Check if rp_id column exists using PRAGMA table_info
+    let columns: Vec<(String,)> = sqlx::query_as(&format!(
+        "SELECT name FROM pragma_table_info('{passkey_table}')"
+    ))
+    .fetch_all(pool)
+    .await
+    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    let has_rp_id = columns.iter().any(|(name,)| name == "rp_id");
+
+    if !has_rp_id {
+        sqlx::query(&format!(
+            "ALTER TABLE {passkey_table} ADD COLUMN rp_id TEXT NOT NULL DEFAULT ''"
+        ))
+        .execute(pool)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    }
+
+    Ok(())
+}
+
 /// Validates that the Passkey credential table schema matches what we expect
 pub(super) async fn validate_passkey_tables_sqlite(
     pool: &Pool<Sqlite>,
@@ -68,6 +96,7 @@ pub(super) async fn validate_passkey_tables_sqlite(
         ("user_name", "TEXT"),
         ("user_display_name", "TEXT"),
         ("aaguid", "TEXT"),
+        ("rp_id", "TEXT"),
         ("created_at", "TIMESTAMP"),
         ("updated_at", "TIMESTAMP"),
         ("last_used_at", "TIMESTAMP"),
@@ -94,6 +123,7 @@ pub(super) async fn store_credential_sqlite(
     let user_name = &credential.user.name;
     let user_display_name = &credential.user.display_name;
     let aaguid = &credential.aaguid;
+    let rp_id = &credential.rp_id;
     let created_at = &credential.created_at;
     let updated_at = &credential.updated_at;
     let last_used_at = &credential.last_used_at;
@@ -102,8 +132,8 @@ pub(super) async fn store_credential_sqlite(
     sqlx::query(&format!(
         r#"
         INSERT OR REPLACE INTO {passkey_table}
-        (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, created_at, updated_at, last_used_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, rp_id, created_at, updated_at, last_used_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#
     ))
     .bind(credential_id.as_str())
@@ -114,6 +144,7 @@ pub(super) async fn store_credential_sqlite(
     .bind(user_name)
     .bind(user_display_name)
     .bind(aaguid)
+    .bind(rp_id)
     .bind(created_at)
     .bind(updated_at)
     .bind(last_used_at)

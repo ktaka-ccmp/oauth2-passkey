@@ -30,7 +30,7 @@
         <div class="item" id="user-info-display">
             <div class="item-detail"><strong>User ID:</strong> {{ user.id }}</div>
             <div class="item-detail">
-                <strong>Is Admin:</strong> 
+                <strong>Is Admin:</strong>
                 {% if user.sequence_number.is_some() && user.sequence_number.unwrap_or(0) == 1 %}
                     <span>{{ user.is_admin }} (First User)</span>
                 {% else %}
@@ -79,6 +79,11 @@
                         {{ credential.user_display_name }}
                     </div>
                     <div class="item-detail"><strong>AAGUID:</strong>{{ credential.aaguid }}</div>
+                    {% if credential.rp_id != "" %}
+                    <div class="item-detail"><strong>RP ID:</strong> {{ credential.rp_id }}</div>
+                    {% else %}
+                    <div class="item-detail"><strong>RP ID:</strong> (unknown)</div>
+                    {% endif %}
                     <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
                     <div class="item-detail"><strong>Updated:</strong> {{ credential.updated_at }}</div>
                     <div class="item-detail  created-row">

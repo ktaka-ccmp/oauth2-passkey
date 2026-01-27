@@ -39,6 +39,8 @@ pub struct PasskeyCredential {
     pub public_key: String,
     /// AAGUID of the authenticator
     pub aaguid: String,
+    /// Relying Party ID used when this credential was registered
+    pub rp_id: String,
     /// Counter value for the credential (used to prevent replay attacks)
     pub counter: u32,
     /// User entity information

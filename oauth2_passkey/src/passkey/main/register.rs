@@ -46,6 +46,8 @@ pub(crate) struct ValidatedRegistrationData {
     pub credential_id: String,
     /// Extracted AAGUID from attestation object
     pub aaguid: String,
+    /// Relying Party ID used for this registration
+    pub rp_id: String,
 }
 
 /// Resolves a user handle for passkey registration
@@ -329,6 +331,7 @@ pub(crate) async fn validate_registration_challenge(
         stored_user,
         credential_id,
         aaguid,
+        rp_id: PASSKEY_RP_ID.to_string(),
     })
 }
 
@@ -354,6 +357,7 @@ pub(crate) async fn prepare_registration_storage(
         stored_user,
         credential_id,
         aaguid,
+        rp_id,
     } = validated_data;
 
     // Handle existing credential cleanup if configured
@@ -425,6 +429,7 @@ pub(crate) async fn prepare_registration_storage(
         counter: 0,
         user: stored_user,
         aaguid,
+        rp_id,
         created_at: Utc::now(),
         updated_at: Utc::now(),
         last_used_at: Utc::now(),

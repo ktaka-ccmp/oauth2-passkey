@@ -97,9 +97,14 @@
                             {{ credential.user_display_name }}
                         </span>
                     </div>
+                    {% if credential.rp_id != "" %}
+                    <div class="item-detail"><strong>RP ID:</strong> {{ credential.rp_id }}</div>
+                    {% else %}
+                    <div class="item-detail"><strong>RP ID:</strong> (unknown)</div>
+                    {% endif %}
+                    <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
                     <!--
                     <div class="item-detail"><strong>AAGUID:</strong>{{ credential.aaguid }}</div>
-                    <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
                     -->
                     <div class="item-detail  created-row">
                         <span><strong>Last Used:</strong> {{ credential.last_used_at }}</span>
