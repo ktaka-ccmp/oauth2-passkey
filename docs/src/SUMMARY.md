@@ -48,6 +48,7 @@
 - [Security Model](security/model.md)
 - [CSRF Protection](security/csrf.md)
 - [Session Security](security/session.md)
+- [Session Conflict Policy](security/session-conflict.md)
 - [Page Session Protection](security/page-session.md)
 - [OAuth2 Security](security/oauth2-security.md)
 - [Authorization Patterns](security/authorization.md)

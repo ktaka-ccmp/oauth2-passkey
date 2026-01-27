@@ -5,7 +5,7 @@ use http::header::{COOKIE, HeaderMap};
 use subtle::ConstantTimeEq;
 
 use crate::session::config::{
-    O2P_SESSION_CONFLICT_POLICY, SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME, SessionConflictPolicy,
+    SESSION_CONFLICT_POLICY, SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME, SessionConflictPolicy,
 };
 use crate::session::errors::SessionError;
 use crate::session::types::{
@@ -73,7 +73,7 @@ pub(super) async fn create_new_session_with_uid(
     let active_sessions = cleanup_stale_sessions(user_id_str).await?;
 
     if !active_sessions.is_empty() {
-        let policy = &*O2P_SESSION_CONFLICT_POLICY;
+        let policy = &*SESSION_CONFLICT_POLICY;
         tracing::debug!(
             "User {} has {} active session(s), policy: {:?}",
             user_id_str,

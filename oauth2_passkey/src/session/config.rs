@@ -28,7 +28,7 @@ pub static SESSION_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
 /// are always maintained regardless of the policy value. The policy only controls
 /// what happens when existing sessions are found.
 ///
-/// Configured via the `O2P_SESSION_CONFLICT_POLICY` environment variable.
+/// Configured via the `SESSION_CONFLICT_POLICY` environment variable.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SessionConflictPolicy {
     /// Allow multiple concurrent sessions (default)
@@ -42,14 +42,14 @@ pub enum SessionConflictPolicy {
 /// Session conflict policy configuration.
 ///
 /// Controls what happens when a user logs in while already having active sessions.
-/// Set via the `O2P_SESSION_CONFLICT_POLICY` environment variable.
+/// Set via the `SESSION_CONFLICT_POLICY` environment variable.
 ///
 /// Valid values:
 /// - `allow` (default): Permit multiple concurrent sessions
 /// - `replace`: Invalidate all existing sessions, create new one
 /// - `reject`: Deny login if active session exists
-pub static O2P_SESSION_CONFLICT_POLICY: LazyLock<SessionConflictPolicy> = LazyLock::new(|| {
-    match env::var("O2P_SESSION_CONFLICT_POLICY")
+pub static SESSION_CONFLICT_POLICY: LazyLock<SessionConflictPolicy> = LazyLock::new(|| {
+    match env::var("SESSION_CONFLICT_POLICY")
         .unwrap_or_default()
         .to_lowercase()
         .as_str()

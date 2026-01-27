@@ -382,6 +382,24 @@ Maximum age (in seconds) for the session cookie.
 SESSION_COOKIE_MAX_AGE=600
 ```
 
+#### SESSION_CONFLICT_POLICY
+
+Controls behavior when a user logs in while already having active sessions.
+
+| Value | Description |
+|-------|-------------|
+| `allow` | Permit multiple concurrent sessions (default) |
+| `replace` | Invalidate all existing sessions, create a new one |
+| `reject` | Deny login if an active session already exists |
+
+- **Default**: `allow`
+
+```bash
+SESSION_CONFLICT_POLICY=allow
+```
+
+See [Session Conflict Policy](../security/session-conflict.md) for detailed documentation.
+
 ### User Field Mapping
 
 These settings control how user fields are mapped between authentication providers and the internal user model.

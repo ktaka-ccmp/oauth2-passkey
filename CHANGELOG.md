@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Session conflict policy via `O2P_SESSION_CONFLICT_POLICY` env var (`allow`/`replace`/`reject`) to control login behavior when a user already has active sessions
+- Session conflict policy via `SESSION_CONFLICT_POLICY` env var (`allow`/`replace`/`reject`) to control login behavior when a user already has active sessions
 - User-to-session reverse index (`user_sessions` cache mapping) with lazy cleanup of stale entries
 - Built-in CSS theme system with 9 pre-built themes: Zinc, Slate, Blue, Violet, Rose, Neumorphism, Material, Eco, SaaS
 - `O2P_CUSTOM_CSS_URL` environment variable for custom CSS theme loading
