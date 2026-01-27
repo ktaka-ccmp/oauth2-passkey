@@ -107,7 +107,7 @@ async fn protected(user: AuthUser) -> impl IntoResponse {
 }
 
 // ============================================================================
-// Custom Summary Page
+// Custom Account Page
 // ============================================================================
 
 /// Template-friendly passkey credential info
@@ -151,8 +151,8 @@ impl From<&OAuth2Account> for TemplateOAuth2 {
 }
 
 #[derive(Template)]
-#[template(path = "summary.j2")]
-struct SummaryTemplate<'a> {
+#[template(path = "account.j2")]
+struct AccountTemplate<'a> {
     user_id: &'a str,
     user_account: &'a str,
     user_label: &'a str,
@@ -164,8 +164,8 @@ struct SummaryTemplate<'a> {
     o2p_route_prefix: &'a str,
 }
 
-/// Custom summary page - shows user info, passkeys, and OAuth2 accounts
-async fn summary(user: AuthUser) -> impl IntoResponse {
+/// Custom account page - shows user info, passkeys, and OAuth2 accounts
+async fn account(user: AuthUser) -> impl IntoResponse {
     let user_id = UserId::new(user.id.clone()).expect("Invalid user ID");
 
     // Fetch passkey credentials
@@ -180,7 +180,7 @@ async fn summary(user: AuthUser) -> impl IntoResponse {
         Err(_) => vec![],
     };
 
-    let template = SummaryTemplate {
+    let template = AccountTemplate {
         user_id: &user.id,
         user_account: &user.account,
         user_label: &user.label,
@@ -213,15 +213,15 @@ struct TemplateUserInfo {
 }
 
 #[derive(Template)]
-#[template(path = "admin_list.j2")]
-struct AdminListTemplate<'a> {
+#[template(path = "admin_index.j2")]
+struct AdminIndexTemplate<'a> {
     users: Vec<TemplateUserInfo>,
     csrf_token: &'a str,
     o2p_route_prefix: &'a str,
 }
 
-/// Admin user list page - shows all users (admin only)
-async fn admin_list(user: AuthUser) -> impl IntoResponse {
+/// Admin index page - shows all users (admin only)
+async fn admin_index(user: AuthUser) -> impl IntoResponse {
     // Check admin privileges
     if !user.has_admin_privileges() {
         return (StatusCode::FORBIDDEN, "Admin access required").into_response();
@@ -255,7 +255,7 @@ async fn admin_list(user: AuthUser) -> impl IntoResponse {
         }
     };
 
-    let template = AdminListTemplate {
+    let template = AdminIndexTemplate {
         users,
         csrf_token: &user.csrf_token,
         o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
@@ -364,8 +364,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/", get(index))
         .route("/login", get(login)) // Custom login page
         .route("/protected", get(protected))
-        .route("/summary", get(summary)) // Custom summary page
-        .route("/admin", get(admin_list)) // Custom admin list page
+        .route("/account", get(account)) // Custom account page
+        .route("/admin", get(admin_index)) // Custom admin index page
         .route("/admin/user/{id}", get(admin_user)) // Custom admin user detail page
         .merge(oauth2_passkey_full_router());
 
