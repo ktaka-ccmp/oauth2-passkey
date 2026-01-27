@@ -1,0 +1,38 @@
+/* =============================================================================
+   Blue Theme - Primary blue palette
+   ============================================================================= */
+:root {
+    /* Colors - Blue Palette */
+    --o2p-primary: #2563eb;
+    --o2p-primary-hover: #1d4ed8;
+    --o2p-oauth2: #3b82f6;
+    --o2p-oauth2-hover: #2563eb;
+    --o2p-passkey: #0ea5e9;
+    --o2p-passkey-hover: #0284c7;
+    --o2p-danger: #1d4ed8;
+    --o2p-danger-hover: #1e40af;
+    --o2p-secondary: #64748b;
+    --o2p-secondary-hover: #475569;
+
+    /* Text */
+    --o2p-text: #0f172a;
+    --o2p-text-secondary: #475569;
+    --o2p-text-light: #94a3b8;
+
+    /* Backgrounds */
+    --o2p-background: #f8fafc;
+    --o2p-surface: #ffffff;
+    --o2p-surface-alt: #f1f5f9;
+
+    /* Borders */
+    --o2p-border: #e2e8f0;
+    --o2p-border-light: #f1f5f9;
+}
+
+.login-page {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.form-input:focus {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}

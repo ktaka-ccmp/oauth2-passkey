@@ -62,6 +62,7 @@ mod oauth2;
 mod passkey;
 mod router;
 mod session;
+mod themes;
 mod user;
 
 // Test utilities module (only available in test builds)

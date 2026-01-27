@@ -1,0 +1,38 @@
+/* =============================================================================
+   Slate Theme - Cool slate gray palette
+   ============================================================================= */
+:root {
+    /* Colors - Slate Palette */
+    --o2p-primary: #0f172a;
+    --o2p-primary-hover: #1e293b;
+    --o2p-oauth2: #334155;
+    --o2p-oauth2-hover: #475569;
+    --o2p-passkey: #475569;
+    --o2p-passkey-hover: #64748b;
+    --o2p-danger: #64748b;
+    --o2p-danger-hover: #475569;
+    --o2p-secondary: #64748b;
+    --o2p-secondary-hover: #475569;
+
+    /* Text */
+    --o2p-text: #020617;
+    --o2p-text-secondary: #334155;
+    --o2p-text-light: #94a3b8;
+
+    /* Backgrounds */
+    --o2p-background: #f8fafc;
+    --o2p-surface: #ffffff;
+    --o2p-surface-alt: #f1f5f9;
+
+    /* Borders */
+    --o2p-border: #e2e8f0;
+    --o2p-border-light: #f1f5f9;
+}
+
+.login-page {
+    background: linear-gradient(135deg, #334155 0%, #0f172a 100%);
+}
+
+.form-input:focus {
+    box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.1);
+}

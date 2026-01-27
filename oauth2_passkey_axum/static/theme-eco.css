@@ -1,0 +1,56 @@
+/* =============================================================================
+   Eco Wellness Theme - Nature-inspired organic shapes in green tones
+   ============================================================================= */
+:root {
+    /* Colors - Natural Green Palette */
+    --o2p-primary: #059669;
+    --o2p-primary-hover: #047857;
+    --o2p-oauth2: #10b981;
+    --o2p-oauth2-hover: #059669;
+    --o2p-passkey: #34d399;
+    --o2p-passkey-hover: #10b981;
+    --o2p-danger: #b45309;
+    --o2p-danger-hover: #92400e;
+    --o2p-secondary: #78716c;
+    --o2p-secondary-hover: #57534e;
+
+    /* Text */
+    --o2p-text: #1c1917;
+    --o2p-text-secondary: #44403c;
+    --o2p-text-light: #78716c;
+
+    /* Backgrounds - Earthy tones */
+    --o2p-background: #faf7f5;
+    --o2p-surface: #ffffff;
+    --o2p-surface-alt: #f5f0eb;
+
+    /* Borders */
+    --o2p-border: #d6cfc7;
+    --o2p-border-light: #e7e0d8;
+}
+
+.login-page {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 50%, #6ee7b7 100%);
+}
+
+.login-card {
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 4px 20px rgba(5, 150, 105, 0.1);
+}
+
+.form-input {
+    border: 2px solid #d6cfc7;
+    border-radius: 12px;
+    background: #faf7f5;
+}
+
+.form-input:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    background: #ffffff;
+}
+
+.btn-primary, .btn-oauth2, .btn-passkey {
+    border-radius: 12px;
+}

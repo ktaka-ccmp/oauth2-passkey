@@ -1,0 +1,38 @@
+/* =============================================================================
+   Violet Theme - Elegant violet palette
+   ============================================================================= */
+:root {
+    /* Colors - Violet Palette */
+    --o2p-primary: #7c3aed;
+    --o2p-primary-hover: #6d28d9;
+    --o2p-oauth2: #8b5cf6;
+    --o2p-oauth2-hover: #7c3aed;
+    --o2p-passkey: #a78bfa;
+    --o2p-passkey-hover: #8b5cf6;
+    --o2p-danger: #7c3aed;
+    --o2p-danger-hover: #6d28d9;
+    --o2p-secondary: #64748b;
+    --o2p-secondary-hover: #475569;
+
+    /* Text */
+    --o2p-text: #0f172a;
+    --o2p-text-secondary: #475569;
+    --o2p-text-light: #94a3b8;
+
+    /* Backgrounds */
+    --o2p-background: #faf5ff;
+    --o2p-surface: #ffffff;
+    --o2p-surface-alt: #f5f3ff;
+
+    /* Borders */
+    --o2p-border: #ede9fe;
+    --o2p-border-light: #f5f3ff;
+}
+
+.login-page {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+}
+
+.form-input:focus {
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}

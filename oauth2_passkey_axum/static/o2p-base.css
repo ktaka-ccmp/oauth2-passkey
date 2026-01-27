@@ -8,31 +8,31 @@
    Override these in your custom CSS file via O2P_CUSTOM_CSS_URL
    ----------------------------------------------------------------------------- */
 :root {
-    /* Colors */
-    --o2p-primary: #667eea;
-    --o2p-primary-hover: #5a6fd6;
-    --o2p-oauth2: #4285f4;
-    --o2p-oauth2-hover: #3367d6;
-    --o2p-passkey: #34a853;
-    --o2p-passkey-hover: #2d9248;
-    --o2p-danger: #dc3545;
-    --o2p-danger-hover: #c82333;
-    --o2p-secondary: #6c757d;
-    --o2p-secondary-hover: #5a6268;
+    /* Colors - Professional Indigo Palette (Clean Banking) */
+    --o2p-primary: #4f46e5;
+    --o2p-primary-hover: #4338ca;
+    --o2p-oauth2: #6366f1;
+    --o2p-oauth2-hover: #4f46e5;
+    --o2p-passkey: #818cf8;
+    --o2p-passkey-hover: #6366f1;
+    --o2p-danger: #dc2626;
+    --o2p-danger-hover: #b91c1c;
+    --o2p-secondary: #6b7280;
+    --o2p-secondary-hover: #4b5563;
 
     /* Text */
-    --o2p-text: #333;
-    --o2p-text-secondary: #666;
-    --o2p-text-light: #999;
+    --o2p-text: #111827;
+    --o2p-text-secondary: #4b5563;
+    --o2p-text-light: #9ca3af;
 
     /* Backgrounds */
-    --o2p-background: #f5f5f5;
+    --o2p-background: #f9fafb;
     --o2p-surface: #ffffff;
-    --o2p-surface-alt: #f9f9f9;
+    --o2p-surface-alt: #f3f4f6;
 
     /* Borders */
-    --o2p-border: #ddd;
-    --o2p-border-light: #eee;
+    --o2p-border: #e5e7eb;
+    --o2p-border-light: #f3f4f6;
 
     /* Spacing */
     --o2p-space-xs: 4px;
@@ -42,13 +42,13 @@
     --o2p-space-xl: 32px;
 
     /* Border Radius */
-    --o2p-radius-sm: 6px;
-    --o2p-radius-md: 8px;
-    --o2p-radius-lg: 12px;
+    --o2p-radius-sm: 4px;
+    --o2p-radius-md: 6px;
+    --o2p-radius-lg: 8px;
 
     /* Shadows */
-    --o2p-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    --o2p-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.15);
+    --o2p-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --o2p-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
 
     /* Typography */
     --o2p-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -298,7 +298,7 @@ a:hover {
 .form-input:focus {
     outline: none;
     border-color: var(--o2p-primary);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .form-input::placeholder {
@@ -356,7 +356,7 @@ a:hover {
 /* Credential item with type indicator */
 .item {
     background-color: var(--o2p-surface-alt);
-    border-left: 4px solid var(--o2p-oauth2);
+    border-left: 3px solid var(--o2p-primary);
     padding: var(--o2p-space-md);
     margin-bottom: var(--o2p-space-sm);
     border-radius: 0 var(--o2p-radius-sm) var(--o2p-radius-sm) 0;
@@ -372,7 +372,7 @@ a:hover {
 }
 
 .item.oauth2 {
-    border-left-color: var(--o2p-oauth2);
+    border-left-color: var(--o2p-secondary);
 }
 
 .item-detail {
@@ -538,7 +538,7 @@ nav a:hover {
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
     padding: var(--o2p-space-md);
 }
 
