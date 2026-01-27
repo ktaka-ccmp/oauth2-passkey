@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Built-in CSS theme system with 9 pre-built themes: Zinc, Slate, Blue, Violet, Rose, Neumorphism, Material, Eco, SaaS
+- `O2P_CUSTOM_CSS_URL` environment variable for custom CSS theme loading
+- Theme CSS files served at `{O2P_ROUTE_PREFIX}/themes/` (e.g., `/o2p/themes/theme-zinc.css`)
+- `oauth2_passkey_full_router()` unified router that automatically includes `/.well-known/webauthn` when multi-origin is configured
+
 ### Changed
 
 - **BREAKING**: Renamed `O2P_REDIRECT_ANON` to `O2P_DEFAULT_REDIRECT` for clarity (env var, config, and template variable)
