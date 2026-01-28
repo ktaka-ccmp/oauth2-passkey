@@ -105,7 +105,46 @@ function base64URLToUint8Array(base64URL) {
 
                 if (!authResponse.ok) {
                     const errorText = await authResponse.text();
+
+                    // Signal unknown credential to the authenticator
+                    if (
+                        credential.id &&
+                        window.PublicKeyCredential &&
+                        typeof window.PublicKeyCredential.signalUnknownCredential === "function"
+                    ) {
+                        try {
+                            await window.PublicKeyCredential.signalUnknownCredential({
+                                rpId: window.location.hostname,
+                                credentialId: credential.id,
+                            });
+                            console.log("signalUnknownCredential: signaled", credential.id);
+                        } catch (signalErr) {
+                            console.warn("signalUnknownCredential error (non-critical):", signalErr);
+                        }
+                    }
+
                     throw new Error('Verification failed: ' + errorText);
+                }
+
+                // Synchronize credentials with authenticator via Signal API
+                try {
+                    const data = await authResponse.json();
+                    if (
+                        window.PublicKeyCredential &&
+                        typeof window.PublicKeyCredential.signalAllAcceptedCredentials === "function" &&
+                        data.user_handle && data.credential_ids
+                    ) {
+                        const userIdBytes = new TextEncoder().encode(data.user_handle);
+                        const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
+                        await window.PublicKeyCredential.signalAllAcceptedCredentials({
+                            rpId: window.location.hostname,
+                            userId: userIdBase64Url,
+                            allAcceptedCredentialIds: data.credential_ids,
+                        });
+                        console.log("signalAllAcceptedCredentials: signaled", data.credential_ids.length, "credentials");
+                    }
+                } catch (signalErr) {
+                    console.warn("Signal API error (non-critical):", signalErr);
                 }
 
                 window.location.href = '/';

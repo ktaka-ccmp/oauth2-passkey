@@ -111,14 +111,22 @@ async fn handle_start_authentication(
 
 async fn handle_finish_authentication(
     Json(auth_response): Json<AuthenticatorResponse>,
-) -> Result<(HeaderMap, String), (StatusCode, String)> {
+) -> Result<(HeaderMap, Json<Value>), (StatusCode, String)> {
     // Call the core function with the extracted data
-    let (_, name, headers) = handle_finish_authentication_core(auth_response)
+    let (auth_data, headers) = handle_finish_authentication_core(auth_response)
         .await
         .into_response_error()?;
 
-    // Return the headers and name
-    Ok((headers, name))
+    // Return the headers and authentication data as JSON
+    // Includes credential IDs and user handle for WebAuthn Signal API synchronization
+    Ok((
+        headers,
+        Json(serde_json::json!({
+            "name": auth_data.name,
+            "user_handle": auth_data.user_handle,
+            "credential_ids": auth_data.credential_ids,
+        })),
+    ))
 }
 
 async fn serve_passkey_js() -> Response {
@@ -177,7 +185,7 @@ async fn list_passkey_credentials(
 async fn delete_passkey_credential(
     auth_user: AuthUser,
     Path(credential_id): Path<String>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     let user_id = UserId::new(auth_user.id.clone()).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -191,10 +199,14 @@ async fn delete_passkey_credential(
         )
     })?;
 
-    delete_passkey_credential_core(user_id, credential_id_enum)
+    let response = delete_passkey_credential_core(user_id, credential_id_enum)
         .await
-        .into_response_error()
-        .map(|()| StatusCode::NO_CONTENT)
+        .into_response_error()?;
+
+    Ok(Json(serde_json::json!({
+        "remaining_credential_ids": response.remaining_credential_ids,
+        "user_handle": response.user_handle,
+    })))
 }
 
 async fn serve_related_origin() -> Response {

@@ -66,6 +66,7 @@
   - [None Attestation](webauthn/none.md)
   - [Packed Attestation](webauthn/packed.md)
   - [TPM Attestation](webauthn/tpm.md)
+- [User Handle and Signal API](webauthn/user-handle-and-signal-api.md)
 
 ---
 

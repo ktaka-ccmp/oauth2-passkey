@@ -95,7 +95,7 @@ async fn delete_passkey_credential(
 
     delete_passkey_credential_core(user_id, credential_id_enum)
         .await
-        .map(|()| StatusCode::NO_CONTENT)
+        .map(|_| StatusCode::NO_CONTENT)
         .into_response_error()
 }
 

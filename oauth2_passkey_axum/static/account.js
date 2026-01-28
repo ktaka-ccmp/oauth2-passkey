@@ -150,8 +150,8 @@ function unlinkOAuth2Account(provider, providerUserId) {
 
 // Function to synchronize credentials with the authenticator using signalAllAcceptedCredentials
 // This helps keep the authenticator's credential store in sync with the server
-// Takes the user handle of the deleted credential as a parameter
-function synchronizeCredentials(userHandle) {
+// by sending the list of remaining valid credential IDs after a deletion.
+function synchronizeCredentials(userHandle, remainingCredentialIds) {
     // Check if the WebAuthn API and signalAllAcceptedCredentials are available
     if (
         !window.PublicKeyCredential ||
@@ -176,16 +176,19 @@ function synchronizeCredentials(userHandle) {
     const userIdBytes = new TextEncoder().encode(userHandle);
     const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
 
-    // Signal all accepted credentials with an empty array
-    // This tells the authenticator that no credentials are valid for this user and RP
+    const credentialIds = remainingCredentialIds || [];
+
+    // Signal all accepted credentials to the authenticator
+    // Credentials not in this list may be removed by the passkey provider
     return window.PublicKeyCredential.signalAllAcceptedCredentials({
         rpId: window.location.hostname,
         userId: userIdBase64Url,
-        allAcceptedCredentialIds: [], // Empty array = no valid credentials
+        allAcceptedCredentialIds: credentialIds,
     })
         .then(() => {
             console.log(
-                "Successfully signaled credential deletion to authenticator"
+                "Successfully signaled accepted credentials to authenticator.",
+                "remaining:", credentialIds.length
             );
         })
         .catch((err) => {
@@ -258,20 +261,23 @@ function deletePasskeyCredential(credentialId, userHandle) {
                 "Content-Type": "application/json",
             },
         })
-            .then((response) => {
+            .then(async (response) => {
                 if (response.ok) {
-                    // After successful deletion, synchronize credentials with the authenticator
-                    // Pass the user handle of the deleted credential for accurate synchronization
-                    // return synchronizeCredentials(userHandle);
-                    return synchronizeCredentialsWithSignalUnknown(
-                        credentialId
+                    // Server returns remaining credential IDs and user handle
+                    const data = await response.json();
+                    // Dual approach: use both Signal APIs for maximum compatibility
+                    // Step 1: Signal the deleted credential as unknown (works for both user_handle modes)
+                    await synchronizeCredentialsWithSignalUnknown(credentialId);
+                    // Step 2: Signal remaining accepted credentials (effective when user_handle is shared)
+                    return synchronizeCredentials(
+                        data.user_handle || userHandle,
+                        data.remaining_credential_ids
                     );
                 } else {
-                    return response.text().then((text) => {
-                        throw new Error(
-                            `Failed to unlink passkey credential: ${text}`
-                        );
-                    });
+                    const text = await response.text();
+                    throw new Error(
+                        `Failed to unlink passkey credential: ${text}`
+                    );
                 }
             })
             .then(() => {

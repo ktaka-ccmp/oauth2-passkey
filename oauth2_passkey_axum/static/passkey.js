@@ -88,23 +88,80 @@ async function startAuthentication() {
         if (!verifyResponse.ok) {
             console.error('Authentication failed:', verifyResponse.status, verifyResponse.statusText);
             const errorText = await verifyResponse.text();
+
+            // Signal unknown credential if the server doesn't recognize it
+            if (
+                credential.id &&
+                window.PublicKeyCredential &&
+                typeof window.PublicKeyCredential.signalUnknownCredential === "function"
+            ) {
+                try {
+                    await window.PublicKeyCredential.signalUnknownCredential({
+                        rpId: window.location.hostname,
+                        credentialId: credential.id,
+                    });
+                    console.log("signalUnknownCredential: signaled", credential.id);
+                } catch (signalErr) {
+                    console.warn("signalUnknownCredential error (non-critical):", signalErr);
+                }
+            }
+
             alert('Authentication failed: ' + errorText);
             return;
         }
 
         // Response is OK, handle success
-        setTimeout(() => {
-            window.location.reload();
-        }, 100);  // Wait for 0.1 second before reloading
+        const data = await verifyResponse.json();
 
-        verifyResponse.text().then(function(text) {
-            if (authStatus) {
-                authStatus.textContent = `Welcome back ${text}!`;
-            }
-        });
+        if (authStatus) {
+            authStatus.textContent = `Welcome back ${data.name}!`;
+        }
+
+        // Synchronize credentials with the authenticator via Signal API
+        await signalAfterLogin(data);
+
+        window.location.reload();
     } catch (error) {
         console.error('Error during authentication:', error);
         alert('Authentication failed: ' + error.message);
+    }
+}
+
+// Signal API: notify authenticator about accepted credentials after login
+async function signalAfterLogin(data) {
+    try {
+        if (
+            window.PublicKeyCredential &&
+            typeof window.PublicKeyCredential.signalAllAcceptedCredentials === "function" &&
+            data.user_handle && data.credential_ids
+        ) {
+            const userIdBytes = new TextEncoder().encode(data.user_handle);
+            const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
+            await window.PublicKeyCredential.signalAllAcceptedCredentials({
+                rpId: window.location.hostname,
+                userId: userIdBase64Url,
+                allAcceptedCredentialIds: data.credential_ids,
+            });
+            console.log("signalAllAcceptedCredentials: signaled", data.credential_ids.length, "credentials");
+        }
+
+        if (
+            window.PublicKeyCredential &&
+            typeof window.PublicKeyCredential.signalCurrentUserDetails === "function" &&
+            data.user_handle && data.name
+        ) {
+            const userIdBytes = new TextEncoder().encode(data.user_handle);
+            const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
+            await window.PublicKeyCredential.signalCurrentUserDetails({
+                rpId: window.location.hostname,
+                userId: userIdBase64Url,
+                name: data.name,
+                displayName: data.name,
+            });
+            console.log("signalCurrentUserDetails: updated user details");
+        }
+    } catch (err) {
+        console.warn("Signal API error (non-critical):", err);
     }
 }
 
