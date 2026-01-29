@@ -1,87 +1,87 @@
 # Session Snapshot: Signal API Response Control
 
-## Current Task
+## Status: COMPLETED
 
-Remove `signalApiMode` variable from client-side (JS/templates) entirely and control Signal API calls via server response instead.
+## Summary
 
-### Background
+Removed `signalApiMode` variable from client-side (JS/templates) entirely and implemented server response-controlled Signal API behavior.
 
-Requiring custom page developers to define `signalApiMode` in their templates is poor developer experience. Adopted approach: control `signalAllAcceptedCredentials` calls by whether `credential_ids` is included in server response (Option 6).
+## Changes Made
 
-## Files Modified (This Session - Uncommitted)
+### Server-Side (Rust)
 
-The following files were modified in the previous session but will be **rolled back** due to Option 6 adoption:
-
-- `demo-custom-login/src/main.rs` - Added `signal_api_mode` field (to be removed)
-- `demo-custom-login/templates/login.j2` - Added `signalApiMode` variable (to be removed)
-- `demo-custom-login/templates/account.j2` - Added `signalApiMode` variable (to be removed)
-
-## Key Decisions
-
-### Option 6 Adopted: Server Response Control
-
-All 6 options considered:
-
-| Option | Summary | Adopted |
-|--------|---------|---------|
-| 1 | Embed config at JS serve time | ✗ Cache issues |
-| 2 | Remove mode, hardcode direct | ✗ No future flexibility |
-| 3 | Fetch from /o2p/config endpoint | ✗ Extra request needed |
-| 4 | Serve separate config.js | ✗ Requires extra script tag |
-| 5 | Use default value in JS | ✗ Global variable dependency |
-| **6** | **Server response control** | **✓ Adopted** |
-
-### Option 6 Design
-
-```javascript
-// Client-side - no signalApiMode needed
-if (data.credential_ids && data.user_handle) {
-    signalAllAcceptedCredentials({...});
-}
-```
+**`oauth2_passkey_axum/src/passkey.rs`**:
+- `handle_finish_authentication()`: Returns `signal_api_mode` in all responses
+- `delete_passkey_credential()`: Returns `signal_api_mode` in all responses
+- When mode includes `sync`: Also includes `credential_ids` and `user_handle`
 
 ```rust
-// Server-side - include credential_ids based on mode
+let mut response = serde_json::json!({
+    "name": auth_data.name,
+    "signal_api_mode": PASSKEY_SIGNAL_API_MODE.as_str(),
+});
+
 if PASSKEY_SIGNAL_API_MODE.contains("sync") {
-    Json(json!({ "name": name, "user_handle": handle, "credential_ids": ids }))
-} else {
-    Json(json!({ "name": name }))
+    response["user_handle"] = serde_json::json!(auth_data.user_handle);
+    response["credential_ids"] = serde_json::json!(auth_data.credential_ids);
 }
 ```
 
-## Next Steps
+### Client-Side (JavaScript)
 
-See detailed plan at `.claude/plans/signal-api-response-control.md`.
+**`oauth2_passkey_axum/static/account.js`**:
+- `deletePasskeyCredential()`: Checks `signal_api_mode` before calling `signalUnknownCredential`
 
-1. **Step 1**: Conditional server response control
-   - `oauth2_passkey_axum/src/passkey.rs` - Modify `handle_finish_authentication()`
+```javascript
+const mode = data.signal_api_mode || "direct";
+if (mode.includes("direct")) {
+    synchronizeCredentialsWithSignalUnknown(credentialId);
+}
+if (data.remaining_credential_ids) {
+    synchronizeCredentials(data.user_handle, data.remaining_credential_ids);
+}
+```
 
-2. **Step 2**: Remove signalApiMode from JS
-   - Modify `passkey.js`, `conditional_ui.js`
+**`oauth2_passkey_axum/static/passkey.js`** and **`conditional_ui.js`**:
+- Auth failure: Always calls `signalUnknownCredential` (credential doesn't exist on server)
+- Auth success: Calls `signalAllAcceptedCredentials` only if `credential_ids` present
 
-3. **Step 3**: Remove signalApiMode from templates
-   - Library templates (login.j2, account.j2, conditional_ui.j2)
-   - Rust template structs
+### Templates
 
-4. **Step 4**: Fix demo-custom-login
-   - Remove signalApiMode added in previous session
+Removed `signalApiMode` variable from:
+- `oauth2_passkey_axum/templates/login.j2`
+- `oauth2_passkey_axum/templates/user_account.j2`
+- `oauth2_passkey_axum/templates/conditional_ui.j2`
 
-5. **Step 5**: Clean up re-exports
-   - Remove `PASSKEY_SIGNAL_API_MODE` re-export
+Removed `signal_api_mode` field from Rust template structs:
+- `oauth2_passkey_axum/src/user/optional.rs` - `LoginTemplate`, `UserAccountTemplate`
 
-## Context
+### Documentation
 
-### PASSKEY_SIGNAL_API_MODE
+Updated `docs/src/webauthn/user-handle-and-signal-api.md`:
+- Added `signal_api_mode` field descriptions to response examples
+- Updated client-side code examples
 
-- `direct` (default): `signalUnknownCredential` only - **the only working API**
-- `sync`: `signalAllAcceptedCredentials` only - currently has no effect
-- `direct+sync`: Both - for future compatibility testing
+## Signal API Mode Behavior
 
-### Related Commits (Previous Session)
+| Mode | APIs Called | Use Case |
+|------|-------------|----------|
+| `direct` (default) | `signalUnknownCredential` only | Production |
+| `sync` | `signalAllAcceptedCredentials` only | Testing |
+| `direct+sync` | Both APIs | Future compatibility |
 
-- `f2dd947` - Fix CHANGELOG (move Signal API docs to Added section)
-- `1e628dc` - Fix outdated paths in demo-custom-login README
+## Key Design Decisions
 
-### Reference Documentation
+1. **Server controls client behavior via response content** - No client-side configuration needed
+2. **Pure `sync` mode works correctly** - Only calls `signalAllAcceptedCredentials`
+3. **Auth failure always calls `signalUnknownCredential`** - Credential genuinely doesn't exist
 
-- `docs/src/webauthn/user-handle-and-signal-api.md` - Signal API detailed documentation
+## Commits
+
+- `d145ecc` - refactor(passkey): control Signal API via server response signal_api_mode
+- `5d90fc6` - docs: add session snapshots for Signal API improvements
+
+## Related Files
+
+- `docs/src/webauthn/user-handle-and-signal-api.md` - Detailed documentation
+- `dot.env.example` - Configuration example
