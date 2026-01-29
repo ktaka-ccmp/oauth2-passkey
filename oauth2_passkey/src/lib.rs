@@ -55,21 +55,24 @@ mod test_utils;
 
 // Core coordination components for authentication
 pub use coordination::{
-    CoordinationError, RegistrationStartRequest, get_all_users, get_user,
+    AuthenticationResponse, CoordinationError, RegistrationStartRequest, get_all_users, get_user,
     handle_finish_authentication_core, handle_finish_registration_core,
     handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
 };
 
 // User and account management operations
 pub use coordination::{
-    delete_oauth2_account_admin, delete_oauth2_account_core, delete_passkey_credential_admin,
-    delete_passkey_credential_core, delete_user_account, delete_user_account_admin,
-    get_authorized_core, list_accounts_core, post_authorized_core, update_passkey_credential_core,
-    update_user_account, update_user_admin_status,
+    DeleteCredentialResponse, delete_oauth2_account_admin, delete_oauth2_account_core,
+    delete_passkey_credential_admin, delete_passkey_credential_core, delete_user_account,
+    delete_user_account_admin, get_authorized_core, list_accounts_core, post_authorized_core,
+    update_passkey_credential_core, update_user_account, update_user_admin_status,
 };
 
 // Environment variable configurable route prefix for all auth routes (defaults to "/o2p")
 pub use config::O2P_ROUTE_PREFIX;
+
+// Signal API mode for credential synchronization with authenticators
+pub use config::PASSKEY_SIGNAL_API_MODE;
 
 // OAuth2 authentication types and functions
 pub use oauth2::{
