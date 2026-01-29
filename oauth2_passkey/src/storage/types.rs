@@ -144,6 +144,14 @@ impl CachePrefix {
     pub fn session_info() -> Self {
         CachePrefix("session_info".to_string())
     }
+
+    /// Convenience constructor for user sessions mapping prefix.
+    ///
+    /// Used to store the user_id -> session_id[] reverse index
+    /// for tracking all active sessions per user.
+    pub fn user_sessions() -> Self {
+        CachePrefix("user_sessions".to_string())
+    }
 }
 
 /// Type-safe wrapper for cache keys.

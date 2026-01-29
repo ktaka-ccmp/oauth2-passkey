@@ -1,0 +1,61 @@
+/* =============================================================================
+   Neumorphism Theme - Soft design with subtle shadows creating depth
+   ============================================================================= */
+:root {
+    /* Colors - Soft Neutral Palette */
+    --o2p-primary: #6366f1;
+    --o2p-primary-hover: #4f46e5;
+    --o2p-oauth2: #8b5cf6;
+    --o2p-oauth2-hover: #7c3aed;
+    --o2p-passkey: #a78bfa;
+    --o2p-passkey-hover: #8b5cf6;
+    --o2p-danger: #ef4444;
+    --o2p-danger-hover: #dc2626;
+    --o2p-secondary: #94a3b8;
+    --o2p-secondary-hover: #64748b;
+
+    /* Text */
+    --o2p-text: #334155;
+    --o2p-text-secondary: #64748b;
+    --o2p-text-light: #94a3b8;
+
+    /* Backgrounds - Neumorphic base */
+    --o2p-background: #e0e5ec;
+    --o2p-surface: #e0e5ec;
+    --o2p-surface-alt: #d1d9e6;
+
+    /* Borders */
+    --o2p-border: #d1d9e6;
+    --o2p-border-light: #e8ecf1;
+}
+
+.login-page {
+    background: #e0e5ec;
+}
+
+.login-card {
+    background: #e0e5ec;
+    border-radius: 20px;
+    box-shadow: 9px 9px 16px #b8bec7, -9px -9px 16px #ffffff;
+    border: none;
+}
+
+.form-input {
+    background: #e0e5ec;
+    border: none;
+    box-shadow: inset 4px 4px 8px #b8bec7, inset -4px -4px 8px #ffffff;
+    border-radius: 10px;
+}
+
+.form-input:focus {
+    box-shadow: inset 4px 4px 8px #b8bec7, inset -4px -4px 8px #ffffff, 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.btn-primary, .btn-oauth2, .btn-passkey, .btn-secondary {
+    box-shadow: 4px 4px 8px #b8bec7, -4px -4px 8px #ffffff;
+    border: none;
+}
+
+.btn-primary:hover, .btn-oauth2:hover, .btn-passkey:hover {
+    box-shadow: 2px 2px 4px #b8bec7, -2px -2px 4px #ffffff;
+}

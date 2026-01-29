@@ -1,15 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>User List</title>
+    <title>Admin Panel</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{o2p_route_prefix}}/admin/admin_user.css">
+    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
 </head>
 <body>
+<div class="container">
     <div class="page-header">
-        <h1>User List</h1>
+        <h1>Admin Panel</h1>
         <nav>
-            <a href="{{o2p_route_prefix}}/user/summary">Go Back</a>
+            <a href="/">Home</a>
+            <a href="{{o2p_route_prefix}}/user/account">My Account</a>
         </nav>
         <div class="header-buttons">
             <button onclick="Logout()" class="action-button">Logout</button>
@@ -29,22 +34,22 @@
             <tbody>
                 {% for user in users %}
                 <tr class="user-row">
-                    <td><a href="{{o2p_route_prefix}}/admin/user/{{ user.id }}">{{ user.id }}</a></td>
-                    <td>{{ user.account }}</td>
-                    <td>{{ user.label }}</td>
+                    <td class="id-cell" data-label="ID"><a href="{{o2p_route_prefix}}/admin/user/{{ user.id }}">{{ user.id }}</a></td>
+                    <td data-label="Account">{{ user.account }}</td>
+                    <td data-label="Label">{{ user.label }}</td>
                     {% if user.sequence_number.is_some() && user.sequence_number.unwrap_or(0) == 1 %}
-                        <td>
+                        <td data-label="Admin">
                             <span>{{ user.is_admin }}</span>
                         </td>
-                        <td>
+                        <td class="actions-cell">
                         </td>
                     {% else %}
-                        <td>
+                        <td data-label="Admin">
                             <button onclick="toggleAdminStatus('{{ user.id }}', {{ user.is_admin }})">
                                 <span id="admin-status-{{ user.id }}">{{ user.is_admin }}</span>
                             </button>
                         </td>
-                        <td>
+                        <td class="actions-cell">
                             <button onclick="DeleteAccount('{{ user.id }}')" class="action-button delete-button">Delete</button>
                         </td>
                     {% endif %}
@@ -53,12 +58,13 @@
             </tbody>
         </table>
     </div>
+</div>
     <script src="{{o2p_route_prefix}}/admin/admin_user.js"></script>
     <script>
         const csrfToken = "{{csrf_token}}";
         const O2P_ROUTE_PREFIX = "{{o2p_route_prefix}}";
         function Logout() {
-            window.location.href = "{{o2p_route_prefix}}/user/logout?redirect={{o2p_redirect_anon}}";
+            window.location.href = "{{o2p_route_prefix}}/user/logout?redirect={{o2p_default_redirect}}";
         }
     </script>
 

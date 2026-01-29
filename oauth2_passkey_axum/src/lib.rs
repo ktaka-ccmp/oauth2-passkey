@@ -62,6 +62,7 @@ mod oauth2;
 mod passkey;
 mod router;
 mod session;
+mod themes;
 mod user;
 
 // Test utilities module (only available in test builds)
@@ -69,7 +70,9 @@ mod user;
 pub(crate) mod test_utils;
 
 // URL constants for different authentication-related pages
-pub use config::{O2P_ADMIN_URL, O2P_LOGIN_URL, O2P_REDIRECT_ANON, O2P_SUMMARY_URL};
+pub use config::{
+    O2P_ACCOUNT_URL, O2P_ADMIN_URL, O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT, O2P_LOGIN_URL,
+};
 
 // Authentication middleware for protecting routes
 pub use middleware::{
@@ -80,11 +83,23 @@ pub use middleware::{
 // Router for WebAuthn/.well-known endpoints
 pub use passkey::passkey_well_known_router;
 
-// Main router that provides all authentication endpoints
-pub use router::oauth2_passkey_router;
+// Main routers that provide all authentication endpoints
+pub use router::{oauth2_passkey_full_router, oauth2_passkey_router};
 
 // Axum extractor for authenticated users
 pub use session::AuthUser;
 
 // Re-export the route prefix and initialization function from oauth2_passkey crate
 pub use oauth2_passkey::{CsrfHeaderVerified, CsrfToken, O2P_ROUTE_PREFIX, init};
+
+// Re-export types and functions for custom summary pages
+pub use oauth2_passkey::{
+    OAuth2Account, PasskeyCredential, UserId, list_accounts_core, list_credentials_core,
+};
+
+// Re-export types and functions for custom admin pages
+pub use oauth2_passkey::{
+    CredentialId, DbUser, ProviderUserId, SessionId, delete_oauth2_account_admin,
+    delete_passkey_credential_admin, delete_user_account_admin, get_all_users, get_user,
+    update_user_admin_status,
+};

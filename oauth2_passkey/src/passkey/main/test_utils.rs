@@ -84,6 +84,7 @@ pub async fn insert_test_credential(data: TestCredentialData) -> Result<(), Pass
         user_id: data.user_id,
         public_key: data.public_key,
         aaguid: data.aaguid,
+        rp_id: "localhost".to_string(),
         counter: data.counter,
         user: PublicKeyCredentialUserEntity {
             user_handle: data.user_handle,

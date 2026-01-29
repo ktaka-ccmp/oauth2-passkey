@@ -12,20 +12,43 @@
 
 ---
 
-# Part 2: Integration Guide
+# Part 2: Basic Integration
 
-- [Framework Integration](integration/framework.md)
+- [Basic Setup](integration/framework.md)
+- [Route Protection](integration/route-protection.md)
+- [CSRF Token Handling](integration/csrf-handling.md)
+- [User Data Integration](integration/user-data.md)
 - [Configuration](integration/configuration.md)
-- [OAuth2 Implementation](integration/oauth2.md)
-- [Passkey Implementation](integration/passkey.md)
+- [Multi-Origin Passkey Setup](integration/multi-origin.md)
+- [Server Setup](integration/server-setup.md)
 
 ---
 
-# Part 3: Security
+# Part 3: Customization
+
+- [Built-in Themes](integration/themes.md)
+- [Customizing CSS](integration/customizing-css.md)
+- [Customizing Templates](integration/customizing-templates.md)
+- [OAuth2 JavaScript API](integration/oauth2-js.md)
+- [Passkey JavaScript API](integration/passkey-js.md)
+- [Askama Templates](integration/templates.md)
+
+---
+
+# Part 4: Internals
+
+- [OAuth2 Implementation](integration/oauth2.md)
+- [Passkey Implementation](integration/passkey.md)
+- [Development Tunneling](guides/tunneling.md)
+
+---
+
+# Part 5: Security
 
 - [Security Model](security/model.md)
 - [CSRF Protection](security/csrf.md)
 - [Session Security](security/session.md)
+- [Session Conflict Policy](security/session-conflict.md)
 - [Page Session Protection](security/page-session.md)
 - [OAuth2 Security](security/oauth2-security.md)
 - [Authorization Patterns](security/authorization.md)
@@ -33,31 +56,24 @@
 
 ---
 
-# Part 4: WebAuthn Technical Reference
-
-- [Attestation Overview](webauthn/attestation-overview.md)
-- [None Attestation](webauthn/none.md)
-- [Packed Attestation](webauthn/packed.md)
-- [TPM Attestation](webauthn/tpm.md)
-
----
-
-# Part 5: Platform Compatibility
-
-- [iOS Safari](compatibility/ios-safari.md)
-
----
-
-# Part 6: API Reference
+# Part 6: Reference
 
 - [Core Library API](api/core.md)
 - [Axum Integration API](api/axum.md)
+- [iOS Safari Compatibility](compatibility/ios-safari.md)
+- [WebAuthn Attestation]()
+  - [Attestation Overview](webauthn/attestation-overview.md)
+  - [None Attestation](webauthn/none.md)
+  - [Packed Attestation](webauthn/packed.md)
+  - [TPM Attestation](webauthn/tpm.md)
+- [User Handle and Signal API](webauthn/user-handle-and-signal-api.md)
 
 ---
 
 # Part 7: Maintainer Guide
 
 - [Development](maintainer/development.md)
+- [CI/CD](maintainer/ci-cd.md)
 - [Release Process](maintainer/release.md)
 
 ---
@@ -66,6 +82,7 @@
 
 - [Security Advisories](appendix/security-advisories.md)
 - [Type-Safe Validation](appendix/type-safe.md)
+- [Storage Pattern](appendix/storage-pattern.md)
 - [Troubleshooting](appendix/troubleshooting.md)
 
 ---
@@ -90,6 +107,7 @@
       - [Comprehensive Assessment](archived/testing-assessments/assessment_202506/ComprehensiveAssessment.md)
       - [Axum Test Quality](archived/testing-assessments/assessment_202506/OAuth2PasskeyAxumTestQualityAssessment.md)
   - [Design Proposals]()
+    - [Bearer Token Support](archived/design-proposals/bearer-token-support.md)
     - [Cache Expiration Simplification](archived/design-proposals/cache-expiration-system-simplification.md)
     - [Implementing Tracing](archived/design-proposals/implementing-tracing.md)
     - [Integration Testing Plan](archived/design-proposals/integration-testing-plan.md)

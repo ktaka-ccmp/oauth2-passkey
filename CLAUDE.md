@@ -221,6 +221,45 @@ git push origin --delete release-X.Y.Z
 - Required after rebase because commit history is rewritten
 - Prevents accidentally overwriting others' work on the branch
 
+## Workflow Tools
+
+This project uses Claude Code commands for workflow management.
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `/snapshot` | Create a session snapshot for context transfer between machines |
+| `/issue` | Create or update an issue for task/bug tracking |
+| `/backlog` | View all open issues |
+
+### Session Snapshots (`.claude/sessions/`)
+
+For transferring work context between machines or sessions:
+- **Purpose**: Capture current work state for resumption
+- **Filename**: `YYYY-MM-DD-<topic>.md`
+- **Content**: Current task, files modified, key decisions, next steps, context
+
+### Issue Tracking (`.claude/issues/`)
+
+For persistent task and bug tracking across sessions:
+- **Purpose**: Track tasks that span multiple sessions
+- **Filename**: `YYYY-MM-DD-<short-slug>.md`
+- **Status**: `open`, `completed`, `wontfix`, `deferred`
+- **Priority**: `high`, `medium`, `low`
+- **Structure**: `open/`, `completed/`, `deferred/` subdirectories
+
+### When to Use Each
+
+| Scenario | Use |
+|----------|-----|
+| Switching machines mid-task | `/snapshot` |
+| End of day work capture | `/snapshot` |
+| Feature request to implement later | `/issue` |
+| Bug found but not fixing now | `/issue` |
+| Check pending work | `/backlog` |
+| Planning next session | `/backlog` then read relevant snapshots |
+
 ## Commit Message Guidelines
 
 1. **Use ASCII characters only** for better copy-paste compatibility:

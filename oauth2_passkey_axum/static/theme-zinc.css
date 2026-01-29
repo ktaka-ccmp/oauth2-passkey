@@ -1,0 +1,81 @@
+/* =============================================================================
+   Zinc Theme - Neutral zinc palette
+   ============================================================================= */
+:root {
+    /* Colors - Zinc/Neutral Palette */
+    --o2p-primary: #18181b;
+    --o2p-primary-hover: #27272a;
+    --o2p-oauth2: #3f3f46;
+    --o2p-oauth2-hover: #52525b;
+    --o2p-passkey: #52525b;
+    --o2p-passkey-hover: #71717a;
+    --o2p-danger: #18181b;
+    --o2p-danger-hover: #09090b;
+    --o2p-secondary: #e4e4e7;
+    --o2p-secondary-hover: #d4d4d8;
+
+    /* Text */
+    --o2p-text: #09090b;
+    --o2p-text-secondary: #3f3f46;
+    --o2p-text-light: #a1a1aa;
+
+    /* Backgrounds */
+    --o2p-background: #fafafa;
+    --o2p-surface: #ffffff;
+    --o2p-surface-alt: #f4f4f5;
+
+    /* Borders */
+    --o2p-border: #e4e4e7;
+    --o2p-border-light: #f4f4f5;
+}
+
+.login-page {
+    background: linear-gradient(135deg, #d4d4d8 0%, #a1a1aa 100%);
+}
+
+.form-input:focus {
+    box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.1);
+}
+
+/* Override action-button to use lighter color for Edit/Add buttons */
+.action-button {
+    background-color: var(--o2p-secondary);
+    color: var(--o2p-text);
+}
+
+.action-button:hover {
+    background-color: var(--o2p-secondary-hover);
+}
+
+/* Edit button same as action-button */
+.edit-button {
+    background-color: var(--o2p-secondary);
+    color: var(--o2p-text);
+}
+
+.edit-button:hover {
+    background-color: var(--o2p-secondary-hover);
+}
+
+/* Delete and Logout buttons use darker color */
+.action-button.delete-button,
+.action-button[onclick*="Logout"] {
+    background-color: var(--o2p-danger);
+    color: white;
+}
+
+.action-button.delete-button:hover,
+.action-button[onclick*="Logout"]:hover {
+    background-color: var(--o2p-danger-hover);
+}
+
+/* is_admin toggle button - match table header */
+button[onclick*="toggleAdminStatus"] {
+    background-color: var(--o2p-surface-alt);
+    color: var(--o2p-text);
+    border: 1px solid var(--o2p-border);
+}
+
+button[onclick*="toggleAdminStatus"]:hover {
+    background-color: var(--o2p-border);
+}

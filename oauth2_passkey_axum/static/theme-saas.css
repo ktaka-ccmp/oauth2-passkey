@@ -1,0 +1,67 @@
+/* =============================================================================
+   Modern SaaS Theme - Stripe-inspired purple accents
+   ============================================================================= */
+:root {
+    /* Colors - Stripe-like Palette */
+    --o2p-primary: #635bff;
+    --o2p-primary-hover: #5851db;
+    --o2p-oauth2: #00d4ff;
+    --o2p-oauth2-hover: #00b8e6;
+    --o2p-passkey: #7a73ff;
+    --o2p-passkey-hover: #635bff;
+    --o2p-danger: #ff5b5b;
+    --o2p-danger-hover: #e64545;
+    --o2p-secondary: #8792a2;
+    --o2p-secondary-hover: #697386;
+
+    /* Text */
+    --o2p-text: #1a1f36;
+    --o2p-text-secondary: #525f7f;
+    --o2p-text-light: #8792a2;
+
+    /* Backgrounds */
+    --o2p-background: #f7f9fc;
+    --o2p-surface: #ffffff;
+    --o2p-surface-alt: #f0f3f9;
+
+    /* Borders */
+    --o2p-border: #e3e8ee;
+    --o2p-border-light: #f0f3f9;
+}
+
+.login-page {
+    background: linear-gradient(135deg, #0a2540 0%, #1a1f36 100%);
+}
+
+.login-card {
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.05);
+    border-radius: 12px;
+}
+
+.form-input {
+    border: 1px solid #e3e8ee;
+    border-radius: 6px;
+    background: #ffffff;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.form-input:focus {
+    border-color: #635bff;
+    box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.12);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #635bff 0%, #7a73ff 100%);
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #5851db 0%, #635bff 100%);
+    box-shadow: 0 4px 12px rgba(99, 91, 255, 0.35);
+}
+
+.btn-oauth2, .btn-passkey {
+    border-radius: 6px;
+    font-weight: 600;
+}

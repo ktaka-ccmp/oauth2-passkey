@@ -5,20 +5,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Passkey Login - Conditional UI</title>
-    <style>
-    </style>
+    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
 </head>
 
-<body>
-    <div class="container">
-        <h1>Conditional UI</h1>
+<body class="conditional-ui-page">
+    <div class="conditional-ui-card">
+        <h1>Passkey Login</h1>
+        <p class="description">Enter your email to sign in with your passkey</p>
         <form id="signin-form">
             <div class="form-group">
                 <label for="username-input">Email</label>
-                <input type="email" id="username-input" name="username" autocomplete="username webauthn"
-                    placeholder="Enter your email" required>
+                <input type="email" id="username-input" name="username" class="form-input"
+                    autocomplete="username webauthn" placeholder="Enter your email" required>
             </div>
         </form>
+        <p class="login-link">
+            <a href="{{o2p_route_prefix}}/user/login">Back to Login</a>
+        </p>
     </div>
     <script>
         const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';

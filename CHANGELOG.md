@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- TPM attestation verification failure with Windows Hello due to unsupported RS1 algorithm (`-65535`). The `integer_to_i64()` helper used hardcoded value comparisons that could not convert `-65535`, and the TPM verifier lacked RS1 support. Fixed by using proper `i128`-based conversion and adding RS1 signature verification via ring's legacy SHA-1 RSA API.
+
+### Added
+
+- `PASSKEY_SIGNAL_API_MODE` env var to control WebAuthn Signal API behavior (`direct`/`sync`/`direct+sync`)
+  - `direct` (default): Uses `signalUnknownCredential` only - the only working API with Google Password Manager
+  - `sync`: Uses `signalAllAcceptedCredentials` only - currently no effect on Chrome
+  - `direct+sync`: Uses both APIs for future compatibility testing
+- Session conflict policy via `SESSION_CONFLICT_POLICY` env var (`allow`/`replace`/`reject`) to control login behavior when a user already has active sessions
+- User-to-session reverse index (`user_sessions` cache mapping) with lazy cleanup of stale entries
+- Built-in CSS theme system with 9 pre-built themes: Zinc, Slate, Blue, Violet, Rose, Neumorphism, Material, Eco, SaaS
+- `O2P_CUSTOM_CSS_URL` environment variable for custom CSS theme loading
+- Theme CSS files served at `{O2P_ROUTE_PREFIX}/themes/` (e.g., `/o2p/themes/theme-zinc.css`)
+- `oauth2_passkey_full_router()` unified router that automatically includes `/.well-known/webauthn` when multi-origin is configured
+- `rp_id` field in `PasskeyCredential` to store and display the Relying Party ID used during registration
+- WebAuthn Signal API documentation (`user-handle-and-signal-api.md`) focusing on `signalUnknownCredential` as the primary working API
+
+### Changed
+
+- Signal API calls now conditionally execute based on `PASSKEY_SIGNAL_API_MODE` setting
+- Passkey registration username prefill changed from `#N` sequential numbering to `@YYYYMMDD` date suffix
+
+- **BREAKING**: Renamed `O2P_REDIRECT_ANON` to `O2P_DEFAULT_REDIRECT` for clarity (env var, config, and template variable)
+- **BREAKING**: Admin route renamed from `/admin/list_users` to `/admin/index` for clarity
+- **BREAKING**: User account page renamed from `/user/summary` to `/user/account` for accuracy
+  - Route: `/summary` -> `/account`
+  - Env var: `O2P_SUMMARY_URL` -> `O2P_ACCOUNT_URL`
+  - Handler: `summary()` -> `user_account()`
+  - Template: `summary.j2` -> `user_account.j2`
+  - Static files: `summary.js` -> `account.js`, `summary.css` -> `account.css`
+- Admin page title changed from "User List" to "User Management"
+- Admin link text in account page changed from "User List" to "Admin"
+- Internal refactoring: handler and template names aligned (`admin_index`, `admin_user_page`)
+
 ## [0.2.0] - 2026-01-22
 
 ### Security

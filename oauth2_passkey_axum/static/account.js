@@ -94,6 +94,7 @@ function DeleteAccount() {
                     let notificationChain = Promise.resolve();
 
                     // Process each credential sequentially
+                    // signalUnknownCredential is always called - it's the only working API
                     credentialIds.forEach((credentialId) => {
                         notificationChain = notificationChain.then(() => {
                             return synchronizeCredentialsWithSignalUnknown(
@@ -148,10 +149,28 @@ function unlinkOAuth2Account(provider, providerUserId) {
     }
 }
 
-// Function to synchronize credentials with the authenticator using signalAllAcceptedCredentials
-// This helps keep the authenticator's credential store in sync with the server
-// Takes the user handle of the deleted credential as a parameter
-function synchronizeCredentials(userHandle) {
+// Synchronize credentials with the authenticator using signalAllAcceptedCredentials (WebAuthn Signal API).
+//
+// This API tells the authenticator which credentials are still valid for this user.
+// The authenticator may remove credentials not in the list.
+//
+// IMPORTANT: This API is scoped by userId (user_handle). It only affects credentials
+// that share the same user_handle. When PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true,
+// each credential has a unique user_handle, so this API only affects the single credential
+// matching the provided user_handle. When false, all credentials share the same user_handle,
+// so this API can synchronize all credentials for the user.
+//
+// Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
+//
+// FIRE-AND-FORGET: This function should be called without await. The Signal API is
+// non-critical - it's a best-effort hint to the authenticator, not essential for
+// authentication to work. Awaiting this call can block page navigation/reload on
+// browsers where the API is slow or unsupported (e.g., iOS Safari), causing a poor
+// user experience. The deletion/login has already succeeded on the server; the UI
+// should proceed immediately.
+//
+// See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
+function synchronizeCredentials(userHandle, remainingCredentialIds) {
     // Check if the WebAuthn API and signalAllAcceptedCredentials are available
     if (
         !window.PublicKeyCredential ||
@@ -176,16 +195,19 @@ function synchronizeCredentials(userHandle) {
     const userIdBytes = new TextEncoder().encode(userHandle);
     const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
 
-    // Signal all accepted credentials with an empty array
-    // This tells the authenticator that no credentials are valid for this user and RP
+    const credentialIds = remainingCredentialIds || [];
+
+    // Signal all accepted credentials to the authenticator
+    // Credentials not in this list may be removed by the passkey provider
     return window.PublicKeyCredential.signalAllAcceptedCredentials({
         rpId: window.location.hostname,
         userId: userIdBase64Url,
-        allAcceptedCredentialIds: [], // Empty array = no valid credentials
+        allAcceptedCredentialIds: credentialIds,
     })
         .then(() => {
             console.log(
-                "Successfully signaled credential deletion to authenticator"
+                "Successfully signaled accepted credentials to authenticator.",
+                "remaining:", credentialIds.length
             );
         })
         .catch((err) => {
@@ -193,9 +215,32 @@ function synchronizeCredentials(userHandle) {
         });
 }
 
-// Function to synchronize credentials with the authenticator using signalUnknownCredential
-// This is an alternative approach for testing purposes
-// Takes the credential ID of the deleted credential as a parameter
+// Signal a specific credential as unknown/deleted using signalUnknownCredential (WebAuthn Signal API).
+//
+// This API tells the authenticator that a specific credential is no longer recognized
+// by the server. The authenticator may remove or mark the credential as invalid.
+//
+// IMPORTANT: Unlike signalAllAcceptedCredentials, this API is scoped by credentialId only,
+// NOT by user_handle. This makes it work correctly regardless of the
+// PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting. It directly targets the
+// specific credential that was deleted.
+//
+// Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
+//
+// FIRE-AND-FORGET: This function should be called without await. The Signal API is
+// non-critical - it's a best-effort hint to the authenticator, not essential for
+// authentication to work. Awaiting this call can block page navigation/reload on
+// browsers where the API is slow or unsupported (e.g., iOS Safari), causing a poor
+// user experience. The deletion has already succeeded on the server; the UI should
+// proceed immediately.
+//
+// DUAL APPROACH: For credential deletion, we call BOTH signalUnknownCredential (this function)
+// and signalAllAcceptedCredentials (synchronizeCredentials). This provides optimal behavior
+// for both user_handle modes:
+// - signalUnknownCredential: Works in both modes, directly targets the deleted credential
+// - signalAllAcceptedCredentials: Additionally syncs remaining credentials when user_handle is shared
+//
+// See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
 function synchronizeCredentialsWithSignalUnknown(credentialId) {
     try {
         // Check if the WebAuthn API is available
@@ -249,6 +294,22 @@ function synchronizeCredentialsWithSignalUnknown(credentialId) {
     }
 }
 
+// Delete a passkey credential from the server and notify the authenticator via Signal API.
+//
+// After successful server-side deletion, we use a DUAL APPROACH for authenticator sync:
+// 1. signalUnknownCredential: Directly targets the deleted credential by credentialId.
+//    Works correctly regardless of PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting.
+// 2. signalAllAcceptedCredentials: Sends the list of remaining valid credentials.
+//    Effective when user_handle is shared (PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=false),
+//    harmless but redundant when user_handle is unique per credential.
+//
+// Both Signal API calls are FIRE-AND-FORGET (no await) because:
+// - The deletion has already succeeded on the server
+// - Signal API is non-critical - just a hint to the authenticator
+// - Awaiting can block page reload on iOS Safari and other browsers where the API may be slow
+// - User experience should not be degraded by optional sync features
+//
+// See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
 function deletePasskeyCredential(credentialId, userHandle) {
     if (confirm("Are you sure you want to unlink this passkey credential?")) {
         fetch(`${O2P_ROUTE_PREFIX}/passkey/credentials/${credentialId}`, {
@@ -258,25 +319,44 @@ function deletePasskeyCredential(credentialId, userHandle) {
                 "Content-Type": "application/json",
             },
         })
-            .then((response) => {
+            .then(async (response) => {
                 if (response.ok) {
-                    // After successful deletion, synchronize credentials with the authenticator
-                    // Pass the user handle of the deleted credential for accurate synchronization
-                    // return synchronizeCredentials(userHandle);
-                    return synchronizeCredentialsWithSignalUnknown(
-                        credentialId
-                    );
+                    // Server returns JSON: { signal_api_mode: "...", remaining_credential_ids: [...], user_handle: "..." }
+                    // Signal API calls are fire-and-forget (no await) to avoid blocking page reload
+                    try {
+                        const data = await response.json();
+                        const mode = data.signal_api_mode || "direct";
+
+                        // signalUnknownCredential: directly targets the deleted credential
+                        // Only called if signal_api_mode includes 'direct'
+                        // Currently the only API that works with Google Password Manager
+                        if (mode.includes("direct")) {
+                            synchronizeCredentialsWithSignalUnknown(credentialId);
+                        }
+
+                        // signalAllAcceptedCredentials: syncs remaining credentials
+                        // Only called if server includes remaining_credential_ids
+                        // (controlled by PASSKEY_SIGNAL_API_MODE including 'sync' on the server)
+                        if (data.remaining_credential_ids) {
+                            synchronizeCredentials(
+                                data.user_handle || userHandle,
+                                data.remaining_credential_ids
+                            );
+                        }
+                    } catch (parseErr) {
+                        // JSON parse failure is non-critical - deletion already succeeded
+                        // Default to calling signalUnknownCredential
+                        console.warn("Response parse error (non-critical):", parseErr);
+                        synchronizeCredentialsWithSignalUnknown(credentialId);
+                    }
+                    // Proceed immediately with page reload - don't wait for Signal API
+                    window.location.reload();
                 } else {
-                    return response.text().then((text) => {
-                        throw new Error(
-                            `Failed to unlink passkey credential: ${text}`
-                        );
-                    });
+                    const text = await response.text();
+                    throw new Error(
+                        `Failed to unlink passkey credential: ${text}`
+                    );
                 }
-            })
-            .then(() => {
-                // Refresh the page to show updated credential list
-                window.location.reload();
             })
             .catch((error) => {
                 alert(`Error: ${error.message}`);

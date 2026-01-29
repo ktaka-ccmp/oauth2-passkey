@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Profile - Demo Profile</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        body.dark {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        body.dark .container {
+            background: #2d2d44;
+            color: #e0e0e0;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.8rem;
+            text-align: center;
+        }
+        body.dark h1 {
+            color: #e0e0e0;
+        }
+        .subtitle {
+            color: #888;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 0.9rem;
+        }
+        .avatar-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #667eea;
+            margin-bottom: 10px;
+        }
+        .avatar-placeholder {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3rem;
+            font-weight: bold;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #555;
+        }
+        body.dark label {
+            color: #bbb;
+        }
+        input[type="text"],
+        input[type="url"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        body.dark input[type="text"],
+        body.dark input[type="url"],
+        body.dark textarea,
+        body.dark select {
+            background: #3d3d5c;
+            border-color: #4d4d6c;
+            color: #e0e0e0;
+        }
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .hint {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 4px;
+        }
+        .buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 30px;
+        }
+        button, .btn {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .btn-save {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn-cancel {
+            background: #f5f5f5;
+            color: #333;
+        }
+        body.dark .btn-cancel {
+            background: #4d4d6c;
+            color: #e0e0e0;
+        }
+        .btn-cancel:hover {
+            background: #e8e8e8;
+        }
+        body.dark .btn-cancel:hover {
+            background: #5d5d7c;
+        }
+        .info-box {
+            background: #f0f4ff;
+            border: 1px solid #d0dcff;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #4a5568;
+        }
+        body.dark .info-box {
+            background: #3d3d5c;
+            border-color: #4d4d6c;
+            color: #bbb;
+        }
+    </style>
+</head>
+<body class="{{ profile.theme }}">
+    <div class="container">
+        <h1>Edit Profile</h1>
+        <p class="subtitle">{{ user.account }}</p>
+
+        <div class="avatar-section">
+            {% match profile.avatar_url %}
+                {% when Some with (url) %}
+                    <img src="{{ url }}" alt="Avatar" class="avatar" id="avatar-preview">
+                {% when None %}
+                    <div class="avatar-placeholder" id="avatar-placeholder">
+                        {{ user.label.chars().next().unwrap_or('?') }}
+                    </div>
+            {% endmatch %}
+        </div>
+
+        <form method="POST" action="/profile">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="form-group">
+                <label for="display_name">Display Name</label>
+                <input type="text" id="display_name" name="display_name"
+                       value="{{ profile.display_name.as_deref().unwrap_or("") }}"
+                       placeholder="Your display name">
+            </div>
+
+            <div class="form-group">
+                <label for="bio">Bio</label>
+                <textarea id="bio" name="bio" placeholder="Tell us about yourself">{{ profile.bio.as_deref().unwrap_or("") }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="avatar_url">Avatar URL</label>
+                <input type="url" id="avatar_url" name="avatar_url"
+                       value="{{ profile.avatar_url.as_deref().unwrap_or("") }}"
+                       placeholder="https://example.com/avatar.jpg">
+                <p class="hint">Enter a URL to your profile picture</p>
+            </div>
+
+            <div class="form-group">
+                <label for="theme">Theme</label>
+                <select id="theme" name="theme">
+                    <option value="light" {% if profile.theme == "light" %}selected{% endif %}>Light</option>
+                    <option value="dark" {% if profile.theme == "dark" %}selected{% endif %}>Dark</option>
+                </select>
+            </div>
+
+            <div class="info-box">
+                User ID: {{ user.user_id }}<br>
+                Created: {{ profile.created_at.format("%Y-%m-%d %H:%M UTC") }}
+            </div>
+
+            <div class="buttons">
+                <a href="/" class="btn btn-cancel">Cancel</a>
+                <button type="submit" class="btn btn-save">Save Changes</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Preview avatar URL changes
+        const avatarInput = document.getElementById('avatar_url');
+        const avatarPreview = document.getElementById('avatar-preview');
+        const avatarPlaceholder = document.getElementById('avatar-placeholder');
+
+        avatarInput.addEventListener('input', function() {
+            const url = this.value.trim();
+            if (url && avatarPreview) {
+                avatarPreview.src = url;
+            } else if (url && avatarPlaceholder) {
+                // Replace placeholder with image
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = 'Avatar';
+                img.className = 'avatar';
+                img.id = 'avatar-preview';
+                avatarPlaceholder.replaceWith(img);
+            }
+        });
+
+        // Theme preview
+        const themeSelect = document.getElementById('theme');
+        themeSelect.addEventListener('change', function() {
+            document.body.className = this.value;
+        });
+    </script>
+</body>
+</html>

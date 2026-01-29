@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Login Demo</title>
+    <script>
+        const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 16px;
+        }
+
+        p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .user-info {
+            background: #e8f5e9;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .user-info strong {
+            color: #2e7d32;
+        }
+
+        .btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: background 0.2s;
+            cursor: pointer;
+            border: none;
+            font-size: 16px;
+        }
+
+        .protected-link {
+            background: #667eea;
+            color: white;
+        }
+
+        .protected-link:hover {
+            background: #5a6fd6;
+        }
+
+        .logout-btn {
+            background: #f0f0f0;
+            color: #333;
+            margin-left: 10px;
+        }
+
+        .logout-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .account-link {
+            background: #ff9800;
+            color: white;
+            margin-left: 10px;
+        }
+
+        .account-link:hover {
+            background: #f57c00;
+        }
+
+        .admin-link {
+            background: #9c27b0;
+            color: white;
+            margin-left: 10px;
+        }
+
+        .admin-link:hover {
+            background: #7b1fa2;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Custom Login Demo</h1>
+        <p>This demo shows how to create a custom login page with your own design while using the oauth2-passkey library for authentication.</p>
+
+        <div class="user-info">
+            <strong>Logged in as:</strong> {{user_label}}
+        </div>
+
+        <a href="/protected" class="btn protected-link">View Protected Page</a>
+        <a href="/account" class="btn account-link">Account</a>
+        {% if is_admin %}
+        <a href="/admin" class="btn admin-link">Admin Panel</a>
+        {% endif %}
+        <button class="btn logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <script>
+        function logout() {
+            window.location.href = O2P_ROUTE_PREFIX + "/user/logout?redirect=/";
+        }
+    </script>
+</body>
+
+</html>

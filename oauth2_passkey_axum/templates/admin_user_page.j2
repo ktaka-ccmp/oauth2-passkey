@@ -1,26 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Admin User</title>
+    <title>User Detail</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Embed obfuscated user context for session boundary verification -->
     <!-- External CSS file -->
-    <link rel="stylesheet" href="{{o2p_route_prefix}}/admin/admin_user.css">
-    <style>
-        .authenticator-icon {
-            width: 36px;
-            height: 36px;
-            vertical-align: middle;
-            margin-left: 8px;
-            float: right;
-        }
-    </style>
+    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
 </head>
 <body>
+<div class="container">
     <div class="page-header">
-        <h1>Manage User</h1>
+        <h1>User Detail</h1>
         <nav>
-            <a href="{{o2p_route_prefix}}/admin/list_users">Go Back</a>         
+            <a href="{{o2p_route_prefix}}/admin/index">Admin Panel</a>
+            <a href="{{o2p_route_prefix}}/user/account">My Account</a>
         </nav>
         <div class="header-buttons">
             <button onclick="DeleteAccount()" class="action-button delete-button">Delete Account</button>
@@ -35,7 +30,7 @@
         <div class="item" id="user-info-display">
             <div class="item-detail"><strong>User ID:</strong> {{ user.id }}</div>
             <div class="item-detail">
-                <strong>Is Admin:</strong> 
+                <strong>Is Admin:</strong>
                 {% if user.sequence_number.is_some() && user.sequence_number.unwrap_or(0) == 1 %}
                     <span>{{ user.is_admin }} (First User)</span>
                 {% else %}
@@ -60,7 +55,7 @@
             <p>You don't have any passkey credentials yet.</p>
         {% else %}
             {% for credential in passkey_credentials %}
-                <div class="item" data-credential-id="{{ credential.credential_id }}">
+                <div class="item passkey" data-credential-id="{{ credential.credential_id }}">
                     <div class="item-detail has-icon">
                         {% if credential.authenticator_info.is_some() %}
                             {% if let Some(auth_info) = credential.authenticator_info.as_ref() %}
@@ -84,6 +79,11 @@
                         {{ credential.user_display_name }}
                     </div>
                     <div class="item-detail"><strong>AAGUID:</strong>{{ credential.aaguid }}</div>
+                    {% if credential.rp_id != "" %}
+                    <div class="item-detail"><strong>RP ID:</strong> {{ credential.rp_id }}</div>
+                    {% else %}
+                    <div class="item-detail"><strong>RP ID:</strong> (unknown)</div>
+                    {% endif %}
                     <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
                     <div class="item-detail"><strong>Updated:</strong> {{ credential.updated_at }}</div>
                     <div class="item-detail  created-row">
@@ -106,7 +106,7 @@
             <p>You don't have any linked OAuth2 accounts yet.</p>
         {% else %}
             {% for account in oauth2_accounts %}
-                <div class="item">
+                <div class="item oauth2">
                     {% if account.picture != "" %}
                     <div class="account-picture">
                         <img src="{{ account.picture }}" alt="Profile Picture" style="max-width: 100px; max-height: 100px; border-radius: 50%;">
@@ -131,6 +131,7 @@
             {% endfor %}
         {% endif %}
     </div>
+</div>
 
     <script src="{{o2p_route_prefix}}/admin/admin_user.js"></script>
     <script>

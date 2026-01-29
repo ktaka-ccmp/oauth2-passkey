@@ -124,14 +124,17 @@ Main route prefix for all authentication endpoints.
 O2P_ROUTE_PREFIX='/o2p'
 ```
 
-#### O2P_REDIRECT_ANON
+#### O2P_DEFAULT_REDIRECT
 
-Redirect path for anonymous (unauthenticated) users.
+Default redirect URL for authentication flows. Used when:
+- Unauthenticated users access protected routes
+- Authenticated users visit the login page
+- After logout
 
 - **Default**: `/`
 
 ```bash
-O2P_REDIRECT_ANON='/'
+O2P_DEFAULT_REDIRECT='/'
 ```
 
 #### O2P_LOGIN_URL
@@ -144,14 +147,14 @@ URL path for the login page.
 O2P_LOGIN_URL='/o2p/user/login'
 ```
 
-#### O2P_SUMMARY_URL
+#### O2P_ACCOUNT_URL
 
-URL path for the user summary page (shown after successful authentication).
+URL path for the user account management page.
 
-- **Default**: `/o2p/user/summary`
+- **Default**: `/o2p/user/account`
 
 ```bash
-O2P_SUMMARY_URL='/o2p/user/summary'
+O2P_ACCOUNT_URL='/o2p/user/account'
 ```
 
 #### O2P_RESPOND_WITH_X_CSRF_TOKEN
@@ -378,6 +381,24 @@ Maximum age (in seconds) for the session cookie.
 ```bash
 SESSION_COOKIE_MAX_AGE=600
 ```
+
+#### SESSION_CONFLICT_POLICY
+
+Controls behavior when a user logs in while already having active sessions.
+
+| Value | Description |
+|-------|-------------|
+| `allow` | Permit multiple concurrent sessions (default) |
+| `replace` | Invalidate all existing sessions, create a new one |
+| `reject` | Deny login if an active session already exists |
+
+- **Default**: `allow`
+
+```bash
+SESSION_CONFLICT_POLICY=allow
+```
+
+See [Session Conflict Policy](../security/session-conflict.md) for detailed documentation.
 
 ### User Field Mapping
 

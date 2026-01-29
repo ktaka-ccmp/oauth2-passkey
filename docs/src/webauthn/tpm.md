@@ -173,9 +173,53 @@ While the implementation is fully compliant with the WebAuthn specification, the
 
 4. **Performance Optimization**: The current implementation prioritizes correctness and compliance over performance. There may be opportunities to optimize the verification process for high-volume deployments.
 
+## Supported Signature Algorithms
+
+The TPM attestation verifier supports the following COSE algorithms for signature verification over `certInfo`:
+
+| COSE Alg ID | Name  | Description                    | Verification Method |
+| ----------- | ----- | ------------------------------ | ------------------- |
+| -7          | ES256 | ECDSA with P-256 and SHA-256   | webpki              |
+| -257        | RS256 | RSASSA-PKCS1-v1_5 with SHA-256 | webpki              |
+| -65535      | RS1   | RSASSA-PKCS1-v1_5 with SHA-1   | ring (legacy)       |
+
+### RS1 (SHA-1 RSA) Support
+
+Windows Hello with TPM attestation commonly uses RS1 (`-65535`) to sign the `certInfo` structure, even when the credential key itself uses ES256. This is because the TPM's Attestation Identity Key (AIK) may be an RSA key that signs using SHA-1.
+
+Since the `webpki` crate does not support SHA-1 RSA signature verification, RS1 signatures are verified directly using the `ring` crate's `RSA_PKCS1_2048_8192_SHA1_FOR_LEGACY_USE_ONLY` algorithm. The public key is extracted from the AIK certificate using `x509-parser`.
+
+#### Why Windows Hello TPM uses RS1
+
+The attestation signature algorithm is determined by the TPM hardware, not the OS. The TPM's AIK (Attestation Identity Key) is derived from the Endorsement Key (EK), which is burned into the TPM chip at manufacturing time. On many existing TPM chips, the EK is an RSA key that signs using SHA-1, and the AIK inherits this characteristic.
+
+It is important to distinguish between two different keys and algorithms in TPM attestation:
+
+- **Attestation signature (AIK)**: Signs `certInfo` to prove the TPM generated the credential. This is where RS1 (`-65535`) appears. The algorithm is dictated by the TPM hardware.
+- **Credential key**: Used for ongoing authentication (login). Typically uses ES256 (`-7`), a modern and secure algorithm. This is unaffected by the AIK's algorithm.
+
+#### Why RS1 persists and the outlook
+
+SHA-1 has been considered cryptographically broken since 2017 (SHAttered collision attack), and all major browsers and CAs have stopped accepting SHA-1 certificates. However, RS1 remains in TPM attestation for the following reasons:
+
+- **Hardware constraint**: Changing the AIK algorithm requires a new TPM chip, not just a software or firmware update. The EK is immutable, and re-provisioning risks breaking dependent services (e.g., BitLocker relies on the TPM's key hierarchy).
+- **webpki's design decision**: The `webpki` (rustls-webpki) crate intentionally excludes SHA-1 as a security policy. This is a deliberate choice, not an omission, and future support is unlikely.
+- **ring's pragmatic approach**: The `ring` crate provides `RSA_PKCS1_2048_8192_SHA1_FOR_LEGACY_USE_ONLY` explicitly for legacy compatibility scenarios like this one.
+
+Newer TPM chips (especially those shipping in recent PCs) tend to support SHA-256 based attestation. However, the transition is tied to hardware replacement cycles (5-10 years), so RS1 support will remain necessary for the foreseeable future.
+
+#### Security impact
+
+The use of RS1 for attestation has limited security impact:
+
+- The SHA-1 signature only proves that the TPM generated the credential at registration time. It does not affect the security of ongoing authentication.
+- An attacker exploiting SHA-1 collisions would need to forge a TPM attestation statement, which would also require compromising the TPM's private AIK -- a much harder attack than finding a hash collision.
+- The credential's authentication signatures use ES256 (SHA-256), which is not affected.
+
 ## Implementation Notes
 
-- The library uses both webpki and x509-parser for certificate verification
+- The library uses webpki, x509-parser, and ring for certificate and signature verification
+- RS1 (SHA-1 RSA) signatures bypass webpki and are verified directly with ring's legacy API
 - A fallback verification mechanism is implemented when webpki cannot parse the certificate
 - The implementation follows a modular approach to separate core attestation logic from TPM-specific logic
 - Comprehensive error handling is provided throughout the attestation verification process

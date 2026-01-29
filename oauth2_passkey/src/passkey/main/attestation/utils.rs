@@ -52,56 +52,11 @@ pub(super) fn get_sig_from_stmt(
 
 /// Helper function to convert a ciborium::value::Integer to i64
 pub(super) fn integer_to_i64(i: &Integer) -> i64 {
-    // Since ciborium::value::Integer doesn't have direct conversion methods,
-    // we'll implement a simple comparison-based approach
-
-    // Try common small values first for efficiency
-    if *i == Integer::from(0) {
-        return 0;
-    }
-    if *i == Integer::from(1) {
-        return 1;
-    }
-    if *i == Integer::from(2) {
-        return 2;
-    }
-    if *i == Integer::from(3) {
-        return 3;
-    }
-    if *i == Integer::from(-1) {
-        return -1;
-    }
-    if *i == Integer::from(-2) {
-        return -2;
-    }
-    if *i == Integer::from(-3) {
-        return -3;
-    }
-    if *i == Integer::from(-7) {
-        return -7;
-    }
-    if *i == Integer::from(-257) {
-        return -257;
-    }
-    if *i == Integer::from(999) {
-        return 999;
-    }
-
-    // Try powers of 2 for larger values
-    for n in 0..63 {
-        let val = 1i64 << n;
-        if *i == Integer::from(val) {
-            return val;
-        }
-        if *i == Integer::from(-val) {
-            return -val;
-        }
-    }
-
-    // For values we can't easily determine, return a default
-    // In a production environment, you'd want a more robust conversion
-    tracing::warn!("Unable to precisely convert Integer to i64");
-    0
+    let val: i128 = (*i).into();
+    i64::try_from(val).unwrap_or_else(|_| {
+        tracing::warn!("Integer value {val} out of i64 range");
+        0
+    })
 }
 
 /// Helper function to extract public key coordinates from COSE key

@@ -237,19 +237,31 @@ pub async fn handle_start_authentication_core(
     Ok(start_authentication(username).await?)
 }
 
+/// Response from successful passkey authentication, containing data needed for
+/// client-side authenticator synchronization via WebAuthn Signal API.
+#[derive(Debug, Serialize)]
+pub struct AuthenticationResponse {
+    /// The authenticated user's name
+    pub name: String,
+    /// The user handle for signalAllAcceptedCredentials
+    pub user_handle: String,
+    /// All valid credential IDs for this user (for signalAllAcceptedCredentials)
+    pub credential_ids: Vec<String>,
+}
+
 /// Core function that handles the business logic of finishing authentication
 ///
 /// This function verifies the authentication response, creates a session for the
-/// authenticated user, and returns the user ID, name, and session headers.
+/// authenticated user, and returns the authentication response data and session headers.
 #[tracing::instrument(skip(auth_response), fields(user_id))]
 pub async fn handle_finish_authentication_core(
     auth_response: AuthenticatorResponse,
-) -> Result<(String, String, HeaderMap), CoordinationError> {
+) -> Result<(AuthenticationResponse, HeaderMap), CoordinationError> {
     tracing::info!("Finishing passkey authentication flow");
     tracing::debug!("Auth response: {:#?}", auth_response);
 
-    // Verify the authentication and get the user ID and name
-    let (uid, name) = finish_authentication(auth_response).await?;
+    // Verify the authentication and get the user ID, name, and user handle
+    let (uid, name, user_handle) = finish_authentication(auth_response).await?;
 
     // Record user_id in the tracing span
     tracing::Span::current().record("user_id", &uid);
@@ -259,9 +271,23 @@ pub async fn handle_finish_authentication_core(
     // Create a session for the authenticated user
     let user_id = UserId::new(uid.clone())
         .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
-    let headers = new_session_header(user_id).await?;
+    let headers = new_session_header(user_id.clone()).await?;
 
-    Ok((uid, name, headers))
+    // Retrieve all credential IDs for authenticator synchronization
+    let credentials = list_credentials_core(user_id).await?;
+    let credential_ids = credentials
+        .iter()
+        .map(|c| c.credential_id.clone())
+        .collect();
+
+    Ok((
+        AuthenticationResponse {
+            name,
+            user_handle,
+            credential_ids,
+        },
+        headers,
+    ))
 }
 
 /// Core function that handles the business logic of listing passkey credentials
@@ -282,15 +308,27 @@ pub async fn list_credentials_core(
     Ok(credentials)
 }
 
+/// Response from deleting a passkey credential, containing remaining credentials
+/// for client-side synchronization with the authenticator via WebAuthn Signal API.
+#[derive(Debug, Serialize)]
+pub struct DeleteCredentialResponse {
+    /// Credential IDs still registered for this user after deletion
+    pub remaining_credential_ids: Vec<String>,
+    /// The user handle associated with the deleted credential
+    pub user_handle: String,
+}
+
 /// Delete a passkey credential for a user
 ///
 /// This function checks that the credential belongs to the authenticated user
 /// before deleting it to prevent unauthorized deletions.
+/// Returns the remaining credential IDs and user handle for client-side
+/// authenticator synchronization via the WebAuthn Signal API.
 #[tracing::instrument(fields(user_id, credential_id))]
 pub async fn delete_passkey_credential_core(
     user_id: UserId,
     credential_id: CredentialId,
-) -> Result<(), CoordinationError> {
+) -> Result<DeleteCredentialResponse, CoordinationError> {
     tracing::info!("Attempting to delete passkey credential");
 
     let credential = PasskeyStore::get_credentials_by(CredentialSearchField::CredentialId(
@@ -312,12 +350,27 @@ pub async fn delete_passkey_credential_core(
         return Err(CoordinationError::Unauthorized.log());
     }
 
+    let user_handle = credential.user.user_handle.clone();
+
     // Delete the credential using the raw credential ID format from the database
     PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(credential_id)).await?;
 
+    // Retrieve remaining credentials for authenticator synchronization
+    // Filter to only include credentials with the same user_handle, since
+    // signalAllAcceptedCredentials is scoped by userId (user_handle)
+    let remaining = list_credentials_core(user_id).await?;
+    let remaining_credential_ids = remaining
+        .iter()
+        .filter(|c| c.user.user_handle == user_handle)
+        .map(|c| c.credential_id.clone())
+        .collect();
+
     tracing::debug!("Successfully deleted credential");
 
-    Ok(())
+    Ok(DeleteCredentialResponse {
+        remaining_credential_ids,
+        user_handle,
+    })
 }
 
 /// Update the name and display name of a passkey credential

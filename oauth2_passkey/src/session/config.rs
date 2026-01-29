@@ -22,6 +22,51 @@ pub static SESSION_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
         .unwrap_or(600) // Default to 10 minutes if not set or invalid
 });
 
+/// Policy for handling session conflicts when a user logs in while already having active sessions.
+///
+/// This policy is always evaluated during login, and user_id -> session_id mappings
+/// are always maintained regardless of the policy value. The policy only controls
+/// what happens when existing sessions are found.
+///
+/// Configured via the `SESSION_CONFLICT_POLICY` environment variable.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SessionConflictPolicy {
+    /// Allow multiple concurrent sessions (default)
+    Allow,
+    /// Invalidate all existing sessions and create a new one
+    Replace,
+    /// Deny login if an active session already exists
+    Reject,
+}
+
+/// Session conflict policy configuration.
+///
+/// Controls what happens when a user logs in while already having active sessions.
+/// Set via the `SESSION_CONFLICT_POLICY` environment variable.
+///
+/// Valid values:
+/// - `allow` (default): Permit multiple concurrent sessions
+/// - `replace`: Invalidate all existing sessions, create new one
+/// - `reject`: Deny login if active session exists
+pub static SESSION_CONFLICT_POLICY: LazyLock<SessionConflictPolicy> = LazyLock::new(|| {
+    match env::var("SESSION_CONFLICT_POLICY")
+        .unwrap_or_default()
+        .to_lowercase()
+        .as_str()
+    {
+        "replace" => SessionConflictPolicy::Replace,
+        "reject" => SessionConflictPolicy::Reject,
+        _ => SessionConflictPolicy::Allow,
+    }
+});
+
+/// TTL for user session mappings in seconds (30 days).
+///
+/// The user_id -> session_id[] mapping needs a long TTL because it tracks
+/// all active sessions for a user. Individual sessions expire via their own TTL,
+/// and stale entries are cleaned up lazily when the mapping is read.
+pub(super) const USER_SESSIONS_MAPPING_TTL: u64 = 86400 * 30;
+
 // We're using a simple string representation for tokens instead of a struct
 // to minimize dependencies and complexity
 

@@ -19,7 +19,7 @@ use oauth2_passkey::{
     get_authenticator_info_batch, list_accounts_core, list_credentials_core,
 };
 
-use crate::config::O2P_REDIRECT_ANON;
+use crate::config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT};
 use crate::session::AuthUser;
 
 pub(crate) fn router() -> Router<()> {
@@ -27,9 +27,9 @@ pub(crate) fn router() -> Router<()> {
         .route("/info", get(user_info))
         .route("/csrf_token", get(csrf_token))
         .route("/login", get(login))
-        .route("/summary", get(summary))
-        .route("/summary.js", get(serve_summary_js))
-        .route("/summary.css", get(serve_summary_css))
+        .route("/account", get(user_account))
+        .route("/account.js", get(serve_account_js))
+        .route("/o2p-base.css", get(serve_base_css))
 }
 
 #[derive(Template)]
@@ -37,15 +37,17 @@ pub(crate) fn router() -> Router<()> {
 struct LoginTemplate<'a> {
     message: &'a str,
     o2p_route_prefix: &'a str,
+    custom_css_url: Option<&'a str>,
 }
 
 async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
     match user {
-        Some(_) => Ok(Redirect::to(O2P_REDIRECT_ANON.as_str()).into_response()),
+        Some(_) => Ok(Redirect::to(O2P_DEFAULT_REDIRECT.as_str()).into_response()),
         None => {
             let template = LoginTemplate {
-                message: "Passkey/OAuth2 Login Page!",
+                message: "Sign in or create an account",
                 o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
+                custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
             };
             let html = Html(
                 template
@@ -66,6 +68,7 @@ struct TemplateCredential {
     pub user_display_name: String,
     pub user_handle: String,
     pub aaguid: String,
+    pub rp_id: String,
     pub counter: String,
     pub created_at: String,
     pub updated_at: String,
@@ -100,23 +103,25 @@ struct TemplateAuthUser {
 }
 
 #[derive(Template)]
-#[template(path = "summary.j2")]
-struct UserSummaryTemplate {
+#[template(path = "user_account.j2")]
+struct UserAccountTemplate {
     pub user: TemplateAuthUser,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
-    pub o2p_redirect_anon: String,
+    pub o2p_default_redirect: String,
     pub page_session_token: String,
+    pub custom_css_url: Option<String>,
 }
 
-impl UserSummaryTemplate {
+impl UserAccountTemplate {
     fn new(
         user: AuthUser,
         passkey_credentials: Vec<TemplateCredential>,
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
-        o2p_redirect_anon: String,
+        o2p_default_redirect: String,
+        custom_css_url: Option<String>,
     ) -> Self {
         let page_session_token = generate_page_session_token(&user.csrf_token);
 
@@ -133,8 +138,9 @@ impl UserSummaryTemplate {
             passkey_credentials,
             oauth2_accounts,
             o2p_route_prefix,
-            o2p_redirect_anon,
+            o2p_default_redirect,
             page_session_token,
+            custom_css_url,
         }
     }
 }
@@ -146,27 +152,11 @@ impl UserSummaryTemplate {
 async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCode, String)> {
     match auth_user {
         Some(user) => {
-            // Get passkey credentials count for the user
-            // let stored_credentials = list_credentials_core(Some(&user)).await.map_err(|e| {
-            let user_id = UserId::new(user.id.clone()).map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Invalid user ID: {e}"),
-                )
-            })?;
-            let stored_credentials = list_credentials_core(user_id).await.map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to fetch credentials: {e:?}"),
-                )
-            })?;
-
             // Return user information as JSON
             let user_data = json!({
                 "id": user.id,
                 "account": user.account,
                 "label": user.label,
-                "passkey_count": stored_credentials.len()
             });
 
             Ok(Json(user_data))
@@ -187,8 +177,8 @@ async fn csrf_token(auth_user: AuthUser) -> Result<Json<Value>, (StatusCode, Str
     })))
 }
 
-/// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
-async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
+/// Display the user account management page with user info, passkey credentials, and OAuth2 accounts
+async fn user_account(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
     // Convert AuthUser to SessionUser for the core functions
     // let session_user: &SessionUser = &auth_user;
     let user_id = &auth_user.id;
@@ -238,6 +228,7 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
                 user_display_name: cred.user.display_name.clone(),
                 user_handle: cred.user.user_handle.clone(),
                 aaguid: cred.aaguid.clone(),
+                rp_id: cred.rp_id.clone(),
                 counter: cred.counter.to_string(),
                 created_at: format_date_tz(&cred.created_at, "JST"),
                 updated_at: format_date_tz(&cred.updated_at, "JST"),
@@ -284,13 +275,14 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
     // Create template with all data
     // Create the route strings first
 
-    let template = UserSummaryTemplate::new(
+    let template = UserAccountTemplate::new(
         auth_user,
         passkey_credentials,
         oauth2_accounts,
         // Pass owned String values to the template
         O2P_ROUTE_PREFIX.to_string(),
-        O2P_REDIRECT_ANON.to_string(),
+        O2P_DEFAULT_REDIRECT.to_string(),
+        O2P_CUSTOM_CSS_URL.clone(),
     );
 
     // Render the template
@@ -304,8 +296,8 @@ async fn summary(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, Strin
     Ok(Html(html))
 }
 
-async fn serve_summary_js() -> Response {
-    let js_content = include_str!("../../static/summary.js");
+async fn serve_account_js() -> Response {
+    let js_content = include_str!("../../static/account.js");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
@@ -313,8 +305,8 @@ async fn serve_summary_js() -> Response {
         .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
-async fn serve_summary_css() -> Response {
-    let css_content = include_str!("../../static/summary.css");
+async fn serve_base_css() -> Response {
+    let css_content = include_str!("../../static/o2p-base.css");
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "text/css")

@@ -109,6 +109,7 @@ pub mod core_mocks {
             "user_id": "{}",
             "public_key": "{}",
             "aaguid": "00000000-0000-0000-0000-000000000000",
+            "rp_id": "localhost",
             "counter": 0,
             "user": {{
                 "user_handle": "user-handle-{}",

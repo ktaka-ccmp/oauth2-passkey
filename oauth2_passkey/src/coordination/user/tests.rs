@@ -31,6 +31,7 @@ fn create_test_credential(id: &str, user_id: &str) -> PasskeyCredential {
         user_id: user_id.to_string(),
         public_key: String::new(),
         aaguid: String::new(),
+        rp_id: String::new(),
         counter: 0,
         // We don't need to access the user field in our tests
         // so we can use a simpler approach

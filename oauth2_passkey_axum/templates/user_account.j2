@@ -1,28 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>User Summary</title>
+    <title>My Account</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Embed obfuscated user context for session boundary verification -->
     <!-- External CSS file -->
-    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/summary.css">
-    <style>
-        .authenticator-icon {
-            width: 36px;
-            height: 36px;
-            vertical-align: middle;
-            margin-left: 8px;
-            float: right;
-        }
-    </style>
+    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
 </head>
 <body>
+<div class="container">
     <div class="page-header">
-        <h1>User</h1>
+        <h1>My Account</h1>
         <nav>
             <a href="/">Home</a>
             {% if user.is_admin %}
-            <a href="{{o2p_route_prefix}}/admin/list_users">User List</a>
+            <a href="{{o2p_route_prefix}}/admin/index">Admin</a>
             {% endif %}
         </nav>
         <div class="header-buttons">
@@ -75,7 +69,7 @@
             <p>You don't have any passkey credentials yet.</p>
         {% else %}
             {% for credential in passkey_credentials %}
-                <div class="item" data-credential-id="{{ credential.credential_id }}">
+                <div class="item passkey" data-credential-id="{{ credential.credential_id }}">
                     <!--
                     <div class="item-detail"><strong>User Handle:</strong> {{ credential.user_handle }}</div>
                     <div class="item-detail"><strong>Credential ID:</strong> {{ credential.credential_id }}</div>
@@ -103,9 +97,14 @@
                             {{ credential.user_display_name }}
                         </span>
                     </div>
+                    {% if credential.rp_id != "" %}
+                    <div class="item-detail"><strong>RP ID:</strong> {{ credential.rp_id }}</div>
+                    {% else %}
+                    <div class="item-detail"><strong>RP ID:</strong> (unknown)</div>
+                    {% endif %}
+                    <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
                     <!--
                     <div class="item-detail"><strong>AAGUID:</strong>{{ credential.aaguid }}</div>
-                    <div class="item-detail"><strong>Created:</strong> {{ credential.created_at }}</div>
                     -->
                     <div class="item-detail  created-row">
                         <span><strong>Last Used:</strong> {{ credential.last_used_at }}</span>
@@ -139,7 +138,7 @@
             <p>You don't have any linked OAuth2 accounts yet.</p>
         {% else %}
             {% for account in oauth2_accounts %}
-                <div class="item">
+                <div class="item oauth2">
                     {% if account.picture != "" %}
                     <div class="account-picture">
                         <img src="{{ account.picture }}" alt="Profile Picture" style="max-width: 100px; max-height: 100px; border-radius: 50%;">
@@ -167,6 +166,7 @@
             {% endfor %}
         {% endif %}
     </div>
+</div>
 
     <!-- Update Credential Modal -->
     <div id="update-credential-modal" class="credential-modal" style="display: none;">
@@ -195,7 +195,7 @@
     <!-- External JavaScript files -->
     <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
     <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
-    <script src="{{o2p_route_prefix}}/user/summary.js"></script>
+    <script src="{{o2p_route_prefix}}/user/account.js"></script>
     <script>
         // Page session token for session boundary protection
         const PAGE_SESSION_TOKEN = "{{ page_session_token }}";
@@ -205,7 +205,7 @@
         const userId = "{{user.id}}";
         const csrfToken = "{{user.csrf_token}}";
         function Logout() {
-            window.location.href = "{{o2p_route_prefix}}/user/logout?redirect={{o2p_redirect_anon}}";
+            window.location.href = "{{o2p_route_prefix}}/user/logout?redirect={{o2p_default_redirect}}";
         }
     </script>
 

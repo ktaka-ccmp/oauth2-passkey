@@ -1,0 +1,38 @@
+/* =============================================================================
+   Rose Theme - Warm rose palette
+   ============================================================================= */
+:root {
+    /* Colors - Rose Palette */
+    --o2p-primary: #e11d48;
+    --o2p-primary-hover: #be123c;
+    --o2p-oauth2: #f43f5e;
+    --o2p-oauth2-hover: #e11d48;
+    --o2p-passkey: #fb7185;
+    --o2p-passkey-hover: #f43f5e;
+    --o2p-danger: #e11d48;
+    --o2p-danger-hover: #be123c;
+    --o2p-secondary: #64748b;
+    --o2p-secondary-hover: #475569;
+
+    /* Text */
+    --o2p-text: #0f172a;
+    --o2p-text-secondary: #475569;
+    --o2p-text-light: #94a3b8;
+
+    /* Backgrounds */
+    --o2p-background: #fff1f2;
+    --o2p-surface: #ffffff;
+    --o2p-surface-alt: #ffe4e6;
+
+    /* Borders */
+    --o2p-border: #fecdd3;
+    --o2p-border-light: #ffe4e6;
+}
+
+.login-page {
+    background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%);
+}
+
+.form-input:focus {
+    box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15);
+}

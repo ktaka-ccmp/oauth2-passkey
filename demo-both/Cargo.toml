@@ -4,8 +4,8 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-#oauth2-passkey-axum = { path = "../oauth2_passkey_axum" }
-oauth2-passkey-axum = "0.2"
+oauth2-passkey-axum = { path = "../oauth2_passkey_axum" }
+#oauth2-passkey-axum = "0.2"
 
 askama = { workspace = true }
 axum = { workspace = true }

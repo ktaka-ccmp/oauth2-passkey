@@ -1,55 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Protected Area</title>
+    <title>Demo: AJAX with CSRF</title>
+    <link rel="stylesheet" href="{{prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
     <style>
-        .container {
-            max-width: 600px;
-            margin: auto;
-            padding: 20px;
-            /* border: 1px solid #ccc; */
-            border-radius: 8px;
-        }
-        .button-container {
-            margin: 1rem 0;
-        }
-
-        button {
-            padding: 0.5rem 1rem;
-            margin-right: 1rem;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #45a049;
-        }
-
+        .demo-description { color: var(--o2p-text-secondary); margin-bottom: var(--o2p-space-md); }
         #result {
-            margin-top: 1rem;
-            padding: 1rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            margin-top: var(--o2p-space-md);
+            padding: var(--o2p-space-md);
+            border: 1px solid var(--o2p-border);
+            border-radius: var(--o2p-radius-md);
+            background: var(--o2p-surface-alt);
             display: none;
         }
-        body { font-family: sans-serif; margin: 20px; }
-        nav { margin-bottom: 20px; }
-        nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
-        nav a:hover { text-decoration: underline; }
     </style>
 </head>
-
 <body>
-    <div class="container">
+<div class="container">
+    <div class="page-header">
+        <h1>p3: AJAX with CSRF</h1>
         <nav>
             <a href="/">Home</a>
-            <a href="{{ prefix }}/user/summary">User</a>
             <a href="/p1">p1</a>
             <a href="/p2">p2</a>
             <a href="/p3">p3</a>
@@ -57,80 +33,80 @@
             <a href="/p5">p5</a>
             <a href="/p6">p6</a>
             <a href="/nested/p3">nested/p3</a>
-            <a href="{{ prefix }}/user/logout?redirect=/">Logout</a>
+            <a href="{{prefix}}/user/account">My Account</a>
         </nav>
-
-    <h1>Ajax Submission Demo</h1>
-    {{message}}
-
-    <div class="button-container">
-        <button id="withCsrf">POST with CSRF Token</button>
-        <button id="withoutCsrf">POST without CSRF Token</button>
+        <div class="header-buttons">
+            <a href="{{prefix}}/user/logout?redirect=/" class="btn btn-secondary btn-sm">Logout</a>
+        </div>
     </div>
 
-    <div id="result"></div>
-
-    <p><a href="{{ prefix }}/user/logout?redirect=/">Logout</a></p>
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">About This Page</h2>
+        </div>
+        <p class="demo-description">
+            AJAX POST requests with <code>X-CSRF-Token</code> header.
+            Middleware automatically provides the CSRF token via response header.
+            {{message}}
+        </p>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const resultDiv = document.getElementById('result');
-            let csrfToken = null;
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">Test AJAX Submission</h2>
+        </div>
+        <div class="item">
+            <div style="display: flex; gap: var(--o2p-space-sm); flex-wrap: wrap;">
+                <button id="withCsrf" class="btn btn-primary">POST with CSRF Token</button>
+                <button id="withoutCsrf" class="btn btn-danger">POST without CSRF Token</button>
+            </div>
+            <div id="result"></div>
+        </div>
+    </div>
+</div>
 
-            // Get initial CSRF token
-            fetch(window.location.href, { method: 'HEAD' })
-                .then(response => {
-                    const headers = {};
-                    response.headers.forEach((value, key) => {
-                        headers[key] = value;
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const resultDiv = document.getElementById('result');
+        let csrfToken = null;
+
+        // Get initial CSRF token
+        fetch(window.location.href, { method: 'HEAD' })
+            .then(response => {
+                csrfToken = response.headers.get('X-CSRF-Token') || null;
+                console.log('CSRF Token:', csrfToken);
+            })
+            .catch(error => console.error('Error fetching CSRF token:', error));
+
+        // Handle button clicks
+        document.querySelectorAll('#withCsrf, #withoutCsrf').forEach(button => {
+            button.addEventListener('click', async function() {
+                const includeCsrf = this.id === 'withCsrf';
+
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = 'Sending request...';
+
+                try {
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (includeCsrf && csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
+                    const response = await fetch('/p3', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({ test: 'data' })
                     });
-                    console.log('Response headers:', headers);
-                    // Always use lowercase when accessing the plain object
-                    // csrfToken = headers['x-csrf-token'] || null;
-                    csrfToken = response.headers.get('X-CSRF-Token') || null;
-                    console.log('CSRF Token:', csrfToken);
-                })
-                .catch(error => console.error('Error fetching CSRF token:', error));
 
-            // Handle button clicks
-            document.querySelectorAll('#withCsrf, #withoutCsrf').forEach(button => {
-                button.addEventListener('click', async function() {
-                    let includeCsrf = false;
-                    if (this.id === 'withCsrf') {
-                        includeCsrf = true;
-                    }
+                    const text = await response.text();
+                    resultDiv.textContent = `Response (${response.status}): ${text}`;
 
-                    // Show loading state
-                    resultDiv.style.display = 'block';
-                    resultDiv.textContent = 'Sending request...';
-
-                    try {
-                        // Prepare headers
-                        const headers = { 'Content-Type': 'application/json' };
-                        if (includeCsrf && csrfToken) headers['X-CSRF-Token'] = csrfToken;
-
-                        // Send request
-                        const response = await fetch('/p3', {
-                            method: 'POST',
-                            headers: headers,
-                            body: JSON.stringify({ test: 'data' })
-                        });
-
-                        // Display result
-                        const text = await response.text();
-                        resultDiv.textContent = `Response (${response.status}): ${text}`;
-
-                        // Update token if available
-                        const newToken = response.headers.get('X-CSRF-Token');
-                        if (newToken) csrfToken = newToken;
-                    } catch (error) {
-                        resultDiv.textContent = `Error: ${error.message}`;
-                    }
-                });
+                    const newToken = response.headers.get('X-CSRF-Token');
+                    if (newToken) csrfToken = newToken;
+                } catch (error) {
+                    resultDiv.textContent = `Error: ${error.message}`;
+                }
             });
         });
-    </script>
+    });
+</script>
 </body>
-
 </html>

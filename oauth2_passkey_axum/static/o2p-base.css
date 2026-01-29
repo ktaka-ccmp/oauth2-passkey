@@ -1,0 +1,842 @@
+/* =============================================================================
+   OAuth2-Passkey Base Styles
+   Modern UI foundation with CSS Custom Properties for theming
+   ============================================================================= */
+
+/* -----------------------------------------------------------------------------
+   CSS Custom Properties (Design Tokens)
+   Override these in your custom CSS file via O2P_CUSTOM_CSS_URL
+   ----------------------------------------------------------------------------- */
+:root {
+    /* Colors - Professional Indigo Palette (Clean Banking) */
+    --o2p-primary: #4f46e5;
+    --o2p-primary-hover: #4338ca;
+    --o2p-oauth2: #6366f1;
+    --o2p-oauth2-hover: #4f46e5;
+    --o2p-passkey: #818cf8;
+    --o2p-passkey-hover: #6366f1;
+    --o2p-danger: #dc2626;
+    --o2p-danger-hover: #b91c1c;
+    --o2p-secondary: #6b7280;
+    --o2p-secondary-hover: #4b5563;
+
+    /* Text */
+    --o2p-text: #111827;
+    --o2p-text-secondary: #4b5563;
+    --o2p-text-light: #9ca3af;
+
+    /* Backgrounds */
+    --o2p-background: #f9fafb;
+    --o2p-surface: #ffffff;
+    --o2p-surface-alt: #f3f4f6;
+
+    /* Borders */
+    --o2p-border: #e5e7eb;
+    --o2p-border-light: #f3f4f6;
+
+    /* Spacing */
+    --o2p-space-xs: 4px;
+    --o2p-space-sm: 8px;
+    --o2p-space-md: 16px;
+    --o2p-space-lg: 24px;
+    --o2p-space-xl: 32px;
+
+    /* Border Radius */
+    --o2p-radius-sm: 4px;
+    --o2p-radius-md: 6px;
+    --o2p-radius-lg: 8px;
+
+    /* Shadows */
+    --o2p-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --o2p-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+    /* Typography */
+    --o2p-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --o2p-font-size: 16px;
+    --o2p-line-height: 1.6;
+}
+
+/* -----------------------------------------------------------------------------
+   Base Reset & Typography
+   ----------------------------------------------------------------------------- */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--o2p-font);
+    font-size: var(--o2p-font-size);
+    line-height: var(--o2p-line-height);
+    color: var(--o2p-text);
+    background-color: var(--o2p-background);
+}
+
+body {
+    min-height: 100vh;
+}
+
+h1, h2, h3 {
+    margin: 0 0 var(--o2p-space-md) 0;
+    color: var(--o2p-text);
+    font-weight: 600;
+}
+
+h1 { font-size: 1.75rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.25rem; }
+
+p {
+    margin: 0 0 var(--o2p-space-md) 0;
+    color: var(--o2p-text-secondary);
+}
+
+a {
+    color: var(--o2p-primary);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* -----------------------------------------------------------------------------
+   Button Components
+   ----------------------------------------------------------------------------- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--o2p-space-sm) var(--o2p-space-md);
+    font-family: var(--o2p-font);
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.5;
+    text-align: center;
+    text-decoration: none;
+    border: none;
+    border-radius: var(--o2p-radius-md);
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    min-height: 44px;
+    white-space: nowrap;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-primary {
+    background-color: var(--o2p-primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: var(--o2p-primary-hover);
+}
+
+.btn-oauth2 {
+    background-color: var(--o2p-oauth2);
+    color: white;
+}
+
+.btn-oauth2:hover {
+    background-color: var(--o2p-oauth2-hover);
+}
+
+.btn-passkey {
+    background-color: var(--o2p-passkey);
+    color: white;
+}
+
+.btn-passkey:hover {
+    background-color: var(--o2p-passkey-hover);
+}
+
+.btn-danger {
+    background-color: var(--o2p-danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: var(--o2p-danger-hover);
+}
+
+.btn-secondary {
+    background-color: var(--o2p-secondary);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: var(--o2p-secondary-hover);
+}
+
+.btn-sm {
+    padding: var(--o2p-space-xs) var(--o2p-space-sm);
+    font-size: 0.875rem;
+    min-height: 32px;
+}
+
+.btn-block {
+    display: flex;
+    width: 100%;
+}
+
+/* Legacy button classes (backward compatibility) */
+.action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--o2p-primary);
+    color: white;
+    border: none;
+    padding: var(--o2p-space-sm) var(--o2p-space-md);
+    border-radius: var(--o2p-radius-md);
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    white-space: nowrap;
+    min-height: 40px;
+    transition: background-color 0.2s;
+}
+
+.action-button:hover {
+    background-color: var(--o2p-primary-hover);
+}
+
+.delete-button {
+    background-color: var(--o2p-danger);
+    color: white;
+    border: none;
+    padding: var(--o2p-space-xs) var(--o2p-space-sm);
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 0.875rem;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: var(--o2p-radius-sm);
+    transition: background-color 0.2s;
+}
+
+.delete-button:hover {
+    background-color: var(--o2p-danger-hover);
+}
+
+.edit-button {
+    background-color: var(--o2p-oauth2);
+    color: white;
+    border: none;
+    padding: var(--o2p-space-xs) var(--o2p-space-sm);
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 0.875rem;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: var(--o2p-radius-sm);
+    transition: background-color 0.2s;
+}
+
+.edit-button:hover {
+    background-color: var(--o2p-oauth2-hover);
+}
+
+.secondary-button {
+    background-color: var(--o2p-secondary);
+}
+
+.secondary-button:hover {
+    background-color: var(--o2p-secondary-hover);
+}
+
+.link-button {
+    display: inline-block;
+    background-color: var(--o2p-oauth2);
+    color: white;
+    padding: var(--o2p-space-sm) var(--o2p-space-md);
+    text-decoration: none;
+    border-radius: var(--o2p-radius-md);
+    margin-top: var(--o2p-space-sm);
+    font-weight: 500;
+}
+
+.link-button:hover {
+    background-color: var(--o2p-oauth2-hover);
+    text-decoration: none;
+}
+
+/* -----------------------------------------------------------------------------
+   Form Components
+   ----------------------------------------------------------------------------- */
+.form-group {
+    margin-bottom: var(--o2p-space-md);
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: var(--o2p-space-xs);
+    font-weight: 500;
+    color: var(--o2p-text);
+}
+
+.form-input {
+    width: 100%;
+    padding: var(--o2p-space-sm) var(--o2p-space-md);
+    border: 1px solid var(--o2p-border);
+    border-radius: var(--o2p-radius-sm);
+    font-size: 1rem;
+    font-family: var(--o2p-font);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--o2p-primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.form-input::placeholder {
+    color: var(--o2p-text-light);
+}
+
+.form-actions {
+    display: flex;
+    gap: var(--o2p-space-sm);
+    margin-top: var(--o2p-space-md);
+}
+
+/* -----------------------------------------------------------------------------
+   Card & Section Components
+   ----------------------------------------------------------------------------- */
+.container {
+    max-width: 800px;
+    width: 95%;
+    margin: 0 auto;
+    padding: var(--o2p-space-md);
+}
+
+.section {
+    background-color: var(--o2p-surface);
+    margin-bottom: var(--o2p-space-lg);
+    border: 1px solid var(--o2p-border);
+    border-radius: var(--o2p-radius-lg);
+    padding: var(--o2p-space-md);
+    box-shadow: var(--o2p-shadow);
+}
+
+.section-title {
+    background-color: var(--o2p-surface-alt);
+    padding: var(--o2p-space-sm) var(--o2p-space-md);
+    margin: calc(-1 * var(--o2p-space-md)) calc(-1 * var(--o2p-space-md)) var(--o2p-space-md) calc(-1 * var(--o2p-space-md));
+    border-bottom: 1px solid var(--o2p-border);
+    border-radius: var(--o2p-radius-lg) var(--o2p-radius-lg) 0 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--o2p-space-sm);
+}
+
+.section-header .section-title {
+    margin: 0;
+    flex: 1;
+}
+
+/* Credential item with type indicator */
+.item {
+    background-color: var(--o2p-surface-alt);
+    border-left: 3px solid var(--o2p-primary);
+    padding: var(--o2p-space-md);
+    margin-bottom: var(--o2p-space-sm);
+    border-radius: 0 var(--o2p-radius-sm) var(--o2p-radius-sm) 0;
+    word-break: break-word;
+}
+
+.item:last-child {
+    margin-bottom: 0;
+}
+
+.item.passkey {
+    border-left-color: var(--o2p-passkey);
+}
+
+.item.oauth2 {
+    border-left-color: var(--o2p-secondary);
+}
+
+.item-detail {
+    margin: var(--o2p-space-xs) 0;
+    color: var(--o2p-text-secondary);
+}
+
+.item-detail strong {
+    color: var(--o2p-text);
+}
+
+.created-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--o2p-space-sm);
+}
+
+/* -----------------------------------------------------------------------------
+   Page Header
+   ----------------------------------------------------------------------------- */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--o2p-space-lg);
+    flex-wrap: wrap;
+    gap: var(--o2p-space-sm);
+}
+
+.page-header h1 {
+    margin: 0;
+}
+
+.header-buttons {
+    display: flex;
+    gap: var(--o2p-space-sm);
+    flex-wrap: wrap;
+}
+
+/* Navigation */
+nav {
+    margin-bottom: var(--o2p-space-lg);
+}
+
+nav a {
+    margin-right: var(--o2p-space-md);
+    color: var(--o2p-primary);
+    text-decoration: none;
+}
+
+nav a:hover {
+    text-decoration: underline;
+}
+
+.back-link {
+    display: inline-block;
+    margin-top: var(--o2p-space-lg);
+    color: var(--o2p-primary);
+    text-decoration: none;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+/* -----------------------------------------------------------------------------
+   Table Components
+   ----------------------------------------------------------------------------- */
+.user-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--o2p-surface);
+    border-radius: var(--o2p-radius-md);
+    overflow: hidden;
+    box-shadow: var(--o2p-shadow);
+}
+
+.user-table th,
+.user-table td {
+    padding: var(--o2p-space-sm) var(--o2p-space-md);
+    text-align: left;
+    border-bottom: 1px solid var(--o2p-border-light);
+}
+
+.user-table th {
+    background-color: var(--o2p-surface-alt);
+    font-weight: 600;
+    color: var(--o2p-text);
+}
+
+.user-table tr:hover td {
+    background-color: var(--o2p-surface-alt);
+}
+
+.user-table a {
+    color: var(--o2p-primary);
+}
+
+.user-row button:not(.action-button):not(.delete-button) {
+    background-color: var(--o2p-surface);
+    border: 1px solid var(--o2p-border);
+    padding: var(--o2p-space-xs) var(--o2p-space-sm);
+    border-radius: var(--o2p-radius-sm);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.user-row button:not(.action-button):not(.delete-button):hover {
+    background-color: var(--o2p-surface-alt);
+}
+
+/* -----------------------------------------------------------------------------
+   Modal Components
+   ----------------------------------------------------------------------------- */
+.credential-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.credential-modal-content {
+    background-color: var(--o2p-surface);
+    margin: 10% auto;
+    padding: var(--o2p-space-lg);
+    border: 1px solid var(--o2p-border);
+    width: 90%;
+    max-width: 500px;
+    border-radius: var(--o2p-radius-lg);
+    box-shadow: var(--o2p-shadow-lg);
+}
+
+.credential-close {
+    color: var(--o2p-text-light);
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.credential-close:hover {
+    color: var(--o2p-text);
+}
+
+/* Legacy modal class */
+.modal {
+    display: none;
+}
+
+/* -----------------------------------------------------------------------------
+   Login Page Specific
+   ----------------------------------------------------------------------------- */
+.login-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    padding: var(--o2p-space-md);
+}
+
+.login-card {
+    background-color: var(--o2p-surface);
+    padding: var(--o2p-space-xl);
+    border-radius: var(--o2p-radius-lg);
+    box-shadow: var(--o2p-shadow-lg);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.login-card h1 {
+    margin-bottom: var(--o2p-space-sm);
+}
+
+.login-card .subtitle {
+    color: var(--o2p-text-secondary);
+    margin-bottom: var(--o2p-space-lg);
+}
+
+.auth-section {
+    margin-bottom: var(--o2p-space-lg);
+}
+
+.auth-section .section-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--o2p-text-secondary);
+    margin-bottom: var(--o2p-space-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.auth-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: var(--o2p-space-sm);
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    margin: var(--o2p-space-lg) 0;
+    color: var(--o2p-text-light);
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--o2p-border);
+}
+
+.divider span {
+    padding: 0 var(--o2p-space-md);
+    font-size: 0.875rem;
+}
+
+.login-link {
+    margin-top: var(--o2p-space-md);
+    font-size: 0.875rem;
+}
+
+/* -----------------------------------------------------------------------------
+   Conditional UI Page Specific
+   ----------------------------------------------------------------------------- */
+.conditional-ui-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: var(--o2p-space-md);
+}
+
+.conditional-ui-card {
+    background-color: var(--o2p-surface);
+    padding: var(--o2p-space-xl);
+    border-radius: var(--o2p-radius-lg);
+    box-shadow: var(--o2p-shadow-lg);
+    width: 100%;
+    max-width: 400px;
+}
+
+.conditional-ui-card h1 {
+    text-align: center;
+    margin-bottom: var(--o2p-space-sm);
+}
+
+.conditional-ui-card .description {
+    text-align: center;
+    color: var(--o2p-text-secondary);
+    margin-bottom: var(--o2p-space-lg);
+}
+
+/* -----------------------------------------------------------------------------
+   Authenticator Icon
+   ----------------------------------------------------------------------------- */
+.authenticator-icon {
+    width: 36px;
+    height: 36px;
+    vertical-align: middle;
+    margin-left: var(--o2p-space-sm);
+    float: right;
+}
+
+/* Account picture */
+.account-picture img {
+    max-width: 80px;
+    max-height: 80px;
+    border-radius: 50%;
+    border: 2px solid var(--o2p-border-light);
+}
+
+/* -----------------------------------------------------------------------------
+   Utility Classes
+   ----------------------------------------------------------------------------- */
+.user-passkeys,
+.user-accounts {
+    margin-top: var(--o2p-space-sm);
+}
+
+.has-icon {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* -----------------------------------------------------------------------------
+   Responsive Design
+   ----------------------------------------------------------------------------- */
+@media screen and (max-width: 600px) {
+    html, body {
+        font-size: 16px;
+        overflow-x: hidden;
+        width: 100%;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+    }
+
+    h2 {
+        font-size: 1.25rem;
+    }
+
+    .container {
+        padding: var(--o2p-space-sm);
+        width: 100%;
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .header-buttons {
+        width: 100%;
+    }
+
+    .header-buttons .action-button {
+        flex: 1;
+    }
+
+    .section {
+        padding: var(--o2p-space-sm);
+        margin-bottom: var(--o2p-space-md);
+    }
+
+    .section-title {
+        padding: var(--o2p-space-sm);
+        margin: calc(-1 * var(--o2p-space-sm)) calc(-1 * var(--o2p-space-sm)) var(--o2p-space-sm) calc(-1 * var(--o2p-space-sm));
+        font-size: 1.1rem;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .section-header .action-button {
+        width: 100%;
+    }
+
+    .item {
+        padding: var(--o2p-space-sm);
+    }
+
+    .action-button {
+        padding: var(--o2p-space-sm);
+        font-size: 0.9rem;
+        min-height: 44px;
+    }
+
+    .btn {
+        min-height: 44px;
+        padding: var(--o2p-space-sm) var(--o2p-space-md);
+    }
+
+    .login-card,
+    .conditional-ui-card {
+        padding: var(--o2p-space-lg);
+    }
+
+    .created-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    /* Transform table to card layout on mobile */
+    .user-table,
+    .user-table thead,
+    .user-table tbody,
+    .user-table th,
+    .user-table td,
+    .user-table tr {
+        display: block;
+    }
+
+    /* Hide table header on mobile */
+    .user-table thead {
+        display: none;
+    }
+
+    /* Style each row as a card */
+    .user-table tr.user-row {
+        background-color: var(--o2p-surface);
+        border: 1px solid var(--o2p-border);
+        border-radius: var(--o2p-radius-md);
+        margin-bottom: var(--o2p-space-md);
+        padding: var(--o2p-space-sm);
+        box-shadow: var(--o2p-shadow);
+    }
+
+    /* Style table cells */
+    .user-table td {
+        padding: var(--o2p-space-xs) var(--o2p-space-sm);
+        border: none;
+        position: relative;
+        padding-left: 30%;
+        text-align: left;
+        min-height: 32px;
+        display: block;
+        /* Truncate long content with ellipsis */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Add label before each cell */
+    .user-table td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: var(--o2p-space-sm);
+        width: 25%;
+        font-weight: 600;
+        color: var(--o2p-text);
+    }
+
+    /* Ensure links and buttons inside cells also truncate */
+    .user-table td a {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Actions cell */
+    .user-table td.actions-cell {
+        padding-left: var(--o2p-space-sm);
+        border-top: 1px solid var(--o2p-border-light);
+        margin-top: var(--o2p-space-xs);
+        padding-top: var(--o2p-space-sm);
+    }
+
+    .user-table td.actions-cell::before {
+        display: none;
+    }
+
+    /* Smaller buttons inside table cards */
+    .user-table .action-button,
+    .user-table .delete-button {
+        min-height: auto;
+        padding: var(--o2p-space-xs) var(--o2p-space-sm);
+        font-size: 0.875rem;
+    }
+
+    /* ID cell - first row with bottom border */
+    .user-table td.id-cell {
+        border-bottom: 1px solid var(--o2p-border-light);
+        padding-bottom: var(--o2p-space-sm);
+        margin-bottom: var(--o2p-space-xs);
+    }
+
+    .credential-modal-content {
+        margin: 5% auto;
+        padding: var(--o2p-space-md);
+    }
+}

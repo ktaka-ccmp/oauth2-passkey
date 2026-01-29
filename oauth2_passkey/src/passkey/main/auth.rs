@@ -83,7 +83,7 @@ pub(crate) async fn start_authentication(
 
 pub(crate) async fn finish_authentication(
     auth_response: AuthenticatorResponse,
-) -> Result<(String, String), PasskeyError> {
+) -> Result<(String, String, String), PasskeyError> {
     tracing::debug!(
         "Starting authentication verification for response: {:?}",
         auth_response
@@ -172,8 +172,9 @@ pub(crate) async fn finish_authentication(
     remove_options(cache_prefix, cache_key).await?;
     let user_name = stored_credential.user.name.clone();
     let user_id = stored_credential.user_id.clone();
+    let user_handle = stored_credential.user.user_handle.clone();
 
-    Ok((user_id, user_name))
+    Ok((user_id, user_name, user_handle))
 }
 
 /// Verifies that the user handle in the authenticator response matches the stored credential

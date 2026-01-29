@@ -18,11 +18,13 @@ impl PasskeyStore {
         match (store.as_sqlite(), store.as_postgres()) {
             (Some(pool), _) => {
                 create_tables_sqlite(pool).await?;
+                migrate_passkey_tables_sqlite(pool).await?;
                 validate_passkey_tables_sqlite(pool).await?;
                 Ok(())
             }
             (_, Some(pool)) => {
                 create_tables_postgres(pool).await?;
+                migrate_passkey_tables_postgres(pool).await?;
                 validate_passkey_tables_postgres(pool).await?;
                 Ok(())
             }

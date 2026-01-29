@@ -1,0 +1,22 @@
+[package]
+name = "demo-profile"
+version = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+oauth2-passkey-axum = { path = "../oauth2_passkey_axum" }
+
+askama = { workspace = true }
+axum = { workspace = true }
+axum-server = { workspace = true }
+chrono = { workspace = true }
+dotenvy = { workspace = true }
+http = { workspace = true }
+rustls = { workspace = true }
+serde = { workspace = true }
+sqlx = { workspace = true }
+subtle = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }

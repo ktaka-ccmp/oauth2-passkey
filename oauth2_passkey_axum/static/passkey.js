@@ -88,23 +88,106 @@ async function startAuthentication() {
         if (!verifyResponse.ok) {
             console.error('Authentication failed:', verifyResponse.status, verifyResponse.statusText);
             const errorText = await verifyResponse.text();
+
+            // Signal unknown credential to the authenticator (WebAuthn Signal API).
+            // This tells the authenticator that this credential is not recognized by the server,
+            // allowing the authenticator to remove or mark it as invalid.
+            // This API is scoped by credentialId only (not user_handle), so it works correctly
+            // regardless of PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting.
+            // Note: This is always called on auth failure regardless of PASSKEY_SIGNAL_API_MODE,
+            // because the credential genuinely doesn't exist on the server.
+            // Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
+            if (
+                credential.id &&
+                window.PublicKeyCredential &&
+                typeof window.PublicKeyCredential.signalUnknownCredential === "function"
+            ) {
+                try {
+                    await window.PublicKeyCredential.signalUnknownCredential({
+                        rpId: window.location.hostname,
+                        credentialId: credential.id,
+                    });
+                    console.log("signalUnknownCredential: signaled", credential.id);
+                } catch (signalErr) {
+                    console.warn("signalUnknownCredential error (non-critical):", signalErr);
+                }
+            }
+
             alert('Authentication failed: ' + errorText);
             return;
         }
 
-        // Response is OK, handle success
-        setTimeout(() => {
-            window.location.reload();
-        }, 100);  // Wait for 0.1 second before reloading
+        // Authentication successful
+        // Server returns JSON: { name: "...", user_handle: "...", credential_ids: [...] }
+        let userName = '';
+        try {
+            const data = await verifyResponse.json();
+            userName = data.name || '';
+            // FIRE-AND-FORGET: Signal API is non-critical, don't block navigation.
+            // Awaiting signalAfterLogin can block page reload on iOS Safari and other
+            // browsers where the Signal API may be slow or cause issues.
+            // The login has already succeeded on the server; proceed immediately.
+            signalAfterLogin(data);
+        } catch (parseErr) {
+            // JSON parse failure is non-critical - login already succeeded
+            console.warn("Response parse error (non-critical):", parseErr);
+        }
 
-        verifyResponse.text().then(function(text) {
-            if (authStatus) {
-                authStatus.textContent = `Welcome back ${text}!`;
-            }
-        });
+        if (authStatus && userName) {
+            authStatus.textContent = `Welcome back ${userName}!`;
+        }
+
+        // Proceed immediately with page reload - don't wait for Signal API
+        window.location.reload();
     } catch (error) {
         console.error('Error during authentication:', error);
         alert('Authentication failed: ' + error.message);
+    }
+}
+
+// Notify the authenticator about valid credentials after successful login (WebAuthn Signal API).
+//
+// This function is called FIRE-AND-FORGET (without await) from the login success handler.
+// The caller should NOT await this function because:
+// - The login has already succeeded on the server
+// - Signal API is non-critical - just a best-effort hint to the authenticator
+// - Awaiting can block page reload on iOS Safari and other browsers where the API may be slow
+// - User experience should not be degraded by optional sync features
+//
+// signalAllAcceptedCredentials: Tells the authenticator which credentials are valid for this user.
+// - Scoped by userId (user_handle) - only affects credentials with matching user_handle
+// - When PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true, only the authenticated credential is affected
+// - When false, all credentials for the user are synchronized
+//
+// Note: signalCurrentUserDetails is NOT called here because user details don't change during login.
+// It is called in account.js when the user explicitly updates their credential display name.
+//
+// The server controls whether to call this by including credential_ids in the response.
+// When PASSKEY_SIGNAL_API_MODE includes 'sync', the server includes credential_ids.
+//
+// Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
+// See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
+async function signalAfterLogin(data) {
+    try {
+        // signalAllAcceptedCredentials: Tell authenticator which credentials are valid
+        // Only called if server includes credential_ids in the response
+        // (controlled by PASSKEY_SIGNAL_API_MODE on the server)
+        if (
+            window.PublicKeyCredential &&
+            typeof window.PublicKeyCredential.signalAllAcceptedCredentials === "function" &&
+            data.user_handle && data.credential_ids
+        ) {
+            const userIdBytes = new TextEncoder().encode(data.user_handle);
+            const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
+            await window.PublicKeyCredential.signalAllAcceptedCredentials({
+                rpId: window.location.hostname,
+                userId: userIdBase64Url,
+                allAcceptedCredentialIds: data.credential_ids,
+            });
+            console.log("signalAllAcceptedCredentials: signaled", data.credential_ids.length, "credentials");
+        }
+    } catch (err) {
+        console.warn("Signal API error (non-critical):", err);
     }
 }
 
@@ -160,8 +243,9 @@ function showRegistrationModal(mode) {
     .then(userData => {
         if (userData) {
             // Pre-fill the form with user data
-            document.getElementById('reg-username').value = userData.account ? `${userData.account}#${userData.passkey_count + 1}` : 'username';
-            document.getElementById('reg-displayname').value = userData.label ? `${userData.label}#${userData.passkey_count + 1}` : 'displayname';
+            const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            document.getElementById('reg-username').value = userData.account ? `${userData.account}@${today}` : 'username';
+            document.getElementById('reg-displayname').value = userData.label || 'displayname';
         }
     })
     .catch(error => {

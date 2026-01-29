@@ -17,6 +17,7 @@ fn create_test_credential(
         user_id: user_id.to_string(),
         public_key: format!("test_public_key_for_{credential_id}"),
         aaguid: "test-aaguid-1234-5678".to_string(),
+        rp_id: "localhost".to_string(),
         counter: 1,
         user: PublicKeyCredentialUserEntity {
             user_handle: user_handle.to_string(),

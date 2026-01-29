@@ -2,16 +2,15 @@
 
 ## What is oauth2-passkey?
 
-oauth2-passkey is a drop-in authentication library for Rust web applications. It enables you to add secure login functionality with Google OAuth2 and/or Passkeys in minutes.
+oauth2-passkey is a passwordless authentication library for Rust web applications. **Password authentication is fundamentally flawed** - even strong, unique passwords are vulnerable to phishing, brute-force attacks, and server-side breaches. This library avoids passwords entirely.
 
-The library provides a complete authentication solution where users authenticate with OAuth2 or Passkey, then receive a secure session cookie to maintain their login status.
+**Intended workflow:** Users register with Google OAuth2, then add a Passkey for fast, phishing-resistant daily login. OAuth2 remains as a backup if the device is lost. After authentication, the library issues a secure session cookie to maintain login state.
 
 ### Key Features
 
-- **"Sign in with Google"** - OAuth2/OIDC authentication that works out of the box
-- **Passwordless login** - WebAuthn/Passkey support for modern devices
+- **Passkey** - Phishing-resistant login with biometrics, inherently multi-factor (no 2FA needed)
+- **Google OAuth2** - One-click registration and backup authentication
 - **Account linking** - Users can add multiple login methods to one account
-- **Security built-in** - Sessions, CSRF protection, secure cookies
 - **Minimal setup** - Works with SQLite out of the box, scales to PostgreSQL + Redis
 
 ## Supported Authentication Methods
@@ -80,13 +79,57 @@ The `oauth2-passkey-axum` crate provides seamless integration with the Axum web 
 - HTML templates for authentication pages
 - Extractors for accessing authenticated user information
 
-## Why Choose oauth2-passkey?
+## Why OAuth2 + Passkey?
+
+**Intended workflow:** Users create an account with Google OAuth2, then register a Passkey for daily login. OAuth2 serves as the initial registration method and backup.
+
+### Password Authentication is Fundamentally Flawed
+
+Password-based authentication has inherent design flaws that cannot be fixed by better implementation:
+
+- **Weak passwords** - Users choose predictable passwords (123456, password, etc.). No amount of complexity rules can change human behavior.
+- **Password reuse** - Users reuse passwords across sites, making credential stuffing attacks effective
+- **Phishing vulnerability** - Users can be tricked into entering passwords on fake sites
+- **2FA is a band-aid** - Two-factor authentication exists because passwords alone are insufficient. It adds complexity without addressing the root cause.
+
+### Our Solution: OAuth2 for Registration, Passkey for Login
+
+This library is designed for a specific workflow:
+
+1. **Initial Registration with Google OAuth2**
+   - Users sign up with one click using their Google account
+   - No password to create or remember
+   - Google handles the authentication security
+
+2. **Register a Passkey**
+   - After registration, prompt users to add a Passkey
+   - Uses device biometrics (fingerprint, face) or security key
+   - Stored securely on user's device
+
+3. **Daily Login with Passkey**
+   - Fast biometric authentication (1-2 seconds)
+   - Phishing-resistant (bound to your domain)
+   - Works offline from Google
+
+4. **OAuth2 as Backup**
+   - If device is lost, Google OAuth2 still works
+   - User can register a new Passkey on new device
+
+### Benefits
+
+- **No password management** - You never store or validate passwords
+- **No 2FA implementation needed** - Passkey is inherently multi-factor (device possession + biometrics)
+- **Phishing resistant** - Passkeys are cryptographically bound to origin
+- **Fast login** - Biometric authentication in seconds
+- **Resilient** - Multiple auth methods provide fallback options
+- **Reduced attack surface** - No password database to breach
+
+### Technical Highlights
 
 - **Beginner-friendly** - Works out of the box with SQLite
 - **Production-ready** - Scales to PostgreSQL + Redis
-- **Modern auth methods** - OAuth2 + Passkeys in one package
-- **Security built-in** - CSRF, secure sessions, minimal dependencies
-- **Flexible** - Users can mix and match auth methods
+- **Security built-in** - CSRF, secure sessions, `__Host-` cookie prefix
+- **Minimal dependencies** - Careful dependency selection
 
 ## Next Steps
 

@@ -1,46 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Protected Area</title>
+    <title>Demo: User Details via Extension</title>
+    <link rel="stylesheet" href="{{prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
     <style>
-        .container {
-            max-width: 600px;
-            margin: auto;
-            padding: 20px;
-            /* border: 1px solid #ccc; */
-            border-radius: 8px;
+        .demo-description { color: var(--o2p-text-secondary); margin-bottom: var(--o2p-space-md); }
+        .token-display {
+            font-family: monospace;
+            background: var(--o2p-surface-alt);
+            padding: var(--o2p-space-xs) var(--o2p-space-sm);
+            border-radius: var(--o2p-radius-sm);
+            word-break: break-all;
         }
-
-        .user-info {
-            background: #f5f5f5;
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 1rem 0;
-        }
-
-        .user-info dt {
-            font-weight: bold;
-            margin-top: 0.5rem;
-        }
-
-        .user-info dd {
-            margin-left: 1rem;
-        }
-        body { font-family: sans-serif; margin: 20px; }
-        nav { margin-bottom: 20px; }
-        nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
-        nav a:hover { text-decoration: underline; }
     </style>
 </head>
-
 <body>
-    <div class="container">
+<div class="container">
+    <div class="page-header">
+        <h1>p4: User Details via Extension</h1>
         <nav>
             <a href="/">Home</a>
-            <a href="{{ prefix }}/user/summary">User</a>
             <a href="/p1">p1</a>
             <a href="/p2">p2</a>
             <a href="/p3">p3</a>
@@ -48,46 +32,37 @@
             <a href="/p5">p5</a>
             <a href="/p6">p6</a>
             <a href="/nested/p3">nested/p3</a>
-            <a href="{{ prefix }}/user/logout?redirect=/">Logout</a>
+            <a href="{{prefix}}/user/account">My Account</a>
         </nav>
+        <div class="header-buttons">
+            <a href="{{prefix}}/user/logout?redirect=/" class="btn btn-secondary btn-sm">Logout</a>
+        </div>
+    </div>
 
-    <h1>Welcome to the Protected Area</h1>
-    <div class="user-info">
-        <h2>Your Account Information:</h2>
-        <table style="width: 100%; border-collapse: collapse;">
-            <tr>
-                <td>User ID</td>
-                <td>{{ user.id }}</td>
-            </tr>
-            <tr>
-                <td>Account</td>
-                <td>{{ user.account }}</td>
-            </tr>
-            <tr>
-                <td>Label</td>
-                <td>{{ user.label }}</td>
-            </tr>
-            <tr>
-                <td>Created At</td>
-                <td>{{ user.created_at }}</td>
-            </tr>
-            <tr>
-                <td>Updated At</td>
-                <td>{{ user.updated_at }}</td>
-            </tr>
-            <tr>
-                <td>CSRF Token</td>
-                <td>{{ user.csrf_token }}</td>
-            </tr>
-        </table>
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">About This Page</h2>
+        </div>
+        <p class="demo-description">
+            User data extracted from middleware <code>Extension</code>.
+            The <code>is_authenticated_user_redirect</code> middleware injects <code>AuthUser</code>
+            into the request, accessible in the handler via <code>Extension(user)</code>.
+        </p>
     </div>
-    <button onclick="Logout()">Logout</button>
+
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">Account Information</h2>
+        </div>
+        <div class="item">
+            <div class="item-detail"><strong>User ID:</strong> {{ user.id }}</div>
+            <div class="item-detail"><strong>Account:</strong> {{ user.account }}</div>
+            <div class="item-detail"><strong>Label:</strong> {{ user.label }}</div>
+            <div class="item-detail"><strong>Created At:</strong> {{ user.created_at }}</div>
+            <div class="item-detail"><strong>Updated At:</strong> {{ user.updated_at }}</div>
+            <div class="item-detail"><strong>CSRF Token:</strong> <span class="token-display">{{ user.csrf_token }}</span></div>
+        </div>
     </div>
-    <script>
-        function Logout() {
-            window.location.href = "{{prefix}}/user/logout?redirect=/";
-        }
-    </script>
+</div>
 </body>
-
 </html>

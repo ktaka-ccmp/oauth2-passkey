@@ -26,6 +26,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             user_name TEXT NOT NULL,
             user_display_name TEXT NOT NULL,
             aaguid TEXT NOT NULL,
+            rp_id TEXT NOT NULL DEFAULT '',
             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_used_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -62,6 +63,23 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     Ok(())
 }
 
+/// Migrates the passkey credentials table to add the rp_id column if it doesn't exist.
+/// This is needed for existing databases that were created before rp_id was added.
+pub(super) async fn migrate_passkey_tables_postgres(
+    pool: &Pool<Postgres>,
+) -> Result<(), PasskeyError> {
+    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
+
+    sqlx::query(&format!(
+        "ALTER TABLE {passkey_table} ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT ''"
+    ))
+    .execute(pool)
+    .await
+    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    Ok(())
+}
+
 /// Validates that the Passkey credential table schema matches what we expect
 pub(super) async fn validate_passkey_tables_postgres(
     pool: &Pool<Postgres>,
@@ -78,6 +96,7 @@ pub(super) async fn validate_passkey_tables_postgres(
         ("user_name", "text"),
         ("user_display_name", "text"),
         ("aaguid", "text"),
+        ("rp_id", "text"),
         ("created_at", "timestamp with time zone"),
         ("updated_at", "timestamp with time zone"),
         ("last_used_at", "timestamp with time zone"),
@@ -104,6 +123,7 @@ pub(super) async fn store_credential_postgres(
     let user_name = &credential.user.name;
     let user_display_name = &credential.user.display_name;
     let aaguid = &credential.aaguid;
+    let rp_id = &credential.rp_id;
     let created_at = &credential.created_at;
     let updated_at = &credential.updated_at;
     let last_used_at = &credential.last_used_at;
@@ -112,10 +132,10 @@ pub(super) async fn store_credential_postgres(
     sqlx::query_as::<_, (i32,)>(&format!(
         r#"
         INSERT INTO {passkey_table}
-        (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, created_at, updated_at, last_used_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, rp_id, created_at, updated_at, last_used_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         ON CONFLICT (credential_id) DO UPDATE
-        SET user_id = $2, public_key = $3, counter = $4, user_handle = $5, user_name = $6, user_display_name = $7, aaguid = $8, updated_at = CURRENT_TIMESTAMP, last_used_at = CURRENT_TIMESTAMP
+        SET user_id = $2, public_key = $3, counter = $4, user_handle = $5, user_name = $6, user_display_name = $7, aaguid = $8, rp_id = $9, updated_at = CURRENT_TIMESTAMP, last_used_at = CURRENT_TIMESTAMP
         RETURNING 1
         "#
     ))
@@ -127,6 +147,7 @@ pub(super) async fn store_credential_postgres(
     .bind(user_name)
     .bind(user_display_name)
     .bind(aaguid)
+    .bind(rp_id)
     .bind(created_at)
     .bind(updated_at)
     .bind(last_used_at)
@@ -275,6 +296,7 @@ impl<'r> FromRow<'r, SqliteRow> for PasskeyCredential {
         let user_name: String = row.try_get("user_name")?;
         let user_display_name: String = row.try_get("user_display_name")?;
         let aaguid: String = row.try_get("aaguid")?;
+        let rp_id: String = row.try_get("rp_id")?;
         let created_at: DateTime<Utc> = row.try_get("created_at")?;
         let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
         let last_used_at: DateTime<Utc> = row.try_get("last_used_at")?;
@@ -290,6 +312,7 @@ impl<'r> FromRow<'r, SqliteRow> for PasskeyCredential {
                 display_name: user_display_name,
             },
             aaguid,
+            rp_id,
             created_at,
             updated_at,
             last_used_at,
@@ -308,6 +331,7 @@ impl<'r> FromRow<'r, PgRow> for PasskeyCredential {
         let user_name: String = row.try_get("user_name")?;
         let user_display_name: String = row.try_get("user_display_name")?;
         let aaguid: String = row.try_get("aaguid")?;
+        let rp_id: String = row.try_get("rp_id")?;
         let created_at: DateTime<Utc> = row.try_get("created_at")?;
         let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
         let last_used_at: DateTime<Utc> = row.try_get("last_used_at")?;
@@ -323,6 +347,7 @@ impl<'r> FromRow<'r, PgRow> for PasskeyCredential {
                 display_name: user_display_name,
             },
             aaguid,
+            rp_id,
             created_at,
             updated_at,
             last_used_at,

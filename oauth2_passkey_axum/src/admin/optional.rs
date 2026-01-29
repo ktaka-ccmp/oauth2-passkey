@@ -14,17 +14,63 @@ use std::{
 };
 
 use oauth2_passkey::{
-    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, get_authenticator_info_batch,
-    get_user, list_accounts_core, list_credentials_core,
+    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, get_all_users,
+    get_authenticator_info_batch, get_user, list_accounts_core, list_credentials_core,
 };
 
-use crate::{O2P_ADMIN_URL, session::AuthUser};
+use crate::{
+    O2P_ADMIN_URL,
+    config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT},
+    session::AuthUser,
+};
 
 pub(crate) fn router() -> Router<()> {
     Router::new()
-        .route("/user/{user_id}", get(user_summary))
+        .route("/index", get(admin_index))
+        .route("/user/{user_id}", get(admin_user_page))
         .route("/admin_user.js", get(serve_admin_user_js))
-        .route("/admin_user.css", get(serve_admin_user_css))
+}
+
+#[derive(Template)]
+#[template(path = "admin_index.j2")]
+struct AdminIndexTemplate {
+    users: Vec<DbUser>,
+    o2p_route_prefix: String,
+    o2p_default_redirect: String,
+    csrf_token: String,
+    custom_css_url: Option<String>,
+}
+
+async fn admin_index(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
+    // Convert AuthUser to SessionUser for the core functions
+    if !auth_user.has_admin_privileges() {
+        return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
+    };
+
+    // Fetch users from storage using session ID
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+    let users = get_all_users(session_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let csrf_token = auth_user.csrf_token.clone();
+
+    // Render the template
+    let template = AdminIndexTemplate {
+        users,
+        o2p_route_prefix: O2P_ROUTE_PREFIX.to_string(),
+        o2p_default_redirect: O2P_DEFAULT_REDIRECT.to_string(),
+        csrf_token,
+        custom_css_url: O2P_CUSTOM_CSS_URL.clone(),
+    };
+    Ok(Html(template.render().map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?))
 }
 
 // Template-friendly version of StoredCredential for display
@@ -36,6 +82,7 @@ struct TemplateCredential {
     pub user_display_name: String,
     pub user_handle: String,
     pub aaguid: String,
+    pub rp_id: String,
     pub created_at: String,
     pub updated_at: String,
     pub last_used_at: String,
@@ -69,22 +116,24 @@ struct TemplateUser {
 }
 
 #[derive(Template)]
-#[template(path = "admin_user.j2")]
-struct UserSummaryTemplate {
+#[template(path = "admin_user_page.j2")]
+struct AdminUserPageTemplate {
     pub user: TemplateUser,
     pub csrf_token: String,
     pub passkey_credentials: Vec<TemplateCredential>,
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
+    pub custom_css_url: Option<String>,
 }
 
-impl UserSummaryTemplate {
+impl AdminUserPageTemplate {
     fn new(
         user: DbUser,
         csrf_token: String,
         passkey_credentials: Vec<TemplateCredential>,
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
+        custom_css_url: Option<String>,
     ) -> Self {
         Self {
             user: TemplateUser {
@@ -100,12 +149,13 @@ impl UserSummaryTemplate {
             passkey_credentials,
             oauth2_accounts,
             o2p_route_prefix,
+            custom_css_url,
         }
     }
 }
 
 /// Display a comprehensive summary page with user info, passkey credentials, and OAuth2 accounts
-async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoResponse {
+async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl IntoResponse {
     if !auth_user.has_admin_privileges() {
         tracing::warn!(
             "User {} is not authorized to view user summary",
@@ -186,6 +236,7 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
                 user_display_name: cred.user.display_name.clone(),
                 user_handle: cred.user.user_handle.clone(),
                 aaguid: cred.aaguid.clone(),
+                rp_id: cred.rp_id.clone(),
                 created_at: format_date_tz(&cred.created_at, "JST"),
                 updated_at: format_date_tz(&cred.updated_at, "JST"),
                 last_used_at: format_date_tz(&cred.last_used_at, "JST"),
@@ -231,12 +282,13 @@ async fn user_summary(auth_user: AuthUser, user_id: Path<String>) -> impl IntoRe
     let csrf_token = auth_user.csrf_token.clone();
 
     // Create template with all data
-    let template = UserSummaryTemplate::new(
+    let template = AdminUserPageTemplate::new(
         user,
         csrf_token,
         passkey_credentials,
         oauth2_accounts,
         O2P_ROUTE_PREFIX.to_string(),
+        O2P_CUSTOM_CSS_URL.clone(),
     );
 
     // Render the template
@@ -256,15 +308,6 @@ async fn serve_admin_user_js() -> Response {
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.to_string().into())
-        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
-}
-
-async fn serve_admin_user_css() -> Response {
-    let css_content = include_str!("../../static/admin_user.css");
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(CONTENT_TYPE, "text/css")
-        .body(css_content.to_string().into())
         .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 

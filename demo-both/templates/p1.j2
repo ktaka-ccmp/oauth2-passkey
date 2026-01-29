@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo: AuthUser Extractor</title>
+    <link rel="stylesheet" href="{{prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
+    <style>
+        .demo-description { color: var(--o2p-text-secondary); margin-bottom: var(--o2p-space-md); }
+        .token-display {
+            font-family: monospace;
+            background: var(--o2p-surface-alt);
+            padding: var(--o2p-space-xs) var(--o2p-space-sm);
+            border-radius: var(--o2p-radius-sm);
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="page-header">
+        <h1>p1: AuthUser Extractor</h1>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/p1">p1</a>
+            <a href="/p2">p2</a>
+            <a href="/p3">p3</a>
+            <a href="/p4">p4</a>
+            <a href="/p5">p5</a>
+            <a href="/p6">p6</a>
+            <a href="/nested/p3">nested/p3</a>
+            <a href="{{prefix}}/user/account">My Account</a>
+        </nav>
+        <div class="header-buttons">
+            <a href="{{prefix}}/user/logout?redirect=/" class="btn btn-secondary btn-sm">Logout</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">About This Page</h2>
+        </div>
+        <p class="demo-description">
+            Route protection via <code>AuthUser</code> extractor parameter.
+            Unauthenticated users are automatically redirected to the login page.
+            CSRF token is delivered via <code>X-CSRF-Token</code> response header (check DevTools).
+        </p>
+    </div>
+
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">User Info</h2>
+        </div>
+        <div class="item">
+            <div class="item-detail"><strong>Account:</strong> {{ user.account }}</div>
+            <div class="item-detail"><strong>CSRF Token:</strong> <span class="token-display">{{ user.csrf_token }}</span></div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

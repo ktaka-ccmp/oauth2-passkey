@@ -7,7 +7,9 @@ use axum::{
 
 use dotenvy::dotenv;
 
-use oauth2_passkey_axum::{AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, oauth2_passkey_router};
+use oauth2_passkey_axum::{
+    AuthUser, O2P_CUSTOM_CSS_URL, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router,
+};
 
 mod protected;
 mod server;
@@ -20,16 +22,17 @@ use server::{init_tracing, spawn_http_server, spawn_https_server};
 struct IndexTemplate<'a> {
     message: &'a str,
     prefix: &'a str,
+    custom_css_url: Option<&'a str>,
 }
 
-// O2P_LOGIN_URL is /o2p/user/login and O2P_SUMMARY_URL is /o2p/user/summary by default
+// O2P_LOGIN_URL is /o2p/user/login and O2P_ACCOUNT_URL is /o2p/user/account by default
 async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
     match user {
-        // Some(_) => Ok(Redirect::to(O2P_SUMMARY_URL.as_str()).into_response()),
         Some(_) => {
             let template = IndexTemplate {
                 message: "This is a protected page.",
                 prefix: O2P_ROUTE_PREFIX.as_str(),
+                custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
             };
             match template.render() {
                 Ok(html) => Ok(Html(html).into_response()),
@@ -53,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .route("/", get(index))
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
+        .merge(oauth2_passkey_full_router())
         .merge(protected::router());
 
     let http_server = spawn_http_server(3001, app.clone());
