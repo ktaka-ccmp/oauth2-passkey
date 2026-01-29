@@ -2,9 +2,11 @@
 
 ## ID: 2026-01-30-04
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
+
+## Difficulty: small
 
 ## Description
 
@@ -12,7 +14,8 @@ Update the project README.md to include important external links and update demo
 
 ## Related Files
 
-- `README.md` - Main project README
+- `oauth2_passkey/README.md` - Core library README
+- `oauth2_passkey_axum/README.md` - Axum integration README
 
 ## Notes
 
@@ -27,16 +30,14 @@ Update the project README.md to include important external links and update demo
    - Update demo-xxx descriptions if needed
    - Ensure demo instructions are current
 
-**Suggested Badge/Link Format**:
-```markdown
-[![Crates.io](https://img.shields.io/crates/v/oauth2-passkey.svg)](https://crates.io/crates/oauth2-passkey)
-[![Documentation](https://docs.rs/oauth2-passkey/badge.svg)](https://docs.rs/oauth2-passkey)
-
-## Documentation
-
-- [User Guide](https://ktaka-ccmp.github.io/oauth2-passkey/index.html) - Comprehensive tutorials and guides
-- [API Reference](https://docs.rs/oauth2-passkey) - Rust API documentation
-```
-
 ## Resolution
 
+Added Documentation section to both READMEs:
+
+1. **oauth2_passkey/README.md**:
+   - Added "Documentation" section with links to User Guide, API Reference (docs.rs), Crates.io, and GitHub
+
+2. **oauth2_passkey_axum/README.md**:
+   - Added "Documentation" section with links to User Guide, API Reference (docs.rs), Crates.io, and GitHub
+
+Demo links and descriptions verified - all current and correct.
