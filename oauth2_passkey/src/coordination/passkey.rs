@@ -356,8 +356,14 @@ pub async fn delete_passkey_credential_core(
     PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(credential_id)).await?;
 
     // Retrieve remaining credentials for authenticator synchronization
+    // Filter to only include credentials with the same user_handle, since
+    // signalAllAcceptedCredentials is scoped by userId (user_handle)
     let remaining = list_credentials_core(user_id).await?;
-    let remaining_credential_ids = remaining.iter().map(|c| c.credential_id.clone()).collect();
+    let remaining_credential_ids = remaining
+        .iter()
+        .filter(|c| c.user.user_handle == user_handle)
+        .map(|c| c.credential_id.clone())
+        .collect();
 
     tracing::debug!("Successfully deleted credential");
 

@@ -314,16 +314,15 @@ After deleting credential A (user_handle = `handle_aaa`) from the server:
 signalAllAcceptedCredentials({
     rpId: "example.com",
     userId: encode("handle_aaa"),             // Deleted credential's handle
-    allAcceptedCredentialIds: ["cred_222", "cred_333"],  // Remaining credentials
+    allAcceptedCredentialIds: [],             // Empty - no other credentials share this handle
 });
 ```
 
 The authenticator:
 1. Finds credentials with `userId = handle_aaa` -> **only credential A**
 2. Credential A (`cred_111`) is NOT in the accepted list -> **removed** (correct)
-3. `cred_222` and `cred_333` have different `userId` values -> **not matched, ignored**
 
-**Result**: The deleted credential itself may be removed (its `credentialId` is absent from the list), but the remaining credential IDs in the list are meaningless noise. The authenticator cannot verify or act on credentials that don't match the given `userId`.
+**Result**: The deleted credential is removed. The empty list is semantically correct since no other credentials share this `user_handle`.
 
 Using `signalUnknownCredential` is simpler and more direct for this case:
 
@@ -499,8 +498,8 @@ After deleting a credential, the server returns:
 }
 ```
 
-- `user_handle`: From the deleted credential (important: this is the deleted credential's handle, not the remaining credentials' handle)
-- `remaining_credential_ids`: All credential IDs still registered for this user
+- `user_handle`: From the deleted credential
+- `remaining_credential_ids`: Credential IDs with the same `user_handle` as the deleted credential (filtered for `signalAllAcceptedCredentials` which is scoped by userId)
 
 **Source**: `oauth2_passkey/src/coordination/passkey.rs`
 
