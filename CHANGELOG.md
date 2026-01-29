@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `PASSKEY_SIGNAL_API_MODE` env var to control WebAuthn Signal API behavior (`direct`/`sync`/`direct+sync`)
+  - `direct` (default): Uses `signalUnknownCredential` only - the only working API with Google Password Manager
+  - `sync`: Uses `signalAllAcceptedCredentials` only - currently no effect on Chrome
+  - `direct+sync`: Uses both APIs for future compatibility testing
 - Session conflict policy via `SESSION_CONFLICT_POLICY` env var (`allow`/`replace`/`reject`) to control login behavior when a user already has active sessions
 - User-to-session reverse index (`user_sessions` cache mapping) with lazy cleanup of stale entries
 - Built-in CSS theme system with 9 pre-built themes: Zinc, Slate, Blue, Violet, Rose, Neumorphism, Material, Eco, SaaS
@@ -20,9 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Theme CSS files served at `{O2P_ROUTE_PREFIX}/themes/` (e.g., `/o2p/themes/theme-zinc.css`)
 - `oauth2_passkey_full_router()` unified router that automatically includes `/.well-known/webauthn` when multi-origin is configured
 - `rp_id` field in `PasskeyCredential` to store and display the Relying Party ID used during registration
+- WebAuthn Signal API documentation (`user-handle-and-signal-api.md`) focusing on `signalUnknownCredential` as the primary working API
 
 ### Changed
 
+- Signal API calls now conditionally execute based on `PASSKEY_SIGNAL_API_MODE` setting
 - Passkey registration username prefill changed from `#N` sequential numbering to `@YYYYMMDD` date suffix
 
 - **BREAKING**: Renamed `O2P_REDIRECT_ANON` to `O2P_DEFAULT_REDIRECT` for clarity (env var, config, and template variable)
