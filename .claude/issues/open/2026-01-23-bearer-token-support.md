@@ -1,5 +1,7 @@
 # Issue: Bearer Token Authentication Support
 
+## ID: 2026-01-23-01
+
 ## Status: open
 
 ## Priority: medium

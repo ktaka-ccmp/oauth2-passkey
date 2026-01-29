@@ -6,6 +6,7 @@ List all open issues in the project.
 
 1. Read all markdown files in `.claude/issues/open/` directory
 2. Parse each file to extract:
+   - ID (from `## ID: <id>`)
    - Title (from `# Issue: <Title>`)
    - Priority (from `## Priority: <priority>`)
    - Description (first paragraph after `## Description`)
@@ -18,15 +19,15 @@ List all open issues in the project.
 # Open Issues
 
 ## High Priority
-- [filename.md](path) Title
+- `ID` [Title](path)
   Related: path/to/files
 
 ## Medium Priority
-- [filename.md](path) Title
+- `ID` [Title](path)
   Related: path/to/files
 
 ## Low Priority
-- [filename.md](path) Title
+- `ID` [Title](path)
   Related: path/to/files
 
 ---

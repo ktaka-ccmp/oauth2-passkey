@@ -1,5 +1,7 @@
 # Issue: Documentation Improvement Planning
 
+## ID: 2026-01-24-01
+
 ## Status: deferred
 
 ## Priority: low

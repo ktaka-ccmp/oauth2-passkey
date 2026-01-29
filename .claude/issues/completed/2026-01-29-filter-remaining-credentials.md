@@ -1,6 +1,8 @@
 # Issue: Filter remaining_credential_ids by user_handle
 
-## Status: open
+## ID: 2026-01-29-02
+
+## Status: completed
 
 ## Priority: low
 
@@ -43,3 +45,4 @@ let remaining_credential_ids = remaining
 
 ## Resolution
 
+Completed as part of Signal API implementation (2026-01-28-01). The filter was added in commit `d145ecc`.

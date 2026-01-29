@@ -18,12 +18,16 @@ Create, update, or close an issue for task/bug tracking.
 
 Create a markdown file in `.claude/issues/open/` with:
 - Filename: `YYYY-MM-DD-<short-slug>.md` (e.g., `2026-01-30-move-info-endpoint.md`)
+- ID: `YYYY-MM-DD-NN` where NN is the sequential number for that day
+- Check existing issues to determine the next sequence number for today
 - Use the template below
 
 ### Issue Template
 
 ```markdown
 # Issue: <Title>
+
+## ID: YYYY-MM-DD-NN
 
 ## Status: open
 
@@ -66,7 +70,12 @@ When updating an existing issue:
 
 ### After Creating/Updating
 
-Inform the user of:
-1. The file path
-2. A brief summary of what was created/changed
-3. If moved, the new location
+1. **Update README.md**: Update the "Current Issues" section in `.claude/issues/README.md`
+   - The section is between `<!-- AUTO-UPDATED -->` and `<!-- END AUTO-UPDATED -->` markers
+   - Regenerate the tables for Open, Completed, and Deferred issues
+   - Sort Open issues by priority (high > medium > low), then by ID
+
+2. **Inform the user** of:
+   - The file path
+   - A brief summary of what was created/changed
+   - If moved, the new location

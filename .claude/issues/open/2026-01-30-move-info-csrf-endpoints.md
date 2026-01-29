@@ -1,5 +1,7 @@
 # Issue: Move /info and /csrf_token endpoints to default.rs
 
+## ID: 2026-01-30-01
+
 ## Status: open
 
 ## Priority: medium

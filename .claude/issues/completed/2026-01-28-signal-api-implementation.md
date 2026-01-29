@@ -1,5 +1,7 @@
 # Issue: WebAuthn Signal API Implementation
 
+## ID: 2026-01-28-01
+
 ## Status: completed
 
 ## Priority: medium

@@ -1,5 +1,7 @@
 # Issue: Change PASSKEY_USER_HANDLE_UNIQUE default to false
 
+## ID: 2026-01-29-01
+
 ## Status: open
 
 ## Priority: medium

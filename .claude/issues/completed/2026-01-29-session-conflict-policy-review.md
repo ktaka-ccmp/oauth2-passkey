@@ -1,5 +1,7 @@
 # Issue: Review SESSION_CONFLICT_POLICY Default
 
+## ID: 2026-01-29-04
+
 ## Status: completed
 
 ## Priority: low
