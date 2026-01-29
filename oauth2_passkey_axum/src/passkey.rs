@@ -10,9 +10,9 @@ use serde_json::Value;
 
 use oauth2_passkey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialId, O2P_ROUTE_PREFIX,
-    PasskeyCredential, RegisterCredential, RegistrationOptions, RegistrationStartRequest,
-    SessionUser, UserId, delete_passkey_credential_core, get_related_origin_json,
-    handle_finish_authentication_core, handle_finish_registration_core,
+    PASSKEY_SIGNAL_API_MODE, PasskeyCredential, RegisterCredential, RegistrationOptions,
+    RegistrationStartRequest, SessionUser, UserId, delete_passkey_credential_core,
+    get_related_origin_json, handle_finish_authentication_core, handle_finish_registration_core,
     handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
     update_passkey_credential_core,
 };
@@ -143,12 +143,14 @@ async fn serve_passkey_js() -> Response {
 struct ConditionalUiTemplate<'a> {
     o2p_route_prefix: &'a str,
     custom_css_url: Option<&'a str>,
+    signal_api_mode: &'a str,
 }
 
 async fn conditional_ui() -> impl IntoResponse {
     let template = ConditionalUiTemplate {
         o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
         custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+        signal_api_mode: PASSKEY_SIGNAL_API_MODE.as_str(),
     };
     match template.render() {
         Ok(html) => (StatusCode::OK, Html(html)).into_response(),

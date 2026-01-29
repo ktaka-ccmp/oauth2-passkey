@@ -150,7 +150,11 @@ function base64URLToUint8Array(base64URL) {
                 // See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
                 try {
                     const data = await authResponse.json();
+                    // Only call signalAllAcceptedCredentials if mode includes 'sync'
+                    // signalApiMode is set from PASSKEY_SIGNAL_API_MODE environment variable
                     if (
+                        typeof signalApiMode !== 'undefined' &&
+                        (signalApiMode === 'sync' || signalApiMode === 'direct+sync') &&
                         window.PublicKeyCredential &&
                         typeof window.PublicKeyCredential.signalAllAcceptedCredentials === "function" &&
                         data.user_handle && data.credential_ids

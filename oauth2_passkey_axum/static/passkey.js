@@ -164,6 +164,13 @@ async function startAuthentication() {
 // See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
 async function signalAfterLogin(data) {
     try {
+        // Only call signalAllAcceptedCredentials if mode includes 'sync'
+        // signalApiMode is set from PASSKEY_SIGNAL_API_MODE environment variable
+        if (typeof signalApiMode === 'undefined' ||
+            (signalApiMode !== 'sync' && signalApiMode !== 'direct+sync')) {
+            return;
+        }
+
         // signalAllAcceptedCredentials: Tell authenticator which credentials are valid
         // Note: This is scoped by user_handle, so effectiveness depends on
         // PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting

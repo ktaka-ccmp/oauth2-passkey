@@ -71,6 +71,9 @@ pub use coordination::{
 // Environment variable configurable route prefix for all auth routes (defaults to "/o2p")
 pub use config::O2P_ROUTE_PREFIX;
 
+// Signal API mode for credential synchronization with authenticators
+pub use config::PASSKEY_SIGNAL_API_MODE;
+
 // OAuth2 authentication types and functions
 pub use oauth2::{
     AuthResponse, OAuth2Account, OAuth2Mode, OAuth2State, Provider, ProviderUserId,

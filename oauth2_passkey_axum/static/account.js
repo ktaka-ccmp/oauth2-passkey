@@ -94,13 +94,16 @@ function DeleteAccount() {
                     let notificationChain = Promise.resolve();
 
                     // Process each credential sequentially
-                    credentialIds.forEach((credentialId) => {
-                        notificationChain = notificationChain.then(() => {
-                            return synchronizeCredentialsWithSignalUnknown(
-                                credentialId
-                            );
+                    // Only call signalUnknownCredential if mode includes 'direct'
+                    if (signalApiMode === 'direct' || signalApiMode === 'direct+sync') {
+                        credentialIds.forEach((credentialId) => {
+                            notificationChain = notificationChain.then(() => {
+                                return synchronizeCredentialsWithSignalUnknown(
+                                    credentialId
+                                );
+                            });
                         });
-                    });
+                    }
 
                     return notificationChain;
                 } else {
@@ -323,17 +326,23 @@ function deletePasskeyCredential(credentialId, userHandle) {
                     // Server returns JSON: { remaining_credential_ids: [...], user_handle: "..." }
                     try {
                         const data = await response.json();
-                        // DUAL APPROACH: Use both Signal APIs for maximum compatibility
+                        // Signal API calls based on PASSKEY_SIGNAL_API_MODE
                         // Both are fire-and-forget (no await) to avoid blocking page reload
-                        // Step 1: signalUnknownCredential - directly targets the deleted credential
-                        // Works for both user_handle modes (unique or shared)
-                        synchronizeCredentialsWithSignalUnknown(credentialId);
-                        // Step 2: signalAllAcceptedCredentials - syncs remaining credentials
-                        // Effective when user_handle is shared, harmless when unique
-                        synchronizeCredentials(
-                            data.user_handle || userHandle,
-                            data.remaining_credential_ids
-                        );
+
+                        // signalUnknownCredential: directly targets the deleted credential
+                        // Currently the only API that works with Google Password Manager
+                        if (signalApiMode === 'direct' || signalApiMode === 'direct+sync') {
+                            synchronizeCredentialsWithSignalUnknown(credentialId);
+                        }
+
+                        // signalAllAcceptedCredentials: syncs remaining credentials
+                        // Currently has no effect on Google Password Manager, kept for future compatibility
+                        if (signalApiMode === 'sync' || signalApiMode === 'direct+sync') {
+                            synchronizeCredentials(
+                                data.user_handle || userHandle,
+                                data.remaining_credential_ids
+                            );
+                        }
                     } catch (parseErr) {
                         // JSON parse failure is non-critical - deletion already succeeded
                         console.warn("Response parse error (non-critical):", parseErr);
