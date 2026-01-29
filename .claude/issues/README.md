@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (8)
+### Open (7)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -16,15 +16,15 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-05` | medium | small | [getClientCapabilities Feature Detection](open/2026-01-30-client-capabilities-detection.md) |
 | `2026-01-30-06` | medium | small | [Passkey Endpoint (.well-known) Support](open/2026-01-30-passkey-endpoint-wellknown.md) |
 | `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
-| `2026-01-29-03` | low | small | [Create Terminology/Glossary Document](open/2026-01-29-terminology-document.md) |
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
 
-### Completed (16)
+### Completed (17)
 
 | ID | Title |
 |----|-------|
 | `2025-01-23-01` | [CI/CD Documentation](completed/2025-01-23-ci-cd-documentation.md) |
 | `2026-01-29-01` | [Change PASSKEY_USER_HANDLE_UNIQUE default to false](completed/2026-01-29-change-user-handle-default.md) |
+| `2026-01-29-03` | [Create Terminology/Glossary Document](completed/2026-01-29-terminology-document.md) |
 | `2026-01-30-04` | [Update README.md with Links and Demo Info](completed/2026-01-30-readme-links-update.md) |
 | `2025-01-23-02` | [CSRF Documentation & Snapshot System](completed/2025-01-23-csrf-docs-snapshot-system.md) |
 | `2026-01-24-02` | [Demo Apps Implementation](completed/2026-01-24-demo-apps-implementation.md) |

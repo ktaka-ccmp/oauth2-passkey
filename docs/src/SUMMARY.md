@@ -81,6 +81,7 @@
 
 # Appendices
 
+- [Terminology and Glossary](appendix/terminology.md)
 - [Security Advisories](appendix/security-advisories.md)
 - [Type-Safe Validation](appendix/type-safe.md)
 - [Storage Pattern](appendix/storage-pattern.md)
