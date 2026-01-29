@@ -275,13 +275,13 @@ Controls user handle generation strategy.
 
 | Value | Behavior |
 |-------|----------|
-| `true` | Generate unique user_handle per credential (allows multiple credentials per user per site) |
 | `false` | Use single user_handle for all credentials for a user (limits to one credential per user per site) |
+| `true` | Generate unique user_handle per credential (allows multiple credentials per user per site) |
 
-- **Default**: `true`
+- **Default**: `false`
 
 ```bash
-PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true
+PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=false
 ```
 
 **Note**: Password managers typically allow only one credential per user identifier. Set to `true` if users need multiple passkeys.

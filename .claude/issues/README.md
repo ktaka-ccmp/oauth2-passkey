@@ -6,27 +6,26 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (11)
+### Open (9)
 
-| ID | Priority | Title |
-|----|----------|-------|
-| `2026-01-23-01` | medium | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
-| `2026-01-29-01` | medium | [Change PASSKEY_USER_HANDLE_UNIQUE default to false](open/2026-01-29-change-user-handle-default.md) |
-| `2026-01-30-01` | medium | [Move /info and /csrf_token to default.rs](open/2026-01-30-move-info-csrf-endpoints.md) |
-| `2026-01-30-02` | medium | [Admin Force Logout Feature](open/2026-01-30-admin-force-logout.md) |
-| `2026-01-30-03` | medium | [Admin Login History View](open/2026-01-30-admin-login-history.md) |
-| `2026-01-30-04` | medium | [Update README.md with Links and Demo Info](open/2026-01-30-readme-links-update.md) |
-| `2026-01-30-05` | medium | [getClientCapabilities Feature Detection](open/2026-01-30-client-capabilities-detection.md) |
-| `2026-01-30-06` | medium | [Passkey Endpoint (.well-known) Support](open/2026-01-30-passkey-endpoint-wellknown.md) |
-| `2026-01-30-07` | medium | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
-| `2026-01-29-03` | low | [Create Terminology/Glossary Document](open/2026-01-29-terminology-document.md) |
-| `2026-01-30-08` | low | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
+| ID | Priority | Difficulty | Title |
+|----|----------|------------|-------|
+| `2026-01-23-01` | medium | large | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
+| `2026-01-30-02` | medium | medium | [Admin Force Logout Feature](open/2026-01-30-admin-force-logout.md) |
+| `2026-01-30-03` | medium | large | [Admin Login History View](open/2026-01-30-admin-login-history.md) |
+| `2026-01-30-04` | medium | small | [Update README.md with Links and Demo Info](open/2026-01-30-readme-links-update.md) |
+| `2026-01-30-05` | medium | small | [getClientCapabilities Feature Detection](open/2026-01-30-client-capabilities-detection.md) |
+| `2026-01-30-06` | medium | small | [Passkey Endpoint (.well-known) Support](open/2026-01-30-passkey-endpoint-wellknown.md) |
+| `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
+| `2026-01-29-03` | low | small | [Create Terminology/Glossary Document](open/2026-01-29-terminology-document.md) |
+| `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
 
-### Completed (13)
+### Completed (15)
 
 | ID | Title |
 |----|-------|
 | `2025-01-23-01` | [CI/CD Documentation](completed/2025-01-23-ci-cd-documentation.md) |
+| `2026-01-29-01` | [Change PASSKEY_USER_HANDLE_UNIQUE default to false](completed/2026-01-29-change-user-handle-default.md) |
 | `2025-01-23-02` | [CSRF Documentation & Snapshot System](completed/2025-01-23-csrf-docs-snapshot-system.md) |
 | `2026-01-24-02` | [Demo Apps Implementation](completed/2026-01-24-demo-apps-implementation.md) |
 | `2026-01-26-01` | [Demo Apps Database Configuration](completed/2026-01-26-demo-apps-db-config.md) |
@@ -39,6 +38,7 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-28-03` | [Fix Windows Hello TPM Attestation (RS1)](completed/2026-01-28-tpm-rs1-attestation-fix.md) |
 | `2026-01-29-02` | [Filter remaining_credential_ids by user_handle](completed/2026-01-29-filter-remaining-credentials.md) |
 | `2026-01-29-04` | [Review SESSION_CONFLICT_POLICY Default](completed/2026-01-29-session-conflict-policy-review.md) |
+| `2026-01-30-01` | [Move /info and /csrf_token to default.rs](completed/2026-01-30-move-info-csrf-endpoints.md) |
 
 ### Deferred (1)
 
@@ -89,6 +89,8 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 ## Status: open | completed | wontfix | deferred
 
 ## Priority: high | medium | low
+
+## Difficulty: small | medium | large
 
 ## Description
 
