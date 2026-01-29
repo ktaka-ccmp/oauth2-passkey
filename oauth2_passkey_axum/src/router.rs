@@ -45,7 +45,7 @@ pub fn oauth2_passkey_router() -> Router {
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```rust,no_run
 /// use axum::Router;
 /// use oauth2_passkey_axum::oauth2_passkey_full_router;
 ///

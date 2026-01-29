@@ -2,7 +2,7 @@
 
 ## ID: 2026-01-30-01
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -35,3 +35,8 @@ Implementation steps:
 
 ## Resolution
 
+Completed on 2026-01-30.
+
+- Moved `/info` and `/csrf_token` handlers from `optional.rs` to `default.rs`
+- These endpoints are now always available regardless of `user-ui` feature flag
+- Cleaned up unused imports in `optional.rs`
