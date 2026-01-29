@@ -15,11 +15,21 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-01` | medium | [Move /info and /csrf_token to default.rs](open/2026-01-30-move-info-csrf-endpoints.md) |
 | `2026-01-29-03` | low | [Create Terminology/Glossary Document](open/2026-01-29-terminology-document.md) |
 
-### Completed (3)
+### Completed (13)
 
 | ID | Title |
 |----|-------|
+| `2025-01-23-01` | [CI/CD Documentation](completed/2025-01-23-ci-cd-documentation.md) |
+| `2025-01-23-02` | [CSRF Documentation & Snapshot System](completed/2025-01-23-csrf-docs-snapshot-system.md) |
+| `2026-01-24-02` | [Demo Apps Implementation](completed/2026-01-24-demo-apps-implementation.md) |
+| `2026-01-26-01` | [Demo Apps Database Configuration](completed/2026-01-26-demo-apps-db-config.md) |
+| `2026-01-26-02` | [Documentation and Demo Cleanup](completed/2026-01-26-docs-and-demos-cleanup.md) |
+| `2026-01-27-01` | [Admin Route Refactoring](completed/2026-01-27-admin-route-refactoring.md) |
+| `2026-01-27-02` | [Unified Router API Design](completed/2026-01-27-unified-router-api.md) |
+| `2026-01-27-03` | [Demo Cleanup & Unification](completed/2026-01-27-demo-cleanup-unification.md) |
 | `2026-01-28-01` | [WebAuthn Signal API Implementation](completed/2026-01-28-signal-api-implementation.md) |
+| `2026-01-28-02` | [Session Conflict Policy Implementation](completed/2026-01-28-session-conflict-policy.md) |
+| `2026-01-28-03` | [Fix Windows Hello TPM Attestation (RS1)](completed/2026-01-28-tpm-rs1-attestation-fix.md) |
 | `2026-01-29-02` | [Filter remaining_credential_ids by user_handle](completed/2026-01-29-filter-remaining-credentials.md) |
 | `2026-01-29-04` | [Review SESSION_CONFLICT_POLICY Default](completed/2026-01-29-session-conflict-policy-review.md) |
 
