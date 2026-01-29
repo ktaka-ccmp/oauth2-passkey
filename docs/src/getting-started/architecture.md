@@ -9,9 +9,11 @@ This chapter describes the architecture of the oauth2-passkey library.
 - **demo-both**: Example Axum application that uses both OAuth2 and passkey authentication
 - **demo-oauth2**: Example Axum application using OAuth2-only authentication
 - **demo-passkey**: Example Axum application using passkey-only authentication
-- **demo-custom-login**: Example Axum application with custom login and summary pages
+- **demo-custom-login**: Example Axum application with custom login and account pages
+- **demo-profile**: Example Axum application demonstrating user profile management
+- **demo-todo**: Example Axum application demonstrating a todo list with authentication
 - **oauth2_passkey_axum**: Provides OAuth2 and passkey authentication handlers for Axum applications
-  - Includes routers for OAuth2, passkey, and user summary endpoints
+  - Includes routers for OAuth2, passkey, and user account endpoints
   - Handles HTTP-specific concerns like request/response handling
 - **oauth2_passkey**: Core authentication coordination library
   - **config**: Environment variable configuration management
@@ -22,6 +24,7 @@ This chapter describes the architecture of the oauth2-passkey library.
   - **storage**: Cache and SQL store providers (PostgreSQL and SQLite support)
   - **userdb**: User database operations, provides user_id management
   - **utils**: Common utility functions
+  - **test_utils**: Testing utilities for unit and integration tests
 
 ## Component Responsibilities
 
