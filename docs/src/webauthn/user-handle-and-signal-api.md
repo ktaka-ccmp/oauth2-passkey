@@ -41,6 +41,8 @@ The WebAuthn Level 3 specification states:
 
 The spec does not mandate whether user handles should be unique per user or per credential. However, the design of discoverable credentials and the Signal API strongly assumes a **one-user-handle-per-user** model.
 
+This library provides an option to generate a unique user handle for each credential. This allows a single user to register multiple credentials from the same authenticator type (e.g., multiple passkeys in Google Password Manager), which would otherwise be prevented by password managers that enforce "one credential per user per RP".
+
 ---
 
 ## `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL`
@@ -52,10 +54,10 @@ The spec does not mandate whether user handles should be unique per user or per 
 PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true
 ```
 
-| Value | Behavior |
-|-------|----------|
-| `true` (default) | Each credential gets a new random 32-character `user_handle` |
-| `false` | All credentials for a user share the same `user_handle` |
+| Value            | `user_handle`         | Credentials per authenticator |
+|------------------|-----------------------|-------------------------------|
+| `true` (default) | Unique per credential | Unlimited                     |
+| `false`          | Shared per user       | One                           |
 
 ### When `true` (Unique Per Credential)
 
@@ -109,6 +111,8 @@ From the authenticator's perspective, these all belong to **the same user**.
 - Password managers may overwrite an existing credential with the same user handle on re-registration
 - The authenticator can group all credentials under one user identity
 - For already-logged-in users, the user_handle is retrieved from the first existing credential
+
+> **Note**: In the deletion rule above, `user_id` refers to the application's internal user identifier (database primary key), not the WebAuthn `user_handle`.
 
 **Source**: `oauth2_passkey/src/passkey/main/register.rs` lines 73-110
 
@@ -177,6 +181,8 @@ The WebAuthn Signal API (part of CTAP 2.1 and WebAuthn Level 3) provides three f
 | `signalAllAcceptedCredentials` | Tell the authenticator which credentials are still valid for a user | Per `userId` (user_handle) |
 | `signalCurrentUserDetails` | Update user metadata (name, display name) in the authenticator | Per `userId` (user_handle) |
 | `signalUnknownCredential` | Tell the authenticator that a specific credential is not recognized | Per `credentialId` |
+
+> **Terminology note**: The Signal API uses `userId` as the parameter name. This is the same value as `user.id` (registration), `userHandle` (authentication response), and `user_handle` (this library's database field). The WebAuthn ecosystem uses different names for this identifier depending on context.
 
 ### Browser Support
 
@@ -372,16 +378,22 @@ signalUnknownCredential({
 
 ## Implementation Strategy
 
-### Key Insight: API Effectiveness by Mode
+### Why Both APIs Are Needed
 
-From the analysis above, we can summarize which APIs work in which mode:
+`signalUnknownCredential` alone is insufficient for full credential synchronization.
 
-| API                            | `true` (unique handle)               | `false` (shared handle)               |
-|--------------------------------|--------------------------------------|---------------------------------------|
-| `signalUnknownCredential`      | Works (scoped by credentialId)       | Works (scoped by credentialId)        |
-| `signalAllAcceptedCredentials` | Limited (only affects one credential)| Works (affects all user's credentials)|
+**Cases where `signalUnknownCredential` cannot help**:
 
-This leads to a simple conclusion: **call both APIs** for credential deletion. Since the APIs are independent, idempotent, and non-conflicting, calling both ensures correct behavior regardless of the user handle strategy:
+- Credential deleted from a browser without Signal API support (e.g., Firefox)
+- Admin deletes credential directly from database
+- Credential revoked for security reasons
+- Any server-side deletion where client doesn't know the deleted ID
+
+In these cases, only `signalAllAcceptedCredentials` can synchronize the authenticator on the next login from a supported browser.
+
+### Dual Approach for Credential Deletion
+
+**Call both APIs** for credential deletion. Since the APIs are independent, idempotent, and non-conflicting, calling both ensures correct behavior regardless of the user handle strategy:
 
 ```javascript
 // After successful credential deletion:
@@ -416,30 +428,6 @@ signalAllAcceptedCredentials({
 #### Ordering
 
 `signalUnknownCredential` is called first. This ensures the deleted credential is flagged immediately, even if the subsequent call fails.
-
-### Login Flow
-
-The login flow uses:
-
-| Event | APIs Used | Notes |
-|-------|-----------|-------|
-| Login success | `signalAllAcceptedCredentials` | Effective for `false`; harmless for `true` |
-| Login failure | `signalUnknownCredential` | Effective for both modes |
-
-No dual approach is needed for login because:
-
-- On success, there is no specific credential to signal as unknown
-- On failure, `signalUnknownCredential` already works correctly for both modes
-
-### Current Implementation
-
-The implementation uses the dual approach for credential deletion:
-
-- `account.js`: `deletePasskeyCredential()` calls both `synchronizeCredentialsWithSignalUnknown(credentialId)` and `synchronizeCredentials(userHandle, remainingCredentialIds)`
-- `passkey.js`: Login success calls `signalAllAcceptedCredentials` via `signalAfterLogin()`; login failure calls `signalUnknownCredential`
-- `conditional_ui.js`: Same as `passkey.js`
-
-All Signal API calls are fire-and-forget (no await on success paths) to avoid blocking page navigation.
 
 ---
 
@@ -555,30 +543,7 @@ await PublicKeyCredential.signalUnknownCredential({
 
 #### After Credential Deletion (`account.js`)
 
-Uses a dual approach for maximum compatibility across both user handle modes.
-Signal API calls are fire-and-forget (no await) to avoid blocking page reload:
-
-```javascript
-const data = await response.json();
-
-// IMPORTANT: These calls are fire-and-forget to avoid blocking page reload.
-// The deletion has already succeeded on the server; Signal API is non-critical.
-
-// Step 1: Signal the specific deleted credential as unknown
-PublicKeyCredential.signalUnknownCredential({
-    rpId: window.location.hostname,
-    credentialId: deletedCredentialId,
-});
-
-// Step 2: Signal remaining accepted credentials
-const userIdBytes = new TextEncoder().encode(data.user_handle);
-const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
-PublicKeyCredential.signalAllAcceptedCredentials({
-    rpId: window.location.hostname,
-    userId: userIdBase64Url,
-    allAcceptedCredentialIds: data.remaining_credential_ids,
-});
-```
+Uses the dual approach described in [Implementation Strategy](#dual-approach-for-credential-deletion). Both `signalUnknownCredential` and `signalAllAcceptedCredentials` are called as fire-and-forget.
 
 ### Encoding Note
 
