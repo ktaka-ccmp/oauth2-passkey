@@ -94,6 +94,8 @@ async function startAuthentication() {
             // allowing the authenticator to remove or mark it as invalid.
             // This API is scoped by credentialId only (not user_handle), so it works correctly
             // regardless of PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting.
+            // Note: This is always called on auth failure regardless of PASSKEY_SIGNAL_API_MODE,
+            // because the credential genuinely doesn't exist on the server.
             // Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
             if (
                 credential.id &&
@@ -160,20 +162,16 @@ async function startAuthentication() {
 // Note: signalCurrentUserDetails is NOT called here because user details don't change during login.
 // It is called in account.js when the user explicitly updates their credential display name.
 //
+// The server controls whether to call this by including credential_ids in the response.
+// When PASSKEY_SIGNAL_API_MODE includes 'sync', the server includes credential_ids.
+//
 // Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
 // See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
 async function signalAfterLogin(data) {
     try {
-        // Only call signalAllAcceptedCredentials if mode includes 'sync'
-        // signalApiMode is set from PASSKEY_SIGNAL_API_MODE environment variable
-        if (typeof signalApiMode === 'undefined' ||
-            (signalApiMode !== 'sync' && signalApiMode !== 'direct+sync')) {
-            return;
-        }
-
         // signalAllAcceptedCredentials: Tell authenticator which credentials are valid
-        // Note: This is scoped by user_handle, so effectiveness depends on
-        // PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting
+        // Only called if server includes credential_ids in the response
+        // (controlled by PASSKEY_SIGNAL_API_MODE on the server)
         if (
             window.PublicKeyCredential &&
             typeof window.PublicKeyCredential.signalAllAcceptedCredentials === "function" &&

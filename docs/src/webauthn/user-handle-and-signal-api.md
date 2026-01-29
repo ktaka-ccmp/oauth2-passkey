@@ -365,9 +365,19 @@ PASSKEY_SIGNAL_API_MODE=direct
 
 | Value | APIs Called | Use Case |
 |-------|-------------|----------|
-| `direct` (default) | `signalUnknownCredential` | **Production** - use this |
-| `sync` | `signalAllAcceptedCredentials` | Testing only - currently no effect |
-| `direct+sync` | Both | Future compatibility testing |
+| `direct` (default) | `signalUnknownCredential` only | **Production** - use this |
+| `sync` | `signalAllAcceptedCredentials` only | Testing `signalAllAcceptedCredentials` in isolation |
+| `direct+sync` | Both APIs | Future compatibility testing |
+
+**Important**: This is a **server-side only** configuration. The client-side behavior is controlled entirely by the server response content:
+
+- Server always includes `signal_api_mode` in responses
+- When mode includes `direct`: Client calls `signalUnknownCredential`
+- When mode includes `sync`: Server also includes `credential_ids` and `user_handle`, client calls `signalAllAcceptedCredentials`
+
+This design means **custom page developers do not need to configure Signal API behavior** -- it's handled automatically by the library.
+
+**Pure `sync` mode**: When set to `sync` (without `direct`), only `signalAllAcceptedCredentials` is called. This is useful for testing whether `signalAllAcceptedCredentials` alone can properly synchronize credentials with the authenticator, without `signalUnknownCredential` interference.
 
 ### Credential Deletion Flow
 
@@ -398,18 +408,21 @@ signalUnknownCredential({
 
 ### Optional: `signalAllAcceptedCredentials` (Future Compatibility)
 
-When `PASSKEY_SIGNAL_API_MODE=direct+sync`, the library also calls `signalAllAcceptedCredentials`:
+When `PASSKEY_SIGNAL_API_MODE` includes `sync`, the server includes `credential_ids` and `user_handle` in responses. The client then calls `signalAllAcceptedCredentials`:
 
 ```javascript
+// Only called if server returns credential_ids in response
 // Currently has no effect on Chrome + GPM, kept for future compatibility
-signalAllAcceptedCredentials({
-    rpId: "example.com",
-    userId: encode(userHandle),
-    allAcceptedCredentialIds: remainingCredentialIds,
-});
+if (data.credential_ids && data.user_handle) {
+    signalAllAcceptedCredentials({
+        rpId: "example.com",
+        userId: encode(data.user_handle),
+        allAcceptedCredentialIds: data.credential_ids,
+    });
+}
 ```
 
-This may work in future browser updates or with different authenticators (iCloud Keychain, etc.).
+This approach eliminates the need for client-side configuration -- the server controls the behavior via response content. This may work in future browser updates or with different authenticators (iCloud Keychain, etc.).
 
 ---
 
@@ -451,15 +464,25 @@ Switching from `true` to `false` requires consideration:
 After successful authentication, the server returns:
 
 ```json
+// When PASSKEY_SIGNAL_API_MODE includes 'sync':
 {
   "name": "alice",
+  "signal_api_mode": "direct+sync",
   "user_handle": "handle_of_authenticated_credential",
   "credential_ids": ["cred_111", "cred_222", "cred_333"]
 }
+
+// When PASSKEY_SIGNAL_API_MODE is 'direct' (default):
+{
+  "name": "alice",
+  "signal_api_mode": "direct"
+}
 ```
 
-- `user_handle`: From the specific credential used for authentication
-- `credential_ids`: All credential IDs for this user (queried by `user_id`, not by `user_handle`)
+- `name`: Always included
+- `signal_api_mode`: Always included (controls whether client calls `signalUnknownCredential`)
+- `user_handle`: Only included when mode includes 'sync'
+- `credential_ids`: Only included when mode includes 'sync' (all credential IDs for this user, queried by `user_id`, not by `user_handle`)
 
 **Source**: `oauth2_passkey/src/coordination/passkey.rs`
 
@@ -476,14 +499,22 @@ pub struct AuthenticationResponse {
 After deleting a credential, the server returns:
 
 ```json
+// When PASSKEY_SIGNAL_API_MODE includes 'sync':
 {
+  "signal_api_mode": "direct+sync",
   "remaining_credential_ids": ["cred_222", "cred_333"],
   "user_handle": "handle_of_deleted_credential"
 }
+
+// When PASSKEY_SIGNAL_API_MODE is 'direct' (default):
+{
+  "signal_api_mode": "direct"
+}
 ```
 
-- `user_handle`: From the deleted credential
-- `remaining_credential_ids`: Credential IDs with the same `user_handle` as the deleted credential (filtered for `signalAllAcceptedCredentials` which is scoped by userId)
+- `signal_api_mode`: Always included (controls whether client calls `signalUnknownCredential`)
+- `user_handle`: Only included when mode includes 'sync' (from the deleted credential)
+- `remaining_credential_ids`: Only included when mode includes 'sync' (credential IDs with the same `user_handle` as the deleted credential, filtered for `signalAllAcceptedCredentials` which is scoped by userId)
 
 **Source**: `oauth2_passkey/src/coordination/passkey.rs`
 
@@ -512,34 +543,50 @@ PublicKeyCredential.signalUnknownCredential({
 
 #### After Credential Deletion (`account.js`)
 
-Remove the deleted credential from the authenticator:
+Remove the deleted credential from the authenticator. The server controls which APIs are called via `signal_api_mode`:
 
 ```javascript
-// Primary: signalUnknownCredential - works with any user_handle strategy
-signalUnknownCredential({
-    rpId: window.location.hostname,
-    credentialId: deletedCredentialId,
-});
+const data = await response.json();
+const mode = data.signal_api_mode || "direct";
 
-// Optional (if PASSKEY_SIGNAL_API_MODE includes 'sync'):
-// signalAllAcceptedCredentials - for future compatibility
+// signalUnknownCredential - only if mode includes 'direct'
+// Works with any user_handle strategy
+if (mode.includes("direct")) {
+    signalUnknownCredential({
+        rpId: window.location.hostname,
+        credentialId: deletedCredentialId,
+    });
+}
+
+// signalAllAcceptedCredentials - only if server returns remaining_credential_ids
+// Server includes these fields when mode includes 'sync'
+if (data.remaining_credential_ids && data.user_handle) {
+    signalAllAcceptedCredentials({
+        rpId: window.location.hostname,
+        userId: encode(data.user_handle),
+        allAcceptedCredentialIds: data.remaining_credential_ids,
+    });
+}
 ```
 
 #### After Successful Login (Optional)
 
-When `PASSKEY_SIGNAL_API_MODE` includes `sync`, the library calls `signalAllAcceptedCredentials` after login:
+When `PASSKEY_SIGNAL_API_MODE` includes `sync`, the server includes `credential_ids` and `user_handle` in the authentication response. The client detects this and calls `signalAllAcceptedCredentials`:
 
 ```javascript
-// Only called if signalApiMode === 'sync' or 'direct+sync'
+// Server controls whether this is called by including credential_ids in response
+// No client-side configuration needed
 // Currently has no effect on Chrome + GPM
-const userIdBytes = new TextEncoder().encode(data.user_handle);
-const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
+if (data.credential_ids && data.user_handle) {
+    const userIdBytes = new TextEncoder().encode(data.user_handle);
+    const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
 
-PublicKeyCredential.signalAllAcceptedCredentials({
-    rpId: window.location.hostname,
-    userId: userIdBase64Url,
-    allAcceptedCredentialIds: data.credential_ids,
-});
+    PublicKeyCredential.signalAllAcceptedCredentials({
+        rpId: window.location.hostname,
+        userId: userIdBase64Url,
+        allAcceptedCredentialIds: data.credential_ids,
+    });
+}
 ```
 
 ### Encoding Note

@@ -15,9 +15,8 @@ use std::{
 use serde_json::{Value, json};
 
 use oauth2_passkey::{
-    AuthenticatorInfo, O2P_ROUTE_PREFIX, PASSKEY_SIGNAL_API_MODE, UserId,
-    generate_page_session_token, get_authenticator_info_batch, list_accounts_core,
-    list_credentials_core,
+    AuthenticatorInfo, O2P_ROUTE_PREFIX, UserId, generate_page_session_token,
+    get_authenticator_info_batch, list_accounts_core, list_credentials_core,
 };
 
 use crate::config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT};
@@ -39,7 +38,6 @@ struct LoginTemplate<'a> {
     message: &'a str,
     o2p_route_prefix: &'a str,
     custom_css_url: Option<&'a str>,
-    signal_api_mode: &'a str,
 }
 
 async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
@@ -50,7 +48,6 @@ async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
                 message: "Sign in or create an account",
                 o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
                 custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
-                signal_api_mode: PASSKEY_SIGNAL_API_MODE.as_str(),
             };
             let html = Html(
                 template
@@ -115,7 +112,6 @@ struct UserAccountTemplate {
     pub o2p_default_redirect: String,
     pub page_session_token: String,
     pub custom_css_url: Option<String>,
-    pub signal_api_mode: String,
 }
 
 impl UserAccountTemplate {
@@ -126,7 +122,6 @@ impl UserAccountTemplate {
         o2p_route_prefix: String,
         o2p_default_redirect: String,
         custom_css_url: Option<String>,
-        signal_api_mode: String,
     ) -> Self {
         let page_session_token = generate_page_session_token(&user.csrf_token);
 
@@ -146,7 +141,6 @@ impl UserAccountTemplate {
             o2p_default_redirect,
             page_session_token,
             custom_css_url,
-            signal_api_mode,
         }
     }
 }
@@ -289,7 +283,6 @@ async fn user_account(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, 
         O2P_ROUTE_PREFIX.to_string(),
         O2P_DEFAULT_REDIRECT.to_string(),
         O2P_CUSTOM_CSS_URL.clone(),
-        PASSKEY_SIGNAL_API_MODE.to_string(),
     );
 
     // Render the template
