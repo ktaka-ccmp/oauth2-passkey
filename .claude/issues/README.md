@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (10)
+### Open (11)
 
 | ID | Priority | Title |
 |----|----------|-------|
@@ -20,6 +20,7 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-06` | medium | [Passkey Endpoint (.well-known) Support](open/2026-01-30-passkey-endpoint-wellknown.md) |
 | `2026-01-30-07` | medium | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
 | `2026-01-29-03` | low | [Create Terminology/Glossary Document](open/2026-01-29-terminology-document.md) |
+| `2026-01-30-08` | low | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
 
 ### Completed (13)
 
