@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (7)
+### Open (10)
 
 | ID | Priority | Title |
 |----|----------|-------|
@@ -16,6 +16,9 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-02` | medium | [Admin Force Logout Feature](open/2026-01-30-admin-force-logout.md) |
 | `2026-01-30-03` | medium | [Admin Login History View](open/2026-01-30-admin-login-history.md) |
 | `2026-01-30-04` | medium | [Update README.md with Links and Demo Info](open/2026-01-30-readme-links-update.md) |
+| `2026-01-30-05` | medium | [getClientCapabilities Feature Detection](open/2026-01-30-client-capabilities-detection.md) |
+| `2026-01-30-06` | medium | [Passkey Endpoint (.well-known) Support](open/2026-01-30-passkey-endpoint-wellknown.md) |
+| `2026-01-30-07` | medium | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
 | `2026-01-29-03` | low | [Create Terminology/Glossary Document](open/2026-01-29-terminology-document.md) |
 
 ### Completed (13)
