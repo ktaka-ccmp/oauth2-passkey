@@ -50,14 +50,14 @@ This library provides an option to generate a unique user handle for each creden
 ### Configuration
 
 ```bash
-# Default: true
-PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true
+# Default: false
+PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=false
 ```
 
-| Value            | `user_handle`         | Credentials per authenticator |
-|------------------|-----------------------|-------------------------------|
-| `true` (default) | Unique per credential | Unlimited                     |
-| `false`          | Shared per user       | One                           |
+| Value             | `user_handle`         | Credentials per authenticator |
+|-------------------|--------------------------------------|-------------------------------|
+| `false` (default) | Shared per user                      | One                           |
+| `true`            | Unique per credential                | Unlimited                     |
 
 ### When `true` (Unique Per Credential)
 

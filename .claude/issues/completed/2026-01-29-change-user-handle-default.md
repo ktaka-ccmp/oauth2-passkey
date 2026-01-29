@@ -2,9 +2,11 @@
 
 ## ID: 2026-01-29-01
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
+
+## Difficulty: small
 
 ## Description
 
@@ -12,9 +14,12 @@ Change `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` default from `true` to 
 
 ## Related Files
 
-- `oauth2_passkey/src/env_var.rs` - Change default value
+- `oauth2_passkey/src/passkey/config.rs` - Change default value
 - `docs/src/webauthn/user-handle-and-signal-api.md` - Update documentation
+- `docs/src/integration/configuration.md` - Update config reference
+- `docs/src/integration/passkey.md` - Update config table
 - `dot.env.example` - Update example config
+- `CHANGELOG.md` - Document breaking change
 
 ## Notes
 
@@ -45,29 +50,16 @@ From session 2026-01-29:
 - Migration guide in release notes
 - Prominent warning about credential replacement
 
-**Implementation Plan**:
-
-Step 1: Change default value in `oauth2_passkey/src/env_var.rs`:
-```rust
-// Before
-env_var_bool("PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL", true)
-// After
-env_var_bool("PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL", false)
-```
-
-Step 2: Update documentation table in `user-handle-and-signal-api.md`:
-```markdown
-| `false` (default) | Shared per user | One |
-| `true` | Unique per credential | Unlimited |
-```
-
-Step 3: Update `dot.env.example`:
-```bash
-# Uncomment to allow multiple credentials per authenticator type
-# PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true
-```
-
-Step 4: Add migration note to CHANGELOG/release notes
-
 ## Resolution
 
+Implemented in branch `dev-2026-01-29-01`:
+
+1. Changed default from `true` to `false` in `oauth2_passkey/src/passkey/config.rs`
+2. Updated all documentation to reflect new default:
+   - `docs/src/webauthn/user-handle-and-signal-api.md`
+   - `docs/src/integration/configuration.md`
+   - `docs/src/integration/passkey.md`
+3. Updated `dot.env.example` with new default and clarified comments
+4. Added BREAKING CHANGE entry in `CHANGELOG.md`
+
+All tests pass. Existing credentials are not affected; only newly registered credentials use the new default.

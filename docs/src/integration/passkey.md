@@ -656,7 +656,7 @@ let app = Router::new()
 | `PASSKEY_RESIDENT_KEY` | `required` | Resident key requirement (`required`, `preferred`, `discouraged`) |
 | `PASSKEY_REQUIRE_RESIDENT_KEY` | `true` | Require resident/discoverable credentials |
 | `PASSKEY_USER_VERIFICATION` | `discouraged` | User verification (`required`, `preferred`, `discouraged`) |
-| `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` | `true` | Generate unique user handle per credential |
+| `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` | `false` | Use single user handle per user (set to `true` for unique per credential) |
 | `PASSKEY_USER_ACCOUNT_FIELD` | `name` | Field to use for user account (`name` or `display_name`) |
 | `PASSKEY_USER_LABEL_FIELD` | `display_name` | Field to use for user label (`name` or `display_name`) |
 
