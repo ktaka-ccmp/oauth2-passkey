@@ -39,5 +39,17 @@ From session 2026-01-23:
 - Bearer mode: No CSRF needed (token is proof of possession)
 - Both mode: CSRF required only for cookie requests
 
+**Key Decisions**:
+1. Reuse existing 32-byte session token (no storage layer changes)
+2. Same security strength (cryptographically secure random)
+3. Complexity: Medium (6 files to modify)
+
+**Reference Files**:
+- `oauth2_passkey/src/session/main/session.rs` - Session management core
+- `oauth2_passkey/src/session/config.rs` - Configuration
+- `oauth2_passkey_axum/src/session.rs` - Axum AuthUser extractor
+- `oauth2_passkey/src/coordination/oauth2.rs` - OAuth2 flow
+- `oauth2_passkey/src/coordination/passkey.rs` - Passkey flow
+
 ## Resolution
 

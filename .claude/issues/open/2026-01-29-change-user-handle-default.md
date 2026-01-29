@@ -45,5 +45,29 @@ From session 2026-01-29:
 - Migration guide in release notes
 - Prominent warning about credential replacement
 
+**Implementation Plan**:
+
+Step 1: Change default value in `oauth2_passkey/src/env_var.rs`:
+```rust
+// Before
+env_var_bool("PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL", true)
+// After
+env_var_bool("PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL", false)
+```
+
+Step 2: Update documentation table in `user-handle-and-signal-api.md`:
+```markdown
+| `false` (default) | Shared per user | One |
+| `true` | Unique per credential | Unlimited |
+```
+
+Step 3: Update `dot.env.example`:
+```bash
+# Uncomment to allow multiple credentials per authenticator type
+# PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true
+```
+
+Step 4: Add migration note to CHANGELOG/release notes
+
 ## Resolution
 

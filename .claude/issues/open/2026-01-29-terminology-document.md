@@ -36,5 +36,36 @@ From session 2026-01-29:
 
 **Note**: `user_handle`, `user.id`, `userHandle`, `userId` = same value. `user_id` is different.
 
+**Credential Identifiers**:
+| Term | Context | Description |
+|------|---------|-------------|
+| `credential_id` | This library (DB) | Base64URL-encoded credential identifier |
+| `credentialId` | WebAuthn/Signal API | Raw credential identifier |
+| `id` | `PublicKeyCredential` | Same as credentialId |
+
+**Relationship Diagram**:
+```
+Application Database:
+┌─────────────────────────────────────────────┐
+│ users table                                 │
+│   user_id (PK) ──────────────────┐          │
+│   name, email                    │          │
+└──────────────────────────────────│──────────┘
+                                   ▼
+┌─────────────────────────────────────────────┐
+│ passkey_credentials table                   │
+│   credential_id (PK)                        │
+│   user_id (FK) ◄─────────────────┘          │
+│   user_handle ─────► WebAuthn user.id       │
+│   public_key, aaguid                        │
+└─────────────────────────────────────────────┘
+
+WebAuthn Term Aliases:
+  Registration:   user.id ────┐
+  Authentication: userHandle ─┼──► Same value
+  Signal API:     userId ─────┘
+  This library:   user_handle ┘
+```
+
 ## Resolution
 
