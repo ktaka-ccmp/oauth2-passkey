@@ -6,13 +6,16 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (4)
+### Open (7)
 
 | ID | Priority | Title |
 |----|----------|-------|
 | `2026-01-23-01` | medium | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
 | `2026-01-29-01` | medium | [Change PASSKEY_USER_HANDLE_UNIQUE default to false](open/2026-01-29-change-user-handle-default.md) |
 | `2026-01-30-01` | medium | [Move /info and /csrf_token to default.rs](open/2026-01-30-move-info-csrf-endpoints.md) |
+| `2026-01-30-02` | medium | [Admin Force Logout Feature](open/2026-01-30-admin-force-logout.md) |
+| `2026-01-30-03` | medium | [Admin Login History View](open/2026-01-30-admin-login-history.md) |
+| `2026-01-30-04` | medium | [Update README.md with Links and Demo Info](open/2026-01-30-readme-links-update.md) |
 | `2026-01-29-03` | low | [Create Terminology/Glossary Document](open/2026-01-29-terminology-document.md) |
 
 ### Completed (13)
