@@ -1,6 +1,6 @@
 # demo-custom-login
 
-This demo demonstrates how to create **fully custom login, summary, and admin pages** with your own design while using the `oauth2-passkey` library for authentication.
+This demo demonstrates how to create **fully custom login, account, and admin pages** with your own design while using the `oauth2-passkey` library for authentication.
 
 ## Key Concept
 
@@ -48,7 +48,7 @@ The login page is completely custom-designed:
 - Full control over HTML, CSS, and layout
 - Integrates with OAuth2 and Passkey authentication
 
-### Custom Summary Page (`/summary`)
+### Custom Account Page (`/account`)
 
 A custom user account page showing:
 - User profile information with edit functionality
@@ -88,7 +88,7 @@ The custom login page uses these JavaScript functions:
 | `/` | Home page (different content for auth/anon users) |
 | `/login` | Custom login page |
 | `/protected` | Protected page (requires auth) |
-| `/summary` | Custom user summary page |
+| `/account` | Custom user account page |
 | `/admin` | Custom admin user list (admin only) |
 | `/admin/user/{id}` | Custom admin user detail (admin only) |
 
@@ -101,8 +101,8 @@ demo-custom-login/
 │   └── server.rs        # HTTP/HTTPS server setup
 ├── templates/
 │   ├── login.j2         # Custom login page
-│   ├── summary.j2       # Custom user summary page
-│   ├── admin_list.j2    # Custom admin user list
+│   ├── account.j2       # Custom user account page
+│   ├── admin_index.j2   # Custom admin user list
 │   ├── admin_user.j2    # Custom admin user detail
 │   ├── index_anon.j2    # Index for anonymous users
 │   ├── index_user.j2    # Index for authenticated users

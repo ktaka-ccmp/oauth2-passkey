@@ -111,6 +111,8 @@ function base64URLToUint8Array(base64URL) {
                     // allowing the authenticator to remove or mark it as invalid.
                     // This API is scoped by credentialId only (not user_handle), so it works correctly
                     // regardless of PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting.
+                    // Note: This is always called on auth failure regardless of PASSKEY_SIGNAL_API_MODE,
+                    // because the credential genuinely doesn't exist on the server.
                     // Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
                     if (
                         credential.id &&
@@ -146,15 +148,16 @@ function base64URLToUint8Array(base64URL) {
                 // - When true: Only the authenticated credential is affected (limited usefulness)
                 // - When false: All credentials for the user are synchronized
                 //
+                // The server controls whether to call this by including credential_ids in the response.
+                // When PASSKEY_SIGNAL_API_MODE includes 'sync', the server includes credential_ids.
+                //
                 // Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
                 // See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
                 try {
                     const data = await authResponse.json();
-                    // Only call signalAllAcceptedCredentials if mode includes 'sync'
-                    // signalApiMode is set from PASSKEY_SIGNAL_API_MODE environment variable
+                    // Only call signalAllAcceptedCredentials if server includes credential_ids
+                    // (controlled by PASSKEY_SIGNAL_API_MODE on the server)
                     if (
-                        typeof signalApiMode !== 'undefined' &&
-                        (signalApiMode === 'sync' || signalApiMode === 'direct+sync') &&
                         window.PublicKeyCredential &&
                         typeof window.PublicKeyCredential.signalAllAcceptedCredentials === "function" &&
                         data.user_handle && data.credential_ids

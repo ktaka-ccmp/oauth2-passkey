@@ -118,15 +118,21 @@ async fn handle_finish_authentication(
         .into_response_error()?;
 
     // Return the headers and authentication data as JSON
-    // Includes credential IDs and user handle for WebAuthn Signal API synchronization
-    Ok((
-        headers,
-        Json(serde_json::json!({
-            "name": auth_data.name,
-            "user_handle": auth_data.user_handle,
-            "credential_ids": auth_data.credential_ids,
-        })),
-    ))
+    // Include credential_ids and user_handle only when PASSKEY_SIGNAL_API_MODE includes 'sync'
+    // This controls whether the client calls signalAllAcceptedCredentials
+    // Include signal_api_mode to control whether client calls signalUnknownCredential
+    let mut response = serde_json::json!({
+        "name": auth_data.name,
+        "signal_api_mode": PASSKEY_SIGNAL_API_MODE.as_str(),
+    });
+
+    // Add credential sync data only when mode includes 'sync'
+    if PASSKEY_SIGNAL_API_MODE.contains("sync") {
+        response["user_handle"] = serde_json::json!(auth_data.user_handle);
+        response["credential_ids"] = serde_json::json!(auth_data.credential_ids);
+    }
+
+    Ok((headers, Json(response)))
 }
 
 async fn serve_passkey_js() -> Response {
@@ -143,14 +149,12 @@ async fn serve_passkey_js() -> Response {
 struct ConditionalUiTemplate<'a> {
     o2p_route_prefix: &'a str,
     custom_css_url: Option<&'a str>,
-    signal_api_mode: &'a str,
 }
 
 async fn conditional_ui() -> impl IntoResponse {
     let template = ConditionalUiTemplate {
         o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
         custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
-        signal_api_mode: PASSKEY_SIGNAL_API_MODE.as_str(),
     };
     match template.render() {
         Ok(html) => (StatusCode::OK, Html(html)).into_response(),
@@ -205,10 +209,21 @@ async fn delete_passkey_credential(
         .await
         .into_response_error()?;
 
-    Ok(Json(serde_json::json!({
-        "remaining_credential_ids": response.remaining_credential_ids,
-        "user_handle": response.user_handle,
-    })))
+    // Include remaining_credential_ids and user_handle only when PASSKEY_SIGNAL_API_MODE includes 'sync'
+    // This controls whether the client calls signalAllAcceptedCredentials
+    // Include signal_api_mode to control whether client calls signalUnknownCredential
+    let mut response_json = serde_json::json!({
+        "signal_api_mode": PASSKEY_SIGNAL_API_MODE.as_str(),
+    });
+
+    // Add credential sync data only when mode includes 'sync'
+    if PASSKEY_SIGNAL_API_MODE.contains("sync") {
+        response_json["remaining_credential_ids"] =
+            serde_json::json!(response.remaining_credential_ids);
+        response_json["user_handle"] = serde_json::json!(response.user_handle);
+    }
+
+    Ok(Json(response_json))
 }
 
 async fn serve_related_origin() -> Response {
