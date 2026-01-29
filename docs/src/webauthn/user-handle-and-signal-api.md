@@ -281,16 +281,9 @@ signalAllAcceptedCredentials({
     userId: encode("aliceHandle123"),
     allAcceptedCredentialIds: ["cred_111", "cred_222", "cred_333"],
 });
-
-signalCurrentUserDetails({
-    rpId: "example.com",
-    userId: encode("aliceHandle123"),
-    name: "alice@example.com",
-    displayName: "Alice",
-});
 ```
 
-**Result**: Correct. All credentials are confirmed as valid, and display names are updated for all.
+**Result**: Correct. All credentials are confirmed as valid.
 
 #### Login Failure
 
@@ -355,17 +348,6 @@ The authenticator:
 
 **Result**: Only confirms the credential that was just used for login. Cannot synchronize other credentials.
 
-```javascript
-signalCurrentUserDetails({
-    rpId: "example.com",
-    userId: encode("handle_bbb"),
-    name: "alice@example.com",
-    displayName: "Alice",
-});
-```
-
-**Result**: Only updates display info for credential B. Credentials A and C are not updated.
-
 #### Login Failure
 
 ```javascript
@@ -383,44 +365,33 @@ signalUnknownCredential({
 |------------|-----------------|-------------------|
 | `signalAllAcceptedCredentials` (deletion) | Only removes the deleted credential; remaining IDs are noise | Correctly removes deleted credential and confirms remaining ones |
 | `signalAllAcceptedCredentials` (login) | Only confirms the one authenticated credential | Confirms all credentials for the user |
-| `signalCurrentUserDetails` (login) | Updates only one credential's display info | Updates all credentials' display info |
+| `signalCurrentUserDetails` (name update) | Updates only one credential's display info | Updates all credentials' display info |
 | `signalUnknownCredential` (login failure) | Works correctly | Works correctly |
 
 ---
 
-## Optimal Signal API Strategy by Mode
+## Implementation Strategy
 
-### Per-Mode Optimal Strategy
+### Key Insight: API Effectiveness by Mode
 
-If each mode were optimized independently:
+From the analysis above, we can summarize which APIs work in which mode:
 
-**For `false` (Shared User Handle)**:
+| API                            | `true` (unique handle)               | `false` (shared handle)               |
+|--------------------------------|--------------------------------------|---------------------------------------|
+| `signalUnknownCredential`      | Works (scoped by credentialId)       | Works (scoped by credentialId)        |
+| `signalAllAcceptedCredentials` | Limited (only affects one credential)| Works (affects all user's credentials)|
 
-| Event | Recommended API | Data |
-|-------|----------------|------|
-| Credential deletion | `signalAllAcceptedCredentials` | userId + remaining credential IDs |
-| Login success | `signalAllAcceptedCredentials` + `signalCurrentUserDetails` | userId + all credential IDs + user details |
-| Login failure | `signalUnknownCredential` | credential ID |
-
-**For `true` (Unique Per Credential)**:
-
-| Event | Recommended API | Data |
-|-------|----------------|------|
-| Credential deletion | `signalUnknownCredential` | deleted credential ID |
-| Login success | (minimal benefit) | -- |
-| Login failure | `signalUnknownCredential` | credential ID |
-
-### Dual Approach: Combining Both APIs for Credential Deletion
-
-Rather than branching behavior based on the `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` setting, both `signalUnknownCredential` and `signalAllAcceptedCredentials` can be called together. The two APIs are independent, idempotent, and non-conflicting:
+This leads to a simple conclusion: **call both APIs** for credential deletion. Since the APIs are independent, idempotent, and non-conflicting, calling both ensures correct behavior regardless of the user handle strategy:
 
 ```javascript
 // After successful credential deletion:
+// IMPORTANT: These calls are fire-and-forget (no await) to avoid blocking page reload.
+// The deletion has already succeeded on the server; Signal API is non-critical.
 
 // 1. signalUnknownCredential: directly target the deleted credential
 //    - Works correctly in BOTH modes (true and false)
 //    - Scoped by credentialId, independent of user_handle
-await signalUnknownCredential({
+signalUnknownCredential({
     rpId: "example.com",
     credentialId: deletedCredentialId,
 });
@@ -428,38 +399,31 @@ await signalUnknownCredential({
 // 2. signalAllAcceptedCredentials: sync remaining credentials
 //    - Fully effective when false (shared user_handle)
 //    - Harmless but redundant when true (unique user_handle)
-await signalAllAcceptedCredentials({
+signalAllAcceptedCredentials({
     rpId: "example.com",
     userId: encode(userHandle),
     allAcceptedCredentialIds: remainingCredentialIds,
 });
 ```
 
-#### Why the dual approach works
+#### Result by Mode
 
-| Step | `true` (unique handle) | `false` (shared handle) |
-|------|------------------------|-------------------------|
-| `signalUnknownCredential(deletedId)` | Directly removes the deleted credential | Directly removes the deleted credential |
-| `signalAllAcceptedCredentials(handle, remainingIds)` | Redundant removal (same credential); remaining IDs ignored (different handles) | Confirms remaining credentials; catches any other stale credentials |
-| **Combined result** | Deleted credential removed | Deleted credential removed + full sync |
+| Mode    | `signalUnknownCredential`  | `signalAllAcceptedCredentials`         | Combined                           |
+|---------|----------------------------|----------------------------------------|------------------------------------|
+| `true`  | Removes deleted credential | Harmless (no-op for other credentials) | Deleted credential removed         |
+| `false` | Removes deleted credential | Confirms remaining credentials         | Deleted credential removed + full sync |
 
-The dual approach provides the **best of both strategies**:
+#### Ordering
 
-- **For `true`**: `signalUnknownCredential` does the real work; `signalAllAcceptedCredentials` is harmless overhead
-- **For `false`**: Both APIs contribute; `signalAllAcceptedCredentials` provides the comprehensive sync that `signalUnknownCredential` alone cannot
-- **No branching needed**: The same code path works optimally regardless of the configuration setting
+`signalUnknownCredential` is called first. This ensures the deleted credential is flagged immediately, even if the subsequent call fails.
 
-#### Ordering consideration
+### Login Flow
 
-`signalUnknownCredential` should be called **before** `signalAllAcceptedCredentials`. This ensures the deleted credential is immediately flagged, even if the subsequent `signalAllAcceptedCredentials` call fails for any reason.
-
-### Login Flow (No Change Needed)
-
-The login flow already uses the appropriate APIs:
+The login flow uses:
 
 | Event | APIs Used | Notes |
 |-------|-----------|-------|
-| Login success | `signalAllAcceptedCredentials` + `signalCurrentUserDetails` | Effective for `false`; harmless for `true` |
+| Login success | `signalAllAcceptedCredentials` | Effective for `false`; harmless for `true` |
 | Login failure | `signalUnknownCredential` | Effective for both modes |
 
 No dual approach is needed for login because:
@@ -467,11 +431,15 @@ No dual approach is needed for login because:
 - On success, there is no specific credential to signal as unknown
 - On failure, `signalUnknownCredential` already works correctly for both modes
 
-### Current Implementation Status
+### Current Implementation
 
-The credential deletion flow currently uses only `signalAllAcceptedCredentials`. The `synchronizeCredentialsWithSignalUnknown` function exists in `account.js` but is not called during deletion.
+The implementation uses the dual approach for credential deletion:
 
-Adding the dual approach requires only a client-side change: call `synchronizeCredentialsWithSignalUnknown(credentialId)` before `synchronizeCredentials(userHandle, remainingCredentialIds)` in the `deletePasskeyCredential` function. No server-side changes are needed.
+- `account.js`: `deletePasskeyCredential()` calls both `synchronizeCredentialsWithSignalUnknown(credentialId)` and `synchronizeCredentials(userHandle, remainingCredentialIds)`
+- `passkey.js`: Login success calls `signalAllAcceptedCredentials` via `signalAfterLogin()`; login failure calls `signalUnknownCredential`
+- `conditional_ui.js`: Same as `passkey.js`
+
+All Signal API calls are fire-and-forget (no await on success paths) to avoid blocking page navigation.
 
 ---
 
@@ -559,22 +527,20 @@ pub struct DeleteCredentialResponse {
 
 #### After Successful Login (`passkey.js`, `conditional_ui.js`)
 
+Signal API calls are fire-and-forget (no await) to avoid blocking page navigation:
+
 ```javascript
-// signalAllAcceptedCredentials
+// IMPORTANT: This call is fire-and-forget to avoid blocking page reload.
+// The login has already succeeded on the server; Signal API is non-critical.
+
 const userIdBytes = new TextEncoder().encode(data.user_handle);
 const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
-await PublicKeyCredential.signalAllAcceptedCredentials({
+
+// signalAllAcceptedCredentials: Tell authenticator which credentials are valid
+PublicKeyCredential.signalAllAcceptedCredentials({
     rpId: window.location.hostname,
     userId: userIdBase64Url,
     allAcceptedCredentialIds: data.credential_ids,
-});
-
-// signalCurrentUserDetails
-await PublicKeyCredential.signalCurrentUserDetails({
-    rpId: window.location.hostname,
-    userId: userIdBase64Url,
-    name: data.name,
-    displayName: data.name,
 });
 ```
 
@@ -589,13 +555,17 @@ await PublicKeyCredential.signalUnknownCredential({
 
 #### After Credential Deletion (`account.js`)
 
-Uses a dual approach for maximum compatibility across both user handle modes:
+Uses a dual approach for maximum compatibility across both user handle modes.
+Signal API calls are fire-and-forget (no await) to avoid blocking page reload:
 
 ```javascript
 const data = await response.json();
 
+// IMPORTANT: These calls are fire-and-forget to avoid blocking page reload.
+// The deletion has already succeeded on the server; Signal API is non-critical.
+
 // Step 1: Signal the specific deleted credential as unknown
-await PublicKeyCredential.signalUnknownCredential({
+PublicKeyCredential.signalUnknownCredential({
     rpId: window.location.hostname,
     credentialId: deletedCredentialId,
 });
@@ -603,7 +573,7 @@ await PublicKeyCredential.signalUnknownCredential({
 // Step 2: Signal remaining accepted credentials
 const userIdBytes = new TextEncoder().encode(data.user_handle);
 const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
-await PublicKeyCredential.signalAllAcceptedCredentials({
+PublicKeyCredential.signalAllAcceptedCredentials({
     rpId: window.location.hostname,
     userId: userIdBase64Url,
     allAcceptedCredentialIds: data.remaining_credential_ids,

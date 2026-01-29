@@ -152,15 +152,13 @@ async function startAuthentication() {
 // - Awaiting can block page reload on iOS Safari and other browsers where the API may be slow
 // - User experience should not be degraded by optional sync features
 //
-// Calls two Signal APIs:
-// 1. signalAllAcceptedCredentials: Tells the authenticator which credentials are valid for this user.
-//    - Scoped by userId (user_handle) - only affects credentials with matching user_handle
-//    - When PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true, only the authenticated credential is affected
-//    - When false, all credentials for the user are synchronized
+// signalAllAcceptedCredentials: Tells the authenticator which credentials are valid for this user.
+// - Scoped by userId (user_handle) - only affects credentials with matching user_handle
+// - When PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true, only the authenticated credential is affected
+// - When false, all credentials for the user are synchronized
 //
-// 2. signalCurrentUserDetails: Updates the user's display name in the authenticator.
-//    - Also scoped by userId (user_handle)
-//    - Same scope limitations as signalAllAcceptedCredentials
+// Note: signalCurrentUserDetails is NOT called here because user details don't change during login.
+// It is called in account.js when the user explicitly updates their credential display name.
 //
 // Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
 // See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
@@ -182,24 +180,6 @@ async function signalAfterLogin(data) {
                 allAcceptedCredentialIds: data.credential_ids,
             });
             console.log("signalAllAcceptedCredentials: signaled", data.credential_ids.length, "credentials");
-        }
-
-        // signalCurrentUserDetails: Update user's display name in the authenticator
-        // Note: Also scoped by user_handle
-        if (
-            window.PublicKeyCredential &&
-            typeof window.PublicKeyCredential.signalCurrentUserDetails === "function" &&
-            data.user_handle && data.name
-        ) {
-            const userIdBytes = new TextEncoder().encode(data.user_handle);
-            const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
-            await window.PublicKeyCredential.signalCurrentUserDetails({
-                rpId: window.location.hostname,
-                userId: userIdBase64Url,
-                name: data.name,
-                displayName: data.name,
-            });
-            console.log("signalCurrentUserDetails: updated user details");
         }
     } catch (err) {
         console.warn("Signal API error (non-critical):", err);
