@@ -106,7 +106,12 @@ function base64URLToUint8Array(base64URL) {
                 if (!authResponse.ok) {
                     const errorText = await authResponse.text();
 
-                    // Signal unknown credential to the authenticator
+                    // Signal unknown credential to the authenticator (WebAuthn Signal API).
+                    // This tells the authenticator that this credential is not recognized by the server,
+                    // allowing the authenticator to remove or mark it as invalid.
+                    // This API is scoped by credentialId only (not user_handle), so it works correctly
+                    // regardless of PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting.
+                    // Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
                     if (
                         credential.id &&
                         window.PublicKeyCredential &&
@@ -126,7 +131,23 @@ function base64URLToUint8Array(base64URL) {
                     throw new Error('Verification failed: ' + errorText);
                 }
 
-                // Synchronize credentials with authenticator via Signal API
+                // Authentication successful
+                // Synchronize credentials with authenticator via Signal API (WebAuthn Signal API).
+                //
+                // FIRE-AND-FORGET: We deliberately don't await signalAllAcceptedCredentials because:
+                // - The login has already succeeded on the server
+                // - Signal API is non-critical - just a best-effort hint to the authenticator
+                // - Awaiting can block page redirect on iOS Safari and other browsers where the API may be slow
+                // - User experience should not be degraded by optional sync features
+                //
+                // signalAllAcceptedCredentials tells the authenticator which credentials are valid for this user.
+                // It's scoped by userId (user_handle), so effectiveness depends on
+                // PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting:
+                // - When true: Only the authenticated credential is affected (limited usefulness)
+                // - When false: All credentials for the user are synchronized
+                //
+                // Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
+                // See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
                 try {
                     const data = await authResponse.json();
                     if (
@@ -136,17 +157,23 @@ function base64URLToUint8Array(base64URL) {
                     ) {
                         const userIdBytes = new TextEncoder().encode(data.user_handle);
                         const userIdBase64Url = arrayBufferToBase64URL(userIdBytes.buffer);
-                        await window.PublicKeyCredential.signalAllAcceptedCredentials({
+                        // Don't await - fire-and-forget to avoid blocking page redirect
+                        window.PublicKeyCredential.signalAllAcceptedCredentials({
                             rpId: window.location.hostname,
                             userId: userIdBase64Url,
                             allAcceptedCredentialIds: data.credential_ids,
+                        }).then(() => {
+                            console.log("signalAllAcceptedCredentials: signaled", data.credential_ids.length, "credentials");
+                        }).catch((err) => {
+                            console.warn("signalAllAcceptedCredentials error (non-critical):", err);
                         });
-                        console.log("signalAllAcceptedCredentials: signaled", data.credential_ids.length, "credentials");
                     }
-                } catch (signalErr) {
-                    console.warn("Signal API error (non-critical):", signalErr);
+                } catch (parseErr) {
+                    // JSON parse failure is non-critical - login already succeeded
+                    console.warn("Response parse error (non-critical):", parseErr);
                 }
 
+                // Proceed immediately with redirect - don't wait for Signal API
                 window.location.href = '/';
             }
         } catch (error) {

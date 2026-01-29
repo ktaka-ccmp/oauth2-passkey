@@ -89,7 +89,12 @@ async function startAuthentication() {
             console.error('Authentication failed:', verifyResponse.status, verifyResponse.statusText);
             const errorText = await verifyResponse.text();
 
-            // Signal unknown credential if the server doesn't recognize it
+            // Signal unknown credential to the authenticator (WebAuthn Signal API).
+            // This tells the authenticator that this credential is not recognized by the server,
+            // allowing the authenticator to remove or mark it as invalid.
+            // This API is scoped by credentialId only (not user_handle), so it works correctly
+            // regardless of PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting.
+            // Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
             if (
                 credential.id &&
                 window.PublicKeyCredential &&
@@ -110,16 +115,27 @@ async function startAuthentication() {
             return;
         }
 
-        // Response is OK, handle success
-        const data = await verifyResponse.json();
-
-        if (authStatus) {
-            authStatus.textContent = `Welcome back ${data.name}!`;
+        // Authentication successful
+        // Server returns JSON: { name: "...", user_handle: "...", credential_ids: [...] }
+        let userName = '';
+        try {
+            const data = await verifyResponse.json();
+            userName = data.name || '';
+            // FIRE-AND-FORGET: Signal API is non-critical, don't block navigation.
+            // Awaiting signalAfterLogin can block page reload on iOS Safari and other
+            // browsers where the Signal API may be slow or cause issues.
+            // The login has already succeeded on the server; proceed immediately.
+            signalAfterLogin(data);
+        } catch (parseErr) {
+            // JSON parse failure is non-critical - login already succeeded
+            console.warn("Response parse error (non-critical):", parseErr);
         }
 
-        // Synchronize credentials with the authenticator via Signal API
-        await signalAfterLogin(data);
+        if (authStatus && userName) {
+            authStatus.textContent = `Welcome back ${userName}!`;
+        }
 
+        // Proceed immediately with page reload - don't wait for Signal API
         window.location.reload();
     } catch (error) {
         console.error('Error during authentication:', error);
@@ -127,9 +143,32 @@ async function startAuthentication() {
     }
 }
 
-// Signal API: notify authenticator about accepted credentials after login
+// Notify the authenticator about valid credentials after successful login (WebAuthn Signal API).
+//
+// This function is called FIRE-AND-FORGET (without await) from the login success handler.
+// The caller should NOT await this function because:
+// - The login has already succeeded on the server
+// - Signal API is non-critical - just a best-effort hint to the authenticator
+// - Awaiting can block page reload on iOS Safari and other browsers where the API may be slow
+// - User experience should not be degraded by optional sync features
+//
+// Calls two Signal APIs:
+// 1. signalAllAcceptedCredentials: Tells the authenticator which credentials are valid for this user.
+//    - Scoped by userId (user_handle) - only affects credentials with matching user_handle
+//    - When PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true, only the authenticated credential is affected
+//    - When false, all credentials for the user are synchronized
+//
+// 2. signalCurrentUserDetails: Updates the user's display name in the authenticator.
+//    - Also scoped by userId (user_handle)
+//    - Same scope limitations as signalAllAcceptedCredentials
+//
+// Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
+// See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
 async function signalAfterLogin(data) {
     try {
+        // signalAllAcceptedCredentials: Tell authenticator which credentials are valid
+        // Note: This is scoped by user_handle, so effectiveness depends on
+        // PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL setting
         if (
             window.PublicKeyCredential &&
             typeof window.PublicKeyCredential.signalAllAcceptedCredentials === "function" &&
@@ -145,6 +184,8 @@ async function signalAfterLogin(data) {
             console.log("signalAllAcceptedCredentials: signaled", data.credential_ids.length, "credentials");
         }
 
+        // signalCurrentUserDetails: Update user's display name in the authenticator
+        // Note: Also scoped by user_handle
         if (
             window.PublicKeyCredential &&
             typeof window.PublicKeyCredential.signalCurrentUserDetails === "function" &&
