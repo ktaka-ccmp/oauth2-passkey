@@ -9,6 +9,13 @@
 
 A framework-agnostic core library for OAuth2 and WebAuthn/passkey authentication in Rust applications.
 
+## Documentation
+
+- **[User Guide](https://ktaka-ccmp.github.io/oauth2-passkey/)** - Comprehensive tutorials and integration guides
+- **[API Reference](https://docs.rs/oauth2-passkey)** - Rust API documentation on docs.rs
+- **[Crates.io](https://crates.io/crates/oauth2-passkey)** - Package registry
+- **[GitHub](https://github.com/ktaka-ccmp/oauth2-passkey)** - Source code and issue tracker
+
 This library provides the essential authentication logic and coordination functions that can be integrated into any Rust web framework. It handles complex authentication flows while leaving web framework integration to separate crates.
 
 ## Features
