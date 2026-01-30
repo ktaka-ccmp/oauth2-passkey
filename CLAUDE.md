@@ -245,10 +245,12 @@ For transferring work context between machines or sessions:
 For persistent task and bug tracking across sessions:
 - **Purpose**: Track tasks that span multiple sessions
 - **Filename**: `YYYY-MM-DD-<short-slug>.md`
+- **ID Format**: `YYYY-MM-DD-NN` (e.g., `2026-01-30-09`)
 - **Status**: `open`, `completed`, `wontfix`, `deferred`
 - **Priority**: `high`, `medium`, `low`
 - **Structure**: `open/`, `completed/`, `deferred/` subdirectories
 - **Language**: All issue documents must be written in English
+- **Format & Rules**: See `.claude/issues/README.md` for issue template, workflow, and README update requirements
 
 ### When to Use Each
 

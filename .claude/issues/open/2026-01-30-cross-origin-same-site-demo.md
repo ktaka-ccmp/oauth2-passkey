@@ -1,11 +1,12 @@
 # Issue: Create Cross-Origin Same-Site Demo (Pattern 2)
 
-**Created**: 2026-01-30
-**Status**: open
-**Priority**: medium
-**Type**: feature
+## ID: 2026-01-30-09
 
-## Summary
+## Status: open
+
+## Priority: medium
+
+## Description
 
 Create a demo application that demonstrates Pattern 2: Cross-Origin Same-Site cookie-based authentication. This will show how to configure cookie authentication when the frontend and API are on different subdomains of the same site.
 
@@ -120,12 +121,17 @@ Use actual subdomains with HTTPS for production-like testing:
 - [ ] Documentation of /etc/hosts testing approach
 - [ ] All code passes `cargo fmt`, `cargo clippy`, `cargo test`
 
-## Related
+## Related Files
 
-- [deployment-patterns.md](docs/src/integration/deployment-patterns.md) - Pattern 2 documentation
-- [demo-passkey/](demo-passkey/) - Reference for passkey-only demo (Pattern 1)
-- Issue 2026-01-23-01 - Bearer Token Support (Pattern 4)
+- `docs/src/integration/deployment-patterns.md` - Pattern 2 documentation
+- `demo-passkey/` - Reference for passkey-only demo (Pattern 1)
+
+## Related Issues
+
+- `2026-01-23-01` - Bearer Token Support (Pattern 4)
 
 ## Notes
 
 This demo differs from existing demos (demo-both, demo-passkey, etc.) which all use Pattern 1 (Same-Origin). This will be the first demo showing cross-origin cookie configuration.
+
+## Resolution

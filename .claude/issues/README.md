@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (5)
+### Open (6)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -15,6 +15,7 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-03` | medium | large | [Admin Login History View](open/2026-01-30-admin-login-history.md) |
 | `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
+| `2026-01-30-09` | medium | medium | [Cross-Origin Same-Site Demo (Pattern 2)](open/2026-01-30-cross-origin-same-site-demo.md) |
 
 ### Completed (18)
 
