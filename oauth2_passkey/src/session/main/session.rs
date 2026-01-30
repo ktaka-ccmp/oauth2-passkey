@@ -5,7 +5,8 @@ use http::header::{COOKIE, HeaderMap};
 use subtle::ConstantTimeEq;
 
 use crate::session::config::{
-    SESSION_CONFLICT_POLICY, SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME, SessionConflictPolicy,
+    SESSION_CONFLICT_POLICY, SESSION_COOKIE_DOMAIN, SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME,
+    SessionConflictPolicy,
 };
 use crate::session::errors::SessionError;
 use crate::session::types::{
@@ -57,6 +58,7 @@ pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderM
         "value".to_string(),
         Utc::now() - Duration::seconds(86400),
         -86400,
+        SESSION_COOKIE_DOMAIN.as_deref(),
     )?;
     delete_session_from_store(cookies, SESSION_COOKIE_NAME.to_string()).await?;
     Ok(headers)
@@ -141,6 +143,7 @@ pub(super) async fn create_new_session_with_uid(
         session_id.clone(),
         expires_at,
         *SESSION_COOKIE_MAX_AGE as i64,
+        SESSION_COOKIE_DOMAIN.as_deref(),
     )?;
 
     tracing::debug!("Headers: {:#?}", headers);

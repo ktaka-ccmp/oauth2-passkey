@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "demo-both",
+    "demo-cross-origin",
     "demo-custom-login",
     "demo-oauth2",
     "demo-passkey",
@@ -80,6 +81,7 @@ x509-parser = { version = "0.18.0", features = ["validate", "verify"] }
 
 ### For demo-apps
 axum-server = { version = "0.8.0", features = ["tls-rustls"] }
+tower-http = { version = "0.6", features = ["cors", "fs"] }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 
 ### Test dependencies

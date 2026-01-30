@@ -16,6 +16,7 @@ readme = "README.md"
 default = ["admin-ui", "user-ui"]
 admin-ui = []
 user-ui = []
+cors = ["dep:tower-http"]
 
 [dependencies]
 # Changed from workspace dependency to published crate version
@@ -31,6 +32,7 @@ http = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 subtle = { workspace = true }
+tower-http = { workspace = true, optional = true }
 tracing = { workspace = true }
 urlencoding = { workspace = true }
 

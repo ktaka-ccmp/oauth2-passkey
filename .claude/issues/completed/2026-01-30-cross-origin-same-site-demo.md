@@ -2,7 +2,7 @@
 
 ## ID: 2026-01-30-09
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -113,13 +113,13 @@ Use actual subdomains with HTTPS for production-like testing:
 
 ## Acceptance Criteria
 
-- [ ] API server with CORS configuration
-- [ ] SPA frontend with proper fetch configuration
-- [ ] Cookie Domain configuration working
-- [ ] CSRF protection working across origins
-- [ ] README with setup instructions
-- [ ] Documentation of /etc/hosts testing approach
-- [ ] All code passes `cargo fmt`, `cargo clippy`, `cargo test`
+- [x] API server with CORS configuration
+- [x] SPA frontend with proper fetch configuration
+- [x] Cookie Domain configuration working
+- [x] CSRF protection working across origins
+- [x] README with setup instructions
+- [x] Documentation of /etc/hosts testing approach
+- [x] All code passes `cargo fmt`, `cargo clippy`, `cargo test`
 
 ## Related Files
 
@@ -135,3 +135,54 @@ Use actual subdomains with HTTPS for production-like testing:
 This demo differs from existing demos (demo-both, demo-passkey, etc.) which all use Pattern 1 (Same-Origin). This will be the first demo showing cross-origin cookie configuration.
 
 ## Resolution
+
+Implemented Pattern 2 (Cross-Origin Same-Site) support with the following changes:
+
+### Library Changes
+
+1. **SESSION_COOKIE_DOMAIN** (`oauth2_passkey/src/session/config.rs`)
+   - Added new environment variable for cookie domain configuration
+   - Enables cross-subdomain cookie sharing
+
+2. **header_set_cookie()** (`oauth2_passkey/src/utils.rs`)
+   - Added optional `domain` parameter for Domain attribute in cookies
+   - Updated all call sites to pass domain parameter
+
+3. **CORS Support** (`oauth2_passkey_axum/src/cors.rs`)
+   - New module with configurable CORS layer
+   - Environment variables: `CORS_ALLOWED_ORIGINS`, `CORS_ALLOW_CREDENTIALS`
+   - Available via `cors` feature flag
+
+### Demo Application
+
+Created `demo-cross-origin/` demonstrating:
+- API server with CORS and cookie domain configuration
+- SPA frontend with `credentials: 'include'` fetch calls
+- WebAuthn passkey authentication across origins
+- Complete setup instructions with /etc/hosts approach
+
+### Key Configuration
+
+```bash
+# Cookie domain for cross-subdomain sharing
+SESSION_COOKIE_DOMAIN='.example.local'
+SESSION_COOKIE_NAME='SessionId'  # No __Host- prefix!
+
+# CORS for cross-origin requests
+CORS_ALLOWED_ORIGINS='http://app.example.local:3000'
+CORS_ALLOW_CREDENTIALS=true
+```
+
+### Files Modified/Created
+
+- `oauth2_passkey/src/session/config.rs` - Added SESSION_COOKIE_DOMAIN
+- `oauth2_passkey/src/utils.rs` - Added domain parameter to header_set_cookie
+- `oauth2_passkey/src/session/main/session.rs` - Updated cookie creation
+- `oauth2_passkey/src/coordination/oauth2.rs` - Updated CSRF cookie creation
+- `oauth2_passkey/src/utils/tests.rs` - Added test for domain parameter
+- `oauth2_passkey_axum/src/cors.rs` - New CORS configuration module
+- `oauth2_passkey_axum/src/lib.rs` - Export cors module
+- `oauth2_passkey_axum/Cargo.toml` - Added cors feature with tower-http
+- `Cargo.toml` - Added demo-cross-origin to workspace, tower-http dependency
+- `dot.env.example` - Documented new configuration options
+- `demo-cross-origin/` - Complete demo application
