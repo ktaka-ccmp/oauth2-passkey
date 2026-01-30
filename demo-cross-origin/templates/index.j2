@@ -3,36 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cross-Origin Same-Site Demo (Pattern 2)</title>
+    <title>Cross-Origin Demo</title>
     <link rel="stylesheet" href="{{prefix}}/user/o2p-base.css">
     {% if let Some(css_url) = custom_css_url %}
     <link rel="stylesheet" href="{{css_url}}">
     {% endif %}
     <style>
-        .architecture {
-            background: var(--o2p-bg-tertiary);
-            border-radius: var(--o2p-radius-md);
-            padding: var(--o2p-space-md);
-            font-family: monospace;
-            font-size: 0.875rem;
-            white-space: pre;
-            overflow-x: auto;
-            margin-bottom: var(--o2p-space-md);
-        }
-        .server-tag {
+        .status-badge {
             display: inline-block;
-            padding: 0.125rem 0.5rem;
+            padding: 0.25rem 0.75rem;
             border-radius: var(--o2p-radius-sm);
-            font-size: 0.75rem;
+            font-size: 0.875rem;
             font-weight: 600;
         }
-        .server-tag.auth {
-            background: var(--o2p-primary-light, #dbeafe);
-            color: var(--o2p-primary, #1e40af);
+        .status-badge.authenticated {
+            background: #dcfce7;
+            color: #166534;
         }
-        .server-tag.api {
+        .status-badge.not-authenticated {
             background: #fef3c7;
             color: #92400e;
+        }
+        .api-buttons {
+            display: flex;
+            gap: var(--o2p-space-sm);
+            flex-wrap: wrap;
         }
         .log-container {
             background: #1e293b;
@@ -40,8 +35,8 @@
             padding: var(--o2p-space-md);
             border-radius: var(--o2p-radius-md);
             font-family: monospace;
-            font-size: 0.75rem;
-            max-height: 300px;
+            font-size: 0.8rem;
+            max-height: 250px;
             overflow-y: auto;
         }
         .log-entry { margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #334155; }
@@ -49,32 +44,20 @@
         .log-time { color: #94a3b8; }
         .log-success { color: #4ade80; }
         .log-error { color: #f87171; }
-        .log-warning { color: #fbbf24; }
-        .config-grid {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 0.5rem 1rem;
-        }
-        .config-label { font-weight: 500; color: var(--o2p-text-secondary); }
-        .config-value { font-family: monospace; font-size: 0.875rem; }
-        .alert-info {
-            background: var(--o2p-primary-light, #eff6ff);
-            border: 1px solid var(--o2p-primary, #bfdbfe);
-            color: var(--o2p-primary-dark, #1e40af);
-            padding: var(--o2p-space-md);
-            border-radius: var(--o2p-radius-md);
-            margin-bottom: var(--o2p-space-md);
+        .log-info { color: #60a5fa; }
+        .user-info {
+            color: var(--o2p-text-secondary);
+            font-size: 0.875rem;
         }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="page-header">
-        <h1>Cross-Origin Same-Site Demo</h1>
-        <p style="color: var(--o2p-text-secondary);">Pattern 2: Auth Server + Separate API Server</p>
+        <h1>Cross-Origin Demo</h1>
         <nav>
             <a href="/">Home</a>
-            <a href="{{prefix}}/user/account">My Account</a>
+            <a href="{{prefix}}/user/account">Account</a>
         </nav>
         <div class="header-buttons">
             {% if authenticated %}
@@ -85,77 +68,43 @@
         </div>
     </div>
 
-    <div class="alert-info">
-        <strong>Pattern 2 Demo:</strong> This page is served from the <strong>Auth Server</strong>.
-        After login, you can call the <strong>API server</strong> (different subdomain) using the same session cookie.
-    </div>
-
     <div class="section">
         <div class="section-header">
-            <h2 class="section-title">Architecture</h2>
-        </div>
-        <div class="architecture">Auth Server ({{auth_origin}})              API Server ({{api_origin}})
-├── This page (frontend)                   ├── /api/info (public)
-├── {{prefix}}/user/login (OAuth2/Passkey) ├── /api/protected (auth required)
-└── Cookie: Domain={{cookie_domain}}       └── Validates same Cookie via CORS</div>
-    </div>
-
-    <div class="section">
-        <div class="section-header">
-            <h2 class="section-title">Authentication Status</h2>
+            <h2 class="section-title">Auth Server</h2>
+            <code style="font-size: 0.75rem; color: var(--o2p-text-secondary);">{{auth_origin}}</code>
         </div>
         {% if authenticated %}
         <div class="item">
-            <div class="item-detail"><strong>Status:</strong> Authenticated</div>
-            <div class="item-detail"><strong>Account:</strong> {{user_account}}</div>
-            <div class="item-detail"><strong>Label:</strong> {{user_label}}</div>
+            <span class="status-badge authenticated">Authenticated</span>
+            <span class="user-info">{{user_account}}</span>
         </div>
         {% else %}
         <div class="item">
-            <div class="item-detail"><strong>Status:</strong> Not authenticated</div>
-            <div class="item-detail">
-                <a href="{{prefix}}/user/login" class="btn btn-primary">Login with OAuth2 or Passkey</a>
-            </div>
+            <span class="status-badge not-authenticated">Not logged in</span>
+            <a href="{{prefix}}/user/login" class="btn btn-primary btn-sm" style="margin-left: var(--o2p-space-sm);">Login</a>
         </div>
         {% endif %}
     </div>
 
     <div class="section">
         <div class="section-header">
-            <h2 class="section-title">Test API <span class="server-tag api">Cross-Origin</span></h2>
+            <h2 class="section-title">API Server</h2>
+            <code style="font-size: 0.75rem; color: var(--o2p-text-secondary);">{{api_origin}}</code>
         </div>
-        <p style="color: var(--o2p-text-secondary); margin-bottom: var(--o2p-space-md);">
-            These buttons call the API server at <code>{{api_origin}}</code>.
-            The browser sends the session cookie automatically because both servers share <code>Domain={{cookie_domain}}</code>.
+        <p style="color: var(--o2p-text-secondary); margin-bottom: var(--o2p-space-md); font-size: 0.875rem;">
+            Call the API server (Cross-Origin) to verify session cookie sharing.
         </p>
-        <div class="item">
-            <button class="btn btn-secondary" onclick="callResourceApi('/api/info')">GET /api/info</button>
-            <button class="btn btn-secondary" onclick="callResourceApi('/api/protected')">GET /api/protected</button>
-            <button class="btn btn-secondary" onclick="callResourceApi('/api/health')">GET /api/health</button>
+        <div class="api-buttons">
+            <button class="btn btn-secondary" onclick="callApi('/api/info')">GET /api/info</button>
+            <button class="btn btn-secondary" onclick="callApi('/api/protected')">GET /api/protected</button>
         </div>
     </div>
 
     <div class="section">
         <div class="section-header">
-            <h2 class="section-title">Configuration</h2>
+            <h2 class="section-title">Response Log</h2>
         </div>
-        <div class="config-grid">
-            <span class="config-label">Auth Server (Same-Origin):</span>
-            <span class="config-value">{{auth_origin}}</span>
-            <span class="config-label">API Server (Cross-Origin):</span>
-            <span class="config-value">{{api_origin}}</span>
-            <span class="config-label">Cookie Domain:</span>
-            <span class="config-value">{{cookie_domain}}</span>
-            <span class="config-label">CORS Credentials:</span>
-            <span class="config-value">include (for API server)</span>
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-header">
-            <h2 class="section-title">Request Log</h2>
-        </div>
-        <div class="log-container" id="log">Waiting for requests...</div>
+        <div class="log-container" id="log">Ready to test...</div>
     </div>
 </div>
 
@@ -165,30 +114,32 @@
     function log(message, type = 'info') {
         const logEl = document.getElementById('log');
         const time = new Date().toLocaleTimeString();
-        const className = type === 'success' ? 'log-success' : type === 'error' ? 'log-error' : type === 'warning' ? 'log-warning' : '';
+        const className = 'log-' + type;
         const entry = document.createElement('div');
         entry.className = 'log-entry';
         entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${className}">${message}</span>`;
         logEl.insertBefore(entry, logEl.firstChild);
     }
 
-    async function callResourceApi(path) {
+    async function callApi(path) {
         const url = `${API_ORIGIN}${path}`;
-        log(`[API] GET ${url} (Cross-Origin, credentials: include)`, 'warning');
+        log(`GET ${url}`, 'info');
 
         try {
-            const response = await fetch(url, {
-                credentials: 'include',  // Required for cross-origin cookies!
-            });
+            const response = await fetch(url, { credentials: 'include' });
             const data = await response.json().catch(() => null);
-            log(`[API] ${response.status}: ${JSON.stringify(data)}`, response.ok ? 'success' : 'error');
+
+            if (response.ok && data?.authenticated) {
+                log(`${response.status} OK - Authenticated as: ${data.user?.account}`, 'success');
+            } else if (response.ok) {
+                log(`${response.status} OK - Not authenticated`, 'info');
+            } else {
+                log(`${response.status} ${response.statusText}`, 'error');
+            }
         } catch (error) {
-            log(`[API] Error: ${error.message}`, 'error');
+            log(`Error: ${error.message}`, 'error');
         }
     }
-
-    // Initial log
-    log('Page loaded. Auth calls go to Same-Origin, API calls go to Cross-Origin.');
 </script>
 </body>
 </html>

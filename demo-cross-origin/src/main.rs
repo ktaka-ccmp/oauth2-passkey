@@ -42,8 +42,9 @@
 
 use askama::Template;
 use axum::{
-    Json, Router,
+    Extension, Json, Router,
     http::StatusCode,
+    middleware::from_fn,
     response::{Html, IntoResponse, Response},
     routing::get,
 };
@@ -52,7 +53,8 @@ use serde::Serialize;
 use std::sync::LazyLock;
 
 use oauth2_passkey_axum::{
-    AuthUser, O2P_CUSTOM_CSS_URL, O2P_ROUTE_PREFIX, cors_layer, oauth2_passkey_full_router,
+    AuthUser, O2P_CUSTOM_CSS_URL, O2P_ROUTE_PREFIX, cors_layer, is_authenticated_user_401,
+    oauth2_passkey_full_router,
 };
 
 mod server;
@@ -84,10 +86,8 @@ struct IndexTemplate<'a> {
     custom_css_url: Option<&'a str>,
     authenticated: bool,
     user_account: &'a str,
-    user_label: &'a str,
     auth_origin: &'a str,
     api_origin: &'a str,
-    cookie_domain: &'a str,
 }
 
 // =============================================================================
@@ -99,9 +99,9 @@ async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
     let auth_origin =
         std::env::var("ORIGIN").unwrap_or_else(|_| "http://auth.example.local:3000".to_string());
 
-    let (authenticated, user_account, user_label) = match &user {
-        Some(u) => (true, u.account.as_str(), u.label.as_str()),
-        None => (false, "", ""),
+    let (authenticated, user_account) = match &user {
+        Some(u) => (true, u.account.as_str()),
+        None => (false, ""),
     };
 
     let template = IndexTemplate {
@@ -109,10 +109,8 @@ async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
         custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
         authenticated,
         user_account,
-        user_label,
         auth_origin: &auth_origin,
         api_origin: API_ORIGIN.as_str(),
-        cookie_domain: COOKIE_DOMAIN.as_str(),
     };
 
     match template.render() {
@@ -154,10 +152,12 @@ async fn resource_info(user: Option<AuthUser>) -> impl IntoResponse {
 }
 
 /// Protected endpoint - requires valid session cookie
-async fn resource_protected(user: AuthUser) -> impl IntoResponse {
+/// Uses middleware `is_authenticated_user_401` for authentication (returns 401, not redirect)
+async fn resource_protected(Extension(user): Extension<AuthUser>) -> impl IntoResponse {
     Json(serde_json::json!({
         "server": "API",
         "endpoint": "/api/protected",
+        "authenticated": true,
         "message": format!("Hello, {}! Cross-origin cookie sharing works!", user.account),
         "user": {
             "account": user.account,
@@ -217,8 +217,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     let api_route = Router::new()
         .route("/api/info", get(resource_info))
-        .route("/api/protected", get(resource_protected))
-        .route("/api/health", get(resource_health));
+        .route("/api/health", get(resource_health))
+        // Protected route uses middleware that returns 401 (not redirect)
+        .route(
+            "/api/protected",
+            get(resource_protected).layer(from_fn(is_authenticated_user_401)),
+        );
 
     // Apply CORS layer
     let api_route = if let Some(cors) = cors_layer() {
