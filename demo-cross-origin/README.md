@@ -3,17 +3,31 @@
 This demo demonstrates **Pattern 2: Cross-Origin Same-Site** authentication.
 A separate **Resource API** validates session cookies issued by the **Auth Server**.
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Why This Architecture?](#why-this-architecture)
+- [Testing Methods](#testing-methods)
+  - [localhost (Easiest)](#localhost-easiest)
+  - [HTTPS Proxy](#https-proxy)
+  - [Production-like (Direct HTTPS)](#production-like-direct-https)
+- [Configuration](#configuration)
+- [How It Works](#how-it-works)
+- [Key Technical Points](#key-technical-points)
+- [Troubleshooting](#troubleshooting)
+- [Related](#related)
+
 ## Architecture
 
 ```text
 cargo run
   │
-  ├── Auth Server (auth.example.local:3000)
+  ├── Auth Server (localhost:3001)
   │     ├── Frontend (Askama template)
   │     ├── OAuth2 + Passkey authentication (oauth2_passkey_full_router)
-  │     └── Issues Cookie: Domain=.example.local
+  │     └── Issues Cookie
   │
-  └── Resource API (api.example.local:3001)
+  └── Resource API (localhost:3002)
         ├── /api/info (public endpoint)
         ├── /api/protected (requires auth)
         └── Validates same Cookie via CORS
@@ -22,12 +36,12 @@ cargo run
 ## Why This Architecture?
 
 **Pattern 2's value**: A session cookie issued by one server can be validated by
-a completely **separate server** on a different subdomain.
+a completely **separate server** on a different subdomain (or port).
 
-| Server               | Role                     | CORS Needed |
-|----------------------|--------------------------|-------------|
-| Auth Server (3000)   | Issues session cookie    | No          |
-| Resource API (3001)  | Validates session cookie | Yes         |
+| Server             | Role                     | CORS Needed |
+|--------------------|--------------------------|-------------|
+| Auth Server        | Issues session cookie    | No          |
+| Resource API       | Validates session cookie | Yes         |
 
 Use cases:
 
@@ -35,30 +49,275 @@ Use cases:
 - **Separation of concerns**: Auth service separate from business logic
 - **Scalability**: Auth and API servers can scale independently
 
-## Quick Start
+## Testing Methods
 
-### 1. Add hosts entries
+### localhost (Easiest)
+
+The simplest way to try this demo. No `/etc/hosts`, HTTPS, or proxy required.
+
+| Requirement  | Status     |
+|--------------|------------|
+| /etc/hosts   | Not needed |
+| HTTPS        | Not needed |
+| Proxy        | Not needed |
+| Passkey      | Works      |
+| OAuth2       | Works      |
+
+#### 1. Create `.env`
 
 ```bash
-sudo sh -c 'echo "127.0.0.1 auth.example.local api.example.local" >> /etc/hosts'
+cat > .env << 'EOF'
+ORIGIN='http://localhost:3001'
+RESOURCE_API_ORIGIN='http://localhost:3002'
+CORS_ALLOWED_ORIGINS='http://localhost:3001'
+CORS_ALLOW_CREDENTIALS=true
+
+AUTH_PORT=3001
+API_PORT=3002
+
+# Google OAuth2 (get from https://console.cloud.google.com/apis/credentials)
+OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
+OAUTH2_GOOGLE_CLIENT_SECRET='your-secret'
+
+# Storage (in-memory for demo)
+GENERIC_CACHE_STORE_TYPE=memory
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL='sqlite::memory:'
+EOF
 ```
 
-### 2. Configure environment
+#### 2. Configure Google OAuth2
 
-```bash
-cp .env.example .env
-# Edit .env to add your Google OAuth2 credentials
+Add this redirect URI in Google Cloud Console:
+
+```text
+http://localhost:3001/o2p/oauth2/authorized
 ```
 
-### 3. Start the servers
+#### 3. Start the servers
 
 ```bash
 cargo run
 ```
 
-### 4. Open in browser
+#### 4. Open in browser
 
-Navigate to <http://auth.example.local:3000>
+Navigate to <http://localhost:3001>
+
+**Why localhost works:**
+
+- `localhost` is a secure context (Passkey works over HTTP)
+- Google allows `http://localhost:*` for OAuth2 redirect URIs
+- `localhost:3001` and `localhost:3002` are Cross-Origin but Same-Site
+
+### HTTPS Proxy
+
+Use nginx or Caddy to terminate HTTPS and proxy to the Rust app on HTTP.
+This is the recommended approach for production.
+
+| Requirement       | Status        |
+|-------------------|---------------|
+| /etc/hosts or DNS | Required      |
+| HTTPS             | Proxy handles |
+| Valid certificate | Required      |
+| Passkey           | Works         |
+| OAuth2            | Works         |
+
+```text
+Browser
+  │
+  ├─→ https://auth.foobar.com ──→ nginx/Caddy ──→ localhost:3001 (Auth Server)
+  │
+  └─→ https://api.foobar.com  ──→ nginx/Caddy ──→ localhost:3002 (Resource API)
+```
+
+#### 1. Nginx configuration
+
+```nginx
+# /etc/nginx/sites-available/cross-origin-demo
+
+# Auth Server
+server {
+    listen 443 ssl;
+    server_name auth.foobar.com;
+
+    ssl_certificate /path/to/fullchain.pem;
+    ssl_certificate_key /path/to/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Resource API
+server {
+    listen 443 ssl;
+    server_name api.foobar.com;
+
+    ssl_certificate /path/to/fullchain.pem;
+    ssl_certificate_key /path/to/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:3002;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+#### 2. Caddy configuration (alternative)
+
+```caddyfile
+# Caddyfile
+auth.foobar.com {
+    reverse_proxy localhost:3001
+}
+
+api.foobar.com {
+    reverse_proxy localhost:3002
+}
+```
+
+Caddy automatically obtains and renews certificates via Let's Encrypt.
+
+#### 3. Create `.env`
+
+```bash
+cat > .env << 'EOF'
+# ORIGIN must match the external HTTPS URL
+ORIGIN='https://auth.foobar.com'
+RESOURCE_API_ORIGIN='https://api.foobar.com'
+SESSION_COOKIE_DOMAIN='.foobar.com'
+CORS_ALLOWED_ORIGINS='https://auth.foobar.com'
+CORS_ALLOW_CREDENTIALS=true
+
+# Internal HTTP ports (proxy forwards to these)
+AUTH_PORT=3001
+API_PORT=3002
+
+# Google OAuth2
+OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
+OAUTH2_GOOGLE_CLIENT_SECRET='your-secret'
+
+# Storage
+GENERIC_CACHE_STORE_TYPE=redis
+GENERIC_CACHE_STORE_URL='redis://localhost:6379'
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL='sqlite:data.db'
+EOF
+```
+
+#### 4. Configure Google OAuth2
+
+Add this redirect URI in Google Cloud Console:
+
+```text
+https://auth.foobar.com/o2p/oauth2/authorized
+```
+
+#### 5. Start the servers
+
+```bash
+# Start nginx/Caddy first, then:
+cargo run
+```
+
+#### 6. Open in browser
+
+Navigate to <https://auth.foobar.com>
+
+**Benefits:**
+
+- No TLS configuration in Rust code
+- Easy certificate management (especially with Caddy)
+- Production-like architecture
+- Can add rate limiting, logging, etc. at proxy level
+
+### Production-like (Direct HTTPS)
+
+The Rust application serves HTTPS directly using a valid wildcard certificate.
+
+| Requirement       | Status     |
+|-------------------|------------|
+| DNS records       | Required   |
+| Valid certificate | Required   |
+| Proxy             | Not needed |
+| Passkey           | Works      |
+| OAuth2            | Works      |
+
+#### 1. Prerequisites
+
+- Valid wildcard certificate for `*.foobar.com`
+- DNS records pointing to your server:
+  - `auth.foobar.com` → your server IP
+  - `api.foobar.com` → your server IP
+
+#### 2. Place certificate files
+
+```bash
+mkdir -p certs
+cp /path/to/fullchain.pem certs/
+cp /path/to/privkey.pem certs/
+```
+
+#### 3. Create `.env` for direct HTTPS
+
+```bash
+cat > .env << 'EOF'
+ORIGIN='https://auth.foobar.com'
+RESOURCE_API_ORIGIN='https://api.foobar.com'
+SESSION_COOKIE_DOMAIN='.foobar.com'
+CORS_ALLOWED_ORIGINS='https://auth.foobar.com'
+CORS_ALLOW_CREDENTIALS=true
+
+# HTTPS configuration
+AUTH_PORT=3443
+API_PORT=3444
+TLS_CERT_PATH='certs/fullchain.pem'
+TLS_KEY_PATH='certs/privkey.pem'
+
+# Google OAuth2
+OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
+OAUTH2_GOOGLE_CLIENT_SECRET='your-secret'
+
+# Storage
+GENERIC_CACHE_STORE_TYPE=redis
+GENERIC_CACHE_STORE_URL='redis://localhost:6379'
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL='sqlite:data.db'
+EOF
+```
+
+#### 4. Add OAuth2 redirect URI
+
+Add this redirect URI in Google Cloud Console:
+
+```text
+https://auth.foobar.com/o2p/oauth2/authorized
+```
+
+#### 5. Run the application
+
+```bash
+cargo run
+```
+
+#### 6. Access the demo
+
+Navigate to <https://auth.foobar.com>
+
+**Benefits:**
+
+- Full Passkey support (secure context)
+- OAuth2 with real domain (not just localhost)
+- Cookie `Secure` flag works correctly
+- Production-identical behavior
 
 ## Configuration
 
@@ -66,27 +325,29 @@ Navigate to <http://auth.example.local:3000>
 
 | Variable                      | Description                     | Example                          |
 |-------------------------------|---------------------------------|----------------------------------|
-| `ORIGIN`                      | Auth server URL                 | `http://auth.example.local:3000` |
-| `RESOURCE_API_ORIGIN`         | Resource API URL (for frontend) | `http://api.example.local:3001`  |
-| `SESSION_COOKIE_DOMAIN`       | Cookie domain for sharing       | `.example.local`                 |
-| `CORS_ALLOWED_ORIGINS`        | Origins allowed for CORS        | `http://auth.example.local:3000` |
+| `ORIGIN`                      | Auth server URL                 | `http://localhost:3001`          |
+| `RESOURCE_API_ORIGIN`         | Resource API URL (for frontend) | `http://localhost:3002`          |
+| `CORS_ALLOWED_ORIGINS`        | Origins allowed for CORS        | `http://localhost:3001`          |
 | `OAUTH2_GOOGLE_CLIENT_ID`     | Google OAuth2 client ID         | `xxx.apps.googleusercontent.com` |
 | `OAUTH2_GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret     | (from Google Cloud Console)      |
 
 ### Optional Environment Variables
 
-| Variable       | Default | Description             |
-|----------------|---------|-------------------------|
-| `AUTH_PORT`    | 3000    | Auth server port        |
-| `API_PORT`     | 3001    | Resource API port       |
+| Variable                | Default | Description                              |
+|-------------------------|---------|------------------------------------------|
+| `AUTH_PORT`             | 3000    | Auth server port                         |
+| `API_PORT`              | 3001    | Resource API port                        |
+| `SESSION_COOKIE_DOMAIN` | -       | Cookie domain (e.g., `.foobar.com`)      |
+| `TLS_CERT_PATH`         | -       | Path to TLS certificate (enables HTTPS)  |
+| `TLS_KEY_PATH`          | -       | Path to TLS private key                  |
 
 ## How It Works
 
-1. **User visits Auth Server** at `http://auth.example.local:3000`
+1. **User visits Auth Server** (e.g., `http://localhost:3001`)
 2. **User logs in** via OAuth2 (Google) or Passkey
-3. **Auth Server sets cookie** with `Domain=.example.local`
+3. **Auth Server sets cookie** (with optional `Domain` for subdomains)
 4. **User clicks "Test Resource API"** buttons on the page
-5. **Browser sends cookie** to `api.example.local` (same domain)
+5. **Browser sends cookie** to Resource API (Cross-Origin, Same-Site)
 6. **Resource API validates session** using the shared cookie
 7. **CORS headers** allow the cross-origin response
 
@@ -94,14 +355,16 @@ Navigate to <http://auth.example.local:3000>
 
 ### Cookie Domain
 
+For subdomain sharing (not needed for localhost):
+
 ```bash
-SESSION_COOKIE_DOMAIN='.example.local'
+SESSION_COOKIE_DOMAIN='.foobar.com'
 ```
 
 The leading dot allows the cookie to be shared across all subdomains:
 
-- `auth.example.local` (Auth Server) - issues the cookie
-- `api.example.local` (Resource API) - receives and validates the cookie
+- `auth.foobar.com` (Auth Server) - issues the cookie
+- `api.foobar.com` (Resource API) - receives and validates the cookie
 
 ### Cookie Name
 
@@ -115,28 +378,12 @@ SESSION_COOKIE_NAME='SessionId'
 ### CORS Configuration
 
 ```bash
-CORS_ALLOWED_ORIGINS='http://auth.example.local:3000'
+CORS_ALLOWED_ORIGINS='http://localhost:3001'
 CORS_ALLOW_CREDENTIALS=true
 ```
 
 Only the Resource API needs CORS. The Auth Server serves the frontend
 (Same-Origin), so no CORS is needed there.
-
-## Production Deployment
-
-For production with HTTP proxy (nginx, Caddy, etc.):
-
-```bash
-# Example: proxy passes to localhost:3000 and localhost:3001
-ORIGIN='https://auth.example.com'
-RESOURCE_API_ORIGIN='https://api.example.com'
-SESSION_COOKIE_DOMAIN='.example.com'
-CORS_ALLOWED_ORIGINS='https://auth.example.com'
-
-# Ports for local binding (proxy forwards to these)
-AUTH_PORT=3000
-API_PORT=3001
-```
 
 ## Troubleshooting
 
@@ -149,7 +396,7 @@ API_PORT=3001
 2. Check the cookie is being sent:
    - Open browser DevTools > Network > check for `Cookie` header
 
-3. Verify cookie domain:
+3. Verify cookie domain (if using subdomains):
    - `SESSION_COOKIE_DOMAIN` must match both subdomains
 
 ### CORS errors
@@ -161,8 +408,13 @@ API_PORT=3001
 ### OAuth2 login fails
 
 1. Verify Google OAuth2 credentials in `.env`
-2. Add redirect URI to Google Cloud Console:
-   `http://auth.example.local:3000/o2p/oauth2/authorized`
+2. Add redirect URI to Google Cloud Console matching your `ORIGIN`
+
+### Passkey doesn't work
+
+1. `localhost` works over HTTP (secure context)
+2. Custom domains require HTTPS
+3. Check browser console for WebAuthn errors
 
 ## Related
 
