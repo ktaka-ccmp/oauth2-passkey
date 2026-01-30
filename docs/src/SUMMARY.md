@@ -21,6 +21,7 @@
 - [Configuration](integration/configuration.md)
 - [Multi-Origin Passkey Setup](integration/multi-origin.md)
 - [Server Setup](integration/server-setup.md)
+- [Deployment Patterns](integration/deployment-patterns.md)
 
 ---
 

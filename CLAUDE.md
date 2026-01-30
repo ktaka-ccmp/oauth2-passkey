@@ -248,6 +248,7 @@ For persistent task and bug tracking across sessions:
 - **Status**: `open`, `completed`, `wontfix`, `deferred`
 - **Priority**: `high`, `medium`, `low`
 - **Structure**: `open/`, `completed/`, `deferred/` subdirectories
+- **Language**: All issue documents must be written in English
 
 ### When to Use Each
 
