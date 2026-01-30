@@ -2,7 +2,7 @@
 
 ## ID: 2026-01-30-09
 
-## Status: completed
+## Status: open
 
 ## Priority: medium
 
@@ -186,3 +186,65 @@ CORS_ALLOW_CREDENTIALS=true
 - `Cargo.toml` - Added demo-cross-origin to workspace, tower-http dependency
 - `dot.env.example` - Documented new configuration options
 - `demo-cross-origin/` - Complete demo application
+
+---
+
+## Enhancement: Auth + Resource API Architecture (2026-01-30)
+
+### Problem
+
+The initial implementation had frontend on a separate server, which:
+
+1. Doesn't clearly demonstrate Pattern 2's value (Cookie sharing across services)
+2. Adds unnecessary CORS complexity on the auth server
+3. Is essentially Pattern 1 with extra steps
+
+### Corrected Architecture
+
+Pattern 2's real value is **Cookie sharing between separate services**:
+
+```text
+cargo run
+  │
+  ├── Auth Server (auth.example.local:3000)
+  │   ├── Frontend (static files)
+  │   ├── oauth2_passkey (authentication)
+  │   └── Set-Cookie: Domain=.example.local
+  │
+  └── Resource API (api.example.local:3001)
+      ├── Protected endpoints
+      ├── Session validation (Cookie)
+      └── CORS: allow auth.example.local:3000
+```
+
+### Key Demonstration Points
+
+1. **Auth server issues cookie** with `Domain=.example.local`
+2. **Resource API validates the same cookie** - no additional auth needed
+3. **CORS only needed on Resource API** (frontend is Same-Origin with Auth)
+4. **Shows microservice pattern**: separate services sharing authentication
+
+### Implementation Plan
+
+1. **Auth Server (port 3000)**
+   - Serve frontend static files
+   - oauth2_passkey_full_router() for authentication
+   - No CORS needed (Same-Origin with frontend)
+
+2. **Resource API Server (port 3001)**
+   - Protected endpoints only (no oauth2_passkey)
+   - Validate session cookie directly
+   - CORS enabled for auth.example.local:3000
+
+3. **Frontend updates**
+   - Auth calls -> Same-Origin (auth.example.local:3000)
+   - Resource calls -> Cross-Origin (api.example.local:3001) with credentials:'include'
+
+### Enhancement Acceptance Criteria
+
+- [ ] Single `cargo run` starts both servers
+- [ ] Auth server on port 3000 with frontend + oauth2_passkey
+- [ ] Resource API on port 3001 with CORS
+- [ ] Frontend demonstrates Cross-Origin resource access
+- [ ] Cookie sharing across subdomains verified
+- [ ] README updated with architecture explanation

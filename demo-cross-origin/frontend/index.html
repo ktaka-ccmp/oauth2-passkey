@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cross-Origin Same-Site Demo</title>
+    <title>Cross-Origin Same-Site Demo (Pattern 2)</title>
     <style>
         :root {
             --primary: #3b82f6;
             --primary-hover: #2563eb;
             --success: #22c55e;
             --error: #ef4444;
+            --warning: #f59e0b;
             --bg: #f8fafc;
             --card-bg: #ffffff;
             --text: #1e293b;
@@ -32,7 +33,7 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
         }
 
@@ -165,6 +166,10 @@
             color: #f87171;
         }
 
+        .log-warning {
+            color: #fbbf24;
+        }
+
         .user-info {
             padding: 1rem;
             background: #f0fdf4;
@@ -184,23 +189,69 @@
             color: #1e40af;
         }
 
+        .alert-warning {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            color: #92400e;
+        }
+
         code {
             background: #f1f5f9;
             padding: 0.125rem 0.375rem;
             border-radius: 0.25rem;
             font-size: 0.875rem;
         }
+
+        .server-tag {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .server-tag.auth {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .server-tag.api {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .architecture-diagram {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.75rem;
+            white-space: pre;
+            overflow-x: auto;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Cross-Origin Same-Site Demo</h1>
-        <p class="subtitle">Pattern 2: Frontend and API on different subdomains</p>
+        <p class="subtitle">Pattern 2: Auth Server + Separate Resource API</p>
 
         <div class="alert alert-info">
-            <strong>Architecture:</strong>
-            Frontend at <code>http://app.example.local:3000</code> calls API at <code>http://api.example.local:3001</code>
-            with <code>credentials: 'include'</code> for cross-origin cookie sharing.
+            <strong>Architecture:</strong> This demo shows how a <strong>separate Resource API</strong> can validate
+            session cookies issued by the Auth Server. The cookie's <code>Domain=.example.local</code> allows
+            sharing across subdomains.
+        </div>
+
+        <div class="card">
+            <h2>Architecture</h2>
+            <div class="architecture-diagram">
+Auth Server (auth.example.local:3000)     Resource API (api.example.local:3001)
+├── Frontend (this page)                  ├── /api/info (public)
+├── /o2p/passkey/* (authentication)       ├── /api/protected (requires auth)
+└── Issues Cookie: Domain=.example.local  └── Validates same Cookie (Cross-Origin)
+            </div>
         </div>
 
         <div class="card">
@@ -213,30 +264,48 @@
             <div class="btn-group" style="margin-top: 1rem;">
                 <button class="btn btn-primary" id="loginBtn" onclick="login()">Login with Passkey</button>
                 <button class="btn btn-secondary" id="logoutBtn" onclick="logout()" style="display: none;">Logout</button>
-                <button class="btn btn-secondary" onclick="checkAuth()">Refresh Status</button>
+                <button class="btn btn-secondary" onclick="checkAuthStatus()">Refresh Status</button>
             </div>
         </div>
 
         <div class="card">
-            <h2>API Endpoints</h2>
+            <h2>Test Endpoints</h2>
+
+            <h3 style="margin-bottom: 0.5rem; font-size: 1rem;">
+                Auth Server <span class="server-tag auth">Same-Origin</span>
+            </h3>
+            <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 0.75rem;">
+                Authentication endpoints - no CORS needed
+            </p>
+            <div class="btn-group" style="margin-bottom: 1rem;">
+                <button class="btn btn-secondary" onclick="callAuthServer('/o2p/info')">GET /o2p/info</button>
+                <button class="btn btn-secondary" onclick="callAuthServer('/o2p/passkey/csrf_token')">GET /csrf_token</button>
+            </div>
+
+            <h3 style="margin-bottom: 0.5rem; font-size: 1rem;">
+                Resource API <span class="server-tag api">Cross-Origin</span>
+            </h3>
+            <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 0.75rem;">
+                Business logic endpoints - requires CORS + credentials: 'include'
+            </p>
             <div class="btn-group">
-                <button class="btn btn-secondary" onclick="callApi('/api/info')">GET /api/info</button>
-                <button class="btn btn-secondary" onclick="callApi('/api/protected')">GET /api/protected</button>
-                <button class="btn btn-secondary" onclick="callApi('/api/health')">GET /api/health</button>
+                <button class="btn btn-secondary" onclick="callResourceApi('/api/info')">GET /api/info</button>
+                <button class="btn btn-secondary" onclick="callResourceApi('/api/protected')">GET /api/protected</button>
+                <button class="btn btn-secondary" onclick="callResourceApi('/api/health')">GET /api/health</button>
             </div>
         </div>
 
         <div class="card">
             <h2>Configuration</h2>
             <div class="info-grid">
-                <span class="info-label">Frontend Origin:</span>
-                <span class="info-value" id="frontendOrigin"></span>
-                <span class="info-label">API Origin:</span>
+                <span class="info-label">Auth Server (Same-Origin):</span>
+                <span class="info-value" id="authOrigin"></span>
+                <span class="info-label">Resource API (Cross-Origin):</span>
                 <span class="info-value" id="apiOrigin"></span>
                 <span class="info-label">Cookie Domain:</span>
                 <span class="info-value">.example.local</span>
                 <span class="info-label">CORS Credentials:</span>
-                <span class="info-value">include</span>
+                <span class="info-value">include (for Resource API only)</span>
             </div>
         </div>
 
@@ -248,52 +317,66 @@
 
     <script>
         // Configuration
-        const API_ORIGIN = 'http://api.example.local:3001';
+        // Auth server is Same-Origin (this page is served from auth server)
+        const AUTH_ORIGIN = window.location.origin;
+        // Resource API is Cross-Origin (different subdomain)
+        const RESOURCE_API_ORIGIN = 'http://api.example.local:3001';
         const O2P_PREFIX = '/o2p';
 
         // Update UI with origins
-        document.getElementById('frontendOrigin').textContent = window.location.origin;
-        document.getElementById('apiOrigin').textContent = API_ORIGIN;
+        document.getElementById('authOrigin').textContent = AUTH_ORIGIN;
+        document.getElementById('apiOrigin').textContent = RESOURCE_API_ORIGIN;
 
         // Logging helper
         function log(message, type = 'info') {
             const logEl = document.getElementById('log');
             const time = new Date().toLocaleTimeString();
-            const className = type === 'success' ? 'log-success' : type === 'error' ? 'log-error' : '';
+            const className = type === 'success' ? 'log-success' : type === 'error' ? 'log-error' : type === 'warning' ? 'log-warning' : '';
             const entry = document.createElement('div');
             entry.className = 'log-entry';
             entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${className}">${message}</span>`;
             logEl.insertBefore(entry, logEl.firstChild);
         }
 
-        // Fetch wrapper with credentials
-        async function apiFetch(path, options = {}) {
-            const url = `${API_ORIGIN}${path}`;
-            log(`Fetching: ${options.method || 'GET'} ${url}`);
+        // Call Auth Server (Same-Origin - no credentials option needed)
+        async function callAuthServer(path) {
+            const url = `${AUTH_ORIGIN}${path}`;
+            log(`[Auth Server] GET ${url}`);
 
             try {
-                const response = await fetch(url, {
-                    ...options,
-                    credentials: 'include', // Required for cross-origin cookies
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...options.headers,
-                    },
-                });
-
+                const response = await fetch(url);
                 const data = await response.json().catch(() => null);
-                log(`Response: ${response.status} ${JSON.stringify(data)}`, response.ok ? 'success' : 'error');
+                log(`[Auth Server] ${response.status}: ${JSON.stringify(data)}`, response.ok ? 'success' : 'error');
                 return { response, data };
             } catch (error) {
-                log(`Error: ${error.message}`, 'error');
+                log(`[Auth Server] Error: ${error.message}`, 'error');
                 throw error;
             }
         }
 
-        // Check authentication status
-        async function checkAuth() {
+        // Call Resource API (Cross-Origin - requires credentials: 'include')
+        async function callResourceApi(path) {
+            const url = `${RESOURCE_API_ORIGIN}${path}`;
+            log(`[Resource API] GET ${url} (Cross-Origin, credentials: include)`);
+
             try {
-                const { response, data } = await apiFetch('/api/info');
+                const response = await fetch(url, {
+                    credentials: 'include', // Required for cross-origin cookies!
+                });
+                const data = await response.json().catch(() => null);
+                log(`[Resource API] ${response.status}: ${JSON.stringify(data)}`, response.ok ? 'success' : 'error');
+                return { response, data };
+            } catch (error) {
+                log(`[Resource API] Error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // Check authentication status via Resource API (demonstrates cookie sharing)
+        async function checkAuthStatus() {
+            log('Checking auth status on Resource API (Cross-Origin)...', 'warning');
+            try {
+                const { data } = await callResourceApi('/api/info');
                 updateAuthUI(data);
             } catch (error) {
                 updateAuthUI({ authenticated: false });
@@ -310,7 +393,7 @@
 
             if (data && data.authenticated) {
                 statusIndicator.className = 'status-indicator authenticated';
-                authStatus.textContent = 'Authenticated';
+                authStatus.textContent = 'Authenticated (Cookie shared with Resource API!)';
                 userInfo.style.display = 'block';
                 userInfo.innerHTML = `
                     <div class="info-grid">
@@ -331,38 +414,26 @@
             }
         }
 
-        // Call API endpoint
-        async function callApi(path) {
-            try {
-                await apiFetch(path);
-            } catch (error) {
-                // Error already logged
-            }
-        }
-
-        // Login with Passkey
+        // Login with Passkey (calls Auth Server - Same-Origin)
         async function login() {
-            log('Starting passkey authentication...');
+            log('Starting passkey authentication on Auth Server...', 'warning');
 
             try {
-                // Get CSRF token first
-                const csrfUrl = `${API_ORIGIN}${O2P_PREFIX}/passkey/csrf_token`;
-                log(`Fetching CSRF token from: ${csrfUrl}`);
+                // Get CSRF token (Same-Origin)
+                const csrfUrl = `${AUTH_ORIGIN}${O2P_PREFIX}/passkey/csrf_token`;
+                log(`[Auth Server] Fetching CSRF token`);
 
-                const csrfResponse = await fetch(csrfUrl, {
-                    credentials: 'include',
-                });
+                const csrfResponse = await fetch(csrfUrl);
                 const csrfData = await csrfResponse.json();
                 const csrfToken = csrfData.csrf_token;
-                log(`Got CSRF token: ${csrfToken.substring(0, 10)}...`, 'success');
+                log(`[Auth Server] Got CSRF token`, 'success');
 
-                // Start authentication
-                const startUrl = `${API_ORIGIN}${O2P_PREFIX}/passkey/auth/start`;
-                log(`Starting auth at: ${startUrl}`);
+                // Start authentication (Same-Origin)
+                const startUrl = `${AUTH_ORIGIN}${O2P_PREFIX}/passkey/auth/start`;
+                log(`[Auth Server] POST ${startUrl}`);
 
                 const startResponse = await fetch(startUrl, {
                     method: 'POST',
-                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': csrfToken,
@@ -375,10 +446,10 @@
                 }
 
                 const options = await startResponse.json();
-                log('Received WebAuthn options', 'success');
+                log('[Auth Server] Received WebAuthn options', 'success');
 
                 // Call WebAuthn API
-                log('Calling navigator.credentials.get()...');
+                log('Calling navigator.credentials.get()...', 'warning');
                 const credential = await navigator.credentials.get({
                     publicKey: {
                         ...options.publicKey,
@@ -392,11 +463,12 @@
 
                 log('Got credential from authenticator', 'success');
 
-                // Finish authentication
-                const finishUrl = `${API_ORIGIN}${O2P_PREFIX}/passkey/auth/finish`;
+                // Finish authentication (Same-Origin)
+                const finishUrl = `${AUTH_ORIGIN}${O2P_PREFIX}/passkey/auth/finish`;
+                log(`[Auth Server] POST ${finishUrl}`);
+
                 const finishResponse = await fetch(finishUrl, {
                     method: 'POST',
-                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': csrfToken,
@@ -417,8 +489,9 @@
                 });
 
                 if (finishResponse.ok) {
-                    log('Authentication successful!', 'success');
-                    await checkAuth();
+                    log('[Auth Server] Authentication successful!', 'success');
+                    log('Cookie set with Domain=.example.local - now checking Resource API...', 'warning');
+                    await checkAuthStatus();
                 } else {
                     const errorData = await finishResponse.json().catch(() => ({}));
                     throw new Error(`Auth finish failed: ${errorData.error || finishResponse.status}`);
@@ -428,20 +501,17 @@
             }
         }
 
-        // Logout
+        // Logout (calls Auth Server - Same-Origin)
         async function logout() {
-            log('Logging out...');
+            log('Logging out via Auth Server...', 'warning');
             try {
                 // Get CSRF token
-                const csrfResponse = await fetch(`${API_ORIGIN}${O2P_PREFIX}/passkey/csrf_token`, {
-                    credentials: 'include',
-                });
+                const csrfResponse = await fetch(`${AUTH_ORIGIN}${O2P_PREFIX}/passkey/csrf_token`);
                 const csrfData = await csrfResponse.json();
 
                 // Logout
-                const response = await fetch(`${API_ORIGIN}${O2P_PREFIX}/passkey/logout`, {
+                const response = await fetch(`${AUTH_ORIGIN}${O2P_PREFIX}/passkey/logout`, {
                     method: 'POST',
-                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': csrfData.csrf_token,
@@ -449,8 +519,8 @@
                 });
 
                 if (response.ok) {
-                    log('Logout successful', 'success');
-                    await checkAuth();
+                    log('[Auth Server] Logout successful', 'success');
+                    await checkAuthStatus();
                 } else {
                     throw new Error(`Logout failed: ${response.status}`);
                 }
@@ -481,7 +551,7 @@
         }
 
         // Initial check
-        checkAuth();
+        checkAuthStatus();
     </script>
 </body>
 </html>
