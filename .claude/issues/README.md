@@ -6,14 +6,13 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (6)
+### Open (5)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `2026-01-23-01` | medium | large | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
 | `2026-01-30-02` | medium | medium | [Admin Force Logout Feature](open/2026-01-30-admin-force-logout.md) |
 | `2026-01-30-03` | medium | large | [Admin Login History View](open/2026-01-30-admin-login-history.md) |
-| `2026-01-30-06` | medium | small | [Passkey Endpoint (.well-known) Support](open/2026-01-30-passkey-endpoint-wellknown.md) |
 | `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
 
@@ -40,11 +39,12 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-29-04` | [Review SESSION_CONFLICT_POLICY Default](completed/2026-01-29-session-conflict-policy-review.md) |
 | `2026-01-30-01` | [Move /info and /csrf_token to default.rs](completed/2026-01-30-move-info-csrf-endpoints.md) |
 
-### Deferred (1)
+### Deferred (2)
 
 | ID | Title |
 |----|-------|
 | `2026-01-24-01` | [Documentation Improvement Planning](deferred/2026-01-24-docs-improvement-planning.md) |
+| `2026-01-30-06` | [Passkey Endpoint (.well-known) Support](deferred/2026-01-30-passkey-endpoint-wellknown.md) |
 
 <!-- END AUTO-UPDATED -->
 

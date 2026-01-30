@@ -2,9 +2,9 @@
 
 ## ID: 2026-01-30-06
 
-## Status: open
+## Status: deferred
 
-## Priority: medium
+## Priority: low
 
 ## Description
 
@@ -74,3 +74,4 @@ PASSKEY_MANAGE_URL=/account
 
 ## Resolution
 
+**Deferred** - This specification is still in proposal stage and not widely adopted. This library uses OAuth2 + Passkey (no password authentication), so the benefit of "upgrade from password to passkey" prompts is limited. Will revisit when the specification gains broader adoption.
