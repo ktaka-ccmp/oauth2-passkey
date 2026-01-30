@@ -6,7 +6,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub(crate) fn spawn_http_server(port: u16, app: Router) -> JoinHandle<()> {
     tokio::spawn(async move {
         let addr = SocketAddr::from(([0, 0, 0, 0], port));
-        tracing::debug!("HTTP server listening on {}:{}", addr, port);
+        tracing::debug!("HTTP server listening on {}", addr);
         axum_server::bind(addr)
             .serve(app.into_make_service())
             .await

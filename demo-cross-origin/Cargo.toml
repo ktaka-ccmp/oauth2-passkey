@@ -4,10 +4,10 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-oauth2-passkey-axum = { path = "../oauth2_passkey_axum", default-features = false, features = ["cors"] }
+oauth2-passkey-axum = { path = "../oauth2_passkey_axum", features = ["cors"] }
 
+askama = { workspace = true }
 axum = { workspace = true }
-axum-core = { workspace = true }
 axum-server = { workspace = true }
 dotenvy = { workspace = true }
 http = { workspace = true }

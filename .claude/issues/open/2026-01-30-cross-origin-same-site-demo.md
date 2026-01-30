@@ -242,9 +242,12 @@ cargo run
 
 ### Enhancement Acceptance Criteria
 
-- [ ] Single `cargo run` starts both servers
-- [ ] Auth server on port 3000 with frontend + oauth2_passkey
-- [ ] Resource API on port 3001 with CORS
-- [ ] Frontend demonstrates Cross-Origin resource access
-- [ ] Cookie sharing across subdomains verified
-- [ ] README updated with architecture explanation
+- [x] Single `cargo run` starts both servers
+- [x] Auth server on port 3000 with frontend + oauth2_passkey
+- [x] Resource API on port 3001 with CORS
+- [x] Frontend demonstrates Cross-Origin resource access
+- [x] Cookie sharing across subdomains verified
+- [x] README updated with architecture explanation
+- [x] Askama templates (no static HTML)
+- [x] OAuth2 + Passkey via oauth2_passkey_full_router()
+- [x] RESOURCE_API_ORIGIN configurable via environment variable

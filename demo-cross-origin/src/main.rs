@@ -1,61 +1,130 @@
-//! Demo application for Cross-Origin Same-Site cookie authentication (Pattern 2).
+//! Cross-Origin Same-Site Demo (Pattern 2)
 //!
-//! This demo demonstrates how to configure oauth2-passkey for cross-origin deployments
-//! where the frontend and API are on different subdomains of the same site.
+//! Demonstrates how a **separate Resource API** can validate session cookies
+//! issued by the Auth Server, using cookie domain sharing.
 //!
 //! # Architecture
 //!
 //! ```text
-//! http://auth.example.local:3000    (Auth Server + Frontend)
-//!     |
-//!     +-- Frontend (static files)
-//!     +-- oauth2_passkey (authentication)
-//!     +-- Set-Cookie: Domain=.example.local
+//! Auth Server (auth.example.local:3000)
+//!   ├── Frontend (this demo's UI)
+//!   ├── oauth2_passkey (OAuth2 + Passkey authentication)
+//!   └── Issues Cookie: Domain=.example.local
 //!
-//! http://api.example.local:3001     (Resource API)
-//!     |
-//!     +-- Protected endpoints
-//!     +-- Session validation (same Cookie)
-//!     +-- CORS: Access-Control-Allow-Origin: http://auth.example.local:3000
+//! Resource API (api.example.local:3001)
+//!   ├── Business logic endpoints (/api/*)
+//!   ├── Validates same session Cookie
+//!   └── CORS enabled for Auth Server origin
 //! ```
 //!
-//! # Pattern 2 Demonstration
+//! # Key Points
 //!
-//! This demo shows how a **separate API server** can validate sessions using
-//! cookies issued by the auth server. The key is:
-//!
-//! 1. Auth server sets `Cookie: Domain=.example.local`
-//! 2. Browser sends the same cookie to `api.example.local`
-//! 3. Resource API validates the cookie and authorizes the request
+//! 1. **Auth Server**: Uses `oauth2_passkey_full_router()` for complete auth
+//! 2. **Resource API**: Separate server that only validates cookies (no auth routes)
+//! 3. **Cookie Domain**: `SESSION_COOKIE_DOMAIN=.example.local` enables sharing
+//! 4. **CORS**: Only needed on Resource API (Auth Server is Same-Origin with frontend)
 //!
 //! # Setup
 //!
 //! 1. Add to /etc/hosts:
 //!    ```
-//!    127.0.0.1 auth.example.local
-//!    127.0.0.1 api.example.local
+//!    127.0.0.1 auth.example.local api.example.local
 //!    ```
 //!
-//! 2. Start both servers (single command):
+//! 2. Configure `.env` (copy from `.env.example`)
+//!
+//! 3. Start both servers:
 //!    ```bash
 //!    cd demo-cross-origin && cargo run
 //!    ```
 //!
-//! 3. Open http://auth.example.local:3000 in your browser
+//! 4. Open http://auth.example.local:3000
 
-use axum::{Json, Router, response::IntoResponse, routing::get};
+use askama::Template;
+use axum::{
+    Json, Router,
+    http::StatusCode,
+    response::{Html, IntoResponse, Response},
+    routing::get,
+};
 use dotenvy::dotenv;
 use serde::Serialize;
-use tower_http::services::ServeDir;
+use std::sync::LazyLock;
 
-use oauth2_passkey_axum::{AuthUser, cors_layer, oauth2_passkey_full_router};
+use oauth2_passkey_axum::{
+    AuthUser, O2P_CUSTOM_CSS_URL, O2P_ROUTE_PREFIX, cors_layer, oauth2_passkey_full_router,
+};
 
 mod server;
 use crate::server::{init_tracing, spawn_http_server};
 
-// ============================================================================
-// Resource API endpoints (for api.example.local:3001)
-// ============================================================================
+// =============================================================================
+// Configuration
+// =============================================================================
+
+/// Resource API origin (e.g., "http://api.example.local:3001")
+/// This is where the frontend will make cross-origin requests to.
+pub static RESOURCE_API_ORIGIN: LazyLock<String> = LazyLock::new(|| {
+    std::env::var("RESOURCE_API_ORIGIN")
+        .unwrap_or_else(|_| "http://api.example.local:3001".to_string())
+});
+
+/// Cookie domain for cross-subdomain sharing
+pub static COOKIE_DOMAIN: LazyLock<String> = LazyLock::new(|| {
+    std::env::var("SESSION_COOKIE_DOMAIN").unwrap_or_else(|_| ".example.local".to_string())
+});
+
+// =============================================================================
+// Auth Server Templates
+// =============================================================================
+
+#[derive(Template)]
+#[template(path = "index.j2")]
+struct IndexTemplate<'a> {
+    prefix: &'a str,
+    custom_css_url: Option<&'a str>,
+    authenticated: bool,
+    user_account: &'a str,
+    user_label: &'a str,
+    auth_origin: &'a str,
+    resource_api_origin: &'a str,
+    cookie_domain: &'a str,
+}
+
+// =============================================================================
+// Auth Server Handlers
+// =============================================================================
+
+/// Main page - shows authentication status and Resource API test buttons
+async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
+    let auth_origin =
+        std::env::var("ORIGIN").unwrap_or_else(|_| "http://auth.example.local:3000".to_string());
+
+    let (authenticated, user_account, user_label) = match &user {
+        Some(u) => (true, u.account.as_str(), u.label.as_str()),
+        None => (false, "", ""),
+    };
+
+    let template = IndexTemplate {
+        prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+        authenticated,
+        user_account,
+        user_label,
+        auth_origin: &auth_origin,
+        resource_api_origin: RESOURCE_API_ORIGIN.as_str(),
+        cookie_domain: COOKIE_DOMAIN.as_str(),
+    };
+
+    match template.render() {
+        Ok(html) => Ok(Html(html).into_response()),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    }
+}
+
+// =============================================================================
+// Resource API Handlers
+// =============================================================================
 
 #[derive(Serialize)]
 struct UserInfo {
@@ -63,7 +132,7 @@ struct UserInfo {
     label: String,
 }
 
-/// Public endpoint on Resource API - shows auth status
+/// Public endpoint - shows whether the cookie-based auth works cross-origin
 async fn resource_info(user: Option<AuthUser>) -> impl IntoResponse {
     let (authenticated, user_info) = match user {
         Some(u) => (
@@ -81,25 +150,24 @@ async fn resource_info(user: Option<AuthUser>) -> impl IntoResponse {
         "endpoint": "/api/info",
         "authenticated": authenticated,
         "user": user_info,
-        "note": "This endpoint is on a DIFFERENT server than auth, but shares the same session cookie"
+        "note": "Cookie issued by Auth Server is validated here on Resource API"
     }))
 }
 
-/// Protected endpoint on Resource API - requires authentication
+/// Protected endpoint - requires valid session cookie
 async fn resource_protected(user: AuthUser) -> impl IntoResponse {
     Json(serde_json::json!({
         "server": "Resource API",
         "endpoint": "/api/protected",
-        "message": format!("Hello, {}! You accessed a protected resource on a SEPARATE server.", user.account),
+        "message": format!("Hello, {}! Cross-origin cookie sharing works!", user.account),
         "user": {
             "account": user.account,
             "label": user.label,
-        },
-        "note": "Cookie issued by auth.example.local:3000 is valid here on api.example.local:3001"
+        }
     }))
 }
 
-/// Health check for Resource API
+/// Health check
 async fn resource_health() -> impl IntoResponse {
     Json(serde_json::json!({
         "server": "Resource API",
@@ -107,9 +175,9 @@ async fn resource_health() -> impl IntoResponse {
     }))
 }
 
-// ============================================================================
+// =============================================================================
 // Main
-// ============================================================================
+// =============================================================================
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -122,7 +190,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     oauth2_passkey_axum::init().await?;
 
-    // Get ports from environment (or use defaults)
+    // Get ports from environment
     let auth_port: u16 = std::env::var("AUTH_PORT")
         .ok()
         .and_then(|s| s.parse().ok())
@@ -132,64 +200,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|s| s.parse().ok())
         .unwrap_or(3001);
 
-    // ========================================================================
+    // =========================================================================
     // Auth Server (auth.example.local:3000)
-    // - Frontend static files
-    // - oauth2_passkey authentication endpoints
+    // - Frontend UI (index page)
+    // - Full oauth2_passkey authentication (OAuth2 + Passkey)
     // - No CORS needed (Same-Origin with frontend)
-    // ========================================================================
+    // =========================================================================
     let auth_app = Router::new()
-        .merge(oauth2_passkey_full_router())
-        .fallback_service(ServeDir::new("frontend"));
+        .route("/", get(index))
+        .merge(oauth2_passkey_full_router());
 
-    // ========================================================================
+    // =========================================================================
     // Resource API Server (api.example.local:3001)
-    // - Protected business logic endpoints
-    // - Session validation via Cookie (issued by Auth Server)
-    // - CORS enabled for cross-origin requests from frontend
-    // ========================================================================
+    // - Business logic endpoints only
+    // - Validates session cookie (issued by Auth Server)
+    // - CORS required for cross-origin requests from frontend
+    // =========================================================================
     let resource_api = Router::new()
         .route("/api/info", get(resource_info))
         .route("/api/protected", get(resource_protected))
         .route("/api/health", get(resource_health));
 
-    // Apply CORS layer for cross-origin requests from auth server
+    // Apply CORS layer
     let resource_api = if let Some(cors) = cors_layer() {
-        tracing::info!("CORS layer enabled on Resource API");
+        tracing::info!("CORS enabled on Resource API");
         resource_api.layer(cors)
     } else {
-        tracing::warn!("CORS not configured - cross-origin requests to Resource API will fail!");
-        tracing::warn!("Set CORS_ALLOWED_ORIGINS=http://auth.example.local:3000");
+        tracing::warn!("CORS not configured! Set CORS_ALLOWED_ORIGINS in .env");
         resource_api
     };
 
-    // ========================================================================
+    // =========================================================================
     // Startup
-    // ========================================================================
+    // =========================================================================
+    let auth_origin =
+        std::env::var("ORIGIN").unwrap_or_else(|_| "http://auth.example.local:3000".to_string());
+
     tracing::info!("");
     tracing::info!("=== Cross-Origin Same-Site Demo (Pattern 2) ===");
     tracing::info!("");
-    tracing::info!("Auth Server:     http://auth.example.local:{}", auth_port);
-    tracing::info!("  - Frontend (static files)");
-    tracing::info!("  - Authentication endpoints (/o2p/*)");
-    tracing::info!("  - Issues Cookie with Domain=.example.local");
+    tracing::info!("Auth Server:     {}", auth_origin);
+    tracing::info!("  - Frontend + OAuth2/Passkey authentication");
+    tracing::info!("  - Cookie Domain: {}", *COOKIE_DOMAIN);
     tracing::info!("");
-    tracing::info!("Resource API:    http://api.example.local:{}", api_port);
-    tracing::info!("  - Protected endpoints (/api/*)");
-    tracing::info!("  - Validates Cookie issued by Auth Server");
-    tracing::info!("  - CORS enabled for auth server origin");
+    tracing::info!("Resource API:    {}", *RESOURCE_API_ORIGIN);
+    tracing::info!("  - Cross-origin endpoints (/api/*)");
+    tracing::info!("  - Validates session cookie from Auth Server");
     tracing::info!("");
     tracing::info!("Setup: Add to /etc/hosts:");
     tracing::info!("  127.0.0.1 auth.example.local api.example.local");
     tracing::info!("");
-    tracing::info!("Then open: http://auth.example.local:{}", auth_port);
+    tracing::info!("Then open: {}", auth_origin);
     tracing::info!("================================================");
 
     // Spawn both servers
     let auth_server = spawn_http_server(auth_port, auth_app);
     let api_server = spawn_http_server(api_port, resource_api);
 
-    // Wait for both servers (they run indefinitely)
     tokio::try_join!(auth_server, api_server)?;
 
     Ok(())
