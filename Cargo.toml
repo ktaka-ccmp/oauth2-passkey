@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "demo-api",
     "demo-both",
     "demo-custom-login",
     "demo-oauth2",
