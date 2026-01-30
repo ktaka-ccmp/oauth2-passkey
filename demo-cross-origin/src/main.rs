@@ -1,6 +1,6 @@
 //! Cross-Origin Same-Site Demo (Pattern 2)
 //!
-//! Demonstrates how a **separate Resource API** can validate session cookies
+//! Demonstrates how a **separate API server** can validate session cookies
 //! issued by the Auth Server, using cookie domain sharing.
 //!
 //! # Architecture
@@ -11,7 +11,7 @@
 //!   ├── oauth2_passkey (OAuth2 + Passkey authentication)
 //!   └── Issues Cookie: Domain=.example.local
 //!
-//! Resource API (api.example.local:3001)
+//! API Server (api.example.local:3001)
 //!   ├── Business logic endpoints (/api/*)
 //!   ├── Validates same session Cookie
 //!   └── CORS enabled for Auth Server origin
@@ -20,9 +20,9 @@
 //! # Key Points
 //!
 //! 1. **Auth Server**: Uses `oauth2_passkey_full_router()` for complete auth
-//! 2. **Resource API**: Separate server that only validates cookies (no auth routes)
+//! 2. **API Server**: Separate server that only validates cookies (no auth routes)
 //! 3. **Cookie Domain**: `SESSION_COOKIE_DOMAIN=.example.local` enables sharing
-//! 4. **CORS**: Only needed on Resource API (Auth Server is Same-Origin with frontend)
+//! 4. **CORS**: Only needed on API Server (Auth Server is Same-Origin with frontend)
 //!
 //! # Setup
 //!
@@ -62,11 +62,10 @@ use crate::server::{init_tracing, is_tls_configured, spawn_http_server, spawn_ht
 // Configuration
 // =============================================================================
 
-/// Resource API origin (e.g., "http://api.example.local:3001")
+/// API server origin (e.g., "http://api.example.local:3001")
 /// This is where the frontend will make cross-origin requests to.
-pub static RESOURCE_API_ORIGIN: LazyLock<String> = LazyLock::new(|| {
-    std::env::var("RESOURCE_API_ORIGIN")
-        .unwrap_or_else(|_| "http://api.example.local:3001".to_string())
+pub static API_ORIGIN: LazyLock<String> = LazyLock::new(|| {
+    std::env::var("API_ORIGIN").unwrap_or_else(|_| "http://api.example.local:3001".to_string())
 });
 
 /// Cookie domain for cross-subdomain sharing
@@ -87,7 +86,7 @@ struct IndexTemplate<'a> {
     user_account: &'a str,
     user_label: &'a str,
     auth_origin: &'a str,
-    resource_api_origin: &'a str,
+    api_origin: &'a str,
     cookie_domain: &'a str,
 }
 
@@ -95,7 +94,7 @@ struct IndexTemplate<'a> {
 // Auth Server Handlers
 // =============================================================================
 
-/// Main page - shows authentication status and Resource API test buttons
+/// Main page - shows authentication status and API test buttons
 async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
     let auth_origin =
         std::env::var("ORIGIN").unwrap_or_else(|_| "http://auth.example.local:3000".to_string());
@@ -112,7 +111,7 @@ async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
         user_account,
         user_label,
         auth_origin: &auth_origin,
-        resource_api_origin: RESOURCE_API_ORIGIN.as_str(),
+        api_origin: API_ORIGIN.as_str(),
         cookie_domain: COOKIE_DOMAIN.as_str(),
     };
 
@@ -123,7 +122,7 @@ async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
 }
 
 // =============================================================================
-// Resource API Handlers
+// API Handlers
 // =============================================================================
 
 #[derive(Serialize)]
@@ -146,18 +145,18 @@ async fn resource_info(user: Option<AuthUser>) -> impl IntoResponse {
     };
 
     Json(serde_json::json!({
-        "server": "Resource API",
+        "server": "API",
         "endpoint": "/api/info",
         "authenticated": authenticated,
         "user": user_info,
-        "note": "Cookie issued by Auth Server is validated here on Resource API"
+        "note": "Cookie issued by Auth Server is validated here on API server"
     }))
 }
 
 /// Protected endpoint - requires valid session cookie
 async fn resource_protected(user: AuthUser) -> impl IntoResponse {
     Json(serde_json::json!({
-        "server": "Resource API",
+        "server": "API",
         "endpoint": "/api/protected",
         "message": format!("Hello, {}! Cross-origin cookie sharing works!", user.account),
         "user": {
@@ -170,7 +169,7 @@ async fn resource_protected(user: AuthUser) -> impl IntoResponse {
 /// Health check
 async fn resource_health() -> impl IntoResponse {
     Json(serde_json::json!({
-        "server": "Resource API",
+        "server": "API",
         "status": "ok"
     }))
 }
@@ -206,28 +205,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // - Full oauth2_passkey authentication (OAuth2 + Passkey)
     // - No CORS needed (Same-Origin with frontend)
     // =========================================================================
-    let auth_app = Router::new()
+    let auth_route = Router::new()
         .route("/", get(index))
         .merge(oauth2_passkey_full_router());
 
     // =========================================================================
-    // Resource API Server (api.example.local:3001)
+    // API Server (api.example.local:3001)
     // - Business logic endpoints only
     // - Validates session cookie (issued by Auth Server)
     // - CORS required for cross-origin requests from frontend
     // =========================================================================
-    let resource_api = Router::new()
+    let api_route = Router::new()
         .route("/api/info", get(resource_info))
         .route("/api/protected", get(resource_protected))
         .route("/api/health", get(resource_health));
 
     // Apply CORS layer
-    let resource_api = if let Some(cors) = cors_layer() {
-        tracing::info!("CORS enabled on Resource API");
-        resource_api.layer(cors)
+    let api_route = if let Some(cors) = cors_layer() {
+        tracing::info!("CORS enabled on API server");
+        api_route.layer(cors)
     } else {
         tracing::warn!("CORS not configured! Set CORS_ALLOWED_ORIGINS in .env");
-        resource_api
+        api_route
     };
 
     // =========================================================================
@@ -248,7 +247,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::info!("  - Cookie Domain: {}", *COOKIE_DOMAIN);
     }
     tracing::info!("");
-    tracing::info!("Resource API:    {}", *RESOURCE_API_ORIGIN);
+    tracing::info!("API Server:      {}", *API_ORIGIN);
     tracing::info!("  - Cross-origin endpoints (/api/*)");
     tracing::info!("  - Validates session cookie from Auth Server");
     tracing::info!("");
@@ -257,12 +256,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn both servers (HTTP or HTTPS based on configuration)
     if use_https {
-        let auth_server = spawn_https_server(auth_port, auth_app).await;
-        let api_server = spawn_https_server(api_port, resource_api).await;
+        let auth_server = spawn_https_server(auth_port, auth_route).await;
+        let api_server = spawn_https_server(api_port, api_route).await;
         tokio::try_join!(auth_server, api_server)?;
     } else {
-        let auth_server = spawn_http_server(auth_port, auth_app);
-        let api_server = spawn_http_server(api_port, resource_api);
+        let auth_server = spawn_http_server(auth_port, auth_route);
+        let api_server = spawn_http_server(api_port, api_route);
         tokio::try_join!(auth_server, api_server)?;
     }
 

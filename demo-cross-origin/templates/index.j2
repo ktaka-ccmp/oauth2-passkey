@@ -71,7 +71,7 @@
 <div class="container">
     <div class="page-header">
         <h1>Cross-Origin Same-Site Demo</h1>
-        <p style="color: var(--o2p-text-secondary);">Pattern 2: Auth Server + Separate Resource API</p>
+        <p style="color: var(--o2p-text-secondary);">Pattern 2: Auth Server + Separate API Server</p>
         <nav>
             <a href="/">Home</a>
             <a href="{{prefix}}/user/account">My Account</a>
@@ -87,14 +87,14 @@
 
     <div class="alert-info">
         <strong>Pattern 2 Demo:</strong> This page is served from the <strong>Auth Server</strong>.
-        After login, you can call the <strong>Resource API</strong> (different subdomain) using the same session cookie.
+        After login, you can call the <strong>API server</strong> (different subdomain) using the same session cookie.
     </div>
 
     <div class="section">
         <div class="section-header">
             <h2 class="section-title">Architecture</h2>
         </div>
-        <div class="architecture">Auth Server ({{auth_origin}})              Resource API ({{resource_api_origin}})
+        <div class="architecture">Auth Server ({{auth_origin}})              API Server ({{api_origin}})
 ├── This page (frontend)                   ├── /api/info (public)
 ├── {{prefix}}/user/login (OAuth2/Passkey) ├── /api/protected (auth required)
 └── Cookie: Domain={{cookie_domain}}       └── Validates same Cookie via CORS</div>
@@ -122,10 +122,10 @@
 
     <div class="section">
         <div class="section-header">
-            <h2 class="section-title">Test Resource API <span class="server-tag api">Cross-Origin</span></h2>
+            <h2 class="section-title">Test API <span class="server-tag api">Cross-Origin</span></h2>
         </div>
         <p style="color: var(--o2p-text-secondary); margin-bottom: var(--o2p-space-md);">
-            These buttons call the Resource API at <code>{{resource_api_origin}}</code>.
+            These buttons call the API server at <code>{{api_origin}}</code>.
             The browser sends the session cookie automatically because both servers share <code>Domain={{cookie_domain}}</code>.
         </p>
         <div class="item">
@@ -142,12 +142,12 @@
         <div class="config-grid">
             <span class="config-label">Auth Server (Same-Origin):</span>
             <span class="config-value">{{auth_origin}}</span>
-            <span class="config-label">Resource API (Cross-Origin):</span>
-            <span class="config-value">{{resource_api_origin}}</span>
+            <span class="config-label">API Server (Cross-Origin):</span>
+            <span class="config-value">{{api_origin}}</span>
             <span class="config-label">Cookie Domain:</span>
             <span class="config-value">{{cookie_domain}}</span>
             <span class="config-label">CORS Credentials:</span>
-            <span class="config-value">include (for Resource API)</span>
+            <span class="config-value">include (for API server)</span>
         </div>
     </div>
 
@@ -160,7 +160,7 @@
 </div>
 
 <script>
-    const RESOURCE_API_ORIGIN = '{{resource_api_origin}}';
+    const API_ORIGIN = '{{api_origin}}';
 
     function log(message, type = 'info') {
         const logEl = document.getElementById('log');
@@ -173,22 +173,22 @@
     }
 
     async function callResourceApi(path) {
-        const url = `${RESOURCE_API_ORIGIN}${path}`;
-        log(`[Resource API] GET ${url} (Cross-Origin, credentials: include)`, 'warning');
+        const url = `${API_ORIGIN}${path}`;
+        log(`[API] GET ${url} (Cross-Origin, credentials: include)`, 'warning');
 
         try {
             const response = await fetch(url, {
                 credentials: 'include',  // Required for cross-origin cookies!
             });
             const data = await response.json().catch(() => null);
-            log(`[Resource API] ${response.status}: ${JSON.stringify(data)}`, response.ok ? 'success' : 'error');
+            log(`[API] ${response.status}: ${JSON.stringify(data)}`, response.ok ? 'success' : 'error');
         } catch (error) {
-            log(`[Resource API] Error: ${error.message}`, 'error');
+            log(`[API] Error: ${error.message}`, 'error');
         }
     }
 
     // Initial log
-    log('Page loaded. Auth calls go to Same-Origin, Resource API calls go to Cross-Origin.');
+    log('Page loaded. Auth calls go to Same-Origin, API calls go to Cross-Origin.');
 </script>
 </body>
 </html>

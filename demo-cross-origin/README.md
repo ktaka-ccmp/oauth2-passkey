@@ -1,7 +1,7 @@
 # Cross-Origin Same-Site Demo (Pattern 2)
 
 This demo demonstrates **Pattern 2: Cross-Origin Same-Site** authentication.
-A separate **Resource API** validates session cookies issued by the **Auth Server**.
+A separate **API server** validates session cookies issued by the **Auth Server**.
 
 ## Table of Contents
 
@@ -27,7 +27,7 @@ cargo run
   │     ├── OAuth2 + Passkey authentication (oauth2_passkey_full_router)
   │     └── Issues Cookie
   │
-  └── Resource API (localhost:3002)
+  └── API Server (localhost:3002)
         ├── /api/info (public endpoint)
         ├── /api/protected (requires auth)
         └── Validates same Cookie via CORS
@@ -38,10 +38,10 @@ cargo run
 **Pattern 2's value**: A session cookie issued by one server can be validated by
 a completely **separate server** on a different subdomain (or port).
 
-| Server             | Role                     | CORS Needed |
-|--------------------|--------------------------|-------------|
-| Auth Server        | Issues session cookie    | No          |
-| Resource API       | Validates session cookie | Yes         |
+| Server      | Role                     | CORS Needed |
+|-------------|--------------------------|-------------|
+| Auth Server | Issues session cookie    | No          |
+| API Server  | Validates session cookie | Yes         |
 
 Use cases:
 
@@ -68,7 +68,7 @@ The simplest way to try this demo. No `/etc/hosts`, HTTPS, or proxy required.
 ```bash
 cat > .env << 'EOF'
 ORIGIN='http://localhost:3001'
-RESOURCE_API_ORIGIN='http://localhost:3002'
+API_ORIGIN='http://localhost:3002'
 CORS_ALLOWED_ORIGINS='http://localhost:3001'
 CORS_ALLOW_CREDENTIALS=true
 
@@ -128,7 +128,7 @@ Browser
   │
   ├─→ https://auth.foobar.com ──→ nginx/Caddy ──→ localhost:3001 (Auth Server)
   │
-  └─→ https://api.foobar.com  ──→ nginx/Caddy ──→ localhost:3002 (Resource API)
+  └─→ https://api.foobar.com  ──→ nginx/Caddy ──→ localhost:3002 (API Server)
 ```
 
 #### 1. Nginx configuration
@@ -153,7 +153,7 @@ server {
     }
 }
 
-# Resource API
+# API Server
 server {
     listen 443 ssl;
     server_name api.foobar.com;
@@ -192,7 +192,7 @@ Caddy automatically obtains and renews certificates via Let's Encrypt.
 cat > .env << 'EOF'
 # ORIGIN must match the external HTTPS URL
 ORIGIN='https://auth.foobar.com'
-RESOURCE_API_ORIGIN='https://api.foobar.com'
+API_ORIGIN='https://api.foobar.com'
 SESSION_COOKIE_DOMAIN='.foobar.com'
 CORS_ALLOWED_ORIGINS='https://auth.foobar.com'
 CORS_ALLOW_CREDENTIALS=true
@@ -271,7 +271,7 @@ cp /path/to/privkey.pem certs/
 ```bash
 cat > .env << 'EOF'
 ORIGIN='https://auth.foobar.com'
-RESOURCE_API_ORIGIN='https://api.foobar.com'
+API_ORIGIN='https://api.foobar.com'
 SESSION_COOKIE_DOMAIN='.foobar.com'
 CORS_ALLOWED_ORIGINS='https://auth.foobar.com'
 CORS_ALLOW_CREDENTIALS=true
@@ -326,7 +326,7 @@ Navigate to <https://auth.foobar.com>
 | Variable                      | Description                     | Example                          |
 |-------------------------------|---------------------------------|----------------------------------|
 | `ORIGIN`                      | Auth server URL                 | `http://localhost:3001`          |
-| `RESOURCE_API_ORIGIN`         | Resource API URL (for frontend) | `http://localhost:3002`          |
+| `API_ORIGIN`                  | API server URL (for frontend)   | `http://localhost:3002`          |
 | `CORS_ALLOWED_ORIGINS`        | Origins allowed for CORS        | `http://localhost:3001`          |
 | `OAUTH2_GOOGLE_CLIENT_ID`     | Google OAuth2 client ID         | `xxx.apps.googleusercontent.com` |
 | `OAUTH2_GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret     | (from Google Cloud Console)      |
@@ -336,7 +336,7 @@ Navigate to <https://auth.foobar.com>
 | Variable                | Default | Description                              |
 |-------------------------|---------|------------------------------------------|
 | `AUTH_PORT`             | 3000    | Auth server port                         |
-| `API_PORT`              | 3001    | Resource API port                        |
+| `API_PORT`              | 3001    | API server port                          |
 | `SESSION_COOKIE_DOMAIN` | -       | Cookie domain (e.g., `.foobar.com`)      |
 | `TLS_CERT_PATH`         | -       | Path to TLS certificate (enables HTTPS)  |
 | `TLS_KEY_PATH`          | -       | Path to TLS private key                  |
@@ -346,9 +346,9 @@ Navigate to <https://auth.foobar.com>
 1. **User visits Auth Server** (e.g., `http://localhost:3001`)
 2. **User logs in** via OAuth2 (Google) or Passkey
 3. **Auth Server sets cookie** (with optional `Domain` for subdomains)
-4. **User clicks "Test Resource API"** buttons on the page
-5. **Browser sends cookie** to Resource API (Cross-Origin, Same-Site)
-6. **Resource API validates session** using the shared cookie
+4. **User clicks "Test API"** buttons on the page
+5. **Browser sends cookie** to API server (Cross-Origin, Same-Site)
+6. **API server validates session** using the shared cookie
 7. **CORS headers** allow the cross-origin response
 
 ## Key Technical Points
@@ -364,7 +364,7 @@ SESSION_COOKIE_DOMAIN='.foobar.com'
 The leading dot allows the cookie to be shared across all subdomains:
 
 - `auth.foobar.com` (Auth Server) - issues the cookie
-- `api.foobar.com` (Resource API) - receives and validates the cookie
+- `api.foobar.com` (API Server) - receives and validates the cookie
 
 ### Cookie Name
 
@@ -382,12 +382,12 @@ CORS_ALLOWED_ORIGINS='http://localhost:3001'
 CORS_ALLOW_CREDENTIALS=true
 ```
 
-Only the Resource API needs CORS. The Auth Server serves the frontend
+Only the API server needs CORS. The Auth Server serves the frontend
 (Same-Origin), so no CORS is needed there.
 
 ## Troubleshooting
 
-### "Not authenticated" on Resource API
+### "Not authenticated" on API server
 
 1. Check that both servers use the same session storage:
    - `GENERIC_DATA_STORE_URL` must be shared (use PostgreSQL/Redis for separate processes)
