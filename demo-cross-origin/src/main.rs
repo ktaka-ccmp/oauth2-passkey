@@ -56,7 +56,7 @@ use oauth2_passkey_axum::{
 };
 
 mod server;
-use crate::server::{init_tracing, spawn_http_server};
+use crate::server::{init_tracing, is_tls_configured, spawn_http_server, spawn_https_server};
 
 // =============================================================================
 // Configuration
@@ -234,30 +234,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Startup
     // =========================================================================
     let auth_origin =
-        std::env::var("ORIGIN").unwrap_or_else(|_| "http://auth.example.local:3000".to_string());
+        std::env::var("ORIGIN").unwrap_or_else(|_| "http://localhost:3001".to_string());
+    let use_https = is_tls_configured();
+    let protocol = if use_https { "HTTPS" } else { "HTTP" };
 
     tracing::info!("");
     tracing::info!("=== Cross-Origin Same-Site Demo (Pattern 2) ===");
     tracing::info!("");
+    tracing::info!("Protocol:        {}", protocol);
     tracing::info!("Auth Server:     {}", auth_origin);
     tracing::info!("  - Frontend + OAuth2/Passkey authentication");
-    tracing::info!("  - Cookie Domain: {}", *COOKIE_DOMAIN);
+    if !COOKIE_DOMAIN.is_empty() {
+        tracing::info!("  - Cookie Domain: {}", *COOKIE_DOMAIN);
+    }
     tracing::info!("");
     tracing::info!("Resource API:    {}", *RESOURCE_API_ORIGIN);
     tracing::info!("  - Cross-origin endpoints (/api/*)");
     tracing::info!("  - Validates session cookie from Auth Server");
     tracing::info!("");
-    tracing::info!("Setup: Add to /etc/hosts:");
-    tracing::info!("  127.0.0.1 auth.example.local api.example.local");
-    tracing::info!("");
-    tracing::info!("Then open: {}", auth_origin);
+    tracing::info!("Open: {}", auth_origin);
     tracing::info!("================================================");
 
-    // Spawn both servers
-    let auth_server = spawn_http_server(auth_port, auth_app);
-    let api_server = spawn_http_server(api_port, resource_api);
-
-    tokio::try_join!(auth_server, api_server)?;
+    // Spawn both servers (HTTP or HTTPS based on configuration)
+    if use_https {
+        let auth_server = spawn_https_server(auth_port, auth_app).await;
+        let api_server = spawn_https_server(api_port, resource_api).await;
+        tokio::try_join!(auth_server, api_server)?;
+    } else {
+        let auth_server = spawn_http_server(auth_port, auth_app);
+        let api_server = spawn_http_server(api_port, resource_api);
+        tokio::try_join!(auth_server, api_server)?;
+    }
 
     Ok(())
 }
