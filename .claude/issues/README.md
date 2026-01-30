@@ -6,19 +6,18 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (7)
+### Open (6)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `2026-01-23-01` | medium | large | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
 | `2026-01-30-02` | medium | medium | [Admin Force Logout Feature](open/2026-01-30-admin-force-logout.md) |
 | `2026-01-30-03` | medium | large | [Admin Login History View](open/2026-01-30-admin-login-history.md) |
-| `2026-01-30-05` | medium | small | [getClientCapabilities Feature Detection](open/2026-01-30-client-capabilities-detection.md) |
 | `2026-01-30-06` | medium | small | [Passkey Endpoint (.well-known) Support](open/2026-01-30-passkey-endpoint-wellknown.md) |
 | `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
 
-### Completed (17)
+### Completed (18)
 
 | ID | Title |
 |----|-------|
@@ -26,6 +25,7 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-29-01` | [Change PASSKEY_USER_HANDLE_UNIQUE default to false](completed/2026-01-29-change-user-handle-default.md) |
 | `2026-01-29-03` | [Create Terminology/Glossary Document](completed/2026-01-29-terminology-document.md) |
 | `2026-01-30-04` | [Update README.md with Links and Demo Info](completed/2026-01-30-readme-links-update.md) |
+| `2026-01-30-05` | [getClientCapabilities Feature Detection](completed/2026-01-30-client-capabilities-detection.md) |
 | `2025-01-23-02` | [CSRF Documentation & Snapshot System](completed/2025-01-23-csrf-docs-snapshot-system.md) |
 | `2026-01-24-02` | [Demo Apps Implementation](completed/2026-01-24-demo-apps-implementation.md) |
 | `2026-01-26-01` | [Demo Apps Database Configuration](completed/2026-01-26-demo-apps-db-config.md) |
