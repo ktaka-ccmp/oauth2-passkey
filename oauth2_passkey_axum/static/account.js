@@ -2,6 +2,48 @@ window.addEventListener("error", function (event) {
     console.error("Uncaught error:", event.error);
 });
 
+// WebAuthn capabilities detection using getClientCapabilities API (Chrome 131+)
+// Cached capabilities object - null means not yet fetched, undefined means not supported
+let _passkeyCapabilities = null;
+
+// Initialize and cache WebAuthn capabilities
+async function initPasskeyCapabilities() {
+    if (_passkeyCapabilities !== null) {
+        return _passkeyCapabilities;
+    }
+    if (typeof PublicKeyCredential?.getClientCapabilities === 'function') {
+        try {
+            _passkeyCapabilities = await PublicKeyCredential.getClientCapabilities();
+            console.log('WebAuthn capabilities:', _passkeyCapabilities);
+            return _passkeyCapabilities;
+        } catch (err) {
+            console.warn('getClientCapabilities error:', err);
+            _passkeyCapabilities = undefined;
+            return undefined;
+        }
+    }
+    _passkeyCapabilities = undefined;
+    console.log('getClientCapabilities not supported, using fallback feature detection');
+    return undefined;
+}
+
+// Check if a specific Signal API capability is supported
+// Falls back to typeof check if getClientCapabilities is not available
+function hasSignalCapability(capabilityName) {
+    // If capabilities are cached, use them
+    if (_passkeyCapabilities) {
+        return _passkeyCapabilities[capabilityName] === true;
+    }
+    // Fallback: check if the function exists
+    if (window.PublicKeyCredential) {
+        return typeof window.PublicKeyCredential[capabilityName] === 'function';
+    }
+    return false;
+}
+
+// Initialize capabilities on page load
+initPasskeyCapabilities();
+
 function toggleEditUserForm() {
     const displayDiv = document.getElementById("user-info-display");
     const editForm = document.getElementById("user-edit-form");
@@ -171,14 +213,10 @@ function unlinkOAuth2Account(provider, providerUserId) {
 //
 // See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
 function synchronizeCredentials(userHandle, remainingCredentialIds) {
-    // Check if the WebAuthn API and signalAllAcceptedCredentials are available
-    if (
-        !window.PublicKeyCredential ||
-        typeof window.PublicKeyCredential.signalAllAcceptedCredentials !==
-            "function"
-    ) {
+    // Check if signalAllAcceptedCredentials is available using capabilities detection
+    if (!hasSignalCapability('signalAllAcceptedCredentials')) {
         console.log(
-            "WebAuthn credential management API not available or not supported"
+            "signalAllAcceptedCredentials not available or not supported"
         );
         return Promise.resolve(); // Return resolved promise for chaining
     }
@@ -243,26 +281,15 @@ function synchronizeCredentials(userHandle, remainingCredentialIds) {
 // See docs/src/webauthn/user-handle-and-signal-api.md for detailed documentation.
 function synchronizeCredentialsWithSignalUnknown(credentialId) {
     try {
-        // Check if the WebAuthn API is available
-        if (!window.PublicKeyCredential) {
-            console.log("WebAuthn credential management API not available");
-            return Promise.resolve();
-        }
-
-        console.log("PublicKeyCredential is available");
-
-        // Check if signalUnknownCredential is available
-        if (
-            typeof window.PublicKeyCredential.signalUnknownCredential !==
-            "function"
-        ) {
+        // Check if signalUnknownCredential is available using capabilities detection
+        if (!hasSignalCapability('signalUnknownCredential')) {
             console.log(
-                "signalUnknownCredential API not supported in this browser"
+                "signalUnknownCredential not available or not supported"
             );
             return Promise.resolve();
         }
 
-        console.log("signalUnknownCredential API is available");
+        console.log("signalUnknownCredential is available");
 
         let options = {
             rpId: window.location.hostname,
@@ -466,11 +493,8 @@ async function signalCurrentUserDetails(options) {
     try {
         console.log("signalCurrentUserDetails called with options:", options);
 
-        if (
-            !window.PublicKeyCredential ||
-            typeof window.PublicKeyCredential.signalCurrentUserDetails !==
-                "function"
-        ) {
+        // Check if signalCurrentUserDetails is available using capabilities detection
+        if (!hasSignalCapability('signalCurrentUserDetails')) {
             console.warn(
                 "signalCurrentUserDetails is not supported in this browser"
             );

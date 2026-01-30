@@ -1,3 +1,44 @@
+// WebAuthn capabilities detection using getClientCapabilities API (Chrome 131+)
+// Cached capabilities object - null means not yet fetched, undefined means not supported
+let _passkeyCapabilities = null;
+
+// Initialize and cache WebAuthn capabilities
+async function initPasskeyCapabilities() {
+    if (_passkeyCapabilities !== null) {
+        return _passkeyCapabilities;
+    }
+    if (typeof PublicKeyCredential?.getClientCapabilities === 'function') {
+        try {
+            _passkeyCapabilities = await PublicKeyCredential.getClientCapabilities();
+            console.log('WebAuthn capabilities:', _passkeyCapabilities);
+            return _passkeyCapabilities;
+        } catch (err) {
+            console.warn('getClientCapabilities error:', err);
+            _passkeyCapabilities = undefined;
+            return undefined;
+        }
+    }
+    _passkeyCapabilities = undefined;
+    return undefined;
+}
+
+// Check if a specific Signal API capability is supported
+// Falls back to typeof check if getClientCapabilities is not available
+function hasSignalCapability(capabilityName) {
+    // If capabilities are cached, use them
+    if (_passkeyCapabilities) {
+        return _passkeyCapabilities[capabilityName] === true;
+    }
+    // Fallback: check if the function exists
+    if (window.PublicKeyCredential) {
+        return typeof window.PublicKeyCredential[capabilityName] === 'function';
+    }
+    return false;
+}
+
+// Initialize capabilities on page load
+initPasskeyCapabilities();
+
 // Base64 URL encoding utilities
 function arrayBufferToBase64URL(buffer) {
     const bytes = new Uint8Array(buffer);
@@ -114,11 +155,7 @@ function base64URLToUint8Array(base64URL) {
                     // Note: This is always called on auth failure regardless of PASSKEY_SIGNAL_API_MODE,
                     // because the credential genuinely doesn't exist on the server.
                     // Browser support: Chrome 132+, Edge 132+, Safari 26+. Firefox not supported.
-                    if (
-                        credential.id &&
-                        window.PublicKeyCredential &&
-                        typeof window.PublicKeyCredential.signalUnknownCredential === "function"
-                    ) {
+                    if (credential.id && hasSignalCapability('signalUnknownCredential')) {
                         try {
                             await window.PublicKeyCredential.signalUnknownCredential({
                                 rpId: window.location.hostname,
@@ -158,8 +195,7 @@ function base64URLToUint8Array(base64URL) {
                     // Only call signalAllAcceptedCredentials if server includes credential_ids
                     // (controlled by PASSKEY_SIGNAL_API_MODE on the server)
                     if (
-                        window.PublicKeyCredential &&
-                        typeof window.PublicKeyCredential.signalAllAcceptedCredentials === "function" &&
+                        hasSignalCapability('signalAllAcceptedCredentials') &&
                         data.user_handle && data.credential_ids
                     ) {
                         const userIdBytes = new TextEncoder().encode(data.user_handle);
