@@ -81,7 +81,7 @@ pub async fn verify_page_session_token(
     page_session_token: Option<&String>,
 ) -> Result<(), SessionError> {
     let session_id: &str = match get_session_id_from_headers(headers) {
-        Ok(Some(session_id)) => session_id,
+        Ok(Some(extraction)) => extraction.session_id,
         _ => {
             return Err(SessionError::PageSessionToken(
                 "Session ID missing".to_string(),

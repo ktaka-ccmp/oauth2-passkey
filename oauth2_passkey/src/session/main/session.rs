@@ -1,11 +1,12 @@
 use chrono::{Duration, Utc};
 use headers::Cookie;
 use http::Method;
-use http::header::{COOKIE, HeaderMap};
+use http::header::{AUTHORIZATION, COOKIE, HeaderMap};
 use subtle::ConstantTimeEq;
 
 use crate::session::config::{
-    SESSION_CONFLICT_POLICY, SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME, SessionConflictPolicy,
+    SESSION_AUTH_MODE, SESSION_CONFLICT_POLICY, SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME,
+    SessionAuthMode, SessionConflictPolicy,
 };
 use crate::session::errors::SessionError;
 use crate::session::types::{
@@ -22,6 +23,49 @@ use crate::storage::{
 use super::user_sessions::{
     add_session_to_user_mapping, cleanup_stale_sessions, remove_session_from_user_mapping,
 };
+
+/// Indicates the source of session authentication.
+///
+/// Used to determine whether CSRF validation is required:
+/// - Cookie-based auth requires CSRF protection (cookies are auto-sent)
+/// - Bearer-based auth does not require CSRF (token must be explicitly provided)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthSource {
+    /// Session was authenticated via HTTP-only cookie
+    Cookie,
+    /// Session was authenticated via Authorization: Bearer header
+    Bearer,
+}
+
+/// Result of session ID extraction from headers.
+#[derive(Debug)]
+pub struct SessionExtraction<'a> {
+    /// The extracted session ID
+    pub session_id: &'a str,
+    /// The source of the session (cookie or bearer)
+    pub source: AuthSource,
+}
+
+/// Response from session creation, varies based on authentication mode.
+///
+/// In cookie mode, returns HTTP headers with Set-Cookie.
+/// In bearer mode, returns the token and expiration for JSON response.
+#[derive(Debug)]
+pub enum SessionCreationResponse {
+    /// No session response needed (e.g., adding credential to existing session)
+    NoOp,
+    /// Cookie-based session: return Set-Cookie headers
+    Cookie(HeaderMap),
+    /// Bearer token session: return token data for JSON response
+    Bearer {
+        /// The session token (to be used as Bearer token)
+        token: String,
+        /// Token type (always "Bearer")
+        token_type: String,
+        /// Time until token expires in seconds
+        expires_in: u64,
+    },
+}
 
 /// Prepare a logout response by removing the session cookie and deleting the session from storage
 ///
@@ -65,7 +109,7 @@ pub async fn prepare_logout_response(cookies: headers::Cookie) -> Result<HeaderM
 #[tracing::instrument(fields(user_id = %user_id.as_str(), session_id))]
 pub(super) async fn create_new_session_with_uid(
     user_id: UserId,
-) -> Result<HeaderMap, SessionError> {
+) -> Result<SessionCreationResponse, SessionError> {
     tracing::info!("Creating new session for user");
     let user_id_str = user_id.as_str();
 
@@ -134,17 +178,43 @@ pub(super) async fn create_new_session_with_uid(
     // Record session_id in the tracing span
     tracing::Span::current().record("session_id", &session_id);
 
-    let mut headers = HeaderMap::new();
-    header_set_cookie(
-        &mut headers,
-        SESSION_COOKIE_NAME.to_string(),
-        session_id.clone(),
-        expires_at,
-        *SESSION_COOKIE_MAX_AGE as i64,
-    )?;
-
-    tracing::debug!("Headers: {:#?}", headers);
-    Ok(headers)
+    // Generate response based on auth mode
+    match *SESSION_AUTH_MODE {
+        SessionAuthMode::Cookie => {
+            let mut headers = HeaderMap::new();
+            header_set_cookie(
+                &mut headers,
+                SESSION_COOKIE_NAME.to_string(),
+                session_id.clone(),
+                expires_at,
+                *SESSION_COOKIE_MAX_AGE as i64,
+            )?;
+            tracing::debug!("Cookie mode - Headers: {:#?}", headers);
+            Ok(SessionCreationResponse::Cookie(headers))
+        }
+        SessionAuthMode::Bearer => {
+            tracing::debug!("Bearer mode - Token generated");
+            Ok(SessionCreationResponse::Bearer {
+                token: session_id,
+                token_type: "Bearer".to_string(),
+                expires_in: *SESSION_COOKIE_MAX_AGE,
+            })
+        }
+        SessionAuthMode::Both => {
+            // In "both" mode, we return cookie headers for session creation
+            // (API clients can extract the token from the response body separately)
+            let mut headers = HeaderMap::new();
+            header_set_cookie(
+                &mut headers,
+                SESSION_COOKIE_NAME.to_string(),
+                session_id.clone(),
+                expires_at,
+                *SESSION_COOKIE_MAX_AGE as i64,
+            )?;
+            tracing::debug!("Both mode - Headers: {:#?}", headers);
+            Ok(SessionCreationResponse::Cookie(headers))
+        }
+    }
 }
 
 async fn delete_session_from_store(
@@ -237,11 +307,54 @@ pub async fn get_user_from_session(
     Ok(SessionUser::from(user))
 }
 
-pub(crate) fn get_session_id_from_headers(
-    headers: &HeaderMap,
-) -> Result<Option<&str>, SessionError> {
-    tracing::debug!("Headers: {:#?}", headers);
+/// Extracts session ID from the Authorization: Bearer header.
+///
+/// # Arguments
+/// * `headers` - The HTTP headers from the request
+///
+/// # Returns
+/// * `Ok(Some(&str))` - The bearer token if found and valid
+/// * `Ok(None)` - If no Authorization header or not Bearer scheme
+/// * `Err(SessionError)` - If header is malformed
+fn get_session_id_from_bearer(headers: &HeaderMap) -> Result<Option<&str>, SessionError> {
+    let auth_header = match headers.get(AUTHORIZATION) {
+        Some(header) => header,
+        None => return Ok(None),
+    };
 
+    let auth_str = auth_header.to_str().map_err(|e| {
+        tracing::error!("Invalid Authorization header: {}", e);
+        SessionError::HeaderError("Invalid Authorization header".to_string())
+    })?;
+
+    // Check for "Bearer " prefix (case-insensitive for the scheme)
+    if auth_str.len() < 7 {
+        return Ok(None);
+    }
+
+    let (scheme, token) = auth_str.split_at(7);
+    if scheme.eq_ignore_ascii_case("Bearer ") {
+        let token = token.trim();
+        if token.is_empty() {
+            return Ok(None);
+        }
+        tracing::debug!("Found Bearer token");
+        Ok(Some(token))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Extracts session ID from cookie headers.
+///
+/// # Arguments
+/// * `headers` - The HTTP headers from the request
+///
+/// # Returns
+/// * `Ok(Some(&str))` - The session cookie value if found
+/// * `Ok(None)` - If no session cookie found
+/// * `Err(SessionError)` - If cookie header is malformed
+fn get_session_id_from_cookie(headers: &HeaderMap) -> Result<Option<&str>, SessionError> {
     let cookie_name = SESSION_COOKIE_NAME.as_str();
     tracing::debug!("Looking for cookie: {}", cookie_name);
 
@@ -291,11 +404,73 @@ pub(crate) fn get_session_id_from_headers(
     Ok(None)
 }
 
+/// Extracts session ID from headers based on the configured authentication mode.
+///
+/// Behavior depends on `SESSION_AUTH_MODE`:
+/// - `Cookie`: Only check cookies (default, existing behavior)
+/// - `Bearer`: Only check Authorization header
+/// - `Both`: Check bearer first (takes precedence), then fall back to cookie
+///
+/// # Arguments
+/// * `headers` - The HTTP headers from the request
+///
+/// # Returns
+/// * `Ok(Some(SessionExtraction))` - The session ID and its source
+/// * `Ok(None)` - If no valid session found
+/// * `Err(SessionError)` - If header parsing fails
+pub(crate) fn get_session_id_from_headers(
+    headers: &HeaderMap,
+) -> Result<Option<SessionExtraction<'_>>, SessionError> {
+    tracing::debug!("Headers: {:#?}", headers);
+
+    match *SESSION_AUTH_MODE {
+        SessionAuthMode::Cookie => {
+            // Cookie-only mode (default)
+            get_session_id_from_cookie(headers).map(|opt| {
+                opt.map(|session_id| SessionExtraction {
+                    session_id,
+                    source: AuthSource::Cookie,
+                })
+            })
+        }
+        SessionAuthMode::Bearer => {
+            // Bearer-only mode
+            get_session_id_from_bearer(headers).map(|opt| {
+                opt.map(|session_id| SessionExtraction {
+                    session_id,
+                    source: AuthSource::Bearer,
+                })
+            })
+        }
+        SessionAuthMode::Both => {
+            // Both mode: bearer takes precedence
+            if let Some(session_id) = get_session_id_from_bearer(headers)? {
+                tracing::debug!("Using Bearer token authentication");
+                return Ok(Some(SessionExtraction {
+                    session_id,
+                    source: AuthSource::Bearer,
+                }));
+            }
+            // Fall back to cookie
+            get_session_id_from_cookie(headers).map(|opt| {
+                opt.map(|session_id| SessionExtraction {
+                    session_id,
+                    source: AuthSource::Cookie,
+                })
+            })
+        }
+    }
+}
+
 /// Core internal function to check session authentication and perform flexible CSRF validation.
 ///
 /// This function verifies the session ID from headers, checks the session store,
 /// validates the CSRF token based on method and Content-Type (if header is missing),
 /// and optionally verifies user existence.
+///
+/// **CSRF Behavior by Auth Source:**
+/// - **Cookie-based auth**: CSRF validation is required for state-changing methods
+/// - **Bearer-based auth**: CSRF validation is skipped (token is proof of possession)
 ///
 /// Returns a tuple: `(authenticated, Option<UserId>, Option<CsrfToken>, csrf_via_header_verified)`
 /// where `csrf_via_header_verified` indicates if the CSRF token was successfully validated via the X-CSRF-Token header.
@@ -312,8 +487,8 @@ async fn is_authenticated(
     ),
     SessionError,
 > {
-    let session_id = match get_session_id_from_headers(headers)? {
-        Some(id) => id,
+    let extraction = match get_session_id_from_headers(headers)? {
+        Some(ext) => ext,
         None => {
             return Ok((
                 AuthenticationStatus(false),
@@ -323,6 +498,9 @@ async fn is_authenticated(
             ));
         } // Not authenticated, no CSRF check done
     };
+
+    let session_id = extraction.session_id;
+    let auth_source = extraction.source;
 
     // Get session data - Redis TTL handles expiration automatically
     let cache_key =
@@ -364,10 +542,14 @@ async fn is_authenticated(
     let mut csrf_via_header_verified = false;
 
     // CSRF validation for state-changing methods
-    if method == Method::POST
-        || method == Method::PUT
-        || method == Method::DELETE
-        || method == Method::PATCH
+    // Skip CSRF validation for Bearer auth (token is proof of possession)
+    let requires_csrf = auth_source == AuthSource::Cookie;
+
+    if requires_csrf
+        && (method == Method::POST
+            || method == Method::PUT
+            || method == Method::DELETE
+            || method == Method::PATCH)
     {
         if let Some(header_csrf_token_str) =
             headers.get("X-CSRF-Token").and_then(|h| h.to_str().ok())
@@ -422,6 +604,10 @@ async fn is_authenticated(
                 // Proceed, csrf_via_header_verified is false.
             }
         }
+    } else if auth_source == AuthSource::Bearer {
+        // Bearer auth: CSRF is implicitly verified (token is proof of possession)
+        csrf_via_header_verified = true;
+        tracing::trace!("Bearer auth: CSRF validation skipped (token is proof of possession)");
     }
 
     if verify_user_exists {

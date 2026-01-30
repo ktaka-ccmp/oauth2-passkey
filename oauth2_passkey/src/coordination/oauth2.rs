@@ -15,7 +15,7 @@ use crate::utils::header_set_cookie;
 use super::errors::CoordinationError;
 use super::user::gen_new_user_id;
 
-use crate::session::{UserId, new_session_header};
+use crate::session::{SessionCreationResponse, UserId, new_session_response};
 
 /// OAuth2 user account field mapping configuration
 static OAUTH2_USER_ACCOUNT_FIELD: LazyLock<String> =
@@ -45,7 +45,7 @@ pub async fn authorized_core(
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
-) -> Result<(HeaderMap, String), CoordinationError> {
+) -> Result<(SessionCreationResponse, String), CoordinationError> {
     tracing::info!(?method, "Processing OAuth2 authorization callback");
     // Verify this is the correct response mode for the HTTP method
     match (method, OAUTH2_RESPONSE_MODE.to_lowercase().as_str()) {
@@ -91,13 +91,13 @@ pub async fn authorized_core(
 ///
 /// # Returns
 ///
-/// * `Ok((HeaderMap, String))` - Response headers (including session cookie) and response body
+/// * `Ok((SessionCreationResponse, String))` - Session response and response body
 /// * `Err(CoordinationError)` - If authentication fails for any reason
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::{get_authorized_core, AuthResponse};
+/// use oauth2_passkey::{get_authorized_core, AuthResponse, SessionCreationResponse};
 /// use headers::Cookie;
 /// use http::HeaderMap;
 ///
@@ -105,16 +105,16 @@ pub async fn authorized_core(
 ///     auth_response: &AuthResponse,
 ///     cookies: &Cookie,
 ///     headers: &HeaderMap
-/// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {
-///     let (response_headers, body) = get_authorized_core(auth_response, cookies, headers).await?;
-///     Ok((response_headers, body))
+/// ) -> Result<(SessionCreationResponse, String), Box<dyn std::error::Error>> {
+///     let (session_response, body) = get_authorized_core(auth_response, cookies, headers).await?;
+///     Ok((session_response, body))
 /// }
 /// ```
 pub async fn get_authorized_core(
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
-) -> Result<(HeaderMap, String), CoordinationError> {
+) -> Result<(SessionCreationResponse, String), CoordinationError> {
     authorized_core(HttpMethod::Get, auth_response, cookies, headers).await
 }
 
@@ -132,13 +132,13 @@ pub async fn get_authorized_core(
 ///
 /// # Returns
 ///
-/// * `Ok((HeaderMap, String))` - Response headers (including session cookie) and response body
+/// * `Ok((SessionCreationResponse, String))` - Session response and response body
 /// * `Err(CoordinationError)` - If authentication fails for any reason
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::{post_authorized_core, AuthResponse};
+/// use oauth2_passkey::{post_authorized_core, AuthResponse, SessionCreationResponse};
 /// use headers::Cookie;
 /// use http::HeaderMap;
 ///
@@ -146,23 +146,23 @@ pub async fn get_authorized_core(
 ///     auth_response: &AuthResponse,
 ///     cookies: &Cookie,
 ///     headers: &HeaderMap
-/// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {
-///     let (response_headers, body) = post_authorized_core(auth_response, cookies, headers).await?;
-///     Ok((response_headers, body))
+/// ) -> Result<(SessionCreationResponse, String), Box<dyn std::error::Error>> {
+///     let (session_response, body) = post_authorized_core(auth_response, cookies, headers).await?;
+///     Ok((session_response, body))
 /// }
 /// ```
 pub async fn post_authorized_core(
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
-) -> Result<(HeaderMap, String), CoordinationError> {
+) -> Result<(SessionCreationResponse, String), CoordinationError> {
     authorized_core(HttpMethod::Post, auth_response, cookies, headers).await
 }
 
 #[tracing::instrument(skip(auth_response), fields(user_id, provider = "google", state = %auth_response.state))]
 async fn process_oauth2_authorization(
     auth_response: &AuthResponse,
-) -> Result<(HeaderMap, String), CoordinationError> {
+) -> Result<(SessionCreationResponse, String), CoordinationError> {
     tracing::info!("Processing OAuth2 authorization core logic");
     let (idinfo, userinfo) = get_idinfo_userinfo(auth_response).await?;
 
@@ -318,17 +318,32 @@ async fn process_oauth2_authorization(
 
     let user_id_validated = UserId::new(user_id)
         .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
-    let mut headers = new_session_header(user_id_validated).await?;
+    let session_response = new_session_response(user_id_validated).await?;
 
-    let _ = header_set_cookie(
-        &mut headers,
-        OAUTH2_CSRF_COOKIE_NAME.to_string(),
-        "value".to_string(),
-        Utc::now() - Duration::seconds(86400),
-        -86400,
-    )?;
-
-    Ok((headers, message))
+    // Handle response based on session creation mode
+    match session_response {
+        SessionCreationResponse::Cookie(mut headers) => {
+            // Clear the OAuth2 CSRF cookie
+            let _ = header_set_cookie(
+                &mut headers,
+                OAUTH2_CSRF_COOKIE_NAME.to_string(),
+                "value".to_string(),
+                Utc::now() - Duration::seconds(86400),
+                -86400,
+            )?;
+            Ok((SessionCreationResponse::Cookie(headers), message))
+        }
+        SessionCreationResponse::Bearer { .. } => {
+            // For bearer mode, no cookie operations needed
+            Ok((session_response, message))
+        }
+        SessionCreationResponse::NoOp => {
+            // This shouldn't happen for OAuth2 authorization (always creates a session)
+            // but handle it gracefully
+            tracing::warn!("Unexpected NoOp session response in OAuth2 authorization");
+            Ok((session_response, message))
+        }
+    }
 }
 
 // When creating a new user, map fields according to configuration or defaults

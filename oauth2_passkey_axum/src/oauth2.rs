@@ -11,9 +11,10 @@ use axum_extra::{TypedHeader, headers};
 use std::collections::HashMap;
 
 use oauth2_passkey::{
-    AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, Provider, ProviderUserId, UserId,
-    delete_oauth2_account_core, get_authorized_core, list_accounts_core, post_authorized_core,
-    prepare_oauth2_auth_request, verify_page_session_token,
+    AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, Provider, ProviderUserId,
+    SessionCreationResponse, UserId, delete_oauth2_account_core, get_authorized_core,
+    list_accounts_core, post_authorized_core, prepare_oauth2_auth_request,
+    verify_page_session_token,
 };
 
 use super::error::IntoResponseError;
@@ -100,12 +101,18 @@ async fn get_authorized(
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (headers, message) = get_authorized_core(&query, &cookies, &headers)
+    let (session_response, message) = get_authorized_core(&query, &cookies, &headers)
         .await
         .into_response_error()?;
 
+    // Extract headers from session response (for browser redirect, always cookie mode)
+    let response_headers = match session_response {
+        SessionCreationResponse::Cookie(h) => h,
+        SessionCreationResponse::Bearer { .. } | SessionCreationResponse::NoOp => HeaderMap::new(),
+    };
+
     Ok((
-        headers,
+        response_headers,
         Redirect::to(&format!(
             "{}/oauth2/popup_close?message={}",
             O2P_ROUTE_PREFIX.as_str(),
@@ -128,12 +135,18 @@ async fn post_authorized(
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     Form(form): Form<AuthResponse>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (headers, message) = post_authorized_core(&form, &cookies, &headers)
+    let (session_response, message) = post_authorized_core(&form, &cookies, &headers)
         .await
         .into_response_error()?;
 
+    // Extract headers from session response (for browser redirect, always cookie mode)
+    let response_headers = match session_response {
+        SessionCreationResponse::Cookie(h) => h,
+        SessionCreationResponse::Bearer { .. } | SessionCreationResponse::NoOp => HeaderMap::new(),
+    };
+
     Ok((
-        headers,
+        response_headers,
         Redirect::to(&format!(
             "{}/oauth2/popup_close?message={}",
             O2P_ROUTE_PREFIX.as_str(),

@@ -6,20 +6,20 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (5)
+### Open (4)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `2026-01-23-01` | medium | large | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
 | `2026-01-30-02` | medium | medium | [Admin Force Logout Feature](open/2026-01-30-admin-force-logout.md) |
 | `2026-01-30-03` | medium | large | [Admin Login History View](open/2026-01-30-admin-login-history.md) |
 | `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
 
-### Completed (18)
+### Completed (19)
 
 | ID | Title |
 |----|-------|
+| `2026-01-23-01` | [Bearer Token Authentication Support](completed/2026-01-23-bearer-token-support.md) |
 | `2025-01-23-01` | [CI/CD Documentation](completed/2025-01-23-ci-cd-documentation.md) |
 | `2026-01-29-01` | [Change PASSKEY_USER_HANDLE_UNIQUE default to false](completed/2026-01-29-change-user-handle-default.md) |
 | `2026-01-29-03` | [Create Terminology/Glossary Document](completed/2026-01-29-terminology-document.md) |

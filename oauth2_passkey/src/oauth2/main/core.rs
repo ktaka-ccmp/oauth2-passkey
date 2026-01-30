@@ -85,10 +85,10 @@ async fn prepare_oauth2_auth_request_with_params(
     let (pkce_token, pkce_id) =
         generate_store_token(TokenType::Pkce, ttl, expires_at, None).await?;
 
-    let misc_id = if let Some(session_id) = get_session_id_from_headers(&headers)? {
-        tracing::info!("Session ID found: {}", session_id);
+    let misc_id = if let Some(extraction) = get_session_id_from_headers(&headers)? {
+        tracing::info!("Session ID found: {}", extraction.session_id);
         let stored_token = StoredToken {
-            token: session_id.to_string(),
+            token: extraction.session_id.to_string(),
             expires_at,
             user_agent: None,
             ttl,

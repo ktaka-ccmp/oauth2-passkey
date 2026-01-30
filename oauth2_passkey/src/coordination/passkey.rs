@@ -1,5 +1,4 @@
 use chrono::Utc;
-use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{env, sync::LazyLock};
@@ -10,7 +9,7 @@ use crate::passkey::{
     finish_authentication, prepare_registration_storage, start_authentication, start_registration,
     validate_registration_challenge, verify_session_then_finish_registration,
 };
-use crate::session::{User as SessionUser, UserId, new_session_header};
+use crate::session::{SessionCreationResponse, User as SessionUser, UserId, new_session_response};
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
@@ -116,7 +115,7 @@ pub async fn handle_start_registration_core(
 pub async fn handle_finish_registration_core(
     auth_user: Option<&SessionUser>,
     reg_data: RegisterCredential,
-) -> Result<(HeaderMap, String), CoordinationError> {
+) -> Result<(SessionCreationResponse, String), CoordinationError> {
     tracing::info!("Finishing passkey registration flow");
     match auth_user {
         Some(session_user) => {
@@ -126,7 +125,8 @@ pub async fn handle_finish_registration_core(
             let message =
                 verify_session_then_finish_registration(session_user.clone(), reg_data).await?;
 
-            Ok((HeaderMap::new(), message))
+            // User already has a session, no new session needed
+            Ok((SessionCreationResponse::NoOp, message))
         }
         None => {
             let result = create_user_then_finish_registration(reg_data).await;
@@ -137,9 +137,9 @@ pub async fn handle_finish_registration_core(
                     let user_id = UserId::new(stored_user_id).map_err(|e| {
                         CoordinationError::Validation(format!("Invalid user ID: {e}"))
                     })?;
-                    let headers = new_session_header(user_id).await?;
+                    let session_response = new_session_response(user_id).await?;
 
-                    Ok((headers, message))
+                    Ok((session_response, message))
                 }
                 Err(err) => Err(err),
             }
@@ -252,11 +252,11 @@ pub struct AuthenticationResponse {
 /// Core function that handles the business logic of finishing authentication
 ///
 /// This function verifies the authentication response, creates a session for the
-/// authenticated user, and returns the authentication response data and session headers.
+/// authenticated user, and returns the authentication response data and session response.
 #[tracing::instrument(skip(auth_response), fields(user_id))]
 pub async fn handle_finish_authentication_core(
     auth_response: AuthenticatorResponse,
-) -> Result<(AuthenticationResponse, HeaderMap), CoordinationError> {
+) -> Result<(AuthenticationResponse, SessionCreationResponse), CoordinationError> {
     tracing::info!("Finishing passkey authentication flow");
     tracing::debug!("Auth response: {:#?}", auth_response);
 
@@ -271,7 +271,7 @@ pub async fn handle_finish_authentication_core(
     // Create a session for the authenticated user
     let user_id = UserId::new(uid.clone())
         .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
-    let headers = new_session_header(user_id.clone()).await?;
+    let session_response = new_session_response(user_id.clone()).await?;
 
     // Retrieve all credential IDs for authenticator synchronization
     let credentials = list_credentials_core(user_id).await?;
@@ -286,7 +286,7 @@ pub async fn handle_finish_authentication_core(
             user_handle,
             credential_ids,
         },
-        headers,
+        session_response,
     ))
 }
 

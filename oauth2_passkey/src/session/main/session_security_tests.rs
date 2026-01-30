@@ -95,13 +95,17 @@ mod tests {
 
         // Create multiple sessions to check for uniqueness
         for i in 0..100 {
-            let headers_result = create_new_session_with_uid(
+            let response_result = create_new_session_with_uid(
                 UserId::new(format!("{user_id}_{i}")).expect("Valid user ID"),
             )
             .await;
-            assert!(headers_result.is_ok(), "Session creation should succeed");
+            assert!(response_result.is_ok(), "Session creation should succeed");
 
-            let headers = headers_result.unwrap();
+            let response = response_result.unwrap();
+            let headers = match response {
+                SessionCreationResponse::Cookie(h) => h,
+                _ => panic!("Expected Cookie response in default mode"),
+            };
             let cookie_header = headers.get(http::header::SET_COOKIE).unwrap();
             let cookie_str = cookie_header.to_str().unwrap();
 

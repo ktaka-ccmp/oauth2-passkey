@@ -28,11 +28,13 @@ fn test_get_session_id_from_headers() {
     // When getting the session ID
     let result = get_session_id_from_headers(&headers);
 
-    // Then it should return the session ID
+    // Then it should return the session ID with cookie source
     assert!(result.is_ok());
-    let session_id_opt = result.unwrap();
-    assert!(session_id_opt.is_some());
-    assert_eq!(session_id_opt.unwrap(), session_id);
+    let extraction_opt = result.unwrap();
+    assert!(extraction_opt.is_some());
+    let extraction = extraction_opt.unwrap();
+    assert_eq!(extraction.session_id, session_id);
+    assert_eq!(extraction.source, AuthSource::Cookie);
 }
 
 /// Test get_session_id_from_headers_no_cookie
@@ -290,9 +292,15 @@ async fn test_create_new_session_with_uid() {
     let result =
         create_new_session_with_uid(UserId::new(user_id.to_string()).expect("Valid user ID")).await;
 
-    // Should succeed and return headers with cookie
+    // Should succeed and return SessionCreationResponse
     assert!(result.is_ok());
-    let headers = result.unwrap();
+    let response = result.unwrap();
+
+    // Extract headers from SessionCreationResponse (default mode is cookie)
+    let headers = match response {
+        SessionCreationResponse::Cookie(h) => h,
+        _ => panic!("Expected Cookie response in default mode"),
+    };
 
     // Verify there is a cookie header
     assert!(headers.contains_key(http::header::SET_COOKIE));
@@ -863,7 +871,13 @@ async fn test_create_new_session_with_uid_success() {
         create_new_session_with_uid(UserId::new(user_id.to_string()).expect("Valid user ID")).await;
     assert!(result.is_ok());
 
-    let headers = result.unwrap();
+    let response = result.unwrap();
+
+    // Extract headers from SessionCreationResponse (default mode is cookie)
+    let headers = match response {
+        SessionCreationResponse::Cookie(h) => h,
+        _ => panic!("Expected Cookie response in default mode"),
+    };
 
     // Verify Set-Cookie header was created
     let cookie_header = headers.get(http::header::SET_COOKIE).unwrap();
@@ -1501,9 +1515,11 @@ fn test_get_session_id_from_headers_multiple_cookie_headers() {
 
     // Then it should return the session ID from the correct header
     assert!(result.is_ok());
-    let session_id_opt = result.unwrap();
-    assert!(session_id_opt.is_some());
-    assert_eq!(session_id_opt.unwrap(), session_id);
+    let extraction_opt = result.unwrap();
+    assert!(extraction_opt.is_some());
+    let extraction = extraction_opt.unwrap();
+    assert_eq!(extraction.session_id, session_id);
+    assert_eq!(extraction.source, AuthSource::Cookie);
 }
 
 /// Test get_session_id_from_headers_semicolon_separated
@@ -1527,9 +1543,11 @@ fn test_get_session_id_from_headers_semicolon_separated() {
 
     // Then it should return the session ID from the semicolon-separated string
     assert!(result.is_ok());
-    let session_id_opt = result.unwrap();
-    assert!(session_id_opt.is_some());
-    assert_eq!(session_id_opt.unwrap(), session_id);
+    let extraction_opt = result.unwrap();
+    assert!(extraction_opt.is_some());
+    let extraction = extraction_opt.unwrap();
+    assert_eq!(extraction.session_id, session_id);
+    assert_eq!(extraction.source, AuthSource::Cookie);
 }
 
 // Helper function to create a header map with a complete cookie string
@@ -1537,4 +1555,79 @@ fn create_header_map_with_cookie_string(cookie_str: &str) -> HeaderMap {
     let mut headers = HeaderMap::new();
     headers.insert(COOKIE, HeaderValue::from_str(cookie_str).unwrap());
     headers
+}
+
+/// Test get_session_id_from_bearer with valid bearer token
+/// Tests the bearer token extraction functionality
+#[test]
+fn test_get_session_id_from_bearer_valid() {
+    // Given a header map with a valid Bearer token
+    let token = "test_bearer_token_12345";
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", token)).unwrap(),
+    );
+
+    // When getting the session ID from bearer
+    let result = get_session_id_from_bearer(&headers);
+
+    // Then it should return the token
+    assert!(result.is_ok());
+    let token_opt = result.unwrap();
+    assert!(token_opt.is_some());
+    assert_eq!(token_opt.unwrap(), token);
+}
+
+/// Test get_session_id_from_bearer with lowercase "bearer" scheme
+/// Verifies case-insensitive scheme matching
+#[test]
+fn test_get_session_id_from_bearer_lowercase() {
+    let token = "test_bearer_token_lowercase";
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("bearer {}", token)).unwrap(),
+    );
+
+    let result = get_session_id_from_bearer(&headers);
+    assert!(result.is_ok());
+    let token_opt = result.unwrap();
+    assert!(token_opt.is_some());
+    assert_eq!(token_opt.unwrap(), token);
+}
+
+/// Test get_session_id_from_bearer with no Authorization header
+#[test]
+fn test_get_session_id_from_bearer_no_header() {
+    let headers = HeaderMap::new();
+
+    let result = get_session_id_from_bearer(&headers);
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_none());
+}
+
+/// Test get_session_id_from_bearer with non-Bearer scheme
+#[test]
+fn test_get_session_id_from_bearer_wrong_scheme() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str("Basic dXNlcjpwYXNz").unwrap(),
+    );
+
+    let result = get_session_id_from_bearer(&headers);
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_none());
+}
+
+/// Test get_session_id_from_bearer with empty token
+#[test]
+fn test_get_session_id_from_bearer_empty_token() {
+    let mut headers = HeaderMap::new();
+    headers.insert(AUTHORIZATION, HeaderValue::from_str("Bearer ").unwrap());
+
+    let result = get_session_id_from_bearer(&headers);
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_none());
 }

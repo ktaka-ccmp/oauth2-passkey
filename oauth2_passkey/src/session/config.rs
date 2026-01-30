@@ -60,6 +60,48 @@ pub static SESSION_CONFLICT_POLICY: LazyLock<SessionConflictPolicy> = LazyLock::
     }
 });
 
+/// Authentication mode for session tokens.
+///
+/// Controls how session tokens are transmitted between client and server.
+/// Configured via the `SESSION_AUTH_MODE` environment variable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SessionAuthMode {
+    /// Cookie-based authentication (default).
+    /// Session token is stored in an HTTP-only cookie.
+    /// Requires CSRF protection for state-changing requests.
+    #[default]
+    Cookie,
+    /// Bearer token authentication.
+    /// Session token is sent via Authorization header.
+    /// No CSRF protection needed (token is proof of possession).
+    Bearer,
+    /// Support both cookie and bearer authentication.
+    /// Bearer takes precedence if both are present.
+    /// CSRF required only for cookie-authenticated requests.
+    Both,
+}
+
+/// Session authentication mode configuration.
+///
+/// Controls how session tokens are transmitted and validated.
+/// Set via the `SESSION_AUTH_MODE` environment variable.
+///
+/// Valid values:
+/// - `cookie` (default): Use HTTP-only cookies (browser applications)
+/// - `bearer`: Use Authorization header (API/mobile clients)
+/// - `both`: Support both methods (hybrid applications)
+pub static SESSION_AUTH_MODE: LazyLock<SessionAuthMode> = LazyLock::new(|| {
+    match env::var("SESSION_AUTH_MODE")
+        .unwrap_or_default()
+        .to_lowercase()
+        .as_str()
+    {
+        "bearer" => SessionAuthMode::Bearer,
+        "both" => SessionAuthMode::Both,
+        _ => SessionAuthMode::Cookie,
+    }
+});
+
 /// TTL for user session mappings in seconds (30 days).
 ///
 /// The user_id -> session_id[] mapping needs a long TTL because it tracks

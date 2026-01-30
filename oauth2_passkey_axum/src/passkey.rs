@@ -11,10 +11,10 @@ use serde_json::Value;
 use oauth2_passkey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialId, O2P_ROUTE_PREFIX,
     PASSKEY_SIGNAL_API_MODE, PasskeyCredential, RegisterCredential, RegistrationOptions,
-    RegistrationStartRequest, SessionUser, UserId, delete_passkey_credential_core,
-    get_related_origin_json, handle_finish_authentication_core, handle_finish_registration_core,
-    handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
-    update_passkey_credential_core,
+    RegistrationStartRequest, SessionCreationResponse, SessionUser, UserId,
+    delete_passkey_credential_core, get_related_origin_json, handle_finish_authentication_core,
+    handle_finish_registration_core, handle_start_authentication_core,
+    handle_start_registration_core, list_credentials_core, update_passkey_credential_core,
 };
 
 use super::config::O2P_CUSTOM_CSS_URL;
@@ -92,9 +92,18 @@ async fn handle_finish_registration(
     Json(reg_data): Json<RegisterCredential>,
 ) -> Result<(HeaderMap, String), (StatusCode, String)> {
     let session_user = auth_user.as_ref().map(SessionUser::from);
-    handle_finish_registration_core(session_user.as_ref(), reg_data)
-        .await
-        .into_response_error()
+    let (session_response, message) =
+        handle_finish_registration_core(session_user.as_ref(), reg_data)
+            .await
+            .into_response_error()?;
+
+    // Extract headers from session response
+    let headers = match session_response {
+        SessionCreationResponse::Cookie(h) => h,
+        SessionCreationResponse::Bearer { .. } | SessionCreationResponse::NoOp => HeaderMap::new(),
+    };
+
+    Ok((headers, message))
 }
 
 async fn handle_start_authentication(
@@ -113,9 +122,15 @@ async fn handle_finish_authentication(
     Json(auth_response): Json<AuthenticatorResponse>,
 ) -> Result<(HeaderMap, Json<Value>), (StatusCode, String)> {
     // Call the core function with the extracted data
-    let (auth_data, headers) = handle_finish_authentication_core(auth_response)
+    let (auth_data, session_response) = handle_finish_authentication_core(auth_response)
         .await
         .into_response_error()?;
+
+    // Extract headers from session response
+    let headers = match session_response {
+        SessionCreationResponse::Cookie(h) => h,
+        SessionCreationResponse::Bearer { .. } | SessionCreationResponse::NoOp => HeaderMap::new(),
+    };
 
     // Return the headers and authentication data as JSON
     // Include credential_ids and user_handle only when PASSKEY_SIGNAL_API_MODE includes 'sync'
