@@ -93,6 +93,7 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
 | **demo-oauth2** | OAuth2-only authentication | Simpler setup, no passkey |
 | **demo-passkey** | Passkey-only authentication | No Google credentials needed |
 | **demo-custom-login** | Custom login/summary pages | See [Custom Pages](../integration/custom-pages.md) |
+| **demo-cross-origin** | Cross-Origin Same-Site (Pattern 2) | Auth + API servers, see [Deployment Patterns](../integration/deployment-patterns.md) |
 
 Setup is similar to demo-both: copy `.env` from `dot.env.simple`, adjust for each demo's needs.
 
