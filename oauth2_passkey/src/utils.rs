@@ -126,19 +126,27 @@ fn validate_entropy(bytes: &[u8]) -> bool {
 /// * `value` - The value of the cookie
 /// * `_expires_at` - The expiration time of the cookie (currently unused)
 /// * `max_age` - The max age of the cookie in seconds
+/// * `domain` - Optional domain attribute for cross-subdomain cookies
 ///
 /// # Returns
 /// * `Ok(&HeaderMap)` on success
 /// * `Err(UtilError::Cookie)` if parsing the cookie fails
-pub(crate) fn header_set_cookie(
-    headers: &mut HeaderMap,
+///
+/// # Note
+/// When using a domain attribute, ensure the cookie name does NOT use the
+/// `__Host-` prefix, as `__Host-` cookies cannot have a Domain attribute.
+pub(crate) fn header_set_cookie<'a>(
+    headers: &'a mut HeaderMap,
     name: String,
     value: String,
     _expires_at: DateTime<Utc>,
     max_age: i64,
-) -> Result<&HeaderMap, UtilError> {
-    let cookie =
-        format!("{name}={value}; SameSite=Lax; Secure; HttpOnly; Path=/; Max-Age={max_age}");
+    domain: Option<&str>,
+) -> Result<&'a HeaderMap, UtilError> {
+    let domain_attr = domain.map(|d| format!("; Domain={d}")).unwrap_or_default();
+    let cookie = format!(
+        "{name}={value}; SameSite=Lax; Secure; HttpOnly; Path=/; Max-Age={max_age}{domain_attr}"
+    );
     headers.append(
         SET_COOKIE,
         cookie

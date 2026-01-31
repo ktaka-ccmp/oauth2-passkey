@@ -1,0 +1,18 @@
+[package]
+name = "demo-cross-origin"
+version = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+oauth2-passkey-axum = { path = "../oauth2_passkey_axum", features = ["cors"] }
+
+askama = { workspace = true }
+axum = { workspace = true }
+dotenvy = { workspace = true }
+http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

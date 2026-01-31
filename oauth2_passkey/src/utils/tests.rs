@@ -57,6 +57,7 @@ fn test_header_set_cookie() {
         value.clone(),
         expires_at,
         max_age,
+        None,
     );
 
     assert!(result.is_ok());
@@ -88,10 +89,46 @@ fn test_header_set_cookie_invalid() {
         "value".to_string(),
         Utc::now(),
         3600,
+        None,
     );
 
     assert!(
         result.is_ok(),
         "Should accept any cookie name in this version"
     );
+}
+
+#[test]
+fn test_header_set_cookie_with_domain() {
+    let mut headers = HeaderMap::new();
+    let name = "session_cookie".to_string();
+    let value = "session_value".to_string();
+    let expires_at = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+    let max_age = 3600;
+    let domain = Some(".example.com");
+
+    let result = header_set_cookie(
+        &mut headers,
+        name.clone(),
+        value.clone(),
+        expires_at,
+        max_age,
+        domain,
+    );
+
+    assert!(result.is_ok());
+
+    let cookies: Vec<_> = headers
+        .get_all(SET_COOKIE)
+        .into_iter()
+        .filter_map(|v| v.to_str().ok())
+        .collect();
+
+    assert_eq!(cookies.len(), 1);
+    let cookie = cookies[0];
+    assert!(cookie.starts_with(&format!("{name}={value}")));
+    assert!(cookie.contains("Domain=.example.com"));
+    assert!(cookie.contains("SameSite=Lax"));
+    assert!(cookie.contains("Secure"));
+    assert!(cookie.contains("HttpOnly"));
 }

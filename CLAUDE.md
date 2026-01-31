@@ -135,7 +135,11 @@ Environment variables (see `dot.env.example`):
 11. **Incremental Testing**: Write unit tests one by one, ensuring each passes before writing the next
 12. **Approval Required**: Ask for approval before proceeding to next file or writing multiple tests
 13. **Non-Invasive**: Never modify original functions when writing tests without explanation and permission
-14. **Test Placement**: Place inline unit tests at the bottom of files
+14. **Test Placement**: Place unit tests in a separate `tests.rs` file under a directory with the module name
+    - Example: For `foo.rs`, create `foo/tests.rs` for tests
+    - In `foo.rs`, add `#[cfg(test)] mod tests;` at the bottom
+    - `tests.rs` can access private items from the parent module
+    - This keeps test code separate from logic, making it easy to identify what changed (logic vs tests) from file names
 15. **Use Test Utils**: Utilize the `test_utils` module for data store and cache initialization
 16. **Functional Testing**: Test actual functionality by calling functions, not mimicking behavior
 

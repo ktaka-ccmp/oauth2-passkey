@@ -56,6 +56,8 @@
 
 mod admin;
 mod config;
+#[cfg(feature = "cors")]
+mod cors;
 mod error;
 mod middleware;
 mod oauth2;
@@ -103,3 +105,7 @@ pub use oauth2_passkey::{
     delete_passkey_credential_admin, delete_user_account_admin, get_all_users, get_user,
     update_user_admin_status,
 };
+
+// CORS support (requires "cors" feature)
+#[cfg(feature = "cors")]
+pub use cors::{CORS_ALLOW_CREDENTIALS, CORS_ALLOWED_ORIGINS, cors_layer};

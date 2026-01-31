@@ -326,6 +326,7 @@ async fn process_oauth2_authorization(
         "value".to_string(),
         Utc::now() - Duration::seconds(86400),
         -86400,
+        None, // CSRF cookie doesn't need domain attribute
     )?;
 
     Ok((headers, message))

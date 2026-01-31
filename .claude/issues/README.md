@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (6)
+### Open (5)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -15,9 +15,8 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-03` | medium | large | [Admin Login History View](open/2026-01-30-admin-login-history.md) |
 | `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
-| `2026-01-30-09` | medium | medium | [Cross-Origin Same-Site Demo (Pattern 2)](open/2026-01-30-cross-origin-same-site-demo.md) |
 
-### Completed (18)
+### Completed (19)
 
 | ID | Title |
 |----|-------|
@@ -39,6 +38,7 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-29-02` | [Filter remaining_credential_ids by user_handle](completed/2026-01-29-filter-remaining-credentials.md) |
 | `2026-01-29-04` | [Review SESSION_CONFLICT_POLICY Default](completed/2026-01-29-session-conflict-policy-review.md) |
 | `2026-01-30-01` | [Move /info and /csrf_token to default.rs](completed/2026-01-30-move-info-csrf-endpoints.md) |
+| `2026-01-30-09` | [Cross-Origin Same-Site Demo (Pattern 2)](completed/2026-01-30-cross-origin-same-site-demo.md) |
 
 ### Deferred (2)
 

@@ -112,6 +112,15 @@ fetch('https://api.example.com/o2p/passkey/auth/start', {
 - `Access-Control-Allow-Origin` cannot be `*` when using `credentials: include`
 - The API server must explicitly list allowed origins
 
+### Demo Application
+
+See [demo-cross-origin](../../../demo-cross-origin/README.md) for a working example that demonstrates:
+
+- Auth Server with OAuth2/Passkey authentication
+- Separate API Server validating session cookies
+- CORS configuration for cross-origin requests
+- Multiple testing methods (localhost, HTTPS proxy, direct HTTPS)
+
 ## Pattern 3: Cross-Site (Not Supported)
 
 Cross-site requests (different eTLD+1) face significant restrictions:
