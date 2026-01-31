@@ -10,7 +10,6 @@ A separate **API server** validates session cookies issued by the **Auth Server*
 - [Testing Methods](#testing-methods)
   - [localhost (Easiest)](#localhost-easiest)
   - [HTTPS Proxy](#https-proxy)
-  - [Direct HTTPS (Non-standard Ports)](#direct-https-non-standard-ports)
 - [Configuration](#configuration)
 - [How It Works](#how-it-works)
 - [Key Technical Points](#key-technical-points)
@@ -257,95 +256,6 @@ Navigate to <https://auth.foobar.com>
 - Production-like architecture
 - Can add rate limiting, logging, etc. at proxy level
 
-### Direct HTTPS (Non-standard Ports)
-
-The Rust application serves HTTPS directly. Since binding to port 443 requires
-root privileges, this method uses non-standard ports (3443/3444).
-
-| Requirement       | Status                |
-|-------------------|-----------------------|
-| DNS records       | Required              |
-| Valid certificate | Required              |
-| Proxy             | Not needed            |
-| Passkey           | Works                 |
-| OAuth2            | Works                 |
-
-**Note**: URLs will include port numbers (e.g., `https://auth.foobar.com:3443`).
-For standard ports without root, use the [HTTPS Proxy](#https-proxy) method instead.
-
-#### 1. Prerequisites
-
-- Valid certificate covering both subdomains (wildcard `*.foobar.com` or individual certs)
-- DNS records pointing to your server:
-  - `auth.foobar.com` -> your server IP
-  - `api.foobar.com` -> your server IP
-
-#### 2. Place certificate files
-
-```bash
-mkdir -p certs
-cp /path/to/fullchain.pem certs/
-cp /path/to/privkey.pem certs/
-```
-
-#### 3. Create `.env` for direct HTTPS
-
-```bash
-cat > .env << 'EOF'
-# IMPORTANT: URLs must include port numbers
-ORIGIN='https://auth.foobar.com:3443'
-API_ORIGIN='https://api.foobar.com:3444'
-SESSION_COOKIE_DOMAIN='.foobar.com'
-CORS_ALLOWED_ORIGINS='https://auth.foobar.com:3443'
-CORS_ALLOW_CREDENTIALS=true
-
-# HTTPS configuration (non-standard ports, no root required)
-AUTH_PORT=3443
-API_PORT=3444
-TLS_CERT_PATH='certs/fullchain.pem'
-TLS_KEY_PATH='certs/privkey.pem'
-
-# Google OAuth2
-OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
-OAUTH2_GOOGLE_CLIENT_SECRET='your-secret'
-
-# Storage
-GENERIC_CACHE_STORE_TYPE=redis
-GENERIC_CACHE_STORE_URL='redis://localhost:6379'
-GENERIC_DATA_STORE_TYPE=sqlite
-GENERIC_DATA_STORE_URL='sqlite:data.db'
-EOF
-```
-
-#### 4. Add OAuth2 redirect URI
-
-Add this redirect URI in Google Cloud Console:
-
-```text
-https://auth.foobar.com:3443/o2p/oauth2/authorized
-```
-
-#### 5. Run the application
-
-```bash
-cargo run
-```
-
-#### 6. Access the demo
-
-Navigate to <https://auth.foobar.com:3443>
-
-**Benefits:**
-
-- No proxy required
-- Full Passkey support (secure context)
-- Cookie `Secure` flag works correctly
-
-**Trade-offs:**
-
-- Non-standard ports in URLs
-- Firewall must allow ports 3443/3444
-
 ## Configuration
 
 ### Required Environment Variables
@@ -360,13 +270,11 @@ Navigate to <https://auth.foobar.com:3443>
 
 ### Optional Environment Variables
 
-| Variable                | Default | Description                              |
-|-------------------------|---------|------------------------------------------|
-| `AUTH_PORT`             | 3000    | Auth server port                         |
-| `API_PORT`              | 3001    | API server port                          |
-| `SESSION_COOKIE_DOMAIN` | -       | Cookie domain (e.g., `.foobar.com`)      |
-| `TLS_CERT_PATH`         | -       | Path to TLS certificate (enables HTTPS)  |
-| `TLS_KEY_PATH`          | -       | Path to TLS private key                  |
+| Variable                | Default | Description                         |
+|-------------------------|---------|-------------------------------------|
+| `AUTH_PORT`             | 3000    | Auth server port                    |
+| `API_PORT`              | 3001    | API server port                     |
+| `SESSION_COOKIE_DOMAIN` | -       | Cookie domain (e.g., `.foobar.com`) |
 
 ## How It Works
 

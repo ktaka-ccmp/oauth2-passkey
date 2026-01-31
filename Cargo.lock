@@ -671,11 +671,9 @@ version = "0.2.1-dev"
 dependencies = [
  "askama",
  "axum",
- "axum-server",
  "dotenvy",
  "http",
  "oauth2-passkey-axum",
- "rustls",
  "serde",
  "serde_json",
  "tokio",

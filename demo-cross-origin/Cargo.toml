@@ -8,10 +8,8 @@ oauth2-passkey-axum = { path = "../oauth2_passkey_axum", features = ["cors"] }
 
 askama = { workspace = true }
 axum = { workspace = true }
-axum-server = { workspace = true }
 dotenvy = { workspace = true }
 http = { workspace = true }
-rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

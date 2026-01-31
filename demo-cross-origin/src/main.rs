@@ -58,7 +58,7 @@ use oauth2_passkey_axum::{
 };
 
 mod server;
-use crate::server::{init_tracing, is_tls_configured, spawn_http_server, spawn_https_server};
+use crate::server::{init_tracing, spawn_http_server};
 
 // =============================================================================
 // Configuration
@@ -180,10 +180,6 @@ async fn resource_health() -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install default CryptoProvider");
-
     init_tracing("demo_cross_origin");
 
     dotenv().ok();
@@ -238,13 +234,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     let auth_origin =
         std::env::var("ORIGIN").unwrap_or_else(|_| "http://localhost:3001".to_string());
-    let use_https = is_tls_configured();
-    let protocol = if use_https { "HTTPS" } else { "HTTP" };
 
     tracing::info!("");
     tracing::info!("=== Cross-Origin Same-Site Demo (Pattern 2) ===");
     tracing::info!("");
-    tracing::info!("Protocol:        {}", protocol);
     tracing::info!("Auth Server:     {}", auth_origin);
     tracing::info!("  - Frontend + OAuth2/Passkey authentication");
     if !COOKIE_DOMAIN.is_empty() {
@@ -258,16 +251,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Open: {}", auth_origin);
     tracing::info!("================================================");
 
-    // Spawn both servers (HTTP or HTTPS based on configuration)
-    if use_https {
-        let auth_server = spawn_https_server(auth_port, auth_route).await;
-        let api_server = spawn_https_server(api_port, api_route).await;
-        tokio::try_join!(auth_server, api_server)?;
-    } else {
-        let auth_server = spawn_http_server(auth_port, auth_route);
-        let api_server = spawn_http_server(api_port, api_route);
-        tokio::try_join!(auth_server, api_server)?;
-    }
+    // Spawn both HTTP servers
+    let auth_server = spawn_http_server(auth_port, auth_route);
+    let api_server = spawn_http_server(api_port, api_route);
+    tokio::try_join!(auth_server, api_server)?;
 
     Ok(())
 }

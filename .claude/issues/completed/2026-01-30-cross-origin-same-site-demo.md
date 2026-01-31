@@ -2,7 +2,7 @@
 
 ## ID: 2026-01-30-09
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -251,3 +251,30 @@ cargo run
 - [x] Askama templates (no static HTML)
 - [x] OAuth2 + Passkey via oauth2_passkey_full_router()
 - [x] RESOURCE_API_ORIGIN configurable via environment variable
+
+---
+
+## Simplification: Remove Direct HTTPS Support (2026-01-31)
+
+### Decision
+
+Remove "Direct HTTPS (Non-standard Ports)" testing method and related TLS code.
+
+### Rationale
+
+1. **Non-standard ports reduce practicality**: URLs like `https://auth.foobar.com:3443` are not production-like
+2. **Binding to port 443 requires root**: Making "direct HTTPS" impractical without a proxy
+3. **HTTPS Proxy is the recommended production approach**: nginx/Caddy handle TLS termination better
+4. **Simplifies documentation and code**: Two testing methods (localhost, HTTPS Proxy) are sufficient
+
+### Changes
+
+- Remove "Direct HTTPS" section from README
+- Remove TLS-related code from `server.rs` (`TLS_CERT_PATH`, `TLS_KEY_PATH`, `is_tls_configured()`, `spawn_https_server()`)
+- Simplify `main.rs` to HTTP-only server spawning
+- Remove `axum-server` TLS dependencies from `Cargo.toml`
+
+### Final Testing Methods
+
+1. **localhost** - Development and testing (HTTP, no setup required)
+2. **HTTPS Proxy** - Production (nginx/Caddy terminates TLS, proxies to HTTP)
