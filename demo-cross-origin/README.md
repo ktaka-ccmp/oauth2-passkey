@@ -10,7 +10,7 @@ A separate **API server** validates session cookies issued by the **Auth Server*
 - [Testing Methods](#testing-methods)
   - [localhost (Easiest)](#localhost-easiest)
   - [HTTPS Proxy](#https-proxy)
-  - [Production-like (Direct HTTPS)](#production-like-direct-https)
+  - [Direct HTTPS (Non-standard Ports)](#direct-https-non-standard-ports)
 - [Configuration](#configuration)
 - [How It Works](#how-it-works)
 - [Key Technical Points](#key-technical-points)
@@ -173,18 +173,36 @@ server {
 
 #### 2. Caddy configuration (alternative)
 
+Copy the example configuration:
+
+```bash
+cp Caddyfile.example Caddyfile
+# Edit paths to your certificate files
+```
+
 ```caddyfile
-# Caddyfile
+# Auth Server
 auth.foobar.com {
+    tls /path/to/fullchain.pem /path/to/privkey.pem
     reverse_proxy localhost:3001
 }
 
+# API Server
 api.foobar.com {
+    tls /path/to/fullchain.pem /path/to/privkey.pem
     reverse_proxy localhost:3002
 }
 ```
 
-Caddy automatically obtains and renews certificates via Let's Encrypt.
+Validate and run:
+
+```bash
+caddy validate --config Caddyfile
+caddy run --config Caddyfile
+```
+
+**Note**: You can use a wildcard certificate (`*.foobar.com`) or individual certificates.
+For automatic Let's Encrypt, remove the `tls` directive and Caddy will obtain certificates automatically.
 
 #### 3. Create `.env`
 
@@ -239,24 +257,28 @@ Navigate to <https://auth.foobar.com>
 - Production-like architecture
 - Can add rate limiting, logging, etc. at proxy level
 
-### Production-like (Direct HTTPS)
+### Direct HTTPS (Non-standard Ports)
 
-The Rust application serves HTTPS directly using a valid wildcard certificate.
+The Rust application serves HTTPS directly. Since binding to port 443 requires
+root privileges, this method uses non-standard ports (3443/3444).
 
-| Requirement       | Status     |
-|-------------------|------------|
-| DNS records       | Required   |
-| Valid certificate | Required   |
-| Proxy             | Not needed |
-| Passkey           | Works      |
-| OAuth2            | Works      |
+| Requirement       | Status                |
+|-------------------|-----------------------|
+| DNS records       | Required              |
+| Valid certificate | Required              |
+| Proxy             | Not needed            |
+| Passkey           | Works                 |
+| OAuth2            | Works                 |
+
+**Note**: URLs will include port numbers (e.g., `https://auth.foobar.com:3443`).
+For standard ports without root, use the [HTTPS Proxy](#https-proxy) method instead.
 
 #### 1. Prerequisites
 
-- Valid wildcard certificate for `*.foobar.com`
+- Valid certificate covering both subdomains (wildcard `*.foobar.com` or individual certs)
 - DNS records pointing to your server:
-  - `auth.foobar.com` → your server IP
-  - `api.foobar.com` → your server IP
+  - `auth.foobar.com` -> your server IP
+  - `api.foobar.com` -> your server IP
 
 #### 2. Place certificate files
 
@@ -270,13 +292,14 @@ cp /path/to/privkey.pem certs/
 
 ```bash
 cat > .env << 'EOF'
-ORIGIN='https://auth.foobar.com'
-API_ORIGIN='https://api.foobar.com'
+# IMPORTANT: URLs must include port numbers
+ORIGIN='https://auth.foobar.com:3443'
+API_ORIGIN='https://api.foobar.com:3444'
 SESSION_COOKIE_DOMAIN='.foobar.com'
-CORS_ALLOWED_ORIGINS='https://auth.foobar.com'
+CORS_ALLOWED_ORIGINS='https://auth.foobar.com:3443'
 CORS_ALLOW_CREDENTIALS=true
 
-# HTTPS configuration
+# HTTPS configuration (non-standard ports, no root required)
 AUTH_PORT=3443
 API_PORT=3444
 TLS_CERT_PATH='certs/fullchain.pem'
@@ -299,7 +322,7 @@ EOF
 Add this redirect URI in Google Cloud Console:
 
 ```text
-https://auth.foobar.com/o2p/oauth2/authorized
+https://auth.foobar.com:3443/o2p/oauth2/authorized
 ```
 
 #### 5. Run the application
@@ -310,14 +333,18 @@ cargo run
 
 #### 6. Access the demo
 
-Navigate to <https://auth.foobar.com>
+Navigate to <https://auth.foobar.com:3443>
 
 **Benefits:**
 
+- No proxy required
 - Full Passkey support (secure context)
-- OAuth2 with real domain (not just localhost)
 - Cookie `Secure` flag works correctly
-- Production-identical behavior
+
+**Trade-offs:**
+
+- Non-standard ports in URLs
+- Firewall must allow ports 3443/3444
 
 ## Configuration
 

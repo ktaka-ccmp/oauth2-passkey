@@ -1,0 +1,11 @@
+# Auth Server
+auth.foobar.com {
+    tls /path/to/fullchain.pem /path/to/privkey.pem
+    reverse_proxy localhost:3001
+}
+
+# API Server
+api.foobar.com {
+    tls /path/to/fullchain.pem /path/to/privkey.pem
+    reverse_proxy localhost:3002
+}
