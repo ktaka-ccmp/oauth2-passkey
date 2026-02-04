@@ -130,9 +130,12 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 ## Workflow
 
 1. Create new issue in `open/` directory
-2. Work on the issue
-3. When resolved, update Resolution section and move to `completed/`
-4. If postponed, move to `deferred/`
+2. **Update this README's "Current Issues" table** (increment count, add row)
+3. Work on the issue
+4. When resolved, update Resolution section and move to `completed/`
+5. If postponed, move to `deferred/`
+
+**Important**: Always update the README table when creating, completing, or moving issues.
 
 ## Difference from Sessions
 
