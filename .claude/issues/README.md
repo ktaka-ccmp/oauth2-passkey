@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (7)
+### Open (8)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -14,6 +14,7 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-02` | medium | medium | [Admin Force Logout Feature](open/2026-01-30-admin-force-logout.md) |
 | `2026-01-30-03` | medium | large | [Admin Login History View](open/2026-01-30-admin-login-history.md) |
 | `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
+| `2026-02-07-01` | medium | medium | [Update README and Docs for Current API](open/2026-02-07-readme-docs-update.md) |
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 | `2026-01-31-02` | low | small | [Remove HTTPS Support from Demo Apps](open/2026-01-31-demo-remove-https.md) |
