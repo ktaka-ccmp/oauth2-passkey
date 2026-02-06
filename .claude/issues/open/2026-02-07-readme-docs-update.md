@@ -68,12 +68,23 @@ After HTTPS removal from demos is complete, update `localhost:3443` references i
 - `docs/src/integration/customizing-templates.md`
 - `docs/src/appendix/troubleshooting.md`
 
+### 5. demo-cross-origin/README.md Improvements
+
+- [ ] Add `/etc/hosts` setup example before nginx/Caddy configuration:
+
+```bash
+# Add to /etc/hosts (for local testing without DNS)
+127.0.0.1  auth.foobar.com
+127.0.0.1  api.foobar.com
+```
+
 ## Related Files
 
 - `Readme.md`
 - `oauth2_passkey_axum/README.md`
 - `docs/src/**/*.md`
 - `demo-*/README.md`
+- `demo-cross-origin/README.md` (specifically for /etc/hosts example)
 
 ## Notes
 
