@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (8)
+### Open (7)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -17,9 +17,8 @@ This directory contains issue/task tracking files for the project.
 | `2026-02-07-01` | medium | medium | [Update README and Docs for Current API](open/2026-02-07-readme-docs-update.md) |
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
-| `2026-01-31-02` | low | small | [Remove HTTPS Support from Demo Apps](open/2026-01-31-demo-remove-https.md) |
 
-### Completed (19)
+### Completed (20)
 
 | ID | Title |
 |----|-------|
@@ -42,6 +41,7 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-29-04` | [Review SESSION_CONFLICT_POLICY Default](completed/2026-01-29-session-conflict-policy-review.md) |
 | `2026-01-30-01` | [Move /info and /csrf_token to default.rs](completed/2026-01-30-move-info-csrf-endpoints.md) |
 | `2026-01-30-09` | [Cross-Origin Same-Site Demo (Pattern 2)](completed/2026-01-30-cross-origin-same-site-demo.md) |
+| `2026-01-31-02` | [Remove HTTPS Support from Demo Apps](completed/2026-01-31-demo-remove-https.md) |
 
 ### Deferred (2)
 

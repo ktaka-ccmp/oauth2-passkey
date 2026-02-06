@@ -70,20 +70,13 @@ cp .env.example .env
 cd ../db/postgresql && docker compose up -d
 ```
 
-5. Generate TLS certificates:
-
-```bash
-cd self_signed_certs
-./gen_certs.sh
-```
-
-6. Run the demo:
+5. Run the demo:
 
 ```bash
 cargo run
 ```
 
-7. Open https://localhost:3443 in your browser
+6. Open http://localhost:3001 in your browser
 
 ## Database Schema
 
