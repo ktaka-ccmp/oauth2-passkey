@@ -130,7 +130,19 @@ Browser
   └─→ https://api.foobar.com  ──→ nginx/Caddy ──→ localhost:3002 (API Server)
 ```
 
-#### 1. Nginx configuration
+#### 1. Configure /etc/hosts (for local testing without DNS)
+
+If you don't have DNS for your domains, add entries to `/etc/hosts`:
+
+```bash
+# Add to /etc/hosts (requires sudo)
+127.0.0.1  auth.foobar.com
+127.0.0.1  api.foobar.com
+```
+
+For production, configure proper DNS records instead.
+
+#### 2. Nginx configuration
 
 ```nginx
 # /etc/nginx/sites-available/cross-origin-demo
@@ -170,7 +182,7 @@ server {
 }
 ```
 
-#### 2. Caddy configuration (alternative)
+#### 3. Caddy configuration (alternative)
 
 Copy the example configuration:
 
@@ -203,7 +215,7 @@ caddy run --config Caddyfile
 **Note**: You can use a wildcard certificate (`*.foobar.com`) or individual certificates.
 For automatic Let's Encrypt, remove the `tls` directive and Caddy will obtain certificates automatically.
 
-#### 3. Create `.env`
+#### 4. Create `.env`
 
 ```bash
 cat > .env << 'EOF'
@@ -230,7 +242,7 @@ GENERIC_DATA_STORE_URL='sqlite:data.db'
 EOF
 ```
 
-#### 4. Configure Google OAuth2
+#### 5. Configure Google OAuth2
 
 Add this redirect URI in Google Cloud Console:
 
@@ -238,14 +250,14 @@ Add this redirect URI in Google Cloud Console:
 https://auth.foobar.com/o2p/oauth2/authorized
 ```
 
-#### 5. Start the servers
+#### 6. Start the servers
 
 ```bash
 # Start nginx/Caddy first, then:
 cargo run
 ```
 
-#### 6. Open in browser
+#### 7. Open in browser
 
 Navigate to <https://auth.foobar.com>
 

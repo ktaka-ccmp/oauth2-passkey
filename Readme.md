@@ -37,7 +37,7 @@ OAUTH2_GOOGLE_CLIENT_SECRET='your-google-secret'
 
 ```rust
 use axum::{Router, routing::get, response::IntoResponse};
-use oauth2_passkey_axum::{AuthUser, oauth2_passkey_router, O2P_ROUTE_PREFIX};
+use oauth2_passkey_axum::{AuthUser, oauth2_passkey_full_router};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/", get(home))
         .route("/protected", get(protected))
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+        .merge(oauth2_passkey_full_router());
 
     // Your app is now ready with login/logout at /o2p/*
     Ok(())
@@ -88,9 +88,15 @@ Database + Cache     ← SQLite/PostgreSQL + Memory/Redis
 
 See it in action before integrating:
 
-- **[Complete Demo](demo-both/)** - Both OAuth2 and Passkey authentication
-- **[OAuth2 Only](demo-oauth2/)** - "Sign in with Google" focus
-- **[Passkey Only](demo-passkey/)** - Passwordless authentication focus
+| Demo | Description |
+|------|-------------|
+| **[demo-both](demo-both/)** | Complete OAuth2 + Passkey authentication |
+| **[demo-oauth2](demo-oauth2/)** | OAuth2 only ("Sign in with Google") |
+| **[demo-passkey](demo-passkey/)** | Passkey only (passwordless) |
+| **[demo-custom-login](demo-custom-login/)** | Custom login page implementation |
+| **[demo-profile](demo-profile/)** | User profile extension example |
+| **[demo-todo](demo-todo/)** | Todo app with user-specific data |
+| **[demo-cross-origin](demo-cross-origin/)** | Cross-origin authentication setup |
 
 ```bash
 # Copy demo configuration
@@ -100,7 +106,7 @@ cp dot.env.simple demo-both/.env
 cd demo-both && cargo run
 
 # Open in your browser:
-# Visit https://localhost:3443
+# Visit http://localhost:3001
 ```
 
 ## 📦 Repository Structure
@@ -109,10 +115,9 @@ This repository contains:
 
 - **[`oauth2_passkey/`](oauth2_passkey/)** - Core authentication library
 - **[`oauth2_passkey_axum/`](oauth2_passkey_axum/)** - Axum web framework integration
-- **[`demo-both/`](demo-both/)** - Complete integration example
-- **[`demo-oauth2/`](demo-oauth2/)** - OAuth2-focused example
-- **[`demo-passkey/`](demo-passkey/)** - Passkey-focused example
-- **[`db`](db/)** - Database configuration example
+- **[`demo-*/`](.)** - 7 demo applications (see table above)
+- **[`docs/`](docs/)** - Documentation (mdBook format)
+- **[`db/`](db/)** - Database configuration (Docker Compose)
 
 ## 🔧 Configuration
 

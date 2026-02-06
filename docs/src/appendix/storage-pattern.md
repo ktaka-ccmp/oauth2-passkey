@@ -55,7 +55,7 @@ oauth2_passkey_axum::init().await?;
 // 2. Router doesn't need state - just merge it
 let app = Router::new()
     .route("/", get(home))
-    .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+    .merge(oauth2_passkey_full_router());
 
 // Internally, the library accesses global stores directly
 // No State<T> extractor needed in handlers
@@ -91,7 +91,7 @@ pub(crate) fn get_data_store() -> &'static dyn DataStore {
 | Reason | Explanation |
 | --- | --- |
 | **Simpler API** | Users just call `init()` once. No need to create `AppState`, understand `State<T>`, or manage lifetimes. |
-| **Easy Router Integration** | `oauth2_passkey_router()` returns a stateless router. Users can simply `.nest()` or `.merge()` it with their app. |
+| **Easy Router Integration** | `oauth2_passkey_full_router()` returns a stateless router. Users can simply `.merge()` it with their app. |
 | **Internal Module Sharing** | The coordination layer accesses oauth2, passkey, session, and userdb stores. Global access avoids threading state through many internal layers. |
 | **Environment Configuration** | Storage backends (SQLite/PostgreSQL, Memory/Redis) are selected via environment variables, making the singleton pattern a natural fit. |
 

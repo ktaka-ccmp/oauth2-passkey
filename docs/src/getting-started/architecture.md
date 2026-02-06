@@ -158,7 +158,7 @@ This design means:
 oauth2_passkey_axum::init().await?;
 
 let app = Router::new()
-    .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+    .merge(oauth2_passkey_full_router());
 ```
 
 This provides a simpler API at the cost of some flexibility. For a detailed comparison of both approaches and the trade-offs involved, see [Storage Pattern](../appendix/storage-pattern.md).

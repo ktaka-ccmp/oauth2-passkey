@@ -26,7 +26,7 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
 1. **Choose Your ORIGIN**
 
    Decide how you'll access the application:
-   - **localhost** (default): `https://localhost:3443` - for local desktop testing
+   - **localhost** (default): `http://localhost:3001` - for local desktop testing (localhost is a [secure context](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts))
    - **tunnel** (mobile testing): Use [Cloudflare Tunnel](../guides/tunneling.md) to get a public URL like `https://random-name.trycloudflare.com`
 
    > **Note**: If using a tunnel, set it up first to get your URL before proceeding.
@@ -36,7 +36,7 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
    1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
    2. Create OAuth2 credentials (Web application)
    3. Add `{YOUR_ORIGIN}/o2p/oauth2/authorized` to "Authorized redirect URIs"
-      - For localhost: `https://localhost:3443/o2p/oauth2/authorized`
+      - For localhost: `http://localhost:3001/o2p/oauth2/authorized`
       - For tunnel: `https://random-name.trycloudflare.com/o2p/oauth2/authorized`
    4. Copy the Client ID and Client Secret
 
@@ -51,7 +51,7 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
 
    ```bash
    # Required: Base URL of your application (must match step 1)
-   ORIGIN='https://localhost:3443'
+   ORIGIN='http://localhost:3001'
 
    # Required: Google OAuth2 credentials (from step 2)
    OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
@@ -73,12 +73,13 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
    ```
 
    The application starts on:
-   - **HTTPS**: Port 3443 (access as `https://localhost:3443`)
-   - **HTTP**: Port 3001 (for use behind HTTPS proxies or tunnels)
+   - **HTTP**: Port 3001 (access as `http://localhost:3001`)
+
+   > **Note**: localhost is a secure context, so WebAuthn/Passkey works over HTTP. For production, use a reverse proxy (nginx/Caddy) to provide HTTPS.
 
 5. **Try the Demo**
 
-   1. Visit your ORIGIN URL (e.g., `https://localhost:3443` or your tunnel URL)
+   1. Visit your ORIGIN URL (e.g., `http://localhost:3001` or your tunnel URL)
    2. Create a user with Google OAuth2 or Passkey
    3. Navigate to the user account page: `{YOUR_ORIGIN}/o2p/user/account`
    4. Add new Passkey or OAuth2 account
@@ -103,7 +104,7 @@ Setup is similar to demo-both: copy `.env` from `dot.env.simple`, adjust for eac
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ORIGIN` | Yes | Base URL of your application (e.g., `https://localhost:3443`) |
+| `ORIGIN` | Yes | Base URL of your application (e.g., `http://localhost:3001`) |
 | `OAUTH2_GOOGLE_CLIENT_ID` | For OAuth2 | Google OAuth2 client ID |
 | `OAUTH2_GOOGLE_CLIENT_SECRET` | For OAuth2 | Google OAuth2 client secret |
 | `GENERIC_DATA_STORE_TYPE` | Yes | Database type: `sqlite` or `postgresql` |
@@ -140,14 +141,14 @@ cd db && docker compose up -d
 
 1. **"Invalid origin" error**
    - Ensure `ORIGIN` in `.env` matches the URL you're visiting exactly
-   - Use `https://localhost:3443` (not `127.0.0.1` or `http://`)
+   - Use `http://localhost:3001` (not `127.0.0.1`)
 
 2. **Google OAuth2 not working**
    - Check your Google OAuth2 credentials in `.env`
    - Verify authorized origins and redirect URIs in Google Cloud Console
 
 3. **WebAuthn/Passkey not working**
-   - Ensure you're using HTTPS (required for WebAuthn)
+   - WebAuthn requires a [secure context](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts) (localhost or HTTPS)
    - Try a different browser (Chrome has the best WebAuthn support)
    - Clear browser data for localhost if needed
 
@@ -160,12 +161,7 @@ cd db && docker compose up -d
    - Delete the database file to reset: `rm auth.db`
    - Ensure the path in `GENERIC_DATA_STORE_URL` is writable
 
-6. **SSL/HTTPS issues**
-   - Browser will show security warning for self-signed certificates
-   - Click "Advanced" -> "Proceed" to continue
-
 ### Development Tips
 
 - **Logs**: Check console output for detailed error messages
-- **Self-signed certificates**: Browser will show security warning; proceed anyway
 - **Reset database**: Delete `auth.db` to clear all sessions and credentials

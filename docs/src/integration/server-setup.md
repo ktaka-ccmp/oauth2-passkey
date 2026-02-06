@@ -1,12 +1,13 @@
 # Server Setup
 
-This guide covers server setup patterns for running OAuth2/Passkey authentication, based on the `demo-both` application.
+This guide covers server setup patterns for running OAuth2/Passkey authentication, based on the demo applications.
 
 ## Overview
 
-A typical setup runs both HTTP and HTTPS servers:
-- **HTTPS (port 3443)**: Primary server with TLS for production and local development
-- **HTTP (port 3001)**: Secondary server for tunnels and reverse proxies
+Demo applications run HTTP servers on port 3001. For production deployments requiring HTTPS:
+
+- **localhost development**: WebAuthn works over HTTP (localhost is a [secure context](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts))
+- **Production**: Use a reverse proxy (nginx/Caddy) to handle TLS termination
 
 ## Tracing Initialization
 
@@ -49,35 +50,9 @@ Override with `RUST_LOG`:
 RUST_LOG=debug cargo run
 ```
 
-## Self-Signed Certificate Setup
+## HTTP Server
 
-Each demo includes a `gen_certs.sh` script that generates certificates with proper SANs:
-
-```bash
-cd self_signed_certs
-./gen_certs.sh
-```
-
-This creates `cert.pem` and `key.pem` valid for 10 years with localhost and 127.0.0.1 as SANs.
-
-Load certificates with `RustlsConfig`:
-
-```rust,ignore
-use axum_server::tls_rustls::RustlsConfig;
-
-let config = RustlsConfig::from_pem_file(
-    format!("{}/self_signed_certs/cert.pem", env!("CARGO_MANIFEST_DIR")),
-    format!("{}/self_signed_certs/key.pem", env!("CARGO_MANIFEST_DIR")),
-)
-.await
-.expect("Failed to load TLS certificates");
-```
-
-## HTTP and HTTPS Servers
-
-### HTTP Server
-
-Spawn HTTP server for tunnel/proxy access:
+Spawn HTTP server using `tokio::net::TcpListener`:
 
 ```rust,ignore
 use axum::Router;
@@ -88,50 +63,49 @@ pub(crate) fn spawn_http_server(port: u16, app: Router) -> JoinHandle<()> {
     tokio::spawn(async move {
         let addr = SocketAddr::from(([0, 0, 0, 0], port));
         tracing::info!("HTTP server listening on {}", addr);
-        axum_server::bind(addr)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        axum::serve(listener, app).await.unwrap();
     })
 }
 ```
 
-### HTTPS Server
+## Production HTTPS Setup
 
-Spawn HTTPS server with TLS:
+For production, use a reverse proxy to handle TLS termination:
 
-```rust,ignore
-pub(crate) async fn spawn_https_server(port: u16, app: Router) -> JoinHandle<()> {
-    let config = RustlsConfig::from_pem_file(
-        format!("{}/self_signed_certs/cert.pem", env!("CARGO_MANIFEST_DIR")),
-        format!("{}/self_signed_certs/key.pem", env!("CARGO_MANIFEST_DIR")),
-    )
-    .await
-    .expect("Failed to load TLS certificates");
+### Caddy Example
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    tracing::info!("HTTPS server listening on {}", addr);
-    tokio::spawn(async move {
-        axum_server::bind_rustls(addr, config)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
-    })
+```caddyfile
+example.com {
+    reverse_proxy localhost:3001
 }
 ```
 
-## Why HTTP Port is Needed
+### nginx Example
 
-The HTTP server enables:
+```nginx
+server {
+    listen 443 ssl;
+    server_name example.com;
 
-1. **Development tunnels**: Services like ngrok or cloudflared terminate TLS and forward HTTP to your app
-2. **Reverse proxies**: Nginx/Caddy handle TLS termination, proxying HTTP internally
-3. **Load balancers**: Cloud load balancers often communicate with backends over HTTP
-4. **Container deployments**: Kubernetes ingress controllers manage TLS externally
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
 
-When using tunnels, set `ORIGIN` to the tunnel's HTTPS URL while the tunnel connects to your HTTP port.
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
 
-Example with cloudflared:
+When using a reverse proxy:
+- Set `ORIGIN` to your HTTPS URL (e.g., `https://example.com`)
+- The proxy forwards to your HTTP server on port 3001
+
+## Development Tunnels
+
+For remote testing, use tunnel services like ngrok or cloudflared:
 
 - Tunnel URL: `https://myapp.trycloudflare.com`
 - Set `ORIGIN='https://myapp.trycloudflare.com'`
@@ -147,14 +121,13 @@ use axum::{
     routing::get,
 };
 use axum::response::Html;
-use axum_server::tls_rustls::RustlsConfig;
 use askama::Template;
 use dotenvy::dotenv;
 use std::net::SocketAddr;
 use tokio::task::JoinHandle;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use oauth2_passkey_axum::{AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, oauth2_passkey_router};
+use oauth2_passkey_axum::{AuthUser, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router};
 
 #[derive(Template)]
 #[template(path = "index.j2")]
@@ -183,28 +156,8 @@ fn spawn_http_server(port: u16, app: Router) -> JoinHandle<()> {
     tokio::spawn(async move {
         let addr = SocketAddr::from(([0, 0, 0, 0], port));
         tracing::info!("HTTP server listening on {}", addr);
-        axum_server::bind(addr)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
-    })
-}
-
-async fn spawn_https_server(port: u16, app: Router) -> JoinHandle<()> {
-    let config = RustlsConfig::from_pem_file(
-        format!("{}/self_signed_certs/cert.pem", env!("CARGO_MANIFEST_DIR")),
-        format!("{}/self_signed_certs/key.pem", env!("CARGO_MANIFEST_DIR")),
-    )
-    .await
-    .expect("Failed to load TLS certificates");
-
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    tracing::info!("HTTPS server listening on {}", addr);
-    tokio::spawn(async move {
-        axum_server::bind_rustls(addr, config)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        axum::serve(listener, app).await.unwrap();
     })
 }
 
@@ -231,11 +184,6 @@ fn init_tracing(app_name: &str) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Install rustls crypto provider (required for TLS)
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install default CryptoProvider");
-
     // Initialize logging
     init_tracing("my-app");
 
@@ -248,14 +196,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build application router
     let app = Router::new()
         .route("/", get(index))
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+        .merge(oauth2_passkey_full_router());
 
-    // Start both servers
-    let http_server = spawn_http_server(3001, app.clone());
-    let https_server = spawn_https_server(3443, app).await;
-
-    // Wait for both servers
-    tokio::try_join!(http_server, https_server)?;
+    // Start server
+    spawn_http_server(3001, app).await?;
     Ok(())
 }
 ```
@@ -267,21 +211,18 @@ Add these to your `Cargo.toml`:
 ```toml
 [dependencies]
 axum = "0.8"
-axum-server = { version = "0.7", features = ["tls-rustls"] }
-rustls = "0.23"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenvy = "0.15"
 askama = "0.12"
-oauth2_passkey_axum = { version = "0.1", features = ["oauth2", "passkey"] }
+oauth2-passkey-axum = "0.2"
 ```
 
 ## Startup Sequence
 
-1. Install rustls crypto provider
-2. Initialize tracing
-3. Load environment variables with `dotenv()`
-4. Call `oauth2_passkey_axum::init().await`
-5. Build router with `oauth2_passkey_router()`
-6. Start HTTP and HTTPS servers
+1. Initialize tracing
+2. Load environment variables with `dotenv()`
+3. Call `oauth2_passkey_axum::init().await`
+4. Build router with `oauth2_passkey_full_router()`
+5. Start HTTP server

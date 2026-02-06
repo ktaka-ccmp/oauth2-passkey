@@ -80,7 +80,7 @@ See [dot.env.example](../dot.env.example) for available options.
 
 ```rust
 use axum::{Router, response::Html};
-use oauth2_passkey_axum::{oauth2_passkey_router, init, O2P_ROUTE_PREFIX};
+use oauth2_passkey_axum::{oauth2_passkey_full_router, init};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -91,8 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/", axum::routing::get(|| async { Html("Hello World!") }))
         // Add authentication routes (default: /o2p, configurable via O2P_ROUTE_PREFIX env var)
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
-        .merge(/* other routes */);
+        .merge(oauth2_passkey_full_router());
 
     // Start server
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
@@ -147,7 +146,7 @@ oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["
 
 ## Available Routes
 
-When you include `oauth2_passkey_router()`, all authentication endpoints are available under `/o2p` by default.
+When you include `oauth2_passkey_full_router()`, all authentication endpoints are available under `/o2p` by default.
 You can change this prefix by setting the `O2P_ROUTE_PREFIX` environment variable.
 
 ### Core Authentication
