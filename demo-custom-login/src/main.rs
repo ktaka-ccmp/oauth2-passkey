@@ -14,7 +14,7 @@ use oauth2_passkey_axum::{
 };
 
 mod server;
-use server::{init_tracing, spawn_http_server, spawn_https_server};
+use server::{init_tracing, spawn_http_server};
 
 // ============================================================================
 // Custom Login Page
@@ -351,10 +351,6 @@ async fn admin_user(user: AuthUser, Path(target_id): Path<String>) -> impl IntoR
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install default CryptoProvider");
-
     init_tracing("demo-custom-login");
 
     dotenv().ok();
@@ -369,9 +365,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/admin/user/{id}", get(admin_user)) // Custom admin user detail page
         .merge(oauth2_passkey_full_router());
 
-    let http_server = spawn_http_server(3001, app.clone());
-    let https_server = spawn_https_server(3443, app).await;
-
-    tokio::try_join!(http_server, https_server).unwrap();
+    spawn_http_server(3001, app).await?;
     Ok(())
 }

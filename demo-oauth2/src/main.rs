@@ -8,17 +8,11 @@ mod server;
 
 use crate::{
     handlers::{index, protected},
-    server::{init_tracing, spawn_http_server, spawn_https_server},
+    server::{init_tracing, spawn_http_server},
 };
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Install default CryptoProvider for rustls to prevent:
-    // "no process-level CryptoProvider available -- call CryptoProvider::install_default() before this point"
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install default CryptoProvider");
-
     init_tracing("demo_oauth2");
 
     dotenv().ok();
@@ -29,13 +23,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/protected", get(protected))
         .merge(oauth2_passkey_full_router());
 
-    // spawn_http_server doesn't need await because it's synchronous - it immediately returns a JoinHandle
-    let http_server = spawn_http_server(3001, app.clone());
-
-    // spawn_https_server requires await because it loads TLS certificates asynchronously before returning a JoinHandle
-    let https_server = spawn_https_server(3443, app).await;
-
-    // Wait for both servers to complete (which they never will in this case)
-    tokio::try_join!(http_server, https_server).unwrap();
+    spawn_http_server(3001, app).await?;
     Ok(())
 }

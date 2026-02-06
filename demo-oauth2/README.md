@@ -27,7 +27,7 @@ Edit `.env` with your Google OAuth2 credentials:
 
 ```bash
 # Required: Base URL of your application
-ORIGIN='https://localhost:3443'
+ORIGIN='http://localhost:3001'
 
 # Required: Google OAuth2 credentials
 OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
@@ -46,7 +46,7 @@ GENERIC_CACHE_STORE_URL='memory://demo'
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 2. Create OAuth2 credentials (Web application)
-3. Add `https://localhost:3443/o2p/oauth2/authorized` to "Authorized redirect URIs"
+3. Add `http://localhost:3001/o2p/oauth2/authorized` to "Authorized redirect URIs"
 
 ### 3. Run the Demo
 
@@ -56,16 +56,31 @@ cargo run
 
 The application will start on:
 
-- **HTTPS**: 3443 (access as <https://localhost:3443> for testing with self-signed certs)
-- **HTTP**: 3001 (for use behind HTTPS proxies or tunnels)
+- **HTTP**: Port 3001 (access as <http://localhost:3001>)
 
 **For mobile testing**, see the [Development Tunneling Guide](../docs/src/guides/tunneling.md).
 
 ### 4. Try the Demo
 
-1. **Visit**: <https://localhost:3443>
+1. **Visit**: <http://localhost:3001>
 2. **Sign In**: Click "Sign in with Google"
 3. **Explore**: Navigate to protected pages and view your profile
+
+## HTTPS for Production
+
+For production or non-localhost environments, use an HTTPS proxy (nginx/Caddy) to terminate TLS:
+
+```text
+Browser -> HTTPS (nginx/Caddy) -> HTTP (localhost:3001)
+```
+
+Example Caddy configuration:
+
+```caddyfile
+your-domain.com {
+    reverse_proxy localhost:3001
+}
+```
 
 ## Application Structure
 
@@ -79,10 +94,6 @@ demo-oauth2/
 │   ├── index_anon.j2   # Landing page for anonymous users
 │   ├── index_user.j2   # Landing page for authenticated users
 │   └── protected.j2    # Protected page template
-├── self_signed_certs/   # HTTPS certificates for development
-│   ├── cert.pem
-│   ├── key.pem
-│   └── gen_certs.sh    # Certificate generation script
 ├── Cargo.toml          # Dependencies
 └── README.md           # This file
 ```
@@ -93,15 +104,11 @@ demo-oauth2/
 
 1. **"Invalid origin" error**
    - Ensure `ORIGIN` in `.env` matches the URL you're visiting
-   - Use `https://localhost:3443` (not `127.0.0.1` or `http://`)
+   - Use `http://localhost:3001` for local development
 
 2. **Google OAuth2 not working**
    - Check your Google OAuth2 credentials in `.env`
    - Verify authorized origins and redirect URIs in Google Cloud Console
-
-3. **SSL/HTTPS issues**
-   - Browser will show security warning for self-signed certificates
-   - Click "Advanced" → "Proceed" to continue
 
 ### Development Tips
 
