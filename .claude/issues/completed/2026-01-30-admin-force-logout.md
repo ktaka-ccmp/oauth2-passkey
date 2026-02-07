@@ -52,7 +52,7 @@ Add session status indicator to admin panel showing which users are currently lo
 ### Implementation Plan
 
 **Phase 1: Core API**
-1. Expose `cleanup_stale_sessions` via coordination layer as `get_active_session_count(user_id)`
+1. Add `get_all_active_sessions(session_id)` to coordination layer
 2. Add bulk endpoint: `GET /o2p/admin/sessions` returning `{ user_id: session_count, ... }`
 
 **Phase 2: Admin Index (User List)**
@@ -99,7 +99,6 @@ Make the session status indicator (●) in admin index clickable to allow direct
 All phases of the Admin Force Logout feature have been implemented:
 
 **Core API & Coordination Layer:**
-- `get_active_session_count(session_id, user_id)` - Get session count for a specific user
 - `get_all_active_sessions(session_id)` - Get session counts for all users (bulk API)
 - `force_logout_user(session_id, target_user_id)` - Terminate all sessions for a user
 
@@ -127,7 +126,6 @@ All phases of the Admin Force Logout feature have been implemented:
 - Defense in depth: admin check at Axum handler layer AND coordination layer
 
 **Unit Tests Added:**
-- `test_get_active_session_count_requires_admin`
 - `test_get_all_active_sessions_requires_admin`
 - `test_force_logout_user_requires_admin`
 - `test_get_all_active_sessions_success`

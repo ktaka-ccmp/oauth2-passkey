@@ -340,40 +340,9 @@ pub async fn update_user_admin_status(
     Ok(user)
 }
 
-/// Gets the count of active sessions for a specific user.
-///
-/// This function checks the session cache and returns the number of currently
-/// active sessions for the specified user. It performs cleanup of stale sessions
-/// before counting.
-///
-/// # Arguments
-///
-/// * `session_id` - The session ID of the administrator performing the action
-/// * `user_id` - The unique identifier of the user to check
-///
-/// # Returns
-///
-/// * `Ok(usize)` - The number of active sessions for the user
-/// * `Err(CoordinationError::Unauthorized)` - If the caller doesn't have admin privileges
-/// * `Err(CoordinationError)` - If an error occurs during the operation
-#[cfg(test)]
-pub(crate) async fn get_active_session_count(
-    session_id: SessionId,
-    user_id: UserId,
-) -> Result<usize, CoordinationError> {
-    // Validate admin session
-    let _admin_user = validate_admin_session(session_id).await?;
-
-    let session_ids = cleanup_stale_sessions(user_id.as_str()).await?;
-
-    Ok(session_ids.len())
-}
-
 /// Gets active session counts for all users.
 ///
 /// This function returns a map of user IDs to their active session counts.
-/// It's more efficient than calling `get_active_session_count` for each user
-/// individually when you need session status for multiple users.
 ///
 /// # Arguments
 ///

@@ -647,59 +647,6 @@ async fn test_delete_oauth2_account_admin_requires_admin() {
         .ok();
 }
 
-/// Test to ensure that getting active session count requires admin privileges.
-/// This test verifies that our session-based security model correctly prevents
-/// unauthorized access to session information by non-admin users.
-#[serial]
-#[tokio::test]
-async fn test_get_active_session_count_requires_admin() {
-    init_test_environment().await;
-
-    // Create unique user with timestamp
-    let timestamp = chrono::Utc::now().timestamp_millis();
-    let non_admin_user_id = format!("non-admin-session-count-{timestamp}");
-    let target_user_id = format!("target-session-count-{timestamp}");
-
-    // Create a non-admin user with session
-    insert_test_user(
-        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
-        &format!("{non_admin_user_id}@example.com"),
-        "Non Admin",
-        false,
-    )
-    .await
-    .expect("Failed to create non-admin user");
-
-    let non_admin_session_id = format!("test-session-{non_admin_user_id}");
-    insert_test_session(
-        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
-        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
-        "csrf-token",
-        3600,
-    )
-    .await
-    .expect("Failed to create non-admin session");
-
-    // Attempt to get active session count as non-admin
-    let result = get_active_session_count(
-        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
-        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
-    )
-    .await;
-
-    // Verify that the operation is rejected due to lack of admin privileges
-    assert!(result.is_err());
-    match result {
-        Err(CoordinationError::Unauthorized) => {}
-        _ => panic!("Expected Unauthorized error, got: {result:?}"),
-    }
-
-    // Clean up
-    delete_user_if_exists_and_not_first(&non_admin_user_id)
-        .await
-        .ok();
-}
-
 /// Test to ensure that getting all active sessions requires admin privileges.
 /// This test verifies that our session-based security model correctly prevents
 /// unauthorized access to session information by non-admin users.
@@ -889,19 +836,6 @@ async fn test_force_logout_user_success() {
     .await
     .expect("Failed to create target session");
 
-    // Verify target user has an active session
-    let session_count_before = get_active_session_count(
-        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
-        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
-    )
-    .await
-    .expect("Failed to get session count before");
-
-    assert!(
-        session_count_before >= 1,
-        "Target user should have at least 1 session before force logout"
-    );
-
     // Force logout the target user
     let terminated_count = force_logout_user(
         SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
@@ -910,22 +844,23 @@ async fn test_force_logout_user_success() {
     .await
     .expect("Failed to force logout user");
 
-    assert!(
-        terminated_count >= 1,
-        "At least 1 session should have been terminated"
+    // Verify at least 1 session was terminated
+    assert_eq!(
+        terminated_count, 1,
+        "Exactly 1 session should have been terminated"
     );
 
-    // Verify target user has no active sessions
-    let session_count_after = get_active_session_count(
+    // Verify calling force_logout again returns 0 (no more sessions)
+    let terminated_count_again = force_logout_user(
         SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
         UserId::new(target_user_id.clone()).expect("Valid target user ID"),
     )
     .await
-    .expect("Failed to get session count after");
+    .expect("Failed to force logout user again");
 
     assert_eq!(
-        session_count_after, 0,
-        "Target user should have 0 sessions after force logout"
+        terminated_count_again, 0,
+        "No sessions should remain after force logout"
     );
 
     // Clean up
