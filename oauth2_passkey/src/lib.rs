@@ -40,6 +40,7 @@
 //!
 //! See the repository documentation for more details on configuration and advanced usage.
 
+mod audit;
 mod config;
 mod coordination;
 mod oauth2;
@@ -67,6 +68,12 @@ pub use coordination::{
     delete_user_account_admin, force_logout_user, get_all_active_sessions, get_authorized_core,
     list_accounts_core, post_authorized_core, update_passkey_credential_core, update_user_account,
     update_user_admin_status,
+};
+
+// Login history types and functions
+pub use audit::{LoginContext, LoginHistoryEntry};
+pub use coordination::{
+    LoginHistoryEntryMasked, get_own_login_history, get_user_login_history_admin,
 };
 
 // Environment variable configurable route prefix for all auth routes (defaults to "/o2p")
@@ -144,5 +151,6 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
     userdb::init().await?;
     oauth2::init().await?;
     passkey::init().await?;
+    audit::LoginHistoryStore::init().await?;
     Ok(())
 }

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{env, sync::LazyLock};
 
+use crate::audit::{AuthMethod, LoginContext};
 use crate::passkey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialId, CredentialSearchField,
     PasskeyCredential, PasskeyStore, RegisterCredential, RegistrationOptions, commit_registration,
@@ -14,6 +15,7 @@ use crate::session::{User as SessionUser, UserId, new_session_header};
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
+use super::login_history::record_login_success;
 use super::user::gen_new_user_id;
 
 /// Passkey user account field mapping configuration
@@ -253,9 +255,17 @@ pub struct AuthenticationResponse {
 ///
 /// This function verifies the authentication response, creates a session for the
 /// authenticated user, and returns the authentication response data and session headers.
-#[tracing::instrument(skip(auth_response), fields(user_id))]
+///
+/// # Arguments
+///
+/// * `auth_response` - The authenticator response from the client
+/// * `login_context` - Optional context for recording login history (IP, user-agent)
+/// * `credential_id_for_history` - Optional credential ID for recording in login history
+#[tracing::instrument(skip(auth_response, login_context), fields(user_id))]
 pub async fn handle_finish_authentication_core(
     auth_response: AuthenticatorResponse,
+    login_context: Option<LoginContext>,
+    credential_id_for_history: Option<String>,
 ) -> Result<(AuthenticationResponse, HeaderMap), CoordinationError> {
     tracing::info!("Finishing passkey authentication flow");
     tracing::debug!("Auth response: {:#?}", auth_response);
@@ -272,6 +282,19 @@ pub async fn handle_finish_authentication_core(
     let user_id = UserId::new(uid.clone())
         .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
     let headers = new_session_header(user_id.clone()).await?;
+
+    // Record login history (non-blocking, errors are logged but don't fail the login)
+    if let Some(context) = login_context {
+        let _ = record_login_success(
+            user_id.clone(),
+            AuthMethod::Passkey,
+            context,
+            credential_id_for_history,
+            None,
+            None,
+        )
+        .await;
+    }
 
     // Retrieve all credential IDs for authenticator synchronization
     let credentials = list_credentials_core(user_id).await?;

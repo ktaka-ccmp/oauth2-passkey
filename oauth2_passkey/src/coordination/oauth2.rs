@@ -2,6 +2,7 @@ use chrono::{Duration, Utc};
 use http::HeaderMap;
 use std::{env, sync::LazyLock};
 
+use crate::audit::{AuthMethod, LoginContext};
 use crate::oauth2::{
     AccountSearchField, AuthResponse, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_RESPONSE_MODE, OAuth2Account,
     OAuth2Mode, OAuth2Store, Provider, ProviderUserId, csrf_checks, decode_state,
@@ -13,6 +14,7 @@ use crate::userdb::{User as DbUser, UserStore};
 use crate::utils::header_set_cookie;
 
 use super::errors::CoordinationError;
+use super::login_history::record_login_success;
 use super::user::gen_new_user_id;
 
 use crate::session::{UserId, new_session_header};
@@ -39,12 +41,21 @@ pub(crate) enum HttpMethod {
 /// 2. Validates the state parameter is not empty
 /// 3. Performs CSRF checks
 /// 4. Processes the OAuth2 authorization
-#[tracing::instrument(skip(auth_response, cookies, headers), fields(user_id, provider = "google", state = %auth_response.state))]
+///
+/// # Arguments
+///
+/// * `method` - The HTTP method used for the callback (GET or POST)
+/// * `auth_response` - The OAuth2 authentication response from the provider
+/// * `cookies` - Cookie headers from the client request
+/// * `headers` - All headers from the client request
+/// * `login_context` - Optional context for recording login history (IP, user-agent)
+#[tracing::instrument(skip(auth_response, cookies, headers, login_context), fields(user_id, provider = "google", state = %auth_response.state))]
 pub async fn authorized_core(
     method: HttpMethod,
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
+    login_context: Option<LoginContext>,
 ) -> Result<(HeaderMap, String), CoordinationError> {
     tracing::info!(?method, "Processing OAuth2 authorization callback");
     // Verify this is the correct response mode for the HTTP method
@@ -74,7 +85,7 @@ pub async fn authorized_core(
     }
 
     csrf_checks(cookies.clone(), auth_response, headers.clone()).await?;
-    process_oauth2_authorization(auth_response).await
+    process_oauth2_authorization(auth_response, login_context).await
 }
 
 /// Processes an OAuth2 GET authorization request.
@@ -88,6 +99,7 @@ pub async fn authorized_core(
 /// * `auth_response` - The OAuth2 authentication response from the provider
 /// * `cookies` - Cookie headers from the client request
 /// * `headers` - All headers from the client request
+/// * `login_context` - Optional context for recording login history (IP, user-agent)
 ///
 /// # Returns
 ///
@@ -106,7 +118,7 @@ pub async fn authorized_core(
 ///     cookies: &Cookie,
 ///     headers: &HeaderMap
 /// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {
-///     let (response_headers, body) = get_authorized_core(auth_response, cookies, headers).await?;
+///     let (response_headers, body) = get_authorized_core(auth_response, cookies, headers, None).await?;
 ///     Ok((response_headers, body))
 /// }
 /// ```
@@ -114,8 +126,16 @@ pub async fn get_authorized_core(
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
+    login_context: Option<LoginContext>,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    authorized_core(HttpMethod::Get, auth_response, cookies, headers).await
+    authorized_core(
+        HttpMethod::Get,
+        auth_response,
+        cookies,
+        headers,
+        login_context,
+    )
+    .await
 }
 
 /// Processes an OAuth2 POST authorization request.
@@ -129,6 +149,7 @@ pub async fn get_authorized_core(
 /// * `auth_response` - The OAuth2 authentication response from the provider
 /// * `cookies` - Cookie headers from the client request
 /// * `headers` - All headers from the client request
+/// * `login_context` - Optional context for recording login history (IP, user-agent)
 ///
 /// # Returns
 ///
@@ -147,7 +168,7 @@ pub async fn get_authorized_core(
 ///     cookies: &Cookie,
 ///     headers: &HeaderMap
 /// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {
-///     let (response_headers, body) = post_authorized_core(auth_response, cookies, headers).await?;
+///     let (response_headers, body) = post_authorized_core(auth_response, cookies, headers, None).await?;
 ///     Ok((response_headers, body))
 /// }
 /// ```
@@ -155,13 +176,22 @@ pub async fn post_authorized_core(
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
+    login_context: Option<LoginContext>,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    authorized_core(HttpMethod::Post, auth_response, cookies, headers).await
+    authorized_core(
+        HttpMethod::Post,
+        auth_response,
+        cookies,
+        headers,
+        login_context,
+    )
+    .await
 }
 
-#[tracing::instrument(skip(auth_response), fields(user_id, provider = "google", state = %auth_response.state))]
+#[tracing::instrument(skip(auth_response, login_context), fields(user_id, provider = "google", state = %auth_response.state))]
 async fn process_oauth2_authorization(
     auth_response: &AuthResponse,
+    login_context: Option<LoginContext>,
 ) -> Result<(HeaderMap, String), CoordinationError> {
     tracing::info!("Processing OAuth2 authorization core logic");
     let (idinfo, userinfo) = get_idinfo_userinfo(auth_response).await?;
@@ -209,6 +239,10 @@ async fn process_oauth2_authorization(
         .map_err(|e| CoordinationError::Validation(format!("Invalid provider user ID: {e}")))?;
     let existing_account =
         OAuth2Store::get_oauth2_account_by_provider(provider, provider_user_id).await?;
+
+    // Capture provider info for login history before oauth2_account is potentially moved
+    let provider_for_history = oauth2_account.provider.clone();
+    let provider_user_id_for_history = oauth2_account.provider_user_id.clone();
 
     // Extract mode_id from the stored session if available
     let mode = match &state_in_response.mode_id {
@@ -318,7 +352,20 @@ async fn process_oauth2_authorization(
 
     let user_id_validated = UserId::new(user_id)
         .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
-    let mut headers = new_session_header(user_id_validated).await?;
+    let mut headers = new_session_header(user_id_validated.clone()).await?;
+
+    // Record login history (non-blocking, errors are logged but don't fail the login)
+    if let Some(context) = login_context {
+        let _ = record_login_success(
+            user_id_validated,
+            AuthMethod::OAuth2,
+            context,
+            None,
+            Some(provider_for_history),
+            Some(provider_user_id_for_history),
+        )
+        .await;
+    }
 
     let _ = header_set_cookie(
         &mut headers,

@@ -166,6 +166,17 @@
             {% endfor %}
         {% endif %}
     </div>
+
+    <!-- Recent Login History Section -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">Recent Login History</h2>
+            <button onclick="loadLoginHistory()" class="action-button">Refresh</button>
+        </div>
+        <div id="login-history-container">
+            <p id="login-history-loading">Loading...</p>
+        </div>
+    </div>
 </div>
 
     <!-- Update Credential Modal -->
@@ -207,6 +218,59 @@
         function Logout() {
             window.location.href = "{{o2p_route_prefix}}/user/logout?redirect={{o2p_default_redirect}}";
         }
+
+        // Login History Functions
+        async function loadLoginHistory() {
+            const container = document.getElementById('login-history-container');
+            container.innerHTML = '<p id="login-history-loading">Loading...</p>';
+
+            try {
+                const response = await fetch(`${O2P_ROUTE_PREFIX}/user/login_history?limit=10`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch login history');
+                }
+
+                const entries = await response.json();
+
+                if (entries.length === 0) {
+                    container.innerHTML = '<p>No login history available.</p>';
+                    return;
+                }
+
+                let html = '<div class="login-history-list">';
+                for (const entry of entries) {
+                    const date = new Date(entry.timestamp).toLocaleString();
+                    const method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
+                    const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
+                    const status = entry.success ? '✓' : '✗';
+                    const statusClass = entry.success ? 'success' : 'failure';
+
+                    html += `
+                        <div class="item login-history-entry">
+                            <div class="item-detail">
+                                <span class="login-icon">${icon}</span>
+                                <strong>${method}</strong>
+                                <span class="login-status ${statusClass}">${status}</span>
+                            </div>
+                            <div class="item-detail"><strong>Time:</strong> ${date}</div>
+                            ${entry.ip_address ? `<div class="item-detail"><strong>IP:</strong> ${entry.ip_address}</div>` : ''}
+                            ${entry.provider ? `<div class="item-detail"><strong>Provider:</strong> ${entry.provider}</div>` : ''}
+                        </div>
+                    `;
+                }
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading login history:', error);
+                container.innerHTML = '<p class="error">Failed to load login history.</p>';
+            }
+        }
+
+        // Load login history when page loads
+        document.addEventListener('DOMContentLoaded', loadLoginHistory);
     </script>
 
 </body>

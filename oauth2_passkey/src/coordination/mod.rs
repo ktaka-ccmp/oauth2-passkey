@@ -7,12 +7,14 @@
 //! The module is divided into several submodules:
 //! - `admin`: Admin-specific operations like user management and credential administration
 //! - `errors`: Error types specific to coordination operations
+//! - `login_history`: Login history recording and retrieval
 //! - `oauth2`: OAuth2 authentication flow coordination
 //! - `passkey`: WebAuthn/Passkey authentication flow coordination
 //! - `user`: User account management operations
 
 mod admin;
 mod errors;
+mod login_history;
 mod oauth2;
 mod passkey;
 mod user;
@@ -33,6 +35,11 @@ pub use passkey::{
     handle_start_registration_core, list_credentials_core, update_passkey_credential_core,
 };
 pub use user::{delete_user_account, update_user_account};
+
+// Login history functions
+pub use login_history::{
+    LoginHistoryEntryMasked, get_own_login_history, get_user_login_history_admin,
+};
 
 // Auth helper functions are now used internally by coordination functions
 // They are not exported as they should not be used directly by external code
