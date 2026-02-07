@@ -4,7 +4,7 @@ use axum::{
     extract::Path,
     http::{StatusCode, header::CONTENT_TYPE},
     response::{Html, IntoResponse, Redirect, Response},
-    routing::get,
+    routing::{get, post},
 };
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
@@ -14,8 +14,9 @@ use std::{
 };
 
 use oauth2_passkey::{
-    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, get_all_users,
-    get_authenticator_info_batch, get_user, list_accounts_core, list_credentials_core,
+    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, force_logout_user,
+    get_all_active_sessions, get_all_users, get_authenticator_info_batch, get_user,
+    list_accounts_core, list_credentials_core,
 };
 
 use crate::{
@@ -28,6 +29,8 @@ pub(crate) fn router() -> Router<()> {
     Router::new()
         .route("/index", get(admin_index))
         .route("/user/{user_id}", get(admin_user_page))
+        .route("/user/{user_id}/logout", post(force_logout_handler))
+        .route("/sessions", get(get_sessions_status))
         .route("/admin_user.js", get(serve_admin_user_js))
 }
 
@@ -71,6 +74,58 @@ async fn admin_index(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, S
     Ok(Html(template.render().map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
     })?))
+}
+
+/// Get active session counts for all users (JSON API)
+async fn get_sessions_status(
+    auth_user: AuthUser,
+) -> Result<axum::Json<HashMap<String, usize>>, (StatusCode, String)> {
+    if !auth_user.has_admin_privileges() {
+        return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
+    }
+
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+
+    let sessions = get_all_active_sessions(session_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(axum::Json(sessions))
+}
+
+/// Force logout a user by terminating all their active sessions
+async fn force_logout_handler(
+    auth_user: AuthUser,
+    Path(user_id): Path<String>,
+) -> Result<axum::Json<serde_json::Value>, (StatusCode, String)> {
+    if !auth_user.has_admin_privileges() {
+        return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
+    }
+
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+
+    let target_user_id = UserId::new(user_id.clone())
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
+
+    let sessions_terminated = force_logout_user(session_id, target_user_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(axum::Json(serde_json::json!({
+        "success": true,
+        "sessions_terminated": sessions_terminated,
+        "user_id": user_id
+    })))
 }
 
 // Template-friendly version of StoredCredential for display

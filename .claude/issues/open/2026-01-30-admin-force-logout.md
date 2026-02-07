@@ -42,5 +42,36 @@ Add ability for administrators to force logout a specific user from the admin pa
 - Should log the action for audit trail
 - Consider CSRF protection for the action
 
+---
+
+## 2026-02-07 Update: Session Status Indicator
+
+### Additional Feature
+Add session status indicator to admin panel showing which users are currently logged in.
+
+### Implementation Plan
+
+**Phase 1: Core API**
+1. Expose `cleanup_stale_sessions` via coordination layer as `get_active_session_count(user_id)`
+2. Add bulk endpoint: `GET /o2p/admin/sessions` returning `{ user_id: session_count, ... }`
+
+**Phase 2: Admin Index (User List)**
+1. Add "Active" column to user table
+2. JavaScript fetches session status after page load via bulk API
+3. Display indicator (green dot for active, gray for inactive)
+
+**Phase 3: Admin User Detail + Force Logout**
+1. Show "Active Sessions: N" in user info section
+2. Add "Force Logout" button (visible when N > 0)
+3. POST `/o2p/admin/user/{user_id}/logout` to invalidate all sessions
+
+### Files to Modify
+- `oauth2_passkey/src/session/main/mod.rs` - Export session count function
+- `oauth2_passkey/src/coordination/admin.rs` - Add coordination function
+- `oauth2_passkey_axum/src/admin/optional.rs` - Add API endpoints
+- `oauth2_passkey_axum/static/admin_user.js` - Add session status fetch
+- `oauth2_passkey_axum/templates/admin_index.j2` - Add Active column
+- `oauth2_passkey_axum/templates/admin_user_page.j2` - Add session info + Force Logout button
+
 ## Resolution
 

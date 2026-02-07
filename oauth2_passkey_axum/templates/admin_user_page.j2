@@ -43,6 +43,11 @@
             <div class="item-detail"><strong>Label:</strong> {{ user.label }}</div>
             <div class="item-detail"><strong>Created:</strong> {{ user.created_at }}</div>
             <div class="item-detail"><strong>Updated:</strong> {{ user.updated_at }}</div>
+            <div class="item-detail">
+                <strong>Active Sessions:</strong>
+                <span id="session-count">...</span>
+                <button id="force-logout-btn" onclick="forceLogout('{{ user.id }}')" class="action-button delete-button" style="display: none; margin-left: 10px;">Force Logout</button>
+            </div>
         </div>
     </div>
 
@@ -140,6 +145,64 @@
         const accountName = "{{user.account}}";
         const userId = "{{user.id}}";
         const csrfToken = "{{csrf_token}}";
+
+        // Fetch session count for this user
+        async function fetchSessionCount() {
+            try {
+                const response = await fetch(`${O2P_ROUTE_PREFIX}/admin/sessions`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to fetch session status');
+                }
+                const sessions = await response.json();
+                const count = sessions[userId] || 0;
+
+                document.getElementById('session-count').textContent = count;
+
+                // Show force logout button if user has active sessions
+                const forceLogoutBtn = document.getElementById('force-logout-btn');
+                if (count > 0) {
+                    forceLogoutBtn.style.display = 'inline-block';
+                } else {
+                    forceLogoutBtn.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error fetching session count:', error);
+                document.getElementById('session-count').textContent = 'Error';
+            }
+        }
+
+        // Force logout the user
+        async function forceLogout(userId) {
+            if (!confirm('Are you sure you want to log out this user from all devices?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${O2P_ROUTE_PREFIX}/admin/user/${userId}/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to force logout user');
+                }
+
+                alert('User has been logged out from all devices.');
+                fetchSessionCount(); // Refresh the session count
+            } catch (error) {
+                console.error('Error forcing logout:', error);
+                alert('Failed to force logout user: ' + error.message);
+            }
+        }
+
+        // Fetch session count when page loads
+        document.addEventListener('DOMContentLoaded', fetchSessionCount);
     </script>
 
 </body>

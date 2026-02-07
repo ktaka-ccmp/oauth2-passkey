@@ -64,7 +64,8 @@ pub use coordination::{
 pub use coordination::{
     DeleteCredentialResponse, delete_oauth2_account_admin, delete_oauth2_account_core,
     delete_passkey_credential_admin, delete_passkey_credential_core, delete_user_account,
-    delete_user_account_admin, get_authorized_core, list_accounts_core, post_authorized_core,
+    delete_user_account_admin, force_logout_user, get_active_session_count,
+    get_all_active_sessions, get_authorized_core, list_accounts_core, post_authorized_core,
     update_passkey_credential_core, update_user_account, update_user_admin_status,
 };
 

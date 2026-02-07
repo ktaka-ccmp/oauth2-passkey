@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `oauth2_passkey_full_router()` unified router that automatically includes `/.well-known/webauthn` when multi-origin is configured
 - `rp_id` field in `PasskeyCredential` to store and display the Relying Party ID used during registration
 - WebAuthn Signal API documentation (`user-handle-and-signal-api.md`) focusing on `signalUnknownCredential` as the primary working API
+- Admin Force Logout feature: administrators can now terminate all active sessions for a user
+  - Session status indicator in Admin Panel user list
+  - "Active Sessions" count and "Force Logout" button in user detail page
+  - New API endpoints: `GET /o2p/admin/sessions`, `POST /o2p/admin/user/{user_id}/logout`
+  - New coordination functions: `get_active_session_count()`, `get_all_active_sessions()`, `force_logout_user()`
 
 ### Changed
 
