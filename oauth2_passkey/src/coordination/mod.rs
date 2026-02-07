@@ -23,8 +23,7 @@ pub use oauth2::{
 
 pub use admin::{
     delete_oauth2_account_admin, delete_passkey_credential_admin, delete_user_account_admin,
-    force_logout_user, get_active_session_count, get_all_active_sessions, get_all_users, get_user,
-    update_user_admin_status,
+    force_logout_user, get_all_active_sessions, get_all_users, get_user, update_user_admin_status,
 };
 
 pub use passkey::{

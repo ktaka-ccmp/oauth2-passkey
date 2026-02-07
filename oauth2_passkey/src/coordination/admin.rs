@@ -356,7 +356,8 @@ pub async fn update_user_admin_status(
 /// * `Ok(usize)` - The number of active sessions for the user
 /// * `Err(CoordinationError::Unauthorized)` - If the caller doesn't have admin privileges
 /// * `Err(CoordinationError)` - If an error occurs during the operation
-pub async fn get_active_session_count(
+#[cfg(test)]
+pub(crate) async fn get_active_session_count(
     session_id: SessionId,
     user_id: UserId,
 ) -> Result<usize, CoordinationError> {

@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Session status indicator in Admin Panel user list
   - "Active Sessions" count and "Force Logout" button in user detail page
   - New API endpoints: `GET /o2p/admin/sessions`, `POST /o2p/admin/user/{user_id}/logout`
-  - New coordination functions: `get_active_session_count()`, `get_all_active_sessions()`, `force_logout_user()`
+  - New coordination functions: `get_all_active_sessions()`, `force_logout_user()`
 
 ### Changed
 
