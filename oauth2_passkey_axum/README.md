@@ -35,11 +35,15 @@ This crate provides ready-to-use Axum handlers, middleware, and UI components fo
 
 ## Getting Started
 
-Try out demo to get familiarize yourself with the usage of the library.
+Try out the demos to familiarize yourself with the library:
 
-- [Complete Integration](../demo-both)
-- [OAuth2 Demo](../demo-oauth2)
-- [Passkey Demo](../demo-passkey)
+- [demo-both](../demo-both) - Complete OAuth2 + Passkey integration
+- [demo-oauth2](../demo-oauth2) - OAuth2 only
+- [demo-passkey](../demo-passkey) - Passkey only
+- [demo-custom-login](../demo-custom-login) - Custom login pages
+- [demo-profile](../demo-profile) - User profile extension
+- [demo-todo](../demo-todo) - App data linked to users
+- [demo-cross-origin](../demo-cross-origin) - Cross-origin setup
 
 ## Basic Usage
 
@@ -80,7 +84,7 @@ See [dot.env.example](../dot.env.example) for available options.
 
 ```rust
 use axum::{Router, response::Html};
-use oauth2_passkey_axum::{oauth2_passkey_router, init, O2P_ROUTE_PREFIX};
+use oauth2_passkey_axum::{oauth2_passkey_full_router, init};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -91,8 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/", axum::routing::get(|| async { Html("Hello World!") }))
         // Add authentication routes (default: /o2p, configurable via O2P_ROUTE_PREFIX env var)
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
-        .merge(/* other routes */);
+        .merge(oauth2_passkey_full_router());
 
     // Start server
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
@@ -147,7 +150,7 @@ oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["
 
 ## Available Routes
 
-When you include `oauth2_passkey_router()`, all authentication endpoints are available under `/o2p` by default.
+When you include `oauth2_passkey_full_router()`, all authentication endpoints are available under `/o2p` by default.
 You can change this prefix by setting the `O2P_ROUTE_PREFIX` environment variable.
 
 ### Core Authentication

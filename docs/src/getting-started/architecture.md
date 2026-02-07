@@ -10,8 +10,9 @@ This chapter describes the architecture of the oauth2-passkey library.
 - **demo-oauth2**: Example Axum application using OAuth2-only authentication
 - **demo-passkey**: Example Axum application using passkey-only authentication
 - **demo-custom-login**: Example Axum application with custom login and account pages
-- **demo-profile**: Example Axum application demonstrating user profile management
-- **demo-todo**: Example Axum application demonstrating a todo list with authentication
+- **demo-profile**: Example Axum application demonstrating user profile extension
+- **demo-todo**: Example Axum application demonstrating app data linked to users
+- **demo-cross-origin**: Example Axum application demonstrating cross-origin authentication (Auth + API servers)
 - **oauth2_passkey_axum**: Provides OAuth2 and passkey authentication handlers for Axum applications
   - Includes routers for OAuth2, passkey, and user account endpoints
   - Handles HTTP-specific concerns like request/response handling
@@ -158,7 +159,7 @@ This design means:
 oauth2_passkey_axum::init().await?;
 
 let app = Router::new()
-    .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+    .merge(oauth2_passkey_full_router());
 ```
 
 This provides a simpler API at the cost of some flexibility. For a detailed comparison of both approaches and the trade-offs involved, see [Storage Pattern](../appendix/storage-pattern.md).
