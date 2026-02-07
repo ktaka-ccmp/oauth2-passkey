@@ -28,18 +28,22 @@
                     <th>Account</th>
                     <th>Label</th>
                     <th>Is Admin</th>
+                    <th>Active</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in users %}
-                <tr class="user-row">
+                <tr class="user-row" data-user-id="{{ user.id }}">
                     <td class="id-cell" data-label="ID"><a href="{{o2p_route_prefix}}/admin/user/{{ user.id }}">{{ user.id }}</a></td>
                     <td data-label="Account">{{ user.account }}</td>
                     <td data-label="Label">{{ user.label }}</td>
                     {% if user.sequence_number.is_some() && user.sequence_number.unwrap_or(0) == 1 %}
                         <td data-label="Admin">
                             <span>{{ user.is_admin }}</span>
+                        </td>
+                        <td data-label="Active" class="session-status" id="session-status-{{ user.id }}">
+                            <span class="status-loading">...</span>
                         </td>
                         <td class="actions-cell">
                         </td>
@@ -48,6 +52,9 @@
                             <button onclick="toggleAdminStatus('{{ user.id }}', {{ user.is_admin }})">
                                 <span id="admin-status-{{ user.id }}">{{ user.is_admin }}</span>
                             </button>
+                        </td>
+                        <td data-label="Active" class="session-status" id="session-status-{{ user.id }}">
+                            <span class="status-loading">...</span>
                         </td>
                         <td class="actions-cell">
                             <button onclick="DeleteAccount('{{ user.id }}')" class="action-button delete-button">Delete</button>
@@ -63,10 +70,110 @@
     <script>
         const csrfToken = "{{csrf_token}}";
         const O2P_ROUTE_PREFIX = "{{o2p_route_prefix}}";
+        const currentUserId = "{{current_user_id}}";
+
+        // User data map for force logout confirmation
+        const userMap = {
+            {% for user in users %}
+            "{{ user.id }}": "{{ user.account }}",
+            {% endfor %}
+        };
+
         function Logout() {
             window.location.href = "{{o2p_route_prefix}}/user/logout?redirect={{o2p_default_redirect}}";
         }
+
+        // Force logout from the user list (clickable indicator)
+        async function forceLogoutFromList(userId) {
+            const accountName = userMap[userId] || userId;
+            if (!confirm(`Force logout "${accountName}" from all devices?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${O2P_ROUTE_PREFIX}/admin/user/${userId}/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to force logout user');
+                }
+
+                // Refresh the session status to update the indicator
+                fetchSessionStatus();
+            } catch (error) {
+                console.error('Error forcing logout:', error);
+                alert('Failed to force logout user: ' + error.message);
+            }
+        }
+
+        // Fetch and display session status for all users
+        async function fetchSessionStatus() {
+            try {
+                const response = await fetch(`${O2P_ROUTE_PREFIX}/admin/sessions`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to fetch session status');
+                }
+                const sessions = await response.json();
+
+                // Update each user's session status indicator
+                for (const [userId, count] of Object.entries(sessions)) {
+                    const statusCell = document.getElementById(`session-status-${userId}`);
+                    if (statusCell) {
+                        if (count > 0) {
+                            // Skip making current user's indicator clickable
+                            if (userId === currentUserId) {
+                                statusCell.innerHTML = `<span class="status-active" title="${count} active session(s) (you)">●</span>`;
+                            } else {
+                                // Active: clickable for force logout
+                                statusCell.innerHTML = `<span class="status-active status-clickable" onclick="forceLogoutFromList('${userId}')" title="${count} active session(s) - Click to force logout">●</span>`;
+                            }
+                        } else {
+                            // Inactive: non-clickable indicator
+                            statusCell.innerHTML = `<span class="status-inactive" title="No active sessions">○</span>`;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching session status:', error);
+                // Show error state for all status cells
+                document.querySelectorAll('.session-status').forEach(cell => {
+                    cell.innerHTML = '<span class="status-error" title="Error loading status">?</span>';
+                });
+            }
+        }
+
+        // Fetch session status when page loads
+        document.addEventListener('DOMContentLoaded', fetchSessionStatus);
+
+        // Poll for session status updates every 5 seconds
+        setInterval(fetchSessionStatus, 5000);
     </script>
+    <style>
+        .status-active { color: #22c55e; font-size: 1.2em; }
+        .status-inactive { color: #9ca3af; font-size: 1.2em; }
+        .status-loading { color: #9ca3af; }
+        .status-error { color: #ef4444; }
+        .session-status { text-align: center; }
+        .status-clickable {
+            cursor: pointer;
+            transition: transform 0.15s ease, filter 0.15s ease;
+        }
+        .status-clickable:hover {
+            transform: scale(1.3);
+            filter: brightness(1.2);
+        }
+        .status-clickable:active {
+            transform: scale(1.1);
+        }
+    </style>
 
 </body>
 </html>

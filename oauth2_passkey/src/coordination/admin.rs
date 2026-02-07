@@ -1,9 +1,14 @@
+use std::collections::HashMap;
+
 use crate::oauth2::{AccountSearchField, OAuth2Store, ProviderUserId};
 use crate::passkey::{CredentialId, CredentialSearchField, PasskeyStore};
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
-use crate::session::{SessionId, User as SessionUser, UserId, get_user_from_session};
+use crate::session::{
+    SessionId, User as SessionUser, UserId, cleanup_stale_sessions,
+    delete_session_from_store_by_session_id, get_user_from_session,
+};
 
 /// Retrieves a list of all users in the system.
 ///
@@ -333,6 +338,93 @@ pub async fn update_user_admin_status(
     let user = UserStore::upsert_user(updated_user).await?;
 
     Ok(user)
+}
+
+/// Gets active session counts for all users.
+///
+/// This function returns a map of user IDs to their active session counts.
+///
+/// # Arguments
+///
+/// * `session_id` - The session ID of the administrator performing the action
+///
+/// # Returns
+///
+/// * `Ok(HashMap<String, usize>)` - A map of user IDs to their active session counts
+/// * `Err(CoordinationError::Unauthorized)` - If the caller doesn't have admin privileges
+/// * `Err(CoordinationError)` - If an error occurs during the operation
+pub async fn get_all_active_sessions(
+    session_id: SessionId,
+) -> Result<HashMap<String, usize>, CoordinationError> {
+    // Validate admin session
+    let _admin_user = validate_admin_session(session_id).await?;
+
+    // Get all users
+    let users = UserStore::get_all_users()
+        .await
+        .map_err(|e| CoordinationError::Database(e.to_string()))?;
+
+    let mut result = HashMap::new();
+
+    for user in users {
+        let session_ids = cleanup_stale_sessions(&user.id).await?;
+        result.insert(user.id, session_ids.len());
+    }
+
+    Ok(result)
+}
+
+/// Forces logout of a user by deleting all their active sessions.
+///
+/// This administrative function invalidates all active sessions for a specific user,
+/// effectively logging them out from all devices. This is useful for security incidents,
+/// account compromises, or when a user requests to be logged out remotely.
+///
+/// # Arguments
+///
+/// * `session_id` - The session ID of the administrator performing the action
+/// * `user_id` - The unique identifier of the user to force logout
+///
+/// # Returns
+///
+/// * `Ok(usize)` - The number of sessions that were terminated
+/// * `Err(CoordinationError::Unauthorized)` - If the caller doesn't have admin privileges
+/// * `Err(CoordinationError)` - If an error occurs during the operation
+pub async fn force_logout_user(
+    session_id: SessionId,
+    user_id: UserId,
+) -> Result<usize, CoordinationError> {
+    // Validate admin session
+    let admin_user = validate_admin_session(session_id).await?;
+
+    tracing::info!(
+        admin_id = %admin_user.id,
+        target_user_id = %user_id.as_str(),
+        "Admin forcing logout for user"
+    );
+
+    // Get all active sessions for the user
+    let session_ids = cleanup_stale_sessions(user_id.as_str()).await?;
+    let session_count = session_ids.len();
+
+    // Delete each session
+    for sid in session_ids {
+        let session_id = SessionId::new(sid.clone())
+            .map_err(|e| CoordinationError::Validation(format!("Invalid session ID: {e}")))?;
+        if let Err(e) = delete_session_from_store_by_session_id(session_id).await {
+            tracing::warn!(session_id = %sid, error = %e, "Failed to delete session");
+            // Continue with other sessions even if one fails
+        }
+    }
+
+    tracing::info!(
+        admin_id = %admin_user.id,
+        target_user_id = %user_id.as_str(),
+        sessions_terminated = session_count,
+        "User sessions terminated successfully"
+    );
+
+    Ok(session_count)
 }
 
 /// Validates that a session belongs to an admin user.
