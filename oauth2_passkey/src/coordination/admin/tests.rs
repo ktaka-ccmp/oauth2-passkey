@@ -646,3 +646,293 @@ async fn test_delete_oauth2_account_admin_requires_admin() {
         .await
         .ok();
 }
+
+/// Test to ensure that getting active session count requires admin privileges.
+/// This test verifies that our session-based security model correctly prevents
+/// unauthorized access to session information by non-admin users.
+#[serial]
+#[tokio::test]
+async fn test_get_active_session_count_requires_admin() {
+    init_test_environment().await;
+
+    // Create unique user with timestamp
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let non_admin_user_id = format!("non-admin-session-count-{timestamp}");
+    let target_user_id = format!("target-session-count-{timestamp}");
+
+    // Create a non-admin user with session
+    insert_test_user(
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
+        &format!("{non_admin_user_id}@example.com"),
+        "Non Admin",
+        false,
+    )
+    .await
+    .expect("Failed to create non-admin user");
+
+    let non_admin_session_id = format!("test-session-{non_admin_user_id}");
+    insert_test_session(
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
+        "csrf-token",
+        3600,
+    )
+    .await
+    .expect("Failed to create non-admin session");
+
+    // Attempt to get active session count as non-admin
+    let result = get_active_session_count(
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
+    )
+    .await;
+
+    // Verify that the operation is rejected due to lack of admin privileges
+    assert!(result.is_err());
+    match result {
+        Err(CoordinationError::Unauthorized) => {}
+        _ => panic!("Expected Unauthorized error, got: {result:?}"),
+    }
+
+    // Clean up
+    delete_user_if_exists_and_not_first(&non_admin_user_id)
+        .await
+        .ok();
+}
+
+/// Test to ensure that getting all active sessions requires admin privileges.
+/// This test verifies that our session-based security model correctly prevents
+/// unauthorized access to session information by non-admin users.
+#[serial]
+#[tokio::test]
+async fn test_get_all_active_sessions_requires_admin() {
+    init_test_environment().await;
+
+    // Create unique user with timestamp
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let non_admin_user_id = format!("non-admin-all-sessions-{timestamp}");
+
+    // Create a non-admin user with session
+    insert_test_user(
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
+        &format!("{non_admin_user_id}@example.com"),
+        "Non Admin",
+        false,
+    )
+    .await
+    .expect("Failed to create non-admin user");
+
+    let non_admin_session_id = format!("test-session-{non_admin_user_id}");
+    insert_test_session(
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
+        "csrf-token",
+        3600,
+    )
+    .await
+    .expect("Failed to create non-admin session");
+
+    // Attempt to get all active sessions as non-admin
+    let result = get_all_active_sessions(
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+    )
+    .await;
+
+    // Verify that the operation is rejected due to lack of admin privileges
+    assert!(result.is_err());
+    match result {
+        Err(CoordinationError::Unauthorized) => {}
+        _ => panic!("Expected Unauthorized error, got: {result:?}"),
+    }
+
+    // Clean up
+    delete_user_if_exists_and_not_first(&non_admin_user_id)
+        .await
+        .ok();
+}
+
+/// Test to ensure that force logout requires admin privileges.
+/// This test verifies that our session-based security model correctly prevents
+/// unauthorized session termination by non-admin users.
+#[serial]
+#[tokio::test]
+async fn test_force_logout_user_requires_admin() {
+    init_test_environment().await;
+
+    // Create unique user with timestamp
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let non_admin_user_id = format!("non-admin-force-logout-{timestamp}");
+    let target_user_id = format!("target-force-logout-{timestamp}");
+
+    // Create a non-admin user with session
+    insert_test_user(
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
+        &format!("{non_admin_user_id}@example.com"),
+        "Non Admin",
+        false,
+    )
+    .await
+    .expect("Failed to create non-admin user");
+
+    let non_admin_session_id = format!("test-session-{non_admin_user_id}");
+    insert_test_session(
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+        UserId::new(non_admin_user_id.clone()).expect("Valid non-admin user ID"),
+        "csrf-token",
+        3600,
+    )
+    .await
+    .expect("Failed to create non-admin session");
+
+    // Attempt to force logout as non-admin
+    let result = force_logout_user(
+        SessionId::new(non_admin_session_id.clone()).expect("Valid non-admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
+    )
+    .await;
+
+    // Verify that the operation is rejected due to lack of admin privileges
+    assert!(result.is_err());
+    match result {
+        Err(CoordinationError::Unauthorized) => {}
+        _ => panic!("Expected Unauthorized error, got: {result:?}"),
+    }
+
+    // Clean up
+    delete_user_if_exists_and_not_first(&non_admin_user_id)
+        .await
+        .ok();
+}
+
+/// Test successful retrieval of all active sessions by admin.
+/// This test verifies that admins can retrieve session counts for all users.
+#[serial]
+#[tokio::test]
+async fn test_get_all_active_sessions_success() {
+    init_test_environment().await;
+
+    // Create unique users with timestamp
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let admin_user_id = format!("admin-all-sessions-{timestamp}");
+
+    // Create an admin user with session
+    let admin_session_id = create_test_admin_with_session(
+        &admin_user_id,
+        &format!("{admin_user_id}@example.com"),
+        "Test Admin",
+    )
+    .await
+    .expect("Failed to create admin session");
+
+    // Get all active sessions using admin session
+    let sessions = get_all_active_sessions(
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+    )
+    .await
+    .expect("Failed to get all active sessions");
+
+    // Verify we got a result (a HashMap of user_id -> session_count)
+    // At minimum, the admin user should have 1 session
+    assert!(
+        sessions.contains_key(&admin_user_id),
+        "Admin user should have at least one session"
+    );
+    assert!(
+        *sessions.get(&admin_user_id).unwrap_or(&0) >= 1,
+        "Admin user should have at least 1 active session"
+    );
+
+    // Clean up
+    delete_user_if_exists_and_not_first(&admin_user_id)
+        .await
+        .ok();
+}
+
+/// Test successful force logout of a user by admin.
+/// This test verifies that admins can terminate all sessions for a target user.
+#[serial]
+#[tokio::test]
+async fn test_force_logout_user_success() {
+    init_test_environment().await;
+
+    // Create unique users with timestamp
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let admin_user_id = format!("admin-force-logout-success-{timestamp}");
+    let target_user_id = format!("target-logout-success-{timestamp}");
+
+    // Create an admin user with session
+    let admin_session_id = create_test_admin_with_session(
+        &admin_user_id,
+        &format!("{admin_user_id}@example.com"),
+        "Test Admin",
+    )
+    .await
+    .expect("Failed to create admin session");
+
+    // Create a target user with session
+    insert_test_user(
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
+        &format!("{target_user_id}@example.com"),
+        "Target User",
+        false,
+    )
+    .await
+    .expect("Failed to create target user");
+
+    let target_session_id = format!("test-session-{target_user_id}");
+    insert_test_session(
+        SessionId::new(target_session_id.clone()).expect("Valid target session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
+        "csrf-token-target",
+        3600,
+    )
+    .await
+    .expect("Failed to create target session");
+
+    // Verify target user has an active session
+    let session_count_before = get_active_session_count(
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
+    )
+    .await
+    .expect("Failed to get session count before");
+
+    assert!(
+        session_count_before >= 1,
+        "Target user should have at least 1 session before force logout"
+    );
+
+    // Force logout the target user
+    let terminated_count = force_logout_user(
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
+    )
+    .await
+    .expect("Failed to force logout user");
+
+    assert!(
+        terminated_count >= 1,
+        "At least 1 session should have been terminated"
+    );
+
+    // Verify target user has no active sessions
+    let session_count_after = get_active_session_count(
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(target_user_id.clone()).expect("Valid target user ID"),
+    )
+    .await
+    .expect("Failed to get session count after");
+
+    assert_eq!(
+        session_count_after, 0,
+        "Target user should have 0 sessions after force logout"
+    );
+
+    // Clean up
+    delete_user_if_exists_and_not_first(&admin_user_id)
+        .await
+        .ok();
+    delete_user_if_exists_and_not_first(&target_user_id)
+        .await
+        .ok();
+}

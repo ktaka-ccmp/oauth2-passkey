@@ -42,6 +42,7 @@ struct AdminIndexTemplate {
     o2p_default_redirect: String,
     csrf_token: String,
     custom_css_url: Option<String>,
+    current_user_id: String,
 }
 
 async fn admin_index(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
@@ -70,6 +71,7 @@ async fn admin_index(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, S
         o2p_default_redirect: O2P_DEFAULT_REDIRECT.to_string(),
         csrf_token,
         custom_css_url: O2P_CUSTOM_CSS_URL.clone(),
+        current_user_id: auth_user.id.clone(),
     };
     Ok(Html(template.render().map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
