@@ -15,7 +15,7 @@ mod protected;
 mod server;
 use askama::Template;
 use axum::response::Html;
-use server::{init_tracing, spawn_http_server, spawn_https_server};
+use server::{init_tracing, spawn_http_server};
 
 #[derive(Template)]
 #[template(path = "index.j2")]
@@ -45,10 +45,6 @@ async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install default CryptoProvider");
-
     init_tracing("demo-both");
 
     dotenv().ok();
@@ -59,9 +55,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(oauth2_passkey_full_router())
         .merge(protected::router());
 
-    let http_server = spawn_http_server(3001, app.clone());
-    let https_server = spawn_https_server(3443, app).await;
-
-    tokio::try_join!(http_server, https_server).unwrap();
+    spawn_http_server(3001, app).await?;
     Ok(())
 }

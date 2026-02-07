@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: Changed `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` default from `true` to `false`
+  - New behavior: All credentials for the same user share a single `user_handle` (standard WebAuthn practice)
+  - Old behavior: Each credential had a unique `user_handle`
+  - Existing credentials are not affected; only newly registered credentials use the new default
 - Signal API calls now conditionally execute based on `PASSKEY_SIGNAL_API_MODE` setting
 - Passkey registration username prefill changed from `#N` sequential numbering to `@YYYYMMDD` date suffix
 

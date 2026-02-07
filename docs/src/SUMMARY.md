@@ -21,6 +21,7 @@
 - [Configuration](integration/configuration.md)
 - [Multi-Origin Passkey Setup](integration/multi-origin.md)
 - [Server Setup](integration/server-setup.md)
+- [Deployment Patterns](integration/deployment-patterns.md)
 
 ---
 
@@ -66,6 +67,7 @@
   - [None Attestation](webauthn/none.md)
   - [Packed Attestation](webauthn/packed.md)
   - [TPM Attestation](webauthn/tpm.md)
+- [AAGUID and Metadata](webauthn/aaguid-metadata.md)
 - [User Handle and Signal API](webauthn/user-handle-and-signal-api.md)
 
 ---
@@ -80,6 +82,7 @@
 
 # Appendices
 
+- [Terminology and Glossary](appendix/terminology.md)
 - [Security Advisories](appendix/security-advisories.md)
 - [Type-Safe Validation](appendix/type-safe.md)
 - [Storage Pattern](appendix/storage-pattern.md)

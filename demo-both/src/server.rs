@@ -1,5 +1,4 @@
 use axum::Router;
-use axum_server::tls_rustls::RustlsConfig;
 use std::net::SocketAddr;
 use tokio::task::JoinHandle;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -8,28 +7,8 @@ pub(crate) fn spawn_http_server(port: u16, app: Router) -> JoinHandle<()> {
     tokio::spawn(async move {
         let addr = SocketAddr::from(([0, 0, 0, 0], port));
         tracing::info!("HTTP server listening on {}", addr);
-        axum_server::bind(addr)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
-    })
-}
-
-pub(crate) async fn spawn_https_server(port: u16, app: Router) -> JoinHandle<()> {
-    let config = RustlsConfig::from_pem_file(
-        format!("{}/self_signed_certs/cert.pem", env!("CARGO_MANIFEST_DIR")),
-        format!("{}/self_signed_certs/key.pem", env!("CARGO_MANIFEST_DIR")),
-    )
-    .await
-    .expect("Failed to load TLS certificates");
-
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    tracing::info!("HTTPS server listening on {}", addr);
-    tokio::spawn(async move {
-        axum_server::bind_rustls(addr, config)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        axum::serve(listener, app).await.unwrap();
     })
 }
 

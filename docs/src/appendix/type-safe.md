@@ -29,8 +29,8 @@ Type-safe wrapper for session identifiers used in coordination layer functions.
 ```rust
 use oauth2_passkey::SessionId;
 
-// Create from string
-let session_id = SessionId::new("session_abc123".to_string());
+// Create from string (validates length and characters)
+let session_id = SessionId::new("session_abc123".to_string())?;
 
 // Use in coordination functions
 let users = get_all_users(session_id).await?;
@@ -42,7 +42,7 @@ Type-safe wrapper for user identifiers to prevent mixing up with other ID types.
 ```rust
 use oauth2_passkey::UserId;
 
-let user_id = UserId::new("user_123".to_string());
+let user_id = UserId::new("user_123".to_string())?;
 let user = get_user(session_id, user_id).await?;
 ```
 
@@ -65,7 +65,7 @@ Type-safe wrapper for passkey credential identifiers.
 ```rust
 use oauth2_passkey::CredentialId;
 
-let cred_id = CredentialId::new("credential_abc".to_string());
+let cred_id = CredentialId::new("credential_abc123".to_string())?;
 let result = delete_credential(session_id, cred_id).await?;
 ```
 
@@ -84,7 +84,7 @@ Type-safe wrapper for usernames.
 ```rust
 use oauth2_passkey::UserName;
 
-let username = UserName::new("alice".to_string());
+let username = UserName::new("alice".to_string())?;
 ```
 
 #### `ChallengeType`
@@ -129,7 +129,7 @@ Type-safe wrapper for OAuth2 account identifiers.
 ```rust
 use oauth2_passkey::AccountId;
 
-let account_id = AccountId::new("account_123".to_string());
+let account_id = AccountId::new("account_123".to_string())?;
 ```
 
 #### `Provider`
@@ -138,7 +138,7 @@ Type-safe wrapper for OAuth2 provider names.
 ```rust
 use oauth2_passkey::Provider;
 
-let provider = Provider::new("google".to_string());
+let provider = Provider::new("google".to_string())?;
 ```
 
 #### `ProviderUserId`
@@ -147,7 +147,7 @@ Type-safe wrapper for provider-specific user identifiers.
 ```rust
 use oauth2_passkey::ProviderUserId;
 
-let provider_user_id = ProviderUserId::new("google_123456".to_string());
+let provider_user_id = ProviderUserId::new("google_123456".to_string())?;
 ```
 
 #### `DisplayName`
@@ -156,7 +156,7 @@ Type-safe wrapper for user display names.
 ```rust
 use oauth2_passkey::DisplayName;
 
-let name = DisplayName::new("Alice Smith".to_string());
+let name = DisplayName::new("Alice Smith".to_string())?;
 ```
 
 #### `Email`
@@ -165,7 +165,7 @@ Type-safe wrapper for email addresses.
 ```rust
 use oauth2_passkey::Email;
 
-let email = Email::new("alice@example.com".to_string());
+let email = Email::new("alice@example.com".to_string())?;
 ```
 
 ### Cache & Storage Types
@@ -349,8 +349,8 @@ let credentials = PasskeyStore::get_credentials_by(
     CredentialSearchField::UserId(user_id.to_string())
 );
 
-// After (type-safe)
-let user_id = UserId::new(user_id_string.to_string());
+// After (type-safe with validation)
+let user_id = UserId::new(user_id_string.to_string())?;
 let credentials = PasskeyStore::get_credentials_by(
     CredentialSearchField::UserId(user_id)
 );

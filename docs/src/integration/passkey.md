@@ -571,11 +571,11 @@ The passkey routes are provided by the `oauth2_passkey_axum` crate:
 
 ```rust
 use axum::Router;
-use oauth2_passkey_axum::{oauth2_passkey_router, O2P_ROUTE_PREFIX};
+use oauth2_passkey_axum::oauth2_passkey_full_router;
 
 let app = Router::new()
     .route("/", get(index))
-    .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+    .merge(oauth2_passkey_full_router());
 ```
 
 ### Route Structure
@@ -631,10 +631,12 @@ async fn handle_finish_authentication(
 
 ### Well-Known Endpoint
 
-WebAuthn supports related origins through a well-known endpoint. Mount it at the root:
+WebAuthn supports related origins through a well-known endpoint. When using `oauth2_passkey_full_router()`, this endpoint is automatically included when `WEBAUTHN_ADDITIONAL_ORIGINS` is set.
+
+For manual setup with `oauth2_passkey_router()`, mount it at the root:
 
 ```rust
-use oauth2_passkey_axum::passkey_well_known_router;
+use oauth2_passkey_axum::{oauth2_passkey_router, passkey_well_known_router, O2P_ROUTE_PREFIX};
 
 let app = Router::new()
     .merge(passkey_well_known_router())  // Serves /.well-known/webauthn
@@ -656,7 +658,7 @@ let app = Router::new()
 | `PASSKEY_RESIDENT_KEY` | `required` | Resident key requirement (`required`, `preferred`, `discouraged`) |
 | `PASSKEY_REQUIRE_RESIDENT_KEY` | `true` | Require resident/discoverable credentials |
 | `PASSKEY_USER_VERIFICATION` | `discouraged` | User verification (`required`, `preferred`, `discouraged`) |
-| `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` | `true` | Generate unique user handle per credential |
+| `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` | `false` | Use single user handle per user (set to `true` for unique per credential) |
 | `PASSKEY_USER_ACCOUNT_FIELD` | `name` | Field to use for user account (`name` or `display_name`) |
 | `PASSKEY_USER_LABEL_FIELD` | `display_name` | Field to use for user label (`name` or `display_name`) |
 
@@ -751,15 +753,10 @@ User handles are random identifiers that:
 A complete demo application is available in `demo-passkey/`:
 
 ```rust
-use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_router};
+use oauth2_passkey_axum::{AuthUser, oauth2_passkey_full_router};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize crypto provider
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install default CryptoProvider");
-
     // Load environment and initialize library
     dotenvy::dotenv().ok();
     oauth2_passkey_axum::init().await?;
@@ -767,7 +764,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create router with passkey authentication
     let app = Router::new()
         .route("/", get(index))
-        .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+        .merge(oauth2_passkey_full_router());
 
     // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], 3001));

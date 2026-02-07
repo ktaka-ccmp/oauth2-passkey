@@ -10,7 +10,7 @@ use dotenvy::dotenv;
 use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_full_router};
 
 mod server;
-use crate::server::{init_tracing, spawn_http_server, spawn_https_server};
+use crate::server::{init_tracing, spawn_http_server};
 
 #[derive(Template)]
 #[template(path = "index_anon.j2")]
@@ -47,10 +47,6 @@ async fn index(user: Option<AuthUser>) -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install default CryptoProvider");
-
     init_tracing("demo_passkey");
 
     dotenv().ok();
@@ -60,13 +56,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/", get(index))
         .merge(oauth2_passkey_full_router());
 
-    // spawn_http_server doesn't need await because it's synchronous - it immediately returns a JoinHandle
-    let http_server = spawn_http_server(3001, app.clone());
-
-    // spawn_https_server requires await because it loads TLS certificates asynchronously before returning a JoinHandle
-    let https_server = spawn_https_server(3443, app).await;
-
-    // Wait for both servers to complete (which they never will in this case)
-    tokio::try_join!(http_server, https_server).unwrap();
+    spawn_http_server(3001, app).await?;
     Ok(())
 }

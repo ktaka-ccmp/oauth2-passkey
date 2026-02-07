@@ -37,7 +37,7 @@ cd ../db && docker compose up -d
 cargo run
 ```
 
-5. Open https://localhost:3443 in your browser.
+5. Open http://localhost:3001 in your browser.
 
 ## How It Works
 
@@ -98,7 +98,7 @@ The custom login page uses these JavaScript functions:
 demo-custom-login/
 ├── src/
 │   ├── main.rs          # Routes and handlers
-│   └── server.rs        # HTTP/HTTPS server setup
+│   └── server.rs        # HTTP server setup
 ├── templates/
 │   ├── login.j2         # Custom login page
 │   ├── account.j2       # Custom user account page
@@ -107,7 +107,6 @@ demo-custom-login/
 │   ├── index_anon.j2    # Index for anonymous users
 │   ├── index_user.j2    # Index for authenticated users
 │   └── protected.j2     # Protected page
-├── self_signed_certs/   # TLS certificates
 ├── Cargo.toml
 └── README.md
 ```

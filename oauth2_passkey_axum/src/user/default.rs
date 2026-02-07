@@ -19,6 +19,8 @@ use crate::session::AuthUser;
 /// Create a router for the user summary endpoints
 pub(crate) fn router() -> Router<()> {
     Router::new()
+        .route("/info", get(user_info))
+        .route("/csrf_token", get(csrf_token))
         .route("/logout", get(logout))
         .route("/delete", delete(delete_user_account_handler))
         .route("/update", put(update_user_account_handler))
@@ -54,6 +56,38 @@ async fn logout(
             }
         },
     }
+}
+
+/// Return basic user information as JSON for the client-side JavaScript
+///
+/// This endpoint provides the authenticated user's basic information (id, name, display_name)
+/// to be used by client-side JavaScript for pre-filling forms or displaying user information.
+async fn user_info(auth_user: Option<AuthUser>) -> Result<Json<Value>, (StatusCode, String)> {
+    match auth_user {
+        Some(user) => {
+            // Return user information as JSON
+            let user_data = json!({
+                "id": user.id,
+                "account": user.account,
+                "label": user.label,
+            });
+
+            Ok(Json(user_data))
+        }
+        None => {
+            // Return a 401 Unauthorized if no user is authenticated
+            Err((StatusCode::UNAUTHORIZED, "Not authenticated".to_string()))
+        }
+    }
+}
+
+/// Return the CSRF token for the authenticated user
+///
+/// This endpoint provides the CSRF token for the authenticated user to be used by the client-side JavaScript.
+async fn csrf_token(auth_user: AuthUser) -> Result<Json<Value>, (StatusCode, String)> {
+    Ok(Json(json!({
+        "csrf_token": auth_user.csrf_token
+    })))
 }
 
 /// Request payload for updating user account information

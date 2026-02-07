@@ -6,20 +6,27 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (4)
+### Open (6)
 
-| ID | Priority | Title |
-|----|----------|-------|
-| `2026-01-23-01` | medium | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
-| `2026-01-29-01` | medium | [Change PASSKEY_USER_HANDLE_UNIQUE default to false](open/2026-01-29-change-user-handle-default.md) |
-| `2026-01-30-01` | medium | [Move /info and /csrf_token to default.rs](open/2026-01-30-move-info-csrf-endpoints.md) |
-| `2026-01-29-03` | low | [Create Terminology/Glossary Document](open/2026-01-29-terminology-document.md) |
+| ID | Priority | Difficulty | Title |
+|----|----------|------------|-------|
+| `2026-01-23-01` | medium | large | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
+| `2026-01-30-02` | medium | medium | [Admin Force Logout Feature](open/2026-01-30-admin-force-logout.md) |
+| `2026-01-30-03` | medium | large | [Admin Login History View](open/2026-01-30-admin-login-history.md) |
+| `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
+| `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
+| `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 
-### Completed (13)
+### Completed (21)
 
 | ID | Title |
 |----|-------|
+| `2026-02-07-01` | [Update README and Docs for Current API](completed/2026-02-07-readme-docs-update.md) |
 | `2025-01-23-01` | [CI/CD Documentation](completed/2025-01-23-ci-cd-documentation.md) |
+| `2026-01-29-01` | [Change PASSKEY_USER_HANDLE_UNIQUE default to false](completed/2026-01-29-change-user-handle-default.md) |
+| `2026-01-29-03` | [Create Terminology/Glossary Document](completed/2026-01-29-terminology-document.md) |
+| `2026-01-30-04` | [Update README.md with Links and Demo Info](completed/2026-01-30-readme-links-update.md) |
+| `2026-01-30-05` | [getClientCapabilities Feature Detection](completed/2026-01-30-client-capabilities-detection.md) |
 | `2025-01-23-02` | [CSRF Documentation & Snapshot System](completed/2025-01-23-csrf-docs-snapshot-system.md) |
 | `2026-01-24-02` | [Demo Apps Implementation](completed/2026-01-24-demo-apps-implementation.md) |
 | `2026-01-26-01` | [Demo Apps Database Configuration](completed/2026-01-26-demo-apps-db-config.md) |
@@ -32,12 +39,16 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-28-03` | [Fix Windows Hello TPM Attestation (RS1)](completed/2026-01-28-tpm-rs1-attestation-fix.md) |
 | `2026-01-29-02` | [Filter remaining_credential_ids by user_handle](completed/2026-01-29-filter-remaining-credentials.md) |
 | `2026-01-29-04` | [Review SESSION_CONFLICT_POLICY Default](completed/2026-01-29-session-conflict-policy-review.md) |
+| `2026-01-30-01` | [Move /info and /csrf_token to default.rs](completed/2026-01-30-move-info-csrf-endpoints.md) |
+| `2026-01-30-09` | [Cross-Origin Same-Site Demo (Pattern 2)](completed/2026-01-30-cross-origin-same-site-demo.md) |
+| `2026-01-31-02` | [Remove HTTPS Support from Demo Apps](completed/2026-01-31-demo-remove-https.md) |
 
-### Deferred (1)
+### Deferred (2)
 
 | ID | Title |
 |----|-------|
 | `2026-01-24-01` | [Documentation Improvement Planning](deferred/2026-01-24-docs-improvement-planning.md) |
+| `2026-01-30-06` | [Passkey Endpoint (.well-known) Support](deferred/2026-01-30-passkey-endpoint-wellknown.md) |
 
 <!-- END AUTO-UPDATED -->
 
@@ -83,6 +94,8 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 
 ## Priority: high | medium | low
 
+## Difficulty: small | medium | large
+
 ## Description
 
 <What needs to be done and why>
@@ -118,9 +131,12 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 ## Workflow
 
 1. Create new issue in `open/` directory
-2. Work on the issue
-3. When resolved, update Resolution section and move to `completed/`
-4. If postponed, move to `deferred/`
+2. **Update this README's "Current Issues" table** (increment count, add row)
+3. Work on the issue
+4. When resolved, update Resolution section and move to `completed/`
+5. If postponed, move to `deferred/`
+
+**Important**: Always update the README table when creating, completing, or moving issues.
 
 ## Difference from Sessions
 

@@ -115,7 +115,7 @@ async fn login(user: Option<AuthUser>) -> impl IntoResponse {
 let app = Router::new()
     .route("/login", get(login))
     .route("/protected", get(protected))
-    .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+    .merge(oauth2_passkey_full_router());
 ```
 
 ## Custom Account Page
@@ -202,7 +202,7 @@ async fn summary(user: AuthUser) -> impl IntoResponse {
 ```rust,ignore
 let app = Router::new()
     .route("/summary", get(summary))
-    .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+    .merge(oauth2_passkey_full_router());
 ```
 
 ## Custom Admin Page
@@ -304,7 +304,7 @@ async fn admin_list(user: AuthUser) -> Result<impl IntoResponse, StatusCode> {
 let app = Router::new()
     .route("/admin/users", get(admin_list))
     .route("/admin/user/:id", get(admin_user_detail))
-    .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router());
+    .merge(oauth2_passkey_full_router());
 ```
 
 ### Admin API Functions
@@ -436,7 +436,7 @@ cd demo-custom-login
 cp ../dot.env.example .env
 # Add: O2P_LOGIN_URL='/login'
 cargo run
-# Open https://localhost:3443
+# Open http://localhost:3001
 ```
 
 ## Environment Variables

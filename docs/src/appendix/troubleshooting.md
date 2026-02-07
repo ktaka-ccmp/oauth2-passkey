@@ -30,7 +30,7 @@ This guide covers common issues you may encounter when using oauth2-passkey and 
 
 - Verify the redirect URI in Google Cloud Console matches exactly
 - The default redirect URI is `{ORIGIN}/o2p/oauth2/authorized`
-- For example: `https://localhost:3443/o2p/oauth2/authorized`
+- For example: `http://localhost:3001/o2p/oauth2/authorized`
 
 **Invalid Credentials**
 
@@ -42,8 +42,8 @@ This guide covers common issues you may encounter when using oauth2-passkey and 
 **"Invalid origin" Error**
 
 - Ensure `ORIGIN` in `.env` matches the URL you're visiting exactly
-- Use `https://localhost:3443` (not `127.0.0.1` or `http://`)
-- The scheme (https), hostname, and port must all match
+- Use `http://localhost:3001` (not `127.0.0.1`)
+- The scheme (http/https), hostname, and port must all match
 
 **Google OAuth2 Not Working**
 
@@ -56,7 +56,7 @@ This guide covers common issues you may encounter when using oauth2-passkey and 
 **Origin Mismatch**
 
 - Ensure `ORIGIN` in `.env` matches the URL exactly
-- Use `https://localhost:3443` (not `127.0.0.1`)
+- Use `http://localhost:3001` (not `127.0.0.1`)
 - WebAuthn is strict about origin validation
 
 **"Authenticator not found" Error**
@@ -71,15 +71,15 @@ This guide covers common issues you may encounter when using oauth2-passkey and 
 - Update your browser to the latest version
 - WebAuthn support varies by browser version
 
-**"HTTPS required" Error**
+**"Secure context required" Error**
 
-- WebAuthn requires HTTPS (except for localhost in some browsers)
-- Use `https://localhost:3443` (not HTTP)
-- Accept self-signed certificate warning when prompted
+- WebAuthn requires a [secure context](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts) (localhost or HTTPS)
+- localhost works over HTTP (it's a secure context)
+- For production, use HTTPS via a reverse proxy (nginx/Caddy)
 
 **WebAuthn/Passkey Not Working**
 
-- Ensure you're using HTTPS (required for WebAuthn)
+- WebAuthn requires a secure context (localhost or HTTPS)
 - Try a different browser if having issues (Chrome has the best support)
 - Clear browser data for localhost if needed
 
@@ -112,12 +112,6 @@ This guide covers common issues you may encounter when using oauth2-passkey and 
 - **Reset**: Delete the database file and restart to clear all data
 - **Location**: Check `GENERIC_DATA_STORE_URL` in your `.env` for the actual path
 
-### Self-Signed Certificates
-
-- Browser will show security warning for self-signed certificates
-- Click "Advanced" then "Proceed to localhost (unsafe)" to continue
-- This is expected behavior for development with self-signed certs
-
 ### Browser-Specific Issues
 
 - **Chrome**: Best WebAuthn support, recommended for development
@@ -129,9 +123,9 @@ This guide covers common issues you may encounter when using oauth2-passkey and 
 
 ### Using Cloudflared Tunnel
 
-For public HTTPS access without self-signed certificates:
+For public HTTPS access for mobile testing or production:
 
-1. Set up a cloudflared tunnel pointing to `https://localhost:3443`
+1. Set up a cloudflared tunnel pointing to `http://localhost:3001`
 2. Update `.env`:
    ```bash
    ORIGIN='https://your-tunnel-domain.example.com'
@@ -141,7 +135,7 @@ For public HTTPS access without self-signed certificates:
 
 ### Environment Configuration
 
-- Always use HTTPS for production and WebAuthn testing
+- Use HTTPS for production (via reverse proxy or tunnel)
 - The `ORIGIN` environment variable must match the URL users access exactly
 - Use SQLite and in-memory cache for quick local development
 - Use PostgreSQL and Redis for production deployments

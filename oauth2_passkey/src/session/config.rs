@@ -22,6 +22,21 @@ pub static SESSION_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
         .unwrap_or(600) // Default to 10 minutes if not set or invalid
 });
 
+/// Domain attribute for session cookies.
+///
+/// When set, cookies will be shared across subdomains of the specified domain.
+/// For example, setting `.example.com` allows cookies to be shared between
+/// `app.example.com` and `api.example.com`.
+///
+/// **Important**: When using a domain attribute, the cookie name should NOT use
+/// the `__Host-` prefix, as `__Host-` cookies cannot have a Domain attribute.
+/// Use `SESSION_COOKIE_NAME` to set a custom name without the prefix.
+///
+/// Configured via the `SESSION_COOKIE_DOMAIN` environment variable.
+/// Default: None (no Domain attribute, same-origin only)
+pub static SESSION_COOKIE_DOMAIN: LazyLock<Option<String>> =
+    LazyLock::new(|| std::env::var("SESSION_COOKIE_DOMAIN").ok());
+
 /// Policy for handling session conflicts when a user logs in while already having active sessions.
 ///
 /// This policy is always evaluated during login, and user_id -> session_id mappings
