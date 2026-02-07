@@ -9,7 +9,7 @@ This guide walks you through running the demo applications to quickly experience
 
 ## Running Demo Applications
 
-The repository includes three demo applications to showcase different authentication scenarios.
+The repository includes several demo applications to showcase different authentication scenarios.
 
 ### demo-both (OAuth2 + Passkey)
 
@@ -94,7 +94,9 @@ A complete authentication example showcasing both Google OAuth2 and WebAuthn/Pas
 | **demo-oauth2** | OAuth2-only authentication | Simpler setup, no passkey |
 | **demo-passkey** | Passkey-only authentication | No Google credentials needed |
 | **demo-custom-login** | Custom login/summary pages | See [Custom Pages](../integration/custom-pages.md) |
-| **demo-cross-origin** | Cross-Origin Same-Site (Pattern 2) | Auth + API servers, see [Deployment Patterns](../integration/deployment-patterns.md) |
+| **demo-profile** | Add custom user attributes | Bio, avatar, theme preferences |
+| **demo-todo** | Store per-user data | CRUD operations with user isolation |
+| **demo-cross-origin** | Cross-Origin Same-Site (Pattern 2) | Auth + API servers |
 
 Setup is similar to demo-both: copy `.env` from `dot.env.simple`, adjust for each demo's needs.
 

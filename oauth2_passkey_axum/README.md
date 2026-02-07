@@ -35,11 +35,15 @@ This crate provides ready-to-use Axum handlers, middleware, and UI components fo
 
 ## Getting Started
 
-Try out demo to get familiarize yourself with the usage of the library.
+Try out the demos to familiarize yourself with the library:
 
-- [Complete Integration](../demo-both)
-- [OAuth2 Demo](../demo-oauth2)
-- [Passkey Demo](../demo-passkey)
+- [demo-both](../demo-both) - Complete OAuth2 + Passkey integration
+- [demo-oauth2](../demo-oauth2) - OAuth2 only
+- [demo-passkey](../demo-passkey) - Passkey only
+- [demo-custom-login](../demo-custom-login) - Custom login pages
+- [demo-profile](../demo-profile) - User profile extension
+- [demo-todo](../demo-todo) - Per-user data storage
+- [demo-cross-origin](../demo-cross-origin) - Cross-origin setup
 
 ## Basic Usage
 
