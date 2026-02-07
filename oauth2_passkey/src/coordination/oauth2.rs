@@ -14,7 +14,7 @@ use crate::userdb::{User as DbUser, UserStore};
 use crate::utils::header_set_cookie;
 
 use super::errors::CoordinationError;
-use super::login_history::record_login_success;
+use super::login_history::{record_anonymous_security_event, record_login_success};
 use super::user::gen_new_user_id;
 
 use crate::session::{UserId, new_session_header};
@@ -84,7 +84,16 @@ pub async fn authorized_core(
         ));
     }
 
-    csrf_checks(cookies.clone(), auth_response, headers.clone()).await?;
+    // CSRF check with security event logging on failure
+    if let Err(e) = csrf_checks(cookies.clone(), auth_response, headers.clone()).await {
+        // Record the security event (non-blocking)
+        if let Some(context) = login_context.clone() {
+            let event_type = format!("oauth2_csrf_failure: {}", e);
+            let _ = record_anonymous_security_event(AuthMethod::OAuth2, context, event_type).await;
+        }
+        return Err(e.into());
+    }
+
     process_oauth2_authorization(auth_response, login_context).await
 }
 

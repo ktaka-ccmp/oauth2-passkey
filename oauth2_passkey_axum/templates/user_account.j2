@@ -171,7 +171,10 @@
     <div class="section">
         <div class="section-header">
             <h2 class="section-title">Recent Login History</h2>
-            <button onclick="loadLoginHistory()" class="action-button">Refresh</button>
+            <div>
+                <a href="{{o2p_route_prefix}}/user/login_history_page" class="action-button secondary-button">View All</a>
+                <button onclick="loadLoginHistory()" class="action-button">Refresh</button>
+            </div>
         </div>
         <div id="login-history-container">
             <p id="login-history-loading">Loading...</p>
@@ -225,7 +228,7 @@
             container.innerHTML = '<p id="login-history-loading">Loading...</p>';
 
             try {
-                const response = await fetch(`${O2P_ROUTE_PREFIX}/user/login_history?limit=10`, {
+                const response = await fetch(`${O2P_ROUTE_PREFIX}/user/login_history?limit=5`, {
                     credentials: 'include'
                 });
 

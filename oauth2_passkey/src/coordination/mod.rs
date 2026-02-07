@@ -38,7 +38,8 @@ pub use user::{delete_user_account, update_user_account};
 
 // Login history functions
 pub use login_history::{
-    LoginHistoryEntryMasked, get_own_login_history, get_user_login_history_admin,
+    LoginHistoryEntryMasked, get_own_login_history, get_own_login_history_with_date_range,
+    get_user_login_history_admin, query_login_history_admin,
 };
 
 // Auth helper functions are now used internally by coordination functions

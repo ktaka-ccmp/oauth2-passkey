@@ -1,5 +1,6 @@
 //! SQLite implementation for login history storage
 
+use chrono::{DateTime, Utc};
 use sqlx::{Pool, Sqlite};
 
 use super::super::{LoginHistoryEntry, LoginHistoryError};
@@ -155,6 +156,155 @@ pub(super) async fn get_login_history_by_user_sqlite(
     .fetch_all(pool)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))
+}
+
+/// Get login history for a user with date range filtering
+pub(super) async fn get_login_history_by_user_with_date_range_sqlite(
+    pool: &Pool<Sqlite>,
+    user_id: &str,
+    from: Option<DateTime<Utc>>,
+    to: Option<DateTime<Utc>>,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<LoginHistoryEntry>, LoginHistoryError> {
+    create_tables_sqlite(pool).await?;
+
+    let table_name = DB_TABLE_LOGIN_HISTORY.as_str();
+
+    // Build query with optional date range filters
+    let (query, has_from, has_to) = match (from.is_some(), to.is_some()) {
+        (true, true) => (
+            format!(
+                r#"
+                SELECT * FROM {table_name}
+                WHERE user_id = ? AND timestamp >= ? AND timestamp <= ?
+                ORDER BY timestamp DESC
+                LIMIT ? OFFSET ?
+                "#
+            ),
+            true,
+            true,
+        ),
+        (true, false) => (
+            format!(
+                r#"
+                SELECT * FROM {table_name}
+                WHERE user_id = ? AND timestamp >= ?
+                ORDER BY timestamp DESC
+                LIMIT ? OFFSET ?
+                "#
+            ),
+            true,
+            false,
+        ),
+        (false, true) => (
+            format!(
+                r#"
+                SELECT * FROM {table_name}
+                WHERE user_id = ? AND timestamp <= ?
+                ORDER BY timestamp DESC
+                LIMIT ? OFFSET ?
+                "#
+            ),
+            false,
+            true,
+        ),
+        (false, false) => (
+            format!(
+                r#"
+                SELECT * FROM {table_name}
+                WHERE user_id = ?
+                ORDER BY timestamp DESC
+                LIMIT ? OFFSET ?
+                "#
+            ),
+            false,
+            false,
+        ),
+    };
+
+    let mut query_builder = sqlx::query_as::<_, LoginHistoryEntry>(&query).bind(user_id);
+
+    if has_from {
+        query_builder = query_builder.bind(from.unwrap());
+    }
+    if has_to {
+        query_builder = query_builder.bind(to.unwrap());
+    }
+
+    query_builder
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| LoginHistoryError::Storage(e.to_string()))
+}
+
+/// Query login history for admin with filters (user, date range, success status)
+pub(super) async fn query_login_history_admin_sqlite(
+    pool: &Pool<Sqlite>,
+    user_id: Option<&str>,
+    from: Option<DateTime<Utc>>,
+    to: Option<DateTime<Utc>>,
+    success: Option<bool>,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<LoginHistoryEntry>, LoginHistoryError> {
+    create_tables_sqlite(pool).await?;
+
+    let table_name = DB_TABLE_LOGIN_HISTORY.as_str();
+
+    // Build WHERE clause dynamically
+    let mut conditions = Vec::new();
+    if user_id.is_some() {
+        conditions.push("user_id = ?");
+    }
+    if from.is_some() {
+        conditions.push("timestamp >= ?");
+    }
+    if to.is_some() {
+        conditions.push("timestamp <= ?");
+    }
+    if success.is_some() {
+        conditions.push("success = ?");
+    }
+
+    let where_clause = if conditions.is_empty() {
+        String::new()
+    } else {
+        format!("WHERE {}", conditions.join(" AND "))
+    };
+
+    let query = format!(
+        r#"
+        SELECT * FROM {table_name}
+        {where_clause}
+        ORDER BY timestamp DESC
+        LIMIT ? OFFSET ?
+        "#
+    );
+
+    let mut query_builder = sqlx::query_as::<_, LoginHistoryEntry>(&query);
+
+    if let Some(uid) = user_id {
+        query_builder = query_builder.bind(uid);
+    }
+    if let Some(f) = from {
+        query_builder = query_builder.bind(f);
+    }
+    if let Some(t) = to {
+        query_builder = query_builder.bind(t);
+    }
+    if let Some(s) = success {
+        query_builder = query_builder.bind(s);
+    }
+
+    query_builder
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| LoginHistoryError::Storage(e.to_string()))
 }
 
 /// Delete old login history entries (for retention policy)

@@ -73,7 +73,8 @@ pub use coordination::{
 // Login history types and functions
 pub use audit::{LoginContext, LoginHistoryEntry};
 pub use coordination::{
-    LoginHistoryEntryMasked, get_own_login_history, get_user_login_history_admin,
+    LoginHistoryEntryMasked, get_own_login_history, get_own_login_history_with_date_range,
+    get_user_login_history_admin, query_login_history_admin,
 };
 
 // Environment variable configurable route prefix for all auth routes (defaults to "/o2p")

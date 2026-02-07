@@ -2,6 +2,8 @@
 //!
 //! This module provides coordination functions for recording and retrieving login history.
 
+use chrono::{DateTime, Utc};
+
 use crate::audit::{
     AuthMethod, LoginContext, LoginHistoryEntry, LoginHistoryError, LoginHistoryStore,
 };
@@ -40,6 +42,32 @@ pub(crate) async fn record_login_success(
         Err(e) => {
             // Log but don't fail the login - recording history is non-critical
             tracing::warn!(error = %e, "Failed to record login history (non-fatal)");
+            Ok(())
+        }
+    }
+}
+
+/// Record an anonymous security event
+///
+/// This function records a security event where the user cannot be identified,
+/// such as OAuth2 CSRF validation failures. Useful for detecting attack patterns
+/// from specific IP addresses.
+#[tracing::instrument(skip(context), fields(auth_method = %auth_method, event_type = %event_type))]
+pub(crate) async fn record_anonymous_security_event(
+    auth_method: AuthMethod,
+    context: LoginContext,
+    event_type: String,
+) -> Result<(), CoordinationError> {
+    let entry = LoginHistoryEntry::anonymous_security_event(auth_method, context, event_type);
+
+    match LoginHistoryStore::insert(entry).await {
+        Ok(_) => {
+            tracing::debug!("Anonymous security event recorded successfully");
+            Ok(())
+        }
+        Err(e) => {
+            // Log but don't fail - recording is non-critical
+            tracing::warn!(error = %e, "Failed to record security event (non-fatal)");
             Ok(())
         }
     }
@@ -130,6 +158,70 @@ pub async fn get_user_login_history_admin(
     let offset = offset.unwrap_or(0);
 
     let entries = LoginHistoryStore::get_by_user(target_user_id.as_str(), limit, offset)
+        .await
+        .map_err(|e| CoordinationError::Database(e.to_string()))?;
+
+    Ok(entries)
+}
+
+/// Get login history for the current user with date range filtering
+///
+/// Returns login history entries with masked IP addresses for privacy.
+#[tracing::instrument(skip(session_cookie), fields(user_id))]
+pub async fn get_own_login_history_with_date_range(
+    session_cookie: &crate::session::SessionCookie,
+    from: Option<DateTime<Utc>>,
+    to: Option<DateTime<Utc>>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<Vec<LoginHistoryEntryMasked>, CoordinationError> {
+    // Get user from session
+    let session_user = get_user_from_session(session_cookie)
+        .await
+        .map_err(|_| CoordinationError::Unauthorized)?;
+
+    tracing::Span::current().record("user_id", &session_user.id);
+
+    let limit = limit.unwrap_or(50);
+    let offset = offset.unwrap_or(0);
+
+    let entries =
+        LoginHistoryStore::get_by_user_with_date_range(&session_user.id, from, to, limit, offset)
+            .await
+            .map_err(|e| CoordinationError::Database(e.to_string()))?;
+
+    // Mask IP addresses for user's own view
+    let masked_entries = entries
+        .into_iter()
+        .map(LoginHistoryEntryMasked::from)
+        .collect();
+
+    Ok(masked_entries)
+}
+
+/// Query login history for admin with filters (audit page)
+///
+/// Returns full login history entries including unmasked IP addresses.
+/// Supports filtering by user, date range, and success status.
+/// Requires admin privileges.
+#[tracing::instrument(fields(admin_user_id))]
+pub async fn query_login_history_admin(
+    session_id: SessionId,
+    user_id: Option<&str>,
+    from: Option<DateTime<Utc>>,
+    to: Option<DateTime<Utc>>,
+    success: Option<bool>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<Vec<LoginHistoryEntry>, CoordinationError> {
+    // Validate admin session
+    let admin_user = validate_admin_session(session_id).await?;
+    tracing::Span::current().record("admin_user_id", &admin_user.id);
+
+    let limit = limit.unwrap_or(50);
+    let offset = offset.unwrap_or(0);
+
+    let entries = LoginHistoryStore::query_admin(user_id, from, to, success, limit, offset)
         .await
         .map_err(|e| CoordinationError::Database(e.to_string()))?;
 
