@@ -195,10 +195,10 @@ async fn get_google_avatar(user_id: &str) -> Option<String> {
 
 ## Example Applications
 
-| Demo | Pattern | Description |
-|------|---------|-------------|
-| [demo-profile](https://github.com/anthropics/oauth2-passkey/tree/master/demo-profile) | 1:1 | User profile with avatar, bio, theme |
-| [demo-todo](https://github.com/anthropics/oauth2-passkey/tree/master/demo-todo) | 1:N | Todo list with CRUD operations |
+| Demo | Description |
+|------|-------------|
+| [demo-profile](https://github.com/anthropics/oauth2-passkey/tree/master/demo-profile) | User profile extension (settings, preferences) |
+| [demo-todo](https://github.com/anthropics/oauth2-passkey/tree/master/demo-todo) | App data linked to users (general pattern) |
 
 ## Related Documentation
 

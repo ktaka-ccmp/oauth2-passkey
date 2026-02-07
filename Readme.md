@@ -94,8 +94,8 @@ See it in action before integrating:
 | **[demo-oauth2](demo-oauth2/)** | OAuth2 only ("Sign in with Google") |
 | **[demo-passkey](demo-passkey/)** | Passkey only (passwordless) |
 | **[demo-custom-login](demo-custom-login/)** | Custom login page implementation |
-| **[demo-profile](demo-profile/)** | User profile extension example |
-| **[demo-todo](demo-todo/)** | Todo app with user-specific data |
+| **[demo-profile](demo-profile/)** | User profile extension |
+| **[demo-todo](demo-todo/)** | App data linked to users |
 | **[demo-cross-origin](demo-cross-origin/)** | Cross-origin authentication setup |
 
 ```bash
