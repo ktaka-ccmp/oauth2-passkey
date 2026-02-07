@@ -86,11 +86,11 @@ impl LoginHistoryEntry {
     }
 
     /// Create a new login history entry for a failed login
-    #[allow(dead_code)]
     pub fn failure(
         user_id: String,
         auth_method: AuthMethod,
         context: LoginContext,
+        credential_id: Option<String>,
         reason: String,
     ) -> Self {
         Self {
@@ -101,7 +101,7 @@ impl LoginHistoryEntry {
             ip_address: context.ip_address,
             user_agent: context.user_agent.map(|ua| truncate_user_agent(&ua)),
             success: false,
-            credential_id: None,
+            credential_id,
             provider: None,
             provider_user_id: None,
             failure_reason: Some(reason),

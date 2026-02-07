@@ -45,6 +45,40 @@ pub(crate) async fn record_login_success(
     }
 }
 
+/// Record a failed login attempt
+///
+/// This function records a failed login event in the login history database.
+/// It is used for security monitoring to detect potential attacks.
+/// Currently only used for Passkey failures where the credential_id can identify the user.
+#[tracing::instrument(skip(context), fields(user_id = %user_id.as_str(), auth_method = %auth_method))]
+pub(crate) async fn record_login_failure(
+    user_id: UserId,
+    auth_method: AuthMethod,
+    context: LoginContext,
+    credential_id: Option<String>,
+    failure_reason: String,
+) -> Result<(), CoordinationError> {
+    let entry = LoginHistoryEntry::failure(
+        user_id.as_str().to_string(),
+        auth_method,
+        context,
+        credential_id,
+        failure_reason,
+    );
+
+    match LoginHistoryStore::insert(entry).await {
+        Ok(_) => {
+            tracing::debug!("Login failure recorded successfully");
+            Ok(())
+        }
+        Err(e) => {
+            // Log but don't fail - recording history is non-critical
+            tracing::warn!(error = %e, "Failed to record login failure (non-fatal)");
+            Ok(())
+        }
+    }
+}
+
 /// Get login history for the current user (user's own view)
 ///
 /// Returns login history entries with masked IP addresses for privacy.

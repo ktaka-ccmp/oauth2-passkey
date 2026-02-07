@@ -15,7 +15,7 @@ use crate::session::{User as SessionUser, UserId, new_session_header};
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
-use super::login_history::record_login_success;
+use super::login_history::{record_login_failure, record_login_success};
 use super::user::gen_new_user_id;
 
 /// Passkey user account field mapping configuration
@@ -270,8 +270,31 @@ pub async fn handle_finish_authentication_core(
     tracing::info!("Finishing passkey authentication flow");
     tracing::debug!("Auth response: {:#?}", auth_response);
 
+    // Extract credential_id for potential failure recording
+    let credential_id_str = auth_response.credential_id().to_string();
+
     // Verify the authentication and get the user ID, name, and user handle
-    let (uid, name, user_handle) = finish_authentication(auth_response).await?;
+    let (uid, name, user_handle) = match finish_authentication(auth_response).await {
+        Ok(result) => result,
+        Err(e) => {
+            // On failure, try to record the failed attempt if we can identify the user
+            if let Some(context) = login_context
+                && let Ok(cred_id) = CredentialId::new(credential_id_str.clone())
+                && let Ok(Some(credential)) = PasskeyStore::get_credential(cred_id).await
+                && let Ok(user_id) = UserId::new(credential.user_id.clone())
+            {
+                let _ = record_login_failure(
+                    user_id,
+                    AuthMethod::Passkey,
+                    context,
+                    Some(credential_id_str),
+                    e.to_string(),
+                )
+                .await;
+            }
+            return Err(e.into());
+        }
+    };
 
     // Record user_id in the tracing span
     tracing::Span::current().record("user_id", &uid);
