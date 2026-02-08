@@ -23,36 +23,36 @@ use crate::session::AuthUser;
 
 /// Query parameters for login history pagination with date range
 #[derive(Debug, Deserialize)]
-pub struct LoginHistoryQuery {
+struct LoginHistoryQuery {
     /// Maximum number of entries to return (default: 50)
-    pub limit: Option<i64>,
+    limit: Option<i64>,
     /// Offset for pagination (default: 0)
-    pub offset: Option<i64>,
+    offset: Option<i64>,
     /// Filter from date (YYYY-MM-DD format)
-    pub from: Option<String>,
+    from: Option<String>,
     /// Filter to date (YYYY-MM-DD format)
-    pub to: Option<String>,
+    to: Option<String>,
     /// Timezone offset in minutes from UTC (e.g., JST = 540, EST = -300)
-    pub tz_offset: Option<i32>,
+    tz_offset: Option<i32>,
 }
 
 /// Query parameters for admin audit page
 #[derive(Debug, Deserialize)]
-pub struct AdminAuditQuery {
+struct AdminAuditQuery {
     /// Maximum number of entries to return (default: 50)
-    pub limit: Option<i64>,
+    limit: Option<i64>,
     /// Offset for pagination (default: 0)
-    pub offset: Option<i64>,
+    offset: Option<i64>,
     /// Filter by user ID
-    pub user_id: Option<String>,
+    user_id: Option<String>,
     /// Filter from date (YYYY-MM-DD format)
-    pub from: Option<String>,
+    from: Option<String>,
     /// Filter to date (YYYY-MM-DD format)
-    pub to: Option<String>,
+    to: Option<String>,
     /// Filter by success status (true/false)
-    pub success: Option<bool>,
+    success: Option<bool>,
     /// Timezone offset in minutes from UTC (e.g., JST = 540, EST = -300)
-    pub tz_offset: Option<i32>,
+    tz_offset: Option<i32>,
 }
 
 /// Parse date string to DateTime<Utc> with timezone offset
@@ -99,7 +99,7 @@ pub(crate) fn admin_router() -> Router {
 ///
 /// This function extracts the IP address and User-Agent from the request headers
 /// for recording in the login history.
-pub fn extract_login_context(headers: &HeaderMap) -> LoginContext {
+pub(crate) fn extract_login_context(headers: &HeaderMap) -> LoginContext {
     // Try to get the real IP from X-Forwarded-For, X-Real-IP, or fall back to connection IP
     let ip_address = headers
         .get("x-forwarded-for")

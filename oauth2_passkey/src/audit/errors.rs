@@ -3,10 +3,7 @@
 use thiserror::Error;
 
 #[derive(Clone, Error, Debug)]
-pub enum LoginHistoryError {
-    #[error("Login history entry not found")]
-    NotFound,
-
+pub(crate) enum LoginHistoryError {
     #[error("Storage error: {0}")]
     Storage(String),
 

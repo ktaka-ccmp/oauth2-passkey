@@ -8,7 +8,7 @@ use std::fmt;
 /// Authentication method used for login
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum AuthMethod {
+pub(crate) enum AuthMethod {
     Passkey,
     OAuth2,
 }
@@ -18,17 +18,6 @@ impl fmt::Display for AuthMethod {
         match self {
             AuthMethod::Passkey => write!(f, "passkey"),
             AuthMethod::OAuth2 => write!(f, "oauth2"),
-        }
-    }
-}
-
-impl AuthMethod {
-    /// Parse auth method from string
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "passkey" => Some(AuthMethod::Passkey),
-            "oauth2" => Some(AuthMethod::OAuth2),
-            _ => None,
         }
     }
 }
@@ -62,7 +51,7 @@ pub struct LoginHistoryEntry {
 
 impl LoginHistoryEntry {
     /// Create a new login history entry for a successful login
-    pub fn success(
+    pub(crate) fn success(
         user_id: String,
         auth_method: AuthMethod,
         context: LoginContext,
@@ -86,7 +75,7 @@ impl LoginHistoryEntry {
     }
 
     /// Create a new login history entry for a failed login
-    pub fn failure(
+    pub(crate) fn failure(
         user_id: String,
         auth_method: AuthMethod,
         context: LoginContext,
@@ -112,7 +101,7 @@ impl LoginHistoryEntry {
     ///
     /// Used for recording security events where the user cannot be identified,
     /// such as OAuth2 CSRF validation failures.
-    pub fn anonymous_security_event(
+    pub(crate) fn anonymous_security_event(
         auth_method: AuthMethod,
         context: LoginContext,
         event_type: String,
@@ -173,41 +162,5 @@ fn truncate_user_agent(ua: &str) -> String {
         ua[..MAX_LENGTH].to_string()
     } else {
         ua.to_string()
-    }
-}
-
-/// Query parameters for fetching login history
-#[allow(dead_code)]
-#[derive(Debug, Clone, Default)]
-pub struct LoginHistoryQuery {
-    /// User ID to fetch history for
-    pub user_id: String,
-    /// Maximum number of entries to return
-    pub limit: Option<i64>,
-    /// Offset for pagination
-    pub offset: Option<i64>,
-}
-
-#[allow(dead_code)]
-impl LoginHistoryQuery {
-    /// Create a new query with defaults
-    pub fn new(user_id: String) -> Self {
-        Self {
-            user_id,
-            limit: Some(50),
-            offset: Some(0),
-        }
-    }
-
-    /// Set limit
-    pub fn with_limit(mut self, limit: i64) -> Self {
-        self.limit = Some(limit);
-        self
-    }
-
-    /// Set offset
-    pub fn with_offset(mut self, offset: i64) -> Self {
-        self.offset = Some(offset);
-        self
     }
 }

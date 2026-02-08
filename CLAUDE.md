@@ -124,6 +124,10 @@ Environment variables (see `dot.env.example`):
 4. **Error Handling**: Use `thiserror` crate instead of `anyhow` (better for library crates)
 5. **Documentation**: Include comprehensive tutorials and examples
 6. **Minimal Visibility**: Keep module internals private, re-export only necessary items
+   - Visibility priority (most restrictive first): `private` > `pub(super)` > `pub(crate)` > `pub`
+   - Always use the most restrictive visibility that still allows the code to compile
+   - Common mistake: using `pub(crate)` when `pub(super)` suffices (e.g., for items only used by sibling modules)
+   - When re-exporting in `mod.rs`, the source definition must have at least the same visibility as the re-export
 
 ### Development Workflow
 7. **Minimal Changes**: Code modifications should be minimal and targeted to fulfill specific needs
@@ -236,6 +240,7 @@ This project uses Claude Code commands for workflow management.
 | `/snapshot` | Create a session snapshot for context transfer between machines |
 | `/issue` | Create or update an issue for task/bug tracking |
 | `/backlog` | View all open issues |
+| `/visibility-check` | Check Rust code for minimal visibility compliance |
 
 ### Session Snapshots (`.claude/sessions/`)
 

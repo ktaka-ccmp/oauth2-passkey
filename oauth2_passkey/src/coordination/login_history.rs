@@ -17,7 +17,7 @@ use super::errors::CoordinationError;
 /// This function records a login event in the login history database.
 /// It should be called after a successful authentication (passkey or OAuth2).
 #[tracing::instrument(skip(context), fields(user_id = %user_id.as_str(), auth_method = %auth_method))]
-pub(crate) async fn record_login_success(
+pub(super) async fn record_login_success(
     user_id: UserId,
     auth_method: AuthMethod,
     context: LoginContext,
@@ -53,7 +53,7 @@ pub(crate) async fn record_login_success(
 /// such as OAuth2 CSRF validation failures. Useful for detecting attack patterns
 /// from specific IP addresses.
 #[tracing::instrument(skip(context), fields(auth_method = %auth_method, event_type = %event_type))]
-pub(crate) async fn record_anonymous_security_event(
+pub(super) async fn record_anonymous_security_event(
     auth_method: AuthMethod,
     context: LoginContext,
     event_type: String,
@@ -79,7 +79,7 @@ pub(crate) async fn record_anonymous_security_event(
 /// It is used for security monitoring to detect potential attacks.
 /// Currently only used for Passkey failures where the credential_id can identify the user.
 #[tracing::instrument(skip(context), fields(user_id = %user_id.as_str(), auth_method = %auth_method))]
-pub(crate) async fn record_login_failure(
+pub(super) async fn record_login_failure(
     user_id: UserId,
     auth_method: AuthMethod,
     context: LoginContext,
