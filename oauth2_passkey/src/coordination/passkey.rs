@@ -260,17 +260,15 @@ pub struct AuthenticationResponse {
 ///
 /// * `auth_response` - The authenticator response from the client
 /// * `login_context` - Optional context for recording login history (IP, user-agent)
-/// * `credential_id_for_history` - Optional credential ID for recording in login history
 #[tracing::instrument(skip(auth_response, login_context), fields(user_id))]
 pub async fn handle_finish_authentication_core(
     auth_response: AuthenticatorResponse,
     login_context: Option<LoginContext>,
-    credential_id_for_history: Option<String>,
 ) -> Result<(AuthenticationResponse, HeaderMap), CoordinationError> {
     tracing::info!("Finishing passkey authentication flow");
     tracing::debug!("Auth response: {:#?}", auth_response);
 
-    // Extract credential_id for potential failure recording
+    // Extract credential_id for login history recording (success and failure)
     let credential_id_str = auth_response.credential_id().to_string();
 
     // Verify the authentication and get the user ID, name, and user handle
@@ -312,7 +310,7 @@ pub async fn handle_finish_authentication_core(
             user_id.clone(),
             AuthMethod::Passkey,
             context,
-            credential_id_for_history,
+            Some(credential_id_str),
             None,
             None,
         )

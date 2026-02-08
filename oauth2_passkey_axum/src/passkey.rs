@@ -118,9 +118,8 @@ async fn handle_finish_authentication(
     let login_context = extract_login_context(&request_headers);
 
     // Call the core function with the extracted data
-    // Note: credential_id is extracted internally by the core function
     let (auth_data, headers) =
-        handle_finish_authentication_core(auth_response, Some(login_context), None)
+        handle_finish_authentication_core(auth_response, Some(login_context))
             .await
             .into_response_error()?;
 
