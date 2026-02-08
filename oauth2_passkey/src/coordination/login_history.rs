@@ -47,47 +47,24 @@ pub(super) async fn record_login_success(
     }
 }
 
-/// Record an anonymous security event
-///
-/// This function records a security event where the user cannot be identified,
-/// such as OAuth2 CSRF validation failures. Useful for detecting attack patterns
-/// from specific IP addresses.
-#[tracing::instrument(skip(context), fields(auth_method = %auth_method, event_type = %event_type))]
-pub(super) async fn record_anonymous_security_event(
-    auth_method: AuthMethod,
-    context: LoginContext,
-    event_type: String,
-) -> Result<(), CoordinationError> {
-    let entry = LoginHistoryEntry::anonymous_security_event(auth_method, context, event_type);
-
-    match LoginHistoryStore::insert(entry).await {
-        Ok(_) => {
-            tracing::debug!("Anonymous security event recorded successfully");
-            Ok(())
-        }
-        Err(e) => {
-            // Log but don't fail - recording is non-critical
-            tracing::warn!(error = %e, "Failed to record security event (non-fatal)");
-            Ok(())
-        }
-    }
-}
-
 /// Record a failed login attempt
 ///
-/// This function records a failed login event in the login history database.
-/// It is used for security monitoring to detect potential attacks.
-/// Currently only used for Passkey failures where the credential_id can identify the user.
-#[tracing::instrument(skip(context), fields(user_id = %user_id.as_str(), auth_method = %auth_method))]
+/// Separate from `record_login_success` to enforce type safety: successful logins
+/// always require a known `UserId`, while failures may occur without identifying
+/// the user (e.g., invalid credential ID or CSRF validation failure).
+#[tracing::instrument(skip(context), fields(user_id = user_id.as_ref().map(|u| u.as_str()), auth_method = %auth_method))]
 pub(super) async fn record_login_failure(
-    user_id: UserId,
+    user_id: Option<UserId>,
     auth_method: AuthMethod,
     context: LoginContext,
     credential_id: Option<String>,
     failure_reason: String,
 ) -> Result<(), CoordinationError> {
     let entry = LoginHistoryEntry::failure(
-        user_id.as_str().to_string(),
+        user_id
+            .as_ref()
+            .map(|u| u.as_str().to_string())
+            .unwrap_or_default(),
         auth_method,
         context,
         credential_id,
@@ -108,14 +85,12 @@ pub(super) async fn record_login_failure(
 }
 
 /// Get login history for the current user (user's own view)
-///
-/// Returns login history entries with masked IP addresses for privacy.
 #[tracing::instrument(skip(session_cookie), fields(user_id))]
 pub async fn get_own_login_history(
     session_cookie: &crate::session::SessionCookie,
     limit: Option<i64>,
     offset: Option<i64>,
-) -> Result<Vec<LoginHistoryEntryMasked>, CoordinationError> {
+) -> Result<Vec<LoginHistoryEntry>, CoordinationError> {
     // Get user from session
     let session_user = get_user_from_session(session_cookie)
         .await
@@ -130,13 +105,7 @@ pub async fn get_own_login_history(
         .await
         .map_err(|e| CoordinationError::Database(e.to_string()))?;
 
-    // Mask IP addresses for user's own view
-    let masked_entries = entries
-        .into_iter()
-        .map(LoginHistoryEntryMasked::from)
-        .collect();
-
-    Ok(masked_entries)
+    Ok(entries)
 }
 
 /// Get login history for any user (admin view)
@@ -165,8 +134,6 @@ pub async fn get_user_login_history_admin(
 }
 
 /// Get login history for the current user with date range filtering
-///
-/// Returns login history entries with masked IP addresses for privacy.
 #[tracing::instrument(skip(session_cookie), fields(user_id))]
 pub async fn get_own_login_history_with_date_range(
     session_cookie: &crate::session::SessionCookie,
@@ -174,7 +141,7 @@ pub async fn get_own_login_history_with_date_range(
     to: Option<DateTime<Utc>>,
     limit: Option<i64>,
     offset: Option<i64>,
-) -> Result<Vec<LoginHistoryEntryMasked>, CoordinationError> {
+) -> Result<Vec<LoginHistoryEntry>, CoordinationError> {
     // Get user from session
     let session_user = get_user_from_session(session_cookie)
         .await
@@ -190,13 +157,7 @@ pub async fn get_own_login_history_with_date_range(
             .await
             .map_err(|e| CoordinationError::Database(e.to_string()))?;
 
-    // Mask IP addresses for user's own view
-    let masked_entries = entries
-        .into_iter()
-        .map(LoginHistoryEntryMasked::from)
-        .collect();
-
-    Ok(masked_entries)
+    Ok(entries)
 }
 
 /// Query login history for admin with filters (audit page)
@@ -226,51 +187,6 @@ pub async fn query_login_history_admin(
         .map_err(|e| CoordinationError::Database(e.to_string()))?;
 
     Ok(entries)
-}
-
-/// Login history entry with masked IP address for user's own view
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct LoginHistoryEntryMasked {
-    /// Database ID
-    pub id: Option<i64>,
-    /// User ID who logged in
-    pub user_id: String,
-    /// Timestamp of the login attempt
-    pub timestamp: chrono::DateTime<chrono::Utc>,
-    /// Authentication method used (passkey/oauth2)
-    pub auth_method: String,
-    /// Masked IP address (last octet hidden)
-    pub ip_address: Option<String>,
-    /// User-Agent header
-    pub user_agent: Option<String>,
-    /// Whether the login was successful
-    pub success: bool,
-    /// Passkey credential ID (for passkey logins)
-    pub credential_id: Option<String>,
-    /// OAuth2 provider name (for OAuth2 logins)
-    pub provider: Option<String>,
-    /// OAuth2 provider user ID (for OAuth2 logins)
-    pub provider_user_id: Option<String>,
-    /// Reason for failure (if success is false)
-    pub failure_reason: Option<String>,
-}
-
-impl From<LoginHistoryEntry> for LoginHistoryEntryMasked {
-    fn from(entry: LoginHistoryEntry) -> Self {
-        Self {
-            id: entry.id,
-            user_id: entry.user_id.clone(),
-            timestamp: entry.timestamp,
-            auth_method: entry.auth_method.clone(),
-            ip_address: entry.masked_ip(),
-            user_agent: entry.user_agent.clone(),
-            success: entry.success,
-            credential_id: entry.credential_id.clone(),
-            provider: entry.provider.clone(),
-            provider_user_id: entry.provider_user_id.clone(),
-            failure_reason: entry.failure_reason.clone(),
-        }
-    }
 }
 
 impl From<LoginHistoryError> for CoordinationError {

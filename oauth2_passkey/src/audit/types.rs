@@ -98,30 +98,6 @@ impl LoginHistoryEntry {
         }
     }
 
-    /// Create a new login history entry for an anonymous security event
-    ///
-    /// Used for recording security events where the user cannot be identified,
-    /// such as OAuth2 CSRF validation failures.
-    pub(crate) fn anonymous_security_event(
-        auth_method: AuthMethod,
-        context: LoginContext,
-        event_type: String,
-    ) -> Self {
-        Self {
-            id: None,
-            user_id: String::new(), // Empty string for anonymous events
-            timestamp: Utc::now(),
-            auth_method: auth_method.to_string(),
-            ip_address: context.ip_address,
-            user_agent: context.user_agent.map(|ua| truncate_user_agent(&ua)),
-            success: false,
-            credential_id: None,
-            provider: Some("security_event".to_string()),
-            provider_user_id: None,
-            failure_reason: Some(event_type),
-        }
-    }
-
     /// Mask IP address for user view (hide last octet)
     pub fn masked_ip(&self) -> Option<String> {
         self.ip_address.as_ref().map(|ip| {

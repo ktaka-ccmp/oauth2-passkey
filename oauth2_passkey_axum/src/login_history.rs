@@ -12,9 +12,8 @@ use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use serde::Deserialize;
 
 use oauth2_passkey::{
-    LoginHistoryEntry, LoginHistoryEntryMasked, O2P_ROUTE_PREFIX, SessionCookie, SessionId, UserId,
-    get_own_login_history, get_own_login_history_with_date_range, get_user_login_history_admin,
-    query_login_history_admin,
+    LoginHistoryEntry, O2P_ROUTE_PREFIX, SessionCookie, SessionId, UserId, get_own_login_history,
+    get_own_login_history_with_date_range, get_user_login_history_admin, query_login_history_admin,
 };
 
 use crate::config::O2P_CUSTOM_CSS_URL;
@@ -96,12 +95,10 @@ pub(crate) fn admin_router() -> Router {
 }
 
 /// Handler for getting the current user's own login history
-///
-/// Returns login history with masked IP addresses for privacy.
 async fn get_my_login_history(
     auth_user: AuthUser,
     Query(query): Query<LoginHistoryQuery>,
-) -> Result<Json<Vec<LoginHistoryEntryMasked>>, (StatusCode, String)> {
+) -> Result<Json<Vec<LoginHistoryEntry>>, (StatusCode, String)> {
     let session_cookie = SessionCookie::new(auth_user.session_id.clone()).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,

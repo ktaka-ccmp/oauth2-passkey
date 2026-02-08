@@ -14,7 +14,7 @@ use crate::userdb::{User as DbUser, UserStore};
 use crate::utils::header_set_cookie;
 
 use super::errors::CoordinationError;
-use super::login_history::{record_anonymous_security_event, record_login_success};
+use super::login_history::{record_login_failure, record_login_success};
 use super::user::gen_new_user_id;
 
 use crate::session::{UserId, new_session_header};
@@ -86,15 +86,21 @@ async fn authorized_core(
     let login_context = LoginContext::from_headers(headers);
 
     // CSRF check with security event logging on failure
-    if let Err(e) = csrf_checks(cookies.clone(), auth_response, headers.clone()).await {
-        // Record the security event (non-blocking)
-        let event_type = format!("oauth2_csrf_failure: {}", e);
-        let _ =
-            record_anonymous_security_event(AuthMethod::OAuth2, login_context, event_type).await;
-        return Err(e.into());
+    match csrf_checks(cookies.clone(), auth_response, headers.clone()).await {
+        Err(e) => {
+            let failure_reason = format!("oauth2_csrf_failure: {}", e);
+            let _ = record_login_failure(
+                None,
+                AuthMethod::OAuth2,
+                login_context,
+                None,
+                failure_reason,
+            )
+            .await;
+            Err(e.into())
+        }
+        Ok(()) => process_oauth2_authorization(auth_response, login_context).await,
     }
-
-    process_oauth2_authorization(auth_response, login_context).await
 }
 
 /// Processes an OAuth2 GET authorization request.
@@ -345,7 +351,7 @@ async fn process_oauth2_authorization(
         .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
     let mut headers = new_session_header(user_id_validated.clone()).await?;
 
-    // Record login history (non-blocking, errors are logged but don't fail the login)
+    // Record login history (fire-and-forget: errors are logged but don't fail the login)
     let _ = record_login_success(
         user_id_validated,
         AuthMethod::OAuth2,

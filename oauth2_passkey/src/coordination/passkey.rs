@@ -7,9 +7,9 @@ use std::{env, sync::LazyLock};
 use crate::audit::{AuthMethod, LoginContext};
 use crate::passkey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialId, CredentialSearchField,
-    PasskeyCredential, PasskeyStore, RegisterCredential, RegistrationOptions, commit_registration,
-    finish_authentication, prepare_registration_storage, start_authentication, start_registration,
-    validate_registration_challenge, verify_session_then_finish_registration,
+    PasskeyCredential, PasskeyError, PasskeyStore, RegisterCredential, RegistrationOptions,
+    commit_registration, finish_authentication, prepare_registration_storage, start_authentication,
+    start_registration, validate_registration_challenge, verify_session_then_finish_registration,
 };
 use crate::session::{User as SessionUser, UserId, new_session_header};
 use crate::userdb::{User, UserStore};
@@ -269,7 +269,7 @@ pub async fn handle_finish_authentication_core(
     tracing::debug!("Auth response: {:#?}", auth_response);
 
     // Extract login context from headers for history recording
-    let login_context = headers.map(LoginContext::from_headers);
+    let login_context = headers.map(LoginContext::from_headers).unwrap_or_default();
 
     // Extract credential_id for login history recording (success and failure)
     let credential_id_str = auth_response.credential_id().to_string();
@@ -278,24 +278,40 @@ pub async fn handle_finish_authentication_core(
     let (uid, name, user_handle) = match finish_authentication(auth_response).await {
         Ok(result) => result,
         Err(e) => {
-            // On failure, try to record the failed attempt if we can identify the user
-            if let Some(context) = login_context
-                && let Ok(cred_id) = CredentialId::new(credential_id_str.clone())
-                && let Ok(Some(credential)) = PasskeyStore::get_credential(cred_id).await
-                && let Ok(user_id) = UserId::new(credential.user_id.clone())
-            {
-                let _ = record_login_failure(
-                    user_id,
-                    AuthMethod::Passkey,
-                    context,
-                    Some(credential_id_str),
-                    e.to_string(),
-                )
-                .await;
-            }
+            record_auth_failure(login_context, credential_id_str, &e).await;
             return Err(e.into());
         }
     };
+
+    /// Record a passkey authentication failure to both tracing and login history DB.
+    async fn record_auth_failure(
+        login_context: LoginContext,
+        credential_id_str: String,
+        error: &PasskeyError,
+    ) {
+        tracing::warn!(
+            credential_id = %credential_id_str,
+            error = %error,
+            "Passkey authentication failed"
+        );
+
+        // Best-effort user identification from credential ID
+        let user_id = async {
+            let cred_id = CredentialId::new(credential_id_str.clone()).ok()?;
+            let cred = PasskeyStore::get_credential(cred_id).await.ok()??;
+            UserId::new(cred.user_id).ok()
+        }
+        .await;
+
+        let _ = record_login_failure(
+            user_id,
+            AuthMethod::Passkey,
+            login_context,
+            Some(credential_id_str),
+            error.to_string(),
+        )
+        .await;
+    }
 
     // Record user_id in the tracing span
     tracing::Span::current().record("user_id", &uid);
@@ -307,18 +323,16 @@ pub async fn handle_finish_authentication_core(
         .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
     let response_headers = new_session_header(user_id.clone()).await?;
 
-    // Record login history (non-blocking, errors are logged but don't fail the login)
-    if let Some(context) = login_context {
-        let _ = record_login_success(
-            user_id.clone(),
-            AuthMethod::Passkey,
-            context,
-            Some(credential_id_str),
-            None,
-            None,
-        )
-        .await;
-    }
+    // Record login history (fire-and-forget: errors are logged but don't fail the login)
+    let _ = record_login_success(
+        user_id.clone(),
+        AuthMethod::Passkey,
+        login_context,
+        Some(credential_id_str),
+        None,
+        None,
+    )
+    .await;
 
     // Retrieve all credential IDs for authenticator synchronization
     let credentials = list_credentials_core(user_id).await?;

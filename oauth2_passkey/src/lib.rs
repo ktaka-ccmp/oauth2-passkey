@@ -73,8 +73,8 @@ pub use coordination::{
 // Login history types and functions
 pub use audit::LoginHistoryEntry;
 pub use coordination::{
-    LoginHistoryEntryMasked, get_own_login_history, get_own_login_history_with_date_range,
-    get_user_login_history_admin, query_login_history_admin,
+    get_own_login_history, get_own_login_history_with_date_range, get_user_login_history_admin,
+    query_login_history_admin,
 };
 
 // Environment variable configurable route prefix for all auth routes (defaults to "/o2p")
@@ -152,6 +152,6 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
     userdb::init().await?;
     oauth2::init().await?;
     passkey::init().await?;
-    audit::LoginHistoryStore::init().await?;
+    audit::init().await?;
     Ok(())
 }

@@ -112,4 +112,4 @@ pub use oauth2_passkey::{
 pub use cors::{CORS_ALLOW_CREDENTIALS, CORS_ALLOWED_ORIGINS, cors_layer};
 
 // Re-export login history types for custom implementations
-pub use oauth2_passkey::{LoginHistoryEntry, LoginHistoryEntryMasked};
+pub use oauth2_passkey::LoginHistoryEntry;

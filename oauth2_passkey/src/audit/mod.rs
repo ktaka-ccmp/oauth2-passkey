@@ -9,6 +9,11 @@ mod errors;
 mod storage;
 mod types;
 
+/// Initialize the audit storage backend
+pub(crate) async fn init() -> Result<(), LoginHistoryError> {
+    LoginHistoryStore::init().await
+}
+
 // Internal-only exports
 pub(crate) use errors::LoginHistoryError;
 pub(crate) use storage::LoginHistoryStore;
