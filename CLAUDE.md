@@ -129,6 +129,9 @@ Environment variables (see `dot.env.example`):
    - Common mistake: using `pub(crate)` when `pub(super)` suffices (e.g., for items only used by sibling modules)
    - When re-exporting in `mod.rs`, the source definition must have at least the same visibility as the re-export
 
+### Coding Style Preferences
+- **Prefer `match` over `if let`**: Use `match` expressions instead of `if let` / `if let ... else` unless clippy suggests otherwise. `match` is more readable and makes all branches explicit.
+
 ### Development Workflow
 7. **Minimal Changes**: Code modifications should be minimal and targeted to fulfill specific needs
 8. **Change Approval**: Discuss and get explicit approval before making changes beyond the immediate request
