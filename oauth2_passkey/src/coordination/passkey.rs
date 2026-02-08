@@ -259,14 +259,17 @@ pub struct AuthenticationResponse {
 /// # Arguments
 ///
 /// * `auth_response` - The authenticator response from the client
-/// * `login_context` - Optional context for recording login history (IP, user-agent)
-#[tracing::instrument(skip(auth_response, login_context), fields(user_id))]
+/// * `headers` - Optional HTTP headers for extracting login context (IP, user-agent)
+#[tracing::instrument(skip(auth_response, headers), fields(user_id))]
 pub async fn handle_finish_authentication_core(
     auth_response: AuthenticatorResponse,
-    login_context: Option<LoginContext>,
+    headers: Option<&HeaderMap>,
 ) -> Result<(AuthenticationResponse, HeaderMap), CoordinationError> {
     tracing::info!("Finishing passkey authentication flow");
     tracing::debug!("Auth response: {:#?}", auth_response);
+
+    // Extract login context from headers for history recording
+    let login_context = headers.map(LoginContext::from_headers);
 
     // Extract credential_id for login history recording (success and failure)
     let credential_id_str = auth_response.credential_id().to_string();
@@ -302,7 +305,7 @@ pub async fn handle_finish_authentication_core(
     // Create a session for the authenticated user
     let user_id = UserId::new(uid.clone())
         .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
-    let headers = new_session_header(user_id.clone()).await?;
+    let response_headers = new_session_header(user_id.clone()).await?;
 
     // Record login history (non-blocking, errors are logged but don't fail the login)
     if let Some(context) = login_context {
@@ -330,7 +333,7 @@ pub async fn handle_finish_authentication_core(
             user_handle,
             credential_ids,
         },
-        headers,
+        response_headers,
     ))
 }
 

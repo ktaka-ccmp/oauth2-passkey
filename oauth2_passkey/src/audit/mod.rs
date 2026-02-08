@@ -15,4 +15,5 @@ pub(crate) use storage::LoginHistoryStore;
 pub(crate) use types::AuthMethod;
 
 // Public exports for external use
-pub use types::{LoginContext, LoginHistoryEntry};
+pub(crate) use types::LoginContext;
+pub use types::LoginHistoryEntry;

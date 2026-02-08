@@ -19,7 +19,6 @@ use oauth2_passkey::{
 
 use super::config::O2P_CUSTOM_CSS_URL;
 use super::error::IntoResponseError;
-use super::login_history::extract_login_context;
 use super::session::AuthUser;
 
 pub(super) fn router() -> Router {
@@ -114,12 +113,9 @@ async fn handle_finish_authentication(
     request_headers: HeaderMap,
     Json(auth_response): Json<AuthenticatorResponse>,
 ) -> Result<(HeaderMap, Json<Value>), (StatusCode, String)> {
-    // Extract login context from request headers for login history
-    let login_context = extract_login_context(&request_headers);
-
     // Call the core function with the extracted data
     let (auth_data, headers) =
-        handle_finish_authentication_core(auth_response, Some(login_context))
+        handle_finish_authentication_core(auth_response, Some(&request_headers))
             .await
             .into_response_error()?;
 

@@ -1,6 +1,7 @@
 //! Types for login history tracking
 
 use chrono::{DateTime, Utc};
+use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use std::fmt;
@@ -138,16 +139,35 @@ impl LoginHistoryEntry {
 
 /// Context information for a login attempt
 #[derive(Debug, Clone, Default)]
-pub struct LoginContext {
+pub(crate) struct LoginContext {
     /// IP address from request headers
-    pub ip_address: Option<String>,
+    ip_address: Option<String>,
     /// User-Agent from request headers
-    pub user_agent: Option<String>,
+    user_agent: Option<String>,
 }
 
 impl LoginContext {
-    /// Create a new login context
-    pub fn new(ip_address: Option<String>, user_agent: Option<String>) -> Self {
+    /// Extract login context from HTTP headers
+    ///
+    /// Extracts the client IP address (from X-Forwarded-For or X-Real-IP headers)
+    /// and User-Agent for recording in the login history.
+    pub(crate) fn from_headers(headers: &HeaderMap) -> Self {
+        let ip_address = headers
+            .get("x-forwarded-for")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.split(',').next().unwrap_or(s).trim().to_string())
+            .or_else(|| {
+                headers
+                    .get("x-real-ip")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string())
+            });
+
+        let user_agent = headers
+            .get("user-agent")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
         Self {
             ip_address,
             user_agent,

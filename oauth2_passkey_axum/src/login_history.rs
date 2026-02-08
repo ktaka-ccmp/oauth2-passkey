@@ -4,7 +4,7 @@ use askama::Template;
 use axum::{
     Json, Router,
     extract::{Path, Query},
-    http::{HeaderMap, StatusCode},
+    http::StatusCode,
     response::Html,
     routing::get,
 };
@@ -12,9 +12,9 @@ use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use serde::Deserialize;
 
 use oauth2_passkey::{
-    LoginContext, LoginHistoryEntry, LoginHistoryEntryMasked, O2P_ROUTE_PREFIX, SessionCookie,
-    SessionId, UserId, get_own_login_history, get_own_login_history_with_date_range,
-    get_user_login_history_admin, query_login_history_admin,
+    LoginHistoryEntry, LoginHistoryEntryMasked, O2P_ROUTE_PREFIX, SessionCookie, SessionId, UserId,
+    get_own_login_history, get_own_login_history_with_date_range, get_user_login_history_admin,
+    query_login_history_admin,
 };
 
 use crate::config::O2P_CUSTOM_CSS_URL;
@@ -93,32 +93,6 @@ pub(crate) fn admin_router() -> Router {
         .route("/user/{user_id}/login_history", get(get_user_login_history))
         .route("/audit", get(get_admin_audit))
         .route("/audit_page", get(admin_audit_page))
-}
-
-/// Extract login context from HTTP headers
-///
-/// This function extracts the IP address and User-Agent from the request headers
-/// for recording in the login history.
-pub(crate) fn extract_login_context(headers: &HeaderMap) -> LoginContext {
-    // Try to get the real IP from X-Forwarded-For, X-Real-IP, or fall back to connection IP
-    let ip_address = headers
-        .get("x-forwarded-for")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.split(',').next().unwrap_or(s).trim().to_string())
-        .or_else(|| {
-            headers
-                .get("x-real-ip")
-                .and_then(|v| v.to_str().ok())
-                .map(|s| s.to_string())
-        });
-
-    // Get the User-Agent header
-    let user_agent = headers
-        .get("user-agent")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
-
-    LoginContext::new(ip_address, user_agent)
 }
 
 /// Handler for getting the current user's own login history
