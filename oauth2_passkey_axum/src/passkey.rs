@@ -110,12 +110,14 @@ async fn handle_start_authentication(
 }
 
 async fn handle_finish_authentication(
+    request_headers: HeaderMap,
     Json(auth_response): Json<AuthenticatorResponse>,
 ) -> Result<(HeaderMap, Json<Value>), (StatusCode, String)> {
     // Call the core function with the extracted data
-    let (auth_data, headers) = handle_finish_authentication_core(auth_response)
-        .await
-        .into_response_error()?;
+    let (auth_data, headers) =
+        handle_finish_authentication_core(auth_response, Some(&request_headers))
+            .await
+            .into_response_error()?;
 
     // Return the headers and authentication data as JSON
     // Include credential_ids and user_handle only when PASSKEY_SIGNAL_API_MODE includes 'sync'

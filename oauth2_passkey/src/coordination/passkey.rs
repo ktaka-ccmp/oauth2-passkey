@@ -4,16 +4,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{env, sync::LazyLock};
 
+use crate::audit::{AuthMethod, LoginContext};
 use crate::passkey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialId, CredentialSearchField,
-    PasskeyCredential, PasskeyStore, RegisterCredential, RegistrationOptions, commit_registration,
-    finish_authentication, prepare_registration_storage, start_authentication, start_registration,
-    validate_registration_challenge, verify_session_then_finish_registration,
+    PasskeyCredential, PasskeyError, PasskeyStore, RegisterCredential, RegistrationOptions,
+    commit_registration, finish_authentication, prepare_registration_storage, start_authentication,
+    start_registration, validate_registration_challenge, verify_session_then_finish_registration,
 };
 use crate::session::{User as SessionUser, UserId, new_session_header};
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
+use super::login_history::{record_login_failure, record_login_success};
 use super::user::gen_new_user_id;
 
 /// Passkey user account field mapping configuration
@@ -253,15 +255,63 @@ pub struct AuthenticationResponse {
 ///
 /// This function verifies the authentication response, creates a session for the
 /// authenticated user, and returns the authentication response data and session headers.
-#[tracing::instrument(skip(auth_response), fields(user_id))]
+///
+/// # Arguments
+///
+/// * `auth_response` - The authenticator response from the client
+/// * `headers` - Optional HTTP headers for extracting login context (IP, user-agent)
+#[tracing::instrument(skip(auth_response, headers), fields(user_id))]
 pub async fn handle_finish_authentication_core(
     auth_response: AuthenticatorResponse,
+    headers: Option<&HeaderMap>,
 ) -> Result<(AuthenticationResponse, HeaderMap), CoordinationError> {
     tracing::info!("Finishing passkey authentication flow");
     tracing::debug!("Auth response: {:#?}", auth_response);
 
+    // Extract login context from headers for history recording
+    let login_context = headers.map(LoginContext::from_headers).unwrap_or_default();
+
+    // Extract credential_id for login history recording (success and failure)
+    let credential_id_str = auth_response.credential_id().to_string();
+
     // Verify the authentication and get the user ID, name, and user handle
-    let (uid, name, user_handle) = finish_authentication(auth_response).await?;
+    let (uid, name, user_handle) = match finish_authentication(auth_response).await {
+        Ok(result) => result,
+        Err(e) => {
+            record_auth_failure(login_context, credential_id_str, &e).await;
+            return Err(e.into());
+        }
+    };
+
+    /// Record a passkey authentication failure to both tracing and login history DB.
+    async fn record_auth_failure(
+        login_context: LoginContext,
+        credential_id_str: String,
+        error: &PasskeyError,
+    ) {
+        tracing::warn!(
+            credential_id = %credential_id_str,
+            error = %error,
+            "Passkey authentication failed"
+        );
+
+        // Best-effort user identification from credential ID
+        let user_id = async {
+            let cred_id = CredentialId::new(credential_id_str.clone()).ok()?;
+            let cred = PasskeyStore::get_credential(cred_id).await.ok()??;
+            UserId::new(cred.user_id).ok()
+        }
+        .await;
+
+        let _ = record_login_failure(
+            user_id,
+            AuthMethod::Passkey,
+            login_context,
+            Some(credential_id_str),
+            error.to_string(),
+        )
+        .await;
+    }
 
     // Record user_id in the tracing span
     tracing::Span::current().record("user_id", &uid);
@@ -271,7 +321,18 @@ pub async fn handle_finish_authentication_core(
     // Create a session for the authenticated user
     let user_id = UserId::new(uid.clone())
         .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
-    let headers = new_session_header(user_id.clone()).await?;
+    let response_headers = new_session_header(user_id.clone()).await?;
+
+    // Record login history (fire-and-forget: errors are logged but don't fail the login)
+    let _ = record_login_success(
+        user_id.clone(),
+        AuthMethod::Passkey,
+        login_context,
+        Some(credential_id_str),
+        None,
+        None,
+    )
+    .await;
 
     // Retrieve all credential IDs for authenticator synchronization
     let credentials = list_credentials_core(user_id).await?;
@@ -286,7 +347,7 @@ pub async fn handle_finish_authentication_core(
             user_handle,
             credential_ids,
         },
-        headers,
+        response_headers,
     ))
 }
 

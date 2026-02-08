@@ -40,6 +40,7 @@
 //!
 //! See the repository documentation for more details on configuration and advanced usage.
 
+mod audit;
 mod config;
 mod coordination;
 mod oauth2;
@@ -55,8 +56,8 @@ mod test_utils;
 
 // Core coordination components for authentication
 pub use coordination::{
-    AuthenticationResponse, CoordinationError, RegistrationStartRequest, get_all_users, get_user,
-    handle_finish_authentication_core, handle_finish_registration_core,
+    AuthenticationResponse, CoordinationError, RegistrationMode, RegistrationStartRequest,
+    get_all_users, get_user, handle_finish_authentication_core, handle_finish_registration_core,
     handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
 };
 
@@ -67,6 +68,13 @@ pub use coordination::{
     delete_user_account_admin, force_logout_user, get_all_active_sessions, get_authorized_core,
     list_accounts_core, post_authorized_core, update_passkey_credential_core, update_user_account,
     update_user_admin_status,
+};
+
+// Login history types and functions
+pub use audit::LoginHistoryEntry;
+pub use coordination::{
+    get_own_login_history, get_own_login_history_with_date_range, get_user_login_history_admin,
+    query_login_history_admin,
 };
 
 // Environment variable configurable route prefix for all auth routes (defaults to "/o2p")
@@ -144,5 +152,6 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
     userdb::init().await?;
     oauth2::init().await?;
     passkey::init().await?;
+    audit::init().await?;
     Ok(())
 }

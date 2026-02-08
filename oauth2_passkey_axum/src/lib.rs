@@ -59,6 +59,7 @@ mod config;
 #[cfg(feature = "cors")]
 mod cors;
 mod error;
+mod login_history;
 mod middleware;
 mod oauth2;
 mod passkey;
@@ -109,3 +110,6 @@ pub use oauth2_passkey::{
 // CORS support (requires "cors" feature)
 #[cfg(feature = "cors")]
 pub use cors::{CORS_ALLOW_CREDENTIALS, CORS_ALLOWED_ORIGINS, cors_layer};
+
+// Re-export login history types for custom implementations
+pub use oauth2_passkey::LoginHistoryEntry;

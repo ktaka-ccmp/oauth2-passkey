@@ -100,12 +100,12 @@ async fn get_authorized(
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (headers, message) = get_authorized_core(&query, &cookies, &headers)
+    let (response_headers, message) = get_authorized_core(&query, &cookies, &headers)
         .await
         .into_response_error()?;
 
     Ok((
-        headers,
+        response_headers,
         Redirect::to(&format!(
             "{}/oauth2/popup_close?message={}",
             O2P_ROUTE_PREFIX.as_str(),
@@ -128,12 +128,12 @@ async fn post_authorized(
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     Form(form): Form<AuthResponse>,
 ) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (headers, message) = post_authorized_core(&form, &cookies, &headers)
+    let (response_headers, message) = post_authorized_core(&form, &cookies, &headers)
         .await
         .into_response_error()?;
 
     Ok((
-        headers,
+        response_headers,
         Redirect::to(&format!(
             "{}/oauth2/popup_close?message={}",
             O2P_ROUTE_PREFIX.as_str(),

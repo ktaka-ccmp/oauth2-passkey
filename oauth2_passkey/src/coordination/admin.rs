@@ -429,10 +429,12 @@ pub async fn force_logout_user(
 
 /// Validates that a session belongs to an admin user.
 ///
-/// This is a private helper function used only within the admin module.
+/// This is a helper function used by admin and login_history modules.
 /// It validates session data using get_user_from_session which already
 /// performs fresh database lookup to ensure current user state.
-async fn validate_admin_session(session_id: SessionId) -> Result<SessionUser, CoordinationError> {
+pub(super) async fn validate_admin_session(
+    session_id: SessionId,
+) -> Result<SessionUser, CoordinationError> {
     // Get user from session (this already does fresh database validation)
     let session_cookie = crate::SessionCookie::new(session_id.as_str().to_string())
         .map_err(|_| CoordinationError::Unauthorized.log())?;
