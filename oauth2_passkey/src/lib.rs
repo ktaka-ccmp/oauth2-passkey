@@ -56,8 +56,8 @@ mod test_utils;
 
 // Core coordination components for authentication
 pub use coordination::{
-    AuthenticationResponse, CoordinationError, RegistrationStartRequest, get_all_users, get_user,
-    handle_finish_authentication_core, handle_finish_registration_core,
+    AuthenticationResponse, CoordinationError, RegistrationMode, RegistrationStartRequest,
+    get_all_users, get_user, handle_finish_authentication_core, handle_finish_registration_core,
     handle_start_authentication_core, handle_start_registration_core, list_credentials_core,
 };
 

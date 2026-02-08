@@ -29,7 +29,7 @@ static OAUTH2_USER_LABEL_FIELD: LazyLock<String> =
 
 /// HTTP method enum for the authorized_core function
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum HttpMethod {
+enum HttpMethod {
     Get,
     Post,
 }
