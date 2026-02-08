@@ -97,20 +97,6 @@ impl LoginHistoryEntry {
             failure_reason: Some(reason),
         }
     }
-
-    /// Mask IP address for user view (hide last octet)
-    pub fn masked_ip(&self) -> Option<String> {
-        self.ip_address.as_ref().map(|ip| {
-            if let Some(pos) = ip.rfind('.') {
-                format!("{}.*", &ip[..pos])
-            } else if let Some(pos) = ip.rfind(':') {
-                // IPv6: mask last segment
-                format!("{}:*", &ip[..pos])
-            } else {
-                ip.clone()
-            }
-        })
-    }
 }
 
 /// Context information for a login attempt
@@ -160,3 +146,6 @@ fn truncate_user_agent(ua: &str) -> String {
         ua.to_string()
     }
 }
+
+#[cfg(test)]
+mod tests;
