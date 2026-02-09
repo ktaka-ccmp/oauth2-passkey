@@ -1,4 +1,13 @@
-# Issue: Add Sequential Primary Keys to oauth2_accounts and passkey_credentials Tables
+# Issue: Sequential Primary Keys Optimization
+
+## Table of Contents
+
+- [Description](#description)
+- [Approach](#approach)
+- [Related Files](#related-files)
+- [Implementation Tasks](#implementation-tasks)
+- [Decision Log](#decision-log)
+- [Resolution](#resolution)
 
 ## ID: 2026-01-31-01
 
@@ -10,7 +19,9 @@
 
 ## Description
 
-Based on analysis of database primary key design best practices (Kenn Ejima's large-scale system experience), consider adding sequential integer primary keys to tables that currently use TEXT primary keys.
+Consider adding sequential integer primary keys to `oauth2_accounts` and
+`passkey_credentials` tables that currently use TEXT primary keys, following
+the pattern already established in the `users` table.
 
 ### Background
 
@@ -21,6 +32,8 @@ id TEXT NOT NULL UNIQUE,                             -- External public_id
 ```
 
 However, `oauth2_accounts` and `passkey_credentials` tables use TEXT primary keys directly.
+
+## Approach
 
 ### Current State
 
@@ -80,13 +93,27 @@ For small to medium scale deployments, the current design is sufficient.
 - `oauth2_passkey/src/oauth2/types.rs`
 - `oauth2_passkey/src/passkey/types.rs`
 
-## Notes
+## Implementation Tasks
 
-Reference: Kenn Ejima's analysis on UUID vs sequential primary keys in large-scale systems (3000万ユーザー・10億API hits/日規模での経験に基づく)
+- [ ] Add `sequence_number` column to `oauth2_accounts` schema
+- [ ] Add `sequence_number` column to `passkey_credentials` schema
+- [ ] Update storage layer for both SQLite and PostgreSQL
+- [ ] Handle migration for existing data
+- [ ] Update type definitions
 
-Key insight: The `users` table already implements this pattern correctly. Sessions are stored in cache (Redis/memory), avoiding the B-tree locality issue entirely.
+## Decision Log
 
-Current design is already well-architected for most use cases. This issue is tracked for potential future optimization if the library is used at very large scale.
+<!-- APPEND-ONLY: Do not edit or delete existing entries. Add new entries at the bottom. -->
+
+### 2026-01-31: Issue created as future optimization
+
+- Context: Analysis of database primary key design best practices (based on
+  large-scale system experience with 30M+ users, 1B+ API hits/day)
+- Decision: Track as low-priority issue; current design is already well-architected
+  for most use cases
+- Reason: The `users` table already implements the sequential pkey pattern correctly.
+  Sessions are stored in cache (Redis/memory), avoiding B-tree locality issues.
+  Benefits only materialize at very large scale (millions of rows, thousands of QPS).
 
 ## Resolution
 
