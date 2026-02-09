@@ -8,6 +8,7 @@ Create, update, or close an issue for task/bug tracking.
 .claude/issues/
 ├── open/           # New issues go here
 ├── completed/      # Move here when resolved
+├── wontfix/        # Move here when closed without implementation
 ├── deferred/       # Move here when postponed
 └── README.md
 ```
@@ -28,7 +29,8 @@ When updating an existing issue:
 1. Read the current issue file
 2. Update the relevant sections (Status, Notes, Resolution)
 3. If status changes, move file to appropriate directory:
-   - `completed` or `wontfix` -> move to `completed/`
+   - `completed` -> move to `completed/`
+   - `wontfix` -> move to `wontfix/`
    - `deferred` -> move to `deferred/`
 4. When closing an issue, set the `Closed:` field to `YYYY-MM-DD-HH-MM`
 
@@ -38,7 +40,7 @@ When updating an existing issue:
 |--------|-----------|-------------|
 | `open` | `open/` | New or in-progress |
 | `completed` | `completed/` | Resolved and committed |
-| `wontfix` | `completed/` | Closed without implementation |
+| `wontfix` | `wontfix/` | Closed without implementation |
 | `deferred` | `deferred/` | Postponed for later |
 
 ### After Creating/Updating

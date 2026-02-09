@@ -48,6 +48,10 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-09` | [Cross-Origin Same-Site Demo (Pattern 2)](completed/2026-01-30-cross-origin-same-site-demo.md) |
 | `2026-01-31-02` | [Remove HTTPS Support from Demo Apps](completed/2026-01-31-demo-remove-https.md) |
 
+### Wontfix (0)
+
+(none)
+
 ### Deferred (2)
 
 | ID | Title |
@@ -63,6 +67,7 @@ This directory contains issue/task tracking files for the project.
 .claude/issues/
 ├── open/           # Active issues
 ├── completed/      # Resolved issues
+├── wontfix/        # Closed without implementation
 ├── deferred/       # Postponed issues
 └── README.md       # This file
 ```
@@ -183,7 +188,7 @@ a corresponding Decision Log entry explaining what changed and why.
 |--------|-----------|-------------|
 | `open` | `open/` | New or in-progress |
 | `completed` | `completed/` | Resolved and committed |
-| `wontfix` | `completed/` | Closed without implementation |
+| `wontfix` | `wontfix/` | Closed without implementation |
 | `deferred` | `deferred/` | Postponed for later |
 
 ## Commands
