@@ -6,12 +6,11 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (8)
+### Open (7)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `2026-01-23-01` | medium | large | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
-| `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
 | `20260210-0547` | medium | medium | [Enhance Login History with Auth-Method-Specific Details](open/20260210-0547-login-history-detail-enhancement.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `2026-02-09-01` | medium | medium | [Update CHANGELOG.md for Changes Since v0.2.0](open/2026-02-09-changelog-update.md) |
@@ -19,10 +18,11 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 
-### Completed (24)
+### Completed (25)
 
 | ID | Title |
 |----|-------|
+| `2026-01-30-07` | [Passkey Registration Promotion After Login](completed/2026-01-30-conditional-creation.md) |
 | `2026-02-08-01` | [Audit Page Enhancement](completed/2026-02-08-audit-page-enhancement.md) |
 | `2026-01-30-02` | [Admin Force Logout Feature](completed/2026-01-30-admin-force-logout.md) |
 | `2026-01-30-03` | [Admin Login History View](completed/2026-01-30-admin-login-history.md) |

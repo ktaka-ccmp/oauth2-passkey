@@ -15,7 +15,9 @@
 
 ## ID: 2026-01-30-07
 
-## Status: open
+## Status: completed
+
+## Closed: 2026-02-10-07-10
 
 ## Priority: medium
 
@@ -121,17 +123,17 @@ When disabled:
 | Component | Impact |
 |-----------|--------|
 | `oauth2_passkey/` (core library) | **None** |
-| `oauth2_passkey_axum/src/passkey.rs` (existing handlers) | **None** |
+| `oauth2_passkey_axum/src/passkey.rs` (existing handlers) | `mod promotion;` + conditional merge in `router()` |
 | `oauth2_passkey_axum/static/passkey.js` | **None** |
 | `oauth2_passkey_axum/static/oauth2.js` | **None** |
 | `oauth2_passkey_axum/src/oauth2.rs` | Conditional redirect in callback handlers |
-| `oauth2_passkey_axum/src/router.rs` | Conditional route merging |
-| `oauth2_passkey_axum/src/config.rs` | `PasskeyPromotionMode` enum + `is_passkey_promotion_enabled()` |
+| `oauth2_passkey_axum/src/router.rs` | Simplified (promotion logic moved to passkey module) |
+| `oauth2_passkey_axum/src/config.rs` | `PasskeyPromotionMode` enum |
 
 ## New Files
 
-- `oauth2_passkey_axum/src/passkey_promotion.rs` -- Handlers, routes, UA+AAGUID heuristic
-- `oauth2_passkey_axum/src/passkey_promotion/tests.rs` -- Unit tests for heuristic
+- `oauth2_passkey_axum/src/passkey/promotion.rs` -- Handlers, routes, UA+AAGUID heuristic (submodule of passkey)
+- `oauth2_passkey_axum/src/passkey/promotion/tests.rs` -- Unit tests for heuristic
 - `oauth2_passkey_axum/templates/promotion_popup.j2` -- Popup page with inline promotion logic
 
 ## Related Files (read-only reference)
@@ -159,7 +161,7 @@ When disabled:
 - [x] Update `dot.env.example` with new env var
 - [x] Change `O2P_PASSKEY_PROMOTION` from bool to enum
 - [x] Add `force` mode: skip modal, direct WebAuthn registration
-- [x] Re-export `is_passkey_promotion_enabled()` public helper
+- [x] ~~Re-export `is_passkey_promotion_enabled()` public helper~~ (removed: unused)
 - [x] Refactor to popup-based approach (promotion inside OAuth2 popup)
 - [x] Create `promotion_popup.j2` template with inline promotion logic
 - [x] Add `GET /promotion/popup` handler
@@ -167,7 +169,10 @@ When disabled:
 - [x] Remove `passkey_promotion_enabled` from login template
 - [x] Revert demo-both promotion changes (no longer needed)
 - [x] Force mode: skip localStorage opt-out check
-- [ ] End-to-end manual testing with `ask` and `force` modes
+- [x] Refactor `passkey_promotion.rs` -> `passkey/promotion.rs` submodule
+- [x] Move promotion router merge into `passkey::router()` (encapsulate in passkey module)
+- [x] Fix unauthenticated popup fallback (redirect to popup_close instead of login)
+- [x] End-to-end manual testing with `ask` and `force` modes
 
 ## Decision Log
 
@@ -281,5 +286,22 @@ When disabled:
   unnecessary prompts for users who have passkeys. Users can still cancel the WebAuthn
   dialog itself.
 
+### 2026-02-10: Refactor promotion into passkey submodule
+
+- Context: `passkey_promotion.rs` was a top-level module in `lib.rs`, but logically
+  belongs under the passkey module. `router.rs` needed to know about promotion internals.
+- Decision: Move `passkey_promotion.rs` -> `passkey/promotion.rs` as a submodule of passkey.
+  Merge promotion router conditionally inside `passkey::router()` instead of `router.rs`.
+- Also: Removed unused `is_passkey_promotion_enabled()` function and its re-export.
+  Fixed `promotion_popup` to redirect to `popup_close` instead of login page when
+  unauthenticated (popup context should never redirect to login).
+- Reason: Encapsulates promotion as an internal detail of the passkey module.
+  `router.rs` no longer needs to know about promotion existence.
+
 ## Resolution
 
+Passkey promotion feature fully implemented and tested. The feature encourages
+passkey registration after OAuth2 login using a popup-based flow with
+`excludeCredentials` for duplicate prevention and UA + AAGUID heuristic for
+smart modal control. Supports `ask` (modal) and `force` (direct registration)
+modes via `O2P_PASSKEY_PROMOTION` environment variable.
