@@ -8,6 +8,13 @@
     {% if let Some(css_url) = custom_css_url %}
     <link rel="stylesheet" href="{{css_url}}">
     {% endif %}
+    {% if passkey_promotion_enabled %}
+    <script>
+        const O2P_ROUTE_PREFIX = '{{prefix}}';
+        const csrfToken = '{{csrf_token}}';
+    </script>
+    <script src="{{prefix}}/passkey/promotion/passkey_promotion.js"></script>
+    {% endif %}
     <style>
         .demo-description { color: var(--o2p-text-secondary); margin-bottom: var(--o2p-space-md); }
     </style>

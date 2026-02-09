@@ -28,9 +28,18 @@ use oauth2_passkey::{O2P_ROUTE_PREFIX, get_related_origin_json};
 ///     .layer(TraceLayer::new_for_http());
 /// ```
 pub fn oauth2_passkey_router() -> Router {
+    // Build passkey router, conditionally merging promotion routes.
+    // Promotion routes are merged into the same router (not nested separately)
+    // to avoid double `.nest("/passkey", ...)` which causes route shadowing in Axum.
+    let passkey_router = if *super::config::O2P_PASSKEY_PROMOTION {
+        super::passkey::router().merge(super::passkey_promotion::router())
+    } else {
+        super::passkey::router()
+    };
+
     Router::new()
         .nest("/oauth2", super::oauth2::router())
-        .nest("/passkey", super::passkey::router())
+        .nest("/passkey", passkey_router)
         .nest("/user", super::user::router())
         .nest("/admin", super::admin::router())
         .nest("/themes", super::themes::router())

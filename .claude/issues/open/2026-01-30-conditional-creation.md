@@ -160,6 +160,10 @@ When disabled:
 - [ ] Add handler to serve `passkey_promotion.js` (conditional on env var)
 - [ ] Add tests for new handler
 - [ ] Update `dot.env.example` with new env var
+- [ ] Server: Add `promotion_check` endpoint with UA + AAGUID heuristic
+- [ ] Server: Add `is_credential_likely_available()` platform matching function
+- [ ] Client: Call check endpoint before showing modal in `passkey_promotion.js`
+- [ ] Server: Add unit tests for platform matching heuristic
 
 ## Decision Log
 
@@ -195,6 +199,22 @@ When disabled:
   add `O2P_PASSKEY_PROMOTION` env var to toggle the feature (default: false)
 - Reason: Preserves backward compatibility of existing passkey registration flow;
   experimental feature should be opt-in and fully isolated
+
+### 2026-02-09: UA + AAGUID heuristic for modal control
+
+- Context: Promotion modal always appears even when user already has passkeys
+  registered on the current device, leading to poor UX
+- Investigated: Pure `excludeCredentials`-only approach works for duplicate prevention
+  but doesn't prevent the modal from showing unnecessarily
+- Decision: Add server-side heuristic using User-Agent + AAGUID/AuthenticatorInfo
+  to determine whether the user likely has a passkey accessible on the current platform
+- Approach: New `GET /passkey/promotion/check` endpoint checks user's credential
+  AAGUIDs against AuthenticatorInfo names, matches against UA platform family
+- Rationale: Separates modal control (best-effort heuristic) from registration safety
+  (`excludeCredentials` as safety net). Not perfect but significantly reduces
+  unnecessary prompts. Cross-platform password managers (1Password, Bitwarden, etc.)
+  always suppress the modal. Platform-specific authenticators (iCloud Keychain,
+  Google PM, Windows Hello) are matched against the UA's OS/browser.
 
 ## Resolution
 

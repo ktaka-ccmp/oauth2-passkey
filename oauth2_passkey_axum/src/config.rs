@@ -42,3 +42,12 @@ pub static O2P_RESPOND_WITH_X_CSRF_TOKEN: LazyLock<bool> = LazyLock::new(|| {
 /// Users can override CSS Custom Properties in their custom CSS file
 pub static O2P_CUSTOM_CSS_URL: LazyLock<Option<String>> =
     LazyLock::new(|| std::env::var("O2P_CUSTOM_CSS_URL").ok());
+
+/// Enable passkey promotion after OAuth2 login (experimental)
+/// When true, users are prompted to register a passkey after OAuth2 login
+/// Default: false
+pub(crate) static O2P_PASSKEY_PROMOTION: LazyLock<bool> = LazyLock::new(|| {
+    std::env::var("O2P_PASSKEY_PROMOTION")
+        .map(|val| val.to_lowercase() == "true")
+        .unwrap_or(false)
+});
