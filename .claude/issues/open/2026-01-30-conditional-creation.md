@@ -49,71 +49,64 @@ eliminates the need for server-side per-device detection.
 
 ## Approach
 
-### Architecture: New Endpoint Wrapping Existing Flow
+### Architecture: Popup-Based Promotion
 
-The promotion registration start uses a **new endpoint** that internally calls the
-existing `handle_start_registration_core()`, serializes the result to JSON, and appends
-`excludeCredentials` by querying the user's existing credentials. The existing
-`/passkey/register/finish` endpoint is reused as-is.
+The promotion flow runs inside the OAuth2 popup window itself. After the OAuth2
+callback, instead of redirecting to `popup_close.j2`, the callback conditionally
+redirects to `/passkey/promotion/popup` which handles the entire promotion flow,
+then sends `postMessage('auth_complete')` and closes the popup.
+
+```
+OAuth2 popup: Google auth -> callback -> [promotion enabled?]
+  -> YES: /passkey/promotion/popup?message=... -> check + register -> postMessage + close
+  -> NO:  /oauth2/popup_close?message=...      -> postMessage + close (existing behavior)
+```
+
+The parent page (login page or account page) never needs to know about promotion.
+No extra JS on the login page. No race conditions. Single coupling point in `oauth2.rs`.
+
+### Server-Side Endpoints
+
+**Registration start** wraps the existing core function and appends `excludeCredentials`:
 
 ```
 Existing flow (unchanged):
   POST /passkey/register/start  -> handle_start_registration (existing handler)
   POST /passkey/register/finish -> handle_finish_registration (existing handler)
 
-Promotion flow (new, only when O2P_PASSKEY_PROMOTION=true):
-  POST /passkey/promotion/register/start -> promotion_start_registration (NEW handler)
-  POST /passkey/register/finish          -> handle_finish_registration (existing, reused)
+Promotion flow (only when O2P_PASSKEY_PROMOTION is set):
+  GET  /passkey/promotion/popup          -> promotion popup page (Askama template)
+  GET  /passkey/promotion/check          -> UA + AAGUID heuristic check
+  POST /passkey/promotion/register/start -> registration with excludeCredentials
+  POST /passkey/register/finish          -> existing handler (reused)
 ```
 
-The new handler wraps the existing core function:
-```rust
-async fn promotion_start_registration(auth_user: AuthUser, ...) -> ... {
-    // 1. Call existing flow unchanged
-    let options = handle_start_registration_core(Some(&session_user), request).await?;
+**UA + AAGUID heuristic** (`GET /promotion/check`): Before showing the modal or
+starting registration, the popup page calls this endpoint. It checks the user's
+existing credential AAGUIDs against AuthenticatorInfo names, matches against the
+User-Agent platform family, and returns `{ "should_promote": bool, "mode": "ask"|"force" }`.
 
-    // 2. Serialize to JSON and append excludeCredentials
-    let mut json = serde_json::to_value(&options)?;
-    let credentials = list_credentials_core(user_id).await?;
-    json["excludeCredentials"] = serde_json::json!(
-        credentials.iter().map(|c| json!({"type": "public-key", "id": c.credential_id}))
-    );
+### Client-Side: Inline in Askama Template (promotion_popup.j2)
 
-    Ok(Json(json))
-}
-```
+All promotion logic is inline in the `promotion_popup.j2` template (no separate JS file).
+The template handles:
 
-### Client-Side: New JS File (passkey_promotion.js)
-
-A new `passkey_promotion.js` file handles all promotion-specific logic. Existing
-`passkey.js` and `oauth2.js` remain untouched.
-
-**sessionStorage flag:** A new `message` event listener (alongside the existing one in
-`oauth2.js`) sets `sessionStorage('oauth2_login_just_completed')` when receiving
-`'auth_complete'`. This listener fires before the existing `setTimeout(reload, 10)`,
-so the flag is set before the page reloads.
-
-**Promotion registration:** Calls the new `/passkey/promotion/register/start` endpoint
-(which returns `excludeCredentials`), transforms them to Uint8Array, and calls
-`navigator.credentials.create()`. Handles `InvalidStateError` gracefully.
-
-**Promotion UI:** On `DOMContentLoaded`, checks for sessionStorage flag, localStorage
-opt-out, and WebAuthn support. Shows modal with Accept / Not Now / Don't Ask Again.
-
-**Post-login redirect:** After OAuth2 login, the login page redirects authenticated
-users to `O2P_DEFAULT_REDIRECT` (default: `/`). The sessionStorage flag survives
-this redirect. The destination page must include `passkey_promotion.js` for the
-promotion to trigger.
+1. localStorage opt-out check -- immediately close popup if dismissed
+2. Call `GET /promotion/check` -- skip if heuristic says not needed
+3. Modal (ask mode) or direct WebAuthn registration (force mode)
+4. `postMessage('auth_complete')` + `window.close()` on completion
 
 ### Environment Variable
 
 ```
-O2P_PASSKEY_PROMOTION=true   # Enable passkey promotion (default: false)
+O2P_PASSKEY_PROMOTION=ask    # Show confirmation modal
+O2P_PASSKEY_PROMOTION=force  # Skip modal, direct WebAuthn registration
+# unset or false -> disabled (default)
 ```
 
 When disabled:
-- Promotion routes are not registered
-- `passkey_promotion.js` is not served
+- Promotion routes are still registered (merged into passkey router) but popup is unreachable
+- OAuth2 callback redirects to `popup_close` as before
 - All existing behavior is completely unchanged
 
 ### Compatibility
@@ -121,6 +114,7 @@ When disabled:
 - Works with both `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true` and `false`
 - Credential lookup is by `UserId` (not `UserHandle`), so all credentials are found
 - Existing "Add New Passkey" on account page is unaffected (no `excludeCredentials`)
+- No consumer app changes required -- the library handles everything internally
 
 ## Impact on Existing Code
 
@@ -130,20 +124,23 @@ When disabled:
 | `oauth2_passkey_axum/src/passkey.rs` (existing handlers) | **None** |
 | `oauth2_passkey_axum/static/passkey.js` | **None** |
 | `oauth2_passkey_axum/static/oauth2.js` | **None** |
-| `oauth2_passkey_axum/src/router.rs` | Conditional route addition only |
+| `oauth2_passkey_axum/src/oauth2.rs` | Conditional redirect in callback handlers |
+| `oauth2_passkey_axum/src/router.rs` | Conditional route merging |
+| `oauth2_passkey_axum/src/config.rs` | `PasskeyPromotionMode` enum + `is_passkey_promotion_enabled()` |
 
 ## New Files
 
-- `oauth2_passkey_axum/src/passkey_promotion.rs` -- New handler + route
-- `oauth2_passkey_axum/static/passkey_promotion.js` -- Promotion UI + registration logic
+- `oauth2_passkey_axum/src/passkey_promotion.rs` -- Handlers, routes, UA+AAGUID heuristic
+- `oauth2_passkey_axum/src/passkey_promotion/tests.rs` -- Unit tests for heuristic
+- `oauth2_passkey_axum/templates/promotion_popup.j2` -- Popup page with inline promotion logic
 
 ## Related Files (read-only reference)
 
 - `oauth2_passkey/src/coordination/passkey.rs` -- `handle_start_registration_core()`,
-  `list_credentials_core()` (called by new handler)
+  `list_credentials_core()` (called by promotion handler)
 - `oauth2_passkey/src/passkey/main/types.rs` -- `RegistrationOptions` (serialized, not modified)
-- `oauth2_passkey_axum/static/passkey.js` -- Reference for registration patterns
-- `oauth2_passkey_axum/static/oauth2.js` -- Reference for postMessage handling
+- `oauth2_passkey_axum/templates/popup_close.j2` -- Reference for postMessage + close pattern
+- `oauth2_passkey_axum/src/oauth2.rs` -- OAuth2 callback redirect (coupling point)
 
 ## References
 
@@ -153,25 +150,23 @@ When disabled:
 
 ## Implementation Tasks
 
-- [x] Add env var `O2P_PASSKEY_PROMOTION` config
-- [x] Create `passkey_promotion.rs` with new handler wrapping existing core function
-- [x] Add conditional route registration in router
-- [x] Create `passkey_promotion.js` with promotion UI, registration, and sessionStorage logic
-- [x] Add handler to serve `passkey_promotion.js` (conditional on env var)
-- [x] Add tests for new handler
+- [x] Add env var `O2P_PASSKEY_PROMOTION` config (`ask`/`force`/disabled)
+- [x] Create `passkey_promotion.rs` with registration handler wrapping existing core
+- [x] Add conditional route merging in router
+- [x] Add `promotion_check` endpoint with UA + AAGUID heuristic
+- [x] Add `is_credential_likely_available()` platform matching function
+- [x] Add unit tests for platform matching heuristic
 - [x] Update `dot.env.example` with new env var
-- [x] Server: Add `promotion_check` endpoint with UA + AAGUID heuristic
-- [x] Server: Add `is_credential_likely_available()` platform matching function
-- [x] Client: Call check endpoint before showing modal in `passkey_promotion.js`
-- [x] Server: Add unit tests for platform matching heuristic
-- [x] Change `O2P_PASSKEY_PROMOTION` from bool to enum (`ask`/`force`/disabled)
-- [x] Add `force` mode: skip modal, go directly to WebAuthn registration
-- [ ] Refactor to intermediate redirect page (eliminate demo app changes)
-- [ ] Simplify `passkey_promotion.js` to redirect-only script
-- [ ] Create `promotion_redirect.j2` template with inline promotion logic
-- [ ] Add `GET /promotion/redirect` handler in `passkey_promotion.rs`
-- [ ] Re-export `is_passkey_promotion_enabled` public helper
-- [ ] Revert all demo-both promotion changes
+- [x] Change `O2P_PASSKEY_PROMOTION` from bool to enum
+- [x] Add `force` mode: skip modal, direct WebAuthn registration
+- [x] Re-export `is_passkey_promotion_enabled()` public helper
+- [x] Refactor to popup-based approach (promotion inside OAuth2 popup)
+- [x] Create `promotion_popup.j2` template with inline promotion logic
+- [x] Add `GET /promotion/popup` handler
+- [x] Conditional redirect in `oauth2.rs` callback handlers
+- [x] Remove `passkey_promotion_enabled` from login template
+- [x] Revert demo-both promotion changes (no longer needed)
+- [ ] End-to-end manual testing with `ask` and `force` modes
 
 ## Decision Log
 
