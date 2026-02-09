@@ -29,9 +29,9 @@ use oauth2_passkey::{
     get_authenticator_info_batch, handle_start_registration_core, list_credentials_core,
 };
 
-use super::config::O2P_CUSTOM_CSS_URL;
-use super::error::IntoResponseError;
-use super::session::AuthUser;
+use super::super::config::O2P_CUSTOM_CSS_URL;
+use super::super::error::IntoResponseError;
+use super::super::session::AuthUser;
 
 /// Create a router for passkey promotion endpoints
 ///
@@ -116,7 +116,7 @@ async fn promotion_check(
     auth_user: AuthUser,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let mode = if super::config::O2P_PASSKEY_PROMOTION.is_force() {
+    let mode = if super::super::config::O2P_PASSKEY_PROMOTION.is_force() {
         "force"
     } else {
         "ask"

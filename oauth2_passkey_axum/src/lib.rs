@@ -63,7 +63,6 @@ mod login_history;
 mod middleware;
 mod oauth2;
 mod passkey;
-mod passkey_promotion;
 mod router;
 mod session;
 mod themes;
