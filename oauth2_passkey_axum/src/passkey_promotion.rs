@@ -4,39 +4,44 @@
 //! after successful OAuth2 login. It wraps the existing registration core function
 //! and adds `excludeCredentials` to prevent duplicate registrations on the same authenticator.
 //!
-//! The promotion modal is controlled by a UA + AAGUID heuristic: before showing the modal,
-//! the client calls `GET /promotion/check` which checks whether the user likely already has
-//! a passkey accessible on the current platform/browser based on the User-Agent header and
-//! the AAGUID metadata of their existing credentials.
+//! The promotion flow uses a library-controlled intermediate redirect page:
+//! after OAuth2 login, `passkey_promotion.js` on the login page redirects to
+//! `/promotion/redirect` instead of letting the page reload. This page handles the
+//! UA + AAGUID heuristic check, shows a modal (ask mode) or starts registration
+//! directly (force mode), then redirects to `O2P_DEFAULT_REDIRECT`.
 //!
 //! Controlled by `O2P_PASSKEY_PROMOTION` environment variable.
 //! Values: `ask` (show modal), `force` (skip modal, direct registration), or unset/`false` (disabled).
 
+use askama::Template;
 use axum::{
     Router,
     extract::Json,
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
-    response::Response,
+    response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
 };
 use serde_json::json;
 
 use oauth2_passkey::{
-    RegistrationMode, RegistrationStartRequest, SessionUser, UserId, get_authenticator_info_batch,
-    handle_start_registration_core, list_credentials_core,
+    O2P_ROUTE_PREFIX, RegistrationMode, RegistrationStartRequest, SessionUser, UserId,
+    get_authenticator_info_batch, handle_start_registration_core, list_credentials_core,
 };
 
+use super::config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT};
 use super::error::IntoResponseError;
 use super::session::AuthUser;
 
 /// Create a router for passkey promotion endpoints
 ///
 /// Routes:
+/// - `GET /promotion/redirect` - Intermediate redirect page for promotion flow
 /// - `POST /promotion/register/start` - Start registration with excludeCredentials
 /// - `GET /promotion/check` - Check if promotion modal should be shown (UA + AAGUID heuristic)
-/// - `GET /promotion/passkey_promotion.js` - Serve the promotion JavaScript
+/// - `GET /promotion/passkey_promotion.js` - Serve the promotion JavaScript (for login page)
 pub(super) fn router() -> Router {
     Router::new()
+        .route("/promotion/redirect", get(promotion_redirect))
         .route(
             "/promotion/register/start",
             post(promotion_start_registration),
@@ -46,6 +51,45 @@ pub(super) fn router() -> Router {
             "/promotion/passkey_promotion.js",
             get(serve_passkey_promotion_js),
         )
+}
+
+#[derive(Template)]
+#[template(path = "promotion_redirect.j2")]
+struct PromotionRedirectTemplate<'a> {
+    o2p_route_prefix: &'a str,
+    csrf_token: &'a str,
+    default_redirect: &'a str,
+    custom_css_url: Option<&'a str>,
+}
+
+/// Serve the passkey promotion intermediate redirect page
+///
+/// This page handles the entire promotion flow after OAuth2 login:
+/// 1. Calls the check endpoint to determine if promotion is needed
+/// 2. Shows a modal (ask mode) or starts registration directly (force mode)
+/// 3. Redirects to `O2P_DEFAULT_REDIRECT` after completion
+///
+/// If the user is not authenticated, redirects to the login page.
+async fn promotion_redirect(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
+    match user {
+        Some(auth_user) => {
+            let template = PromotionRedirectTemplate {
+                o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
+                csrf_token: &auth_user.csrf_token,
+                default_redirect: O2P_DEFAULT_REDIRECT.as_str(),
+                custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+            };
+            let html = Html(
+                template
+                    .render()
+                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+            );
+            Ok(html.into_response())
+        }
+        None => {
+            Ok(Redirect::to(&format!("{}/user/login", O2P_ROUTE_PREFIX.as_str())).into_response())
+        }
+    }
 }
 
 /// Check whether the passkey promotion modal should be shown

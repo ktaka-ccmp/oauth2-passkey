@@ -64,6 +64,15 @@ impl PasskeyPromotionMode {
     }
 }
 
+/// Whether passkey promotion is enabled
+///
+/// Returns `true` when `O2P_PASSKEY_PROMOTION` is set to `ask` or `force`.
+/// Use this to conditionally include `passkey_promotion.js` on pages that users
+/// land on after OAuth2 login.
+pub fn is_passkey_promotion_enabled() -> bool {
+    O2P_PASSKEY_PROMOTION.is_enabled()
+}
+
 /// Passkey promotion after OAuth2 login (experimental)
 /// Values: false (disabled, default), ask (show modal), force (skip modal)
 pub(crate) static O2P_PASSKEY_PROMOTION: LazyLock<PasskeyPromotionMode> = LazyLock::new(|| {

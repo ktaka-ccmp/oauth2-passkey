@@ -153,19 +153,25 @@ When disabled:
 
 ## Implementation Tasks
 
-- [ ] Add env var `O2P_PASSKEY_PROMOTION` config
-- [ ] Create `passkey_promotion.rs` with new handler wrapping existing core function
-- [ ] Add conditional route registration in router
-- [ ] Create `passkey_promotion.js` with promotion UI, registration, and sessionStorage logic
-- [ ] Add handler to serve `passkey_promotion.js` (conditional on env var)
-- [ ] Add tests for new handler
-- [ ] Update `dot.env.example` with new env var
-- [ ] Server: Add `promotion_check` endpoint with UA + AAGUID heuristic
-- [ ] Server: Add `is_credential_likely_available()` platform matching function
-- [ ] Client: Call check endpoint before showing modal in `passkey_promotion.js`
-- [ ] Server: Add unit tests for platform matching heuristic
-- [ ] Change `O2P_PASSKEY_PROMOTION` from bool to enum (`ask`/`force`/disabled)
-- [ ] Add `force` mode: skip modal, go directly to WebAuthn registration
+- [x] Add env var `O2P_PASSKEY_PROMOTION` config
+- [x] Create `passkey_promotion.rs` with new handler wrapping existing core function
+- [x] Add conditional route registration in router
+- [x] Create `passkey_promotion.js` with promotion UI, registration, and sessionStorage logic
+- [x] Add handler to serve `passkey_promotion.js` (conditional on env var)
+- [x] Add tests for new handler
+- [x] Update `dot.env.example` with new env var
+- [x] Server: Add `promotion_check` endpoint with UA + AAGUID heuristic
+- [x] Server: Add `is_credential_likely_available()` platform matching function
+- [x] Client: Call check endpoint before showing modal in `passkey_promotion.js`
+- [x] Server: Add unit tests for platform matching heuristic
+- [x] Change `O2P_PASSKEY_PROMOTION` from bool to enum (`ask`/`force`/disabled)
+- [x] Add `force` mode: skip modal, go directly to WebAuthn registration
+- [ ] Refactor to intermediate redirect page (eliminate demo app changes)
+- [ ] Simplify `passkey_promotion.js` to redirect-only script
+- [ ] Create `promotion_redirect.j2` template with inline promotion logic
+- [ ] Add `GET /promotion/redirect` handler in `passkey_promotion.rs`
+- [ ] Re-export `is_passkey_promotion_enabled` public helper
+- [ ] Revert all demo-both promotion changes
 
 ## Decision Log
 
@@ -229,6 +235,24 @@ When disabled:
   adoption without requiring user opt-in. The WebAuthn dialog itself is the
   user interaction point. Cancel behavior is graceful (sessionStorage flag
   already consumed; no re-prompt until next OAuth2 login)
+
+### 2026-02-09: Intermediate redirect page -- eliminate demo app changes
+
+- Context: The current design requires demo/consumer apps to include `passkey_promotion.js`
+  on their destination pages and provide JS globals (`csrfToken`, `O2P_ROUTE_PREFIX`).
+  This forces app-level template changes for a library feature.
+- Investigated: Whether the entire promotion flow could be handled within the library
+  without any consumer app changes
+- Decision: Use a library-controlled intermediate redirect page at
+  `/passkey/promotion/redirect` between OAuth2 login and the final app redirect
+- Approach: `passkey_promotion.js` on the login page intercepts `auth_complete` and
+  redirects to the library's promotion page (cancelling `oauth2.js`'s reload).
+  The promotion page handles check + modal/registration + redirect to
+  `O2P_DEFAULT_REDIRECT`. All promotion logic is inline in the Askama template.
+- Rationale: Zero consumer app changes needed. The library is fully self-contained.
+  The sessionStorage flag pattern is eliminated. Trade-off: an extra redirect hop
+  when `should_promote: false` (immediately redirects to default), but this is
+  brief and acceptable for the cleaner architecture.
 
 ## Resolution
 
