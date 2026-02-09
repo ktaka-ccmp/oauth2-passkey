@@ -6,112 +6,158 @@
 
 ## Priority: medium
 
+## Difficulty: large
+
 ## Description
 
-Implement passkey registration promotion after successful login to encourage users to add passkeys for faster future logins.
+Prompt users to register a passkey after successful OAuth2 login, encouraging adoption
+of passkey authentication for faster future logins.
 
-## Related Files
+### Core Problem
 
-- `oauth2_passkey_axum/static/passkey.js` - Passkey registration
-- `oauth2_passkey_axum/static/oauth2.js` - OAuth2 login flow
-- `oauth2_passkey_axum/src/coordination/` - Server-side coordination
-- `oauth2_passkey_axum/templates/` - Modal/prompt templates
+The server cannot determine whether a user's existing passkeys are available on their
+current device/authenticator. Passkeys are per-authenticator (per device/platform), so
+a server-side `has_passkey` flag is insufficient -- a user may have a passkey on their
+MacBook but not on their Android phone.
 
-## Notes
+### Solution: excludeCredentials + Client-Side Promotion
 
-### Approach 1: Explicit Passkey Promotion (OAuth2 対応)
+Use WebAuthn's `excludeCredentials` parameter during registration. The authenticator
+itself rejects with `InvalidStateError` if it already has a matching credential. This
+eliminates the need for server-side per-device detection.
 
-OAuth2 ログイン成功後に、パスキー登録を促すモーダル/プロンプトを表示する方式。
+## Design Constraints
 
-**実装概要**:
+1. **Zero changes to existing Passkey flow code** -- existing registration, authentication,
+   and all existing handlers/JS must remain completely untouched
+2. **Environment variable toggle** -- the feature is experimental and must be disabled by
+   default, controlled by `O2P_PASSKEY_PROMOTION` (default: `false`)
+3. **Additive only** -- all changes are new files and conditional route registration
 
-1. **Server**: ログイン成功レスポンスにパスキー登録可否フラグを追加
+## Approach
+
+### Architecture: New Endpoint Wrapping Existing Flow
+
+The promotion registration start uses a **new endpoint** that internally calls the
+existing `handle_start_registration_core()`, serializes the result to JSON, and appends
+`excludeCredentials` by querying the user's existing credentials. The existing
+`/passkey/register/finish` endpoint is reused as-is.
+
+```
+Existing flow (unchanged):
+  POST /passkey/register/start  -> handle_start_registration (existing handler)
+  POST /passkey/register/finish -> handle_finish_registration (existing handler)
+
+Promotion flow (new, only when O2P_PASSKEY_PROMOTION=true):
+  POST /passkey/promotion/register/start -> promotion_start_registration (NEW handler)
+  POST /passkey/register/finish          -> handle_finish_registration (existing, reused)
+```
+
+The new handler wraps the existing core function:
 ```rust
-{
-    "logged_in": true,
-    "has_passkey": false,  // ユーザーがパスキーを持っているか
-    "suggest_passkey": true  // 登録を促すか
+async fn promotion_start_registration(auth_user: AuthUser, ...) -> ... {
+    // 1. Call existing flow unchanged
+    let options = handle_start_registration_core(Some(&session_user), request).await?;
+
+    // 2. Serialize to JSON and append excludeCredentials
+    let mut json = serde_json::to_value(&options)?;
+    let credentials = list_credentials_core(user_id).await?;
+    json["excludeCredentials"] = serde_json::json!(
+        credentials.iter().map(|c| json!({"type": "public-key", "id": c.credential_id}))
+    );
+
+    Ok(Json(json))
 }
 ```
 
-2. **Client**: OAuth2 コールバック後にモーダル表示
-```javascript
-// OAuth2 ログイン成功後
-if (response.logged_in && !response.has_passkey && response.suggest_passkey) {
-    showPasskeyPrompt({
-        title: "パスキーでログインを簡単に",
-        message: "次回からワンタッチでログインできます",
-        onAccept: async () => {
-            // 通常の登録フロー
-            const options = await fetch('/passkey/register/start').then(r => r.json());
-            const credential = await navigator.credentials.create({ publicKey: options });
-            await fetch('/passkey/register/finish', { method: 'POST', body: ... });
-        },
-        onDecline: () => {
-            // "後で" - 一定期間表示しない
-            localStorage.setItem('passkey_prompt_declined', Date.now());
-        },
-        onNever: () => {
-            // "今後表示しない" - サーバーに保存
-            fetch('/api/user/preferences', { method: 'POST', body: ... });
-        }
-    });
-}
+### Client-Side: New JS File (passkey_promotion.js)
+
+A new `passkey_promotion.js` file handles all promotion-specific logic. Existing
+`passkey.js` and `oauth2.js` remain untouched.
+
+**sessionStorage flag:** A new `message` event listener (alongside the existing one in
+`oauth2.js`) sets `sessionStorage('oauth2_login_just_completed')` when receiving
+`'auth_complete'`. This listener fires before the existing `setTimeout(reload, 10)`,
+so the flag is set before the page reloads.
+
+**Promotion registration:** Calls the new `/passkey/promotion/register/start` endpoint
+(which returns `excludeCredentials`), transforms them to Uint8Array, and calls
+`navigator.credentials.create()`. Handles `InvalidStateError` gracefully.
+
+**Promotion UI:** On `DOMContentLoaded`, checks for sessionStorage flag, localStorage
+opt-out, and WebAuthn support. Shows modal with Accept / Not Now / Don't Ask Again.
+
+**Post-login redirect:** After OAuth2 login, the login page redirects authenticated
+users to `O2P_DEFAULT_REDIRECT` (default: `/`). The sessionStorage flag survives
+this redirect. The destination page must include `passkey_promotion.js` for the
+promotion to trigger.
+
+### Environment Variable
+
+```
+O2P_PASSKEY_PROMOTION=true   # Enable passkey promotion (default: false)
 ```
 
-**メリット**:
-- OAuth2 でも動作
-- UI/UX を完全にカスタマイズ可能
-- 「後で」「今後表示しない」などの選択肢
+When disabled:
+- Promotion routes are not registered
+- `passkey_promotion.js` is not served
+- All existing behavior is completely unchanged
 
-**実装タスク**:
-- [ ] サーバー: ログインレスポンスにフラグ追加
-- [ ] サーバー: ユーザー設定保存 API（表示しない設定）
-- [ ] クライアント: プロンプト UI コンポーネント
-- [ ] クライアント: localStorage での一時的なスキップ管理
+### Compatibility
 
----
+- Works with both `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true` and `false`
+- Credential lookup is by `UserId` (not `UserHandle`), so all credentials are found
+- Existing "Add New Passkey" on account page is unaffected (no `excludeCredentials`)
 
-### Approach 2: WebAuthn Conditional Creation (パスワード認証のみ)
+### Approaches Considered but Rejected
 
-ブラウザが自動でパスキー作成を処理する WebAuthn 標準機能。
+1. **Server-side `has_passkey` flag**: Cannot determine per-device availability
+2. **AAGUID matching**: No client-side API to get current device's AAGUID
+3. **WebAuthn Conditional Creation** (`mediation: "conditional"`): Only works with
+   password authentication, not OAuth2/identity federation
+4. **User preferences API** (`/api/user/preferences`): Requires new storage layer;
+   `localStorage` is simpler for "don't ask again" functionality
+5. **Modifying existing RegistrationOptions struct**: Would change existing Passkey
+   flow behavior; rejected in favor of JSON-level augmentation in new handler
 
-**制限**: パスワード認証でのみ動作。OAuth2/identity federation では動作しない。
+## Impact on Existing Code
 
-```javascript
-navigator.credentials.create({
-  publicKey: { ... },
-  mediation: "conditional"
-});
-```
+| Component | Impact |
+|-----------|--------|
+| `oauth2_passkey/` (core library) | **None** |
+| `oauth2_passkey_axum/src/passkey.rs` (existing handlers) | **None** |
+| `oauth2_passkey_axum/static/passkey.js` | **None** |
+| `oauth2_passkey_axum/static/oauth2.js` | **None** |
+| `oauth2_passkey_axum/src/router.rs` | Conditional route addition only |
 
-**Requirements**:
-1. ユーザーがパスワードマネージャーにパスワードを保存している
-2. そのパスワードが最近使用された
-3. パスワードマネージャーがこの機能をサポート
+## New Files
 
-**NOT supported with**:
-- OAuth2 / Identity federation
-- Magic links
-- Phone verification
+- `oauth2_passkey_axum/src/passkey_promotion.rs` -- New handler + route
+- `oauth2_passkey_axum/static/passkey_promotion.js` -- Promotion UI + registration logic
 
-**本ライブラリでの適用性**:
+## Related Files (read-only reference)
 
-| Auth Method | Conditional Creation | Explicit Promotion |
-|-------------|---------------------|-------------------|
-| Password login | Supported | Supported |
-| OAuth2 login | **Not supported** | **Supported** |
-| Passkey login | N/A | N/A |
+- `oauth2_passkey/src/coordination/passkey.rs` -- `handle_start_registration_core()`,
+  `list_credentials_core()` (called by new handler)
+- `oauth2_passkey/src/passkey/main/types.rs` -- `RegistrationOptions` (serialized, not modified)
+- `oauth2_passkey_axum/static/passkey.js` -- Reference for registration patterns
+- `oauth2_passkey_axum/static/oauth2.js` -- Reference for postMessage handling
 
-→ 本ライブラリは OAuth2 + Passkey がメインのため、**Approach 1 を優先実装**
-
----
-
-### 参考資料
+## References
 
 - https://developer.chrome.com/docs/identity/webauthn-conditional-create
 - https://github.com/w3c/webauthn/wiki/Explainer:-Conditional-Create
-- https://blog.agektmr.com/ja/2025/12/passkey-keywords.html
+- https://www.w3.org/TR/webauthn-3/#dom-publickeycredentialcreationoptions-excludecredentials
+
+## Implementation Tasks
+
+- [ ] Add env var `O2P_PASSKEY_PROMOTION` config
+- [ ] Create `passkey_promotion.rs` with new handler wrapping existing core function
+- [ ] Add conditional route registration in router
+- [ ] Create `passkey_promotion.js` with promotion UI, registration, and sessionStorage logic
+- [ ] Add handler to serve `passkey_promotion.js` (conditional on env var)
+- [ ] Add tests for new handler
+- [ ] Update `dot.env.example` with new env var
 
 ## Resolution
 

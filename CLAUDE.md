@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **CRITICAL**: Always observe these fundamental principles:
 - **Never go beyond the scope of the request**
 - **Never shortcut what was requested**
+- **Language**: All documents and code comments in this repository must be written in English
 - Must read ~/.claude/CLAUDE.md
 
 These guidelines ensure focused, complete work that addresses exactly what the user needs without unnecessary additions or omissions.
