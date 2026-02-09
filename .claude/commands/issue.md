@@ -17,38 +17,10 @@ Create, update, or close an issue for task/bug tracking.
 ### Creating a New Issue
 
 Create a markdown file in `.claude/issues/open/` with:
-- Filename: `YYYY-MM-DD-<short-slug>.md` (e.g., `2026-01-30-move-info-endpoint.md`)
-- ID: `YYYY-MM-DD-NN` where NN is the sequential number for that day
-- Check existing issues to determine the next sequence number for today
-- Use the template below
-
-### Issue Template
-
-```markdown
-# Issue: <Title>
-
-## ID: YYYY-MM-DD-NN
-
-## Status: open
-
-## Priority: <high | medium | low>
-
-## Description
-
-<What needs to be done and why>
-
-## Related Files
-
-- `path/to/file.rs`
-
-## Notes
-
-<Additional context, discussion, decisions>
-
-## Resolution
-
-<Leave empty until resolved>
-```
+- Filename: `YYYYMMDD-HHMM-<short-slug>.md` (e.g., `20260210-1430-login-history-enhancement.md`)
+- ID: `YYYYMMDD-HHMM` matching the filename timestamp
+- Created: `YYYY-MM-DD-HH-MM` (same timestamp in readable format)
+- Use the template from `.claude/issues/README.md`
 
 ### Updating an Issue
 
@@ -58,6 +30,7 @@ When updating an existing issue:
 3. If status changes, move file to appropriate directory:
    - `completed` or `wontfix` -> move to `completed/`
    - `deferred` -> move to `deferred/`
+4. When closing an issue, set the `Closed:` field to `YYYY-MM-DD-HH-MM`
 
 ### Status Values
 

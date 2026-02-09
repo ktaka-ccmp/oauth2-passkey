@@ -70,22 +70,30 @@ Issues are organized by status. When status changes, move the file to the approp
 
 ## File Naming Convention
 
+New issues use the timestamp-based format:
+
 ```text
-YYYY-MM-DD-<short-slug>.md
+YYYYMMDD-HHMM-<short-slug>.md
 ```
 
-Example: `2026-01-30-move-info-endpoint.md`
+Example: `20260210-1430-login-history-enhancement.md`
+
+Legacy issues use `YYYY-MM-DD-<slug>.md` and are not renamed.
 
 ## Issue ID Format
 
+New issues use a timestamp-based ID:
+
 ```text
-YYYY-MM-DD-NN
+YYYYMMDD-HHMM
 ```
 
-- `YYYY-MM-DD`: Creation date
-- `NN`: Sequential number for that day (01, 02, ...)
+- `YYYYMMDD`: Creation date
+- `HHMM`: Creation time (24h format)
 
-Example: `2026-01-30-01`, `2026-01-30-02`
+Example: `20260210-1430`, `20260210-1545`
+
+Legacy issues retain their `YYYY-MM-DD-NN` IDs.
 
 ## Issue Template
 
@@ -95,13 +103,18 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 ## Table of Contents
 
 - [Description](#description)
+- [Related Issues](#related-issues)
 - [Approach](#approach)
 - [Related Files](#related-files)
 - [Implementation Tasks](#implementation-tasks)
 - [Decision Log](#decision-log)
 - [Resolution](#resolution)
 
-## ID: YYYY-MM-DD-NN
+## ID: YYYYMMDD-HHMM
+
+## Created: YYYY-MM-DD-HH-MM
+
+## Closed:
 
 ## Status: open | completed | wontfix | deferred
 
@@ -112,6 +125,10 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 ## Description
 
 <What needs to be done and why>
+
+## Related Issues
+
+- `YYYYMMDD-HHMM` <Title> (relationship: e.g., depends on, related to, supersedes)
 
 ## Approach
 
@@ -145,7 +162,10 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 
 | Section | Update Rule |
 |---------|------------|
+| Created | Written once at creation |
+| Closed | Written once when issue is resolved or closed |
 | Description | Freely updatable |
+| Related Issues | Freely updatable |
 | Approach | Freely updatable (always reflects current plan) |
 | Related Files | Freely updatable |
 | Implementation Tasks | Freely updatable |

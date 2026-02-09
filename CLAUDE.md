@@ -257,8 +257,8 @@ For transferring work context between machines or sessions:
 
 For persistent task and bug tracking across sessions:
 - **Purpose**: Track tasks that span multiple sessions
-- **Filename**: `YYYY-MM-DD-<short-slug>.md`
-- **ID Format**: `YYYY-MM-DD-NN` (e.g., `2026-01-30-09`)
+- **Filename**: `YYYYMMDD-HHMM-<short-slug>.md` (legacy: `YYYY-MM-DD-<slug>.md`)
+- **ID Format**: `YYYYMMDD-HHMM` (legacy: `YYYY-MM-DD-NN`)
 - **Status**: `open`, `completed`, `wontfix`, `deferred`
 - **Priority**: `high`, `medium`, `low`
 - **Structure**: `open/`, `completed/`, `deferred/` subdirectories
