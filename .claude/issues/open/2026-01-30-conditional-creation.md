@@ -166,7 +166,7 @@ When disabled:
 - [x] Conditional redirect in `oauth2.rs` callback handlers
 - [x] Remove `passkey_promotion_enabled` from login template
 - [x] Revert demo-both promotion changes (no longer needed)
-- [ ] Force mode: skip localStorage opt-out check
+- [x] Force mode: skip localStorage opt-out check
 - [ ] End-to-end manual testing with `ask` and `force` modes
 
 ## Decision Log
