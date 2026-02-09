@@ -1,5 +1,18 @@
 # Issue: Passkey Registration Promotion After Login
 
+## Table of Contents
+
+- [Description](#description)
+- [Design Constraints](#design-constraints)
+- [Approach](#approach)
+- [Impact on Existing Code](#impact-on-existing-code)
+- [New Files](#new-files)
+- [Related Files](#related-files-read-only-reference)
+- [References](#references)
+- [Implementation Tasks](#implementation-tasks)
+- [Decision Log](#decision-log)
+- [Resolution](#resolution)
+
 ## ID: 2026-01-30-07
 
 ## Status: open
@@ -109,17 +122,6 @@ When disabled:
 - Credential lookup is by `UserId` (not `UserHandle`), so all credentials are found
 - Existing "Add New Passkey" on account page is unaffected (no `excludeCredentials`)
 
-### Approaches Considered but Rejected
-
-1. **Server-side `has_passkey` flag**: Cannot determine per-device availability
-2. **AAGUID matching**: No client-side API to get current device's AAGUID
-3. **WebAuthn Conditional Creation** (`mediation: "conditional"`): Only works with
-   password authentication, not OAuth2/identity federation
-4. **User preferences API** (`/api/user/preferences`): Requires new storage layer;
-   `localStorage` is simpler for "don't ask again" functionality
-5. **Modifying existing RegistrationOptions struct**: Would change existing Passkey
-   flow behavior; rejected in favor of JSON-level augmentation in new handler
-
 ## Impact on Existing Code
 
 | Component | Impact |
@@ -158,6 +160,41 @@ When disabled:
 - [ ] Add handler to serve `passkey_promotion.js` (conditional on env var)
 - [ ] Add tests for new handler
 - [ ] Update `dot.env.example` with new env var
+
+## Decision Log
+
+<!-- APPEND-ONLY: Do not edit or delete existing entries. Add new entries at the bottom. -->
+
+### 2026-01-30: Initial design
+
+- Context: Need to encourage passkey adoption after OAuth2 login
+- Considered two approaches: Explicit Promotion (modal after login) vs
+  WebAuthn Conditional Creation (`mediation: "conditional"`)
+- Decision: Prioritize Explicit Promotion (Approach 1)
+- Reason: Conditional Creation only works with password authentication,
+  not OAuth2/identity federation which is the primary auth method in this library
+
+### 2026-02-09: Revised to excludeCredentials-based approach
+
+- Context: Original plan assumed server-side `has_passkey` / `suggest_passkey`
+  flags in login response, but server cannot determine per-device passkey availability
+- Investigated alternatives: AAGUID matching (no client API to get device AAGUID),
+  Conditional Creation (not applicable to OAuth2), signalAllAcceptedCredentials
+  (for cleanup, not detection), excludeCredentials (for duplicate prevention)
+- Decision: Use WebAuthn `excludeCredentials` in registration options
+- Reason: Authenticator itself detects duplicates via `InvalidStateError`,
+  eliminating server-side per-device detection entirely
+
+### 2026-02-09: Zero-modification constraint for existing code
+
+- Context: Adding `excludeCredentials` to existing `RegistrationOptions` struct
+  would change AddToUser behavior -- re-registration on same authenticator would
+  be blocked (`InvalidStateError`) instead of triggering server-side credential
+  replacement via `prepare_registration_storage()`
+- Decision: Create new endpoint + new JS file instead of modifying existing code;
+  add `O2P_PASSKEY_PROMOTION` env var to toggle the feature (default: false)
+- Reason: Preserves backward compatibility of existing passkey registration flow;
+  experimental feature should be opt-in and fully isolated
 
 ## Resolution
 

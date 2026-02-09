@@ -90,6 +90,15 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 ```markdown
 # Issue: <Title>
 
+## Table of Contents
+
+- [Description](#description)
+- [Approach](#approach)
+- [Related Files](#related-files)
+- [Implementation Tasks](#implementation-tasks)
+- [Decision Log](#decision-log)
+- [Resolution](#resolution)
+
 ## ID: YYYY-MM-DD-NN
 
 ## Status: open | completed | wontfix | deferred
@@ -102,18 +111,48 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 
 <What needs to be done and why>
 
+## Approach
+
+<Current plan for implementation>
+
 ## Related Files
 
 - `path/to/file.rs`
 
-## Notes
+## Implementation Tasks
 
-<Additional context, discussion, decisions>
+- [ ] <Task 1>
+- [ ] <Task 2>
+
+## Decision Log
+
+<!-- APPEND-ONLY: Do not edit or delete existing entries. Add new entries at the bottom. -->
+
+### YYYY-MM-DD: <Short summary of decision>
+
+- Context: <What prompted this decision>
+- Decision: <What was decided>
+- Reason: <Why this was chosen over alternatives>
 
 ## Resolution
 
 <What was done to resolve this issue>
 ```
+
+## Section Update Rules
+
+| Section | Update Rule |
+|---------|------------|
+| Description | Freely updatable |
+| Approach | Freely updatable (always reflects current plan) |
+| Related Files | Freely updatable |
+| Implementation Tasks | Freely updatable |
+| **Decision Log** | **Append-only -- never edit or delete existing entries** |
+| Resolution | Written once when issue is resolved |
+
+The **Decision Log** preserves the history of design decisions, approach changes, and
+rejected alternatives. When updating other sections (especially Approach), always add
+a corresponding Decision Log entry explaining what changed and why.
 
 ## Status Values
 
