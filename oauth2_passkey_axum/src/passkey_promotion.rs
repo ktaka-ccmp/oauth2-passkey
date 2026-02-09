@@ -9,7 +9,8 @@
 //! a passkey accessible on the current platform/browser based on the User-Agent header and
 //! the AAGUID metadata of their existing credentials.
 //!
-//! Controlled by `O2P_PASSKEY_PROMOTION` environment variable (default: false).
+//! Controlled by `O2P_PASSKEY_PROMOTION` environment variable.
+//! Values: `ask` (show modal), `force` (skip modal, direct registration), or unset/`false` (disabled).
 
 use axum::{
     Router,
@@ -60,6 +61,12 @@ async fn promotion_check(
     auth_user: AuthUser,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let mode = if super::config::O2P_PASSKEY_PROMOTION.is_force() {
+        "force"
+    } else {
+        "ask"
+    };
+
     let ua = headers
         .get("user-agent")
         .and_then(|v| v.to_str().ok())
@@ -76,7 +83,7 @@ async fn promotion_check(
 
     // If user has no passkey credentials at all, always promote
     if credentials.is_empty() {
-        return Ok(Json(json!({ "should_promote": true })));
+        return Ok(Json(json!({ "should_promote": true, "mode": mode })));
     }
 
     // Get authenticator info for all AAGUIDs
@@ -99,7 +106,9 @@ async fn promotion_check(
         is_credential_likely_available(name, ua)
     });
 
-    Ok(Json(json!({ "should_promote": !has_available_credential })))
+    Ok(Json(
+        json!({ "should_promote": !has_available_credential, "mode": mode }),
+    ))
 }
 
 /// Determine if a credential is likely available on the current device based on

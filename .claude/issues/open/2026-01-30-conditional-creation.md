@@ -164,6 +164,8 @@ When disabled:
 - [ ] Server: Add `is_credential_likely_available()` platform matching function
 - [ ] Client: Call check endpoint before showing modal in `passkey_promotion.js`
 - [ ] Server: Add unit tests for platform matching heuristic
+- [ ] Change `O2P_PASSKEY_PROMOTION` from bool to enum (`ask`/`force`/disabled)
+- [ ] Add `force` mode: skip modal, go directly to WebAuthn registration
 
 ## Decision Log
 
@@ -215,6 +217,18 @@ When disabled:
   unnecessary prompts. Cross-platform password managers (1Password, Bitwarden, etc.)
   always suppress the modal. Platform-specific authenticators (iCloud Keychain,
   Google PM, Windows Hello) are matched against the UA's OS/browser.
+
+### 2026-02-09: Force mode -- skip modal, direct WebAuthn registration
+
+- Context: User wants option to bypass the confirmation modal and go directly
+  to `navigator.credentials.create()` (browser's native biometric/PIN dialog)
+- Decision: Change `O2P_PASSKEY_PROMOTION` from boolean to three-state enum:
+  `false` (disabled), `ask` (modal), `force` (skip modal)
+- Approach: Check endpoint returns `mode` field; client dispatches accordingly
+- Rationale: `force` mode is useful when the site operator wants maximum passkey
+  adoption without requiring user opt-in. The WebAuthn dialog itself is the
+  user interaction point. Cancel behavior is graceful (sessionStorage flag
+  already consumed; no re-prompt until next OAuth2 login)
 
 ## Resolution
 

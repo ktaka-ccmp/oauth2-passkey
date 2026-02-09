@@ -31,7 +31,7 @@ pub fn oauth2_passkey_router() -> Router {
     // Build passkey router, conditionally merging promotion routes.
     // Promotion routes are merged into the same router (not nested separately)
     // to avoid double `.nest("/passkey", ...)` which causes route shadowing in Axum.
-    let passkey_router = if *super::config::O2P_PASSKEY_PROMOTION {
+    let passkey_router = if super::config::O2P_PASSKEY_PROMOTION.is_enabled() {
         super::passkey::router().merge(super::passkey_promotion::router())
     } else {
         super::passkey::router()

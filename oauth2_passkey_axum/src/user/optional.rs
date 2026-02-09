@@ -45,7 +45,7 @@ async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
                 message: "Sign in or create an account",
                 o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
                 custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
-                passkey_promotion_enabled: *O2P_PASSKEY_PROMOTION,
+                passkey_promotion_enabled: O2P_PASSKEY_PROMOTION.is_enabled(),
             };
             let html = Html(
                 template

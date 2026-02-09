@@ -49,7 +49,7 @@ async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
 
 fn passkey_promotion_enabled() -> bool {
     std::env::var("O2P_PASSKEY_PROMOTION")
-        .map(|val| val.to_lowercase() == "true")
+        .map(|val| matches!(val.to_lowercase().as_str(), "ask" | "force"))
         .unwrap_or(false)
 }
 

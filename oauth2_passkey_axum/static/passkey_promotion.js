@@ -5,7 +5,7 @@
 // sessionStorage flag. After the page reloads, it checks the flag and shows
 // a promotion modal encouraging the user to register a passkey.
 //
-// This file is only served when O2P_PASSKEY_PROMOTION=true.
+// This file is only served when O2P_PASSKEY_PROMOTION is set to 'ask' or 'force'.
 
 // Listen for OAuth2 popup completion to set the promotion flag.
 // This listener fires alongside the existing one in oauth2.js.
@@ -79,13 +79,18 @@ async function checkPasskeyPromotion() {
                 console.log('Passkey promotion: server heuristic says not needed for this platform');
                 return;
             }
+            if (data.mode === 'force') {
+                console.log('Passkey promotion: force mode, starting registration directly');
+                acceptPasskeyPromotion();
+                return;
+            }
         }
     } catch (e) {
         // If the check fails, show the modal anyway (fail-open)
         console.log('Passkey promotion: check failed, showing modal as fallback', e);
     }
 
-    // Show the promotion modal
+    // Default: show the promotion modal (ask mode or fallback)
     showPasskeyPromotionModal();
 }
 
