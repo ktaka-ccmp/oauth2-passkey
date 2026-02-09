@@ -254,5 +254,24 @@ When disabled:
   when `should_promote: false` (immediately redirects to default), but this is
   brief and acceptable for the cleaner architecture.
 
+### 2026-02-09: Popup-based promotion -- replace intermediate redirect page
+
+- Context: The intermediate redirect page approach requires `passkey_promotion.js`
+  on the login page to intercept `auth_complete` and redirect, causing a race condition
+  with `oauth2.js`'s `window.location.reload()`. Required `stopImmediatePropagation()`
+  as a workaround. Also causes a visible redirect flash on the parent page.
+- Investigated: Using the OAuth2 popup window itself for promotion. The popup is already
+  a library-controlled context with a valid session cookie.
+- Decision: Do passkey promotion inside the OAuth2 popup, after the callback and before
+  sending `postMessage('auth_complete')` to the parent.
+- Approach: OAuth2 callback handler conditionally redirects to `/passkey/promotion/popup`
+  (instead of `/oauth2/popup_close`) when `O2P_PASSKEY_PROMOTION` is enabled. The promotion
+  popup page handles check + modal/registration, then sends `postMessage('auth_complete')`
+  and closes. No JS needed on the login page. No race conditions.
+- Rationale: Cleaner than both previous approaches. Single coupling point (conditional
+  redirect in `oauth2.rs`). No `passkey_promotion.js` on login page. No
+  `stopImmediatePropagation`. No visible redirect on parent page. The parent page
+  (login or account) just receives `auth_complete` as before.
+
 ## Resolution
 

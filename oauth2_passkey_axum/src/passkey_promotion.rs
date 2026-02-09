@@ -4,11 +4,11 @@
 //! after successful OAuth2 login. It wraps the existing registration core function
 //! and adds `excludeCredentials` to prevent duplicate registrations on the same authenticator.
 //!
-//! The promotion flow uses a library-controlled intermediate redirect page:
-//! after OAuth2 login, `passkey_promotion.js` on the login page redirects to
-//! `/promotion/redirect` instead of letting the page reload. This page handles the
+//! The promotion flow uses the OAuth2 popup window itself:
+//! after OAuth2 callback, instead of redirecting to `popup_close.j2`,
+//! the callback redirects to `/promotion/popup` which handles the
 //! UA + AAGUID heuristic check, shows a modal (ask mode) or starts registration
-//! directly (force mode), then redirects to `O2P_DEFAULT_REDIRECT`.
+//! directly (force mode), then sends `postMessage('auth_complete')` and closes the popup.
 //!
 //! Controlled by `O2P_PASSKEY_PROMOTION` environment variable.
 //! Values: `ask` (show modal), `force` (skip modal, direct registration), or unset/`false` (disabled).
@@ -16,67 +16,72 @@
 use askama::Template;
 use axum::{
     Router,
-    extract::Json,
-    http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
+    extract::{Json, Query},
+    http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
 };
 use serde_json::json;
+use std::collections::HashMap;
 
 use oauth2_passkey::{
     O2P_ROUTE_PREFIX, RegistrationMode, RegistrationStartRequest, SessionUser, UserId,
     get_authenticator_info_batch, handle_start_registration_core, list_credentials_core,
 };
 
-use super::config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT};
+use super::config::O2P_CUSTOM_CSS_URL;
 use super::error::IntoResponseError;
 use super::session::AuthUser;
 
 /// Create a router for passkey promotion endpoints
 ///
 /// Routes:
-/// - `GET /promotion/redirect` - Intermediate redirect page for promotion flow
+/// - `GET /promotion/popup` - Promotion popup page (shown inside OAuth2 popup)
 /// - `POST /promotion/register/start` - Start registration with excludeCredentials
 /// - `GET /promotion/check` - Check if promotion modal should be shown (UA + AAGUID heuristic)
-/// - `GET /promotion/passkey_promotion.js` - Serve the promotion JavaScript (for login page)
 pub(super) fn router() -> Router {
     Router::new()
-        .route("/promotion/redirect", get(promotion_redirect))
+        .route("/promotion/popup", get(promotion_popup))
         .route(
             "/promotion/register/start",
             post(promotion_start_registration),
         )
         .route("/promotion/check", get(promotion_check))
-        .route(
-            "/promotion/passkey_promotion.js",
-            get(serve_passkey_promotion_js),
-        )
 }
 
 #[derive(Template)]
-#[template(path = "promotion_redirect.j2")]
-struct PromotionRedirectTemplate<'a> {
+#[template(path = "promotion_popup.j2")]
+struct PromotionPopupTemplate<'a> {
     o2p_route_prefix: &'a str,
     csrf_token: &'a str,
-    default_redirect: &'a str,
+    message: &'a str,
     custom_css_url: Option<&'a str>,
 }
 
-/// Serve the passkey promotion intermediate redirect page
+/// Serve the passkey promotion popup page
 ///
-/// This page handles the entire promotion flow after OAuth2 login:
+/// This page is shown inside the OAuth2 popup window after a successful OAuth2 callback.
+/// It handles the entire promotion flow:
 /// 1. Calls the check endpoint to determine if promotion is needed
 /// 2. Shows a modal (ask mode) or starts registration directly (force mode)
-/// 3. Redirects to `O2P_DEFAULT_REDIRECT` after completion
+/// 3. Sends `postMessage('auth_complete')` to the parent window and closes
 ///
 /// If the user is not authenticated, redirects to the login page.
-async fn promotion_redirect(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
+async fn promotion_popup(
+    user: Option<AuthUser>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Response, (StatusCode, String)> {
+    let message = params
+        .get("message")
+        .cloned()
+        .unwrap_or_else(|| "Authentication completed".to_string());
+
     match user {
         Some(auth_user) => {
-            let template = PromotionRedirectTemplate {
+            let template = PromotionPopupTemplate {
                 o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
                 csrf_token: &auth_user.csrf_token,
-                default_redirect: O2P_DEFAULT_REDIRECT.as_str(),
+                message: &message,
                 custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
             };
             let html = Html(
@@ -287,16 +292,6 @@ async fn promotion_start_registration(
     options_json["excludeCredentials"] = json!(exclude_credentials);
 
     Ok(Json(options_json))
-}
-
-/// Serve the passkey promotion JavaScript file
-async fn serve_passkey_promotion_js() -> Response {
-    let js_content = include_str!("../static/passkey_promotion.js");
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(CONTENT_TYPE, "application/javascript")
-        .body(js_content.to_string().into())
-        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
 }
 
 #[cfg(test)]

@@ -17,7 +17,7 @@ use oauth2_passkey::{
     get_authenticator_info_batch, list_accounts_core, list_credentials_core,
 };
 
-use crate::config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT, O2P_PASSKEY_PROMOTION};
+use crate::config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT};
 use crate::session::AuthUser;
 
 pub(crate) fn router() -> Router<()> {
@@ -34,7 +34,6 @@ struct LoginTemplate<'a> {
     message: &'a str,
     o2p_route_prefix: &'a str,
     custom_css_url: Option<&'a str>,
-    passkey_promotion_enabled: bool,
 }
 
 async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
@@ -45,7 +44,6 @@ async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
                 message: "Sign in or create an account",
                 o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
                 custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
-                passkey_promotion_enabled: O2P_PASSKEY_PROMOTION.is_enabled(),
             };
             let html = Html(
                 template

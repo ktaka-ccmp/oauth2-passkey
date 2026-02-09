@@ -11,9 +11,6 @@
     {% endif %}
     <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
     <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
-    {% if passkey_promotion_enabled %}
-    <script src="{{o2p_route_prefix}}/passkey/promotion/passkey_promotion.js"></script>
-    {% endif %}
     <script>
         const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
         const csrfToken = "_NOT_SET_";
