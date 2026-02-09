@@ -76,7 +76,6 @@ pub(crate) mod test_utils;
 // URL constants for different authentication-related pages
 pub use config::{
     O2P_ACCOUNT_URL, O2P_ADMIN_URL, O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT, O2P_LOGIN_URL,
-    is_passkey_promotion_enabled,
 };
 
 // Authentication middleware for protecting routes

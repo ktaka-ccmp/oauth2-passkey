@@ -66,7 +66,7 @@ struct PromotionPopupTemplate<'a> {
 /// 2. Shows a modal (ask mode) or starts registration directly (force mode)
 /// 3. Sends `postMessage('auth_complete')` to the parent window and closes
 ///
-/// If the user is not authenticated, redirects to the login page.
+/// If the user is not authenticated, falls back to popup_close (postMessage + close).
 async fn promotion_popup(
     user: Option<AuthUser>,
     Query(params): Query<HashMap<String, String>>,
@@ -92,7 +92,13 @@ async fn promotion_popup(
             Ok(html.into_response())
         }
         None => {
-            Ok(Redirect::to(&format!("{}/user/login", O2P_ROUTE_PREFIX.as_str())).into_response())
+            // Inside OAuth2 popup — redirect to popup_close instead of login page
+            let redirect_url = format!(
+                "{}/oauth2/popup_close?message={}",
+                O2P_ROUTE_PREFIX.as_str(),
+                urlencoding::encode(&message)
+            );
+            Ok(Redirect::to(&redirect_url).into_response())
         }
     }
 }
@@ -135,16 +141,14 @@ async fn promotion_check(
         return Ok(Json(json!({ "should_promote": true, "mode": mode })));
     }
 
-    // Get authenticator info for all AAGUIDs
-    let unique_aaguids: Vec<String> = credentials.iter().map(|c| c.aaguid.clone()).collect();
-    let auth_info_map = get_authenticator_info_batch(&unique_aaguids)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch authenticator info: {e}"),
-            )
-        })?;
+    // Get authenticator info for the user's registered credentials
+    let aaguids: Vec<String> = credentials.iter().map(|c| c.aaguid.clone()).collect();
+    let auth_info_map = get_authenticator_info_batch(&aaguids).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to fetch authenticator info: {e}"),
+        )
+    })?;
 
     // Check if any credential is likely available on the current platform
     let has_available_credential = credentials.iter().any(|c| {
