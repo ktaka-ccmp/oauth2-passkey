@@ -2,47 +2,8 @@ window.addEventListener("error", function (event) {
     console.error("Uncaught error:", event.error);
 });
 
-// WebAuthn capabilities detection using getClientCapabilities API (Chrome 131+)
-// Cached capabilities object - null means not yet fetched, undefined means not supported
-let _passkeyCapabilities = null;
-
-// Initialize and cache WebAuthn capabilities
-async function initPasskeyCapabilities() {
-    if (_passkeyCapabilities !== null) {
-        return _passkeyCapabilities;
-    }
-    if (typeof PublicKeyCredential?.getClientCapabilities === 'function') {
-        try {
-            _passkeyCapabilities = await PublicKeyCredential.getClientCapabilities();
-            console.log('WebAuthn capabilities:', _passkeyCapabilities);
-            return _passkeyCapabilities;
-        } catch (err) {
-            console.warn('getClientCapabilities error:', err);
-            _passkeyCapabilities = undefined;
-            return undefined;
-        }
-    }
-    _passkeyCapabilities = undefined;
-    console.log('getClientCapabilities not supported, using fallback feature detection');
-    return undefined;
-}
-
-// Check if a specific Signal API capability is supported
-// Falls back to typeof check if getClientCapabilities is not available
-function hasSignalCapability(capabilityName) {
-    // If capabilities are cached, use them
-    if (_passkeyCapabilities) {
-        return _passkeyCapabilities[capabilityName] === true;
-    }
-    // Fallback: check if the function exists
-    if (window.PublicKeyCredential) {
-        return typeof window.PublicKeyCredential[capabilityName] === 'function';
-    }
-    return false;
-}
-
-// Initialize capabilities on page load
-initPasskeyCapabilities();
+// WebAuthn capabilities (_passkeyCapabilities, initPasskeyCapabilities, hasSignalCapability)
+// are provided by passkey.js which is loaded before this file on the account page.
 
 function toggleEditUserForm() {
     const displayDiv = document.getElementById("user-info-display");

@@ -16,6 +16,7 @@ use oauth2_passkey::{
     prepare_oauth2_auth_request, verify_page_session_token,
 };
 
+use super::config::O2P_PASSKEY_PROMOTION;
 use super::error::IntoResponseError;
 use super::session::AuthUser;
 
@@ -104,14 +105,20 @@ async fn get_authorized(
         .await
         .into_response_error()?;
 
-    Ok((
-        response_headers,
-        Redirect::to(&format!(
+    let redirect_url = if O2P_PASSKEY_PROMOTION.is_enabled() {
+        format!(
+            "{}/passkey/promotion/popup?message={}",
+            O2P_ROUTE_PREFIX.as_str(),
+            urlencoding::encode(&message)
+        )
+    } else {
+        format!(
             "{}/oauth2/popup_close?message={}",
             O2P_ROUTE_PREFIX.as_str(),
             urlencoding::encode(&message)
-        )),
-    ))
+        )
+    };
+    Ok((response_headers, Redirect::to(&redirect_url)))
 }
 
 /// Handler for OAuth2 callbacks using form_post response mode.
@@ -132,14 +139,20 @@ async fn post_authorized(
         .await
         .into_response_error()?;
 
-    Ok((
-        response_headers,
-        Redirect::to(&format!(
+    let redirect_url = if O2P_PASSKEY_PROMOTION.is_enabled() {
+        format!(
+            "{}/passkey/promotion/popup?message={}",
+            O2P_ROUTE_PREFIX.as_str(),
+            urlencoding::encode(&message)
+        )
+    } else {
+        format!(
             "{}/oauth2/popup_close?message={}",
             O2P_ROUTE_PREFIX.as_str(),
             urlencoding::encode(&message)
-        )),
-    ))
+        )
+    };
+    Ok((response_headers, Redirect::to(&redirect_url)))
 }
 
 async fn list_oauth2_accounts(

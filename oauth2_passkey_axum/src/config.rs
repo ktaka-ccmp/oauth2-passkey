@@ -42,3 +42,38 @@ pub static O2P_RESPOND_WITH_X_CSRF_TOKEN: LazyLock<bool> = LazyLock::new(|| {
 /// Users can override CSS Custom Properties in their custom CSS file
 pub static O2P_CUSTOM_CSS_URL: LazyLock<Option<String>> =
     LazyLock::new(|| std::env::var("O2P_CUSTOM_CSS_URL").ok());
+
+/// Passkey promotion mode after OAuth2 login (experimental)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PasskeyPromotionMode {
+    /// Disabled (default)
+    Disabled,
+    /// Show confirmation modal before registration
+    Ask,
+    /// Skip modal, go directly to WebAuthn registration dialog
+    Force,
+}
+
+impl PasskeyPromotionMode {
+    pub(crate) fn is_enabled(self) -> bool {
+        !matches!(self, Self::Disabled)
+    }
+
+    pub(crate) fn is_force(self) -> bool {
+        matches!(self, Self::Force)
+    }
+}
+
+/// Passkey promotion after OAuth2 login (experimental)
+/// Values: false (disabled, default), ask (show modal), force (skip modal)
+pub(crate) static O2P_PASSKEY_PROMOTION: LazyLock<PasskeyPromotionMode> = LazyLock::new(|| {
+    match std::env::var("O2P_PASSKEY_PROMOTION")
+        .unwrap_or_default()
+        .to_lowercase()
+        .as_str()
+    {
+        "ask" => PasskeyPromotionMode::Ask,
+        "force" => PasskeyPromotionMode::Force,
+        _ => PasskeyPromotionMode::Disabled,
+    }
+});

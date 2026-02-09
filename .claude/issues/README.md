@@ -6,20 +6,23 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (5)
+### Open (7)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `2026-01-23-01` | medium | large | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
-| `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
+| `20260210-0547` | medium | medium | [Enhance Login History with Auth-Method-Specific Details](open/20260210-0547-login-history-detail-enhancement.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
+| `2026-02-09-01` | medium | medium | [Update CHANGELOG.md for Changes Since v0.2.0](open/2026-02-09-changelog-update.md) |
+| `2026-02-09-02` | medium | medium | [Improve OAuth2 Popup Error Handling UX](open/2026-02-09-oauth2-popup-error-handling.md) |
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 
-### Completed (24)
+### Completed (25)
 
 | ID | Title |
 |----|-------|
+| `2026-01-30-07` | [Passkey Registration Promotion After Login](completed/2026-01-30-conditional-creation.md) |
 | `2026-02-08-01` | [Audit Page Enhancement](completed/2026-02-08-audit-page-enhancement.md) |
 | `2026-01-30-02` | [Admin Force Logout Feature](completed/2026-01-30-admin-force-logout.md) |
 | `2026-01-30-03` | [Admin Login History View](completed/2026-01-30-admin-login-history.md) |
@@ -45,6 +48,10 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-09` | [Cross-Origin Same-Site Demo (Pattern 2)](completed/2026-01-30-cross-origin-same-site-demo.md) |
 | `2026-01-31-02` | [Remove HTTPS Support from Demo Apps](completed/2026-01-31-demo-remove-https.md) |
 
+### Wontfix (0)
+
+(none)
+
 ### Deferred (2)
 
 | ID | Title |
@@ -60,6 +67,7 @@ This directory contains issue/task tracking files for the project.
 .claude/issues/
 ├── open/           # Active issues
 ├── completed/      # Resolved issues
+├── wontfix/        # Closed without implementation
 ├── deferred/       # Postponed issues
 └── README.md       # This file
 ```
@@ -68,22 +76,30 @@ Issues are organized by status. When status changes, move the file to the approp
 
 ## File Naming Convention
 
+New issues use the timestamp-based format:
+
 ```text
-YYYY-MM-DD-<short-slug>.md
+YYYYMMDD-HHMM-<short-slug>.md
 ```
 
-Example: `2026-01-30-move-info-endpoint.md`
+Example: `20260210-1430-login-history-enhancement.md`
+
+Legacy issues use `YYYY-MM-DD-<slug>.md` and are not renamed.
 
 ## Issue ID Format
 
+New issues use a timestamp-based ID:
+
 ```text
-YYYY-MM-DD-NN
+YYYYMMDD-HHMM
 ```
 
-- `YYYY-MM-DD`: Creation date
-- `NN`: Sequential number for that day (01, 02, ...)
+- `YYYYMMDD`: Creation date
+- `HHMM`: Creation time (24h format)
 
-Example: `2026-01-30-01`, `2026-01-30-02`
+Example: `20260210-1430`, `20260210-1545`
+
+Legacy issues retain their `YYYY-MM-DD-NN` IDs.
 
 ## Issue Template
 
@@ -93,13 +109,18 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 ## Table of Contents
 
 - [Description](#description)
+- [Related Issues](#related-issues)
 - [Approach](#approach)
 - [Related Files](#related-files)
 - [Implementation Tasks](#implementation-tasks)
 - [Decision Log](#decision-log)
 - [Resolution](#resolution)
 
-## ID: YYYY-MM-DD-NN
+## ID: YYYYMMDD-HHMM
+
+## Created: YYYY-MM-DD-HH-MM
+
+## Closed:
 
 ## Status: open | completed | wontfix | deferred
 
@@ -110,6 +131,10 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 ## Description
 
 <What needs to be done and why>
+
+## Related Issues
+
+- `YYYYMMDD-HHMM` <Title> (relationship: e.g., depends on, related to, supersedes)
 
 ## Approach
 
@@ -143,7 +168,10 @@ Example: `2026-01-30-01`, `2026-01-30-02`
 
 | Section | Update Rule |
 |---------|------------|
+| Created | Written once at creation |
+| Closed | Written once when issue is resolved or closed |
 | Description | Freely updatable |
+| Related Issues | Freely updatable |
 | Approach | Freely updatable (always reflects current plan) |
 | Related Files | Freely updatable |
 | Implementation Tasks | Freely updatable |
@@ -160,7 +188,7 @@ a corresponding Decision Log entry explaining what changed and why.
 |--------|-----------|-------------|
 | `open` | `open/` | New or in-progress |
 | `completed` | `completed/` | Resolved and committed |
-| `wontfix` | `completed/` | Closed without implementation |
+| `wontfix` | `wontfix/` | Closed without implementation |
 | `deferred` | `deferred/` | Postponed for later |
 
 ## Commands
