@@ -286,7 +286,7 @@ function showRegistrationModal(mode) {
         if (userData) {
             // Pre-fill the form with user data
             const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-            document.getElementById('reg-username').value = userData.account ? `${userData.account}@${today}` : 'username';
+            document.getElementById('reg-username').value = userData.account ? `${userData.account}#${today}` : 'username';
             document.getElementById('reg-displayname').value = userData.label || 'displayname';
         }
     })

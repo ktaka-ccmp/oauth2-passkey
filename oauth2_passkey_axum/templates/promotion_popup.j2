@@ -156,7 +156,7 @@
                 if (userInfoResponse.ok) {
                     const userData = await userInfoResponse.json();
                     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-                    username = userData.account ? `${userData.account}@${today}` : 'user';
+                    username = userData.account ? `${userData.account}#${today}` : 'user';
                     displayname = userData.label || 'User';
                 }
 

@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (6)
+### Open (7)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -14,6 +14,7 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-07` | medium | large | [Passkey Registration Promotion After Login](open/2026-01-30-conditional-creation.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `2026-02-09-01` | medium | medium | [Update CHANGELOG.md for Changes Since v0.2.0](open/2026-02-09-changelog-update.md) |
+| `2026-02-09-02` | medium | medium | [Improve OAuth2 Popup Error Handling UX](open/2026-02-09-oauth2-popup-error-handling.md) |
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Fly.io)](open/2026-01-30-demo-site-deployment.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 
