@@ -91,9 +91,9 @@ User-Agent platform family, and returns `{ "should_promote": bool, "mode": "ask"
 All promotion logic is inline in the `promotion_popup.j2` template (no separate JS file).
 The template handles:
 
-1. localStorage opt-out check (ask mode only) -- immediately close popup if dismissed
-2. Call `GET /promotion/check` -- skip if heuristic says not needed
-3. Modal (ask mode) or direct WebAuthn registration (force mode)
+1. Call `GET /promotion/check` -- skip if heuristic says not needed
+2. Force mode: direct WebAuthn registration (skip localStorage opt-out)
+3. Ask mode: localStorage opt-out check, then show modal
 4. `postMessage('auth_complete')` + `window.close()` on completion
 
 ### Environment Variable
