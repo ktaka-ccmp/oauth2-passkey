@@ -53,12 +53,6 @@
 
         // Check if promotion should be shown, then dispatch
         async function checkAndPromote() {
-            // Check localStorage opt-out
-            if (localStorage.getItem('passkey_promotion_dismissed') === 'true') {
-                closePopup();
-                return;
-            }
-
             // Check WebAuthn support
             if (!window.PublicKeyCredential) {
                 closePopup();
@@ -87,12 +81,18 @@
                 }
 
                 if (data.mode === 'force') {
+                    // Force mode: skip localStorage opt-out, go directly to WebAuthn
                     console.log('Force mode: starting registration directly');
                     await startPromotionRegistration();
                     return;
                 }
 
-                // Default: ask mode - show the modal
+                // Ask mode: check localStorage opt-out before showing modal
+                if (localStorage.getItem('passkey_promotion_dismissed') === 'true') {
+                    closePopup();
+                    return;
+                }
+
                 showPromotionModal();
             } catch (e) {
                 console.error('Promotion check error:', e);

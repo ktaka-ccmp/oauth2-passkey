@@ -91,7 +91,7 @@ User-Agent platform family, and returns `{ "should_promote": bool, "mode": "ask"
 All promotion logic is inline in the `promotion_popup.j2` template (no separate JS file).
 The template handles:
 
-1. localStorage opt-out check -- immediately close popup if dismissed
+1. localStorage opt-out check (ask mode only) -- immediately close popup if dismissed
 2. Call `GET /promotion/check` -- skip if heuristic says not needed
 3. Modal (ask mode) or direct WebAuthn registration (force mode)
 4. `postMessage('auth_complete')` + `window.close()` on completion
@@ -105,7 +105,7 @@ O2P_PASSKEY_PROMOTION=force  # Skip modal, direct WebAuthn registration
 ```
 
 When disabled:
-- Promotion routes are still registered (merged into passkey router) but popup is unreachable
+- Promotion routes are not registered (conditional merge in router.rs)
 - OAuth2 callback redirects to `popup_close` as before
 - All existing behavior is completely unchanged
 
@@ -166,6 +166,7 @@ When disabled:
 - [x] Conditional redirect in `oauth2.rs` callback handlers
 - [x] Remove `passkey_promotion_enabled` from login template
 - [x] Revert demo-both promotion changes (no longer needed)
+- [ ] Force mode: skip localStorage opt-out check
 - [ ] End-to-end manual testing with `ask` and `force` modes
 
 ## Decision Log
@@ -267,6 +268,18 @@ When disabled:
   redirect in `oauth2.rs`). No `passkey_promotion.js` on login page. No
   `stopImmediatePropagation`. No visible redirect on parent page. The parent page
   (login or account) just receives `auth_complete` as before.
+
+### 2026-02-09: Force mode skips localStorage opt-out
+
+- Context: In force mode, the site operator explicitly wants maximum passkey adoption.
+  The localStorage opt-out ("Don't Ask Again") is an ask-mode UI feature. If force mode
+  respects the opt-out flag set during a previous ask-mode session, switching from ask
+  to force would not re-prompt users who previously opted out.
+- Decision: Skip localStorage opt-out check in force mode
+- Reason: Force mode's intent is to always attempt WebAuthn registration. The operator
+  has made a deliberate choice. The `excludeCredentials` + UA heuristic already prevent
+  unnecessary prompts for users who have passkeys. Users can still cancel the WebAuthn
+  dialog itself.
 
 ## Resolution
 
