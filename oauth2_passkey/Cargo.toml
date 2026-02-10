@@ -37,6 +37,8 @@ tracing = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
 webpki = { workspace = true }
+webpki-roots = { workspace = true }
+rustls = { workspace = true }
 x509-parser = { workspace = true }
 
 [dev-dependencies]

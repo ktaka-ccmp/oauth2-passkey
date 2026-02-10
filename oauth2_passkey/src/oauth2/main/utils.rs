@@ -95,6 +95,18 @@ pub(crate) async fn validate_origin(
     }
 }
 
+/// Build a `rustls::ClientConfig` using bundled Mozilla root certificates.
+///
+/// This eliminates the runtime dependency on OS-provided `ca-certificates`,
+/// enabling the binary to run in minimal container images (e.g., `scratch`).
+fn rustls_config_with_webpki_roots() -> rustls::ClientConfig {
+    let mut root_store = rustls::RootCertStore::empty();
+    root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth()
+}
+
 /// Creates a configured HTTP client for OAuth2 operations with the following settings:
 ///
 /// - `timeout`: Set to 30 seconds to prevent indefinite hanging of requests.
@@ -106,8 +118,11 @@ pub(crate) async fn validate_origin(
 /// - `pool_max_idle_per_host`: Set to 32 (default). This controls the maximum number of idle
 ///   connections that can be maintained per host in the connection pool. The default value
 ///   provides good balance for parallel OAuth2 operations while being memory efficient.
-pub(super) fn get_client() -> reqwest::Client {
+///
+/// Uses bundled Mozilla root certificates (webpki-roots) instead of OS certificate store.
+pub(crate) fn get_client() -> reqwest::Client {
     reqwest::Client::builder()
+        .use_preconfigured_tls(rustls_config_with_webpki_roots())
         .timeout(Duration::from_secs(30))
         .pool_idle_timeout(Duration::from_secs(90))
         .pool_max_idle_per_host(32)

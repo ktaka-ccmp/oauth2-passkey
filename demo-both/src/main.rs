@@ -55,6 +55,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(oauth2_passkey_full_router())
         .merge(protected::router());
 
-    spawn_http_server(3001, app).await?;
+    let port = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(3001);
+    spawn_http_server(port, app).await?;
     Ok(())
 }

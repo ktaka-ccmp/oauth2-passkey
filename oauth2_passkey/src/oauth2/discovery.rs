@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use thiserror::Error;
 
 /// OIDC Discovery Document as defined by OpenID Connect Discovery 1.0 specification
@@ -69,9 +68,7 @@ pub(crate) async fn fetch_oidc_discovery(
 
     tracing::debug!("Fetching OIDC discovery from: {}", discovery_url);
 
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
+    let client = super::main::get_client();
 
     let response = client.get(&discovery_url).send().await?;
 
