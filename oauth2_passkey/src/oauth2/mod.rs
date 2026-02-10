@@ -28,8 +28,9 @@ pub(crate) use errors::OAuth2Error;
 pub(crate) use types::{StateParams, StoredToken};
 
 pub(crate) use main::{
-    csrf_checks, decode_state, delete_session_and_misc_token_from_store, get_idinfo_userinfo,
-    get_mode_from_stored_session, get_uid_from_stored_session_by_state_param, validate_origin,
+    csrf_checks, decode_state, delete_session_and_misc_token_from_store, get_client,
+    get_idinfo_userinfo, get_mode_from_stored_session, get_uid_from_stored_session_by_state_param,
+    validate_origin,
 };
 
 // Internal utilities needed by test setup

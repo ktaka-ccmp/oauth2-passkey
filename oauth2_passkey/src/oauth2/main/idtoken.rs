@@ -114,7 +114,8 @@ async fn fetch_jwks(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
 
 // 0. Without caching:
 async fn fetch_jwks_no_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
-    let resp = reqwest::get(jwks_url).await?;
+    let client = super::utils::get_client();
+    let resp = client.get(jwks_url).send().await?;
     let jwks: Jwks = resp.json().await?;
     Ok(jwks)
 }
@@ -174,7 +175,8 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
     }
 
     // If not in cache, fetch from the URL
-    let resp = reqwest::get(jwks_url).await?;
+    let client = super::utils::get_client();
+    let resp = client.get(jwks_url).send().await?;
     let jwks: Jwks = resp.json().await?;
     // tracing::debug!("JWKs fetched from URL: {:#?}", jwks);
     tracing::debug!("JWKs fetched from URL");
