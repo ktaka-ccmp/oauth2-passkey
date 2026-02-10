@@ -17,6 +17,7 @@ default = ["admin-ui", "user-ui"]
 admin-ui = []
 user-ui = []
 cors = ["dep:tower-http"]
+bundled-tls = ["oauth2-passkey/bundled-tls"]
 
 [dependencies]
 # Changed from workspace dependency to published crate version

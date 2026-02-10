@@ -115,8 +115,9 @@ jobs:
 - `.dockerignore` - Excludes db/, target/, .git/, etc.
 - `demo-both/` - Combined OAuth2 + Passkey demo
 - `demo-both/src/main.rs` - PORT env var support
-- `oauth2_passkey/src/oauth2/main/utils.rs` - `get_client()` with webpki-roots TLS
+- `oauth2_passkey/src/utils.rs` - `get_client()` with optional bundled TLS (`bundled-tls` feature)
 - `oauth2_passkey/src/oauth2/discovery.rs` - Uses shared `get_client()`
+- `docker-compose.yml` - Local testing with env_file support
 - `.github/workflows/deploy-demo.yml` (to be created)
 
 ## Implementation Tasks
@@ -131,8 +132,14 @@ jobs:
 - [x] Migrate Dockerfile to `rust:1.88-alpine` + `scratch` (111MB -> 27.7MB)
 - [x] Pass `cargo check`, `cargo clippy`, `cargo test`
 
+### Fixes & Refactoring (done)
+- [x] Fix all `reqwest::get()` calls to use shared `get_client()` (aaguid.rs, idtoken.rs x2)
+- [x] Create `docker-compose.yml` for local testing (solves `.env` quote handling)
+- [x] Verify Docker image runs correctly with `docker compose up`
+- [x] Refactor `get_client()` from `oauth2/main/utils.rs` to crate-level `utils.rs`
+- [x] Add `bundled-tls` feature flag to make `webpki-roots`/`rustls` optional dependencies
+
 ### Deployment (pending)
-- [ ] Verify Docker image runs correctly with `docker run`
 - [ ] Set up GCP project and enable Cloud Run
 - [ ] Configure secrets in Google Secret Manager
 - [ ] Configure Google OAuth2 redirect URIs for run.app domain
@@ -172,5 +179,38 @@ jobs:
 - Reason: Eliminates runtime `ca-certificates` dependency, enables musl static linking,
   reduces image from 111MB to 27.7MB. reqwest 0.13 removed `rustls-tls-webpki-roots` feature
   flag, so code-level `use_preconfigured_tls()` API is required.
+
+### 2026-02-10: Fix reqwest::get() for scratch container TLS
+
+- Context: Docker image built with webpki-roots but 3 call sites still used `reqwest::get()`
+  directly, which creates a default client without bundled certs. In scratch container
+  (no OS cert store), all HTTPS requests via these code paths failed with
+  `add_parsable_certificates processed 0 valid and 0 invalid certs`.
+- Decision: Replace all `reqwest::get()` with `get_client().get().send()`
+- Reason: Ensures all HTTP clients use the centralized TLS configuration
+
+### 2026-02-10: Create docker-compose.yml for local testing
+
+- Context: Docker `--env-file` does not strip quotes from `.env` values (unlike `dotenvy`),
+  causing `OAUTH2_RESPONSE_MODE='query'` to be parsed as literal `'query'` (with quotes)
+- Decision: Use `docker-compose.yml` with `env_file:` directive and `environment:` overrides
+- Reason: Docker Compose's `env_file:` handles quotes correctly, and `environment:` overrides
+  allow setting container-specific values (PORT, ORIGIN, storage config)
+
+### 2026-02-10: Move get_client() to crate-level utils.rs
+
+- Context: `passkey/main/aaguid.rs` needed `get_client()` but it was in `oauth2/main/utils.rs`,
+  creating an architecturally wrong cross-module dependency (`crate::oauth2::get_client()`)
+- Decision: Move `get_client()` and `rustls_config_with_webpki_roots()` to `crate::utils`
+- Reason: HTTP client is a shared utility, not specific to the OAuth2 module
+
+### 2026-02-10: Add bundled-tls feature flag
+
+- Context: `webpki-roots` and `rustls` are only needed for minimal container images (scratch).
+  Normal deployments with OS cert stores don't need them.
+- Decision: Make `webpki-roots` and `rustls` optional via `bundled-tls` feature flag,
+  propagated through `oauth2-passkey` -> `oauth2-passkey-axum` -> `demo-both`
+- Reason: Reduces dependency count for default builds; keeps the library lightweight for
+  users who don't need bundled certs. Dockerfile uses `--features bundled-tls`.
 
 ## Resolution

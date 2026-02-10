@@ -156,6 +156,41 @@ pub(crate) fn header_set_cookie<'a>(
     Ok(headers)
 }
 
+/// Build a `rustls::ClientConfig` using bundled Mozilla root certificates.
+///
+/// This eliminates the runtime dependency on OS-provided `ca-certificates`,
+/// enabling the binary to run in minimal container images (e.g., `scratch`).
+#[cfg(feature = "bundled-tls")]
+fn rustls_config_with_webpki_roots() -> rustls::ClientConfig {
+    let mut root_store = rustls::RootCertStore::empty();
+    root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth()
+}
+
+/// Creates a configured HTTP client.
+///
+/// When the `bundled-tls` feature is enabled, uses bundled Mozilla root certificates
+/// (webpki-roots) instead of the OS certificate store, enabling the binary to run in
+/// minimal container images (e.g., `scratch`).
+///
+/// Settings:
+/// - `timeout`: 30 seconds
+/// - `pool_idle_timeout`: 90 seconds (default)
+/// - `pool_max_idle_per_host`: 32 (default)
+pub(crate) fn get_client() -> reqwest::Client {
+    let builder = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .pool_idle_timeout(std::time::Duration::from_secs(90))
+        .pool_max_idle_per_host(32);
+
+    #[cfg(feature = "bundled-tls")]
+    let builder = builder.use_preconfigured_tls(rustls_config_with_webpki_roots());
+
+    builder.build().expect("Failed to create reqwest client")
+}
+
 #[derive(Debug, Error, Clone)]
 pub enum UtilError {
     #[error("Crypto error: {0}")]

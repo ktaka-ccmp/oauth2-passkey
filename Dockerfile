@@ -9,7 +9,7 @@ RUN apk add --no-cache musl-dev cmake make perl
 WORKDIR /app
 COPY . .
 
-RUN cargo build --release --manifest-path demo-both/Cargo.toml
+RUN cargo build --release --manifest-path demo-both/Cargo.toml --features bundled-tls
 
 # Stage 2: Minimal runtime (no OS, no shell, no libc)
 FROM scratch

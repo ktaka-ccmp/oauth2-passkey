@@ -58,7 +58,7 @@ pub(crate) async fn store_aaguids() -> Result<(), PasskeyError> {
 
     store_aaguid_in_cache(json).await?;
 
-    let client = crate::oauth2::get_client();
+    let client = crate::utils::get_client();
     let response = client
         .get(AAGUID_URL)
         .send()

@@ -12,6 +12,10 @@ keywords = ["oauth2", "passkey", "webauthn", "authentication", "security"]
 categories = ["authentication", "web-programming", "cryptography"]
 readme = "README.md"
 
+[features]
+default = []
+bundled-tls = ["dep:webpki-roots", "dep:rustls"]
+
 [dependencies]
 async-trait = { workspace = true }
 base64 = { workspace = true }
@@ -37,8 +41,8 @@ tracing = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
 webpki = { workspace = true }
-webpki-roots = { workspace = true }
-rustls = { workspace = true }
+webpki-roots = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
 x509-parser = { workspace = true }
 
 [dev-dependencies]

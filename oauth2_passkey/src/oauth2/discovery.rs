@@ -68,7 +68,7 @@ pub(crate) async fn fetch_oidc_discovery(
 
     tracing::debug!("Fetching OIDC discovery from: {}", discovery_url);
 
-    let client = super::main::get_client();
+    let client = crate::utils::get_client();
 
     let response = client.get(&discovery_url).send().await?;
 
