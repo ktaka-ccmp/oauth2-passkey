@@ -44,8 +44,7 @@ async fn test_put_and_get() {
 }
 
 /// Test for putting a value with TTL in the in-memory cache store.
-/// This test checks that a value can be stored with a TTL, even though the in-memory store ignores TTL.
-/// It verifies that the value can still be retrieved after the put operation.
+/// This test checks that a value can be stored with a TTL and retrieved before expiration.
 #[tokio::test]
 async fn test_put_with_ttl() {
     // Given an in-memory cache store
@@ -59,10 +58,10 @@ async fn test_put_with_ttl() {
     // When putting a value with TTL
     let put_result = store.put_with_ttl(prefix, key, value.clone(), 60).await;
 
-    // Then it should succeed (note: in-memory store ignores TTL)
+    // Then it should succeed
     assert!(put_result.is_ok());
 
-    // And when getting the value
+    // And when getting the value before expiration
     let prefix = CachePrefix::new("test".to_string()).unwrap();
     let key = CacheKey::new("key2".to_string()).unwrap();
     let get_result = store.get(prefix, key).await;
@@ -226,6 +225,191 @@ async fn test_empty_prefix_and_key() {
     let key = CacheKey::new("".to_string()).unwrap();
     let get_result = store.get(prefix, key).await.unwrap().unwrap();
     assert_eq!(get_result.value, "test with empty strings");
+}
+
+/// Test that `put()` without TTL creates entries that never expire.
+#[tokio::test]
+async fn test_put_without_ttl_never_expires() {
+    let mut store = InMemoryCacheStore::new();
+    let prefix = CachePrefix::new("test".to_string()).unwrap();
+    let key = CacheKey::new("no_ttl".to_string()).unwrap();
+    let value = CacheData {
+        value: "persistent".to_string(),
+    };
+
+    store.put(prefix, key, value).await.unwrap();
+
+    // Verify the internal entry has no expiration
+    let internal_key = InMemoryCacheStore::make_key(
+        CachePrefix::new("test".to_string()).unwrap(),
+        CacheKey::new("no_ttl".to_string()).unwrap(),
+    );
+    let entry = store.entry.get(&internal_key).unwrap();
+    assert!(entry.expires_at.is_none(), "put() should set no expiration");
+    assert!(!entry.is_expired(), "Entry without TTL should never expire");
+}
+
+/// Test that `put_with_ttl()` with non-zero TTL sets an expiration.
+#[tokio::test]
+async fn test_put_with_ttl_sets_expiration() {
+    let mut store = InMemoryCacheStore::new();
+    let prefix = CachePrefix::new("test".to_string()).unwrap();
+    let key = CacheKey::new("with_ttl".to_string()).unwrap();
+    let value = CacheData {
+        value: "expires soon".to_string(),
+    };
+
+    store.put_with_ttl(prefix, key, value, 300).await.unwrap();
+
+    // Verify the internal entry has an expiration set
+    let internal_key = InMemoryCacheStore::make_key(
+        CachePrefix::new("test".to_string()).unwrap(),
+        CacheKey::new("with_ttl".to_string()).unwrap(),
+    );
+    let entry = store.entry.get(&internal_key).unwrap();
+    assert!(
+        entry.expires_at.is_some(),
+        "put_with_ttl(300) should set an expiration"
+    );
+    assert!(
+        !entry.is_expired(),
+        "Entry with 300s TTL should not be expired yet"
+    );
+}
+
+/// Test that `put_with_ttl()` with TTL=0 means "no expiration".
+#[tokio::test]
+async fn test_put_with_ttl_zero_means_no_expiration() {
+    let mut store = InMemoryCacheStore::new();
+    let prefix = CachePrefix::new("test".to_string()).unwrap();
+    let key = CacheKey::new("zero_ttl".to_string()).unwrap();
+    let value = CacheData {
+        value: "no expiration".to_string(),
+    };
+
+    store.put_with_ttl(prefix, key, value, 0).await.unwrap();
+
+    // Verify the internal entry has no expiration (same as put() without TTL)
+    let internal_key = InMemoryCacheStore::make_key(
+        CachePrefix::new("test".to_string()).unwrap(),
+        CacheKey::new("zero_ttl".to_string()).unwrap(),
+    );
+    let entry = store.entry.get(&internal_key).unwrap();
+    assert!(
+        entry.expires_at.is_none(),
+        "TTL=0 should mean no expiration"
+    );
+    assert!(!entry.is_expired());
+
+    // Value should be retrievable
+    let prefix = CachePrefix::new("test".to_string()).unwrap();
+    let key = CacheKey::new("zero_ttl".to_string()).unwrap();
+    let result = store.get(prefix, key).await.unwrap();
+    assert_eq!(result.unwrap().value, "no expiration");
+}
+
+/// Test that `get()` returns `None` for expired entries (lazy expiration).
+#[tokio::test]
+async fn test_get_returns_none_for_expired_entry() {
+    let mut store = InMemoryCacheStore::new();
+
+    // Manually insert an already-expired entry
+    let internal_key = InMemoryCacheStore::make_key(
+        CachePrefix::new("test".to_string()).unwrap(),
+        CacheKey::new("expired".to_string()).unwrap(),
+    );
+    store.entry.insert(
+        internal_key,
+        CacheEntry {
+            data: CacheData {
+                value: "old data".to_string(),
+            },
+            expires_at: Some(Instant::now() - Duration::from_secs(1)),
+        },
+    );
+
+    // get() should return None for the expired entry
+    let prefix = CachePrefix::new("test".to_string()).unwrap();
+    let key = CacheKey::new("expired".to_string()).unwrap();
+    let result = store.get(prefix, key).await.unwrap();
+    assert!(
+        result.is_none(),
+        "get() should return None for expired entries"
+    );
+}
+
+/// Test that `put_if_not_exists()` treats expired entries as non-existent.
+#[tokio::test]
+async fn test_put_if_not_exists_replaces_expired_entry() {
+    let mut store = InMemoryCacheStore::new();
+
+    // Manually insert an already-expired entry
+    let internal_key = InMemoryCacheStore::make_key(
+        CachePrefix::new("test".to_string()).unwrap(),
+        CacheKey::new("contested".to_string()).unwrap(),
+    );
+    store.entry.insert(
+        internal_key,
+        CacheEntry {
+            data: CacheData {
+                value: "expired data".to_string(),
+            },
+            expires_at: Some(Instant::now() - Duration::from_secs(1)),
+        },
+    );
+
+    // put_if_not_exists should succeed (expired entry treated as absent)
+    let prefix = CachePrefix::new("test".to_string()).unwrap();
+    let key = CacheKey::new("contested".to_string()).unwrap();
+    let new_value = CacheData {
+        value: "fresh data".to_string(),
+    };
+    let inserted = store
+        .put_if_not_exists(prefix, key, new_value, 600)
+        .await
+        .unwrap();
+    assert!(inserted, "Should insert over expired entry");
+
+    // Verify the new value is retrievable
+    let prefix = CachePrefix::new("test".to_string()).unwrap();
+    let key = CacheKey::new("contested".to_string()).unwrap();
+    let result = store.get(prefix, key).await.unwrap();
+    assert_eq!(result.unwrap().value, "fresh data");
+}
+
+/// Test that `put_if_not_exists()` does NOT replace a live (non-expired) entry.
+#[tokio::test]
+async fn test_put_if_not_exists_rejects_when_live_entry_exists() {
+    let mut store = InMemoryCacheStore::new();
+    let prefix = CachePrefix::new("test".to_string()).unwrap();
+    let key = CacheKey::new("live".to_string()).unwrap();
+    let original = CacheData {
+        value: "original".to_string(),
+    };
+
+    // Store a live entry with long TTL
+    store
+        .put_if_not_exists(prefix, key, original, 3600)
+        .await
+        .unwrap();
+
+    // Attempt to overwrite with put_if_not_exists
+    let prefix = CachePrefix::new("test".to_string()).unwrap();
+    let key = CacheKey::new("live".to_string()).unwrap();
+    let replacement = CacheData {
+        value: "replacement".to_string(),
+    };
+    let inserted = store
+        .put_if_not_exists(prefix, key, replacement, 3600)
+        .await
+        .unwrap();
+    assert!(!inserted, "Should NOT insert when live entry exists");
+
+    // Original value should be preserved
+    let prefix = CachePrefix::new("test".to_string()).unwrap();
+    let key = CacheKey::new("live".to_string()).unwrap();
+    let result = store.get(prefix, key).await.unwrap();
+    assert_eq!(result.unwrap().value, "original");
 }
 
 // Integration tests for the global GENERIC_CACHE_STORE
@@ -432,9 +616,9 @@ mod integration_tests {
     }
 
     /// Test for the TTL behavior in the in-memory cache store.
-    /// This test checks that the in-memory store can handle TTL values correctly,
-    /// even though it does not enforce expiration.
-    /// It verifies that values can be stored with TTL and retrieved immediately after.
+    /// This test checks that the in-memory store handles TTL values correctly,
+    /// including that entries with non-zero TTL are retrievable before expiration
+    /// and that TTL=0 means "no expiration".
     #[tokio::test]
     async fn test_cache_store_ttl_behavior() {
         // Initialize test environment
@@ -446,7 +630,7 @@ mod integration_tests {
             value: "ttl test value".to_string(),
         };
 
-        // Test put_with_ttl (in-memory store ignores TTL but should still work)
+        // Test put_with_ttl with non-zero TTL
         {
             let mut cache = GENERIC_CACHE_STORE.lock().await;
             let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();
@@ -457,7 +641,7 @@ mod integration_tests {
             assert!(put_result.is_ok(), "put_with_ttl should succeed");
         }
 
-        // Verify the value was stored (even though TTL is ignored in memory store)
+        // Verify the value is retrievable before expiration
         {
             let cache = GENERIC_CACHE_STORE.lock().await;
             let cache_prefix = CachePrefix::new(prefix.to_string()).unwrap();

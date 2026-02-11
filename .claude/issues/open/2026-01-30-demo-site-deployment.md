@@ -212,4 +212,10 @@ jobs:
 - Reason: Reduces dependency count for default builds; keeps the library lightweight for
   users who don't need bundled certs. Dockerfile uses `--features bundled-tls`.
 
+### 2026-02-11: Fix in-memory backend stability issues for Docker
+
+- Context: Docker container testing revealed two critical issues with in-memory backends: (1) JWKS cache deadlock after 600s TTL expiry due to tokio::sync::Mutex re-entry in `fetch_jwks_cache()`, and (2) SQLite in-memory tables disappearing after ~30min due to pool idle connection eviction.
+- Decision: Three fixes applied: refactor `fetch_jwks_cache()` to use `cache_operations` module (eliminates deadlock), add lazy TTL expiration to `InMemoryCacheStore` (defense in depth), set `min_connections(1)` for in-memory SQLite pools (prevents DB destruction).
+- Reason: In-memory SQLite + memory cache is the chosen storage strategy for Docker/Cloud Run deployment. Both issues only manifest with in-memory backends and were not caught during development with Redis/file-based SQLite. See issue `20260211-1742` for detailed analysis.
+
 ## Resolution

@@ -21,3 +21,4 @@ services:
       # GENERIC_DATA_STORE_URL: "sqlite:/data.db"
       GENERIC_CACHE_STORE_TYPE: memory
       GENERIC_CACHE_STORE_URL: "unused"
+      RUST_LOG: debug
