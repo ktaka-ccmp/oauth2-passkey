@@ -1,0 +1,7 @@
+target/
+db/
+.junk/
+.backup/
+.git/
+.env
+*.log
