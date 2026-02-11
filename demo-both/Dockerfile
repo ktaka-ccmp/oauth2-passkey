@@ -1,5 +1,5 @@
 # Multi-stage build for demo-both
-# Usage: docker build -t oauth2-passkey-demo .
+# Usage: docker build -t oauth2-passkey-demo-both -f demo-both/Dockerfile .
 
 # Stage 1: Build with Alpine (musl libc for static linking)
 FROM rust:1.88-alpine AS builder

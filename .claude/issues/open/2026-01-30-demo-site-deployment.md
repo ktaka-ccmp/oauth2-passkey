@@ -111,13 +111,12 @@ jobs:
 
 ## Related Files
 
-- `Dockerfile` - Multi-stage build (rust:1.88-alpine -> scratch)
-- `.dockerignore` - Excludes db/, target/, .git/, etc.
-- `demo-both/` - Combined OAuth2 + Passkey demo
+- `demo-both/Dockerfile` - Multi-stage build (rust:1.88-alpine -> scratch)
+- `demo-both/docker-compose.yml` - Local testing with env_file support
+- `.dockerignore` - Excludes db/, target/, .git/, etc. (stays at root = build context)
 - `demo-both/src/main.rs` - PORT env var support
 - `oauth2_passkey/src/utils.rs` - `get_client()` with optional bundled TLS (`bundled-tls` feature)
 - `oauth2_passkey/src/oauth2/discovery.rs` - Uses shared `get_client()`
-- `docker-compose.yml` - Local testing with env_file support
 - `.github/workflows/deploy-demo.yml` (to be created)
 
 ## Implementation Tasks

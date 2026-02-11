@@ -1,9 +1,11 @@
 services:
   demo:
-    build: .
+    build:
+      context: ..
+      dockerfile: demo-both/Dockerfile
     ports:
       - "3001:8080"
-    env_file: .env
+    env_file: ../.env
     environment:
       PORT: 8080
       ORIGIN: "http://localhost:3001"
