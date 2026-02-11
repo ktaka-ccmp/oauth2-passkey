@@ -9,5 +9,6 @@ services:
       ORIGIN: "http://localhost:3001"
       GENERIC_DATA_STORE_TYPE: sqlite
       GENERIC_DATA_STORE_URL: "sqlite:file:memdb1?mode=memory&cache=shared"
+      # GENERIC_DATA_STORE_URL: "sqlite:/data.db"
       GENERIC_CACHE_STORE_TYPE: memory
       GENERIC_CACHE_STORE_URL: "unused"
