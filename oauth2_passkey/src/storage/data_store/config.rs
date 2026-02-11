@@ -53,9 +53,16 @@ pub(crate) static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = Lazy
             }
 
             tracing::debug!("Creating lazy SQLite pool");
-            Box::new(SqliteDataStore {
-                pool: sqlx::sqlite::SqlitePool::connect_lazy_with(opts),
-            }) as Box<dyn DataStore>
+            let pool = if is_in_memory {
+                // Keep at least one connection alive so the shared in-memory
+                // database is never destroyed by idle connection eviction.
+                sqlx::sqlite::SqlitePoolOptions::new()
+                    .min_connections(1)
+                    .connect_lazy_with(opts)
+            } else {
+                sqlx::sqlite::SqlitePool::connect_lazy_with(opts)
+            };
+            Box::new(SqliteDataStore { pool }) as Box<dyn DataStore>
         }
         "postgres" => Box::new(PostgresDataStore {
             pool: sqlx::PgPool::connect_lazy(store_url).expect("Failed to create Postgres pool"),
