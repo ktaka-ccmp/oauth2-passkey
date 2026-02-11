@@ -1,3 +1,5 @@
+# Usage (from repo root):  docker compose -f demo-both/docker-compose.yml up --build
+# Usage (from demo-both/): docker compose up --build
 services:
   demo:
     build:
