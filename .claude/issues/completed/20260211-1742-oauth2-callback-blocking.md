@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-11-17-42
 
-## Closed:
+## Closed: 2026-02-11
 
-## Status: open
+## Status: completed
 
 ## Priority: high
 
@@ -108,30 +108,36 @@ This makes in-memory cache behave consistently with Redis, preventing the expire
 
 - `oauth2_passkey/src/oauth2/main/idtoken.rs` - `fetch_jwks_cache()` with deadlock (lines 146-203)
 - `oauth2_passkey/src/storage/cache_operations.rs` - Safe cache operations (`get_data`, `remove_data`, `store_cache_keyed`)
-- `oauth2_passkey/src/storage/cache_store/memory.rs` - `InMemoryCacheStore` with missing TTL
-- `oauth2_passkey/src/storage/cache_store/types.rs` - `CacheStore` trait definition
+- `oauth2_passkey/src/storage/cache_store/memory.rs` - `InMemoryCacheStore` with lazy TTL expiration
+- `oauth2_passkey/src/storage/cache_store/types.rs` - `CacheEntry` with `expires_at: Option<Instant>`
+- `oauth2_passkey/src/storage/cache_store/memory/tests.rs` - TTL-specific unit tests
 - `oauth2_passkey/src/storage/cache_store/config.rs` - `GENERIC_CACHE_STORE` global Mutex
+- `oauth2_passkey/src/storage/data_store/config.rs` - SQLite pool `min_connections(1)` for in-memory DBs
 
 ## Implementation Tasks
 
 ### Fix 1: Deadlock Elimination
-- [ ] Refactor `fetch_jwks_cache()` to use `cache_operations` module
-- [ ] Remove `GENERIC_CACHE_STORE` import from `idtoken.rs`
-- [ ] Verify existing tests pass
+- [x] Refactor `fetch_jwks_cache()` to use `cache_operations` module
+- [x] Remove `GENERIC_CACHE_STORE` import from `idtoken.rs`
+- [x] Verify existing tests pass
 
 ### Fix 2: In-Memory TTL
-- [ ] Add `CacheEntry` wrapper with `expires_at: Option<Instant>` to `memory.rs`
-- [ ] Update `InMemoryCacheStore` to use `HashMap<String, CacheEntry>`
-- [ ] Implement lazy expiration in `get()` (return `None` for expired)
-- [ ] Implement TTL in `put_with_ttl()` and `put_if_not_exists()`
-- [ ] Update existing tests in `memory/tests.rs`
-- [ ] Add TTL-specific tests
+- [x] Add `CacheEntry` wrapper with `expires_at: Option<Instant>` to `types.rs`
+- [x] Update `InMemoryCacheStore` to use `HashMap<String, CacheEntry>`
+- [x] Implement lazy expiration in `get()` (return `None` for expired)
+- [x] Implement TTL in `put_with_ttl()` and `put_if_not_exists()`
+- [x] Update existing tests in `memory/tests.rs`
+- [x] Add 6 TTL-specific tests
+
+### Fix 3: SQLite In-Memory Pool Stability
+- [x] Set `min_connections(1)` for in-memory SQLite pools in `data_store/config.rs`
 
 ### Verification
-- [ ] Run `cargo test`
-- [ ] Run `cargo clippy --all-targets --all-features`
-- [ ] Docker rebuild and test: login -> wait 10+ min -> login again
-- [ ] Verify no deadlock with in-memory cache
+- [x] Run `cargo test` (611 tests pass)
+- [x] Run `cargo clippy --all-targets --all-features` (0 warnings)
+- [x] Docker rebuild and test: login -> wait 10+ min -> login again
+- [x] Verify no deadlock with in-memory cache
+- [x] Verify SQLite tables persist after 10+ minutes idle
 
 ## Decision Log
 
@@ -161,4 +167,20 @@ This makes in-memory cache behave consistently with Redis, preventing the expire
 - Decision: Add lazy TTL expiration to `InMemoryCacheStore` as a second fix (defense in depth)
 - Reason: Makes in-memory and Redis backends behave consistently. Prevents the expired-entry code path from being reached regardless of the deadlock fix. Simple to implement: store `expires_at` alongside data, return `None` in `get()` for expired entries.
 
+### 2026-02-11: SQLite in-memory database tables disappearing after idle timeout
+
+- Context: After deploying the deadlock fix to Docker, `o2p_passkey_credentials` table disappeared after ~30 minutes of low traffic. The `shared_cache(true)` fix from commit `13b947f` was necessary but insufficient.
+- Decision: Set `min_connections(1)` for in-memory SQLite pools via `SqlitePoolOptions::new().min_connections(1).connect_lazy_with(opts)`
+- Reason: `SqlitePool::connect_lazy_with()` defaults to `min_connections=0`. After idle timeout (~10min) or max lifetime (~30min), all pool connections were evicted, destroying the shared in-memory database. `shared_cache(true)` only ensures connections share the same DB while alive; when all connections close, the DB is gone. Keeping at least one connection alive permanently solves this.
+
 ## Resolution
+
+Three fixes were applied to resolve Docker container stability issues with in-memory backends:
+
+1. **Deadlock elimination** (commit `66ab51f`): Refactored `fetch_jwks_cache()` to use `cache_operations` module functions (`get_data`, `remove_data`, `store_cache_keyed`) instead of directly locking `GENERIC_CACHE_STORE`. Each function acquires and releases the Mutex independently, making double-locking structurally impossible.
+
+2. **In-memory cache TTL** (commit `66ab51f`): Added `CacheEntry` wrapper with `expires_at: Option<Instant>` to `InMemoryCacheStore`. `get()` returns `None` for expired entries (lazy expiration), matching Redis semantics. This prevents the expired-entry code path from being reached.
+
+3. **SQLite pool stability** (commit `8b7839d`): Set `min_connections(1)` for in-memory SQLite pools so at least one connection is always maintained, preventing the shared in-memory database from being destroyed by idle connection eviction.
+
+Verified in Docker: OAuth2 login works after 10+ minutes (no deadlock), SQLite tables persist beyond idle timeout.

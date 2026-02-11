@@ -6,11 +6,10 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (10)
+### Open (9)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260211-1742` | high | medium | [OAuth2 Callback Deadlock on JWKS Cache Expiry](open/20260211-1742-oauth2-callback-blocking.md) |
 | `20260210-1930` | high | medium | [Admin Deletion Safeguard](open/20260210-1930-admin-deletion-safeguard.md) |
 | `2026-01-23-01` | medium | large | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
 | `20260210-0547` | medium | medium | [Enhance Login History with Auth-Method-Specific Details](open/20260210-0547-login-history-detail-enhancement.md) |
@@ -21,10 +20,11 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-08` | low | medium | [Demo Site Deployment (Cloud Run)](open/2026-01-30-demo-site-deployment.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 
-### Completed (25)
+### Completed (26)
 
 | ID | Title |
 |----|-------|
+| `20260211-1742` | [OAuth2 Callback Deadlock on JWKS Cache Expiry](completed/20260211-1742-oauth2-callback-blocking.md) |
 | `2026-01-30-07` | [Passkey Registration Promotion After Login](completed/2026-01-30-conditional-creation.md) |
 | `2026-02-08-01` | [Audit Page Enhancement](completed/2026-02-08-audit-page-enhancement.md) |
 | `2026-01-30-02` | [Admin Force Logout Feature](completed/2026-01-30-admin-force-logout.md) |
