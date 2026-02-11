@@ -1,4 +1,4 @@
-# Issue: OAuth2 Callback Blocking Under Network Latency
+# Issue: OAuth2 Callback Deadlock on JWKS Cache Expiry
 
 ## Table of Contents
 
@@ -26,39 +26,57 @@
 
 ### Observed Behavior
 
-During Docker container testing, the OAuth2 login flow sometimes hangs:
-1. User clicks "Login with Google" - popup opens
-2. Google authentication completes and callback arrives at the server
-3. Server logs "Processing OAuth2 authorization core logic" and then hangs (up to 30 seconds)
-4. The popup does not close during this time
-5. **Critical**: While one callback request is stuck, ALL other OAuth2 login attempts are also blocked - users cannot even be redirected to Google
+During Docker container testing with in-memory cache (`GENERIC_CACHE_STORE_TYPE=memory`), the OAuth2 login flow deadlocks exactly 10 minutes after the first successful login:
 
-### Root Cause Analysis
+1. First login succeeds (JWKS fetched and cached with 600s TTL)
+2. Subsequent logins within 10 minutes succeed (JWKS served from cache)
+3. After 10 minutes (JWKS cache expired), the next login attempt hangs permanently
+4. Server logs show "Removing expired JWKs from cache" as the last message, with no further output
+5. The 30-second HTTP timeout never fires because the code never reaches the HTTP request
+6. The server becomes completely unresponsive for all authentication operations
 
-The OAuth2 callback flow (`process_oauth2_authorization` in `coordination/oauth2.rs`) calls `get_idinfo_userinfo()` which makes multiple external HTTP requests to Google APIs:
+### Root Cause: tokio::sync::Mutex Deadlock in `fetch_jwks_cache()`
 
-1. **Token exchange** (`exchange_code_for_token` -> POST to Google token endpoint)
-2. **OIDC Discovery** (`get_discovered_endpoints` -> GET `/.well-known/openid-configuration`, cached in `OnceLock`)
-3. **JWKS fetch** (`fetch_jwks_cache` -> GET JWKS URI, cached in `GENERIC_CACHE_STORE` with 600s TTL)
-4. **UserInfo fetch** (`fetch_user_data_from_google` -> GET userinfo endpoint)
+In `idtoken.rs:146-203`, the `if let` pattern holds the `MutexGuard` as a temporary through the entire block body:
 
-The global cache store is protected by a single `tokio::sync::Mutex<Box<dyn CacheStore>>` (`GENERIC_CACHE_STORE` in `storage/cache_store/config.rs`). This Mutex serializes **all** cache operations across the entire application, including:
-- CSRF token storage/validation
-- PKCE verifier storage/retrieval
-- Nonce storage/validation
-- JWKS caching
-- Session management
-- OAuth2 state storage
+```rust
+// Line 153: MutexGuard acquired as temporary in if-let scrutinee
+if let Some(cached) = GENERIC_CACHE_STORE
+    .lock()          // <-- MutexGuard created here
+    .await
+    .get(...)
+    .await
+    .map_err(...)?
+{
+    // MutexGuard STILL ALIVE here (temporary scope extends through body)
 
-When external HTTP requests to Google are slow (network latency, Google API issues), the callback handler holds processing time for up to 30 seconds (the `reqwest` client timeout). Although the Mutex is not held continuously during HTTP requests, the high number of lock acquisitions per callback (CSRF check, PKCE retrieval, JWKS cache lookup/store, nonce validation, session creation, state cleanup) combined with slow interleaved HTTP requests creates contention that degrades the entire system.
+    if jwks_cache.expires_at > Utc::now() {
+        return Ok(jwks_cache.jwks);  // Early return - guard dropped, OK
+    }
 
-Additionally, the HTTP client timeout of 30 seconds (`get_client()` in `utils.rs`) is excessively long for interactive login flows where users expect sub-second responses.
+    // Line 169: DEADLOCK - re-acquiring same non-reentrant Mutex
+    GENERIC_CACHE_STORE
+        .lock()      // <-- Waits forever: guard from line 153 still held
+        .await
+        .remove(...)
+```
 
-### Impact
+`tokio::sync::Mutex` is **not reentrant**. When the same task tries to acquire it twice, it deadlocks.
 
-- **User-facing**: Login popup appears frozen; users may close it and retry, creating more stuck requests
-- **System-wide**: All cache-dependent operations are serialized, so one slow callback can cascade into delays for all authentication operations
-- **Not Docker-specific**: This can happen in any deployment with network latency to Google APIs
+### Why It Only Manifests with In-Memory Cache
+
+The deadlock path is only reached when `get()` returns an **expired** entry (triggers the `if let` body with re-lock). The cache backend determines whether this path is reachable:
+
+- **Redis**: Implements TTL natively. After 600s, Redis auto-deletes the entry. `get()` returns `None`, code skips the `if let` body entirely -> **no deadlock**
+- **In-memory**: `put_with_ttl()` ignores the `_ttl` parameter (`memory.rs:37-46`). Entries persist forever. `get()` returns the expired entry, code enters the `if let` body and re-locks -> **deadlock**
+
+### Why It Was Not Caught During Development
+
+During development with `cargo run`, the typical environment uses Redis for cache (`GENERIC_CACHE_STORE_TYPE=redis`). Redis auto-expires JWKS entries after the TTL, so the expired-entry code path is never reached and the deadlock never triggers. The Docker container uses `GENERIC_CACHE_STORE_TYPE=memory`, which exposed the bug.
+
+### Additional Issue: `idtoken.rs` Bypasses `cache_operations` Module
+
+`idtoken.rs` is the **only non-test file** that directly uses `GENERIC_CACHE_STORE`. All other cache operations go through `cache_operations.rs`, which properly scopes each lock acquisition in separate functions. If `idtoken.rs` had used the `cache_operations` module, the deadlock would have been structurally impossible.
 
 ## Related Issues
 
@@ -67,47 +85,53 @@ Additionally, the HTTP client timeout of 30 seconds (`get_client()` in `utils.rs
 
 ## Approach
 
-### Phase 1: Quick Fixes (immediate)
+### Fix 1: Eliminate the Deadlock (primary fix)
 
-1. **Reduce HTTP client timeout**: Change `get_client()` timeout from 30s to 5s. For OAuth2 callback flows, Google APIs should respond within 1-2 seconds under normal conditions. A 5-second timeout is generous while preventing long hangs.
+Refactor `fetch_jwks_cache()` in `idtoken.rs` to use `cache_operations` module functions (`get_data`, `remove_data`, `store_cache_keyed`) instead of directly using `GENERIC_CACHE_STORE`. Each `cache_operations` function acquires and releases the lock independently, making double-locking structurally impossible.
 
-2. **Pre-warm OIDC Discovery and JWKS at startup**: Fetch OIDC discovery document and JWKS during server initialization (alongside the existing AAGUID loading). This eliminates the first-request latency for these resources:
-   - Populate `OIDC_DISCOVERY_CACHE` (OnceLock) at startup
-   - Populate JWKS in `GENERIC_CACHE_STORE` at startup
+Required type implementations are already in place:
+- `JwksCache: TryFrom<CacheData>` (idtoken.rs:137-143)
+- `JwksCache: Into<CacheData>` via `From` (idtoken.rs:129-135)
+- `TokenVerificationError: CacheErrorConversion` (idtoken.rs:98-102)
 
-### Phase 2: Architecture Improvement (longer-term)
+### Fix 2: Implement TTL for In-Memory Cache (defense in depth)
 
-3. **Replace global Mutex with RwLock or per-prefix locks**: The current `Mutex<Box<dyn CacheStore>>` serializes all operations. Options:
-   - `RwLock<Box<dyn CacheStore>>` - allows concurrent reads (most cache operations are reads)
-   - Per-prefix locking - separate locks for CSRF, session, JWKS, etc.
-   - Lock-free in-memory store using `DashMap` or similar
+Add lazy expiration to `InMemoryCacheStore`:
+- Store `expires_at: Option<Instant>` alongside each `CacheData` entry
+- In `get()`: return `None` for expired entries (matches Redis semantics)
+- In `put_with_ttl()`: set the expiration timestamp
+- In `put_if_not_exists()`: treat expired entries as non-existent
 
-4. **Background JWKS refresh**: Instead of lazy loading JWKS on each callback, refresh it periodically in the background to ensure it's always warm in cache.
+This makes in-memory cache behave consistently with Redis, preventing the expired-entry code path from being reached in the first place.
 
 ## Related Files
 
-- `oauth2_passkey/src/utils.rs` - `get_client()` with 30s timeout (line 182)
-- `oauth2_passkey/src/storage/cache_store/config.rs` - `GENERIC_CACHE_STORE` global Mutex (line 14)
-- `oauth2_passkey/src/coordination/oauth2.rs` - `process_oauth2_authorization()` (line 189)
-- `oauth2_passkey/src/oauth2/main/core.rs` - `get_idinfo_userinfo()` (line 183)
-- `oauth2_passkey/src/oauth2/main/google.rs` - `exchange_code_for_token()`, `fetch_user_data_from_google()`
-- `oauth2_passkey/src/oauth2/main/idtoken.rs` - `fetch_jwks_cache()` with triple lock pattern (lines 146-203)
-- `oauth2_passkey/src/oauth2/config.rs` - `get_discovered_endpoints()` with OnceLock (line 21)
-- `oauth2_passkey/src/oauth2/discovery.rs` - `fetch_oidc_discovery()`
+- `oauth2_passkey/src/oauth2/main/idtoken.rs` - `fetch_jwks_cache()` with deadlock (lines 146-203)
+- `oauth2_passkey/src/storage/cache_operations.rs` - Safe cache operations (`get_data`, `remove_data`, `store_cache_keyed`)
+- `oauth2_passkey/src/storage/cache_store/memory.rs` - `InMemoryCacheStore` with missing TTL
+- `oauth2_passkey/src/storage/cache_store/types.rs` - `CacheStore` trait definition
+- `oauth2_passkey/src/storage/cache_store/config.rs` - `GENERIC_CACHE_STORE` global Mutex
 
 ## Implementation Tasks
 
-### Phase 1
-- [ ] Reduce `get_client()` timeout from 30s to 5s
-- [ ] Add OIDC Discovery pre-warm at startup
-- [ ] Add JWKS pre-warm at startup
-- [ ] Test with Docker container
+### Fix 1: Deadlock Elimination
+- [ ] Refactor `fetch_jwks_cache()` to use `cache_operations` module
+- [ ] Remove `GENERIC_CACHE_STORE` import from `idtoken.rs`
+- [ ] Verify existing tests pass
 
-### Phase 2
-- [ ] Evaluate RwLock vs per-prefix locks vs DashMap
-- [ ] Implement improved locking strategy
-- [ ] Add background JWKS refresh
-- [ ] Load testing under simulated latency
+### Fix 2: In-Memory TTL
+- [ ] Add `CacheEntry` wrapper with `expires_at: Option<Instant>` to `memory.rs`
+- [ ] Update `InMemoryCacheStore` to use `HashMap<String, CacheEntry>`
+- [ ] Implement lazy expiration in `get()` (return `None` for expired)
+- [ ] Implement TTL in `put_with_ttl()` and `put_if_not_exists()`
+- [ ] Update existing tests in `memory/tests.rs`
+- [ ] Add TTL-specific tests
+
+### Verification
+- [ ] Run `cargo test`
+- [ ] Run `cargo clippy --all-targets --all-features`
+- [ ] Docker rebuild and test: login -> wait 10+ min -> login again
+- [ ] Verify no deadlock with in-memory cache
 
 ## Decision Log
 
@@ -124,5 +148,17 @@ Additionally, the HTTP client timeout of 30 seconds (`get_client()` in `utils.rs
 - Context: Default `reqwest` timeout is effectively infinite; current code sets 30s which is too long for interactive login flows
 - Decision: Reduce to 5s for `get_client()`
 - Reason: Google APIs typically respond within 1-2s. 5s provides margin for slow networks while preventing 30s hangs. If needed, a separate client with longer timeout can be created for non-interactive operations.
+
+### 2026-02-11: Root cause corrected - Mutex deadlock, not contention
+
+- Context: Debug logging in Docker revealed the flow stops at "Removing expired JWKs from cache" and never proceeds to the HTTP request. Investigation of `fetch_jwks_cache()` in `idtoken.rs` showed the `if let` pattern holds a `MutexGuard` temporary while trying to re-acquire the same non-reentrant `tokio::sync::Mutex` inside the body. The 30-second timeout never fires because the code is stuck on Mutex acquisition, not an HTTP request.
+- Decision: Withdraw previous proposals (timeout reduction, pre-warming, RwLock architecture). Replace with: (1) refactor `fetch_jwks_cache()` to use `cache_operations` module, (2) add TTL support to in-memory cache.
+- Reason: The original analysis (Mutex contention during HTTP requests) was incorrect. The actual bug is a deadlock that occurs only when the in-memory cache returns an expired JWKS entry (after 600s TTL). Redis auto-expires entries so the deadlock path is never reached with Redis backend. The fix must address both the deadlock pattern (primary) and the missing TTL (defense in depth).
+
+### 2026-02-11: Why in-memory cache exposes the bug but Redis does not
+
+- Context: User pointed out the deadlock never occurred during `cargo run` development (which uses Redis). Investigation revealed `InMemoryCacheStore::put_with_ttl()` ignores the `_ttl` parameter, keeping entries forever. Redis implements TTL natively and auto-deletes expired entries.
+- Decision: Add lazy TTL expiration to `InMemoryCacheStore` as a second fix (defense in depth)
+- Reason: Makes in-memory and Redis backends behave consistently. Prevents the expired-entry code path from being reached regardless of the deadlock fix. Simple to implement: store `expires_at` alongside data, return `None` in `get()` for expired entries.
 
 ## Resolution

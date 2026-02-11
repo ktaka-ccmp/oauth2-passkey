@@ -10,7 +10,7 @@ This directory contains issue/task tracking files for the project.
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260211-1742` | high | medium | [OAuth2 Callback Blocking Under Network Latency](open/20260211-1742-oauth2-callback-blocking.md) |
+| `20260211-1742` | high | medium | [OAuth2 Callback Deadlock on JWKS Cache Expiry](open/20260211-1742-oauth2-callback-blocking.md) |
 | `20260210-1930` | high | medium | [Admin Deletion Safeguard](open/20260210-1930-admin-deletion-safeguard.md) |
 | `2026-01-23-01` | medium | large | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
 | `20260210-0547` | medium | medium | [Enhance Login History with Auth-Method-Specific Details](open/20260210-0547-login-history-detail-enhancement.md) |

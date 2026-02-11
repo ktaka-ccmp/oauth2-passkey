@@ -1,10 +1,11 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 use crate::storage::errors::StorageError;
 use crate::storage::types::{CacheData, CacheKey, CachePrefix};
 
-use super::types::{CacheStore, InMemoryCacheStore};
+use super::types::{CacheEntry, CacheStore, InMemoryCacheStore};
 
 const CACHE_PREFIX: &str = "cache";
 
@@ -19,6 +20,15 @@ impl InMemoryCacheStore {
     fn make_key(prefix: CachePrefix, key: CacheKey) -> String {
         format!("{CACHE_PREFIX}:{}:{}", prefix.as_str(), key.as_str())
     }
+
+    /// Compute the expiration instant from a TTL value.
+    /// TTL=0 means "no expiration" (returns None).
+    fn compute_expires_at(ttl: usize) -> Option<Instant> {
+        match ttl {
+            0 => None,
+            ttl => Some(Instant::now() + Duration::from_secs(ttl as u64)),
+        }
+    }
 }
 
 #[async_trait]
@@ -30,7 +40,13 @@ impl CacheStore for InMemoryCacheStore {
         value: CacheData,
     ) -> Result<(), StorageError> {
         let key = Self::make_key(prefix, key);
-        self.entry.insert(key, value);
+        self.entry.insert(
+            key,
+            CacheEntry {
+                data: value,
+                expires_at: None,
+            },
+        );
         Ok(())
     }
 
@@ -39,10 +55,16 @@ impl CacheStore for InMemoryCacheStore {
         prefix: CachePrefix,
         key: CacheKey,
         value: CacheData,
-        _ttl: usize,
+        ttl: usize,
     ) -> Result<(), StorageError> {
         let key = Self::make_key(prefix, key);
-        self.entry.insert(key, value);
+        self.entry.insert(
+            key,
+            CacheEntry {
+                data: value,
+                expires_at: Self::compute_expires_at(ttl),
+            },
+        );
         Ok(())
     }
 
@@ -52,7 +74,10 @@ impl CacheStore for InMemoryCacheStore {
         key: CacheKey,
     ) -> Result<Option<CacheData>, StorageError> {
         let key = Self::make_key(prefix, key);
-        Ok(self.entry.get(&key).cloned())
+        match self.entry.get(&key) {
+            Some(entry) if !entry.is_expired() => Ok(Some(entry.data.clone())),
+            _ => Ok(None),
+        }
     }
 
     async fn remove(&mut self, prefix: CachePrefix, key: CacheKey) -> Result<(), StorageError> {
@@ -66,18 +91,27 @@ impl CacheStore for InMemoryCacheStore {
         prefix: CachePrefix,
         key: CacheKey,
         value: CacheData,
-        _ttl: usize,
+        ttl: usize,
     ) -> Result<bool, StorageError> {
         let key = Self::make_key(prefix, key);
 
-        // Atomic check-and-set: only insert if key doesn't exist
-        // Note: In-memory cache doesn't implement TTL expiration yet,
-        // but maintains interface consistency with Redis implementation
-        if let std::collections::hash_map::Entry::Vacant(e) = self.entry.entry(key) {
-            e.insert(value);
-            Ok(true) // Successfully inserted
+        // Treat expired entries as non-existent (consistent with Redis TTL behavior)
+        let is_occupied = self
+            .entry
+            .get(&key)
+            .is_some_and(|entry| !entry.is_expired());
+
+        if is_occupied {
+            Ok(false) // Key exists and is not expired
         } else {
-            Ok(false) // Key already exists
+            self.entry.insert(
+                key,
+                CacheEntry {
+                    data: value,
+                    expires_at: Self::compute_expires_at(ttl),
+                },
+            );
+            Ok(true) // Successfully inserted (or replaced expired entry)
         }
     }
 }
