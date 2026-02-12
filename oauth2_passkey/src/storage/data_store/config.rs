@@ -56,8 +56,12 @@ pub(crate) static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = Lazy
             let pool = if is_in_memory {
                 // Keep at least one connection alive so the shared in-memory
                 // database is never destroyed by idle connection eviction.
+                // Disable idle_timeout and max_lifetime to prevent connection
+                // cycling that can momentarily drop all connections (race condition).
                 sqlx::sqlite::SqlitePoolOptions::new()
                     .min_connections(1)
+                    .idle_timeout(None)
+                    .max_lifetime(None)
                     .connect_lazy_with(opts)
             } else {
                 sqlx::sqlite::SqlitePool::connect_lazy_with(opts)

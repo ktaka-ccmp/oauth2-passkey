@@ -1,0 +1,11 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'demo-both/Dockerfile'
+      - '-t'
+      - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo'
+      - '.'
+images:
+  - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo'

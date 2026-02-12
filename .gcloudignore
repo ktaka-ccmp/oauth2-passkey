@@ -1,0 +1,15 @@
+# Same exclusions as .dockerignore
+target/
+db/
+.junk/
+.backup/
+.git/
+.env
+*.log
+
+# Additional exclusions for Cloud Build upload size
+.claude/
+docs/
+utils/
+memo.txt
+git-diff.log
