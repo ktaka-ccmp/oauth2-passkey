@@ -40,18 +40,19 @@ that would make it unsuitable as a simple library usage example.
 
 ## Approach
 
-### Branch state comparison (verified 2026-02-12)
+### Branch state comparison (verified 2026-02-12, updated after PR #205 merge)
 
 | Branch | demo-both contents |
 |--------|-------------------|
-| **master** (= origin/master) | `Cargo.toml`, `README.md`, `src/`, `templates/` |
-| **dev** (= origin/dev) | master + `Dockerfile`, `docker-compose.yml` |
-| **dev-2026-01-30-08** (current) | dev + `DEPLOY.md`, `cloudbuild.yaml`, `env.cloud-run.yaml` |
+| **master** | `Cargo.toml`, `README.md`, `src/`, `templates/` |
+| **dev** | master + `Dockerfile`, `docker-compose.yml`, `DEPLOY.md`, `DOCKER_NOTES.md`, `cloudbuild.yaml`, `env.cloud-run.yaml` |
+| **dev-20260212-1804** (current, from dev) | same as dev (working branch for this issue) |
 
 master vs dev diff in demo-both:
 - `Cargo.toml`: dev adds `bundled-tls` feature (needed for Docker/Cloud Run)
 - `src/main.rs`: dev adds `PORT` env var support (needed for Cloud Run)
 - `src/protected.rs`, `src/server.rs`, `templates/`: identical
+- dev adds deployment files: `Dockerfile`, `docker-compose.yml`, `DEPLOY.md`, `DOCKER_NOTES.md`, `cloudbuild.yaml`, `env.cloud-run.yaml`
 
 ### Restore source for demo-both
 
@@ -71,52 +72,48 @@ Use **master** (`git checkout master -- demo-both/`). Rationale:
    - `Dockerfile`: Update paths (`demo-both/` -> `demo-live/`)
    - `cloudbuild.yaml`: Update Dockerfile path reference
    - `DEPLOY.md`: Update all `demo-both` references to `demo-live`
-   - `docker-compose.yml`: Update if needed
-5. **Update external references**:
-   - Root `CLAUDE.md`: Update demo-both references that now refer to demo-live
-   - `.dockerignore`: Check if demo-both is mentioned
-   - `.gcloudignore`: Check if demo-both is mentioned
-   - Issue files referencing demo-both paths
-   - `docs/` files referencing demo-both
-   - `Readme.md`, `oauth2_passkey_axum/README.md`
-6. **Verify**:
+   - `DOCKER_NOTES.md`: Update TLS feature chain and file references
+   - `docker-compose.yml`: Update paths in comments and dockerfile reference
+   - `env.cloud-run.yaml`: Update comments
+5. **Update issue files** (deployment/live-site references -> demo-live):
+   - `20260210-1935`: UI customization target changes to demo-live
+   - `20260212-1200`: Deployment paths change to demo-live
+   - `20260212-0235`: Extraction source changes to demo-live
+6. **Optionally add demo-live** to `CLAUDE.md` and `Readme.md` (new entries, not updates)
+   - Note: Existing `demo-both` references in docs/READMEs stay as-is (library example)
+7. **Verify**:
    - `cargo build` (workspace compiles)
    - `cargo test` (all tests pass)
    - `cargo clippy --all-targets --all-features`
    - Docker build works with updated paths
 
-### Files with `demo-both` references (37 files found)
+### Files with `demo-both` references (40 files found)
 
-**Must update (functional impact):**
-- `Cargo.toml` (workspace members)
+**Must update (demo-live internals, paths change from demo-both/ to demo-live/):**
+- `Cargo.toml` (workspace members: add demo-live)
 - `demo-live/Cargo.toml` (package name)
 - `demo-live/Dockerfile` (internal paths)
 - `demo-live/cloudbuild.yaml` (Dockerfile path)
 - `demo-live/DEPLOY.md` (all deployment instructions)
-- `demo-live/docker-compose.yml` (if any paths)
-- `CLAUDE.md` (build/run commands)
+- `demo-live/DOCKER_NOTES.md` (TLS feature chain, file references)
+- `demo-live/docker-compose.yml` (paths in comments and dockerfile reference)
+- `demo-live/env.cloud-run.yaml` (comments)
 
-**Should update (documentation accuracy):**
-- `Readme.md`
-- `oauth2_passkey_axum/README.md`
-- `demo-cross-origin/README.md`
-- `docs/src/getting-started/architecture.md`
-- `docs/src/getting-started/quick-start.md`
-- `docs/src/guides/tunneling.md`
-- `docs/src/security/csrf.md`
-
-**Issue files (update for consistency):**
+**Issue files (deployment/live-site references -> demo-live):**
 - `.claude/issues/open/20260210-1935-demo-site-ui-customizations.md`
 - `.claude/issues/open/20260212-1200-github-actions-auto-deploy.md`
 - `.claude/issues/open/20260212-0235-standalone-demo-repository.md`
-- `.claude/issues/completed/2026-01-30-demo-site-deployment.md`
 
-**Skip (historical/archived, no functional impact):**
-- `.claude/sessions/` files
-- `.claude/issues/completed/` (other than deployment issue)
-- `docs/src/archived/` files
-- `.junk/` files
-- `.backup/` files
+**No change needed (refer to demo-both as library usage example, which stays demo-both):**
+- `CLAUDE.md`, `Readme.md`, `oauth2_passkey_axum/README.md`, `oauth2_passkey_axum/src/lib.rs`
+- `demo-cross-origin/README.md`
+- `docs/src/getting-started/architecture.md`, `docs/src/getting-started/quick-start.md`
+- `docs/src/guides/tunneling.md`, `docs/src/security/csrf.md`
+- `.dockerignore`, `.gcloudignore` (no demo-both references)
+
+**Skip (historical/archived):**
+- `.claude/sessions/`, `.claude/issues/completed/`, `docs/src/archived/`
+- `docs/reorganization-plan.md`, `TestStrategy.md`, `.junk/`, `.backup/`
 - `Cargo.lock` (auto-updated by cargo)
 
 ### What stays in demo-both (restored from master)
@@ -145,9 +142,11 @@ Library usage example with no deployment files:
 - [ ] Update `demo-live/Dockerfile` paths
 - [ ] Update `demo-live/cloudbuild.yaml` paths
 - [ ] Update `demo-live/DEPLOY.md` references
-- [ ] Update root `CLAUDE.md`
-- [ ] Update documentation files (Readme.md, docs/, READMEs)
-- [ ] Update open issue files
+- [ ] Update `demo-live/DOCKER_NOTES.md` references
+- [ ] Update `demo-live/docker-compose.yml` references
+- [ ] Update `demo-live/env.cloud-run.yaml` references
+- [ ] Update issue files (20260210-1935, 20260212-1200, 20260212-0235)
+- [ ] Optionally add demo-live entries to `CLAUDE.md` and `Readme.md`
 - [ ] Verify: `cargo build`, `cargo test`, `cargo clippy`
 - [ ] Verify: Docker build with updated paths
 
@@ -164,5 +163,25 @@ Library usage example with no deployment files:
   as a clean example
 - Reason: Preserves demo-both as a simple, representative library usage example
   while allowing the live site to evolve independently with custom UI/UX
+
+### 2026-02-12: Updated branch comparison and file lists after PR #205 merge
+
+- Context: All changes from dev-2026-01-30-08 were merged into dev via PR #205.
+  The branch comparison table was outdated (still referenced dev-2026-01-30-08).
+- Decision: Updated table to reflect current state (dev now has all deployment
+  files), working branch is dev-20260212-1804. Added missing files to update
+  lists (DOCKER_NOTES.md, env.cloud-run.yaml, lib.rs doc comment, issues README).
+- Reason: Accuracy before implementation
+
+### 2026-02-12: Corrected external reference update scope
+
+- Context: Initial plan listed all files referencing `demo-both` as needing updates,
+  but after separation both `demo-both` and `demo-live` coexist. External files
+  (CLAUDE.md, Readme.md, docs/, READMEs, lib.rs) reference `demo-both` as the
+  library usage example, which remains `demo-both`.
+- Decision: Only update demo-live internals and issue files where references are
+  about deployment/live-site (which moves to demo-live). External docs stay as-is.
+- Reason: demo-both continues to exist as the library example; changing its references
+  would be incorrect
 
 ## Resolution
