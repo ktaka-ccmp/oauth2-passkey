@@ -13,6 +13,8 @@ Multi-stage build with `scratch` base image (27.7 MB total):
 
 TLS certificates are bundled at compile time via `webpki-roots` (`bundled-tls` feature), so no `ca-certificates` package is needed at runtime.
 
+For design decisions, trade-offs, and troubleshooting details, see [DOCKER_NOTES.md](DOCKER_NOTES.md).
+
 ## Local Testing
 
 ```bash
