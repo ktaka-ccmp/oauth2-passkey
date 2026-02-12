@@ -51,6 +51,12 @@ docker compose -f demo-both/docker-compose.yml up
 gcloud projects create $PROJECT_ID --name="OAuth2 Passkey Demo"
 gcloud config set project $PROJECT_ID
 
+# Link a billing account (required before enabling APIs)
+# List available billing accounts:
+gcloud billing accounts list
+# Link to project:
+gcloud billing projects link $PROJECT_ID --billing-account=$BILLING_ACCOUNT_ID
+
 # Enable required APIs
 gcloud services enable run.googleapis.com
 gcloud services enable artifactregistry.googleapis.com
