@@ -135,6 +135,7 @@
     const ENTRIES_PER_PAGE = 50;
     let currentOffset = 0;
     let currentEntries = [];
+    let currentAuthenticators = {};
 
     // Load user list for dropdown
     async function loadUserList() {
@@ -191,7 +192,9 @@
                 throw new Error('Failed to fetch audit log');
             }
 
-            currentEntries = await response.json();
+            const data = await response.json();
+            currentEntries = data.entries;
+            currentAuthenticators = data.authenticators || {};
             currentOffset = offset;
 
             if (currentEntries.length === 0 && offset === 0) {
@@ -209,14 +212,26 @@
         }
     }
 
+    function renderAuthMethodLabel(entry) {
+        const authInfo = entry.aaguid ? currentAuthenticators[entry.aaguid] : null;
+        if (authInfo) {
+            const iconUrl = authInfo.icon_light || authInfo.icon_dark;
+            const iconHtml = iconUrl
+                ? `<img src="${iconUrl}" alt="${authInfo.name}" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;">`
+                : '';
+            return `${iconHtml}<strong>${authInfo.name}</strong>`;
+        }
+        const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
+        const method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
+        return `<span class="login-icon">${icon}</span> <strong>${method}</strong>`;
+    }
+
     function renderEntries(entries) {
         const container = document.getElementById('audit-log-container');
         let html = '<div class="login-history-list">';
 
         for (const entry of entries) {
             const date = new Date(entry.timestamp).toLocaleString();
-            const method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
-            const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
             const status = entry.success ? '✓' : '✗';
             const statusClass = entry.success ? 'success' : 'failure';
 
@@ -230,8 +245,7 @@
             html += `
                 <div class="${itemClass}">
                     <div class="item-detail">
-                        <span class="login-icon">${icon}</span>
-                        <strong>${method}</strong>
+                        ${renderAuthMethodLabel(entry)}
                         <span class="login-status ${statusClass}">${status}</span>
                         ${isAnonymous ? '<span style="color: #856404;">(Anonymous)</span>' : ''}
                     </div>

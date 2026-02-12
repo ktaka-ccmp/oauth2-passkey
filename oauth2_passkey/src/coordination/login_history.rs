@@ -24,6 +24,7 @@ pub(super) async fn record_login_success(
     credential_id: Option<String>,
     provider: Option<String>,
     provider_user_id: Option<String>,
+    aaguid: Option<String>,
 ) -> Result<(), CoordinationError> {
     let entry = LoginHistoryEntry::success(
         user_id.as_str().to_string(),
@@ -32,6 +33,7 @@ pub(super) async fn record_login_success(
         credential_id,
         provider,
         provider_user_id,
+        aaguid,
     );
 
     match LoginHistoryStore::insert(entry).await {

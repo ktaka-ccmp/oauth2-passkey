@@ -213,6 +213,22 @@
         }
 
         // Login History Functions
+        let currentAuthenticators = {};
+
+        function renderAuthMethodLabel(entry) {
+            const authInfo = entry.aaguid ? currentAuthenticators[entry.aaguid] : null;
+            if (authInfo) {
+                const iconUrl = authInfo.icon_light || authInfo.icon_dark;
+                const iconHtml = iconUrl
+                    ? `<img src="${iconUrl}" alt="${authInfo.name}" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;">`
+                    : '';
+                return `${iconHtml}<strong>${authInfo.name}</strong>`;
+            }
+            const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
+            const method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
+            return `<span class="login-icon">${icon}</span> <strong>${method}</strong>`;
+        }
+
         async function loadLoginHistory() {
             const container = document.getElementById('login-history-container');
             container.innerHTML = '<p id="login-history-loading">Loading...</p>';
@@ -226,7 +242,9 @@
                     throw new Error('Failed to fetch login history');
                 }
 
-                const entries = await response.json();
+                const data = await response.json();
+                const entries = data.entries;
+                currentAuthenticators = data.authenticators || {};
 
                 if (entries.length === 0) {
                     container.innerHTML = '<p>No login history available.</p>';
@@ -236,16 +254,13 @@
                 let html = '<div class="login-history-list">';
                 for (const entry of entries) {
                     const date = new Date(entry.timestamp).toLocaleString();
-                    const method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
-                    const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
                     const status = entry.success ? '✓' : '✗';
                     const statusClass = entry.success ? 'success' : 'failure';
 
                     html += `
                         <div class="item login-history-entry">
                             <div class="item-detail">
-                                <span class="login-icon">${icon}</span>
-                                <strong>${method}</strong>
+                                ${renderAuthMethodLabel(entry)}
                                 <span class="login-status ${statusClass}">${status}</span>
                             </div>
                             <div class="item-detail"><strong>Time:</strong> ${date}</div>

@@ -48,6 +48,8 @@ pub struct LoginHistoryEntry {
     pub provider_user_id: Option<String>,
     /// Reason for failure (if success is false)
     pub failure_reason: Option<String>,
+    /// AAGUID of the authenticator (for passkey logins)
+    pub aaguid: Option<String>,
 }
 
 impl LoginHistoryEntry {
@@ -59,6 +61,7 @@ impl LoginHistoryEntry {
         credential_id: Option<String>,
         provider: Option<String>,
         provider_user_id: Option<String>,
+        aaguid: Option<String>,
     ) -> Self {
         Self {
             id: None,
@@ -72,6 +75,7 @@ impl LoginHistoryEntry {
             provider,
             provider_user_id,
             failure_reason: None,
+            aaguid,
         }
     }
 
@@ -95,6 +99,7 @@ impl LoginHistoryEntry {
             provider: None,
             provider_user_id: None,
             failure_reason: Some(reason),
+            aaguid: None,
         }
     }
 }

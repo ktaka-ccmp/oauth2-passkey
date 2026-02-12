@@ -26,7 +26,8 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             credential_id TEXT,
             provider TEXT,
             provider_user_id TEXT,
-            failure_reason TEXT
+            failure_reason TEXT,
+            aaguid TEXT
         )
         "#
     ))
@@ -57,6 +58,23 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     Ok(())
 }
 
+/// Migrates the login history table to add the aaguid column if it doesn't exist.
+/// This is needed for existing databases that were created before aaguid was added.
+pub(super) async fn migrate_login_history_tables_postgres(
+    pool: &Pool<Postgres>,
+) -> Result<(), LoginHistoryError> {
+    let table_name = DB_TABLE_LOGIN_HISTORY.as_str();
+
+    sqlx::query(&format!(
+        "ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS aaguid TEXT"
+    ))
+    .execute(pool)
+    .await
+    .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
+
+    Ok(())
+}
+
 /// Validates that the login history table schema matches what we expect
 pub(super) async fn validate_login_history_tables_postgres(
     pool: &Pool<Postgres>,
@@ -75,6 +93,7 @@ pub(super) async fn validate_login_history_tables_postgres(
         ("provider", "text"),
         ("provider_user_id", "text"),
         ("failure_reason", "text"),
+        ("aaguid", "text"),
     ];
 
     validate_postgres_table_schema(
@@ -99,9 +118,10 @@ pub(super) async fn insert_login_history_postgres(
         r#"
         INSERT INTO {table_name} (
             user_id, timestamp, auth_method, ip_address, user_agent,
-            success, credential_id, provider, provider_user_id, failure_reason
+            success, credential_id, provider, provider_user_id, failure_reason,
+            aaguid
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *
         "#
     ))
@@ -115,6 +135,7 @@ pub(super) async fn insert_login_history_postgres(
     .bind(&entry.provider)
     .bind(&entry.provider_user_id)
     .bind(&entry.failure_reason)
+    .bind(&entry.aaguid)
     .fetch_one(pool)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;

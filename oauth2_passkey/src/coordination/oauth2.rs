@@ -359,6 +359,7 @@ async fn process_oauth2_authorization(
         None,
         Some(provider_for_history),
         Some(provider_user_id_for_history),
+        None,
     )
     .await;
 

@@ -275,7 +275,7 @@ pub async fn handle_finish_authentication_core(
     let credential_id_str = auth_response.credential_id().to_string();
 
     // Verify the authentication and get the user ID, name, and user handle
-    let (uid, name, user_handle) = match finish_authentication(auth_response).await {
+    let (uid, name, user_handle, aaguid) = match finish_authentication(auth_response).await {
         Ok(result) => result,
         Err(e) => {
             record_auth_failure(login_context, credential_id_str, &e).await;
@@ -331,6 +331,7 @@ pub async fn handle_finish_authentication_core(
         Some(credential_id_str),
         None,
         None,
+        Some(aaguid),
     )
     .await;
 
