@@ -182,4 +182,17 @@ Workflow auth changes to:
 - Decision: Create separate issue for auto-deploy
 - Reason: Clean separation of concerns; deployment issue can be closed as completed
 
+### 2026-02-12: Fix Cloud Build log streaming permission error
+
+- Context: `gcloud builds submit` in GitHub Actions failed with "This tool can only stream logs
+  if you are Viewer/Owner of the project". The SA has `cloudbuild.builds.editor` + `storage.admin`
+  but not project-level `roles/viewer`. Three attempts failed:
+  1. `roles/logging.viewer` - insufficient (default logs bucket is Cloud Storage, not Cloud Logging)
+  2. `--suppress-logs` - flag did not prevent the log streaming attempt
+  3. Granting `roles/viewer` was rejected as overly broad (read access to all project resources)
+- Decision: Add `defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET` to `cloudbuild.yaml`
+- Reason: Uses a user-owned regional bucket for build logs instead of the Google-managed default
+  bucket. The SA's existing `roles/storage.admin` covers read/write access to user-owned buckets,
+  eliminating the need for the broad `roles/viewer` role. Logs remain visible in GitHub Actions.
+
 ## Resolution
