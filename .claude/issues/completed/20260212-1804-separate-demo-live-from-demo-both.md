@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-12-18-04
 
-## Closed:
+## Closed: 2026-02-12
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -135,20 +135,20 @@ Library usage example with no deployment files:
 
 ## Implementation Tasks
 
-- [ ] `git mv demo-both demo-live`
-- [ ] Restore `demo-both/` from master: `git checkout master -- demo-both/`
-- [ ] Update `demo-live/Cargo.toml` package name
-- [ ] Update workspace `Cargo.toml` (add demo-live)
-- [ ] Update `demo-live/Dockerfile` paths
-- [ ] Update `demo-live/cloudbuild.yaml` paths
-- [ ] Update `demo-live/DEPLOY.md` references
-- [ ] Update `demo-live/DOCKER_NOTES.md` references
-- [ ] Update `demo-live/docker-compose.yml` references
-- [ ] Update `demo-live/env.cloud-run.yaml` references
-- [ ] Update issue files (20260210-1935, 20260212-1200, 20260212-0235)
-- [ ] Optionally add demo-live entries to `CLAUDE.md` and `Readme.md`
-- [ ] Verify: `cargo build`, `cargo test`, `cargo clippy`
-- [ ] Verify: Docker build with updated paths
+- [x] `git mv demo-both demo-live`
+- [x] Restore `demo-both/` from master: `git checkout master -- demo-both/`
+- [x] Update `demo-live/Cargo.toml` package name
+- [x] Update workspace `Cargo.toml` (add demo-live)
+- [x] Update `demo-live/Dockerfile` paths
+- [x] Update `demo-live/cloudbuild.yaml` paths
+- [x] Update `demo-live/DEPLOY.md` references
+- [x] Update `demo-live/DOCKER_NOTES.md` references
+- [x] Update `demo-live/docker-compose.yml` references
+- [x] Update `demo-live/env.cloud-run.yaml` references
+- [x] Update issue files (20260210-1935, 20260212-1200, 20260212-0235)
+- [x] Skipped: demo-live entries in `CLAUDE.md` and `Readme.md` (not needed)
+- [x] Verify: `cargo build`, `cargo test`, `cargo clippy`
+- [x] Verify: Docker build with updated paths
 
 ## Decision Log
 
@@ -185,3 +185,14 @@ Library usage example with no deployment files:
   would be incorrect
 
 ## Resolution
+
+Separated `demo-live` from `demo-both` successfully:
+
+- **demo-both**: Restored from master as a clean library usage example (no deployment files)
+- **demo-live**: Live demo site with all deployment files (Dockerfile, docker-compose.yml, cloudbuild.yaml, DEPLOY.md, etc.)
+- Updated all internal paths and references in demo-live
+- Updated 3 issue files (20260210-1935, 20260212-1200, 20260212-0235) for deployment/live-site references
+- External docs referencing demo-both as library example left unchanged (correct as-is)
+- Verified: cargo build, cargo test, cargo clippy, Docker build all pass
+- Committed as `1bfd461`
+- Cloud Run (passkey-demo.ccmp.jp) unaffected; next redeployment uses `demo-live/cloudbuild.yaml`
