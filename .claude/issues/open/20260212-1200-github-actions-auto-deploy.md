@@ -164,11 +164,12 @@ Workflow auth changes to:
 
 ## Implementation Tasks
 
-- [ ] Create GCP service account with required IAM roles
-- [ ] Generate JSON key and add to GitHub repository secrets (`GCP_SA_KEY`, `GCP_PROJECT_ID`)
+- [x] Create GCP service account with required IAM roles
+- [x] Generate JSON key and add to GitHub repository secrets (`GCP_SA_KEY`, `GCP_PROJECT_ID`)
 - [x] Create `.github/workflows/deploy-demo.yml`
-- [ ] Test workflow by pushing to master
+- [ ] Test workflow by pushing to dev
 - [x] Update `demo-live/DEPLOY.md` with auto-deploy section
+- [x] Add `sa-key.json` to `.gitignore`
 
 ## Decision Log
 
