@@ -168,9 +168,67 @@ Note: `gcloud run domain-mappings create` (without `beta`) is for Cloud Run for 
 3. Test Passkey registration and authentication
 4. Wait 10+ minutes, test OAuth2 login again (JWKS cache refresh)
 
-## Redeployment
+## Auto-Deploy (GitHub Actions)
 
-After code changes, rebuild and redeploy:
+Pushes to the trigger branch (currently `dev`) that change relevant files automatically build and deploy to Cloud Run. The trigger branch is configured in `.github/workflows/deploy-demo.yml`.
+
+### Trigger paths
+
+- `oauth2_passkey/**`, `oauth2_passkey_axum/**` - library changes
+- `demo-live/**` - demo app changes
+- `.github/workflows/deploy-demo.yml` - workflow changes
+
+### GCP setup (one-time)
+
+```bash
+# 1. Create service account
+gcloud iam service-accounts create github-actions-deploy \
+  --display-name="GitHub Actions Deploy"
+
+SA_EMAIL="github-actions-deploy@${PROJECT_ID}.iam.gserviceaccount.com"
+
+# 2. Grant roles
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${SA_EMAIL}" --role="roles/run.admin"
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${SA_EMAIL}" --role="roles/iam.serviceAccountUser"
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${SA_EMAIL}" --role="roles/cloudbuild.builds.editor"
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${SA_EMAIL}" --role="roles/artifactregistry.writer"
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${SA_EMAIL}" --role="roles/storage.admin"
+
+# 3. Generate JSON key
+gcloud iam service-accounts keys create sa-key.json \
+  --iam-account=$SA_EMAIL
+```
+
+### GitHub repository secrets (one-time)
+
+1. GitHub repository page > Settings > Secrets and variables > Actions
+2. "New repository secret" for each:
+
+| Name | Value |
+|------|-------|
+| `GCP_SA_KEY` | Contents of `sa-key.json` |
+| `GCP_PROJECT_ID` | Your GCP project ID |
+
+3. Delete the local key file:
+```bash
+rm sa-key.json
+```
+
+### Workflow
+
+See `.github/workflows/deploy-demo.yml`. On each push to the trigger branch:
+1. Authenticates to GCP with service account key
+2. Builds Docker image via Cloud Build (`demo-live/cloudbuild.yaml`)
+3. Deploys to Cloud Run (image update only; env vars and secrets are preserved)
+
+## Manual Redeployment
+
+To rebuild and redeploy manually:
 
 ```bash
 # Rebuild image
@@ -215,3 +273,4 @@ Note: `--env-vars-file` replaces all env vars. `--update-env-vars` merges (adds 
 | `cloudbuild.yaml` | Cloud Build config (image tag, Dockerfile path) |
 | `../.dockerignore` | Excludes db/, target/, .git/, etc. |
 | `../.gcloudignore` | Excludes files from Cloud Build upload |
+| `../.github/workflows/deploy-demo.yml` | GitHub Actions auto-deploy workflow |
