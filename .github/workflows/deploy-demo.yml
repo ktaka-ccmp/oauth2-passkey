@@ -30,7 +30,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Build with Cloud Build
-        run: gcloud builds submit --config=demo-live/cloudbuild.yaml --suppress-logs
+        run: gcloud builds submit --config=demo-live/cloudbuild.yaml
 
       - name: Deploy to Cloud Run
         run: |

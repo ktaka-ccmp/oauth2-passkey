@@ -9,3 +9,5 @@ steps:
       - '.'
 images:
   - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo'
+options:
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
