@@ -1,6 +1,6 @@
 # Demo Deployment Guide
 
-This guide covers local Docker testing and Google Cloud Run deployment for the `demo-live` application (OAuth2 + Passkey authentication demo).
+This guide covers local Docker testing and Google Cloud Run deployment for the `demo-live` application (OAuth2 + Passkey authentication demo) at `https://passkey-demo.ccmp.jp`.
 
 ## Docker Image
 
@@ -39,6 +39,7 @@ docker compose -f demo-live/docker-compose.yml up
 - Google Cloud CLI (`gcloud`) installed and authenticated
 - A GCP project (or create one in Step 1)
 - Google OAuth2 credentials (Client ID + Secret)
+- Custom domain `passkey-demo.ccmp.jp` with DNS access
 
 ### Storage Strategy
 
@@ -49,14 +50,15 @@ docker compose -f demo-live/docker-compose.yml up
 ### Step 1: Create GCP project and enable APIs
 
 ```bash
+export PROJECT_ID="your-gcp-project-id"
+
 # Create project (or use existing one)
 gcloud projects create $PROJECT_ID --name="OAuth2 Passkey Demo"
 gcloud config set project $PROJECT_ID
 
 # Link a billing account (required before enabling APIs)
-# List available billing accounts:
 gcloud billing accounts list
-# Link to project:
+export BILLING_ACCOUNT_ID="your-billing-account-id"
 gcloud billing projects link $PROJECT_ID --billing-account=$BILLING_ACCOUNT_ID
 
 # Enable required APIs
@@ -72,10 +74,15 @@ gcloud services enable cloudbuild.googleapis.com
 2. Click "Create Credentials" > "OAuth client ID"
 3. Application type: "Web application"
 4. Name: e.g. "oauth2-passkey-demo"
-5. Authorized redirect URIs: `http://localhost:3001/o2p/oauth2/authorized` (placeholder)
+5. Authorized redirect URIs:
+   - `http://localhost:3001/o2p/oauth2/authorized` (local development)
+   - `https://passkey-demo.ccmp.jp/o2p/oauth2/authorized` (production)
 6. Save the **Client ID** and **Client Secret**
 
-Note: The Cloud Run redirect URI will be added in Step 6 after deployment.
+```bash
+export OAUTH2_GOOGLE_CLIENT_ID="your-client-id"
+export OAUTH2_GOOGLE_CLIENT_SECRET="your-client-secret"
+```
 
 ### Step 3: Store secrets in Secret Manager
 
@@ -121,8 +128,6 @@ docker push asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo
 ### Step 5: Deploy to Cloud Run
 
 ```bash
-# Deploy with env vars from file + secrets
-# (--env-vars-file and --update-env-vars are mutually exclusive)
 gcloud run deploy oauth2-passkey-demo \
   --image asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo \
   --region asia-northeast1 \
@@ -131,45 +136,13 @@ gcloud run deploy oauth2-passkey-demo \
   --min-instances 1 \
   --env-vars-file demo-live/env.cloud-run.yaml \
   --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest"
-
-# Set ORIGIN separately (placeholder for first deploy; Step 6 updates to actual URL)
-gcloud run services update oauth2-passkey-demo \
-  --region asia-northeast1 \
-  --update-env-vars "ORIGIN=https://placeholder.example.com"
 ```
 
-Note: `--env-vars-file` and `--update-env-vars` cannot be combined in one command.
-Environment variables are managed in `env.cloud-run.yaml`, and `ORIGIN` is set
-separately because it is deployment-specific.
+All environment variables including `ORIGIN` are managed in `env.cloud-run.yaml`.
 
-### Step 6: Configure ORIGIN and OAuth2 redirect URI
+### Step 6: Configure custom domain
 
-```bash
-# Get the Cloud Run service URL
-SERVICE_URL=$(gcloud run services describe oauth2-passkey-demo \
-  --region asia-northeast1 --format='value(status.url)')
-echo "Service URL: $SERVICE_URL"
-
-# Update ORIGIN to the actual Cloud Run URL
-gcloud run services update oauth2-passkey-demo \
-  --region asia-northeast1 \
-  --update-env-vars "ORIGIN=$SERVICE_URL"
-```
-
-Then add the redirect URI in Google Cloud Console:
-1. APIs & Services > Credentials > edit the OAuth client
-2. Add authorized redirect URI: `$SERVICE_URL/o2p/oauth2/authorized`
-
-### Step 7: Verify functionality
-
-1. Access `$SERVICE_URL` in browser
-2. Test OAuth2 login (Google)
-3. Test Passkey registration and authentication
-4. Wait 10+ minutes, test OAuth2 login again (JWKS cache refresh)
-
-## Custom Domain (Optional)
-
-Map a custom domain to the Cloud Run service (free, includes managed SSL):
+Map the custom domain to the Cloud Run service (free, includes managed SSL):
 
 ```bash
 # Create domain mapping (requires gcloud beta)
@@ -184,17 +157,16 @@ Add a CNAME record in your DNS:
 passkey-demo.ccmp.jp.  CNAME  ghs.googlehosted.com.
 ```
 
-Then update ORIGIN and OAuth2 redirect URI:
-```bash
-gcloud run services update oauth2-passkey-demo \
-  --region asia-northeast1 \
-  --update-env-vars "ORIGIN=https://passkey-demo.ccmp.jp"
-```
-
-Add `https://passkey-demo.ccmp.jp/o2p/oauth2/authorized` as an authorized redirect URI
-in Google Cloud Console. SSL certificate is provisioned automatically (10-20 min).
+SSL certificate is provisioned automatically (10-20 min).
 
 Note: `gcloud run domain-mappings create` (without `beta`) is for Cloud Run for Anthos only.
+
+### Step 7: Verify functionality
+
+1. Access `https://passkey-demo.ccmp.jp` in browser
+2. Test OAuth2 login (Google)
+3. Test Passkey registration and authentication
+4. Wait 10+ minutes, test OAuth2 login again (JWKS cache refresh)
 
 ## Redeployment
 
@@ -208,19 +180,30 @@ gcloud builds submit --config=demo-live/cloudbuild.yaml
 gcloud run deploy oauth2-passkey-demo \
   --image asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo \
   --region asia-northeast1
+```
 
-# If env vars changed, update them separately:
+If environment variables changed, re-apply the full set or update individually:
+
+```bash
+# Re-apply all env vars from file
 gcloud run services update oauth2-passkey-demo \
   --region asia-northeast1 \
   --env-vars-file demo-live/env.cloud-run.yaml
+
+# Or update individual env vars
+gcloud run services update oauth2-passkey-demo \
+  --region asia-northeast1 \
+  --update-env-vars "KEY=value"
 ```
+
+Note: `--env-vars-file` replaces all env vars. `--update-env-vars` merges (adds or overwrites specified keys only). These two flags cannot be combined in one command.
 
 ## Google OAuth2 Notes
 
 - Authentication is free (no charges)
 - Test mode: max 100 test users (only added test users can log in)
 - Public access requires Google verification review (review is free)
-- Redirect URI format: `https://<service-name>-<hash>.run.app/o2p/oauth2/authorized`
+- Redirect URI: `https://passkey-demo.ccmp.jp/o2p/oauth2/authorized`
 
 ## Related Files
 
