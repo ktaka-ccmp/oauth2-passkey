@@ -68,7 +68,10 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 gcloud iam service-accounts keys create sa-key.json \
   --iam-account=$SA_EMAIL
 
-# 4. Add to GitHub: Settings > Secrets > Actions > GCP_SA_KEY (paste sa-key.json contents)
+# 4. Add repository secrets in GitHub:
+#    Repository page > Settings > Secrets and variables > Actions > "New repository secret"
+#    - GCP_SA_KEY: paste sa-key.json contents
+#    - GCP_PROJECT_ID: your GCP project ID
 # 5. Delete local key: rm sa-key.json
 ```
 
@@ -161,11 +164,12 @@ Workflow auth changes to:
 
 ## Implementation Tasks
 
-- [ ] Create GCP service account with required IAM roles
-- [ ] Generate JSON key and add to GitHub repository secrets
-- [ ] Create `.github/workflows/deploy-demo.yml`
-- [ ] Test workflow by pushing to master
-- [ ] Update `demo-live/DEPLOY.md` with auto-deploy section
+- [x] Create GCP service account with required IAM roles
+- [x] Generate JSON key and add to GitHub repository secrets (`GCP_SA_KEY`, `GCP_PROJECT_ID`)
+- [x] Create `.github/workflows/deploy-demo.yml`
+- [ ] Test workflow by pushing to dev
+- [x] Update `demo-live/DEPLOY.md` with auto-deploy section
+- [x] Add `sa-key.json` to `.gitignore`
 
 ## Decision Log
 
