@@ -1,15 +1,15 @@
 # Rebuild after code changes:
-#   docker compose -f demo-both/docker-compose.yml up --build
-#   (from demo-both/): docker compose up --build
+#   docker compose -f demo-live/docker-compose.yml up --build
+#   (from demo-live/): docker compose up --build
 #
 # Force full rebuild (if cache is stale or behavior is suspicious):
-#   docker compose -f demo-both/docker-compose.yml build --no-cache && docker compose -f demo-both/docker-compose.yml up
-#   (from demo-both/): docker compose build --no-cache && docker compose up
+#   docker compose -f demo-live/docker-compose.yml build --no-cache && docker compose -f demo-live/docker-compose.yml up
+#   (from demo-live/): docker compose build --no-cache && docker compose up
 services:
   demo:
     build:
       context: ..
-      dockerfile: demo-both/Dockerfile
+      dockerfile: demo-live/Dockerfile
     ports:
       - "3001:8080"
     env_file: ../.env

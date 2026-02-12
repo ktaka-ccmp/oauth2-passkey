@@ -25,7 +25,7 @@
 ## Description
 
 The public demo site needs several UI/UX customizations to be suitable for public
-access. These changes should be implemented in the demo application layer (demo-both)
+access. These changes should be implemented in the demo application layer (demo-live)
 or via library configuration, without modifying core library internals.
 
 ### Requirements
@@ -48,13 +48,13 @@ or via library configuration, without modifying core library internals.
 
 ### Strategy: Demo-app-side changes preferred
 
-Prefer making changes in demo-both or via existing library configuration rather than
+Prefer making changes in demo-live or via existing library configuration rather than
 modifying core library code. This keeps the library clean and the demo customizations
 isolated.
 
 ### Per-requirement approach
 
-1. **Admin selection**: Add a post-registration hook in demo-both that calls
+1. **Admin selection**: Add a post-registration hook in demo-live that calls
    `update_user_admin_status()` based on user choice, or add an environment variable
    to the library (e.g., `O2P_NEW_USER_DEFAULT_ADMIN=true`)
 2. **Field masking**: CSS/JS changes in admin templates - mask Account/Label with
@@ -66,7 +66,7 @@ isolated.
 
 ## Related Files
 
-- `demo-both/src/main.rs` (demo application entry point)
+- `demo-live/src/main.rs` (demo application entry point)
 - `oauth2_passkey_axum/src/admin/default.rs` (admin handlers)
 - `oauth2_passkey_axum/templates/admin_index.j2` (user list template)
 - `oauth2_passkey_axum/templates/admin_user.j2` (user detail template)

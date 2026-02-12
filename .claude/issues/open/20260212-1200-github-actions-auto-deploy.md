@@ -84,7 +84,7 @@ on:
     paths:
       - 'oauth2_passkey/**'
       - 'oauth2_passkey_axum/**'
-      - 'demo-both/**'
+      - 'demo-live/**'
       - '.github/workflows/deploy-demo.yml'
 
 env:
@@ -108,7 +108,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Build with Cloud Build
-        run: gcloud builds submit --config=demo-both/cloudbuild.yaml
+        run: gcloud builds submit --config=demo-live/cloudbuild.yaml
 
       - name: Deploy to Cloud Run
         run: |
@@ -121,7 +121,7 @@ jobs:
 
 - **Trigger branch**: `master` (not `dev`) - only deploy stable code
 - **`paths` filter**: Only trigger when relevant code changes (not README edits)
-- **Cloud Build**: Reuse existing `demo-both/cloudbuild.yaml` for image build
+- **Cloud Build**: Reuse existing `demo-live/cloudbuild.yaml` for image build
 - **Deploy only updates image**: Env vars and secrets are already configured on Cloud Run
 
 ### Optional: Workload Identity Federation (more secure)
@@ -156,8 +156,8 @@ Workflow auth changes to:
 ## Related Files
 
 - `.github/workflows/deploy-demo.yml` (to be created)
-- `demo-both/cloudbuild.yaml` - Cloud Build config (reused by workflow)
-- `demo-both/DEPLOY.md` - Deployment guide
+- `demo-live/cloudbuild.yaml` - Cloud Build config (reused by workflow)
+- `demo-live/DEPLOY.md` - Deployment guide
 
 ## Implementation Tasks
 
@@ -165,7 +165,7 @@ Workflow auth changes to:
 - [ ] Generate JSON key and add to GitHub repository secrets
 - [ ] Create `.github/workflows/deploy-demo.yml`
 - [ ] Test workflow by pushing to master
-- [ ] Update `demo-both/DEPLOY.md` with auto-deploy section
+- [ ] Update `demo-live/DEPLOY.md` with auto-deploy section
 
 ## Decision Log
 

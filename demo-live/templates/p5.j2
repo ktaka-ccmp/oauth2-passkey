@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo: CSRF Token in Template</title>
+    <link rel="stylesheet" href="{{prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
+    <style>
+        .demo-description { color: var(--o2p-text-secondary); margin-bottom: var(--o2p-space-md); }
+        .token-display {
+            font-family: monospace;
+            background: var(--o2p-surface-alt);
+            padding: var(--o2p-space-xs) var(--o2p-space-sm);
+            border-radius: var(--o2p-radius-sm);
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="page-header">
+        <h1>p5: CSRF Token in Template</h1>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/p1">p1</a>
+            <a href="/p2">p2</a>
+            <a href="/p3">p3</a>
+            <a href="/p4">p4</a>
+            <a href="/p5">p5</a>
+            <a href="/p6">p6</a>
+            <a href="/nested/p3">nested/p3</a>
+            <a href="{{prefix}}/user/account">My Account</a>
+        </nav>
+        <div class="header-buttons">
+            <a href="{{prefix}}/user/logout?redirect=/" class="btn btn-secondary btn-sm">Logout</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">About This Page</h2>
+        </div>
+        <p class="demo-description">
+            {{message}}
+            The CSRF token is extracted from the middleware <code>Extension&lt;CsrfToken&gt;</code>
+            and embedded directly in the template. Useful for server-rendered forms.
+        </p>
+    </div>
+
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">Embedded CSRF Token</h2>
+        </div>
+        <div class="item">
+            <div class="item-detail"><strong>CSRF Token:</strong> <span class="token-display">{{ csrf_token }}</span></div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
