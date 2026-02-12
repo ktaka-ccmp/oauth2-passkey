@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-12-12-00
 
-## Closed:
+## Closed: 2026-02-13
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -167,7 +167,7 @@ Workflow auth changes to:
 - [x] Create GCP service account with required IAM roles
 - [x] Generate JSON key and add to GitHub repository secrets (`GCP_SA_KEY`, `GCP_PROJECT_ID`)
 - [x] Create `.github/workflows/deploy-demo.yml`
-- [ ] Test workflow by pushing to dev
+- [x] Test workflow by pushing to dev
 - [x] Update `demo-live/DEPLOY.md` with auto-deploy section
 - [x] Add `sa-key.json` to `.gitignore`
 
@@ -196,3 +196,13 @@ Workflow auth changes to:
   eliminating the need for the broad `roles/viewer` role. Logs remain visible in GitHub Actions.
 
 ## Resolution
+
+GitHub Actions auto-deploy workflow is fully operational. Pushes to `dev` branch
+that change relevant paths trigger Cloud Build and deploy to Cloud Run automatically.
+
+Key implementation details:
+- Workflow: `.github/workflows/deploy-demo.yml`
+- Cloud Build uses `REGIONAL_USER_OWNED_BUCKET` for log storage to avoid
+  requiring overly broad `roles/viewer` permission
+- SA roles: `run.admin`, `iam.serviceAccountUser`, `cloudbuild.builds.editor`,
+  `artifactregistry.writer`, `storage.admin`
