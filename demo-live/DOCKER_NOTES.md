@@ -50,7 +50,7 @@ so the shell-less trade-off has zero practical impact.
 The `bundled-tls` feature flag controls whether `webpki-roots` and `rustls` are included:
 
 ```
-demo-both (bundled-tls) -> oauth2-passkey-axum (bundled-tls) -> oauth2-passkey (bundled-tls)
+demo-live (bundled-tls) -> oauth2-passkey-axum (bundled-tls) -> oauth2-passkey (bundled-tls)
 ```
 
 In `oauth2_passkey/src/utils.rs`, `get_client()` conditionally uses `use_preconfigured_tls()`:
@@ -106,7 +106,7 @@ instead of `docker run --env-file`.
 
 ### BuildKit cache invalidation
 
-After relocating Dockerfile (e.g., root -> `demo-both/`), BuildKit's
+After relocating Dockerfile (e.g., root -> `demo-live/`), BuildKit's
 content-based cache may not invalidate properly. Symptom: all build steps
 show `CACHED` despite source code changes.
 
@@ -157,8 +157,8 @@ In-memory databases have no reason to cycle connections.
 - `oauth2_passkey/src/utils.rs` - `get_client()` with cfg-gated bundled TLS
 - `oauth2_passkey/Cargo.toml` - `bundled-tls` feature, optional deps
 - `oauth2_passkey_axum/Cargo.toml` - `bundled-tls` feature forwarding
-- `demo-both/Cargo.toml` - `bundled-tls` feature forwarding
-- `demo-both/src/main.rs` - PORT env var support
+- `demo-live/Cargo.toml` - `bundled-tls` feature forwarding
+- `demo-live/src/main.rs` - PORT env var support
 - `oauth2_passkey/src/oauth2/main/google.rs` - use `crate::utils::get_client`
 - `oauth2_passkey/src/oauth2/discovery.rs` - use `crate::utils::get_client()`
 - `oauth2_passkey/src/oauth2/main/idtoken.rs` - deadlock fix via `cache_operations`

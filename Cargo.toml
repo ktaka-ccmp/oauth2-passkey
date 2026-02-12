@@ -2,6 +2,7 @@
 members = [
     "demo-both",
     "demo-cross-origin",
+    "demo-live",
     "demo-custom-login",
     "demo-oauth2",
     "demo-passkey",

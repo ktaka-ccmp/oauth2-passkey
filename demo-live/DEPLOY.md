@@ -1,6 +1,6 @@
 # Demo Deployment Guide
 
-This guide covers local Docker testing and Google Cloud Run deployment for the `demo-both` application (OAuth2 + Passkey authentication demo).
+This guide covers local Docker testing and Google Cloud Run deployment for the `demo-live` application (OAuth2 + Passkey authentication demo).
 
 ## Docker Image
 
@@ -19,7 +19,7 @@ For design decisions, trade-offs, and troubleshooting details, see [DOCKER_NOTES
 
 ```bash
 # Build and run (from repository root)
-docker compose -f demo-both/docker-compose.yml up --build
+docker compose -f demo-live/docker-compose.yml up --build
 
 # Access at http://localhost:3001
 ```
@@ -28,8 +28,8 @@ The `docker-compose.yml` reads `.env` from the repository root and overrides con
 
 To force a full rebuild (if cache is stale):
 ```bash
-docker compose -f demo-both/docker-compose.yml build --no-cache
-docker compose -f demo-both/docker-compose.yml up
+docker compose -f demo-live/docker-compose.yml build --no-cache
+docker compose -f demo-live/docker-compose.yml up
 ```
 
 ## Cloud Run Deployment
@@ -106,14 +106,14 @@ gcloud artifacts repositories create demo \
   --location=asia-northeast1
 
 # Build and push using Cloud Build
-gcloud builds submit --config=demo-both/cloudbuild.yaml
+gcloud builds submit --config=demo-live/cloudbuild.yaml
 ```
 
-`demo-both/cloudbuild.yaml` specifies `demo-both/Dockerfile` and the image tag (using `$PROJECT_ID` built-in variable).
+`demo-live/cloudbuild.yaml` specifies `demo-live/Dockerfile` and the image tag (using `$PROJECT_ID` built-in variable).
 
 Alternatively, build locally and push:
 ```bash
-docker build -f demo-both/Dockerfile \
+docker build -f demo-live/Dockerfile \
   -t asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo .
 docker push asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo
 ```
@@ -129,7 +129,7 @@ gcloud run deploy oauth2-passkey-demo \
   --port 8080 \
   --allow-unauthenticated \
   --min-instances 1 \
-  --env-vars-file demo-both/env.cloud-run.yaml \
+  --env-vars-file demo-live/env.cloud-run.yaml \
   --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest"
 
 # Set ORIGIN separately (placeholder for first deploy; Step 6 updates to actual URL)
@@ -202,7 +202,7 @@ After code changes, rebuild and redeploy:
 
 ```bash
 # Rebuild image
-gcloud builds submit --config=demo-both/cloudbuild.yaml
+gcloud builds submit --config=demo-live/cloudbuild.yaml
 
 # Redeploy (env vars and secrets are preserved)
 gcloud run deploy oauth2-passkey-demo \
@@ -212,7 +212,7 @@ gcloud run deploy oauth2-passkey-demo \
 # If env vars changed, update them separately:
 gcloud run services update oauth2-passkey-demo \
   --region asia-northeast1 \
-  --env-vars-file demo-both/env.cloud-run.yaml
+  --env-vars-file demo-live/env.cloud-run.yaml
 ```
 
 ## Google OAuth2 Notes

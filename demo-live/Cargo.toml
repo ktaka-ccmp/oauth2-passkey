@@ -1,7 +1,11 @@
 [package]
-name = "demo-both"
+name = "demo-live"
 version = { workspace = true }
 edition = { workspace = true }
+
+[features]
+default = []
+bundled-tls = ["oauth2-passkey-axum/bundled-tls"]
 
 [dependencies]
 oauth2-passkey-axum = { path = "../oauth2_passkey_axum" }

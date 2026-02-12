@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo: AJAX with CSRF</title>
+    <link rel="stylesheet" href="{{prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
+    <style>
+        .demo-description { color: var(--o2p-text-secondary); margin-bottom: var(--o2p-space-md); }
+        #result {
+            margin-top: var(--o2p-space-md);
+            padding: var(--o2p-space-md);
+            border: 1px solid var(--o2p-border);
+            border-radius: var(--o2p-radius-md);
+            background: var(--o2p-surface-alt);
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="page-header">
+        <h1>p3: AJAX with CSRF</h1>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/p1">p1</a>
+            <a href="/p2">p2</a>
+            <a href="/p3">p3</a>
+            <a href="/p4">p4</a>
+            <a href="/p5">p5</a>
+            <a href="/p6">p6</a>
+            <a href="/nested/p3">nested/p3</a>
+            <a href="{{prefix}}/user/account">My Account</a>
+        </nav>
+        <div class="header-buttons">
+            <a href="{{prefix}}/user/logout?redirect=/" class="btn btn-secondary btn-sm">Logout</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">About This Page</h2>
+        </div>
+        <p class="demo-description">
+            AJAX POST requests with <code>X-CSRF-Token</code> header.
+            Middleware automatically provides the CSRF token via response header.
+            {{message}}
+        </p>
+    </div>
+
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">Test AJAX Submission</h2>
+        </div>
+        <div class="item">
+            <div style="display: flex; gap: var(--o2p-space-sm); flex-wrap: wrap;">
+                <button id="withCsrf" class="btn btn-primary">POST with CSRF Token</button>
+                <button id="withoutCsrf" class="btn btn-danger">POST without CSRF Token</button>
+            </div>
+            <div id="result"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const resultDiv = document.getElementById('result');
+        let csrfToken = null;
+
+        // Get initial CSRF token
+        fetch(window.location.href, { method: 'HEAD' })
+            .then(response => {
+                csrfToken = response.headers.get('X-CSRF-Token') || null;
+                console.log('CSRF Token:', csrfToken);
+            })
+            .catch(error => console.error('Error fetching CSRF token:', error));
+
+        // Handle button clicks
+        document.querySelectorAll('#withCsrf, #withoutCsrf').forEach(button => {
+            button.addEventListener('click', async function() {
+                const includeCsrf = this.id === 'withCsrf';
+
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = 'Sending request...';
+
+                try {
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (includeCsrf && csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
+                    const response = await fetch('/p3', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({ test: 'data' })
+                    });
+
+                    const text = await response.text();
+                    resultDiv.textContent = `Response (${response.status}): ${text}`;
+
+                    const newToken = response.headers.get('X-CSRF-Token');
+                    if (newToken) csrfToken = newToken;
+                } catch (error) {
+                    resultDiv.textContent = `Error: ${error.message}`;
+                }
+            });
+        });
+    });
+</script>
+</body>
+</html>

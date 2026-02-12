@@ -24,7 +24,7 @@
 
 ## Description
 
-Extract `demo-both` into an independent repository that uses crates.io published
+Extract `demo-live` into an independent repository that uses crates.io published
 dependencies (`oauth2-passkey`, `oauth2-passkey-axum`) instead of workspace path
 dependencies. This would:
 
@@ -63,48 +63,48 @@ oauth2-passkey-demo/
   README.md
 ```
 
-### Key Changes from Current demo-both
+### Key Changes from Current demo-live
 
 - `Cargo.toml`: Replace `path = "../oauth2_passkey_axum"` with
   `oauth2-passkey-axum = { version = "0.2.x", features = ["bundled-tls"] }`
-- `Dockerfile`: Simplify paths (no `demo-both/` prefix, build context = `.`)
+- `Dockerfile`: Simplify paths (no `demo-live/` prefix, build context = `.`)
 - `.dockerignore` / `.gcloudignore`: Move from parent repo root to project root
-- `cloudbuild.yaml`: Simplify (Dockerfile at `.`, not `demo-both/Dockerfile`)
+- `cloudbuild.yaml`: Simplify (Dockerfile at `.`, not `demo-live/Dockerfile`)
 
 ### Trade-offs
 
 | Aspect | Workspace member (current) | Standalone repository |
 |--------|---------------------------|----------------------|
-| Deployment files | Split across root and demo-both/ | All in one place |
+| Deployment files | Split across root and demo-live/ | All in one place |
 | Library changes | Immediately available via path deps | Requires crates.io publish first |
 | Dev iteration | Fast (local workspace) | Needs `[patch]` for local testing |
 | Reference value | Low (workspace-specific setup) | High (shows real library usage) |
 
 ## Related Files
 
-- `demo-both/` - Current workspace member to be extracted
-- `demo-both/Dockerfile` - Needs path simplification
-- `demo-both/docker-compose.yml` - Needs context/path updates
-- `demo-both/cloudbuild.yaml` - Needs path simplification
-- `demo-both/env.cloud-run.yaml` - Can be copied as-is
-- `demo-both/DEPLOY.md` - Needs path updates
+- `demo-live/` - Current workspace member to be extracted
+- `demo-live/Dockerfile` - Needs path simplification
+- `demo-live/docker-compose.yml` - Needs context/path updates
+- `demo-live/cloudbuild.yaml` - Needs path simplification
+- `demo-live/env.cloud-run.yaml` - Can be copied as-is
+- `demo-live/DEPLOY.md` - Needs path updates
 - `.dockerignore` - Move into standalone repo
 - `.gcloudignore` - Move into standalone repo
 
 ## Implementation Tasks
 
 - [ ] Create new GitHub repository (e.g., `oauth2-passkey-demo`)
-- [ ] Copy and adapt `demo-both/src/main.rs`
+- [ ] Copy and adapt `demo-live/src/main.rs`
 - [ ] Create standalone `Cargo.toml` with crates.io dependencies
-- [ ] Adapt Dockerfile (remove `demo-both/` path prefix)
-- [ ] Adapt cloudbuild.yaml (remove `demo-both/` path prefix)
+- [ ] Adapt Dockerfile (remove `demo-live/` path prefix)
+- [ ] Adapt cloudbuild.yaml (remove `demo-live/` path prefix)
 - [ ] Adapt docker-compose.yml (context = `.`, remove `../` references)
 - [ ] Copy `.dockerignore` and `.gcloudignore` (adapt paths)
 - [ ] Copy and adapt `env.cloud-run.yaml` and `DEPLOY.md`
 - [ ] Create `dot.env.example` and `README.md`
 - [ ] Verify local Docker build works
 - [ ] Verify Cloud Run deployment works
-- [ ] Decide whether to keep or remove `demo-both/` from the main workspace
+- [ ] Decide whether to keep or remove `demo-live/` from the main workspace
 
 ## Decision Log
 
