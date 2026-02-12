@@ -196,7 +196,7 @@ gcloud run services update oauth2-passkey-demo \
   --update-env-vars "KEY=value"
 ```
 
-Note: `--env-vars-file` replaces all env vars. `--update-env-vars` merges (adds or overwrites specified keys only). These two flags cannot be combined in one command.
+Note: `--env-vars-file` replaces all env vars. `--update-env-vars` merges (adds or overwrites specified keys only, including those originally set via `--env-vars-file`). These two flags cannot be combined in one command.
 
 ## Google OAuth2 Notes
 
