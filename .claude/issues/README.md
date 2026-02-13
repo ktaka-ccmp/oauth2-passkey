@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (8)
+### Open (9)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -18,6 +18,7 @@ This directory contains issue/task tracking files for the project.
 | `2026-02-09-02` | medium | medium | [Improve OAuth2 Popup Error Handling UX](open/2026-02-09-oauth2-popup-error-handling.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 | `20260212-0235` | low | medium | [Standalone Demo Repository](open/20260212-0235-standalone-demo-repository.md) |
+| `20260213-0145` | low | medium | [Security Integration Tests Depend on Axum Handler Behavior](open/20260213-0145-security-tests-crate-placement.md) |
 
 ### Completed (30)
 
