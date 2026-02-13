@@ -129,6 +129,21 @@ pub(super) async fn upsert_user_postgres(
     Ok(result)
 }
 
+pub(super) async fn count_admin_users_postgres(pool: &Pool<Postgres>) -> Result<i64, UserError> {
+    let table_name = DB_TABLE_USERS.as_str();
+
+    let row: (i64,) = sqlx::query_as(&format!(
+        r#"
+        SELECT COUNT(*) FROM {table_name} WHERE is_admin = true OR sequence_number = 1
+        "#
+    ))
+    .fetch_one(pool)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    Ok(row.0)
+}
+
 pub(super) async fn delete_user_postgres(
     pool: &Pool<Postgres>,
     id: UserId,

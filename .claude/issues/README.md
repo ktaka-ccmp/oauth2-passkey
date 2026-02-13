@@ -55,9 +55,11 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-09` | [Cross-Origin Same-Site Demo (Pattern 2)](completed/2026-01-30-cross-origin-same-site-demo.md) |
 | `2026-01-31-02` | [Remove HTTPS Support from Demo Apps](completed/2026-01-31-demo-remove-https.md) |
 
-### Wontfix (0)
+### Wontfix (1)
 
-(none)
+| ID | Title |
+|----|-------|
+| `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
 ### Deferred (2)
 

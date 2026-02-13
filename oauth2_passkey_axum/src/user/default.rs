@@ -14,6 +14,7 @@ use oauth2_passkey::{
     SessionId, UserId, delete_user_account, prepare_logout_response, update_user_account,
 };
 
+use super::super::error::IntoResponseError;
 use crate::session::AuthUser;
 
 /// Create a router for the user summary endpoints
@@ -213,7 +214,7 @@ pub(super) async fn delete_user_account_handler(
     })?;
     let credential_ids = delete_user_account(session_id, user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .into_response_error()?;
 
     // Return the credential IDs in the response for client-side notification
     Ok(Json(json!({

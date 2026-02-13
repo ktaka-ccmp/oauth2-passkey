@@ -81,16 +81,15 @@ pub(super) async fn delete_user_account_handler(
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
     delete_user_account_admin(session_id, user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    tracing::debug!(
-        "User account deleted: {} by {}",
-        payload.user_id,
-        auth_user.id
-    );
-
-    // Return the credential IDs in the response for client-side notification
-    Ok(StatusCode::NO_CONTENT)
+        .map(|()| {
+            tracing::debug!(
+                "User account deleted: {} by {}",
+                payload.user_id,
+                auth_user.id
+            );
+            StatusCode::NO_CONTENT
+        })
+        .into_response_error()
 }
 
 #[derive(serde::Deserialize)]
@@ -180,16 +179,16 @@ pub(super) async fn update_admin_status_handler(
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
     update_user_admin_status(session_id, user_id, payload.is_admin)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    tracing::debug!(
-        "User admin status updated: {} is_admin={} by {}",
-        payload.user_id,
-        payload.is_admin,
-        auth_user.id
-    );
-
-    Ok(StatusCode::OK)
+        .map(|_| {
+            tracing::debug!(
+                "User admin status updated: {} is_admin={} by {}",
+                payload.user_id,
+                payload.is_admin,
+                auth_user.id
+            );
+            StatusCode::OK
+        })
+        .into_response_error()
 }
 
 #[cfg(test)]

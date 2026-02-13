@@ -79,6 +79,7 @@ pub async fn update_user_account(
 /// * `Ok(Vec<String>)` - A list of deleted passkey credential IDs for client-side notification
 /// * `Err(CoordinationError::Unauthorized)` - If the user is neither admin nor account owner
 /// * `Err(CoordinationError::ResourceNotFound)` - If the target user doesn't exist
+/// * `Err(CoordinationError::Conflict)` - If trying to delete the last admin user
 /// * `Err(CoordinationError)` - If another error occurs during deletion
 ///
 /// Returns a list of deleted passkey credential IDs for client-side notification
@@ -119,6 +120,19 @@ pub async fn delete_user_account(
             .log()
         })?
     };
+
+    // Prevent deleting the last admin user (applies to both self-deletion and admin deletion)
+    if user.has_admin_privileges() {
+        let admin_count = UserStore::count_admin_users()
+            .await
+            .map_err(|e| CoordinationError::Database(e.to_string()))?;
+        if admin_count <= 1 {
+            return Err(CoordinationError::Conflict(
+                "Cannot delete the last admin user".to_string(),
+            )
+            .log());
+        }
+    }
 
     tracing::debug!("Deleting user account: {:#?}", user);
 

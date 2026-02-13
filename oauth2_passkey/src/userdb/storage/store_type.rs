@@ -125,6 +125,18 @@ impl UserStore {
         final_result
     }
 
+    pub(crate) async fn count_admin_users() -> Result<i64, UserError> {
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        if let Some(pool) = store.as_sqlite() {
+            count_admin_users_sqlite(pool).await
+        } else if let Some(pool) = store.as_postgres() {
+            count_admin_users_postgres(pool).await
+        } else {
+            Err(UserError::Storage("Unsupported database type".to_string()))
+        }
+    }
+
     pub(crate) async fn delete_user(id: UserId) -> Result<(), UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 

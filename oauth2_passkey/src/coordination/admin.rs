@@ -232,6 +232,7 @@ pub async fn delete_oauth2_account_admin(
 /// * `Ok(())` - If the user account was successfully deleted
 /// * `Err(CoordinationError::Unauthorized)` - If the user doesn't have admin privileges
 /// * `Err(CoordinationError::ResourceNotFound)` - If the user doesn't exist
+/// * `Err(CoordinationError::Conflict)` - If trying to delete the last admin user
 /// * `Err(CoordinationError)` - If another error occurs during deletion
 ///
 /// # Examples
@@ -260,6 +261,19 @@ pub async fn delete_user_account_admin(
         .log()
     })?;
 
+    // Prevent deleting the last admin user
+    if user.has_admin_privileges() {
+        let admin_count = UserStore::count_admin_users()
+            .await
+            .map_err(|e| CoordinationError::Database(e.to_string()))?;
+        if admin_count <= 1 {
+            return Err(CoordinationError::Conflict(
+                "Cannot delete the last admin user".to_string(),
+            )
+            .log());
+        }
+    }
+
     tracing::debug!("Deleting user account: {:#?}", user);
 
     // Delete all OAuth2 accounts for this user
@@ -277,8 +291,9 @@ pub async fn delete_user_account_admin(
 /// Updates a user's administrative status.
 ///
 /// This function allows an administrator to grant or revoke administrative privileges
-/// for another user. For security reasons, the first user in the system (sequence number 1)
-/// cannot have their admin status changed.
+/// for another user. For security reasons:
+/// - The first user (sequence_number=1) cannot be demoted (unconditional protection)
+/// - The last admin user in the system cannot be demoted (to prevent admin lockout)
 ///
 /// # Arguments
 ///
@@ -291,8 +306,7 @@ pub async fn delete_user_account_admin(
 /// * `Ok(User)` - The updated user account information
 /// * `Err(CoordinationError::Unauthorized)` - If the caller doesn't have admin privileges
 /// * `Err(CoordinationError::ResourceNotFound)` - If the target user doesn't exist
-/// * `Err(CoordinationError)` - If another error occurs, such as trying to change
-///   the first user's admin status
+/// * `Err(CoordinationError::Conflict)` - If trying to demote the first user or last admin
 ///
 /// # Examples
 ///
@@ -322,13 +336,22 @@ pub async fn update_user_admin_status(
         .log()
     })?;
 
-    // Prevent changing admin status of the first user (sequence_number = 1)
-    if user.sequence_number == Some(1) {
-        tracing::debug!("Cannot change admin status of the first user");
-        return Err(CoordinationError::Coordination(
-            "Cannot change admin status of the first user for security reasons".to_string(),
-        )
-        .log());
+    // First user (sequence_number=1) cannot be demoted unconditionally
+    if !is_admin && user.sequence_number == Some(1) {
+        return Err(CoordinationError::Conflict("Cannot demote the first user".to_string()).log());
+    }
+
+    // Prevent demoting the last admin user
+    if !is_admin && user.has_admin_privileges() {
+        let admin_count = UserStore::count_admin_users()
+            .await
+            .map_err(|e| CoordinationError::Database(e.to_string()))?;
+        if admin_count <= 1 {
+            return Err(CoordinationError::Conflict(
+                "Cannot demote the last admin user".to_string(),
+            )
+            .log());
+        }
     }
 
     // Update the user with the new admin status
