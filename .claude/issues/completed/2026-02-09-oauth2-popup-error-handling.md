@@ -11,7 +11,9 @@
 
 ## ID: 2026-02-09-02
 
-## Status: open
+## Closed: 2026-02-13
+
+## Status: completed
 
 ## Priority: medium
 
@@ -107,12 +109,13 @@ Consider differentiating error display in the popup:
 
 ## Implementation Tasks
 
-- [ ] Fix `Conflict` error mapping to 409 in `error.rs`
-- [ ] Catch errors in `get_authorized` and redirect to `popup_close` with message
-- [ ] Catch errors in `post_authorized` and redirect to `popup_close` with message
-- [ ] Improve error messages to be user-friendly
-- [ ] Optional: differentiate error/success display in popup_close.j2
-- [ ] Optional: pass error info via postMessage for parent page display
+- [x] Fix `Conflict` error mapping to 409 in `error.rs`
+- [x] Catch errors in `get_authorized` and redirect to `popup_close` with message
+- [x] Catch errors in `post_authorized` and redirect to `popup_close` with message
+- [x] Improve error messages to be user-friendly
+- [x] Differentiate error/success display in popup_close.j2 (login-card style, color, Close button)
+- [x] Skip postMessage on error (avoid unnecessary parent reload)
+- [x] Update security tests (BadRequest -> RedirectWithError)
 
 ## Decision Log
 
@@ -127,4 +130,26 @@ Consider differentiating error display in the popup:
 - Reason: popup_close already handles postMessage + close. Minimal changes needed.
   More sophisticated error display (parent-side) can be added later.
 
+### 2026-02-13: Skip postMessage on error, use login-card styling
+
+- Context: Error popup was sending postMessage('auth_complete') to parent, causing
+  unnecessary page reload even when authentication failed
+- Decision: Only send postMessage on success; on error, show styled message with Close button
+- Reason: No session is created on error, so parent reload is pointless and causes
+  visual flicker while user is reading the error message
+
 ## Resolution
+
+Implemented OAuth2 popup error handling with the following changes:
+
+1. **error.rs**: Added `Conflict` -> 409 status code mapping (was falling through to 500)
+2. **oauth2.rs**: Refactored `get_authorized`/`post_authorized` from `Result<...>` to
+   infallible handlers using `match`. Errors redirect to `popup_close` with user-friendly
+   messages via `friendly_error_message()` helper
+3. **popup_close.j2**: Redesigned with `login-card` styling. Error shows red message +
+   Close button. Success shows message + auto-close description. postMessage only sent
+   on success to avoid unnecessary parent reload
+4. **Security tests**: Updated `ExpectedSecurityError::BadRequest` -> `RedirectWithError`
+   for all OAuth2 callback tests (13 in oauth2_security.rs, 1 in cross_flow_security.rs)
+
+Branch: `dev-20260209-0902`, commits: `ac43e38`, `a83aae8`
