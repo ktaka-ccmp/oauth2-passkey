@@ -1,7 +1,6 @@
 use super::*;
 use crate::session::{insert_test_session, insert_test_user};
 use crate::test_utils::init_test_environment;
-use crate::userdb::UserSearchField;
 use chrono::Utc;
 use serial_test::serial;
 
@@ -491,56 +490,91 @@ async fn test_update_user_admin_status_requires_admin() {
         .ok();
 }
 
-/// Test to ensure that updating the admin status of the first user (sequence_number = 1)
-/// is protected and cannot be changed by any user, even an admin.
-/// This test verifies an important business rule that protects the initial admin user.
+/// Test to ensure that demoting the last admin user is prevented.
+/// This test verifies the "at least one admin must exist" invariant.
+/// Uses the first-user (sequence_number=1) as the sole admin to test the guard.
 #[serial]
 #[tokio::test]
-async fn test_update_user_admin_status_protect_first_user() {
+async fn test_demote_last_admin_prevented() {
     init_test_environment().await;
 
-    // Create unique admin user with timestamp
-    let timestamp = chrono::Utc::now().timestamp_millis();
-    let admin_user_id = format!("admin-user-protect-{timestamp}");
-
-    // Create an admin user with session
-    let admin_session_id = create_test_admin_with_session(
-        &admin_user_id,
-        &format!("{admin_user_id}@example.com"),
-        "Test Admin",
+    // Create a session for the first-user (who is the only admin in the test environment)
+    let first_user_session_id = "test-session-first-user-demote";
+    insert_test_session(
+        SessionId::new(first_user_session_id.to_string()).expect("Valid session ID"),
+        UserId::new("first-user".to_string()).expect("Valid user ID"),
+        "test-csrf-token",
+        3600,
     )
     .await
-    .expect("Failed to create admin session");
+    .expect("Failed to create session for first user");
 
-    let first_user = UserStore::get_user_by(UserSearchField::SequenceNumber(1))
-        .await
-        .expect("Failed to get first user")
-        .expect("Failed to get first user");
-
-    // Attempt to change the admin status of the first user (should fail)
+    // Attempt to demote the first-user (the only admin) -> should fail
     let result = update_user_admin_status(
-        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
-        UserId::new(first_user.id.clone()).expect("Valid first user ID"),
+        SessionId::new(first_user_session_id.to_string()).expect("Valid session ID"),
+        UserId::new("first-user".to_string()).expect("Valid user ID"),
         false,
     )
     .await;
 
-    // Verify the operation fails with Coordination error
+    // Verify the operation fails with Conflict error
     assert!(
         result.is_err(),
-        "Should not be able to change first user's admin status"
+        "Should not be able to demote the last admin"
     );
     match result {
-        Err(CoordinationError::Coordination(msg)) => {
-            assert!(msg.contains("Cannot change admin status of the first user"));
+        Err(CoordinationError::Conflict(msg)) => {
+            assert!(
+                msg.contains("Cannot demote the last admin user"),
+                "Error message should mention last admin demotion, got: {msg}"
+            );
         }
-        _ => panic!("Expected Coordination error about first user, got {result:?}"),
+        _ => panic!("Expected Conflict error about last admin, got {result:?}"),
     }
+}
+
+/// Test to ensure that demoting an admin is allowed when other admins exist.
+#[serial]
+#[tokio::test]
+async fn test_demote_admin_allowed_when_others_exist() {
+    init_test_environment().await;
+
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let admin1_id = format!("admin1-demote-{timestamp}");
+    let admin2_id = format!("admin2-demote-{timestamp}");
+
+    // Create first admin with session
+    let admin_session_id =
+        create_test_admin_with_session(&admin1_id, &format!("{admin1_id}@example.com"), "Admin 1")
+            .await
+            .expect("Failed to create admin 1 session");
+
+    // Create second admin
+    create_test_user_in_db(&admin2_id, true)
+        .await
+        .expect("Failed to create admin 2");
+
+    // Demote admin2 (should succeed since admin1 still exists)
+    let result = update_user_admin_status(
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(admin2_id.clone()).expect("Valid admin2 user ID"),
+        false,
+    )
+    .await;
+
+    assert!(
+        result.is_ok(),
+        "Should be able to demote admin when other admins exist, got: {result:?}"
+    );
+    let updated_user = result.unwrap();
+    assert!(
+        !updated_user.is_admin,
+        "Demoted user should no longer be admin"
+    );
 
     // Clean up
-    delete_user_if_exists_and_not_first(&admin_user_id)
-        .await
-        .ok();
+    delete_user_if_exists_and_not_first(&admin1_id).await.ok();
+    delete_user_if_exists_and_not_first(&admin2_id).await.ok();
 }
 
 /// Test to ensure that deleting a passkey credential as an admin requires admin privileges.
@@ -870,4 +904,92 @@ async fn test_force_logout_user_success() {
     delete_user_if_exists_and_not_first(&target_user_id)
         .await
         .ok();
+}
+
+/// Test to ensure that deleting the last admin user is prevented.
+/// This protects the system from becoming permanently locked out of admin functionality.
+/// Uses the first-user (sequence_number=1) as the sole admin to test the guard.
+#[serial]
+#[tokio::test]
+async fn test_delete_last_admin_prevented() {
+    init_test_environment().await;
+
+    // Create a session for the first-user (who is the only admin in the test environment)
+    let first_user_session_id = "test-session-first-user-delete";
+    insert_test_session(
+        SessionId::new(first_user_session_id.to_string()).expect("Valid session ID"),
+        UserId::new("first-user".to_string()).expect("Valid user ID"),
+        "test-csrf-token",
+        3600,
+    )
+    .await
+    .expect("Failed to create session for first user");
+
+    // Attempt to delete the first-user (the only admin) -> should fail
+    let result = delete_user_account_admin(
+        SessionId::new(first_user_session_id.to_string()).expect("Valid session ID"),
+        UserId::new("first-user".to_string()).expect("Valid user ID"),
+    )
+    .await;
+
+    // Verify the operation fails with Conflict error
+    assert!(
+        result.is_err(),
+        "Should not be able to delete the last admin"
+    );
+    match result {
+        Err(CoordinationError::Conflict(msg)) => {
+            assert!(
+                msg.contains("Cannot delete the last admin user"),
+                "Error message should mention last admin deletion, got: {msg}"
+            );
+        }
+        _ => panic!("Expected Conflict error about last admin, got {result:?}"),
+    }
+}
+
+/// Test to ensure that deleting an admin is allowed when other admins exist.
+#[serial]
+#[tokio::test]
+async fn test_delete_admin_allowed_when_others_exist() {
+    init_test_environment().await;
+
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let admin1_id = format!("admin1-delete-ok-{timestamp}");
+    let admin2_id = format!("admin2-delete-ok-{timestamp}");
+
+    // Create first admin with session
+    let admin_session_id =
+        create_test_admin_with_session(&admin1_id, &format!("{admin1_id}@example.com"), "Admin 1")
+            .await
+            .expect("Failed to create admin 1 session");
+
+    // Create second admin
+    create_test_user_in_db(&admin2_id, true)
+        .await
+        .expect("Failed to create admin 2");
+
+    // Delete admin2 (should succeed since admin1 still exists)
+    let result = delete_user_account_admin(
+        SessionId::new(admin_session_id.clone()).expect("Valid admin session ID"),
+        UserId::new(admin2_id.clone()).expect("Valid admin2 user ID"),
+    )
+    .await;
+
+    assert!(
+        result.is_ok(),
+        "Should be able to delete admin when other admins exist, got: {result:?}"
+    );
+
+    // Verify admin2 no longer exists
+    let deleted_user = UserStore::get_user(UserId::new(admin2_id.clone()).expect("Valid user ID"))
+        .await
+        .expect("Failed to query user");
+    assert!(
+        deleted_user.is_none(),
+        "Deleted admin user should no longer exist"
+    );
+
+    // Clean up
+    delete_user_if_exists_and_not_first(&admin1_id).await.ok();
 }

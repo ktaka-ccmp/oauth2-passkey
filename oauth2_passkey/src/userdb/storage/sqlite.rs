@@ -143,6 +143,24 @@ pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Resul
     .map_err(|e| UserError::Storage(e.to_string()))
 }
 
+pub(super) async fn count_admin_users_sqlite(pool: &Pool<Sqlite>) -> Result<i64, UserError> {
+    // Ensure tables exist before any operations - this is critical for in-memory databases
+    create_tables_sqlite(pool).await?;
+
+    let table_name = DB_TABLE_USERS.as_str();
+
+    let row: (i64,) = sqlx::query_as(&format!(
+        r#"
+        SELECT COUNT(*) FROM {table_name} WHERE is_admin = true OR sequence_number = 1
+        "#
+    ))
+    .fetch_one(pool)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    Ok(row.0)
+}
+
 pub(super) async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: UserId) -> Result<(), UserError> {
     // Ensure tables exist before any operations - this is critical for in-memory databases
     create_tables_sqlite(pool).await?;

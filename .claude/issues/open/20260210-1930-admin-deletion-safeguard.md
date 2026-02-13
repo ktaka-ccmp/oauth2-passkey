@@ -62,11 +62,12 @@ the demo deployment.
 
 ## Implementation Tasks
 
-- [ ] Add admin count query to UserStore (count users where is_admin = true)
-- [ ] Add last-admin check in delete_user (coordination/admin.rs)
-- [ ] Add last-admin check in update_user_admin_status (prevent demotion of last admin)
-- [ ] Write unit tests for last-admin protection
-- [ ] Update error types to include LastAdminProtection variant
+- [x] Add `count_admin_users` SQL functions (SQLite/PostgreSQL) counting `is_admin = true OR sequence_number = 1`
+- [x] Add `UserStore::count_admin_users()` dispatch in store_type.rs
+- [x] Add last-admin guard in `delete_user_account_admin` (return `Conflict` error)
+- [x] Replace first-user protection with last-admin guard in `update_user_admin_status` (return `Conflict` error)
+- [x] Fix Axum handler error mapping in `delete_user_account_handler` and `update_admin_status_handler` to use `.into_response_error()`
+- [x] Add 4 new tests, remove 1 obsolete test for last-admin protection
 
 ## Decision Log
 
@@ -92,5 +93,20 @@ the demo deployment.
   negligible. Admin operations (delete/demote) are extremely rare (manual admin actions),
   not a hot path. Additionally, the count query is only executed when the target user
   is actually an admin, skipped entirely for non-admin deletions
+
+### 2026-02-13: Implementation completed
+
+- Context: Implemented the "at least one admin" safeguard as planned
+- Changes:
+  - Added `count_admin_users` SQL functions (SQLite/PostgreSQL) with `WHERE is_admin = true OR sequence_number = 1`
+  - Added `UserStore::count_admin_users()` dispatch in store_type.rs
+  - Added last-admin guard in `delete_user_account_admin` (returns `Conflict` 409)
+  - Replaced first-user seq=1 protection with last-admin guard in `update_user_admin_status` (returns `Conflict` 409)
+  - Fixed Axum handlers to use `.into_response_error()` for proper error code mapping
+  - Added 4 new tests (delete/demote last admin prevented, delete/demote admin allowed when others exist)
+  - Removed obsolete `test_update_user_admin_status_protect_first_user` (tested old first-user protection logic)
+  - Removed unused `UserSearchField` re-export from `userdb/mod.rs`
+- Behavioral change: first-user (seq=1) is no longer unconditionally protected from demotion;
+  any admin can be demoted/deleted as long as at least one other admin remains
 
 ## Resolution
