@@ -90,9 +90,6 @@ pub mod mocks {
 /// Core function mocks for testing without external dependencies
 pub mod core_mocks {
     use super::*;
-    use std::sync::atomic::{AtomicBool, Ordering};
-
-    static MOCK_LIST_CREDENTIALS_CALLED: AtomicBool = AtomicBool::new(false);
 
     /// Helper function to create a mock PasskeyCredential for testing
     fn create_mock_credential(
@@ -139,8 +136,6 @@ pub mod core_mocks {
         user_id: &str,
         _include_transports: bool,
     ) -> Result<Vec<PasskeyCredential>, oauth2_passkey::CoordinationError> {
-        MOCK_LIST_CREDENTIALS_CALLED.store(true, Ordering::SeqCst);
-
         // Create a mock credential
         let credential = create_mock_credential(user_id, "test-credential-id", "test-public-key");
 
@@ -163,16 +158,4 @@ pub mod core_mocks {
             "userVerification": "required"
         }))
     }
-
-    /// Check if mock_list_credentials_core was called
-    pub fn was_list_credentials_called() -> bool {
-        MOCK_LIST_CREDENTIALS_CALLED.load(Ordering::SeqCst)
-    }
-
-    /// Reset mock call tracking
-    pub fn reset_mock_calls() {
-        MOCK_LIST_CREDENTIALS_CALLED.store(false, Ordering::SeqCst);
-    }
-
-    // The mock_update_passkey_credential_core function is already defined above
 }

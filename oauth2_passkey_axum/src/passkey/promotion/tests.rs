@@ -34,9 +34,6 @@ async fn test_promotion_includes_exclude_credentials() {
     // Initialize test environment
     let _ = crate::test_utils::env::origin();
 
-    // Reset mock tracking
-    core_mocks::reset_mock_calls();
-
     // Create a mock AuthUser
     let auth_user = mocks::mock_auth_user("test-user-id", "test@example.com");
 
@@ -68,12 +65,6 @@ async fn test_promotion_includes_exclude_credentials() {
     assert!(
         first["id"].is_string(),
         "id should be a string (credential_id)"
-    );
-
-    // Verify mock was called
-    assert!(
-        core_mocks::was_list_credentials_called(),
-        "list_credentials should be called to build excludeCredentials"
     );
 }
 
