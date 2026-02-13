@@ -13,6 +13,15 @@ use crate::passkey::types::{
 };
 
 use super::challenge::{get_and_validate_options, remove_options};
+
+/// Result of a successful passkey authentication
+#[derive(Debug)]
+pub(crate) struct AuthenticationResult {
+    pub user_id: String,
+    pub user_name: String,
+    pub user_handle: String,
+    pub aaguid: String,
+}
 use super::types::{
     AllowCredential, AuthenticationOptions, AuthenticatorData, AuthenticatorResponse,
     ParsedClientData,
@@ -83,7 +92,7 @@ pub(crate) async fn start_authentication(
 
 pub(crate) async fn finish_authentication(
     auth_response: AuthenticatorResponse,
-) -> Result<(String, String, String, String), PasskeyError> {
+) -> Result<AuthenticationResult, PasskeyError> {
     tracing::debug!(
         "Starting authentication verification for response: {:?}",
         auth_response
@@ -175,7 +184,12 @@ pub(crate) async fn finish_authentication(
     let user_handle = stored_credential.user.user_handle.clone();
     let aaguid = stored_credential.aaguid.clone();
 
-    Ok((user_id, user_name, user_handle, aaguid))
+    Ok(AuthenticationResult {
+        user_id,
+        user_name,
+        user_handle,
+        aaguid,
+    })
 }
 
 /// Verifies that the user handle in the authenticator response matches the stored credential
