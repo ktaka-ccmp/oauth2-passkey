@@ -1,14 +1,154 @@
 //! Data masking utilities for demo mode
 //!
-//! When `O2P_DEMO_MODE` is enabled, these functions mask sensitive user data
+//! When `O2P_DEMO_MODE` is enabled, the [`Masker`] struct masks sensitive user data
 //! in admin API responses. Each user can see their own data in full, but other
 //! users' data is masked to protect privacy on public demo sites.
+//!
+//! When `O2P_DEMO_MODE` is disabled, all `Masker` methods return input unchanged.
 
 use oauth2_passkey::DbUser;
 
-/// Mask an email address: "user@example.com" -> "u***@***"
+/// Handles data masking for admin views.
 ///
-/// Hides the entire domain (including TLD) to prevent domain-based identification.
+/// When `active` is true, field methods mask sensitive data.
+/// When `active` is false, all methods return input unchanged (no-op).
+pub(crate) struct Masker {
+    active: bool,
+}
+
+impl Masker {
+    /// Create a masker for list views (admin index, get_all_users API).
+    ///
+    /// Active when `O2P_DEMO_MODE` is enabled.
+    pub fn for_list() -> Self {
+        Self {
+            active: *oauth2_passkey::O2P_DEMO_MODE,
+        }
+    }
+
+    /// Create an always-active masker (for testing).
+    #[cfg(test)]
+    pub fn always_active() -> Self {
+        Self { active: true }
+    }
+
+    /// Create an always-inactive masker (for testing).
+    #[cfg(test)]
+    pub fn inactive() -> Self {
+        Self { active: false }
+    }
+
+    /// Create a masker for detail views (admin user page, login history).
+    ///
+    /// Active when `O2P_DEMO_MODE` is enabled AND viewing another user's data.
+    pub fn for_detail(viewer_id: &str, target_id: &str) -> Self {
+        Self {
+            active: *oauth2_passkey::O2P_DEMO_MODE && viewer_id != target_id,
+        }
+    }
+
+    // -- Collection-level masking --
+
+    /// Mask a list of users for admin views.
+    ///
+    /// When active: filters out the demo placeholder user and masks other users'
+    /// account/label fields. The viewer's own data is kept unmasked.
+    /// When inactive: returns the list unchanged.
+    pub fn mask_users(&self, users: Vec<DbUser>, viewer_id: &str) -> Vec<DbUser> {
+        if !self.active {
+            return users;
+        }
+        users
+            .into_iter()
+            .filter(|user| user.id != oauth2_passkey::DEMO_PLACEHOLDER_USER_ID)
+            .map(|user| {
+                if user.id == viewer_id {
+                    user
+                } else {
+                    DbUser {
+                        account: mask_email(&user.account),
+                        label: mask_name(&user.label),
+                        ..user
+                    }
+                }
+            })
+            .collect()
+    }
+
+    /// Mask a single user's account and label fields.
+    ///
+    /// When inactive: returns the user unchanged.
+    pub fn mask_user(&self, user: DbUser) -> DbUser {
+        if !self.active {
+            return user;
+        }
+        DbUser {
+            account: mask_email(&user.account),
+            label: mask_name(&user.label),
+            ..user
+        }
+    }
+
+    // -- Field-level masking --
+
+    /// Mask an email address. No-op when inactive.
+    pub fn email(&self, val: &str) -> String {
+        if self.active {
+            mask_email(val)
+        } else {
+            val.to_string()
+        }
+    }
+
+    /// Mask a name string. No-op when inactive.
+    pub fn name(&self, val: &str) -> String {
+        if self.active {
+            mask_name(val)
+        } else {
+            val.to_string()
+        }
+    }
+
+    /// Mask an ID string (credential, user, provider). No-op when inactive.
+    pub fn id(&self, val: &str) -> String {
+        if self.active {
+            mask_id(val)
+        } else {
+            val.to_string()
+        }
+    }
+
+    /// Mask an IP address. No-op when inactive.
+    pub fn ip(&self, val: &str) -> String {
+        if self.active {
+            mask_ip(val)
+        } else {
+            val.to_string()
+        }
+    }
+
+    /// Mask a user-agent string. No-op when inactive.
+    pub fn user_agent(&self, val: &str) -> String {
+        if self.active {
+            mask_user_agent(val)
+        } else {
+            val.to_string()
+        }
+    }
+
+    /// Mask metadata (replaces entirely with "***"). No-op when inactive.
+    pub fn metadata(&self, val: &str) -> String {
+        if self.active {
+            "***".to_string()
+        } else {
+            val.to_string()
+        }
+    }
+}
+
+// -- Private helper functions --
+
+/// Mask an email address: "user@example.com" -> "u***@***"
 fn mask_email(email: &str) -> String {
     match email.split_once('@') {
         Some((local, _domain)) => {
@@ -37,12 +177,10 @@ fn mask_prefix(s: &str) -> String {
 
 /// Mask an IP address: "192.168.1.1" -> "192.168.*.*"
 fn mask_ip(ip: &str) -> String {
-    // Handle IPv4
     let parts: Vec<&str> = ip.split('.').collect();
     if parts.len() == 4 {
         return format!("{}.{}.*.*", parts[0], parts[1]);
     }
-    // Handle IPv6 or other formats: just show first segment
     mask_prefix(ip)
 }
 
@@ -57,7 +195,6 @@ fn mask_id(id: &str) -> String {
 
 /// Mask a user-agent string: show only browser family
 fn mask_user_agent(ua: &str) -> String {
-    // Show a generic description instead of the full UA
     if ua.contains("Chrome") {
         "Chrome/***".to_string()
     } else if ua.contains("Firefox") {
@@ -69,77 +206,6 @@ fn mask_user_agent(ua: &str) -> String {
     } else {
         "***".to_string()
     }
-}
-
-/// Mask a list of users for admin views, keeping the current user's data unmasked.
-///
-/// Also filters out the demo placeholder user (sequence_number=1) which should
-/// never appear in admin views.
-pub(crate) fn mask_users(users: Vec<DbUser>, current_user_id: &str) -> Vec<DbUser> {
-    users
-        .into_iter()
-        .filter(|user| user.id != oauth2_passkey::DEMO_PLACEHOLDER_USER_ID)
-        .map(|user| {
-            if user.id == current_user_id {
-                user
-            } else {
-                DbUser {
-                    account: mask_email(&user.account),
-                    label: mask_name(&user.label),
-                    ..user
-                }
-            }
-        })
-        .collect()
-}
-
-/// Mask sensitive fields on a single user for the admin user detail page
-pub(crate) fn mask_user(user: DbUser) -> DbUser {
-    DbUser {
-        account: mask_email(&user.account),
-        label: mask_name(&user.label),
-        ..user
-    }
-}
-
-/// Mask fields on an OAuth2 account (for admin user detail page)
-pub(crate) fn mask_oauth2_email(email: &str) -> String {
-    mask_email(email)
-}
-
-/// Mask a provider user ID (for admin user detail page)
-pub(crate) fn mask_provider_user_id(id: &str) -> String {
-    mask_id(id)
-}
-
-/// Mask a name field (for OAuth2 account name on admin detail page)
-pub(crate) fn mask_account_name(name: &str) -> String {
-    mask_name(name)
-}
-
-/// Mask a credential ID (for admin user detail page)
-pub(crate) fn mask_credential_id(id: &str) -> String {
-    mask_id(id)
-}
-
-/// Mask an IP address (for audit log)
-pub(crate) fn mask_ip_address(ip: &str) -> String {
-    mask_ip(ip)
-}
-
-/// Mask a user-agent string (for audit log)
-pub(crate) fn mask_user_agent_string(ua: &str) -> String {
-    mask_user_agent(ua)
-}
-
-/// Mask a user ID (internal UUID, for credential/account sub-items and audit log)
-pub(crate) fn mask_user_id(id: &str) -> String {
-    mask_id(id)
-}
-
-/// Mask a WebAuthn user handle (for passkey credential details)
-pub(crate) fn mask_user_handle(handle: &str) -> String {
-    mask_id(handle)
 }
 
 #[cfg(test)]
