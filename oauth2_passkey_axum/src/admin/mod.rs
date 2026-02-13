@@ -1,4 +1,5 @@
 mod default;
+pub(crate) mod masking;
 #[cfg(feature = "admin-ui")]
 mod optional;
 

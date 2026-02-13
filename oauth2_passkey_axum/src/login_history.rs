@@ -233,12 +233,19 @@ async fn get_user_login_history(
     let target_user_id = UserId::new(user_id)
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
 
+    let target_user_id_str = target_user_id.as_str().to_string();
     let entries =
         get_user_login_history_admin(session_id, target_user_id, query.limit, query.offset)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(enrich_login_history(entries).await))
+    let enriched = enrich_login_history(entries).await;
+    let enriched = if *oauth2_passkey::O2P_DEMO_MODE && target_user_id_str != auth_user.id {
+        mask_enriched_entries(enriched)
+    } else {
+        enriched
+    };
+    Ok(Json(enriched))
 }
 
 /// Handler for admin audit page API
@@ -282,7 +289,60 @@ async fn get_admin_audit(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(enrich_login_history(entries).await))
+    let enriched = enrich_login_history(entries).await;
+    let enriched = if *oauth2_passkey::O2P_DEMO_MODE {
+        mask_enriched_entries_selective(enriched, &auth_user.id)
+    } else {
+        enriched
+    };
+    Ok(Json(enriched))
+}
+
+/// Mask all entries in a login history response (for viewing another user's history)
+fn mask_enriched_entries(
+    entries: Vec<EnrichedLoginHistoryEntry>,
+) -> Vec<EnrichedLoginHistoryEntry> {
+    entries.into_iter().map(mask_single_entry).collect()
+}
+
+/// Mask entries selectively: keep own entries unmasked, mask others (for audit log)
+fn mask_enriched_entries_selective(
+    entries: Vec<EnrichedLoginHistoryEntry>,
+    current_user_id: &str,
+) -> Vec<EnrichedLoginHistoryEntry> {
+    entries
+        .into_iter()
+        .map(|e| {
+            if e.entry.user_id == current_user_id {
+                e
+            } else {
+                mask_single_entry(e)
+            }
+        })
+        .collect()
+}
+
+/// Mask sensitive fields on a single enriched login history entry
+fn mask_single_entry(entry: EnrichedLoginHistoryEntry) -> EnrichedLoginHistoryEntry {
+    use crate::admin::masking;
+    let mut masked = entry.entry;
+    masked.user_id = masking::mask_user_id(&masked.user_id);
+    masked.ip_address = masked.ip_address.map(|ip| masking::mask_ip_address(&ip));
+    masked.user_agent = masked
+        .user_agent
+        .map(|ua| masking::mask_user_agent_string(&ua));
+    masked.email = masked.email.map(|e| masking::mask_oauth2_email(&e));
+    masked.credential_id = masked
+        .credential_id
+        .map(|id| masking::mask_credential_id(&id));
+    masked.provider_user_id = masked
+        .provider_user_id
+        .map(|id| masking::mask_provider_user_id(&id));
+    EnrichedLoginHistoryEntry {
+        entry: masked,
+        authenticator_name: entry.authenticator_name,
+        authenticator_icon: entry.authenticator_icon,
+    }
 }
 
 /// Template for admin audit page

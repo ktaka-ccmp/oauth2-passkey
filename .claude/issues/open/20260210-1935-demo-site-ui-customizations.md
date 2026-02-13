@@ -66,20 +66,23 @@ isolated.
 
 ## Related Files
 
+- `oauth2_passkey/src/config.rs` (O2P_DEMO_MODE definition)
+- `oauth2_passkey/src/coordination/oauth2.rs` (OAuth2 user creation, is_admin from demo mode)
+- `oauth2_passkey/src/coordination/passkey.rs` (Passkey user creation, is_admin from demo mode)
+- `oauth2_passkey_axum/src/admin/masking.rs` (masking utility functions)
+- `oauth2_passkey_axum/src/admin/default.rs` (admin API handlers with masking)
+- `oauth2_passkey_axum/src/admin/optional.rs` (admin UI handlers with masking)
+- `oauth2_passkey_axum/src/login_history.rs` (audit/login history with masking)
 - `demo-live/src/main.rs` (demo application entry point)
-- `oauth2_passkey_axum/src/admin/default.rs` (admin handlers)
-- `oauth2_passkey_axum/templates/admin_index.j2` (user list template)
-- `oauth2_passkey_axum/templates/admin_user.j2` (user detail template)
-- `oauth2_passkey_axum/templates/admin_audit.j2` (audit log template)
-- `oauth2_passkey/src/coordination/oauth2.rs` (OAuth2 user creation, line 388)
-- `oauth2_passkey/src/coordination/passkey.rs` (Passkey user creation, line 172)
 
 ## Implementation Tasks
 
-- [ ] Design admin selection UX (dropdown? checkbox? post-creation prompt?)
-- [ ] Implement admin/normal user selection during OAuth2 registration
-- [ ] Add field masking for Account/Label in admin user list
-- [ ] Add audit log masking for sensitive fields
+- [x] Add `O2P_DEMO_MODE` env var (controls admin default + masking)
+- [x] All new users get admin in demo mode (OAuth2 + Passkey creation)
+- [x] Backend masking for admin_index (user list)
+- [x] Backend masking for admin_user_page (user detail)
+- [x] Backend masking for audit log / login history
+- [x] Unit tests for masking functions
 - [ ] Implement OAuth2-only gate for first user creation
 - [ ] Test all customizations in Docker environment
 
@@ -99,5 +102,31 @@ isolated.
 - Decision: Prefer demo-app-side or configuration-based changes
 - Reason: Keeps library clean for publishing; demo-specific customizations should not
   pollute the core library API
+
+### 2026-02-14: Single O2P_DEMO_MODE replaces separate config variables
+
+- Context: Designing admin default and masking for public demo site
+- Decision: Use a single `O2P_DEMO_MODE=true` env var instead of separate
+  `O2P_NEW_USER_DEFAULT_ADMIN` and masking toggles
+- Reason: Prevents accidental misconfiguration in production. If admin default
+  were a separate variable, someone could enable it without masking, exposing
+  all users' data to every admin. Single toggle ensures both behaviors are
+  always paired.
+
+### 2026-02-14: Backend masking in Axum handlers, not core library
+
+- Context: Choosing where to implement data masking (core lib vs Axum handlers)
+- Decision: Mask data in Axum HTTP handlers before returning responses
+- Reason: Core library stays clean (no demo-specific logic). Axum handlers
+  receive raw data from the library and mask it server-side, so DevTools
+  cannot see unmasked data. Same security as library-level masking.
+
+### 2026-02-14: All admin operations allowed in demo mode
+
+- Context: Whether to restrict admin operations (delete, force logout, etc.)
+- Decision: Allow all operations; rely on existing admin safeguard protections
+- Reason: Lets users experience the full admin feature set. Admin safeguard
+  (PR #214) prevents last-admin deletion and first-user demotion, providing
+  minimum safety guarantees.
 
 ## Resolution

@@ -48,6 +48,12 @@ async fn get_all_users_handler(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    let users = if *oauth2_passkey::O2P_DEMO_MODE {
+        super::masking::mask_users(users, &auth_user.id)
+    } else {
+        users
+    };
+
     Ok(Json(users))
 }
 

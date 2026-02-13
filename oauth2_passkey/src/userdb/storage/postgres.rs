@@ -144,6 +144,51 @@ pub(super) async fn count_admin_users_postgres(pool: &Pool<Postgres>) -> Result<
     Ok(row.0)
 }
 
+/// Insert a demo placeholder user with sequence_number=1
+///
+/// This occupies seq=1 so no real user gets first-user protections.
+/// Idempotent: does nothing if seq=1 already exists.
+/// Also advances the BIGSERIAL sequence past 1 to avoid conflicts.
+pub(super) async fn insert_demo_placeholder_postgres(
+    pool: &Pool<Postgres>,
+) -> Result<(), UserError> {
+    let table_name = DB_TABLE_USERS.as_str();
+    let now = chrono::Utc::now();
+
+    sqlx::query(&format!(
+        r#"
+        INSERT INTO {table_name}
+            (sequence_number, id, account, label, is_admin, created_at, updated_at)
+        VALUES (1, $1, $2, $3, true, $4, $5)
+        ON CONFLICT (sequence_number) DO NOTHING
+        "#
+    ))
+    .bind(crate::config::DEMO_PLACEHOLDER_USER_ID)
+    .bind("system@demo.local")
+    .bind("[Demo Placeholder]")
+    .bind(now)
+    .bind(now)
+    .execute(pool)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    // Advance the BIGSERIAL sequence past any explicitly inserted values
+    // Without this, the next auto-generated sequence_number could conflict with 1
+    sqlx::query(&format!(
+        r#"
+        SELECT setval(
+            pg_get_serial_sequence('{table_name}', 'sequence_number'),
+            GREATEST(1, (SELECT COALESCE(MAX(sequence_number), 0) FROM {table_name}))
+        )
+        "#
+    ))
+    .execute(pool)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    Ok(())
+}
+
 pub(super) async fn delete_user_postgres(
     pool: &Pool<Postgres>,
     id: UserId,

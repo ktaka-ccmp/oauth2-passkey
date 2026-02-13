@@ -62,6 +62,12 @@ async fn admin_index(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, S
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    let users = if *oauth2_passkey::O2P_DEMO_MODE {
+        super::masking::mask_users(users, &auth_user.id)
+    } else {
+        users
+    };
+
     let csrf_token = auth_user.csrf_token.clone();
 
     // Render the template
@@ -277,6 +283,9 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
                 )
             })?;
 
+    // Determine if masking is needed (demo mode + viewing another user)
+    let should_mask = *oauth2_passkey::O2P_DEMO_MODE && user.id != auth_user.id;
+
     // Convert PasskeyCredential to TemplateCredential
     let passkey_credentials = stored_credentials
         .iter()
@@ -287,11 +296,31 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
                 .or_else(|| Some(AuthenticatorInfo::default()));
 
             TemplateCredential {
-                credential_id: cred.credential_id.clone(),
-                user_id: cred.user_id.clone(),
-                user_name: cred.user.name.clone(),
-                user_display_name: cred.user.display_name.clone(),
-                user_handle: cred.user.user_handle.clone(),
+                credential_id: if should_mask {
+                    super::masking::mask_credential_id(&cred.credential_id)
+                } else {
+                    cred.credential_id.clone()
+                },
+                user_id: if should_mask {
+                    super::masking::mask_user_id(&cred.user_id)
+                } else {
+                    cred.user_id.clone()
+                },
+                user_name: if should_mask {
+                    super::masking::mask_account_name(&cred.user.name)
+                } else {
+                    cred.user.name.clone()
+                },
+                user_display_name: if should_mask {
+                    super::masking::mask_account_name(&cred.user.display_name)
+                } else {
+                    cred.user.display_name.clone()
+                },
+                user_handle: if should_mask {
+                    super::masking::mask_user_handle(&cred.user.user_handle)
+                } else {
+                    cred.user.user_handle.clone()
+                },
                 aaguid: cred.aaguid.clone(),
                 rp_id: cred.rp_id.clone(),
                 created_at: format_date_tz(&cred.created_at, "JST"),
@@ -303,7 +332,6 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
         .collect::<Vec<_>>();
 
     // Fetch OAuth2 accounts using the public function from libauth
-    // let oauth2_accounts = list_accounts_core(Some(session_user)).await.map_err(|e| {
     let user_id_enum3 = UserId::new(user_id.to_string()).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -320,21 +348,49 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
     // Convert OAuth2Account to TemplateAccount
     let oauth2_accounts = oauth2_accounts
         .into_iter()
-        .map(|account| {
-            TemplateAccount {
-                id: account.id,
-                user_id: account.user_id,
-                provider: account.provider,
-                provider_user_id: account.provider_user_id,
-                name: account.name,
-                email: account.email,
-                picture: account.picture.unwrap_or_default(),
-                metadata_str: account.metadata.to_string(), // Convert metadata Value to string
-                created_at: format_date_tz(&account.created_at, "JST"),
-                updated_at: format_date_tz(&account.updated_at, "JST"),
-            }
+        .map(|account| TemplateAccount {
+            id: if should_mask {
+                super::masking::mask_credential_id(&account.id)
+            } else {
+                account.id
+            },
+            user_id: if should_mask {
+                super::masking::mask_user_id(&account.user_id)
+            } else {
+                account.user_id
+            },
+            provider: account.provider,
+            provider_user_id: if should_mask {
+                super::masking::mask_provider_user_id(&account.provider_user_id)
+            } else {
+                account.provider_user_id
+            },
+            name: if should_mask {
+                super::masking::mask_account_name(&account.name)
+            } else {
+                account.name
+            },
+            email: if should_mask {
+                super::masking::mask_oauth2_email(&account.email)
+            } else {
+                account.email
+            },
+            picture: account.picture.unwrap_or_default(),
+            metadata_str: if should_mask {
+                "***".to_string()
+            } else {
+                account.metadata.to_string()
+            },
+            created_at: format_date_tz(&account.created_at, "JST"),
+            updated_at: format_date_tz(&account.updated_at, "JST"),
         })
         .collect();
+
+    let user = if should_mask {
+        super::masking::mask_user(user)
+    } else {
+        user
+    };
 
     let csrf_token = auth_user.csrf_token.clone();
 
