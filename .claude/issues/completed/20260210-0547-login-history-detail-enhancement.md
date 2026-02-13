@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-10-05-47
 
-## Closed:
+## Closed: 2026-02-12-21-00
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -95,17 +95,17 @@ Existing rows will have `aaguid = NULL`, which is handled gracefully.
 
 ## Implementation Tasks
 
-- [ ] Add `aaguid` column to login history schema (SQLite + PostgreSQL)
-- [ ] Update `LoginHistoryEntry` struct with `aaguid: Option<String>`
-- [ ] Update storage INSERT queries to include `aaguid`
-- [ ] Update storage SELECT queries to return `aaguid`
-- [ ] Update `record_login_success()` to pass AAGUID for passkey logins
-- [ ] Look up AAGUID in passkey auth flow and pass to recording function
-- [ ] Batch fetch `AuthenticatorInfo` for AAGUIDs in history entries
-- [ ] Update user login history template to show authenticator icon + name
-- [ ] Update admin audit template to show authenticator icon + name
-- [ ] Add unit tests for AAGUID recording
-- [ ] Manual testing: verify AAGUID appears in login history after passkey login
+- [x] Add `aaguid` column to login history schema (SQLite + PostgreSQL)
+- [x] Update `LoginHistoryEntry` struct with `aaguid: Option<String>`
+- [x] Update storage INSERT queries to include `aaguid`
+- [x] Update storage SELECT queries to return `aaguid`
+- [x] Update `record_login_success()` to pass AAGUID for passkey logins
+- [x] Look up AAGUID in passkey auth flow and pass to recording function
+- [x] Batch fetch `AuthenticatorInfo` for AAGUIDs in history entries
+- [x] Update user login history template to show authenticator icon + name
+- [x] Update admin audit template to show authenticator icon + name
+- [x] Add unit tests for AAGUID recording
+- [x] Manual testing: verify AAGUID appears in login history after passkey login
 
 ## Decision Log
 
@@ -121,4 +121,26 @@ Existing rows will have `aaguid = NULL`, which is handled gracefully.
 - Reason: Self-contained historical records; icons improve UX; nullable column is
   backward-compatible with no migration needed for existing data
 
+### 2026-02-12: Scope expanded and implementation completed
+
+- Context: During implementation, additional improvements were identified and applied
+- Decision: Added email recording in login history, refactored AuthMethodDetails enum
+  to hold per-variant data, replaced tuple return with AuthenticationResult struct,
+  embedded authenticator info directly in enriched response entries, removed unnecessary
+  LoginHistoryResponse wrapper (YAGNI)
+- Reason: Each change improved code clarity and data completeness; YAGNI applied to
+  remove unnecessary abstraction layer
+
 ## Resolution
+
+Implemented on branch `dev-20260210-0547-v2` (squashed from 7 commits on `dev-20260210-0547`).
+
+Key changes:
+- Added `aaguid` and `email` columns to `o2p_login_history` (SQLite + PostgreSQL)
+- Refactored `AuthMethodDetails` from unit variants to data-carrying variants
+  (`Passkey { credential_id, aaguid }`, `OAuth2 { provider, provider_user_id, email }`)
+- Replaced tuple return from `finish_authentication()` with `AuthenticationResult` struct
+- Added `EnrichedLoginHistoryEntry` with `#[serde(flatten)]` to embed authenticator
+  name/icon directly in JSON responses via batch AAGUID lookup
+- Updated all 4 login history templates to display authenticator icons and names
+- All 611 tests pass, clippy clean
