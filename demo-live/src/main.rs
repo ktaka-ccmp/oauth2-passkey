@@ -11,7 +11,6 @@ use oauth2_passkey_axum::{
     AuthUser, O2P_CUSTOM_CSS_URL, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router,
 };
 
-mod protected;
 mod server;
 use askama::Template;
 use axum::response::Html;
@@ -45,17 +44,16 @@ async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
 #[derive(Template)]
 #[template(path = "index.j2")]
 struct IndexTemplate<'a> {
-    message: &'a str,
+    user_name: &'a str,
     prefix: &'a str,
     custom_css_url: Option<&'a str>,
 }
 
-// O2P_LOGIN_URL is /o2p/user/login and O2P_ACCOUNT_URL is /o2p/user/account by default
 async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
     match user {
-        Some(_) => {
+        Some(user) => {
             let template = IndexTemplate {
-                message: "This is a protected page.",
+                user_name: &user.label,
                 prefix: O2P_ROUTE_PREFIX.as_str(),
                 custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
             };
@@ -78,8 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/", get(index))
         .route("/login", get(login))
-        .merge(oauth2_passkey_full_router())
-        .merge(protected::router());
+        .merge(oauth2_passkey_full_router());
 
     let port = std::env::var("PORT")
         .ok()

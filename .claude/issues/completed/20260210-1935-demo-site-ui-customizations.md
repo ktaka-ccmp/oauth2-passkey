@@ -88,6 +88,8 @@ isolated.
 - [x] Improve O2P_DEMO_MODE env var documentation
 - [x] OAuth2-only first user creation (addressed by login page UI design, no API-level gate needed)
 - [x] Test all customizations on passkey-demo.ccmp.jp
+- [x] Simplify demo-live: remove developer demo pages (p1-p6), simplify home page
+- [x] Add GitHub repository link to demo-live pages
 
 ## Decision Log
 
@@ -159,4 +161,6 @@ All demo site UI/UX customizations implemented and deployed. Key deliverables:
 - Masker struct centralizing all masking logic (2 O2P_DEMO_MODE references in 1 file)
 - Custom login page for demo-live (2-button layout, no passkey registration)
 - Backend masking for admin index, user detail, audit log, and login history
+- Simplified demo-live: removed p1-p6 developer demos, clean welcome page with user name
+- GitHub repository link on both login and home pages (octocat icon)
 - Verification on passkey-demo.ccmp.jp
