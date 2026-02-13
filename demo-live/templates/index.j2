@@ -3,57 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demo: Protected Area</title>
+    <title>OAuth2 Passkey Demo</title>
     <link rel="stylesheet" href="{{prefix}}/user/o2p-base.css">
     {% if let Some(css_url) = custom_css_url %}
     <link rel="stylesheet" href="{{css_url}}">
     {% endif %}
     <style>
-        .demo-description { color: var(--o2p-text-secondary); margin-bottom: var(--o2p-space-md); }
+        .welcome-message { color: var(--o2p-text-secondary); margin-bottom: var(--o2p-space-lg); }
+        .nav-cards { display: flex; flex-direction: column; gap: var(--o2p-space-sm); }
+        .nav-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--o2p-space-md);
+            border: 1px solid var(--o2p-border, #e5e7eb);
+            border-radius: var(--o2p-radius, 8px);
+            text-decoration: none;
+            color: var(--o2p-text, #111827);
+            transition: background-color 0.15s;
+        }
+        .nav-card:hover { background-color: var(--o2p-background-alt, #f3f4f6); }
+        .nav-card-title { font-weight: 600; }
+        .nav-card-desc { color: var(--o2p-text-secondary); font-size: 0.9em; margin-top: 2px; }
+        .nav-card-arrow { color: var(--o2p-text-secondary); font-size: 1.2em; }
+        .github-link {
+            color: var(--o2p-text-secondary, #6b7280);
+            transition: color 0.15s;
+            display: inline-flex;
+            align-items: center;
+        }
+        .github-link:hover { color: var(--o2p-text, #111827); }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="page-header">
-        <h1>Protected Area</h1>
-        <nav>
-            <a href="/">Home</a>
-            <a href="/p1">p1</a>
-            <a href="/p2">p2</a>
-            <a href="/p3">p3</a>
-            <a href="/p4">p4</a>
-            <a href="/p5">p5</a>
-            <a href="/p6">p6</a>
-            <a href="/nested/p3">nested/p3</a>
-            <a href="{{prefix}}/user/account">My Account</a>
-        </nav>
+        <h1>OAuth2 Passkey Demo</h1>
         <div class="header-buttons">
+            <a href="https://github.com/ktaka-ccmp/oauth2-passkey" target="_blank" rel="noopener" class="github-link" title="View source on GitHub">
+                <svg viewBox="0 0 16 16" width="24" height="24" fill="currentColor"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
+            </a>
             <a href="{{prefix}}/user/logout?redirect=/" class="btn btn-secondary btn-sm">Logout</a>
         </div>
     </div>
 
     <div class="section">
-        <p class="demo-description">{{message}}</p>
-        <p class="demo-description">
-            This demo application showcases different route protection patterns.
-            Each page below demonstrates a specific authentication and CSRF protection technique.
-        </p>
+        <p class="welcome-message">Welcome, {{user_name}}.</p>
     </div>
 
     <div class="section">
-        <div class="section-header">
-            <h2 class="section-title">Demo Pages</h2>
-        </div>
-        <div class="item">
-            <div class="item-detail"><a href="/p1">p1: AuthUser Extractor</a> — Route protection via extractor</div>
-            <div class="item-detail"><a href="/p2">p2: Optional Auth</a> — Both authenticated and anonymous access</div>
-            <div class="item-detail"><a href="/p3">p3: AJAX CSRF</a> — AJAX POST with CSRF token header</div>
-            <div class="item-detail"><a href="/p4">p4: User Details</a> — User data via middleware Extension</div>
-            <div class="item-detail"><a href="/p5">p5: CSRF in Template</a> — CSRF token embedded in template</div>
-            <div class="item-detail"><a href="/p6">p6: Form CSRF</a> — Form submission with CSRF validation</div>
-            <div class="item-detail"><a href="/nested/p3">nested/p3: AJAX CSRF</a> — Same as p3 under nested prefix</div>
-            <div class="item-detail"><a href="{{prefix}}/user/account">My Account</a> — Library-provided account management page (admin features shown for admin users)</div>
-            <div class="item-detail"><a href="{{prefix}}/admin/index">Admin</a> — Library-provided admin panel (admin only)</div>
+        <div class="nav-cards">
+            <a href="{{prefix}}/user/account" class="nav-card">
+                <div>
+                    <div class="nav-card-title">My Account</div>
+                    <div class="nav-card-desc">Manage passkeys and linked accounts</div>
+                </div>
+                <span class="nav-card-arrow">&rarr;</span>
+            </a>
+            <a href="{{prefix}}/admin/index" class="nav-card">
+                <div>
+                    <div class="nav-card-title">Admin Panel</div>
+                    <div class="nav-card-desc">Manage users, view audit logs</div>
+                </div>
+                <span class="nav-card-arrow">&rarr;</span>
+            </a>
         </div>
     </div>
 </div>

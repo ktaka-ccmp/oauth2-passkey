@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-10-19-35
 
-## Closed: 2026-02-14
+## Closed:
 
-## Status: completed
+## Status: open
 
 ## Priority: medium
 
@@ -88,6 +88,8 @@ isolated.
 - [x] Improve O2P_DEMO_MODE env var documentation
 - [x] OAuth2-only first user creation (addressed by login page UI design, no API-level gate needed)
 - [x] Test all customizations on passkey-demo.ccmp.jp
+- [ ] Simplify demo-live: remove developer demo pages (p1-p6), simplify home page
+- [ ] Add GitHub repository link to demo-live pages
 
 ## Decision Log
 
