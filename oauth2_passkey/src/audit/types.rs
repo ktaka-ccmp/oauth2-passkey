@@ -48,6 +48,28 @@ pub struct LoginHistoryEntry {
     pub provider_user_id: Option<String>,
     /// Reason for failure (if success is false)
     pub failure_reason: Option<String>,
+    /// AAGUID of the authenticator (for passkey logins)
+    pub aaguid: Option<String>,
+    /// Email address used for OAuth2 login
+    pub email: Option<String>,
+}
+
+/// Auth-method-specific details for a login history entry
+///
+/// Groups the optional fields that vary by authentication method (passkey vs OAuth2),
+/// replacing individual parameters to keep function signatures clean.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct AuthMethodDetails {
+    /// Passkey credential ID
+    pub credential_id: Option<String>,
+    /// OAuth2 provider name
+    pub provider: Option<String>,
+    /// OAuth2 provider user ID
+    pub provider_user_id: Option<String>,
+    /// AAGUID of the authenticator (passkey)
+    pub aaguid: Option<String>,
+    /// Email address (OAuth2)
+    pub email: Option<String>,
 }
 
 impl LoginHistoryEntry {
@@ -56,9 +78,7 @@ impl LoginHistoryEntry {
         user_id: String,
         auth_method: AuthMethod,
         context: LoginContext,
-        credential_id: Option<String>,
-        provider: Option<String>,
-        provider_user_id: Option<String>,
+        details: AuthMethodDetails,
     ) -> Self {
         Self {
             id: None,
@@ -68,10 +88,12 @@ impl LoginHistoryEntry {
             ip_address: context.ip_address,
             user_agent: context.user_agent.map(|ua| truncate_user_agent(&ua)),
             success: true,
-            credential_id,
-            provider,
-            provider_user_id,
+            credential_id: details.credential_id,
+            provider: details.provider,
+            provider_user_id: details.provider_user_id,
             failure_reason: None,
+            aaguid: details.aaguid,
+            email: details.email,
         }
     }
 
@@ -95,6 +117,8 @@ impl LoginHistoryEntry {
             provider: None,
             provider_user_id: None,
             failure_reason: Some(reason),
+            aaguid: None,
+            email: None,
         }
     }
 }

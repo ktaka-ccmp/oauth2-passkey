@@ -26,7 +26,9 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Logi
             credential_id TEXT,
             provider TEXT,
             provider_user_id TEXT,
-            failure_reason TEXT
+            failure_reason TEXT,
+            aaguid TEXT,
+            email TEXT
         )
         "#
     ))
@@ -75,6 +77,8 @@ pub(super) async fn validate_login_history_tables_sqlite(
         ("provider", "TEXT"),
         ("provider_user_id", "TEXT"),
         ("failure_reason", "TEXT"),
+        ("aaguid", "TEXT"),
+        ("email", "TEXT"),
     ];
 
     validate_sqlite_table_schema(
@@ -99,9 +103,10 @@ pub(super) async fn insert_login_history_sqlite(
         r#"
         INSERT INTO {table_name} (
             user_id, timestamp, auth_method, ip_address, user_agent,
-            success, credential_id, provider, provider_user_id, failure_reason
+            success, credential_id, provider, provider_user_id, failure_reason,
+            aaguid, email
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#
     ))
     .bind(&entry.user_id)
@@ -114,6 +119,8 @@ pub(super) async fn insert_login_history_sqlite(
     .bind(&entry.provider)
     .bind(&entry.provider_user_id)
     .bind(&entry.failure_reason)
+    .bind(&entry.aaguid)
+    .bind(&entry.email)
     .execute(pool)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;

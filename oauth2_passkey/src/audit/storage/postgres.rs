@@ -26,7 +26,9 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             credential_id TEXT,
             provider TEXT,
             provider_user_id TEXT,
-            failure_reason TEXT
+            failure_reason TEXT,
+            aaguid TEXT,
+            email TEXT
         )
         "#
     ))
@@ -75,6 +77,8 @@ pub(super) async fn validate_login_history_tables_postgres(
         ("provider", "text"),
         ("provider_user_id", "text"),
         ("failure_reason", "text"),
+        ("aaguid", "text"),
+        ("email", "text"),
     ];
 
     validate_postgres_table_schema(
@@ -99,9 +103,10 @@ pub(super) async fn insert_login_history_postgres(
         r#"
         INSERT INTO {table_name} (
             user_id, timestamp, auth_method, ip_address, user_agent,
-            success, credential_id, provider, provider_user_id, failure_reason
+            success, credential_id, provider, provider_user_id, failure_reason,
+            aaguid, email
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *
         "#
     ))
@@ -115,6 +120,8 @@ pub(super) async fn insert_login_history_postgres(
     .bind(&entry.provider)
     .bind(&entry.provider_user_id)
     .bind(&entry.failure_reason)
+    .bind(&entry.aaguid)
+    .bind(&entry.email)
     .fetch_one(pool)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
