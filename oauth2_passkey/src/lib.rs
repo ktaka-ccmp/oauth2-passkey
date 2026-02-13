@@ -83,6 +83,10 @@ pub use config::O2P_ROUTE_PREFIX;
 // Signal API mode for credential synchronization with authenticators
 pub use config::PASSKEY_SIGNAL_API_MODE;
 
+// Demo mode flag and placeholder user ID for public demo sites
+pub use config::DEMO_PLACEHOLDER_USER_ID;
+pub use config::O2P_DEMO_MODE;
+
 // OAuth2 authentication types and functions
 pub use oauth2::{
     AuthResponse, OAuth2Account, OAuth2Mode, OAuth2State, Provider, ProviderUserId,

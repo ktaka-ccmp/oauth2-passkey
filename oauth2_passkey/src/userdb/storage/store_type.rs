@@ -19,11 +19,17 @@ impl UserStore {
             (Some(pool), _) => {
                 create_tables_sqlite(pool).await?;
                 validate_user_tables_sqlite(pool).await?;
+                if *crate::config::O2P_DEMO_MODE {
+                    insert_demo_placeholder_sqlite(pool).await?;
+                }
                 Ok(())
             }
             (_, Some(pool)) => {
                 create_tables_postgres(pool).await?;
                 validate_user_tables_postgres(pool).await?;
+                if *crate::config::O2P_DEMO_MODE {
+                    insert_demo_placeholder_postgres(pool).await?;
+                }
                 Ok(())
             }
             _ => Err(UserError::Storage("Unsupported database type".to_string())),

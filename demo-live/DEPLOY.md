@@ -224,37 +224,38 @@ rm sa-key.json
 See `.github/workflows/deploy-demo.yml`. On each push to the trigger branch:
 1. Authenticates to GCP with service account key
 2. Builds Docker image via Cloud Build (`demo-live/cloudbuild.yaml`)
-3. Deploys to Cloud Run (image update only; env vars and secrets are preserved)
+3. Full deploy to Cloud Run: image, env vars (`env.cloud-run.yaml`), and secrets
+
+This ensures environment variable changes in `env.cloud-run.yaml` are automatically applied on every deploy.
 
 ## Manual Redeployment
 
-To rebuild and redeploy manually:
+To rebuild and redeploy manually (equivalent to what GitHub Actions does):
 
 ```bash
 # Rebuild image
 gcloud builds submit --config=demo-live/cloudbuild.yaml
 
-# Redeploy (env vars and secrets are preserved)
+# Full deploy (image + env vars + secrets)
 gcloud run deploy oauth2-passkey-demo \
   --image asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo \
-  --region asia-northeast1
+  --region asia-northeast1 \
+  --port 8080 \
+  --allow-unauthenticated \
+  --min-instances 1 \
+  --env-vars-file demo-live/env.cloud-run.yaml \
+  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest"
 ```
 
-If environment variables changed, re-apply the full set or update individually:
+To update only environment variables (without rebuilding the image):
 
 ```bash
-# Re-apply all env vars from file
 gcloud run services update oauth2-passkey-demo \
   --region asia-northeast1 \
   --env-vars-file demo-live/env.cloud-run.yaml
-
-# Or update individual env vars
-gcloud run services update oauth2-passkey-demo \
-  --region asia-northeast1 \
-  --update-env-vars "KEY=value"
 ```
 
-Note: `--env-vars-file` replaces all env vars. `--update-env-vars` merges (adds or overwrites specified keys only, including those originally set via `--env-vars-file`). These two flags cannot be combined in one command.
+Note: `--env-vars-file` replaces all env vars. To update individual keys without affecting others, use `--update-env-vars "KEY=value"` instead.
 
 ## Google OAuth2 Notes
 

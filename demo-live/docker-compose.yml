@@ -22,3 +22,5 @@ services:
       GENERIC_CACHE_STORE_TYPE: memory
       GENERIC_CACHE_STORE_URL: "unused"
       RUST_LOG: debug
+      O2P_DEMO_MODE: "true"
+      O2P_LOGIN_URL: "/login"

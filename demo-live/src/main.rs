@@ -18,6 +18,31 @@ use axum::response::Html;
 use server::{init_tracing, spawn_http_server};
 
 #[derive(Template)]
+#[template(path = "login.j2")]
+struct LoginTemplate<'a> {
+    o2p_route_prefix: &'a str,
+    custom_css_url: Option<&'a str>,
+}
+
+async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
+    match user {
+        Some(_) => Ok(Redirect::to("/").into_response()),
+        None => {
+            let template = LoginTemplate {
+                o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
+                custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+            };
+            Ok(Html(
+                template
+                    .render()
+                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+            )
+            .into_response())
+        }
+    }
+}
+
+#[derive(Template)]
 #[template(path = "index.j2")]
 struct IndexTemplate<'a> {
     message: &'a str,
@@ -52,6 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .route("/", get(index))
+        .route("/login", get(login))
         .merge(oauth2_passkey_full_router())
         .merge(protected::router());
 

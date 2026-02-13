@@ -19,6 +19,7 @@ use oauth2_passkey::{
     list_accounts_core, list_credentials_core,
 };
 
+use super::masking::Masker;
 use crate::{
     O2P_ADMIN_URL,
     config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT},
@@ -61,6 +62,8 @@ async fn admin_index(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, S
     let users = get_all_users(session_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let users = Masker::for_list().mask_users(users, &auth_user.id);
 
     let csrf_token = auth_user.csrf_token.clone();
 
@@ -146,6 +149,19 @@ struct TemplateCredential {
     pub authenticator_info: Option<AuthenticatorInfo>,
 }
 
+impl TemplateCredential {
+    fn masked(self, masker: &Masker) -> Self {
+        Self {
+            credential_id: masker.id(&self.credential_id),
+            user_id: masker.id(&self.user_id),
+            user_name: masker.name(&self.user_name),
+            user_display_name: masker.name(&self.user_display_name),
+            user_handle: masker.id(&self.user_handle),
+            ..self
+        }
+    }
+}
+
 // Template-friendly version of OAuth2Account for display
 #[derive(Debug)]
 struct TemplateAccount {
@@ -159,6 +175,20 @@ struct TemplateAccount {
     pub metadata_str: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+impl TemplateAccount {
+    fn masked(self, masker: &Masker) -> Self {
+        Self {
+            id: masker.id(&self.id),
+            user_id: masker.id(&self.user_id),
+            provider_user_id: masker.id(&self.provider_user_id),
+            name: masker.name(&self.name),
+            email: masker.email(&self.email),
+            metadata_str: masker.metadata(&self.metadata_str),
+            ..self
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -277,6 +307,8 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
                 )
             })?;
 
+    let masker = Masker::for_detail(&auth_user.id, &user.id);
+
     // Convert PasskeyCredential to TemplateCredential
     let passkey_credentials = stored_credentials
         .iter()
@@ -299,11 +331,11 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
                 last_used_at: format_date_tz(&cred.last_used_at, "JST"),
                 authenticator_info,
             }
+            .masked(&masker)
         })
         .collect::<Vec<_>>();
 
     // Fetch OAuth2 accounts using the public function from libauth
-    // let oauth2_accounts = list_accounts_core(Some(session_user)).await.map_err(|e| {
     let user_id_enum3 = UserId::new(user_id.to_string()).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -329,12 +361,15 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
                 name: account.name,
                 email: account.email,
                 picture: account.picture.unwrap_or_default(),
-                metadata_str: account.metadata.to_string(), // Convert metadata Value to string
+                metadata_str: account.metadata.to_string(),
                 created_at: format_date_tz(&account.created_at, "JST"),
                 updated_at: format_date_tz(&account.updated_at, "JST"),
             }
+            .masked(&masker)
         })
         .collect();
+
+    let user = masker.mask_user(user);
 
     let csrf_token = auth_user.csrf_token.clone();
 

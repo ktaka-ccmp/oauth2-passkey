@@ -19,8 +19,8 @@ use oauth2_passkey::{
     get_user_login_history_admin, query_login_history_admin,
 };
 
+use crate::admin::masking::Masker;
 use crate::config::O2P_CUSTOM_CSS_URL;
-
 use crate::session::AuthUser;
 
 /// Query parameters for login history pagination with date range
@@ -95,6 +95,23 @@ struct EnrichedLoginHistoryEntry {
     authenticator_name: Option<String>,
     /// Resolved authenticator icon URL
     authenticator_icon: Option<String>,
+}
+
+impl EnrichedLoginHistoryEntry {
+    fn masked(self, masker: &Masker) -> Self {
+        let mut entry = self.entry;
+        entry.user_id = masker.id(&entry.user_id);
+        entry.ip_address = entry.ip_address.as_deref().map(|v| masker.ip(v));
+        entry.user_agent = entry.user_agent.as_deref().map(|v| masker.user_agent(v));
+        entry.email = entry.email.as_deref().map(|v| masker.email(v));
+        entry.credential_id = entry.credential_id.as_deref().map(|v| masker.id(v));
+        entry.provider_user_id = entry.provider_user_id.as_deref().map(|v| masker.id(v));
+        Self {
+            entry,
+            authenticator_name: self.authenticator_name,
+            authenticator_icon: self.authenticator_icon,
+        }
+    }
 }
 
 /// Enrich login history entries with resolved authenticator metadata
@@ -233,12 +250,16 @@ async fn get_user_login_history(
     let target_user_id = UserId::new(user_id)
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
 
+    let target_user_id_str = target_user_id.as_str().to_string();
     let entries =
         get_user_login_history_admin(session_id, target_user_id, query.limit, query.offset)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(enrich_login_history(entries).await))
+    let enriched = enrich_login_history(entries).await;
+    let masker = Masker::for_detail(&auth_user.id, &target_user_id_str);
+    let enriched: Vec<_> = enriched.into_iter().map(|e| e.masked(&masker)).collect();
+    Ok(Json(enriched))
 }
 
 /// Handler for admin audit page API
@@ -282,7 +303,15 @@ async fn get_admin_audit(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(enrich_login_history(entries).await))
+    let enriched = enrich_login_history(entries).await;
+    let enriched: Vec<_> = enriched
+        .into_iter()
+        .map(|e| {
+            let masker = Masker::for_detail(&auth_user.id, &e.entry.user_id);
+            e.masked(&masker)
+        })
+        .collect();
+    Ok(Json(enriched))
 }
 
 /// Template for admin audit page
