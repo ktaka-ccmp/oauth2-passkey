@@ -97,14 +97,8 @@ struct EnrichedLoginHistoryEntry {
     authenticator_icon: Option<String>,
 }
 
-/// Login history response containing enriched entries
-#[derive(Serialize)]
-struct LoginHistoryResponse {
-    entries: Vec<EnrichedLoginHistoryEntry>,
-}
-
-/// Build a login history response with authenticator info embedded in each entry
-async fn build_login_history_response(entries: Vec<LoginHistoryEntry>) -> LoginHistoryResponse {
+/// Enrich login history entries with resolved authenticator metadata
+async fn enrich_login_history(entries: Vec<LoginHistoryEntry>) -> Vec<EnrichedLoginHistoryEntry> {
     // Collect unique AAGUIDs from entries
     let aaguids: Vec<String> = entries
         .iter()
@@ -122,7 +116,7 @@ async fn build_login_history_response(entries: Vec<LoginHistoryEntry>) -> LoginH
             .unwrap_or_default()
     };
 
-    let enriched = entries
+    entries
         .into_iter()
         .map(|entry| {
             let (name, icon) = entry
@@ -140,9 +134,7 @@ async fn build_login_history_response(entries: Vec<LoginHistoryEntry>) -> LoginH
                 authenticator_icon: icon,
             }
         })
-        .collect();
-
-    LoginHistoryResponse { entries: enriched }
+        .collect()
 }
 
 /// Create a router for user's own login history
@@ -164,7 +156,7 @@ pub(crate) fn admin_router() -> Router {
 async fn get_my_login_history(
     auth_user: AuthUser,
     Query(query): Query<LoginHistoryQuery>,
-) -> Result<Json<LoginHistoryResponse>, (StatusCode, String)> {
+) -> Result<Json<Vec<EnrichedLoginHistoryEntry>>, (StatusCode, String)> {
     let session_cookie = SessionCookie::new(auth_user.session_id.clone()).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -193,7 +185,7 @@ async fn get_my_login_history(
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     };
 
-    Ok(Json(build_login_history_response(entries).await))
+    Ok(Json(enrich_login_history(entries).await))
 }
 
 /// Template for user's login history page
@@ -226,7 +218,7 @@ async fn get_user_login_history(
     auth_user: AuthUser,
     Path(user_id): Path<String>,
     Query(query): Query<LoginHistoryQuery>,
-) -> Result<Json<LoginHistoryResponse>, (StatusCode, String)> {
+) -> Result<Json<Vec<EnrichedLoginHistoryEntry>>, (StatusCode, String)> {
     if !auth_user.has_admin_privileges() {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
@@ -246,7 +238,7 @@ async fn get_user_login_history(
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(build_login_history_response(entries).await))
+    Ok(Json(enrich_login_history(entries).await))
 }
 
 /// Handler for admin audit page API
@@ -255,7 +247,7 @@ async fn get_user_login_history(
 async fn get_admin_audit(
     auth_user: AuthUser,
     Query(query): Query<AdminAuditQuery>,
-) -> Result<Json<LoginHistoryResponse>, (StatusCode, String)> {
+) -> Result<Json<Vec<EnrichedLoginHistoryEntry>>, (StatusCode, String)> {
     if !auth_user.has_admin_privileges() {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
@@ -290,7 +282,7 @@ async fn get_admin_audit(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(build_login_history_response(entries).await))
+    Ok(Json(enrich_login_history(entries).await))
 }
 
 /// Template for admin audit page
