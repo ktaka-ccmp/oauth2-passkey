@@ -7,31 +7,18 @@
     <title>{% if is_error %}Authentication Error{% else %}Self-closing Page{% endif %}</title>
     <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
     <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+        .popup-description {
+            color: var(--o2p-text-secondary);
             margin: 0;
-            padding: var(--o2p-space-md);
-        }
-        .popup-message {
-            text-align: center;
-            max-width: 400px;
-        }
-        .popup-message h3 {
-            margin: 0;
-        }
-        .popup-message.error h3 {
-            color: var(--o2p-danger);
+            font-size: 14px;
         }
     </style>
     <script>
         window.onload = function () {
+            {% if !is_error %}
             if (window.opener) {
                 window.opener.postMessage('auth_complete', window.location.origin);
             }
-            {% if !is_error %}
             setTimeout(function () {
                 window.close();
             }, 10);
@@ -40,9 +27,15 @@
     </script>
 </head>
 
-<body>
-    <div class="popup-message{% if is_error %} error{% endif %}">
-        <h3>{{ message }}</h3>
+<body class="login-page">
+    <div class="login-card" style="text-align: center;">
+        {% if is_error %}
+        <p style="color: var(--o2p-danger);">{{ message }}</p>
+        <button class="btn btn-secondary btn-block" onclick="window.close();">Close</button>
+        {% else %}
+        <p>{{ message }}</p>
+        <p class="popup-description">This window will close automatically.</p>
+        {% endif %}
     </div>
 </body>
 
