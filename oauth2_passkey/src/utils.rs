@@ -164,9 +164,14 @@ pub(crate) fn header_set_cookie<'a>(
 fn rustls_config_with_webpki_roots() -> rustls::ClientConfig {
     let mut root_store = rustls::RootCertStore::empty();
     root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    rustls::ClientConfig::builder()
+    let mut config = rustls::ClientConfig::builder()
         .with_root_certificates(root_store)
-        .with_no_client_auth()
+        .with_no_client_auth();
+    // Set ALPN protocols to match reqwest's default TLS behavior.
+    // Without this, use_preconfigured_tls() leaves ALPN empty, which can
+    // cause intermittent connection issues with some servers.
+    config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+    config
 }
 
 /// Creates a configured HTTP client.
