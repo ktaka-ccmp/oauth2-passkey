@@ -6,11 +6,10 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (8)
+### Open (7)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260210-1930` | high | medium | [Admin Deletion Safeguard](open/20260210-1930-admin-deletion-safeguard.md) |
 | `2026-01-23-01` | medium | large | [Bearer Token Authentication Support](open/2026-01-23-bearer-token-support.md) |
 | `20260210-1935` | medium | medium | [Demo Site UI/UX Customizations](open/20260210-1935-demo-site-ui-customizations.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
@@ -19,10 +18,11 @@ This directory contains issue/task tracking files for the project.
 | `20260212-0235` | low | medium | [Standalone Demo Repository](open/20260212-0235-standalone-demo-repository.md) |
 | `20260213-0145` | low | medium | [Security Integration Tests Depend on Axum Handler Behavior](open/20260213-0145-security-tests-crate-placement.md) |
 
-### Completed (31)
+### Completed (32)
 
 | ID | Title |
 |----|-------|
+| `20260210-1930` | [Admin Deletion Safeguard (Prevent Deleting Last Admin)](completed/20260210-1930-admin-deletion-safeguard.md) |
 | `2026-02-09-02` | [Improve OAuth2 Popup Error Handling UX](completed/2026-02-09-oauth2-popup-error-handling.md) |
 | `20260210-0547` | [Enhance Login History with Auth-Method-Specific Details](completed/20260210-0547-login-history-detail-enhancement.md) |
 | `20260212-1200` | [GitHub Actions Auto-Deploy for Cloud Run](completed/20260212-1200-github-actions-auto-deploy.md) |

@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-10-19-30
 
-## Closed:
+## Closed: 2026-02-13
 
-## Status: open
+## Status: completed
 
 ## Priority: high
 
@@ -206,3 +206,13 @@ the demo deployment.
   creation of child records for a user being deleted is not a realistic scenario.
 
 ## Resolution
+
+Implemented "at least one admin must exist" safeguard across all three admin modification paths:
+
+1. **Admin deletion** (`delete_user_account_admin`): Returns 409 Conflict if the target is the last admin
+2. **Admin demotion** (`update_user_admin_status`): Returns 409 Conflict if demoting would leave no admins; first-user (seq=1) is unconditionally protected from demotion for consistency with `has_admin_privileges()`
+3. **Self-deletion** (`delete_user_account`): Returns 409 Conflict if the self-deleting user is the last admin
+
+Added `count_admin_users` SQL functions (SQLite/PostgreSQL) using `WHERE is_admin = true OR sequence_number = 1` to match `has_admin_privileges()` semantics. 8 tests cover all guard scenarios including edge cases (first-user escape hatch deletion, post-first-user-deletion protection).
+
+Commits: `2cbde15`, `57c6bf0`, `c5bca99`
