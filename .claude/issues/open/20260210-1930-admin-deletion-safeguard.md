@@ -79,4 +79,18 @@ the demo deployment.
 - Decision: Create dedicated issue for core library fix
 - Reason: This is a data integrity bug, not a demo-specific issue
 
+### 2026-02-13: "Last admin" guard vs "first user" protection; performance
+
+- Context: Considered two approaches: (1) prevent deleting the last admin, (2) prevent
+  deleting the first user (sequence_number = 1)
+- Decision: Guard the invariant "at least one admin exists" rather than protecting a
+  specific user
+- Reason: "First user" approach creates a permanently undeletable user. "Last admin"
+  approach is more flexible -- any admin can be deleted as long as another admin remains.
+  Decouples security from the arbitrary "first user" concept
+- Performance: The admin count query (`SELECT COUNT(*) WHERE is_admin = true`) is
+  negligible. Admin operations (delete/demote) are extremely rare (manual admin actions),
+  not a hot path. Additionally, the count query is only executed when the target user
+  is actually an admin, skipped entirely for non-admin deletions
+
 ## Resolution
