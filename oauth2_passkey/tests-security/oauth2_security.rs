@@ -174,7 +174,7 @@ async fn test_consolidated_oauth2_state_parameter_security()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest,
+            &ExpectedSecurityError::RedirectWithError,
             "empty state test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -211,7 +211,7 @@ async fn test_consolidated_oauth2_state_parameter_security()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest,
+            &ExpectedSecurityError::RedirectWithError,
             "malformed state test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -247,7 +247,7 @@ async fn test_consolidated_oauth2_state_parameter_security()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest,
+            &ExpectedSecurityError::RedirectWithError,
             "invalid JSON state test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -283,7 +283,7 @@ async fn test_consolidated_oauth2_state_parameter_security()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest,
+            &ExpectedSecurityError::RedirectWithError,
             "incomplete state test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -315,7 +315,7 @@ async fn test_consolidated_oauth2_state_parameter_security()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest,
+            &ExpectedSecurityError::RedirectWithError,
             "expired state test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -364,7 +364,7 @@ async fn test_consolidated_oauth2_authorization_code_security()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest,
+            &ExpectedSecurityError::RedirectWithError,
             "invalid auth code test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -400,7 +400,7 @@ async fn test_consolidated_oauth2_authorization_code_security()
         // Verify security rejection - form_post mode should reject GET requests
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest, // OAuth2 returns 400 for invalid requests
+            &ExpectedSecurityError::RedirectWithError, // OAuth2 redirects to popup_close with error
             "GET form_post mode test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -434,7 +434,7 @@ async fn test_consolidated_oauth2_authorization_code_security()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest,
+            &ExpectedSecurityError::RedirectWithError,
             "auth code injection test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -480,7 +480,7 @@ async fn test_consolidated_oauth2_origin_redirect_security()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest, // OAuth2 returns 400 for origin validation failures
+            &ExpectedSecurityError::RedirectWithError, // OAuth2 redirects to popup_close on origin validation failure
             "malicious origin test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -509,7 +509,7 @@ async fn test_consolidated_oauth2_origin_redirect_security()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest, // OAuth2 returns 400 for missing origin
+            &ExpectedSecurityError::RedirectWithError, // OAuth2 redirects to popup_close on missing origin
             "missing origin test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -622,7 +622,7 @@ async fn test_consolidated_oauth2_session_context_security()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest,
+            &ExpectedSecurityError::RedirectWithError,
             "ID token substitution test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -670,7 +670,7 @@ async fn test_consolidated_oauth2_advanced_attack_prevention()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest,
+            &ExpectedSecurityError::RedirectWithError,
             "nonce replay attack test",
         );
         assert_no_session_established(&setup.browser).await;
@@ -708,7 +708,7 @@ async fn test_consolidated_oauth2_advanced_attack_prevention()
         // Verify security rejection
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::BadRequest,
+            &ExpectedSecurityError::RedirectWithError,
             "PKCE downgrade attack test",
         );
         assert_no_session_established(&setup.browser).await;

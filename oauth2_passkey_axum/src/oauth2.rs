@@ -11,9 +11,9 @@ use axum_extra::{TypedHeader, headers};
 use std::collections::HashMap;
 
 use oauth2_passkey::{
-    AuthResponse, O2P_ROUTE_PREFIX, OAuth2Account, Provider, ProviderUserId, UserId,
-    delete_oauth2_account_core, get_authorized_core, list_accounts_core, post_authorized_core,
-    prepare_oauth2_auth_request, verify_page_session_token,
+    AuthResponse, CoordinationError, O2P_ROUTE_PREFIX, OAuth2Account, Provider, ProviderUserId,
+    UserId, delete_oauth2_account_core, get_authorized_core, list_accounts_core,
+    post_authorized_core, prepare_oauth2_auth_request, verify_page_session_token,
 };
 
 use super::config::O2P_PASSKEY_PROMOTION;
@@ -37,6 +37,8 @@ pub(super) fn router() -> Router {
 #[template(path = "popup_close.j2")]
 struct PopupCloseTemplate {
     message: String,
+    is_error: bool,
+    o2p_route_prefix: String,
 }
 
 async fn popup_close(
@@ -46,7 +48,12 @@ async fn popup_close(
         .get("message")
         .cloned()
         .unwrap_or_else(|| "Authentication completed".to_string());
-    let template = PopupCloseTemplate { message };
+    let is_error = params.get("error").is_some_and(|v| v == "true");
+    let template = PopupCloseTemplate {
+        message,
+        is_error,
+        o2p_route_prefix: O2P_ROUTE_PREFIX.to_string(),
+    };
     let html = Html(
         template
             .render()
@@ -100,25 +107,18 @@ async fn get_authorized(
     Query(query): Query<AuthResponse>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
-) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (response_headers, message) = get_authorized_core(&query, &cookies, &headers)
-        .await
-        .into_response_error()?;
-
-    let redirect_url = if O2P_PASSKEY_PROMOTION.is_enabled() {
-        format!(
-            "{}/passkey/promotion/popup?message={}",
-            O2P_ROUTE_PREFIX.as_str(),
-            urlencoding::encode(&message)
-        )
-    } else {
-        format!(
-            "{}/oauth2/popup_close?message={}",
-            O2P_ROUTE_PREFIX.as_str(),
-            urlencoding::encode(&message)
-        )
-    };
-    Ok((response_headers, Redirect::to(&redirect_url)))
+) -> (HeaderMap, Redirect) {
+    match get_authorized_core(&query, &cookies, &headers).await {
+        Ok((response_headers, message)) => {
+            let redirect_url = build_success_redirect_url(&message);
+            (response_headers, Redirect::to(&redirect_url))
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "OAuth2 authorization failed");
+            let redirect_url = build_error_redirect_url(&e);
+            (HeaderMap::new(), Redirect::to(&redirect_url))
+        }
+    }
 }
 
 /// Handler for OAuth2 callbacks using form_post response mode.
@@ -134,25 +134,61 @@ async fn post_authorized(
     headers: HeaderMap,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     Form(form): Form<AuthResponse>,
-) -> Result<(HeaderMap, Redirect), (StatusCode, String)> {
-    let (response_headers, message) = post_authorized_core(&form, &cookies, &headers)
-        .await
-        .into_response_error()?;
+) -> (HeaderMap, Redirect) {
+    match post_authorized_core(&form, &cookies, &headers).await {
+        Ok((response_headers, message)) => {
+            let redirect_url = build_success_redirect_url(&message);
+            (response_headers, Redirect::to(&redirect_url))
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "OAuth2 authorization failed (form_post)");
+            let redirect_url = build_error_redirect_url(&e);
+            (HeaderMap::new(), Redirect::to(&redirect_url))
+        }
+    }
+}
 
-    let redirect_url = if O2P_PASSKEY_PROMOTION.is_enabled() {
+/// Build the redirect URL for a successful OAuth2 authorization
+fn build_success_redirect_url(message: &str) -> String {
+    if O2P_PASSKEY_PROMOTION.is_enabled() {
         format!(
             "{}/passkey/promotion/popup?message={}",
             O2P_ROUTE_PREFIX.as_str(),
-            urlencoding::encode(&message)
+            urlencoding::encode(message)
         )
     } else {
         format!(
             "{}/oauth2/popup_close?message={}",
             O2P_ROUTE_PREFIX.as_str(),
-            urlencoding::encode(&message)
+            urlencoding::encode(message)
         )
-    };
-    Ok((response_headers, Redirect::to(&redirect_url)))
+    }
+}
+
+/// Build the redirect URL for a failed OAuth2 authorization
+fn build_error_redirect_url(e: &CoordinationError) -> String {
+    let user_message = friendly_error_message(e);
+    format!(
+        "{}/oauth2/popup_close?message={}&error=true",
+        O2P_ROUTE_PREFIX.as_str(),
+        urlencoding::encode(&user_message)
+    )
+}
+
+/// Map coordination errors to user-friendly messages for popup display
+fn friendly_error_message(e: &CoordinationError) -> String {
+    match e {
+        CoordinationError::Conflict(msg) if msg.contains("not registered") => {
+            "This account is not registered. Please create an account first.".to_string()
+        }
+        CoordinationError::Conflict(msg) if msg.contains("already registered") => {
+            "This account already exists. Please sign in instead.".to_string()
+        }
+        CoordinationError::Conflict(msg) if msg.contains("different user") => {
+            "This account is already linked to a different user.".to_string()
+        }
+        _ => format!("Authentication failed: {e}"),
+    }
 }
 
 async fn list_oauth2_accounts(
