@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{env, sync::LazyLock};
 
-use crate::audit::{AuthMethod, LoginContext};
+use crate::audit::{AuthMethod, AuthMethodDetails, LoginContext};
 use crate::passkey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialId, CredentialSearchField,
     PasskeyCredential, PasskeyError, PasskeyStore, RegisterCredential, RegistrationOptions,
@@ -328,10 +328,11 @@ pub async fn handle_finish_authentication_core(
         user_id.clone(),
         AuthMethod::Passkey,
         login_context,
-        Some(credential_id_str),
-        None,
-        None,
-        Some(aaguid),
+        AuthMethodDetails {
+            credential_id: Some(credential_id_str),
+            aaguid: Some(aaguid),
+            ..Default::default()
+        },
     )
     .await;
 

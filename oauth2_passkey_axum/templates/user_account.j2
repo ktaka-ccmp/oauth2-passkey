@@ -235,7 +235,8 @@
                 return `${iconHtml}<strong>${authInfo.name}</strong>`;
             }
             const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
-            const method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
+            let method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
+            if (entry.provider) method += ` (${entry.provider})`;
             return `<span class="login-icon">${icon}</span> <strong>${method}</strong>`;
         }
 
@@ -274,8 +275,8 @@
                                 <span class="login-status ${statusClass}">${status}</span>
                             </div>
                             <div class="item-detail"><strong>Time:</strong> ${date}</div>
+                            ${entry.email ? `<div class="item-detail"><strong>Email:</strong> ${entry.email}</div>` : ''}
                             ${entry.ip_address ? `<div class="item-detail"><strong>IP:</strong> ${entry.ip_address}</div>` : ''}
-                            ${entry.provider ? `<div class="item-detail"><strong>Provider:</strong> ${entry.provider}</div>` : ''}
                         </div>
                     `;
                 }

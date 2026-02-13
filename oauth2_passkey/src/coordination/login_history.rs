@@ -5,7 +5,8 @@
 use chrono::{DateTime, Utc};
 
 use crate::audit::{
-    AuthMethod, LoginContext, LoginHistoryEntry, LoginHistoryError, LoginHistoryStore,
+    AuthMethod, AuthMethodDetails, LoginContext, LoginHistoryEntry, LoginHistoryError,
+    LoginHistoryStore,
 };
 use crate::session::{SessionId, UserId, get_user_from_session};
 
@@ -16,25 +17,15 @@ use super::errors::CoordinationError;
 ///
 /// This function records a login event in the login history database.
 /// It should be called after a successful authentication (passkey or OAuth2).
-#[tracing::instrument(skip(context), fields(user_id = %user_id.as_str(), auth_method = %auth_method))]
+#[tracing::instrument(skip(context, details), fields(user_id = %user_id.as_str(), auth_method = %auth_method))]
 pub(super) async fn record_login_success(
     user_id: UserId,
     auth_method: AuthMethod,
     context: LoginContext,
-    credential_id: Option<String>,
-    provider: Option<String>,
-    provider_user_id: Option<String>,
-    aaguid: Option<String>,
+    details: AuthMethodDetails,
 ) -> Result<(), CoordinationError> {
-    let entry = LoginHistoryEntry::success(
-        user_id.as_str().to_string(),
-        auth_method,
-        context,
-        credential_id,
-        provider,
-        provider_user_id,
-        aaguid,
-    );
+    let entry =
+        LoginHistoryEntry::success(user_id.as_str().to_string(), auth_method, context, details);
 
     match LoginHistoryStore::insert(entry).await {
         Ok(_) => {
