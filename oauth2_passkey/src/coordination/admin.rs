@@ -291,8 +291,9 @@ pub async fn delete_user_account_admin(
 /// Updates a user's administrative status.
 ///
 /// This function allows an administrator to grant or revoke administrative privileges
-/// for another user. For security reasons, the last admin user in the system cannot
-/// be demoted (to prevent admin lockout).
+/// for another user. For security reasons:
+/// - The first user (sequence_number=1) cannot be demoted (unconditional protection)
+/// - The last admin user in the system cannot be demoted (to prevent admin lockout)
 ///
 /// # Arguments
 ///
@@ -305,7 +306,7 @@ pub async fn delete_user_account_admin(
 /// * `Ok(User)` - The updated user account information
 /// * `Err(CoordinationError::Unauthorized)` - If the caller doesn't have admin privileges
 /// * `Err(CoordinationError::ResourceNotFound)` - If the target user doesn't exist
-/// * `Err(CoordinationError::Conflict)` - If trying to demote the last admin user
+/// * `Err(CoordinationError::Conflict)` - If trying to demote the first user or last admin
 ///
 /// # Examples
 ///
@@ -334,6 +335,11 @@ pub async fn update_user_admin_status(
         }
         .log()
     })?;
+
+    // First user (sequence_number=1) cannot be demoted unconditionally
+    if !is_admin && user.sequence_number == Some(1) {
+        return Err(CoordinationError::Conflict("Cannot demote the first user".to_string()).log());
+    }
 
     // Prevent demoting the last admin user
     if !is_admin && user.has_admin_privileges() {

@@ -323,6 +323,100 @@ async fn ensure_first_user_has_passkey_credential(user_id: &str) {
     }
 }
 
+/// Restores the first user (sequence_number=1) after deletion in tests.
+///
+/// Tests that exercise the "escape hatch" (deleting the first user) need to restore
+/// the first user afterward so subsequent serial tests are not affected.
+/// Uses raw SQL to explicitly set sequence_number=1 since SQLite AUTOINCREMENT
+/// will not reuse previously deleted sequence numbers for auto-generated values.
+/// Also restores the first user's OAuth2 account and passkey credential.
+pub(crate) async fn restore_first_user_after_deletion() {
+    use crate::storage::GENERIC_DATA_STORE;
+    use crate::userdb::DB_TABLE_USERS;
+
+    // Restore user row with explicit sequence_number=1 via raw SQL
+    {
+        let store = GENERIC_DATA_STORE.lock().await;
+        let pool = store.as_sqlite().expect("Test database must be SQLite");
+        let table_name = DB_TABLE_USERS.as_str();
+        let now = chrono::Utc::now();
+
+        sqlx::query(&format!(
+            r#"
+            INSERT OR REPLACE INTO {table_name}
+                (sequence_number, id, account, label, is_admin, created_at, updated_at)
+            VALUES (1, 'first-user', 'first-user@example.com', 'First User', true, ?, ?)
+            "#
+        ))
+        .bind(now)
+        .bind(now)
+        .execute(pool)
+        .await
+        .expect("Failed to restore first user with sequence_number=1");
+    }
+    // Store lock is dropped here before calling other store functions
+
+    // Restore associated OAuth2 account and passkey credential
+    create_first_user_oauth2_account("first-user").await;
+    create_first_user_passkey_credential("first-user").await;
+}
+
+/// Atomically deletes a user and all their child records while holding the GENERIC_DATA_STORE lock.
+///
+/// When running the full test suite, parallel non-serial tests call `init_test_environment()`
+/// which can re-create child records (OAuth2 accounts, passkey credentials) for the first-user
+/// between individual delete operations in `delete_user_account`/`delete_user_account_admin`.
+/// This causes FOREIGN KEY constraint errors on the final user delete.
+///
+/// This function holds the GENERIC_DATA_STORE lock for the entire duration, preventing
+/// any parallel test from interfering with the deletion sequence.
+///
+/// Returns the list of deleted passkey credential IDs.
+pub(crate) async fn delete_user_atomically(user_id: &str) -> Vec<String> {
+    use crate::storage::{DB_TABLE_PREFIX, GENERIC_DATA_STORE};
+    use crate::userdb::DB_TABLE_USERS;
+
+    let store = GENERIC_DATA_STORE.lock().await;
+    let pool = store.as_sqlite().expect("Test database must be SQLite");
+
+    let users_table = DB_TABLE_USERS.as_str();
+    let prefix = DB_TABLE_PREFIX.as_str();
+    let oauth2_table = format!("{prefix}oauth2_accounts");
+    let passkey_table = format!("{prefix}passkey_credentials");
+
+    // Get credential IDs before deletion (for return value)
+    let credentials: Vec<(String,)> = sqlx::query_as(&format!(
+        "SELECT credential_id FROM {passkey_table} WHERE user_id = ?"
+    ))
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .expect("Failed to get credentials for user");
+
+    let credential_ids: Vec<String> = credentials.into_iter().map(|(id,)| id).collect();
+
+    // Delete all child records, then the user -- all while holding the lock
+    sqlx::query(&format!("DELETE FROM {oauth2_table} WHERE user_id = ?"))
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .expect("Failed to delete OAuth2 accounts");
+
+    sqlx::query(&format!("DELETE FROM {passkey_table} WHERE user_id = ?"))
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .expect("Failed to delete passkey credentials");
+
+    sqlx::query(&format!("DELETE FROM {users_table} WHERE id = ?"))
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .expect("Failed to delete user");
+
+    credential_ids
+}
+
 /// Extract SQLite database file path from a database URL string
 ///
 /// Parses a database URL to extract the file path for SQLite databases.
