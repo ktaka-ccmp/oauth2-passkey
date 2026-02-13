@@ -19,13 +19,11 @@ impl LoginHistoryStore {
         match (store.as_sqlite(), store.as_postgres()) {
             (Some(pool), _) => {
                 create_tables_sqlite(pool).await?;
-                migrate_login_history_tables_sqlite(pool).await?;
                 validate_login_history_tables_sqlite(pool).await?;
                 Ok(())
             }
             (_, Some(pool)) => {
                 create_tables_postgres(pool).await?;
-                migrate_login_history_tables_postgres(pool).await?;
                 validate_login_history_tables_postgres(pool).await?;
                 Ok(())
             }

@@ -58,33 +58,6 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Logi
     Ok(())
 }
 
-/// Migrates the login history table to add the aaguid column if it doesn't exist.
-/// This is needed for existing databases that were created before aaguid was added.
-pub(super) async fn migrate_login_history_tables_sqlite(
-    pool: &Pool<Sqlite>,
-) -> Result<(), LoginHistoryError> {
-    let table_name = DB_TABLE_LOGIN_HISTORY.as_str();
-
-    // Check if aaguid column exists using PRAGMA table_info
-    let columns: Vec<(String,)> = sqlx::query_as(&format!(
-        "SELECT name FROM pragma_table_info('{table_name}')"
-    ))
-    .fetch_all(pool)
-    .await
-    .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
-
-    let has_aaguid = columns.iter().any(|(name,)| name == "aaguid");
-
-    if !has_aaguid {
-        sqlx::query(&format!("ALTER TABLE {table_name} ADD COLUMN aaguid TEXT"))
-            .execute(pool)
-            .await
-            .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
-    }
-
-    Ok(())
-}
-
 /// Validates that the login history table schema matches what we expect
 pub(super) async fn validate_login_history_tables_sqlite(
     pool: &Pool<Sqlite>,
