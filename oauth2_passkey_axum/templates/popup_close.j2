@@ -4,22 +4,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Self-closing Page</title>
+    <title>{% if is_error %}Authentication Error{% else %}Self-closing Page{% endif %}</title>
+    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
+    <style>
+        .popup-description {
+            color: var(--o2p-text-secondary);
+            margin: 0;
+            font-size: 14px;
+        }
+    </style>
     <script>
         window.onload = function () {
+            {% if !is_error %}
             if (window.opener) {
                 window.opener.postMessage('auth_complete', window.location.origin);
             }
             setTimeout(function () {
                 window.close();
             }, 10);
+            {% endif %}
         }
     </script>
 </head>
 
-<body>
-    <h3>{{ message }}</h3>
-    {# <p>This window will close automatically within a few seconds...</p> #}
+<body class="login-page">
+    <div class="login-card" style="text-align: center;">
+        {% if is_error %}
+        <p style="color: var(--o2p-danger);">{{ message }}</p>
+        <button class="btn btn-secondary btn-block" onclick="window.close();">Close</button>
+        {% else %}
+        <p>{{ message }}</p>
+        <p class="popup-description">This window will close automatically.</p>
+        {% endif %}
+    </div>
 </body>
 
 </html>

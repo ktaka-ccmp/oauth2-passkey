@@ -20,6 +20,7 @@ impl<T> IntoResponseError<T> for Result<T, CoordinationError> {
                 CoordinationError::InvalidResponseMode(_) => StatusCode::BAD_REQUEST,
                 CoordinationError::NoContent => StatusCode::NO_CONTENT,
                 CoordinationError::ResourceNotFound { .. } => StatusCode::NOT_FOUND,
+                CoordinationError::Conflict(_) => StatusCode::CONFLICT,
                 _ => StatusCode::INTERNAL_SERVER_ERROR,
             };
             (status, e.to_string())
