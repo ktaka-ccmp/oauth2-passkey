@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-10-19-35
 
-## Closed:
+## Closed: 2026-02-14
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -83,8 +83,11 @@ isolated.
 - [x] Backend masking for admin_user_page (user detail)
 - [x] Backend masking for audit log / login history
 - [x] Unit tests for masking functions
-- [ ] Implement OAuth2-only gate for first user creation
-- [ ] Test all customizations in Docker environment
+- [x] Custom login page for demo-live (2-button layout)
+- [x] Refactor: consolidate O2P_DEMO_MODE into Masker struct with per-type masked() methods
+- [x] Improve O2P_DEMO_MODE env var documentation
+- [x] OAuth2-only first user creation (addressed by login page UI design, no API-level gate needed)
+- [x] Test all customizations on passkey-demo.ccmp.jp
 
 ## Decision Log
 
@@ -129,4 +132,31 @@ isolated.
   (PR #214) prevents last-admin deletion and first-user demotion, providing
   minimum safety guarantees.
 
+### 2026-02-14: Masker struct refactor instead of migrating admin UI to demo-live
+
+- Context: Phase 2 plan proposed moving all admin UI and masking code from
+  library to demo-live with feature flags (admin-api, admin-ui, user-ui)
+- Decision: Keep masking code in library, consolidate O2P_DEMO_MODE checks
+  into a Masker struct instead
+- Reason: Phase 2 would duplicate ~500 lines of admin handlers in demo-live,
+  creating maintenance burden (changes needed in two places). Masker struct
+  achieved the main goal (O2P_DEMO_MODE references: 4 places/3 files -> 2
+  places/1 file) with minimal change (4 files, 1 commit). Phase 2 migration
+  can be revisited if library needs to be fully demo-mode-free for publishing.
+
+### 2026-02-14: OAuth2-only first user via UI design, not API gate
+
+- Context: Whether to add API-level enforcement for OAuth2-only first user creation
+- Decision: Rely on custom login page UI (no passkey registration button) instead
+- Reason: Adding API-level gate would increase O2P_DEMO_MODE footprint in core
+  library, contradicting the goal of minimal library pollution. Login page design
+  effectively achieves OAuth2-first without any library changes.
+
 ## Resolution
+
+All demo site UI/UX customizations implemented and deployed. Key deliverables:
+- O2P_DEMO_MODE env var controlling admin defaults and data masking
+- Masker struct centralizing all masking logic (2 O2P_DEMO_MODE references in 1 file)
+- Custom login page for demo-live (2-button layout, no passkey registration)
+- Backend masking for admin index, user detail, audit log, and login history
+- Verification on passkey-demo.ccmp.jp
