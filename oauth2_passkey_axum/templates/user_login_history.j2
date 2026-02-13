@@ -138,8 +138,7 @@
                 throw new Error('Failed to fetch login history');
             }
 
-            const data = await response.json();
-            currentEntries = data;
+            currentEntries = await response.json();
             currentOffset = offset;
 
             if (currentEntries.length === 0 && offset === 0) {

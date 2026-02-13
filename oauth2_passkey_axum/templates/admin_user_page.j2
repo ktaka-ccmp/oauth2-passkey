@@ -239,8 +239,7 @@
                     throw new Error('Failed to fetch login history');
                 }
 
-                const data = await response.json();
-                const entries = data;
+                const entries = await response.json();
 
                 if (entries.length === 0) {
                     container.innerHTML = '<p>No login history available.</p>';
