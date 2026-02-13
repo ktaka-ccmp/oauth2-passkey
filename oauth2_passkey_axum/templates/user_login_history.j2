@@ -113,8 +113,6 @@
     const ENTRIES_PER_PAGE = 20;
     let currentOffset = 0;
     let currentEntries = [];
-    let currentAuthenticators = {};
-
     // Get timezone offset in minutes (e.g., JST = 540, EST = -300)
     // Note: getTimezoneOffset() returns the opposite sign, so we negate it
     function getTimezoneOffset() {
@@ -142,7 +140,6 @@
 
             const data = await response.json();
             currentEntries = data.entries;
-            currentAuthenticators = data.authenticators || {};
             currentOffset = offset;
 
             if (currentEntries.length === 0 && offset === 0) {
@@ -161,13 +158,11 @@
     }
 
     function renderAuthMethodLabel(entry) {
-        const authInfo = entry.aaguid ? currentAuthenticators[entry.aaguid] : null;
-        if (authInfo) {
-            const iconUrl = authInfo.icon_light || authInfo.icon_dark;
-            const iconHtml = iconUrl
-                ? `<img src="${iconUrl}" alt="${authInfo.name}" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;">`
+        if (entry.authenticator_name) {
+            const iconHtml = entry.authenticator_icon
+                ? `<img src="${entry.authenticator_icon}" alt="${entry.authenticator_name}" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;">`
                 : '';
-            return `${iconHtml}<strong>${authInfo.name}</strong>`;
+            return `${iconHtml}<strong>${entry.authenticator_name}</strong>`;
         }
         const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
         let method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';

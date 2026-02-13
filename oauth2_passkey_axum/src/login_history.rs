@@ -14,7 +14,7 @@ use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
 use oauth2_passkey::{
-    AuthenticatorInfo, LoginHistoryEntry, O2P_ROUTE_PREFIX, SessionCookie, SessionId, UserId,
+    LoginHistoryEntry, O2P_ROUTE_PREFIX, SessionCookie, SessionId, UserId,
     get_authenticator_info_batch, get_own_login_history, get_own_login_history_with_date_range,
     get_user_login_history_admin, query_login_history_admin,
 };
@@ -82,16 +82,28 @@ fn parse_date(date_str: &str, end_of_day: bool, tz_offset: Option<i32>) -> Optio
         })
 }
 
-/// Login history response with authenticator metadata
+/// A login history entry enriched with resolved authenticator metadata
+///
+/// Wraps the DB-level `LoginHistoryEntry` and adds display-ready fields
+/// so the frontend can render authenticator names and icons directly
+/// without needing to perform AAGUID lookups.
 #[derive(Serialize)]
-struct LoginHistoryResponse {
-    /// Login history entries
-    entries: Vec<LoginHistoryEntry>,
-    /// Authenticator info keyed by AAGUID (for passkey logins)
-    authenticators: HashMap<String, AuthenticatorInfo>,
+struct EnrichedLoginHistoryEntry {
+    #[serde(flatten)]
+    entry: LoginHistoryEntry,
+    /// Resolved authenticator name (e.g., "Windows Hello", "YubiKey 5")
+    authenticator_name: Option<String>,
+    /// Resolved authenticator icon URL
+    authenticator_icon: Option<String>,
 }
 
-/// Build a login history response with authenticator metadata
+/// Login history response containing enriched entries
+#[derive(Serialize)]
+struct LoginHistoryResponse {
+    entries: Vec<EnrichedLoginHistoryEntry>,
+}
+
+/// Build a login history response with authenticator info embedded in each entry
 async fn build_login_history_response(entries: Vec<LoginHistoryEntry>) -> LoginHistoryResponse {
     // Collect unique AAGUIDs from entries
     let aaguids: Vec<String> = entries
@@ -110,10 +122,27 @@ async fn build_login_history_response(entries: Vec<LoginHistoryEntry>) -> LoginH
             .unwrap_or_default()
     };
 
-    LoginHistoryResponse {
-        entries,
-        authenticators,
-    }
+    let enriched = entries
+        .into_iter()
+        .map(|entry| {
+            let (name, icon) = entry
+                .aaguid
+                .as_ref()
+                .and_then(|aaguid| authenticators.get(aaguid))
+                .map(|info| {
+                    let icon_url = info.icon_light.clone().or_else(|| info.icon_dark.clone());
+                    (Some(info.name.clone()), icon_url)
+                })
+                .unwrap_or((None, None));
+            EnrichedLoginHistoryEntry {
+                entry,
+                authenticator_name: name,
+                authenticator_icon: icon,
+            }
+        })
+        .collect();
+
+    LoginHistoryResponse { entries: enriched }
 }
 
 /// Create a router for user's own login history

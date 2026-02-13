@@ -223,16 +223,12 @@
         }
 
         // Login History Functions
-        let currentAuthenticators = {};
-
         function renderAuthMethodLabel(entry) {
-            const authInfo = entry.aaguid ? currentAuthenticators[entry.aaguid] : null;
-            if (authInfo) {
-                const iconUrl = authInfo.icon_light || authInfo.icon_dark;
-                const iconHtml = iconUrl
-                    ? `<img src="${iconUrl}" alt="${authInfo.name}" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;">`
+            if (entry.authenticator_name) {
+                const iconHtml = entry.authenticator_icon
+                    ? `<img src="${entry.authenticator_icon}" alt="${entry.authenticator_name}" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;">`
                     : '';
-                return `${iconHtml}<strong>${authInfo.name}</strong>`;
+                return `${iconHtml}<strong>${entry.authenticator_name}</strong>`;
             }
             const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
             let method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
@@ -255,7 +251,6 @@
 
                 const data = await response.json();
                 const entries = data.entries;
-                currentAuthenticators = data.authenticators || {};
 
                 if (entries.length === 0) {
                     container.innerHTML = '<p>No login history available.</p>';
