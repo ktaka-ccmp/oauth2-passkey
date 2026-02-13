@@ -1,5 +1,7 @@
 //! Login history handlers and helpers for Axum
 
+use std::collections::HashMap;
+
 use askama::Template;
 use axum::{
     Json, Router,
@@ -9,11 +11,12 @@ use axum::{
     routing::get,
 };
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use oauth2_passkey::{
-    LoginHistoryEntry, O2P_ROUTE_PREFIX, SessionCookie, SessionId, UserId, get_own_login_history,
-    get_own_login_history_with_date_range, get_user_login_history_admin, query_login_history_admin,
+    LoginHistoryEntry, O2P_ROUTE_PREFIX, SessionCookie, SessionId, UserId,
+    get_authenticator_info_batch, get_own_login_history, get_own_login_history_with_date_range,
+    get_user_login_history_admin, query_login_history_admin,
 };
 
 use crate::config::O2P_CUSTOM_CSS_URL;
@@ -79,6 +82,61 @@ fn parse_date(date_str: &str, end_of_day: bool, tz_offset: Option<i32>) -> Optio
         })
 }
 
+/// A login history entry enriched with resolved authenticator metadata
+///
+/// Wraps the DB-level `LoginHistoryEntry` and adds display-ready fields
+/// so the frontend can render authenticator names and icons directly
+/// without needing to perform AAGUID lookups.
+#[derive(Serialize)]
+struct EnrichedLoginHistoryEntry {
+    #[serde(flatten)]
+    entry: LoginHistoryEntry,
+    /// Resolved authenticator name (e.g., "Windows Hello", "YubiKey 5")
+    authenticator_name: Option<String>,
+    /// Resolved authenticator icon URL
+    authenticator_icon: Option<String>,
+}
+
+/// Enrich login history entries with resolved authenticator metadata
+async fn enrich_login_history(entries: Vec<LoginHistoryEntry>) -> Vec<EnrichedLoginHistoryEntry> {
+    // Collect unique AAGUIDs from entries
+    let aaguids: Vec<String> = entries
+        .iter()
+        .filter_map(|e| e.aaguid.as_ref())
+        .cloned()
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    let authenticators = if aaguids.is_empty() {
+        HashMap::new()
+    } else {
+        get_authenticator_info_batch(&aaguids)
+            .await
+            .unwrap_or_default()
+    };
+
+    entries
+        .into_iter()
+        .map(|entry| {
+            let (name, icon) = entry
+                .aaguid
+                .as_ref()
+                .and_then(|aaguid| authenticators.get(aaguid))
+                .map(|info| {
+                    let icon_url = info.icon_light.clone().or_else(|| info.icon_dark.clone());
+                    (Some(info.name.clone()), icon_url)
+                })
+                .unwrap_or((None, None));
+            EnrichedLoginHistoryEntry {
+                entry,
+                authenticator_name: name,
+                authenticator_icon: icon,
+            }
+        })
+        .collect()
+}
+
 /// Create a router for user's own login history
 pub(crate) fn user_router() -> Router {
     Router::new()
@@ -98,7 +156,7 @@ pub(crate) fn admin_router() -> Router {
 async fn get_my_login_history(
     auth_user: AuthUser,
     Query(query): Query<LoginHistoryQuery>,
-) -> Result<Json<Vec<LoginHistoryEntry>>, (StatusCode, String)> {
+) -> Result<Json<Vec<EnrichedLoginHistoryEntry>>, (StatusCode, String)> {
     let session_cookie = SessionCookie::new(auth_user.session_id.clone()).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -127,7 +185,7 @@ async fn get_my_login_history(
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     };
 
-    Ok(Json(entries))
+    Ok(Json(enrich_login_history(entries).await))
 }
 
 /// Template for user's login history page
@@ -160,7 +218,7 @@ async fn get_user_login_history(
     auth_user: AuthUser,
     Path(user_id): Path<String>,
     Query(query): Query<LoginHistoryQuery>,
-) -> Result<Json<Vec<LoginHistoryEntry>>, (StatusCode, String)> {
+) -> Result<Json<Vec<EnrichedLoginHistoryEntry>>, (StatusCode, String)> {
     if !auth_user.has_admin_privileges() {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
@@ -180,7 +238,7 @@ async fn get_user_login_history(
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(entries))
+    Ok(Json(enrich_login_history(entries).await))
 }
 
 /// Handler for admin audit page API
@@ -189,7 +247,7 @@ async fn get_user_login_history(
 async fn get_admin_audit(
     auth_user: AuthUser,
     Query(query): Query<AdminAuditQuery>,
-) -> Result<Json<Vec<LoginHistoryEntry>>, (StatusCode, String)> {
+) -> Result<Json<Vec<EnrichedLoginHistoryEntry>>, (StatusCode, String)> {
     if !auth_user.has_admin_privileges() {
         return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
     }
@@ -224,7 +282,7 @@ async fn get_admin_audit(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(entries))
+    Ok(Json(enrich_login_history(entries).await))
 }
 
 /// Template for admin audit page

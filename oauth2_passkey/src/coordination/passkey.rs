@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{env, sync::LazyLock};
 
-use crate::audit::{AuthMethod, LoginContext};
+use crate::audit::{AuthMethod, AuthMethodDetails, LoginContext};
 use crate::passkey::{
     AuthenticationOptions, AuthenticatorResponse, CredentialId, CredentialSearchField,
     PasskeyCredential, PasskeyError, PasskeyStore, RegisterCredential, RegistrationOptions,
@@ -275,13 +275,17 @@ pub async fn handle_finish_authentication_core(
     let credential_id_str = auth_response.credential_id().to_string();
 
     // Verify the authentication and get the user ID, name, and user handle
-    let (uid, name, user_handle) = match finish_authentication(auth_response).await {
+    let auth_result = match finish_authentication(auth_response).await {
         Ok(result) => result,
         Err(e) => {
             record_auth_failure(login_context, credential_id_str, &e).await;
             return Err(e.into());
         }
     };
+    let uid = auth_result.user_id;
+    let name = auth_result.user_name;
+    let user_handle = auth_result.user_handle;
+    let aaguid = auth_result.aaguid;
 
     /// Record a passkey authentication failure to both tracing and login history DB.
     async fn record_auth_failure(
@@ -328,9 +332,11 @@ pub async fn handle_finish_authentication_core(
         user_id.clone(),
         AuthMethod::Passkey,
         login_context,
-        Some(credential_id_str),
-        None,
-        None,
+        AuthMethodDetails {
+            credential_id: Some(credential_id_str),
+            aaguid: Some(aaguid),
+            ..Default::default()
+        },
     )
     .await;
 

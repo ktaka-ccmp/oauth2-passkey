@@ -2,7 +2,7 @@ use chrono::{Duration, Utc};
 use http::HeaderMap;
 use std::{env, sync::LazyLock};
 
-use crate::audit::{AuthMethod, LoginContext};
+use crate::audit::{AuthMethod, AuthMethodDetails, LoginContext};
 use crate::oauth2::{
     AccountSearchField, AuthResponse, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_RESPONSE_MODE, OAuth2Account,
     OAuth2Mode, OAuth2Store, Provider, ProviderUserId, csrf_checks, decode_state,
@@ -240,6 +240,7 @@ async fn process_oauth2_authorization(
     // Capture provider info for login history before oauth2_account is potentially moved
     let provider_for_history = oauth2_account.provider.clone();
     let provider_user_id_for_history = oauth2_account.provider_user_id.clone();
+    let email_for_history = oauth2_account.email.clone();
 
     // Extract mode_id from the stored session if available
     let mode = match &state_in_response.mode_id {
@@ -356,9 +357,12 @@ async fn process_oauth2_authorization(
         user_id_validated,
         AuthMethod::OAuth2,
         login_context,
-        None,
-        Some(provider_for_history),
-        Some(provider_user_id_for_history),
+        AuthMethodDetails {
+            provider: Some(provider_for_history),
+            provider_user_id: Some(provider_user_id_for_history),
+            email: Some(email_for_history),
+            ..Default::default()
+        },
     )
     .await;
 

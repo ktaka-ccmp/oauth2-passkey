@@ -113,7 +113,6 @@
     const ENTRIES_PER_PAGE = 20;
     let currentOffset = 0;
     let currentEntries = [];
-
     // Get timezone offset in minutes (e.g., JST = 540, EST = -300)
     // Note: getTimezoneOffset() returns the opposite sign, so we negate it
     function getTimezoneOffset() {
@@ -157,27 +156,37 @@
         }
     }
 
+    function renderAuthMethodLabel(entry) {
+        if (entry.authenticator_name) {
+            const iconHtml = entry.authenticator_icon
+                ? `<img src="${entry.authenticator_icon}" alt="${entry.authenticator_name}" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;">`
+                : '';
+            return `${iconHtml}<strong>${entry.authenticator_name}</strong>`;
+        }
+        const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
+        let method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
+        if (entry.provider) method += ` (${entry.provider})`;
+        return `<span class="login-icon">${icon}</span> <strong>${method}</strong>`;
+    }
+
     function renderEntries(entries) {
         const container = document.getElementById('login-history-container');
         let html = '<div class="login-history-list">';
 
         for (const entry of entries) {
             const date = new Date(entry.timestamp).toLocaleString();
-            const method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
-            const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
             const status = entry.success ? '✓' : '✗';
             const statusClass = entry.success ? 'success' : 'failure';
 
             html += `
                 <div class="item login-history-entry">
                     <div class="item-detail">
-                        <span class="login-icon">${icon}</span>
-                        <strong>${method}</strong>
+                        ${renderAuthMethodLabel(entry)}
                         <span class="login-status ${statusClass}">${status}</span>
                     </div>
                     <div class="item-detail"><strong>Time:</strong> ${date}</div>
+                    ${entry.email ? `<div class="item-detail"><strong>Email:</strong> ${entry.email}</div>` : ''}
                     ${entry.ip_address ? `<div class="item-detail"><strong>IP:</strong> ${entry.ip_address}</div>` : ''}
-                    ${entry.provider ? `<div class="item-detail"><strong>Provider:</strong> ${entry.provider}</div>` : ''}
                     ${entry.failure_reason ? `<div class="item-detail"><strong>Reason:</strong> ${entry.failure_reason}</div>` : ''}
                 </div>
             `;
