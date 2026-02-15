@@ -11,7 +11,7 @@
 
 ## ID: 2026-01-24-01
 
-## Status: deferred
+## Status: open
 
 ## Priority: low
 

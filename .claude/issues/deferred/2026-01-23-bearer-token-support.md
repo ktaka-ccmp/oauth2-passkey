@@ -14,7 +14,7 @@
 
 ## Branch: `dev-2026-01-23-01`
 
-## Status: open
+## Status: deferred
 
 ## Priority: medium
 

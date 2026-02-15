@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-12-02-35
 
-## Closed:
+## Closed: 2026-02-14
 
-## Status: open
+## Status: wontfix
 
 ## Priority: low
 
@@ -121,3 +121,8 @@ oauth2-passkey-demo/
   The main workspace's `demo-both/` remains useful for development iteration.
 
 ## Resolution
+
+Closed as wontfix. The current workspace member setup works well for development iteration.
+Extracting to a standalone repository would add maintenance burden (two repos to sync,
+crates.io publish required before testing changes) with marginal benefit. The `.dockerignore`
+and `.gcloudignore` at the repo root is a minor inconvenience that doesn't justify the cost.
