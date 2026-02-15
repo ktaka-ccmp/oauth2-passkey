@@ -1,3 +1,5 @@
+<img src="assets/o2p_logo_tight.svg" alt="logo" height="80">
+
 # oauth2-passkey
 
 🔐 **Passwordless authentication for Rust web apps** - No passwords, no 2FA implementation, better security.

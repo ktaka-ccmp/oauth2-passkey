@@ -6,21 +6,21 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (6)
+### Open (5)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260216-1730` | high | medium | [Release v0.3.0](open/20260216-1730-release-v030.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `20260216-1500` | medium | medium | [O2P_LOGIN_URL Role Clarification and user-ui Feature Granularity](open/20260216-1500-login-url-and-user-ui-cleanup.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 | `20260213-0145` | low | medium | [Security Integration Tests Depend on Axum Handler Behavior](open/20260213-0145-security-tests-crate-placement.md) |
 
-### Completed (34)
+### Completed (35)
 
 | ID | Title |
 |----|-------|
+| `20260216-1730` | [Release v0.3.0](completed/20260216-1730-release-v030.md) |
 | `2026-02-09-01` | [Update CHANGELOG.md for Changes Since v0.2.0](completed/2026-02-09-changelog-update.md) |
 | `20260210-1935` | [Demo Site UI/UX Customizations](completed/20260210-1935-demo-site-ui-customizations.md) |
 | `20260210-1930` | [Admin Deletion Safeguard (Prevent Deleting Last Admin)](completed/20260210-1930-admin-deletion-safeguard.md) |
