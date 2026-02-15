@@ -140,7 +140,6 @@ demo-both/
    - Delete the database file to reset it (path depends on your configuration)
    - Use `touch` to recreate the database file if needed
    - Make sure the path specified by `GENERIC_DATA_STORE_URL` in your `.env` is writable (e.g., the directory for your SQLite file)
-   - Make sure to the path from your `.env` file is writable
 
 ### Development Tips
 
