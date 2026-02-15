@@ -81,4 +81,3 @@ Based on commit history, the following areas need to be verified in the changelo
 Reviewed 195 non-merge commits since v0.2.0 and updated the [Unreleased] section.
 Added 12 new entries to Added, 7 to Fixed, reorganized Changed, and added Removed section.
 Commit: 6fc04f9.
-

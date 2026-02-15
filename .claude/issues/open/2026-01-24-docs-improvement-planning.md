@@ -122,4 +122,3 @@ Update documentation in priority order:
 - Reason: CHANGELOG analysis provided a concrete list of what is missing from docs
 
 ## Resolution
-

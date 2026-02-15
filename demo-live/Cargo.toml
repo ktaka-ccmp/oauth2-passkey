@@ -15,8 +15,6 @@ askama = { workspace = true }
 axum = { workspace = true }
 dotenvy = { workspace = true }
 http = { workspace = true }
-serde = { workspace = true }
-subtle = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

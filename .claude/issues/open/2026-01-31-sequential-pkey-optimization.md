@@ -116,4 +116,3 @@ For small to medium scale deployments, the current design is sufficient.
   Benefits only materialize at very large scale (millions of rows, thousands of QPS).
 
 ## Resolution
-

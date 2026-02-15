@@ -99,4 +99,3 @@ falls back to the generic data store, preserving existing behavior with zero con
   deferred to a dedicated session.
 
 ## Resolution
-
