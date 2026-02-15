@@ -3,6 +3,7 @@
 ## Table of Contents
 
 - [Description](#description)
+- [Related Issues](#related-issues)
 - [Approach](#approach)
 - [Related Files](#related-files)
 - [Implementation Tasks](#implementation-tasks)
@@ -10,6 +11,10 @@
 - [Resolution](#resolution)
 
 ## ID: 2026-01-24-01
+
+## Created: 2026-01-24
+
+## Closed:
 
 ## Status: open
 
@@ -19,10 +24,34 @@
 
 ## Description
 
-Plan improvements to mdBook user guide documentation. Session started but user moved to
-other priorities before selecting specific sections to improve.
+Plan improvements to mdBook user guide documentation. Originally started as a general
+review, now includes specific documentation gaps identified from the CHANGELOG analysis
+of all changes since v0.2.0.
 
-### Documentation Structure Reviewed
+### Documentation Gaps (identified 2026-02-16)
+
+Comparison of CHANGELOG [Unreleased] entries against current docs (`docs/src/`) revealed
+the following items that are not yet documented:
+
+#### New Admin API Endpoints (not in API reference)
+
+- `GET /admin/audit` - Cross-user audit page with date filtering
+- `GET /admin/user/{user_id}/login_history` - Per-user login history
+- `GET /admin/sessions` - Active sessions list
+- `POST /admin/user/{user_id}/logout` - Force logout a user
+
+#### New Environment Variables (not in configuration docs)
+
+- `O2P_PASSKEY_PROMOTION` (`ask`/`force`) - Passkey registration promotion after OAuth2 login
+- `O2P_DEMO_MODE` - Demo mode (all users get admin, sensitive data masked)
+
+#### New Features (not documented)
+
+- `bundled-tls` feature flag - Bundles Mozilla root certificates for scratch/alpine Docker images
+- Admin safeguards - Prevent deleting/demoting the last admin user, self-deletion protection
+- `getClientCapabilities()` JavaScript helper for WebAuthn feature detection
+
+### Documentation Structure
 
 1. Getting Started - Introduction, Quick Start, Architecture
 2. Integration Guide - Framework setup, OAuth2/Passkey JS APIs, Configuration
@@ -33,19 +62,33 @@ other priorities before selecting specific sections to improve.
 7. Maintainer Guide - Development, CI/CD, Release
 8. Appendices - Security advisories, Troubleshooting
 
+## Related Issues
+
+- `2026-02-09-01` Update CHANGELOG.md for Changes Since v0.2.0 (related to: gaps identified during changelog review)
+
 ## Approach
 
-To be determined when work resumes. Needs user input on which sections to prioritize.
+Update documentation in priority order:
+1. API reference (`api/axum.md`) - Add missing admin endpoints
+2. Configuration (`integration/configuration.md`) - Add missing env vars
+3. Feature documentation - `bundled-tls`, admin safeguards, `getClientCapabilities()`
 
 ## Related Files
 
 - `docs/src/` - mdBook documentation
 - `docs/src/SUMMARY.md` - Documentation structure
+- `docs/src/api/axum.md` - Axum API reference (needs new admin endpoints)
+- `docs/src/integration/configuration.md` - Configuration reference (needs new env vars)
+- `docs/src/integration/passkey-js.md` - Passkey JS API (needs `getClientCapabilities()`)
+- `docs/src/integration/deployment-patterns.md` - Deployment (needs `bundled-tls`)
 
 ## Implementation Tasks
 
-- [ ] Select sections to improve (requires user input)
-- [ ] Improve selected sections
+- [ ] Add login history and force logout endpoints to API reference
+- [ ] Add `O2P_PASSKEY_PROMOTION` and `O2P_DEMO_MODE` to configuration docs
+- [ ] Document `bundled-tls` feature flag in deployment patterns
+- [ ] Document admin safeguards (last admin protection)
+- [ ] Add `getClientCapabilities()` to Passkey JS API docs
 
 ## Decision Log
 
@@ -57,7 +100,11 @@ To be determined when work resumes. Needs user input on which sections to priori
 - Decision: Defer; user prioritized Signal API implementation instead
 - Reason: Other work had higher priority at the time
 
-## Resolution
+### 2026-02-16: Reopened with specific gaps from CHANGELOG review
 
-Deferred 2026-01-24. Can be resumed when documentation improvements are needed.
+- Context: CHANGELOG [Unreleased] update (issue 2026-02-09-01) revealed documentation gaps
+- Decision: Add specific tasks for undocumented features/endpoints/env vars
+- Reason: CHANGELOG analysis provided a concrete list of what is missing from docs
+
+## Resolution
 
