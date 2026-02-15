@@ -84,11 +84,26 @@ Update documentation in priority order:
 
 ## Implementation Tasks
 
-- [ ] Add login history and force logout endpoints to API reference
-- [ ] Add `O2P_PASSKEY_PROMOTION` and `O2P_DEMO_MODE` to configuration docs
-- [ ] Document `bundled-tls` feature flag in deployment patterns
-- [ ] Document admin safeguards (last admin protection)
-- [ ] Add `getClientCapabilities()` to Passkey JS API docs
+### Gap filling: Reflect CHANGELOG [Unreleased] changes in docs
+
+- [ ] Add login history and force logout endpoints to `api/axum.md`
+  - `/sessions` (GET), `/user/{user_id}/logout` (POST)
+  - `/user/{user_id}/login_history` (GET), `/audit` (GET), `/audit_page` (GET)
+  - Query params: `limit`, `offset`, `from`, `to`, `tz_offset`, `user_id`, `success`
+  - Admin safeguards note (last admin protection, self-deletion prevention)
+- [ ] Add `O2P_PASSKEY_PROMOTION` and `O2P_DEMO_MODE` to `integration/configuration.md`
+  - `O2P_PASSKEY_PROMOTION`: `ask`/`force`/unset, passkey registration after OAuth2 login
+  - `O2P_DEMO_MODE`: `true`/`false`, auto-admin, data masking, placeholder user
+- [ ] Add `bundled-tls` feature flag to `integration/deployment-patterns.md`
+  - Purpose: bundles `webpki-roots` for scratch/alpine Docker images
+  - Cargo.toml example, Dockerfile example
+- [ ] Add `getClientCapabilities()` to `integration/passkey-js.md`
+  - `initPasskeyCapabilities()`, `hasSignalCapability(name)`
+  - Browser support notes
+
+### General readability improvements
+
+- [ ] Review and improve selected sections (requires user input)
 
 ## Decision Log
 

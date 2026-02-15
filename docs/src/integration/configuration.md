@@ -168,6 +168,24 @@ Controls whether the `X-CSRF-Token` header is included in responses.
 O2P_RESPOND_WITH_X_CSRF_TOKEN=false
 ```
 
+### Demo Mode
+
+#### O2P_DEMO_MODE
+
+Enable demo mode for public demo deployments.
+
+- **Default**: `false`
+- **Values**: `true`, `false`
+
+```bash
+O2P_DEMO_MODE=true
+```
+
+When enabled:
+- All new users automatically receive admin privileges
+- Admin pages mask other users' sensitive data (email, name, IDs, IP addresses)
+- A placeholder user is created at seq=1 so no real user gets first-user admin treatment
+
 ### WebAuthn Configuration
 
 #### WEBAUTHN_ADDITIONAL_ORIGINS
@@ -499,6 +517,26 @@ Custom name for the OAuth2 accounts table.
 ```bash
 DB_TABLE_OAUTH2_ACCOUNTS='o2p_oauth2_accounts'
 ```
+
+### Experimental Features
+
+#### O2P_PASSKEY_PROMOTION
+
+Prompt users to register a passkey after OAuth2 login. When a user logs in via OAuth2 without an existing passkey, a registration modal can be shown.
+
+- **Default**: unset (disabled)
+
+| Value | Description |
+|-------|-------------|
+| unset | Disabled, no promotion |
+| `ask` | Show a confirmation modal asking the user to register a passkey |
+| `force` | Directly show the passkey registration dialog (skip confirmation) |
+
+```bash
+O2P_PASSKEY_PROMOTION=ask
+```
+
+The promotion uses a UA + AAGUID heuristic to detect whether the user's platform authenticator is likely available, avoiding prompts on unsupported devices.
 
 ## Configuration Examples
 
