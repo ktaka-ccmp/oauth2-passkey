@@ -204,6 +204,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## TLS Certificates (bundled-tls)
+
+The library makes HTTPS requests to OAuth2/OIDC providers (e.g., Google) for token exchange and JWKS fetching. By default, it uses the system's CA certificates for TLS verification.
+
+For minimal container deployments (scratch or alpine Docker images) where system certificates are not available, enable the `bundled-tls` feature to bundle Mozilla root certificates:
+
+```toml
+[dependencies]
+oauth2-passkey-axum = { version = "0.2", features = ["bundled-tls"] }
+```
+
+This bundles certificates from the `webpki-roots` crate and configures ALPN protocol negotiation for proper TLS handshakes.
+
+**When to use `bundled-tls`**:
+- Scratch Docker images (no filesystem, no `/etc/ssl/certs/`)
+- Alpine Linux containers without `ca-certificates` package
+- Any environment where system CA certificates are missing
+
+**When NOT needed**:
+- Standard Linux distributions with `ca-certificates` installed
+- Docker images based on Debian, Ubuntu, or similar
+
+Example minimal Dockerfile:
+
+```dockerfile
+FROM rust:latest AS builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release --features bundled-tls
+
+FROM scratch
+COPY --from=builder /app/target/release/myapp /
+ENTRYPOINT ["/myapp"]
+```
+
 ## Required Dependencies
 
 Add these to your `Cargo.toml`:

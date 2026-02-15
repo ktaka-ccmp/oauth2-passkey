@@ -80,7 +80,7 @@ Update documentation in priority order:
 - `docs/src/api/axum.md` - Axum API reference (needs new admin endpoints)
 - `docs/src/integration/configuration.md` - Configuration reference (needs new env vars)
 - `docs/src/integration/passkey-js.md` - Passkey JS API (needs `getClientCapabilities()`)
-- `docs/src/integration/deployment-patterns.md` - Deployment (needs `bundled-tls`)
+- `docs/src/integration/server-setup.md` - Server setup (needs `bundled-tls`)
 
 ## Implementation Tasks
 
@@ -94,7 +94,7 @@ Update documentation in priority order:
 - [ ] Add `O2P_PASSKEY_PROMOTION` and `O2P_DEMO_MODE` to `integration/configuration.md`
   - `O2P_PASSKEY_PROMOTION`: `ask`/`force`/unset, passkey registration after OAuth2 login
   - `O2P_DEMO_MODE`: `true`/`false`, auto-admin, data masking, placeholder user
-- [ ] Add `bundled-tls` feature flag to `integration/deployment-patterns.md`
+- [ ] Add `bundled-tls` feature flag to `integration/server-setup.md`
   - Purpose: bundles `webpki-roots` for scratch/alpine Docker images
   - Cargo.toml example, Dockerfile example
 - [ ] Add `getClientCapabilities()` to `integration/passkey-js.md`
