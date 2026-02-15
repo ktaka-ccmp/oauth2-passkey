@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Security Audit</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
+</head>
+<body>
+<div class="container">
+    <div class="page-header">
+        <h1>Security Audit</h1>
+        <nav>
+            <a href="/">Home</a>
+            <a href="{{o2p_route_prefix}}/admin/index">Admin</a>
+        </nav>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">Filters</h2>
+        </div>
+        <form id="filter-form" class="filter-form">
+            <div class="filter-row">
+                <div class="form-group">
+                    <label for="user-filter">User:</label>
+                    <select id="user-filter" name="user_id" class="form-input">
+                        <option value="">All Users</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="from-date">From:</label>
+                    <input type="date" id="from-date" name="from" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="to-date">To:</label>
+                    <input type="date" id="to-date" name="to" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="success-filter">Status:</label>
+                    <select id="success-filter" name="success" class="form-input">
+                        <option value="">All</option>
+                        <option value="true">Success only</option>
+                        <option value="false">Failures only</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="applyFilter()" class="action-button">Apply</button>
+                <button type="button" onclick="clearFilter()" class="action-button secondary-button">Clear</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Audit Log List -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">Audit Log</h2>
+            <span id="entry-count"></span>
+        </div>
+        <div id="audit-log-container">
+            <p id="audit-loading">Loading...</p>
+        </div>
+        <div id="pagination" class="pagination" style="display: none;">
+            <button id="prev-page" onclick="previousPage()" class="action-button secondary-button" disabled>Previous</button>
+            <span id="page-info"></span>
+            <button id="next-page" onclick="nextPage()" class="action-button secondary-button">Next</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .filter-form {
+        padding: var(--o2p-space-sm);
+    }
+    .filter-row {
+        display: flex;
+        gap: var(--o2p-space-md);
+        align-items: flex-end;
+        flex-wrap: wrap;
+        margin-bottom: var(--o2p-space-sm);
+    }
+    .filter-row .form-group {
+        flex: 1;
+        min-width: 150px;
+    }
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: var(--o2p-space-md);
+        padding: var(--o2p-space-md);
+    }
+    .anonymous-event {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+    }
+    .failure-event {
+        background-color: #f8d7da;
+        border-left: 4px solid var(--o2p-danger);
+    }
+
+    /* Responsive styles */
+    @media (max-width: 768px) {
+        .filter-row {
+            flex-direction: column;
+            gap: var(--o2p-space-sm);
+        }
+        .filter-row .form-group {
+            width: 100%;
+            min-width: auto;
+        }
+        .form-actions {
+            display: flex;
+            flex-direction: column;
+            gap: var(--o2p-space-sm);
+        }
+        .form-actions .action-button {
+            width: 100%;
+        }
+        .pagination {
+            flex-wrap: wrap;
+        }
+        .login-history-entry .item-detail {
+            word-break: break-all;
+        }
+    }
+</style>
+
+<script>
+    const O2P_ROUTE_PREFIX = "{{o2p_route_prefix}}";
+    const ENTRIES_PER_PAGE = 50;
+    let currentOffset = 0;
+    let currentEntries = [];
+    // Load user list for dropdown
+    async function loadUserList() {
+        const select = document.getElementById('user-filter');
+        try {
+            const response = await fetch(`${O2P_ROUTE_PREFIX}/admin/users`, {
+                credentials: 'include'
+            });
+            if (!response.ok) {
+                throw new Error('Failed to fetch user list');
+            }
+            const users = await response.json();
+
+            // Sort users by account name
+            users.sort((a, b) => a.account.localeCompare(b.account));
+
+            for (const user of users) {
+                const option = document.createElement('option');
+                option.value = user.id;
+                option.textContent = `${user.account} (${user.id})`;
+                select.appendChild(option);
+            }
+        } catch (error) {
+            console.error('Error loading user list:', error);
+        }
+    }
+
+    // Get timezone offset in minutes (e.g., JST = 540, EST = -300)
+    // Note: getTimezoneOffset() returns the opposite sign, so we negate it
+    function getTimezoneOffset() {
+        return -new Date().getTimezoneOffset();
+    }
+
+    async function loadAuditLog(filters = {}, offset = 0) {
+        const container = document.getElementById('audit-log-container');
+        container.innerHTML = '<p id="audit-loading">Loading...</p>';
+
+        try {
+            let url = `${O2P_ROUTE_PREFIX}/admin/audit?limit=${ENTRIES_PER_PAGE}&offset=${offset}`;
+            if (filters.user_id) url += `&user_id=${encodeURIComponent(filters.user_id)}`;
+            if (filters.from) url += `&from=${filters.from}`;
+            if (filters.to) url += `&to=${filters.to}`;
+            // Add timezone offset when date filters are present
+            if (filters.from || filters.to) {
+                url += `&tz_offset=${getTimezoneOffset()}`;
+            }
+            if (filters.success !== undefined && filters.success !== '') {
+                url += `&success=${filters.success}`;
+            }
+
+            const response = await fetch(url, { credentials: 'include' });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch audit log');
+            }
+
+            currentEntries = await response.json();
+            currentOffset = offset;
+
+            if (currentEntries.length === 0 && offset === 0) {
+                container.innerHTML = '<p>No entries found for the selected filters.</p>';
+                document.getElementById('pagination').style.display = 'none';
+                document.getElementById('entry-count').textContent = '';
+                return;
+            }
+
+            renderEntries(currentEntries);
+            updatePagination();
+        } catch (error) {
+            console.error('Error loading audit log:', error);
+            container.innerHTML = '<p class="error">Failed to load audit log.</p>';
+        }
+    }
+
+    function renderAuthMethodLabel(entry) {
+        if (entry.authenticator_name) {
+            const iconHtml = entry.authenticator_icon
+                ? `<img src="${entry.authenticator_icon}" alt="${entry.authenticator_name}" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;">`
+                : '';
+            return `${iconHtml}<strong>${entry.authenticator_name}</strong>`;
+        }
+        const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
+        let method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
+        if (entry.provider) method += ` (${entry.provider})`;
+        return `<span class="login-icon">${icon}</span> <strong>${method}</strong>`;
+    }
+
+    function renderEntries(entries) {
+        const container = document.getElementById('audit-log-container');
+        let html = '<div class="login-history-list">';
+
+        for (const entry of entries) {
+            const date = new Date(entry.timestamp).toLocaleString();
+            const status = entry.success ? '✓' : '✗';
+            const statusClass = entry.success ? 'success' : 'failure';
+
+            // Determine if this is an anonymous security event
+            const isAnonymous = !entry.user_id || entry.user_id === '';
+            const isFailure = !entry.success;
+            let itemClass = 'item login-history-entry';
+            if (isAnonymous) itemClass += ' anonymous-event';
+            else if (isFailure) itemClass += ' failure-event';
+
+            html += `
+                <div class="${itemClass}">
+                    <div class="item-detail">
+                        ${renderAuthMethodLabel(entry)}
+                        <span class="login-status ${statusClass}">${status}</span>
+                        ${isAnonymous ? '<span style="color: #856404;">(Anonymous)</span>' : ''}
+                    </div>
+                    <div class="item-detail"><strong>Time:</strong> ${date}</div>
+                    ${entry.email ? `<div class="item-detail"><strong>Email:</strong> ${entry.email}</div>` : ''}
+                    ${!isAnonymous ? `<div class="item-detail"><strong>User ID:</strong> ${entry.user_id}</div>` : ''}
+                    ${entry.ip_address ? `<div class="item-detail"><strong>IP:</strong> ${entry.ip_address}</div>` : ''}
+                    ${entry.user_agent ? `<div class="item-detail"><strong>User-Agent:</strong> ${entry.user_agent.substring(0, 80)}...</div>` : ''}
+                    ${entry.credential_id ? `<div class="item-detail"><strong>Credential ID:</strong> ${entry.credential_id.substring(0, 32)}...</div>` : ''}
+                    ${entry.failure_reason ? `<div class="item-detail"><strong>Reason:</strong> ${entry.failure_reason}</div>` : ''}
+                </div>
+            `;
+        }
+        html += '</div>';
+        container.innerHTML = html;
+
+        document.getElementById('entry-count').textContent = `Showing ${entries.length} entries`;
+    }
+
+    function updatePagination() {
+        const pagination = document.getElementById('pagination');
+        const prevBtn = document.getElementById('prev-page');
+        const nextBtn = document.getElementById('next-page');
+        const pageInfo = document.getElementById('page-info');
+
+        if (currentOffset === 0 && currentEntries.length < ENTRIES_PER_PAGE) {
+            pagination.style.display = 'none';
+            return;
+        }
+
+        pagination.style.display = 'flex';
+        prevBtn.disabled = currentOffset === 0;
+        nextBtn.disabled = currentEntries.length < ENTRIES_PER_PAGE;
+
+        const page = Math.floor(currentOffset / ENTRIES_PER_PAGE) + 1;
+        pageInfo.textContent = `Page ${page}`;
+    }
+
+    function getFilters() {
+        return {
+            user_id: document.getElementById('user-filter').value,
+            from: document.getElementById('from-date').value,
+            to: document.getElementById('to-date').value,
+            success: document.getElementById('success-filter').value,
+        };
+    }
+
+    function applyFilter() {
+        loadAuditLog(getFilters(), 0);
+    }
+
+    function clearFilter() {
+        document.getElementById('user-filter').value = '';
+        document.getElementById('from-date').value = '';
+        document.getElementById('to-date').value = '';
+        document.getElementById('success-filter').value = '';
+        loadAuditLog({}, 0);
+    }
+
+    function previousPage() {
+        if (currentOffset >= ENTRIES_PER_PAGE) {
+            loadAuditLog(getFilters(), currentOffset - ENTRIES_PER_PAGE);
+        }
+    }
+
+    function nextPage() {
+        if (currentEntries.length >= ENTRIES_PER_PAGE) {
+            loadAuditLog(getFilters(), currentOffset + ENTRIES_PER_PAGE);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadUserList();
+        loadAuditLog();
+    });
+</script>
+
+</body>
+</html>

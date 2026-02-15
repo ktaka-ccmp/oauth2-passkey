@@ -29,6 +29,36 @@ In templates:
 <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
 ```
 
+## WebAuthn Feature Detection
+
+The `passkey.js` script automatically detects WebAuthn Signal API capabilities on page load using the `getClientCapabilities()` API (Chrome 131+, Edge 132+).
+
+### initPasskeyCapabilities()
+
+Called automatically when `passkey.js` loads. Queries the browser for supported WebAuthn capabilities and caches the result.
+
+```javascript
+// Called automatically - no need to call manually
+// Result cached in _passkeyCapabilities
+await initPasskeyCapabilities();
+```
+
+### hasSignalCapability(capabilityName)
+
+Check whether a specific WebAuthn Signal API capability is supported by the browser.
+
+```javascript
+if (hasSignalCapability('signalUnknownCredential')) {
+    // Browser supports telling authenticator about deleted credentials
+}
+
+if (hasSignalCapability('signalAllAcceptedCredentials')) {
+    // Browser supports credential list synchronization
+}
+```
+
+Falls back to `typeof` checks when `getClientCapabilities()` is not available.
+
 ## CSRF Token for Registration
 
 Passkey registration requires a CSRF token. Obtain it from the response header and define it before calling registration functions:

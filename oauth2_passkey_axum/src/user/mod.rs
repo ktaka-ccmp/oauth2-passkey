@@ -4,13 +4,17 @@ mod optional;
 
 use axum::Router;
 
+use super::login_history;
+
 pub(super) fn router() -> Router {
+    let base = default::router().merge(login_history::user_router());
+
     #[cfg(feature = "user-ui")]
     {
-        default::router().merge(optional::router())
+        base.merge(optional::router())
     }
     #[cfg(not(feature = "user-ui"))]
     {
-        default::router()
+        base
     }
 }

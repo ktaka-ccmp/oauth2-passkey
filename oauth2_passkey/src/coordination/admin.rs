@@ -1,9 +1,14 @@
+use std::collections::HashMap;
+
 use crate::oauth2::{AccountSearchField, OAuth2Store, ProviderUserId};
 use crate::passkey::{CredentialId, CredentialSearchField, PasskeyStore};
 use crate::userdb::{User, UserStore};
 
 use super::errors::CoordinationError;
-use crate::session::{SessionId, User as SessionUser, UserId, get_user_from_session};
+use crate::session::{
+    SessionId, User as SessionUser, UserId, cleanup_stale_sessions,
+    delete_session_from_store_by_session_id, get_user_from_session,
+};
 
 /// Retrieves a list of all users in the system.
 ///
@@ -227,6 +232,7 @@ pub async fn delete_oauth2_account_admin(
 /// * `Ok(())` - If the user account was successfully deleted
 /// * `Err(CoordinationError::Unauthorized)` - If the user doesn't have admin privileges
 /// * `Err(CoordinationError::ResourceNotFound)` - If the user doesn't exist
+/// * `Err(CoordinationError::Conflict)` - If trying to delete the last admin user
 /// * `Err(CoordinationError)` - If another error occurs during deletion
 ///
 /// # Examples
@@ -255,6 +261,19 @@ pub async fn delete_user_account_admin(
         .log()
     })?;
 
+    // Prevent deleting the last admin user
+    if user.has_admin_privileges() {
+        let admin_count = UserStore::count_admin_users()
+            .await
+            .map_err(|e| CoordinationError::Database(e.to_string()))?;
+        if admin_count <= 1 {
+            return Err(CoordinationError::Conflict(
+                "Cannot delete the last admin user".to_string(),
+            )
+            .log());
+        }
+    }
+
     tracing::debug!("Deleting user account: {:#?}", user);
 
     // Delete all OAuth2 accounts for this user
@@ -272,8 +291,9 @@ pub async fn delete_user_account_admin(
 /// Updates a user's administrative status.
 ///
 /// This function allows an administrator to grant or revoke administrative privileges
-/// for another user. For security reasons, the first user in the system (sequence number 1)
-/// cannot have their admin status changed.
+/// for another user. For security reasons:
+/// - The first user (sequence_number=1) cannot be demoted (unconditional protection)
+/// - The last admin user in the system cannot be demoted (to prevent admin lockout)
 ///
 /// # Arguments
 ///
@@ -286,8 +306,7 @@ pub async fn delete_user_account_admin(
 /// * `Ok(User)` - The updated user account information
 /// * `Err(CoordinationError::Unauthorized)` - If the caller doesn't have admin privileges
 /// * `Err(CoordinationError::ResourceNotFound)` - If the target user doesn't exist
-/// * `Err(CoordinationError)` - If another error occurs, such as trying to change
-///   the first user's admin status
+/// * `Err(CoordinationError::Conflict)` - If trying to demote the first user or last admin
 ///
 /// # Examples
 ///
@@ -317,13 +336,22 @@ pub async fn update_user_admin_status(
         .log()
     })?;
 
-    // Prevent changing admin status of the first user (sequence_number = 1)
-    if user.sequence_number == Some(1) {
-        tracing::debug!("Cannot change admin status of the first user");
-        return Err(CoordinationError::Coordination(
-            "Cannot change admin status of the first user for security reasons".to_string(),
-        )
-        .log());
+    // First user (sequence_number=1) cannot be demoted unconditionally
+    if !is_admin && user.sequence_number == Some(1) {
+        return Err(CoordinationError::Conflict("Cannot demote the first user".to_string()).log());
+    }
+
+    // Prevent demoting the last admin user
+    if !is_admin && user.has_admin_privileges() {
+        let admin_count = UserStore::count_admin_users()
+            .await
+            .map_err(|e| CoordinationError::Database(e.to_string()))?;
+        if admin_count <= 1 {
+            return Err(CoordinationError::Conflict(
+                "Cannot demote the last admin user".to_string(),
+            )
+            .log());
+        }
     }
 
     // Update the user with the new admin status
@@ -335,12 +363,101 @@ pub async fn update_user_admin_status(
     Ok(user)
 }
 
+/// Gets active session counts for all users.
+///
+/// This function returns a map of user IDs to their active session counts.
+///
+/// # Arguments
+///
+/// * `session_id` - The session ID of the administrator performing the action
+///
+/// # Returns
+///
+/// * `Ok(HashMap<String, usize>)` - A map of user IDs to their active session counts
+/// * `Err(CoordinationError::Unauthorized)` - If the caller doesn't have admin privileges
+/// * `Err(CoordinationError)` - If an error occurs during the operation
+pub async fn get_all_active_sessions(
+    session_id: SessionId,
+) -> Result<HashMap<String, usize>, CoordinationError> {
+    // Validate admin session
+    let _admin_user = validate_admin_session(session_id).await?;
+
+    // Get all users
+    let users = UserStore::get_all_users()
+        .await
+        .map_err(|e| CoordinationError::Database(e.to_string()))?;
+
+    let mut result = HashMap::new();
+
+    for user in users {
+        let session_ids = cleanup_stale_sessions(&user.id).await?;
+        result.insert(user.id, session_ids.len());
+    }
+
+    Ok(result)
+}
+
+/// Forces logout of a user by deleting all their active sessions.
+///
+/// This administrative function invalidates all active sessions for a specific user,
+/// effectively logging them out from all devices. This is useful for security incidents,
+/// account compromises, or when a user requests to be logged out remotely.
+///
+/// # Arguments
+///
+/// * `session_id` - The session ID of the administrator performing the action
+/// * `user_id` - The unique identifier of the user to force logout
+///
+/// # Returns
+///
+/// * `Ok(usize)` - The number of sessions that were terminated
+/// * `Err(CoordinationError::Unauthorized)` - If the caller doesn't have admin privileges
+/// * `Err(CoordinationError)` - If an error occurs during the operation
+pub async fn force_logout_user(
+    session_id: SessionId,
+    user_id: UserId,
+) -> Result<usize, CoordinationError> {
+    // Validate admin session
+    let admin_user = validate_admin_session(session_id).await?;
+
+    tracing::info!(
+        admin_id = %admin_user.id,
+        target_user_id = %user_id.as_str(),
+        "Admin forcing logout for user"
+    );
+
+    // Get all active sessions for the user
+    let session_ids = cleanup_stale_sessions(user_id.as_str()).await?;
+    let session_count = session_ids.len();
+
+    // Delete each session
+    for sid in session_ids {
+        let session_id = SessionId::new(sid.clone())
+            .map_err(|e| CoordinationError::Validation(format!("Invalid session ID: {e}")))?;
+        if let Err(e) = delete_session_from_store_by_session_id(session_id).await {
+            tracing::warn!(session_id = %sid, error = %e, "Failed to delete session");
+            // Continue with other sessions even if one fails
+        }
+    }
+
+    tracing::info!(
+        admin_id = %admin_user.id,
+        target_user_id = %user_id.as_str(),
+        sessions_terminated = session_count,
+        "User sessions terminated successfully"
+    );
+
+    Ok(session_count)
+}
+
 /// Validates that a session belongs to an admin user.
 ///
-/// This is a private helper function used only within the admin module.
+/// This is a helper function used by admin and login_history modules.
 /// It validates session data using get_user_from_session which already
 /// performs fresh database lookup to ensure current user state.
-async fn validate_admin_session(session_id: SessionId) -> Result<SessionUser, CoordinationError> {
+pub(super) async fn validate_admin_session(
+    session_id: SessionId,
+) -> Result<SessionUser, CoordinationError> {
     // Get user from session (this already does fresh database validation)
     let session_cookie = crate::SessionCookie::new(session_id.as_str().to_string())
         .map_err(|_| CoordinationError::Unauthorized.log())?;

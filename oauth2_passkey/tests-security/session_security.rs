@@ -332,13 +332,14 @@ async fn test_consolidated_admin_security_controls() -> Result<(), Box<dyn std::
         let setup = TestSetup::new().await?;
 
         // Attempt to access admin endpoints without admin privileges
+        // The /admin/users endpoint now exists and redirects unauthenticated users to login
         let response = setup.browser.get("/auth/admin/users").await?;
         let result = create_security_result_from_response(response).await?;
 
-        // Verify security rejection
+        // Verify security rejection (redirects to login for unauthenticated users)
         assert_security_failure(
             &result,
-            &ExpectedSecurityError::Custom(reqwest::StatusCode::NOT_FOUND, None),
+            &ExpectedSecurityError::Custom(reqwest::StatusCode::TEMPORARY_REDIRECT, None),
             "unauthorized admin operation test",
         );
         assert_no_session_established(&setup.browser).await;

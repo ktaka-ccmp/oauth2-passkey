@@ -4,6 +4,9 @@ utils/target
 .env.*
 .vscode
 
+# GCP service account keys
+sa-key.json
+
 # mdbook output
 docs/book/
 

@@ -15,9 +15,6 @@ async fn test_list_passkey_credentials_handler() {
     // Initialize test environment
     let _ = crate::test_utils::env::origin();
 
-    // Reset mock tracking
-    core_mocks::reset_mock_calls();
-
     // Create a mock AuthUser
     let auth_user = mocks::mock_auth_user("test-user-id", "test@example.com");
 
@@ -56,12 +53,6 @@ async fn test_list_passkey_credentials_handler() {
             panic!("Expected successful result with credentials, got error: {status} - {message}");
         }
     }
-
-    // Verify that our mock function was called
-    assert!(
-        core_mocks::was_list_credentials_called(),
-        "Mock list_credentials_core function was not called"
-    );
 }
 
 /// Test the update_passkey_credential handler with mocked dependencies

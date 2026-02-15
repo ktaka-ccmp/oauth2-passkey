@@ -7,7 +7,8 @@ use thiserror::Error;
 
 use crate::oauth2::config::get_jwks_url;
 use crate::storage::{
-    CacheData, CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE, StorageError,
+    CacheData, CacheErrorConversion, CacheKey, CachePrefix, StorageError, get_data, remove_data,
+    store_cache_keyed,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -87,8 +88,6 @@ pub enum TokenVerificationError {
     SystemTimeError(#[from] std::time::SystemTimeError),
     #[error("JWKS parsing error: {0}")]
     JwksParsing(String),
-    #[error("JWKS fetch error: {0}")]
-    JwksFetch(String),
     #[error("OIDC Discovery error: {0}")]
     OidcDiscovery(#[from] crate::oauth2::discovery::OidcDiscoveryError),
     #[error("Storage error: {0}")]
@@ -114,7 +113,8 @@ async fn fetch_jwks(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
 
 // 0. Without caching:
 async fn fetch_jwks_no_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError> {
-    let resp = reqwest::get(jwks_url).await?;
+    let client = crate::utils::get_client();
+    let resp = client.get(jwks_url).send().await?;
     let jwks: Jwks = resp.json().await?;
     Ok(jwks)
 }
@@ -149,34 +149,24 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
         .map_err(TokenVerificationError::convert_storage_error)?;
 
     // Try to get from cache first
-    if let Some(cached) = GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .get(cache_prefix.clone(), cache_key.clone())
-        .await
-        .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?
+    // Uses cache_operations module to avoid holding MutexGuard across lock boundaries
+    if let Some(jwks_cache) =
+        get_data::<JwksCache, TokenVerificationError>(cache_prefix.clone(), cache_key.clone())
+            .await?
     {
-        let jwks_cache: JwksCache = cached.try_into()?;
-        // tracing::debug!("JWKs found in cache: {:#?}", jwks_cache);
-
         if jwks_cache.expires_at > Utc::now() {
             tracing::debug!("Returning valid cached JWKs");
             return Ok(jwks_cache.jwks);
         }
 
         tracing::debug!("Removing expired JWKs from cache");
-        GENERIC_CACHE_STORE
-            .lock()
-            .await
-            .remove(cache_prefix.clone(), cache_key.clone())
-            .await
-            .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?;
+        remove_data::<TokenVerificationError>(cache_prefix.clone(), cache_key.clone()).await?;
     }
 
     // If not in cache, fetch from the URL
-    let resp = reqwest::get(jwks_url).await?;
+    let client = crate::utils::get_client();
+    let resp = client.get(jwks_url).send().await?;
     let jwks: Jwks = resp.json().await?;
-    // tracing::debug!("JWKs fetched from URL: {:#?}", jwks);
     tracing::debug!("JWKs fetched from URL");
 
     // Store in cache
@@ -185,17 +175,13 @@ async fn fetch_jwks_cache(jwks_url: &str) -> Result<Jwks, TokenVerificationError
         expires_at: Utc::now() + CACHE_EXPIRATION,
     };
 
-    GENERIC_CACHE_STORE
-        .lock()
-        .await
-        .put_with_ttl(
-            cache_prefix,
-            cache_key,
-            jwks_cache.into(),
-            CACHE_EXPIRATION.as_secs() as usize,
-        )
-        .await
-        .map_err(|e| TokenVerificationError::JwksFetch(format!("Cache error: {e}")))?;
+    store_cache_keyed::<JwksCache, TokenVerificationError>(
+        cache_prefix,
+        cache_key,
+        jwks_cache,
+        CACHE_EXPIRATION.as_secs(),
+    )
+    .await?;
 
     Ok(jwks)
 }

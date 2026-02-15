@@ -19,11 +19,17 @@ impl UserStore {
             (Some(pool), _) => {
                 create_tables_sqlite(pool).await?;
                 validate_user_tables_sqlite(pool).await?;
+                if *crate::config::O2P_DEMO_MODE {
+                    insert_demo_placeholder_sqlite(pool).await?;
+                }
                 Ok(())
             }
             (_, Some(pool)) => {
                 create_tables_postgres(pool).await?;
                 validate_user_tables_postgres(pool).await?;
+                if *crate::config::O2P_DEMO_MODE {
+                    insert_demo_placeholder_postgres(pool).await?;
+                }
                 Ok(())
             }
             _ => Err(UserError::Storage("Unsupported database type".to_string())),
@@ -123,6 +129,18 @@ impl UserStore {
         }
 
         final_result
+    }
+
+    pub(crate) async fn count_admin_users() -> Result<i64, UserError> {
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        if let Some(pool) = store.as_sqlite() {
+            count_admin_users_sqlite(pool).await
+        } else if let Some(pool) = store.as_postgres() {
+            count_admin_users_postgres(pool).await
+        } else {
+            Err(UserError::Storage("Unsupported database type".to_string()))
+        }
     }
 
     pub(crate) async fn delete_user(id: UserId) -> Result<(), UserError> {

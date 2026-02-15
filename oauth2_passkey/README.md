@@ -11,6 +11,7 @@ A framework-agnostic core library for OAuth2 and WebAuthn/passkey authentication
 
 ## Documentation
 
+- **[Live Demo Site](https://passkey-demo.ccmp.jp)** - Try OAuth2 + Passkey authentication in your browser
 - **[User Guide](https://ktaka-ccmp.github.io/oauth2-passkey/)** - Comprehensive tutorials and integration guides
 - **[API Reference](https://docs.rs/oauth2-passkey)** - Rust API documentation on docs.rs
 - **[Crates.io](https://crates.io/crates/oauth2-passkey)** - Package registry

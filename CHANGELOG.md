@@ -7,24 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- TPM attestation verification failure with Windows Hello due to unsupported RS1 algorithm (`-65535`). The `integer_to_i64()` helper used hardcoded value comparisons that could not convert `-65535`, and the TPM verifier lacked RS1 support. Fixed by using proper `i128`-based conversion and adding RS1 signature verification via ring's legacy SHA-1 RSA API.
-
 ### Added
 
+- Login history tracking for users and administrators
+  - `GET /o2p/admin/audit` - Cross-user audit page with date filtering
+  - `GET /o2p/admin/user/{user_id}/login_history` - Per-user login history
+  - Records IP address, user agent, authentication method, and credential details
+  - Failed passkey authentication attempts also recorded for security monitoring
+- Passkey promotion: prompt users to register a passkey after OAuth2 login
+  - `O2P_PASSKEY_PROMOTION` env var with `ask` (confirmation modal) and `force` (always prompt) modes
+  - UA + AAGUID heuristic detects whether the user's platform authenticator is likely available
+  - Popup-based registration flow integrated with OAuth2 login redirect
+- Admin safeguards to prevent admin lockout
+  - Prevent deleting or demoting the last admin user
+  - First-user (seq=1) demotion guard
+  - Self-deletion protection for admin accounts
+- `O2P_DEMO_MODE` for public demo deployments
+  - All new users automatically receive admin privileges
+  - Admin pages mask other users' sensitive data (email, name, IDs, IP addresses)
+  - Placeholder user occupies seq=1 so no real user gets first-user admin treatment
+  - `O2P_LOGIN_URL` env var redirects unauthenticated users to a custom login page
+- Admin Force Logout feature: administrators can terminate all active sessions for a user
+  - Session status indicator in Admin Panel user list
+  - "Active Sessions" count and "Force Logout" button in user detail page
+  - New API endpoints: `GET /o2p/admin/sessions`, `POST /o2p/admin/user/{user_id}/logout`
+  - New coordination functions: `get_all_active_sessions()`, `force_logout_user()`
+- `SESSION_CONFLICT_POLICY` env var (`allow`/`replace`/`reject`) to control login behavior when a user already has active sessions
+- User-to-session reverse index (`user_sessions` cache mapping) with lazy cleanup of stale entries
 - `PASSKEY_SIGNAL_API_MODE` env var to control WebAuthn Signal API behavior (`direct`/`sync`/`direct+sync`)
   - `direct` (default): Uses `signalUnknownCredential` only - the only working API with Google Password Manager
   - `sync`: Uses `signalAllAcceptedCredentials` only - currently no effect on Chrome
   - `direct+sync`: Uses both APIs for future compatibility testing
-- Session conflict policy via `SESSION_CONFLICT_POLICY` env var (`allow`/`replace`/`reject`) to control login behavior when a user already has active sessions
-- User-to-session reverse index (`user_sessions` cache mapping) with lazy cleanup of stale entries
+- `SESSION_COOKIE_DOMAIN` env var for cross-origin session cookie support with CORS
+- `bundled-tls` feature flag to bundle Mozilla root certificates via `webpki-roots` for minimal container deployments (scratch/alpine Docker images without system `ca-certificates`)
 - Built-in CSS theme system with 9 pre-built themes: Zinc, Slate, Blue, Violet, Rose, Neumorphism, Material, Eco, SaaS
 - `O2P_CUSTOM_CSS_URL` environment variable for custom CSS theme loading
 - Theme CSS files served at `{O2P_ROUTE_PREFIX}/themes/` (e.g., `/o2p/themes/theme-zinc.css`)
 - `oauth2_passkey_full_router()` unified router that automatically includes `/.well-known/webauthn` when multi-origin is configured
+- `admin-ui` and `user-ui` feature flags for selectively disabling built-in UI components
+- Admin page customization support for framework integrations
+- Responsive mobile layout for admin user list
+- Public re-exports of types needed for custom page implementations (`AuthUser`, template types)
 - `rp_id` field in `PasskeyCredential` to store and display the Relying Party ID used during registration
-- WebAuthn Signal API documentation (`user-handle-and-signal-api.md`) focusing on `signalUnknownCredential` as the primary working API
+- `getClientCapabilities()` JavaScript helper for WebAuthn feature detection
+
+### Fixed
+
+- JWKS cache deadlock with in-memory backend: `tokio::sync::Mutex` guard held across `if let` body caused re-acquisition to deadlock after 600s TTL expiry. Refactored to scope each lock independently.
+- SQLite in-memory database tables disappearing after ~30 minutes of low traffic. Root cause: connection pool eviction destroyed the in-memory database. Fixed with `min_connections(1)`, `idle_timeout(None)`, `max_lifetime(None)`.
+- `credential_id` not recorded on successful passkey login, causing login history entries to lack credential details
+- OAuth2 popup errors now redirect to styled close page instead of showing raw error text
+- ALPN protocol negotiation added to `bundled-tls` rustls configuration for proper TLS handshake
+- WebAuthn Signal API calls changed to fire-and-forget to avoid blocking the authentication response
+- `remaining_credential_ids` now filtered by `user_handle` for correct credential exclusion during registration
+- TPM attestation verification failure with Windows Hello due to unsupported RS1 algorithm (`-65535`). Fixed by using proper `i128`-based conversion and adding RS1 signature verification.
 
 ### Changed
 
@@ -32,9 +68,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New behavior: All credentials for the same user share a single `user_handle` (standard WebAuthn practice)
   - Old behavior: Each credential had a unique `user_handle`
   - Existing credentials are not affected; only newly registered credentials use the new default
-- Signal API calls now conditionally execute based on `PASSKEY_SIGNAL_API_MODE` setting
-- Passkey registration username prefill changed from `#N` sequential numbering to `@YYYYMMDD` date suffix
-
 - **BREAKING**: Renamed `O2P_REDIRECT_ANON` to `O2P_DEFAULT_REDIRECT` for clarity (env var, config, and template variable)
 - **BREAKING**: Admin route renamed from `/admin/list_users` to `/admin/index` for clarity
 - **BREAKING**: User account page renamed from `/user/summary` to `/user/account` for accuracy
@@ -43,9 +76,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Handler: `summary()` -> `user_account()`
   - Template: `summary.j2` -> `user_account.j2`
   - Static files: `summary.js` -> `account.js`, `summary.css` -> `account.css`
+- Signal API calls now conditionally execute based on `PASSKEY_SIGNAL_API_MODE` setting
+- Passkey registration username prefill changed from `#N` sequential numbering to `@YYYYMMDD` date suffix
+- `LoginContext` extraction moved from axum handlers into core crate for framework-agnostic login recording
 - Admin page title changed from "User List" to "User Management"
 - Admin link text in account page changed from "User List" to "Admin"
-- Internal refactoring: handler and template names aligned (`admin_index`, `admin_user_page`)
+
+### Removed
+
+- `signalCurrentUserDetails` removed from passkey login flow (not functional in current browsers)
 
 ## [0.2.0] - 2026-01-22
 

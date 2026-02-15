@@ -61,6 +61,11 @@ pub struct AuthenticatorResponse {
 }
 
 impl AuthenticatorResponse {
+    /// Get the credential ID from the authenticator response
+    pub(crate) fn credential_id(&self) -> &str {
+        &self.id
+    }
+
     #[cfg(test)]
     pub(super) fn new_for_test(
         id: String,

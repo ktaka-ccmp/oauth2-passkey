@@ -521,9 +521,6 @@ fn test_token_verification_error_display() {
 
     let error = TokenVerificationError::JwksParsing("parse error".to_string());
     assert_eq!(error.to_string(), "JWKS parsing error: parse error");
-
-    let error = TokenVerificationError::JwksFetch("fetch error".to_string());
-    assert_eq!(error.to_string(), "JWKS fetch error: fetch error");
 }
 
 /// Test JwksCache serialization and deserialization

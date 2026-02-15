@@ -43,6 +43,11 @@
             <div class="item-detail"><strong>Label:</strong> {{ user.label }}</div>
             <div class="item-detail"><strong>Created:</strong> {{ user.created_at }}</div>
             <div class="item-detail"><strong>Updated:</strong> {{ user.updated_at }}</div>
+            <div class="item-detail">
+                <strong>Active Sessions:</strong>
+                <span id="session-count">...</span>
+                <button id="force-logout-btn" onclick="forceLogout('{{ user.id }}')" class="action-button delete-button" style="display: none; margin-left: 10px;">Force Logout</button>
+            </div>
         </div>
     </div>
 
@@ -131,6 +136,17 @@
             {% endfor %}
         {% endif %}
     </div>
+
+    <!-- Login History Section -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">Login History</h2>
+            <button onclick="loadLoginHistory()" class="action-button">Refresh</button>
+        </div>
+        <div id="login-history-container">
+            <p id="login-history-loading">Loading...</p>
+        </div>
+    </div>
 </div>
 
     <script src="{{o2p_route_prefix}}/admin/admin_user.js"></script>
@@ -140,6 +156,129 @@
         const accountName = "{{user.account}}";
         const userId = "{{user.id}}";
         const csrfToken = "{{csrf_token}}";
+
+        // Fetch session count for this user
+        async function fetchSessionCount() {
+            try {
+                const response = await fetch(`${O2P_ROUTE_PREFIX}/admin/sessions`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to fetch session status');
+                }
+                const sessions = await response.json();
+                const count = sessions[userId] || 0;
+
+                document.getElementById('session-count').textContent = count;
+
+                // Show force logout button if user has active sessions
+                const forceLogoutBtn = document.getElementById('force-logout-btn');
+                if (count > 0) {
+                    forceLogoutBtn.style.display = 'inline-block';
+                } else {
+                    forceLogoutBtn.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error fetching session count:', error);
+                document.getElementById('session-count').textContent = 'Error';
+            }
+        }
+
+        // Force logout the user
+        async function forceLogout(userId) {
+            if (!confirm('Are you sure you want to log out this user from all devices?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${O2P_ROUTE_PREFIX}/admin/user/${userId}/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to force logout user');
+                }
+
+                alert('User has been logged out from all devices.');
+                fetchSessionCount(); // Refresh the session count
+            } catch (error) {
+                console.error('Error forcing logout:', error);
+                alert('Failed to force logout user: ' + error.message);
+            }
+        }
+
+        // Login History Functions
+        function renderAuthMethodLabel(entry) {
+            if (entry.authenticator_name) {
+                const iconHtml = entry.authenticator_icon
+                    ? `<img src="${entry.authenticator_icon}" alt="${entry.authenticator_name}" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;">`
+                    : '';
+                return `${iconHtml}<strong>${entry.authenticator_name}</strong>`;
+            }
+            const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
+            let method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
+            if (entry.provider) method += ` (${entry.provider})`;
+            return `<span class="login-icon">${icon}</span> <strong>${method}</strong>`;
+        }
+
+        async function loadLoginHistory() {
+            const container = document.getElementById('login-history-container');
+            container.innerHTML = '<p id="login-history-loading">Loading...</p>';
+
+            try {
+                const response = await fetch(`${O2P_ROUTE_PREFIX}/admin/user/${userId}/login_history?limit=50`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch login history');
+                }
+
+                const entries = await response.json();
+
+                if (entries.length === 0) {
+                    container.innerHTML = '<p>No login history available.</p>';
+                    return;
+                }
+
+                let html = '<div class="login-history-list">';
+                for (const entry of entries) {
+                    const date = new Date(entry.timestamp).toLocaleString();
+                    const status = entry.success ? '✓' : '✗';
+                    const statusClass = entry.success ? 'success' : 'failure';
+
+                    html += `
+                        <div class="item login-history-entry">
+                            <div class="item-detail">
+                                ${renderAuthMethodLabel(entry)}
+                                <span class="login-status ${statusClass}">${status}</span>
+                            </div>
+                            <div class="item-detail"><strong>Time:</strong> ${date}</div>
+                            ${entry.email ? `<div class="item-detail"><strong>Email:</strong> ${entry.email}</div>` : ''}
+                            ${entry.ip_address ? `<div class="item-detail"><strong>IP:</strong> ${entry.ip_address}</div>` : ''}
+                            ${entry.user_agent ? `<div class="item-detail"><strong>User Agent:</strong> ${entry.user_agent}</div>` : ''}
+                            ${entry.failure_reason ? `<div class="item-detail"><strong>Failure Reason:</strong> ${entry.failure_reason}</div>` : ''}
+                        </div>
+                    `;
+                }
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading login history:', error);
+                container.innerHTML = '<p class="error">Failed to load login history.</p>';
+            }
+        }
+
+        // Fetch session count and login history when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchSessionCount();
+            loadLoginHistory();
+        });
     </script>
 
 </body>

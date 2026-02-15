@@ -172,7 +172,7 @@ async fn test_consolidated_cross_flow_session_attacks() -> Result<(), Box<dyn st
     // Verify security rejection
     assert_security_failure(
         &result,
-        &ExpectedSecurityError::BadRequest,
+        &ExpectedSecurityError::RedirectWithError,
         "CSRF across methods test",
     );
     assert_no_session_established(&setup.browser).await;

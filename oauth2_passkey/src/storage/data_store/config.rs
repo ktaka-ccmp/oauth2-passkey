@@ -31,19 +31,42 @@ pub(crate) static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = Lazy
                 "Environment GENERIC_DATA_STORE_URL: {:?}",
                 std::env::var("GENERIC_DATA_STORE_URL")
             );
-            let opts = sqlx::sqlite::SqliteConnectOptions::from_str(store_url)
+            let is_in_memory = store_url.contains(":memory:") || store_url.contains("mode=memory");
+
+            let mut opts = sqlx::sqlite::SqliteConnectOptions::from_str(store_url)
                 .expect("Failed to parse SQLite connection string")
                 .create_if_missing(true)
-                .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
-                .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
-                .busy_timeout(std::time::Duration::from_secs(30))
-                .pragma("temp_store", "memory")
-                .pragma("mmap_size", "268435456"); // 256MB
+                .busy_timeout(std::time::Duration::from_secs(30));
+
+            if is_in_memory {
+                // In-memory SQLite: enable shared cache so all pool connections
+                // share the same database; WAL and mmap are not supported.
+                opts = opts.shared_cache(true);
+                tracing::info!("Using in-memory SQLite with shared cache");
+            } else {
+                // File-based SQLite: use WAL for concurrent reads and mmap for performance.
+                opts = opts
+                    .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+                    .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
+                    .pragma("temp_store", "memory")
+                    .pragma("mmap_size", "268435456"); // 256MB
+            }
 
             tracing::debug!("Creating lazy SQLite pool");
-            Box::new(SqliteDataStore {
-                pool: sqlx::sqlite::SqlitePool::connect_lazy_with(opts),
-            }) as Box<dyn DataStore>
+            let pool = if is_in_memory {
+                // Keep at least one connection alive so the shared in-memory
+                // database is never destroyed by idle connection eviction.
+                // Disable idle_timeout and max_lifetime to prevent connection
+                // cycling that can momentarily drop all connections (race condition).
+                sqlx::sqlite::SqlitePoolOptions::new()
+                    .min_connections(1)
+                    .idle_timeout(None)
+                    .max_lifetime(None)
+                    .connect_lazy_with(opts)
+            } else {
+                sqlx::sqlite::SqlitePool::connect_lazy_with(opts)
+            };
+            Box::new(SqliteDataStore { pool }) as Box<dyn DataStore>
         }
         "postgres" => Box::new(PostgresDataStore {
             pool: sqlx::PgPool::connect_lazy(store_url).expect("Failed to create Postgres pool"),

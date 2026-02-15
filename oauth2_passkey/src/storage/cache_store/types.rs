@@ -1,11 +1,31 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::time::Instant;
 
 use crate::storage::errors::StorageError;
 use crate::storage::types::{CacheData, CacheKey, CachePrefix};
 
+/// A cache entry with optional TTL expiration.
+///
+/// When `expires_at` is `Some`, the entry is considered expired after that instant.
+/// When `expires_at` is `None`, the entry never expires (used by `put()` without TTL).
+pub(super) struct CacheEntry {
+    pub(super) data: CacheData,
+    pub(super) expires_at: Option<Instant>,
+}
+
+impl CacheEntry {
+    /// Returns true if the entry has expired.
+    pub(super) fn is_expired(&self) -> bool {
+        match self.expires_at {
+            Some(expires_at) => Instant::now() > expires_at,
+            None => false,
+        }
+    }
+}
+
 pub(crate) struct InMemoryCacheStore {
-    pub(super) entry: HashMap<String, CacheData>,
+    pub(super) entry: HashMap<String, CacheEntry>,
 }
 
 pub(crate) struct RedisCacheStore {

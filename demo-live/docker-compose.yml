@@ -1,0 +1,26 @@
+# Rebuild after code changes:
+#   docker compose -f demo-live/docker-compose.yml up --build
+#   (from demo-live/): docker compose up --build
+#
+# Force full rebuild (if cache is stale or behavior is suspicious):
+#   docker compose -f demo-live/docker-compose.yml build --no-cache && docker compose -f demo-live/docker-compose.yml up
+#   (from demo-live/): docker compose build --no-cache && docker compose up
+services:
+  demo:
+    build:
+      context: ..
+      dockerfile: demo-live/Dockerfile
+    ports:
+      - "3001:8080"
+    env_file: ../.env
+    environment:
+      PORT: 8080
+      ORIGIN: "http://localhost:3001"
+      GENERIC_DATA_STORE_TYPE: sqlite
+      GENERIC_DATA_STORE_URL: "sqlite:file:memdb1?mode=memory&cache=shared"
+      # GENERIC_DATA_STORE_URL: "sqlite:/data.db"
+      GENERIC_CACHE_STORE_TYPE: memory
+      GENERIC_CACHE_STORE_URL: "unused"
+      RUST_LOG: debug
+      O2P_DEMO_MODE: "true"
+      O2P_LOGIN_URL: "/login"

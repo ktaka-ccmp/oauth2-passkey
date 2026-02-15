@@ -4,7 +4,7 @@ use axum::{
     extract::Path,
     http::{StatusCode, header::CONTENT_TYPE},
     response::{Html, IntoResponse, Redirect, Response},
-    routing::get,
+    routing::{get, post},
 };
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
@@ -14,10 +14,12 @@ use std::{
 };
 
 use oauth2_passkey::{
-    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, get_all_users,
-    get_authenticator_info_batch, get_user, list_accounts_core, list_credentials_core,
+    AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, force_logout_user,
+    get_all_active_sessions, get_all_users, get_authenticator_info_batch, get_user,
+    list_accounts_core, list_credentials_core,
 };
 
+use super::masking::Masker;
 use crate::{
     O2P_ADMIN_URL,
     config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT},
@@ -28,6 +30,8 @@ pub(crate) fn router() -> Router<()> {
     Router::new()
         .route("/index", get(admin_index))
         .route("/user/{user_id}", get(admin_user_page))
+        .route("/user/{user_id}/logout", post(force_logout_handler))
+        .route("/sessions", get(get_sessions_status))
         .route("/admin_user.js", get(serve_admin_user_js))
 }
 
@@ -39,6 +43,7 @@ struct AdminIndexTemplate {
     o2p_default_redirect: String,
     csrf_token: String,
     custom_css_url: Option<String>,
+    current_user_id: String,
 }
 
 async fn admin_index(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, String)> {
@@ -58,6 +63,8 @@ async fn admin_index(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, S
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    let users = Masker::for_list().mask_users(users, &auth_user.id);
+
     let csrf_token = auth_user.csrf_token.clone();
 
     // Render the template
@@ -67,10 +74,63 @@ async fn admin_index(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, S
         o2p_default_redirect: O2P_DEFAULT_REDIRECT.to_string(),
         csrf_token,
         custom_css_url: O2P_CUSTOM_CSS_URL.clone(),
+        current_user_id: auth_user.id.clone(),
     };
     Ok(Html(template.render().map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
     })?))
+}
+
+/// Get active session counts for all users (JSON API)
+async fn get_sessions_status(
+    auth_user: AuthUser,
+) -> Result<axum::Json<HashMap<String, usize>>, (StatusCode, String)> {
+    if !auth_user.has_admin_privileges() {
+        return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
+    }
+
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+
+    let sessions = get_all_active_sessions(session_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(axum::Json(sessions))
+}
+
+/// Force logout a user by terminating all their active sessions
+async fn force_logout_handler(
+    auth_user: AuthUser,
+    Path(user_id): Path<String>,
+) -> Result<axum::Json<serde_json::Value>, (StatusCode, String)> {
+    if !auth_user.has_admin_privileges() {
+        return Err((StatusCode::UNAUTHORIZED, "Not authorized".to_string()));
+    }
+
+    let session_id = SessionId::new(auth_user.session_id.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid session ID: {e}"),
+        )
+    })?;
+
+    let target_user_id = UserId::new(user_id.clone())
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid user ID: {e}")))?;
+
+    let sessions_terminated = force_logout_user(session_id, target_user_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(axum::Json(serde_json::json!({
+        "success": true,
+        "sessions_terminated": sessions_terminated,
+        "user_id": user_id
+    })))
 }
 
 // Template-friendly version of StoredCredential for display
@@ -89,6 +149,19 @@ struct TemplateCredential {
     pub authenticator_info: Option<AuthenticatorInfo>,
 }
 
+impl TemplateCredential {
+    fn masked(self, masker: &Masker) -> Self {
+        Self {
+            credential_id: masker.id(&self.credential_id),
+            user_id: masker.id(&self.user_id),
+            user_name: masker.name(&self.user_name),
+            user_display_name: masker.name(&self.user_display_name),
+            user_handle: masker.id(&self.user_handle),
+            ..self
+        }
+    }
+}
+
 // Template-friendly version of OAuth2Account for display
 #[derive(Debug)]
 struct TemplateAccount {
@@ -102,6 +175,20 @@ struct TemplateAccount {
     pub metadata_str: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+impl TemplateAccount {
+    fn masked(self, masker: &Masker) -> Self {
+        Self {
+            id: masker.id(&self.id),
+            user_id: masker.id(&self.user_id),
+            provider_user_id: masker.id(&self.provider_user_id),
+            name: masker.name(&self.name),
+            email: masker.email(&self.email),
+            metadata_str: masker.metadata(&self.metadata_str),
+            ..self
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -220,6 +307,8 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
                 )
             })?;
 
+    let masker = Masker::for_detail(&auth_user.id, &user.id);
+
     // Convert PasskeyCredential to TemplateCredential
     let passkey_credentials = stored_credentials
         .iter()
@@ -242,11 +331,11 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
                 last_used_at: format_date_tz(&cred.last_used_at, "JST"),
                 authenticator_info,
             }
+            .masked(&masker)
         })
         .collect::<Vec<_>>();
 
     // Fetch OAuth2 accounts using the public function from libauth
-    // let oauth2_accounts = list_accounts_core(Some(session_user)).await.map_err(|e| {
     let user_id_enum3 = UserId::new(user_id.to_string()).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -272,12 +361,15 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
                 name: account.name,
                 email: account.email,
                 picture: account.picture.unwrap_or_default(),
-                metadata_str: account.metadata.to_string(), // Convert metadata Value to string
+                metadata_str: account.metadata.to_string(),
                 created_at: format_date_tz(&account.created_at, "JST"),
                 updated_at: format_date_tz(&account.updated_at, "JST"),
             }
+            .masked(&masker)
         })
         .collect();
+
+    let user = masker.mask_user(user);
 
     let csrf_token = auth_user.csrf_token.clone();
 

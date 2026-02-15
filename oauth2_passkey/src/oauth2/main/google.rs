@@ -4,7 +4,7 @@ use crate::oauth2::config::{
 use crate::oauth2::errors::OAuth2Error;
 use crate::oauth2::types::{GoogleUserInfo, OidcTokenResponse};
 
-use super::utils::get_client;
+use crate::utils::get_client;
 
 pub(super) async fn fetch_user_data_from_google(
     access_token: String,

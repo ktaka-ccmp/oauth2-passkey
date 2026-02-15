@@ -8,6 +8,8 @@ pub enum ExpectedSecurityError {
     BadRequest,
     /// 401 Unauthorized - authentication required
     Unauthorized,
+    /// 303 See Other - error redirected to popup_close (OAuth2 callback errors)
+    RedirectWithError,
     /// Custom status code with expected message pattern
     Custom(StatusCode, Option<String>),
 }
@@ -79,6 +81,9 @@ impl SecurityTestResult {
             }
             ExpectedSecurityError::Unauthorized => {
                 self.status_code == StatusCode::UNAUTHORIZED && self.security_failure_detected
+            }
+            ExpectedSecurityError::RedirectWithError => {
+                self.status_code == StatusCode::SEE_OTHER && self.security_failure_detected
             }
             ExpectedSecurityError::Custom(expected_status, message_pattern) => {
                 let status_matches = self.status_code == *expected_status;

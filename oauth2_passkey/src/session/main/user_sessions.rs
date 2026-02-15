@@ -93,7 +93,7 @@ pub(super) async fn remove_session_from_user_mapping(
 /// Removes any that no longer exist (expired via TTL or explicitly deleted).
 ///
 /// Returns the list of session IDs that are still valid.
-pub(super) async fn cleanup_stale_sessions(user_id: &str) -> Result<Vec<String>, SessionError> {
+pub(crate) async fn cleanup_stale_sessions(user_id: &str) -> Result<Vec<String>, SessionError> {
     let session_ids = get_user_session_ids(user_id).await?;
 
     if session_ids.is_empty() {

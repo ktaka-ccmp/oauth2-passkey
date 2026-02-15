@@ -58,7 +58,10 @@ pub(crate) async fn store_aaguids() -> Result<(), PasskeyError> {
 
     store_aaguid_in_cache(json).await?;
 
-    let response = reqwest::get(AAGUID_URL)
+    let client = crate::utils::get_client();
+    let response = client
+        .get(AAGUID_URL)
+        .send()
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
     let json = response

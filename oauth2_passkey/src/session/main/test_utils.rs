@@ -1,5 +1,6 @@
 //! Test utilities for session module tests
 
+use super::user_sessions::add_session_to_user_mapping;
 use crate::session::errors::SessionError;
 use crate::session::types::{SessionId, StoredSession, UserId};
 use crate::storage::{CacheData, CacheErrorConversion, CacheKey, CachePrefix, GENERIC_CACHE_STORE};
@@ -61,6 +62,9 @@ pub(crate) async fn insert_test_session(
         .put_with_ttl(CachePrefix::session(), cache_key, cache_data, ttl as usize)
         .await
         .map_err(SessionError::convert_storage_error)?;
+
+    // Also update the user_sessions mapping for session count tracking
+    add_session_to_user_mapping(user_id.as_str(), session_id.as_str()).await?;
 
     Ok(())
 }

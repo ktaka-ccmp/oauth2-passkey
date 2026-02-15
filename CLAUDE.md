@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **CRITICAL**: Always observe these fundamental principles:
 - **Never go beyond the scope of the request**
 - **Never shortcut what was requested**
+- **Language**: All documents and code comments in this repository must be written in English
 - Must read ~/.claude/CLAUDE.md
 
 These guidelines ensure focused, complete work that addresses exactly what the user needs without unnecessary additions or omissions.
@@ -124,6 +125,13 @@ Environment variables (see `dot.env.example`):
 4. **Error Handling**: Use `thiserror` crate instead of `anyhow` (better for library crates)
 5. **Documentation**: Include comprehensive tutorials and examples
 6. **Minimal Visibility**: Keep module internals private, re-export only necessary items
+   - Visibility priority (most restrictive first): `private` > `pub(super)` > `pub(crate)` > `pub`
+   - Always use the most restrictive visibility that still allows the code to compile
+   - Common mistake: using `pub(crate)` when `pub(super)` suffices (e.g., for items only used by sibling modules)
+   - When re-exporting in `mod.rs`, the source definition must have at least the same visibility as the re-export
+
+### Coding Style Preferences
+- **Prefer `match` over `if let`**: Use `match` expressions instead of `if let` / `if let ... else` unless clippy suggests otherwise. `match` is more readable and makes all branches explicit.
 
 ### Development Workflow
 7. **Minimal Changes**: Code modifications should be minimal and targeted to fulfill specific needs
@@ -236,6 +244,7 @@ This project uses Claude Code commands for workflow management.
 | `/snapshot` | Create a session snapshot for context transfer between machines |
 | `/issue` | Create or update an issue for task/bug tracking |
 | `/backlog` | View all open issues |
+| `/visibility-check` | Check Rust code for minimal visibility compliance |
 
 ### Session Snapshots (`.claude/sessions/`)
 
@@ -248,8 +257,8 @@ For transferring work context between machines or sessions:
 
 For persistent task and bug tracking across sessions:
 - **Purpose**: Track tasks that span multiple sessions
-- **Filename**: `YYYY-MM-DD-<short-slug>.md`
-- **ID Format**: `YYYY-MM-DD-NN` (e.g., `2026-01-30-09`)
+- **Filename**: `YYYYMMDD-HHMM-<short-slug>.md` (legacy: `YYYY-MM-DD-<slug>.md`)
+- **ID Format**: `YYYYMMDD-HHMM` (legacy: `YYYY-MM-DD-NN`)
 - **Status**: `open`, `completed`, `wontfix`, `deferred`
 - **Priority**: `high`, `medium`, `low`
 - **Structure**: `open/`, `completed/`, `deferred/` subdirectories

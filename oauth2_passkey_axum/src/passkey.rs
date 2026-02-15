@@ -21,8 +21,10 @@ use super::config::O2P_CUSTOM_CSS_URL;
 use super::error::IntoResponseError;
 use super::session::AuthUser;
 
+mod promotion;
+
 pub(super) fn router() -> Router {
-    Router::new()
+    let base = Router::new()
         .route("/passkey.js", get(serve_passkey_js))
         .route("/conditional_ui", get(conditional_ui))
         .route("/conditional_ui.js", get(serve_conditional_ui_js))
@@ -33,7 +35,13 @@ pub(super) fn router() -> Router {
             "/credentials/{credential_id}",
             delete(delete_passkey_credential),
         )
-        .route("/credential/update", post(update_passkey_credential))
+        .route("/credential/update", post(update_passkey_credential));
+
+    if super::config::O2P_PASSKEY_PROMOTION.is_enabled() {
+        base.merge(promotion::router())
+    } else {
+        base
+    }
 }
 
 fn router_register() -> Router {
@@ -110,12 +118,14 @@ async fn handle_start_authentication(
 }
 
 async fn handle_finish_authentication(
+    request_headers: HeaderMap,
     Json(auth_response): Json<AuthenticatorResponse>,
 ) -> Result<(HeaderMap, Json<Value>), (StatusCode, String)> {
     // Call the core function with the extracted data
-    let (auth_data, headers) = handle_finish_authentication_core(auth_response)
-        .await
-        .into_response_error()?;
+    let (auth_data, headers) =
+        handle_finish_authentication_core(auth_response, Some(&request_headers))
+            .await
+            .into_response_error()?;
 
     // Return the headers and authentication data as JSON
     // Include credential_ids and user_handle only when PASSKEY_SIGNAL_API_MODE includes 'sync'

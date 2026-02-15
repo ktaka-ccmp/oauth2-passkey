@@ -6,7 +6,7 @@ mod session_edge_cases_tests;
 mod session_security_tests;
 #[cfg(test)]
 pub(crate) mod test_utils;
-pub(super) mod user_sessions;
+pub(crate) mod user_sessions;
 
 use crate::session::errors::SessionError;
 use crate::session::types::UserId;

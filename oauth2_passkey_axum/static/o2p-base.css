@@ -656,6 +656,31 @@ nav a:hover {
 }
 
 /* -----------------------------------------------------------------------------
+   Login History
+   ----------------------------------------------------------------------------- */
+.login-history-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.login-history-entry .login-icon {
+    margin-right: var(--o2p-space-xs);
+}
+
+.login-history-entry .login-status {
+    margin-left: var(--o2p-space-sm);
+    font-weight: 600;
+}
+
+.login-history-entry .login-status.success {
+    color: #16a34a;
+}
+
+.login-history-entry .login-status.failure {
+    color: var(--o2p-danger);
+}
+
+/* -----------------------------------------------------------------------------
    Utility Classes
    ----------------------------------------------------------------------------- */
 .user-passkeys,

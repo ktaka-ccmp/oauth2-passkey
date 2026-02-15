@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login History</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
+</head>
+<body>
+<div class="container">
+    <div class="page-header">
+        <h1>Login History</h1>
+        <nav>
+            <a href="/">Home</a>
+            <a href="{{o2p_route_prefix}}/user/account">My Account</a>
+        </nav>
+    </div>
+
+    <!-- Date Range Filter -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">Filter</h2>
+        </div>
+        <form id="filter-form" class="filter-form">
+            <div class="filter-row">
+                <div class="form-group">
+                    <label for="from-date">From:</label>
+                    <input type="date" id="from-date" name="from" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="to-date">To:</label>
+                    <input type="date" id="to-date" name="to" class="form-input">
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="applyFilter()" class="action-button">Apply</button>
+                    <button type="button" onclick="clearFilter()" class="action-button secondary-button">Clear</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Login History List -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">History</h2>
+            <span id="entry-count"></span>
+        </div>
+        <div id="login-history-container">
+            <p id="login-history-loading">Loading...</p>
+        </div>
+        <div id="pagination" class="pagination" style="display: none;">
+            <button id="prev-page" onclick="previousPage()" class="action-button secondary-button" disabled>Previous</button>
+            <span id="page-info"></span>
+            <button id="next-page" onclick="nextPage()" class="action-button secondary-button">Next</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .filter-form {
+        padding: var(--o2p-space-sm);
+    }
+    .filter-row {
+        display: flex;
+        gap: var(--o2p-space-md);
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+    .filter-row .form-group {
+        flex: 1;
+        min-width: 120px;
+    }
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: var(--o2p-space-md);
+        padding: var(--o2p-space-md);
+    }
+
+    /* Responsive styles */
+    @media (max-width: 768px) {
+        .filter-row {
+            flex-direction: column;
+            gap: var(--o2p-space-sm);
+        }
+        .filter-row .form-group {
+            width: 100%;
+            min-width: auto;
+        }
+        .form-actions {
+            display: flex;
+            flex-direction: column;
+            gap: var(--o2p-space-sm);
+            width: 100%;
+        }
+        .form-actions .action-button {
+            width: 100%;
+        }
+        .pagination {
+            flex-wrap: wrap;
+        }
+        .login-history-entry .item-detail {
+            word-break: break-all;
+        }
+    }
+</style>
+
+<script>
+    const O2P_ROUTE_PREFIX = "{{o2p_route_prefix}}";
+    const ENTRIES_PER_PAGE = 20;
+    let currentOffset = 0;
+    let currentEntries = [];
+    // Get timezone offset in minutes (e.g., JST = 540, EST = -300)
+    // Note: getTimezoneOffset() returns the opposite sign, so we negate it
+    function getTimezoneOffset() {
+        return -new Date().getTimezoneOffset();
+    }
+
+    async function loadLoginHistory(from = null, to = null, offset = 0) {
+        const container = document.getElementById('login-history-container');
+        container.innerHTML = '<p id="login-history-loading">Loading...</p>';
+
+        try {
+            let url = `${O2P_ROUTE_PREFIX}/user/login_history?limit=${ENTRIES_PER_PAGE}&offset=${offset}`;
+            if (from) url += `&from=${from}`;
+            if (to) url += `&to=${to}`;
+            // Add timezone offset when date filters are present
+            if (from || to) {
+                url += `&tz_offset=${getTimezoneOffset()}`;
+            }
+
+            const response = await fetch(url, { credentials: 'include' });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch login history');
+            }
+
+            currentEntries = await response.json();
+            currentOffset = offset;
+
+            if (currentEntries.length === 0 && offset === 0) {
+                container.innerHTML = '<p>No login history found for the selected period.</p>';
+                document.getElementById('pagination').style.display = 'none';
+                document.getElementById('entry-count').textContent = '';
+                return;
+            }
+
+            renderEntries(currentEntries);
+            updatePagination();
+        } catch (error) {
+            console.error('Error loading login history:', error);
+            container.innerHTML = '<p class="error">Failed to load login history.</p>';
+        }
+    }
+
+    function renderAuthMethodLabel(entry) {
+        if (entry.authenticator_name) {
+            const iconHtml = entry.authenticator_icon
+                ? `<img src="${entry.authenticator_icon}" alt="${entry.authenticator_name}" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;">`
+                : '';
+            return `${iconHtml}<strong>${entry.authenticator_name}</strong>`;
+        }
+        const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
+        let method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
+        if (entry.provider) method += ` (${entry.provider})`;
+        return `<span class="login-icon">${icon}</span> <strong>${method}</strong>`;
+    }
+
+    function renderEntries(entries) {
+        const container = document.getElementById('login-history-container');
+        let html = '<div class="login-history-list">';
+
+        for (const entry of entries) {
+            const date = new Date(entry.timestamp).toLocaleString();
+            const status = entry.success ? '✓' : '✗';
+            const statusClass = entry.success ? 'success' : 'failure';
+
+            html += `
+                <div class="item login-history-entry">
+                    <div class="item-detail">
+                        ${renderAuthMethodLabel(entry)}
+                        <span class="login-status ${statusClass}">${status}</span>
+                    </div>
+                    <div class="item-detail"><strong>Time:</strong> ${date}</div>
+                    ${entry.email ? `<div class="item-detail"><strong>Email:</strong> ${entry.email}</div>` : ''}
+                    ${entry.ip_address ? `<div class="item-detail"><strong>IP:</strong> ${entry.ip_address}</div>` : ''}
+                    ${entry.failure_reason ? `<div class="item-detail"><strong>Reason:</strong> ${entry.failure_reason}</div>` : ''}
+                </div>
+            `;
+        }
+        html += '</div>';
+        container.innerHTML = html;
+
+        document.getElementById('entry-count').textContent = `Showing ${entries.length} entries`;
+    }
+
+    function updatePagination() {
+        const pagination = document.getElementById('pagination');
+        const prevBtn = document.getElementById('prev-page');
+        const nextBtn = document.getElementById('next-page');
+        const pageInfo = document.getElementById('page-info');
+
+        if (currentOffset === 0 && currentEntries.length < ENTRIES_PER_PAGE) {
+            pagination.style.display = 'none';
+            return;
+        }
+
+        pagination.style.display = 'flex';
+        prevBtn.disabled = currentOffset === 0;
+        nextBtn.disabled = currentEntries.length < ENTRIES_PER_PAGE;
+
+        const page = Math.floor(currentOffset / ENTRIES_PER_PAGE) + 1;
+        pageInfo.textContent = `Page ${page}`;
+    }
+
+    function applyFilter() {
+        const from = document.getElementById('from-date').value;
+        const to = document.getElementById('to-date').value;
+        loadLoginHistory(from || null, to || null, 0);
+    }
+
+    function clearFilter() {
+        document.getElementById('from-date').value = '';
+        document.getElementById('to-date').value = '';
+        loadLoginHistory(null, null, 0);
+    }
+
+    function previousPage() {
+        if (currentOffset >= ENTRIES_PER_PAGE) {
+            const from = document.getElementById('from-date').value;
+            const to = document.getElementById('to-date').value;
+            loadLoginHistory(from || null, to || null, currentOffset - ENTRIES_PER_PAGE);
+        }
+    }
+
+    function nextPage() {
+        if (currentEntries.length >= ENTRIES_PER_PAGE) {
+            const from = document.getElementById('from-date').value;
+            const to = document.getElementById('to-date').value;
+            loadLoginHistory(from || null, to || null, currentOffset + ENTRIES_PER_PAGE);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => loadLoginHistory());
+</script>
+
+</body>
+</html>
