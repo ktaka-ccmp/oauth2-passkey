@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 200" width="280" height="200">
+  <g transform="translate(105, 100)">
+    <!-- OAuth2 cycle arrows -->
+    <path d="M -16 -58 A 58 58 0 0 1 52 -22" stroke="#2a6ab5" stroke-width="10" fill="none" stroke-linecap="round"/>
+    <polygon points="54,-10 64,-32 40,-28" fill="#2a6ab5"/>
+
+    <path d="M 16 58 A 58 58 0 0 1 -52 22" stroke="#3a7a1a" stroke-width="10" fill="none" stroke-linecap="round"/>
+    <polygon points="-54,10 -64,32 -40,28" fill="#3a7a1a"/>
+
+    <!-- Key head -->
+    <circle cx="0" cy="0" r="36" fill="none" stroke="#2a2a2a" stroke-width="9"/>
+    <!-- Keyhole -->
+    <circle cx="0" cy="-5" r="9" fill="#2a6ab5"/>
+    <rect x="-5" y="-3" width="10" height="22" rx="3" fill="#2a6ab5"/>
+
+    <!-- Key shaft -->
+    <line x1="36" y1="0" x2="92" y2="0" stroke="#2a2a2a" stroke-width="9" stroke-linecap="round"/>
+    <!-- Key teeth -->
+    <line x1="70" y1="0" x2="70" y2="16" stroke="#2a2a2a" stroke-width="9" stroke-linecap="round"/>
+    <line x1="86" y1="0" x2="86" y2="13" stroke="#2a2a2a" stroke-width="9" stroke-linecap="round"/>
+  </g>
+</svg>
