@@ -1,158 +1,123 @@
-# Demo-Both: Complete Authentication Example
+# Demo-Live
 
-This demo application showcases both OAuth2 (Google) and WebAuthn/Passkey authentication in a single integrated application using [`oauth2-passkey-axum`](https://crates.io/crates/oauth2-passkey-axum).
+Live demo application for [`oauth2-passkey-axum`](https://crates.io/crates/oauth2-passkey-axum), deployed at **https://passkey-demo.ccmp.jp**.
 
-## Features
+This directory contains the application code, custom templates, and all deployment configuration for the publicly hosted demo site on Google Cloud Run.
 
-- **Dual Authentication Methods**: Users can choose between Google OAuth2 or WebAuthn/Passkey
-- **Session Management**: Secure session handling with CSRF protection
-- **User Management**: Registration, login, and profile management
-- **Admin Interface**: User administration features
+## What This Demo Provides
 
-## Quick Start
+- Custom login page with Google OAuth2 and Passkey buttons
+- Home page with navigation to My Account and Admin Panel
+- Data masking in demo mode (`O2P_DEMO_MODE`) to protect user information
+- Ephemeral storage (in-memory SQLite + in-memory cache) -- data resets on container restart
 
-### Prerequisites
-
-- Rust (latest stable version)
-- Google OAuth2 credentials (for OAuth2 authentication)
-- Modern web browser (for WebAuthn/Passkey support)
-
-### 1. Environment Setup
-
-Copy the environment template and configure:
-
-```bash
-cp ../dot.env.simple .env
-```
-
-Edit `.env` with your configuration:
-
-```bash
-# Required: Base URL of your application
-ORIGIN='http://localhost:3001'
-
-# Required: Google OAuth2 credentials
-OAUTH2_GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com'
-OAUTH2_GOOGLE_CLIENT_SECRET='your-client-secret'
-
-# Database (SQLite for easy setup)
-GENERIC_DATA_STORE_TYPE=sqlite
-GENERIC_DATA_STORE_URL='sqlite:/tmp/auth.db'
-
-# Cache (in-memory for demo)
-GENERIC_CACHE_STORE_TYPE=memory
-GENERIC_CACHE_STORE_URL='memory'
-```
-
-### 2. Get Google OAuth2 Credentials
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Create OAuth2 credentials (Web application)
-3. Add `http://localhost:3001/o2p/oauth2/authorized` to "Authorized redirect URIs"
-
-### 3. Run the Demo
-
-```bash
-cargo run
-```
-
-The application will start on:
-
-- **HTTP**: Port 3001 (access as <http://localhost:3001>)
-
-**Note**: `localhost` is a [secure context](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts), so WebAuthn/Passkey works over HTTP on localhost.
-
-**For mobile testing**, see the [Development Tunneling Guide](../docs/src/guides/tunneling.md).
-
-### 4. Try the Demo
-
-1. **Visit**: <http://localhost:3001>
-2. **Create User** with Google OAuth2 or Passkey
-3. **Navigate to** the user account page: <http://localhost:3001/o2p/user/account>
-4. **Add New Passkey** or **Add New OAuth2 Account**
-5. **Logout**
-6. **Sign in** with Google OAuth2 or Passkey
-7. **Explore**
-   1. Try Credential linking
-   2. Try accessing protected pages p1-p6
-8. **Admin** The first user is given admin privilege
-   1. Create multiple users
-   2. Try accessing the admin interface at <http://localhost:3001/o2p/admin/index>
-   3. Manipulate other users
-
-## HTTPS for Production
-
-For production or non-localhost environments, use an HTTPS proxy (nginx/Caddy) to terminate TLS:
-
-```text
-Browser -> HTTPS (nginx/Caddy) -> HTTP (localhost:3001)
-```
-
-Example Caddy configuration:
-
-```caddyfile
-your-domain.com {
-    reverse_proxy localhost:3001
-}
-```
-
-See [demo-cross-origin](../demo-cross-origin/) for a complete HTTPS proxy setup example.
-
-## Application Structure
+## Directory Structure
 
 ```text
 demo-live/
 ├── src/
-│   ├── main.rs          # Application entry point
-│   ├── server.rs        # Server configuration and routes
-│   └── protected.rs     # Protected route handlers
-├── templates/           # HTML templates
-│   ├── index.j2        # Landing page
-│   ├── p3.j2           # Protected page examples
-│   ├── p4.j2
-│   ├── p5.j2
-│   └── p6.j2
-├── Cargo.toml          # Dependencies
-├── dot.env.simple      # Environment template
-└── README.md           # This file
+│   ├── main.rs              # App entry point, custom login/index handlers
+│   └── server.rs            # HTTP server configuration
+├── templates/               # Custom Askama templates
+│   ├── index.j2            # Home page (welcome + navigation cards)
+│   └── login.j2            # Login page (Google OAuth2 + Passkey buttons)
+├── Cargo.toml              # Dependencies, bundled-tls feature for static linking
+├── Dockerfile              # Multi-stage build: rust:1.88-alpine -> scratch
+├── docker-compose.yml      # Local Docker testing (reads ../.env)
+├── cloudbuild.yaml         # Google Cloud Build image config
+├── env.cloud-run.yaml      # Cloud Run environment variables
+├── DEPLOY.md               # Full deployment guide (GCP setup, secrets, domain)
+├── DOCKER_NOTES.md         # Docker design decisions and troubleshooting
+└── README.md               # This file
 ```
 
-## Troubleshooting
+## CI/CD Pipeline
 
-### Common Issues
+Pushing to the `dev` branch automatically deploys via GitHub Actions (`.github/workflows/deploy-demo.yml`):
 
-1. **"Invalid origin" error**
-   - Ensure `ORIGIN` in `.env` matches the URL you're visiting
-   - Use `http://localhost:3001` for local development
+1. **GitHub Actions** authenticates to GCP with a service account key
+2. **Cloud Build** builds a Docker image per `cloudbuild.yaml` and pushes to **Artifact Registry**
+3. **Cloud Run** deploys the image with environment variables from `env.cloud-run.yaml` and secrets from **Secret Manager**
 
-2. **Google OAuth2 not working**
-   - Check your Google OAuth2 credentials in `.env`
-   - Verify authorized origins and redirect URIs in Google Cloud Console
+Trigger paths: `oauth2_passkey/**`, `oauth2_passkey_axum/**`, `demo-live/**`, `.github/workflows/deploy-demo.yml`
 
-3. **WebAuthn/Passkey not working**
-   - `localhost` is a secure context - WebAuthn works over HTTP
-   - For non-localhost, HTTPS is required (use an HTTPS proxy)
-   - Try a different browser if having issues (Chrome has the best support)
-   - Clear browser data for localhost if needed
+## Build Details
 
-4. **Database errors**
-   - The SQLite database will be created automatically
-   - Delete the database file to reset it (path depends on your configuration)
-   - Use `touch` to recreate the database file if needed
-   - Make sure the path specified by `GENERIC_DATA_STORE_URL` in your `.env` is writable (e.g., the directory for your SQLite file)
-   - Make sure to the path from your `.env` file is writable
+The Docker build produces a fully static binary with no runtime dependencies:
 
-### Development Tips
+- **Builder stage**: `rust:1.88-alpine` with musl libc for static linking
+- **`bundled-tls` feature**: Compiles TLS certificates into the binary via `webpki-roots` (no `ca-certificates` package needed at runtime)
+- **Runtime stage**: `FROM scratch` -- no OS, no shell, no libc (~28 MB total image)
 
-- **Logs**: Check console output for detailed error messages
+See [DOCKER_NOTES.md](DOCKER_NOTES.md) for design decisions, image size breakdown, and known issues.
 
-## Configuration Options
+## Local Development
 
-This demo supports all the same configuration options as the main library:
+### Run with cargo
 
-- **Database**: SQLite, PostgreSQL
-- **Cache**: In-memory, Redis
-- **Route prefix**: Customize authentication routes
-- **UI features**: Enable/disable admin and user interfaces
+```bash
+cp ../dot.env.simple .env
+# Edit .env with your Google OAuth2 credentials
+cargo run
+# Access at http://localhost:3001
+```
 
-See the dot.env.example in the main repository documentation for complete configuration details.
+### Run with Docker
+
+```bash
+# From repository root (reads ../.env for OAuth2 credentials)
+docker compose -f demo-live/docker-compose.yml up --build
+
+# Access at http://localhost:3001
+
+# Force full rebuild if cache is stale
+docker compose -f demo-live/docker-compose.yml build --no-cache
+```
+
+## Demo-Specific Configuration
+
+The following environment variables are set differently from a typical deployment. See `env.cloud-run.yaml` for the full list.
+
+### Demo mode
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `O2P_DEMO_MODE` | `true` | All new users get admin privileges, admin pages mask other users' sensitive data, and a placeholder user occupies seq=1 so no real user gets first-user treatment |
+| `O2P_LOGIN_URL` | `/login` | Redirects unauthenticated users to the custom login page instead of the library default |
+
+### Session
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `SESSION_COOKIE_NAME` | `__Host-SessionId` | `__Host-` prefix enforces HTTPS-only, no Domain, Path=/ (browser security) |
+| `SESSION_COOKIE_MAX_AGE` | `600` | 10-minute session lifetime (short for demo; default is longer) |
+| `SESSION_CONFLICT_POLICY` | `allow` | Allows concurrent sessions from multiple devices |
+
+### Passkey
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `O2P_PASSKEY_PROMOTION` | `force` | Always prompts passkey registration after OAuth2 login |
+| `PASSKEY_AUTHENTICATOR_ATTACHMENT` | `platform` | Only allows platform authenticators (fingerprint, Face ID, Windows Hello) |
+| `PASSKEY_USER_VERIFICATION` | `discouraged` | Skips biometric prompt for faster UX |
+| `PASSKEY_REQUIRE_RESIDENT_KEY` | `true` | Requires discoverable credentials (usernameless login) |
+
+### Storage (ephemeral)
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `GENERIC_DATA_STORE_TYPE` | `sqlite` | SQLite for simplicity (no external DB) |
+| `GENERIC_DATA_STORE_URL` | `sqlite:file:memdb1?mode=memory&cache=shared` | In-memory database; all data lost on restart |
+| `GENERIC_CACHE_STORE_TYPE` | `memory` | In-memory cache; no Redis dependency |
+
+### Build feature
+
+| Feature | Purpose |
+|---------|---------|
+| `bundled-tls` | Required for `scratch` container. Bundles Mozilla root certificates via `webpki-roots` so HTTPS calls (Google OAuth2, JWKS) work without system `ca-certificates`. |
+
+## Related Documentation
+
+- [DEPLOY.md](DEPLOY.md) -- Step-by-step GCP setup, secret management, custom domain, manual deployment
+- [DOCKER_NOTES.md](DOCKER_NOTES.md) -- Base image selection, TLS architecture, in-memory backend stability
+- [dot.env.example](../dot.env.example) -- All available configuration options

@@ -9,6 +9,12 @@
 
 **Password authentication is fundamentally flawed** - even strong, unique passwords are vulnerable to phishing, brute-force attacks, and server-side breaches. This library provides a better approach: users register with Google OAuth2, then add a Passkey for fast, phishing-resistant daily login. OAuth2 remains as a backup if the device is lost. After authentication, the library issues a secure session cookie to maintain login state.
 
+## 🎮 Live Demo
+
+> **[passkey-demo.ccmp.jp](https://passkey-demo.ccmp.jp)**
+
+No setup required. Google account needed for OAuth2. Data is ephemeral (resets on server restart, sessions expire in 10 min).
+
 ## ✨ What You Get
 
 - 🔑 **Passkey** - Phishing-resistant login with biometrics, inherently multi-factor (no 2FA needed)
