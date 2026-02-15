@@ -122,7 +122,7 @@ This repository contains:
 - **[`oauth2_passkey/`](oauth2_passkey/)** - Core authentication library
 - **[`oauth2_passkey_axum/`](oauth2_passkey_axum/)** - Axum web framework integration
 - **[`demo-*/`](.)** - 7 demo applications (see table above)
-- **[`docs/`](docs/)** - Documentation (mdBook format)
+- **[`docs/`](docs/)** - Documentation (mdBook format) | [Read online](https://ktaka-ccmp.github.io/oauth2-passkey/)
 - **[`db/`](db/)** - Database configuration (Docker Compose)
 
 ## 🔧 Configuration
