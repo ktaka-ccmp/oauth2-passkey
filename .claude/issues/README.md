@@ -6,20 +6,20 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (5)
+### Open (4)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
-| `2026-02-09-01` | medium | medium | [Update CHANGELOG.md for Changes Since v0.2.0](open/2026-02-09-changelog-update.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 | `20260213-0145` | low | medium | [Security Integration Tests Depend on Axum Handler Behavior](open/20260213-0145-security-tests-crate-placement.md) |
 
-### Completed (33)
+### Completed (34)
 
 | ID | Title |
 |----|-------|
+| `2026-02-09-01` | [Update CHANGELOG.md for Changes Since v0.2.0](completed/2026-02-09-changelog-update.md) |
 | `20260210-1935` | [Demo Site UI/UX Customizations](completed/20260210-1935-demo-site-ui-customizations.md) |
 | `20260210-1930` | [Admin Deletion Safeguard (Prevent Deleting Last Admin)](completed/20260210-1930-admin-deletion-safeguard.md) |
 | `2026-02-09-02` | [Improve OAuth2 Popup Error Handling UX](completed/2026-02-09-oauth2-popup-error-handling.md) |
