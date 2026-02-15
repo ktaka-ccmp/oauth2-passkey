@@ -341,6 +341,8 @@ Complete list of all endpoints provided by `oauth2_passkey_router()`.
 | `/csrf_token` | GET | Get CSRF token for API calls* |
 | `/delete` | DELETE | Delete user account |
 | `/update` | PUT | Update user profile (account, label) |
+| `/login_history` | GET | User's own login history (JSON) |
+| `/login_history_page` | GET | Login history page* |
 | `/account.js` | GET | JavaScript for account page* |
 | `/account.css` | GET | CSS for account page* |
 | `/o2p-base.css` | GET | Base CSS styles* |
@@ -351,12 +353,35 @@ Complete list of all endpoints provided by `oauth2_passkey_router()`.
 |----------|--------|-------------|
 | `/index` | GET | User management list page* |
 | `/user/{user_id}` | GET | User detail page* |
+| `/users` | GET | List all users (JSON) |
 | `/delete_user` | DELETE | Delete a user (admin only) |
-| `/delete_passkey_credential` | DELETE | Delete user's passkey (admin only) |
-| `/delete_oauth2_account` | DELETE | Unlink user's OAuth2 account (admin only) |
+| `/delete_passkey_credential/{credential_id}` | DELETE | Delete user's passkey (admin only) |
+| `/delete_oauth2_account/{provider}/{provider_user_id}` | DELETE | Unlink user's OAuth2 account (admin only) |
 | `/update_admin_status` | PUT | Grant/revoke admin privileges |
+| `/sessions` | GET | Active session counts for all users (JSON)* |
+| `/user/{user_id}/logout` | POST | Force logout a user (terminate all sessions)* |
+| `/user/{user_id}/login_history` | GET | Per-user login history (JSON) |
+| `/audit` | GET | Cross-user audit data with filters (JSON) |
+| `/audit_page` | GET | Audit page HTML template |
 | `/admin_user.js` | GET | JavaScript for admin pages* |
 | `/admin_user.css` | GET | CSS for admin pages* |
+
+**Login history query parameters** (for `/audit` and `/user/{user_id}/login_history`):
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | 50 | Maximum entries to return |
+| `offset` | integer | 0 | Pagination offset |
+| `from` | string | - | Filter from date (YYYY-MM-DD) |
+| `to` | string | - | Filter to date (YYYY-MM-DD) |
+| `tz_offset` | integer | 0 | Timezone offset from UTC (minutes) |
+| `user_id` | string | - | Filter by user (audit only) |
+| `success` | boolean | - | Filter by success/failure (audit only) |
+
+**Admin safeguards**: The admin API enforces protections to prevent admin lockout:
+- Cannot delete or demote the last remaining admin user
+- The first user (seq=1) cannot be demoted
+- Admin users cannot delete their own account via the admin interface
 
 ### Theme Endpoints (`/themes`)
 
@@ -380,8 +405,8 @@ Endpoints marked with * are controlled by feature flags:
 
 | Feature | Default | Endpoints Affected |
 |---------|---------|-------------------|
-| `user-ui` | ON | `/user/login`, `/user/account`, `/user/info`, `/user/csrf_token`, static files |
-| `admin-ui` | ON | `/admin/index`, `/admin/user/{id}`, admin static files |
+| `user-ui` | ON | `/user/login`, `/user/account`, `/user/info`, `/user/csrf_token`, `/user/login_history_page`, static files |
+| `admin-ui` | ON | `/admin/index`, `/admin/user/{id}`, `/admin/sessions`, `/admin/user/{id}/logout`, admin static files |
 
 API endpoints (authentication, CRUD operations) are always available regardless of feature flags.
 
