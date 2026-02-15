@@ -70,4 +70,3 @@ Possible approaches (to be decided):
 - Reason: The test placement concern is orthogonal to the popup UX improvement
 
 ## Resolution
-

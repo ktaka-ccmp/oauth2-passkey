@@ -198,4 +198,3 @@ Implemented in 6 phases:
   scheme support which is a significant addition
 
 ## Resolution
-

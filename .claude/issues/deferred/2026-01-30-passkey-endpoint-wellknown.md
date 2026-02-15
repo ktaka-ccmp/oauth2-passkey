@@ -110,4 +110,3 @@ PASSKEY_MANAGE_URL=/account
 
 Deferred -- specification not yet widely adopted; limited benefit for OAuth2 + Passkey
 (no password) library.
-
