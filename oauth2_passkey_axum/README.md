@@ -13,7 +13,7 @@ This crate provides ready-to-use Axum handlers, middleware, and UI components fo
 
 ## Documentation
 
-- **[Live Demo](https://passkey-demo.ccmp.jp)** - Try it in your browser (no setup required)
+- **[Live Demo Site](https://passkey-demo.ccmp.jp)** - Public demo running on Google Cloud Run
 - **[User Guide](https://ktaka-ccmp.github.io/oauth2-passkey/)** - Comprehensive tutorials and integration guides
 - **[API Reference](https://docs.rs/oauth2-passkey-axum)** - Rust API documentation on docs.rs
 - **[Crates.io](https://crates.io/crates/oauth2-passkey-axum)** - Package registry
