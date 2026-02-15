@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 280" width="320" height="280">
+  <g transform="translate(145, 105)">
+    <!-- OAuth2 cycle arrows around key head -->
+    <path d="M -16 -58 A 58 58 0 0 1 52 -22" stroke="#2a6ab5" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <polygon points="52,-14 60,-30 42,-27" fill="#2a6ab5"/>
+
+    <path d="M 16 58 A 58 58 0 0 1 -52 22" stroke="#3a7a1a" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <polygon points="-52,14 -60,30 -42,27" fill="#3a7a1a"/>
+
+    <!-- Key head -->
+    <circle cx="0" cy="0" r="36" fill="none" stroke="#2a2a2a" stroke-width="4.5"/>
+    <!-- Keyhole -->
+    <circle cx="0" cy="-5" r="8" fill="#2a6ab5"/>
+    <rect x="-4" y="-3" width="8" height="20" rx="2.5" fill="#2a6ab5"/>
+
+    <!-- Key shaft -->
+    <line x1="36" y1="0" x2="92" y2="0" stroke="#2a2a2a" stroke-width="4.5" stroke-linecap="round"/>
+    <!-- Key teeth -->
+    <line x1="70" y1="0" x2="70" y2="16" stroke="#2a2a2a" stroke-width="4.5" stroke-linecap="round"/>
+    <line x1="86" y1="0" x2="86" y2="13" stroke="#2a2a2a" stroke-width="4.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Text -->
+  <text x="160" y="210" text-anchor="middle" font-family="'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="700">
+    <tspan fill="#2a6ab5">OAuth2</tspan><tspan fill="#2a2a2a" font-weight="300"> · </tspan><tspan fill="#3a7a1a">Passkey</tspan>
+  </text>
+
+  <text x="160" y="235" text-anchor="middle" font-family="'Helvetica Neue', Arial, sans-serif" font-size="10" fill="#999" letter-spacing="2.5" font-weight="400">PASSWORDLESS AUTHENTICATION</text>
+</svg>
