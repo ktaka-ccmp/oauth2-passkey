@@ -185,6 +185,7 @@ impl TemplateAccount {
             provider_user_id: masker.id(&self.provider_user_id),
             name: masker.name(&self.name),
             email: masker.email(&self.email),
+            picture: masker.redact(&self.picture),
             metadata_str: masker.metadata(&self.metadata_str),
             ..self
         }

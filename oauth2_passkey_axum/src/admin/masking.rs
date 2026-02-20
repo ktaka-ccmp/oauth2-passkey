@@ -136,6 +136,18 @@ impl Masker {
         }
     }
 
+    /// Redact a field entirely (returns empty string). No-op when inactive.
+    ///
+    /// Use for fields like profile pictures where any non-empty value would
+    /// be rendered by the template (e.g., `{% if picture != "" %}`).
+    pub fn redact(&self, val: &str) -> String {
+        if self.active {
+            String::new()
+        } else {
+            val.to_string()
+        }
+    }
+
     /// Mask metadata (replaces entirely with "***"). No-op when inactive.
     pub fn metadata(&self, val: &str) -> String {
         if self.active {
@@ -148,22 +160,14 @@ impl Masker {
 
 // -- Private helper functions --
 
-/// Mask an email address: "user@example.com" -> "u***@***"
-fn mask_email(email: &str) -> String {
-    match email.split_once('@') {
-        Some((local, _domain)) => {
-            format!("{}@***", mask_prefix(local))
-        }
-        None => mask_prefix(email),
-    }
+/// Mask an email address: "user@example.com" -> "***"
+fn mask_email(_email: &str) -> String {
+    "***".to_string()
 }
 
-/// Mask a name string: "John Smith" -> "J*** S***"
-fn mask_name(s: &str) -> String {
-    s.split_whitespace()
-        .map(mask_prefix)
-        .collect::<Vec<_>>()
-        .join(" ")
+/// Mask a name string: "John Smith" -> "***"
+fn mask_name(_s: &str) -> String {
+    "***".to_string()
 }
 
 /// Keep the first character, replace the rest with "***"
