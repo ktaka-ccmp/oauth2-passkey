@@ -64,6 +64,35 @@
             transition: color 0.15s;
         }
         .github-corner:hover { color: var(--o2p-text, #111827); }
+        .demo-notice {
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid var(--o2p-border, #e5e7eb);
+            text-align: left;
+        }
+        .demo-notice h2 {
+            font-size: 0.85em;
+            font-weight: 600;
+            color: var(--o2p-text-secondary, #6b7280);
+            margin: 0 0 8px 0;
+        }
+        .demo-notice ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .demo-notice li {
+            font-size: 0.8em;
+            color: var(--o2p-text-secondary, #6b7280);
+            line-height: 1.6;
+            padding-left: 16px;
+            position: relative;
+        }
+        .demo-notice li::before {
+            content: "\2022";
+            position: absolute;
+            left: 4px;
+        }
     </style>
 </head>
 
@@ -91,6 +120,16 @@
                     <span class="btn-hint">Already registered a passkey?</span>
                 </div>
             </div>
+        </div>
+
+        <div class="demo-notice">
+            <h2>About this demo</h2>
+            <ul>
+                <li>All users are granted admin access to explore full functionality</li>
+                <li>Other users' information is masked for privacy</li>
+                <li>Data is stored in memory and reset on app restart</li>
+                <li>You can delete your account from My Account page</li>
+            </ul>
         </div>
     </div>
 </body>
