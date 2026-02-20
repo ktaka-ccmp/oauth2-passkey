@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-20-22-52
 
-## Closed:
+## Closed: 2026-02-20-23-50
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -59,8 +59,8 @@ Design considerations:
 
 ## Implementation Tasks
 
-- [ ] Add "About this demo" notice section to login.j2
-- [ ] Style the notice to be compact and unobtrusive
+- [x] Add "About this demo" notice section to login.j2
+- [x] Style the notice to be compact and unobtrusive
 - [ ] Verify on passkey-demo.ccmp.jp after deployment
 
 ## Decision Log
@@ -75,3 +75,8 @@ Design considerations:
   new enhancement (informational notice) that was not part of the original requirements.
 
 ## Resolution
+
+Added "About this demo" notice section to `demo-live/templates/login.j2`, displayed
+below the authentication buttons with subdued styling. Four bullet points cover:
+admin access, data masking, memory-based storage, and account deletion from My Account
+page. Deployment verification pending.
