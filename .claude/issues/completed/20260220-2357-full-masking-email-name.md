@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-20-23-57
 
-## Closed:
+## Closed: 2026-02-21-00-16
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -47,19 +47,23 @@ Self-view remains unmasked.
 ## Approach
 
 Modify `mask_email()` and `mask_name()` in `masking.rs` to return `"***"` instead
-of preserving the first character. Update corresponding unit tests.
+of preserving the first character. Also redact OAuth2 profile pictures via new
+`Masker::redact()` method (returns empty string to suppress template rendering).
+Update corresponding unit tests.
 
 ## Related Files
 
-- `oauth2_passkey_axum/src/admin/masking.rs` (masking functions)
+- `oauth2_passkey_axum/src/admin/masking.rs` (masking functions + Masker::redact)
 - `oauth2_passkey_axum/src/admin/masking/tests.rs` (unit tests)
+- `oauth2_passkey_axum/src/admin/optional.rs` (TemplateAccount::masked - picture redaction)
 
 ## Implementation Tasks
 
-- [ ] Change `mask_email()` to return `"***"`
-- [ ] Change `mask_name()` to return `"***"`
-- [ ] Update unit tests for new expected values
-- [ ] Verify locally with `cargo run`
+- [x] Change `mask_email()` to return `"***"`
+- [x] Change `mask_name()` to return `"***"`
+- [x] Add `Masker::redact()` and redact OAuth2 profile picture
+- [x] Update unit tests for new expected values
+- [x] Verify locally with `cargo run`
 
 ## Decision Log
 
@@ -73,4 +77,19 @@ of preserving the first character. Update corresponding unit tests.
   users. Full masking better delivers on the "masked for privacy" promise.
   Self-view remains unmasked, so users can still see their own data.
 
+### 2026-02-21: Include OAuth2 profile picture in masking scope
+
+- Context: Profile picture from Google OAuth2 is displayed on admin user detail page
+- Decision: Redact picture field (empty string) via new `Masker::redact()` method
+- Reason: Full masking of email/name is meaningless if profile picture identifies
+  the user. Template already guards with `{% if picture != "" %}`, so empty string
+  suppresses rendering without template changes.
+
 ## Resolution
+
+Implemented full masking for email, name, and OAuth2 profile picture in demo mode:
+- `mask_email()` and `mask_name()` return `"***"` (no first-character exposure)
+- New `Masker::redact()` method returns empty string for fields guarded by template
+  conditionals (profile picture)
+- `TemplateAccount::masked()` now redacts the `picture` field
+- All unit tests updated. Clippy and tests pass.
