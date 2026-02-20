@@ -16,10 +16,11 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 | `20260213-0145` | low | medium | [Security Integration Tests Depend on Axum Handler Behavior](open/20260213-0145-security-tests-crate-placement.md) |
 
-### Completed (35)
+### Completed (36)
 
 | ID | Title |
 |----|-------|
+| `20260220-2252` | [Add Informational Notice to Demo-Live Login Page](completed/20260220-2252-demo-login-page-notice.md) |
 | `20260216-1730` | [Release v0.3.0](completed/20260216-1730-release-v030.md) |
 | `2026-02-09-01` | [Update CHANGELOG.md for Changes Since v0.2.0](completed/2026-02-09-changelog-update.md) |
 | `20260210-1935` | [Demo Site UI/UX Customizations](completed/20260210-1935-demo-site-ui-customizations.md) |
