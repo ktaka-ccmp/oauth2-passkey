@@ -2,16 +2,16 @@ use super::*;
 
 #[test]
 fn test_mask_email() {
-    assert_eq!(mask_email("user@example.com"), "u***@***");
-    assert_eq!(mask_email("a@b.org"), "a***@***");
-    assert_eq!(mask_email("test"), "t***");
+    assert_eq!(mask_email("user@example.com"), "***");
+    assert_eq!(mask_email("a@b.org"), "***");
+    assert_eq!(mask_email("test"), "***");
 }
 
 #[test]
 fn test_mask_name() {
-    assert_eq!(mask_name("John Smith"), "J*** S***");
-    assert_eq!(mask_name("Alice"), "A***");
-    assert_eq!(mask_name(""), "");
+    assert_eq!(mask_name("John Smith"), "***");
+    assert_eq!(mask_name("Alice"), "***");
+    assert_eq!(mask_name(""), "***");
 }
 
 #[test]
@@ -62,8 +62,8 @@ fn test_mask_users_preserves_self() {
     let masked = masker.mask_users(users, "me");
     assert_eq!(masked[0].account, "me@example.com");
     assert_eq!(masked[0].label, "My Name");
-    assert_eq!(masked[1].account, "o***@***");
-    assert_eq!(masked[1].label, "O*** U***");
+    assert_eq!(masked[1].account, "***");
+    assert_eq!(masked[1].label, "***");
 }
 
 #[test]
@@ -116,8 +116,8 @@ fn test_masker_inactive_returns_unchanged() {
 #[test]
 fn test_masker_active_masks_fields() {
     let masker = Masker::always_active();
-    assert_eq!(masker.email("user@example.com"), "u***@***");
-    assert_eq!(masker.name("John Smith"), "J*** S***");
+    assert_eq!(masker.email("user@example.com"), "***");
+    assert_eq!(masker.name("John Smith"), "***");
     assert_eq!(masker.id("abc123def456"), "abc1***");
     assert_eq!(masker.ip("192.168.1.1"), "192.168.*.*");
     assert_eq!(masker.user_agent("Mozilla/5.0 Chrome/120.0"), "Chrome/***");
