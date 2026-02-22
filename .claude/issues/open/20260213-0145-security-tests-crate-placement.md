@@ -1,4 +1,4 @@
-# Issue: Security Integration Tests Depend on Axum Handler Behavior
+# Issue: Move All HTTP Integration Tests to Axum Crate
 
 ## Table of Contents
 
@@ -24,11 +24,23 @@
 
 ## Description
 
-The security integration tests (`tests-security/`) live under the `oauth2_passkey` core library crate, but they test HTTP-level behavior (status codes, redirects) that is determined by the `oauth2_passkey_axum` handler layer.
+All HTTP integration tests (`tests/` and `tests-security/`) live under the `oauth2_passkey` core library crate, but they test HTTP-level behavior through a full Axum HTTP stack. This creates a reverse dependency: the core crate depends on `oauth2-passkey-axum` as a dev-dependency.
 
-This coupling was exposed when changing OAuth2 callback error handling from returning `400 Bad Request` to `303 See Other` (redirect to popup_close). The change was purely in `oauth2_passkey_axum/src/oauth2.rs`, yet it required updating 14 test assertions in `oauth2_passkey/tests-security/` (`oauth2_security.rs` and `cross_flow_security.rs`).
+### Investigation findings (2026-02-23)
 
-This violates the architectural boundary between the core library and the framework integration layer. Changes to handler-level behavior in the `_axum` crate should not require changes to tests in the core crate.
+**Every test in `oauth2_passkey/tests/` is an HTTP-level test:**
+- All use `TestServer` (Axum HTTP server) + `MockBrowser` (reqwest HTTP client)
+- `test_server.rs` calls `oauth2_passkey_axum::oauth2_passkey_router()` directly
+- No test calls core library `_core()` functions directly (except a few admin functions that use HTTP-obtained session IDs)
+- `oauth2-passkey-axum` is listed as a dev-dependency of the core crate
+
+**The core crate already has proper unit tests** in `oauth2_passkey/src/` (40+ files with `#[cfg(test)]`):
+- Business logic, cryptographic verification, session management, storage layer, type conversions
+- These are pure unit tests with zero dependency on `oauth2_passkey_axum`
+
+### Original trigger
+
+This was exposed when changing OAuth2 callback error handling from `400 Bad Request` to `303 See Other`. The change was purely in `oauth2_passkey_axum/src/oauth2.rs`, yet it required updating 14 test assertions in `oauth2_passkey/tests-security/`.
 
 ## Related Issues
 
@@ -37,34 +49,50 @@ This violates the architectural boundary between the core library and the framew
 
 ## Approach
 
-**Move tests to `oauth2_passkey_axum`** (approach 1). The security integration tests use a `TestServer` that starts the full Axum stack and assert HTTP-level behavior (status codes, redirects), so they belong in the Axum crate.
+Move **all** HTTP integration tests to `oauth2_passkey_axum`:
 
-The migration is clean:
-- Only `common/mod.rs` needs path updates (6 `#[path = "..."]` references)
-- All other test files (8 test modules + 2 utility files + README) are copied as-is
-- Shared test utilities stay in `oauth2_passkey/tests/common/` and are referenced via `#[path]` (existing pattern)
-- `test_server.rs` already depends on `oauth2_passkey_axum::oauth2_passkey_router()`
+| Source | Destination | Content |
+|--------|-------------|---------|
+| `oauth2_passkey/tests-security/` | `oauth2_passkey_axum/tests-security/` | Security tests (~3,600 lines) |
+| `oauth2_passkey/tests/integration*` | `oauth2_passkey_axum/tests/integration*` | Positive tests (~2,100 lines) |
+| `oauth2_passkey/tests/common/` | `oauth2_passkey_axum/tests/common/` | Shared utilities (~1,000+ lines) |
+
+After moving:
+- No cross-crate `#[path]` references needed (all tests and utilities in same crate)
+- Security tests' `common/mod.rs` changes from `#[path]` imports to `mod common;` or local paths
+- Remove `oauth2-passkey-axum`, `axum`, `reqwest` etc. from core crate's dev-dependencies
+- Core crate retains only dev-dependencies needed by its unit tests (in `src/`)
 
 Approaches 2 (abstract assertions) and 3 (split by layer) are tracked separately in `20260223-0027`.
 
 ## Related Files
 
-- `oauth2_passkey/tests-security/` - Source (all files to move)
-- `oauth2_passkey/tests-security/common/mod.rs` - 6 `#[path]` references to update
-- `oauth2_passkey/tests/common/` - Shared test utilities (stay here, referenced via `#[path]`)
-- `oauth2_passkey/Cargo.toml` - Remove `[[test]]` section for "security"
-- `oauth2_passkey_axum/Cargo.toml` - Add `[[test]]` section + dev-dependencies
-- `oauth2_passkey_axum/tests-security/` - Destination
+### Source (all move from `oauth2_passkey/`)
+- `tests/integration.rs` - Test harness
+- `tests/integration/` - 4 test modules (oauth2, passkey, combined, api_client flows)
+- `tests/common/` - 10 utility files (mock_browser, test_server, fixtures, etc.)
+- `tests-security/` - Security test harness + 6 test modules + 2 utility files + README
+
+### Destination (`oauth2_passkey_axum/`)
+- `tests/integration.rs` - Test harness
+- `tests/integration/` - Positive test modules
+- `tests/common/` - Shared utilities (replaces existing minimal `tests/common/`)
+- `tests-security/` - Security tests
+
+### Config changes
+- `oauth2_passkey/Cargo.toml` - Remove `[[test]]` section, remove HTTP-related dev-dependencies
+- `oauth2_passkey_axum/Cargo.toml` - Add `[[test]]` sections + dev-dependencies
 
 ## Implementation Tasks
 
-- [ ] Copy `oauth2_passkey/tests-security/` to `oauth2_passkey_axum/tests-security/`
-- [ ] Update 6 `#[path]` references in `common/mod.rs`
-- [ ] Add `[[test]]` section and dev-dependencies to `oauth2_passkey_axum/Cargo.toml`
-- [ ] Remove `[[test]]` section from `oauth2_passkey/Cargo.toml`
-- [ ] Verify security tests pass from new location
-- [ ] Verify positive integration tests still pass
-- [ ] Delete `oauth2_passkey/tests-security/` directory
+- [ ] Move `tests/common/` to `oauth2_passkey_axum/tests/common/`
+- [ ] Move `tests/integration.rs` and `tests/integration/` to `oauth2_passkey_axum/tests/`
+- [ ] Move `tests-security/` to `oauth2_passkey_axum/tests-security/`
+- [ ] Update `tests-security/common/mod.rs`: change `#[path]` imports to local paths
+- [ ] Update `oauth2_passkey_axum/Cargo.toml`: add `[[test]]` sections + dev-dependencies
+- [ ] Update `oauth2_passkey/Cargo.toml`: remove `[[test]]` section + HTTP dev-dependencies
+- [ ] Verify all tests pass from new location
+- [ ] Delete original test directories from `oauth2_passkey/`
 - [ ] Run fmt, clippy, full test suite
 
 ## Decision Log
@@ -83,47 +111,61 @@ Approaches 2 (abstract assertions) and 3 (split by layer) are tracked separately
 - Decision: Proceed with approach 1 only. Track approaches 2+3 as separate issue `20260223-0027`.
 - Reason: Approach 1 resolves the architectural boundary violation (the original complaint). The assertion fragility is a separate concern with lower priority — it only triggers when handler response formats change, which is infrequent.
 
+### 2026-02-23: Expanded scope to include all HTTP integration tests
+
+- Context: Investigation revealed that `oauth2_passkey/tests/` (positive integration tests) have the same problem as security tests — they all use TestServer (Axum HTTP stack) + MockBrowser (reqwest). No test calls core `_core()` functions directly. The core crate has `oauth2-passkey-axum` as a dev-dependency solely for these tests.
+- Decision: Move ALL HTTP integration tests (`tests/`, `tests-security/`, `tests/common/`) to `oauth2_passkey_axum`. This eliminates the reverse dev-dependency and removes the need for cross-crate `#[path]` references.
+- Reason: Moving only security tests would leave the same architectural violation in the positive tests, and require ugly cross-crate `#[path]` references for shared utilities. Moving everything is cleaner and more thorough.
+
 ## Detailed Implementation Plan
 
-### Step 1: Copy test files
+### Step 1: Move common test utilities
 
-Copy entire `oauth2_passkey/tests-security/` directory to `oauth2_passkey_axum/tests-security/`.
+Move `oauth2_passkey/tests/common/` to `oauth2_passkey_axum/tests/common/`.
 
-Files (all copied as-is except `common/mod.rs`):
+This replaces the existing minimal `oauth2_passkey_axum/tests/common/` (currently only `mod.rs` with `TestClient`).
 
-| File | Modification |
-|------|-------------|
-| `lib.rs` | None |
-| `common/mod.rs` | Update 6 `#[path]` references |
-| `common/security_utils.rs` | None |
-| `common/attack_scenarios.rs` | None |
-| `oauth2_security.rs` | None |
-| `passkey_security.rs` | None |
-| `session_security.rs` | None |
-| `cross_flow_security.rs` | None |
-| `information_disclosure_security.rs` | None |
-| `rate_limiting_security.rs` | None |
-| `README.md` | None |
+Files to move (all as-is, no modifications):
+- `mock_browser.rs`, `test_server.rs`, `fixtures.rs`, `webauthn_helpers.rs`
+- `test_setup.rs`, `axum_mock_server.rs`, `secure_auth.rs`
+- `session_utils.rs`, `validation_utils.rs`, `constants.rs`
+- `mod.rs` (replaces existing)
 
-### Step 2: Update `#[path]` references in `common/mod.rs`
+### Step 2: Move positive integration tests
 
-All 6 path imports change from `../../tests/common/` to `../../oauth2_passkey/tests/common/`:
+Move `oauth2_passkey/tests/integration.rs` and `oauth2_passkey/tests/integration/` to `oauth2_passkey_axum/tests/`.
+
+Files to move (all as-is, no modifications):
+- `integration.rs`
+- `integration/mod.rs`
+- `integration/oauth2_flows.rs`
+- `integration/passkey_flows.rs`
+- `integration/combined_flows.rs`
+- `integration/api_client_flows.rs`
+
+### Step 3: Move security tests
+
+Move `oauth2_passkey/tests-security/` to `oauth2_passkey_axum/tests-security/`.
+
+Files to move:
+- All files as-is EXCEPT `common/mod.rs`
+- `common/mod.rs` needs update: change `#[path]` imports to local relative paths
 
 ```rust
-// Before (relative to oauth2_passkey/tests-security/common/)
+// Before: cross-directory #[path] references
 #[path = "../../tests/common/mock_browser.rs"]
 pub mod mock_browser;
 
-// After (relative to oauth2_passkey_axum/tests-security/common/)
-#[path = "../../oauth2_passkey/tests/common/mock_browser.rs"]
+// After: local relative paths (common/ is now a sibling)
+#[path = "../tests/common/mock_browser.rs"]
 pub mod mock_browser;
 ```
 
-Affected modules: `mock_browser`, `test_server`, `fixtures`, `webauthn_helpers`, `test_setup`, `axum_mock_server`
+Affected: `mock_browser`, `test_server`, `fixtures`, `webauthn_helpers`, `test_setup`, `axum_mock_server`
 
-### Step 3: Update `oauth2_passkey_axum/Cargo.toml`
+### Step 4: Update `oauth2_passkey_axum/Cargo.toml`
 
-Add `[[test]]` section and dev-dependencies:
+Add test sections and dev-dependencies:
 
 ```toml
 [[test]]
@@ -131,10 +173,8 @@ name = "security"
 path = "tests-security/lib.rs"
 
 [dev-dependencies]
-# existing:
 dotenvy = { workspace = true }
 tokio = { workspace = true }
-# add for security tests:
 serial_test = { workspace = true }
 proptest = { workspace = true }
 axum = { workspace = true }
@@ -145,47 +185,42 @@ tracing-subscriber = { workspace = true }
 regex = { workspace = true }
 ```
 
-Note: `oauth2-passkey` is already a regular dependency, so it's available without adding as dev-dependency.
+### Step 5: Clean up `oauth2_passkey/Cargo.toml`
 
-### Step 4: Update `oauth2_passkey/Cargo.toml`
+Remove:
+- `[[test]]` section for "security"
+- Dev-dependencies only needed by integration tests: `axum`, `reqwest`, `regex`, `oauth2-passkey-axum`
+- Keep dev-dependencies needed by unit tests in `src/`: `serial_test`, `proptest`, `base64`, `chrono`, `tracing-subscriber`
 
-Remove the `[[test]]` section only:
-
-```toml
-# DELETE these 3 lines:
-[[test]]
-name = "security"
-path = "tests-security/lib.rs"
-```
-
-Keep all dev-dependencies (still needed by positive integration tests in `tests/`).
-
-### Step 5: Verify
+### Step 6: Verify
 
 ```bash
+# Integration tests from new location
+cargo test --manifest-path oauth2_passkey_axum/Cargo.toml --test integration
+
 # Security tests from new location
 cargo test --manifest-path oauth2_passkey_axum/Cargo.toml --test security
 
-# Positive integration tests still pass
-cargo test --manifest-path oauth2_passkey/Cargo.toml --test integration
-
-# Old security test target no longer exists
-cargo test --manifest-path oauth2_passkey/Cargo.toml --test security
-# (should fail: "no test target named security")
+# Core unit tests still pass
+cargo test --manifest-path oauth2_passkey/Cargo.toml
 
 # Quality checks
 cargo fmt --all
 cargo clippy --all-targets --all-features
 ```
 
-### Step 6: Delete original
+### Step 7: Delete originals
 
-Remove `oauth2_passkey/tests-security/` directory.
+Remove from `oauth2_passkey/`:
+- `tests/` directory (entire — unit tests are in `src/`, not here)
+- `tests-security/` directory
 
 ### Key notes
 
 - `.env_test` is at workspace root. `test_server.rs` loads it via `dotenvy::from_filename(".env_test")` from CWD. No change needed.
-- `crate::common::*` references in all test modules resolve to the `common` module in the same test crate. No change needed.
-- `test_server.rs` already uses `oauth2_passkey_axum::oauth2_passkey_router()` — moving makes this a same-crate dependency (cleaner).
+- `test_server.rs` already uses `oauth2_passkey_axum::oauth2_passkey_router()` — now a same-crate reference.
+- Security tests' `#[path]` imports become `../tests/common/` instead of cross-crate paths.
+- `crate::common::*` references in integration tests continue to work (same module structure).
+- Before deleting dev-deps from core Cargo.toml, verify which are actually used by unit tests in `src/`.
 
 ## Resolution
