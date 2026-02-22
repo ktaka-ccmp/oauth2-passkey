@@ -129,7 +129,8 @@ O2P_ROUTE_PREFIX='/o2p'
 URL of the login page. Used by middleware and the `AuthUser` extractor to redirect unauthenticated users.
 
 - **Default**: `/o2p/user/login`
-- Set this when using a custom login page with the `login-ui` feature disabled
+- Set this to override the default login page URL
+- **Required** when the `login-ui` feature is disabled
 
 ```bash
 O2P_LOGIN_URL='/o2p/user/login'
