@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-13-01-45
 
-## Closed:
+## Closed: 2026-02-23-01-34
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -85,15 +85,15 @@ Approaches 2 (abstract assertions) and 3 (split by layer) are tracked separately
 
 ## Implementation Tasks
 
-- [ ] Move `tests/common/` to `oauth2_passkey_axum/tests/common/`
-- [ ] Move `tests/integration.rs` and `tests/integration/` to `oauth2_passkey_axum/tests/`
-- [ ] Move `tests-security/` to `oauth2_passkey_axum/tests-security/`
-- [ ] Update `tests-security/common/mod.rs`: change `#[path]` imports to local paths
-- [ ] Update `oauth2_passkey_axum/Cargo.toml`: add `[[test]]` sections + dev-dependencies
-- [ ] Update `oauth2_passkey/Cargo.toml`: remove `[[test]]` section + HTTP dev-dependencies
-- [ ] Verify all tests pass from new location
-- [ ] Delete original test directories from `oauth2_passkey/`
-- [ ] Run fmt, clippy, full test suite
+- [x] Move `tests/common/` to `oauth2_passkey_axum/tests/common/`
+- [x] Move `tests/integration.rs` and `tests/integration/` to `oauth2_passkey_axum/tests/`
+- [x] Move `tests-security/` to `oauth2_passkey_axum/tests-security/`
+- [x] Update `tests-security/common/mod.rs`: `#[path]` unchanged (relative structure preserved)
+- [x] Update `oauth2_passkey_axum/Cargo.toml`: add `[[test]]` section + 12 dev-dependencies
+- [x] Update `oauth2_passkey/Cargo.toml`: remove `[[test]]` section + 7 dev-dependencies
+- [x] Verify all tests pass from new location
+- [x] Delete original test directories from `oauth2_passkey/`
+- [x] Run fmt, clippy, full test suite
 
 ## Decision Log
 
@@ -116,6 +116,12 @@ Approaches 2 (abstract assertions) and 3 (split by layer) are tracked separately
 - Context: Investigation revealed that `oauth2_passkey/tests/` (positive integration tests) have the same problem as security tests — they all use TestServer (Axum HTTP stack) + MockBrowser (reqwest). No test calls core `_core()` functions directly. The core crate has `oauth2-passkey-axum` as a dev-dependency solely for these tests.
 - Decision: Move ALL HTTP integration tests (`tests/`, `tests-security/`, `tests/common/`) to `oauth2_passkey_axum`. This eliminates the reverse dev-dependency and removes the need for cross-crate `#[path]` references.
 - Reason: Moving only security tests would leave the same architectural violation in the positive tests, and require ugly cross-crate `#[path]` references for shared utilities. Moving everything is cleaner and more thorough.
+
+### 2026-02-23: Implementation findings
+
+- Context: During implementation, two deviations from the plan were discovered.
+- Decision 1: `tests-security/common/mod.rs` `#[path]` references did NOT need updating. The relative path `../../tests/common/X.rs` resolves identically in both crates because the directory structure (`tests-security/common/` -> `tests/common/`) is preserved.
+- Decision 2: The axum crate needed fewer dev-dependencies than planned. `serial_test`, `proptest` are unused by HTTP tests (only by unit tests in `src/`). `axum`, `chrono`, `serde_json` are already regular dependencies of the axum crate and thus available to tests. Additional crates discovered as needed: `ciborium`, `ring`, `jsonwebtoken`, `sha2`, `uuid`, `url` (used by test fixtures and mock servers).
 
 ## Detailed Implementation Plan
 
@@ -224,3 +230,10 @@ Remove from `oauth2_passkey/`:
 - Before deleting dev-deps from core Cargo.toml, verify which are actually used by unit tests in `src/`.
 
 ## Resolution
+
+Moved all HTTP integration tests from `oauth2_passkey/` to `oauth2_passkey_axum/`:
+
+- **27 test files** moved: 10 common utilities, 6 integration tests, 11 security tests
+- **Cargo.toml**: Core crate's dev-dependencies reduced from 9 to 2 (`serial_test`, `proptest`). Reverse dependency on `oauth2-passkey-axum` eliminated. Axum crate gained 12 dev-dependencies and `[[test]]` section.
+- **No code changes** to test files themselves (all paths and imports work as-is)
+- **Verification**: 629 tests pass (509 unit + 10 integration + 21 security + 56 lib + 33 doc), zero clippy warnings
