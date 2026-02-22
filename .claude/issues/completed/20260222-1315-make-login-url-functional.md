@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-22-13-15
 
-## Closed:
+## Closed: 2026-02-22
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -48,6 +48,7 @@ All 3 redirect to `O2P_DEFAULT_REDIRECT`. None use `O2P_LOGIN_URL`.
 
 - `20260216-1500` Original combined issue (superseded)
 - `20260222-1316` user-ui feature flag granularity (completed)
+- `20260222-2201` Early evaluation of OAUTH2_RESPONSE_MODE (discovered during this issue)
 - `2026-01-24-01` Documentation Improvement Planning (related to: docs accuracy)
 
 ## Approach
@@ -65,29 +66,31 @@ This eliminates the 2-hop redirect and makes the behavior match what users expec
 ## Related Files
 
 - `oauth2_passkey_axum/src/config.rs` - O2P_LOGIN_URL definition (line 9)
-- `oauth2_passkey_axum/src/lib.rs` - pub re-export (line 77)
+- `oauth2_passkey_axum/src/lib.rs` - init() wrapper with O2P_LOGIN_URL early evaluation
 - `oauth2_passkey_axum/src/middleware.rs` - handle_auth_error redirect (lines 45, 53)
 - `oauth2_passkey_axum/src/session.rs` - AuthRedirect (lines 25-26)
 - `oauth2_passkey_axum/src/user/optional.rs` - login handler redirect (line 41, keep O2P_DEFAULT_REDIRECT)
-- `docs/src/integration/customizing-templates.md` - misleading docs
 - `docs/src/integration/configuration.md` - config docs
 - `dot.env.example` - env var documentation
-- `demo-both/src/main.rs` - manual redirect to O2P_LOGIN_URL (can be simplified)
-- `demo-live/src/main.rs` - same pattern
-- `demo-custom-login/` - workaround pattern (can be simplified)
+- `demo-both/src/main.rs` - simplified to use AuthUser extractor
+- `demo-live/src/main.rs` - simplified to use AuthUser extractor
+- `CHANGELOG.md` - breaking change noted
 
 ## Implementation Tasks
 
-- [ ] Change `handle_auth_error()` in `middleware.rs` to redirect to `O2P_LOGIN_URL`
-- [ ] Change `AuthRedirect` in `session.rs` to redirect to `O2P_LOGIN_URL`
-- [ ] Update config.rs doc comments to clarify each variable's role
-- [ ] Update middleware.rs doc comments
-- [ ] Simplify demo-both (remove manual redirect from `/` handler)
-- [ ] Simplify demo-live (same)
-- [ ] Update documentation (configuration.md, customizing-templates.md)
-- [ ] Update dot.env.example comments
-- [ ] Run tests and verify compilation
-- [ ] Update CHANGELOG.md
+- [x] Change `handle_auth_error()` in `middleware.rs` to redirect to `O2P_LOGIN_URL`
+- [x] Change `AuthRedirect` in `session.rs` to redirect to `O2P_LOGIN_URL`
+- [x] Update config.rs doc comments to clarify each variable's role
+- [x] Add conditional panic when login-ui disabled and O2P_LOGIN_URL not set
+- [x] Create init() wrapper in oauth2_passkey_axum for early O2P_LOGIN_URL evaluation
+- [x] Update middleware.rs doc comments
+- [x] Simplify demo-both (Option<AuthUser> -> AuthUser)
+- [x] Simplify demo-live (Option<AuthUser> -> AuthUser)
+- [x] Update documentation (configuration.md)
+- [x] Update dot.env.example comments
+- [x] Add cfg_attr(ignore) for tests that require login-ui feature
+- [x] Run tests and verify compilation
+- [x] Update CHANGELOG.md
 
 ## Decision Log
 
@@ -110,6 +113,12 @@ This eliminates the 2-hop redirect and makes the behavior match what users expec
 - Finding: `customizing-templates.md` already documents the correct behavior (lines 29, 42, 446, 450) as if `O2P_LOGIN_URL` is used by middleware. The docs are ahead of the implementation.
 - Decision: 2 env vars are needed. Current names are appropriate. The approach in this issue (make `O2P_LOGIN_URL` functional) is validated.
 - Note: With `login-ui` feature flag (from 20260222-1316, now completed), the interaction is clean: when `login-ui` is enabled, `O2P_LOGIN_URL` default works as-is; when disabled, the user must set `O2P_LOGIN_URL` to their custom login page URL.
+
+### 2026-02-22: login-ui disabled + O2P_LOGIN_URL unset causes redirect loop
+
+- Context: When login-ui is disabled and O2P_LOGIN_URL not set, fallback to "/" caused ERR_TOO_MANY_REDIRECTS (/ -> AuthUser -> O2P_LOGIN_URL(/) -> / -> ...)
+- Decision: panic!() in LazyLock when login-ui disabled and env var not set, plus init() wrapper for early evaluation
+- Reason: Failing fast at startup is better than a confusing runtime redirect loop. The init() wrapper ensures panic happens during initialization, not on first request.
 
 ## Detailed Implementation Plan
 
@@ -152,3 +161,5 @@ This eliminates the 2-hop redirect and makes the behavior match what users expec
 - Note breaking change in redirect behavior
 
 ## Resolution
+
+Implemented all changes. Middleware and AuthUser extractor now redirect unauthenticated users to `O2P_LOGIN_URL` instead of `O2P_DEFAULT_REDIRECT`. When `login-ui` feature is disabled, `O2P_LOGIN_URL` must be set explicitly via env var or the program panics at startup (via init() wrapper that forces early LazyLock evaluation). Demo apps simplified from `Option<AuthUser>` to `AuthUser`. Merged to dev branch.
