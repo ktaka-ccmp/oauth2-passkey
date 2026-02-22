@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-16-15-00
 
-## Closed:
+## Closed: 2026-02-22
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -110,4 +110,66 @@ These options are not mutually exclusive. A combination may be appropriate.
 - Decision: Created issue to track the cleanup and design discussion
 - Reason: Multiple related inconsistencies between docs, code behavior, and user expectations need coordinated resolution
 
+### 2026-02-22: Deep investigation completed
+
+- Context: Full code and git history investigation to understand current state and origin of issues
+
+#### O2P_LOGIN_URL History
+
+1. Originally existed as `O2P_REDIRECT_ANON` (pre-402cf8b) — defaulted to `{O2P_ROUTE_PREFIX}/user/login` and was **actively used by middleware** as the redirect target for unauthenticated users.
+2. Commit `402cf8b` (2025-04-04, "refactor: unify demo implementations") split it into two:
+   - `O2P_LOGIN_URL` — kept the old default (`/o2p/user/login`), but **removed from middleware usage**; became a convenience export only
+   - New `O2P_REDIRECT_ANON` — default `/`, now used by middleware for redirects
+3. Commit `f907b20` (2026-01-27) renamed `O2P_REDIRECT_ANON` to `O2P_DEFAULT_REDIRECT` for clarity.
+
+Root cause: The split in `402cf8b` created the disconnect — `O2P_LOGIN_URL` retained the semantics of "login page URL" but lost its functional role in middleware redirects.
+
+#### Current Redirect Flow (3 locations)
+
+| Location | File | Redirect Target |
+|----------|------|----------------|
+| `handle_auth_error()` (middleware) | `middleware.rs:45,53` | `O2P_DEFAULT_REDIRECT` |
+| `AuthUser` extractor (`AuthRedirect`) | `session.rs:25-26` | `O2P_DEFAULT_REDIRECT` |
+| Login handler (authenticated user visit) | `user/optional.rs:41` | `O2P_DEFAULT_REDIRECT` |
+
+All 3 redirect to `O2P_DEFAULT_REDIRECT` (default: `/`). None use `O2P_LOGIN_URL`.
+
+#### O2P_LOGIN_URL External Usage
+
+Only demo applications use it:
+- `demo-both/src/main.rs:42` — manual redirect from `/` handler
+- `demo-live/src/main.rs:65` — same pattern
+- `demo-custom-login` does NOT import it (uses hardcoded `/login`)
+
+Result: 2-hop redirect chain: protected route -> middleware -> `/` -> app's `/` handler -> `O2P_LOGIN_URL`
+
+#### user-ui Feature Flag
+
+- Defined in `oauth2_passkey_axum/Cargo.toml` as empty marker, default ON
+- Controls 4 routes in `user/optional.rs`: `/login`, `/account`, `/account.js`, `/o2p-base.css`
+- `admin-ui` follows identical pattern for admin routes
+- `demo-custom-login` disables with `default-features = false` (loses BOTH user-ui and admin-ui)
+- No way to disable only login page while keeping account page
+
+#### Approach Assessment
+
+| Option | Pros | Cons | Recommendation |
+|--------|------|------|----------------|
+| A: Docs only | No breaking change | Root issue remains | Minimum viable |
+| B: Make O2P_LOGIN_URL functional | Eliminates 2-hop redirect, intuitive | Breaking change for apps relying on redirect-to-`/` | High impact, recommended |
+| C: Split feature flags | Flexible | Adds complexity | Defer unless needed |
+| D: Runtime disable | Simple, no rebuild | Overlaps with feature flags | Defer unless needed |
+
+Recommended: A+B combination (make O2P_LOGIN_URL the middleware redirect target + fix docs).
+
+### 2026-02-22: Issue split into two separate issues
+
+- Context: The environment variable problem (O2P_LOGIN_URL) and the feature flag problem (user-ui granularity) are different layers (runtime vs compile-time) and should be tracked independently
+- Decision: Split into `20260222-1315` (env var, open) and `20260222-1316` (feature flag, deferred)
+- Reason: Fixing the env var problem (Option B) largely eliminates the urgency of the feature flag problem, so they should be prioritized separately
+
 ## Resolution
+
+Superseded by two separate issues:
+- `20260222-1315` — Make O2P_LOGIN_URL functional in middleware (env var problem)
+- `20260222-1316` — user-ui feature flag granularity (deferred)
