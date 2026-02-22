@@ -88,6 +88,10 @@ fn test_auth_redirect_new() {
 /// Test the AuthRedirect's into_response_with_method method
 /// This test verifies that the method returns the correct response based on the HTTP method.
 #[test]
+#[cfg_attr(
+    not(feature = "login-ui"),
+    ignore = "requires login-ui feature for O2P_LOGIN_URL default"
+)]
 fn test_auth_redirect_into_response_with_method() {
     // Test with GET method
     let auth_redirect = AuthRedirect::new(Method::GET);

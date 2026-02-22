@@ -1,14 +1,14 @@
 use axum::{
     Router,
     http::StatusCode,
-    response::{IntoResponse, Redirect, Response},
+    response::{IntoResponse, Response},
     routing::get,
 };
 
 use dotenvy::dotenv;
 
 use oauth2_passkey_axum::{
-    AuthUser, O2P_CUSTOM_CSS_URL, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router,
+    AuthUser, O2P_CUSTOM_CSS_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router,
 };
 
 mod protected;
@@ -25,21 +25,16 @@ struct IndexTemplate<'a> {
     custom_css_url: Option<&'a str>,
 }
 
-// O2P_LOGIN_URL is /o2p/user/login and O2P_ACCOUNT_URL is /o2p/user/account by default
-async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
-    match user {
-        Some(_) => {
-            let template = IndexTemplate {
-                message: "This is a protected page.",
-                prefix: O2P_ROUTE_PREFIX.as_str(),
-                custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
-            };
-            match template.render() {
-                Ok(html) => Ok(Html(html).into_response()),
-                Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
-            }
-        }
-        None => Ok(Redirect::to(O2P_LOGIN_URL.as_str()).into_response()),
+// AuthUser extractor redirects unauthenticated users to O2P_LOGIN_URL automatically
+async fn index(_user: AuthUser) -> Result<Response, (StatusCode, String)> {
+    let template = IndexTemplate {
+        message: "This is a protected page.",
+        prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+    };
+    match template.render() {
+        Ok(html) => Ok(Html(html).into_response()),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
     }
 }
 

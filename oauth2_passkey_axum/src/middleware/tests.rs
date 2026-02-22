@@ -57,6 +57,10 @@ fn test_add_csrf_header_with_invalid_token() {
 /// 1. A GET request with a CSRF error and redirect enabled
 /// 2. Returns a 302 TEMPORARY_REDIRECT response (not 403 Forbidden)
 #[test]
+#[cfg_attr(
+    not(feature = "login-ui"),
+    ignore = "requires login-ui feature for O2P_LOGIN_URL default"
+)]
 fn test_handle_auth_error_csrf_error_with_redirect() {
     // Create a GET request
     let request = Request::builder()
@@ -101,6 +105,10 @@ fn test_handle_auth_error_csrf_error_without_redirect() {
 /// 1. A GET request with a non-CSRF error and redirect enabled
 /// 2. Returns a 302 TEMPORARY_REDIRECT response
 #[test]
+#[cfg_attr(
+    not(feature = "login-ui"),
+    ignore = "requires login-ui feature for O2P_LOGIN_URL default"
+)]
 fn test_handle_auth_error_other_error_with_redirect() {
     // Create a GET request
     let request = Request::builder()

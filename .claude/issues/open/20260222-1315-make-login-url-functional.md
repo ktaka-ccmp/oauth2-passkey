@@ -40,14 +40,14 @@ protected route -> middleware -> "/" -> app's "/" handler -> O2P_LOGIN_URL
 |----------|------|----------------|
 | `handle_auth_error()` (middleware) | `middleware.rs:45,53` | `O2P_DEFAULT_REDIRECT` |
 | `AuthUser` extractor (`AuthRedirect`) | `session.rs:25-26` | `O2P_DEFAULT_REDIRECT` |
-| Login handler (authenticated user visit) | `user/optional.rs:41` | `O2P_DEFAULT_REDIRECT` |
+| Login handler (authenticated user visit) | `user/login.rs:28` | `O2P_DEFAULT_REDIRECT` |
 
 All 3 redirect to `O2P_DEFAULT_REDIRECT`. None use `O2P_LOGIN_URL`.
 
 ## Related Issues
 
 - `20260216-1500` Original combined issue (superseded)
-- `20260222-1316` user-ui feature flag granularity (deferred, separate concern)
+- `20260222-1316` user-ui feature flag granularity (completed)
 - `2026-01-24-01` Documentation Improvement Planning (related to: docs accuracy)
 
 ## Approach
@@ -98,5 +98,57 @@ This eliminates the 2-hop redirect and makes the behavior match what users expec
 - Context: Deep investigation completed on 20260216-1500 revealed that the env var and feature flag problems are independent concerns at different layers (runtime vs compile-time)
 - Decision: Split into separate issue; approach is Option A+B from the original issue (make O2P_LOGIN_URL functional + fix docs)
 - Reason: Fixing O2P_LOGIN_URL largely eliminates the urgency of the feature flag problem, so they should be tracked and prioritized independently
+
+### 2026-02-22: Investigation - Are 2 env vars needed?
+
+- Context: User questioned whether 2 env vars (`O2P_LOGIN_URL` + `O2P_DEFAULT_REDIRECT`) are necessary, or if 1 suffices. Concern: library users may struggle to understand the distinction.
+- Investigation: Mapped all 5 usage sites of `O2P_DEFAULT_REDIRECT` and identified 3 semantic roles:
+  - Role A: Redirect unauthenticated users (middleware.rs:45,53 + session.rs:25-26) -> needs login page URL
+  - Role B: Redirect authenticated users away from login page (login.rs:28) -> needs app root URL
+  - Role C: Logout redirect target in templates (user_account.j2:222, admin_index.j2:84) -> needs app root URL
+- Finding: Roles A and B/C have different default values (`/o2p/user/login` vs `/`), so 1 env var cannot serve both.
+- Finding: `customizing-templates.md` already documents the correct behavior (lines 29, 42, 446, 450) as if `O2P_LOGIN_URL` is used by middleware. The docs are ahead of the implementation.
+- Decision: 2 env vars are needed. Current names are appropriate. The approach in this issue (make `O2P_LOGIN_URL` functional) is validated.
+- Note: With `login-ui` feature flag (from 20260222-1316, now completed), the interaction is clean: when `login-ui` is enabled, `O2P_LOGIN_URL` default works as-is; when disabled, the user must set `O2P_LOGIN_URL` to their custom login page URL.
+
+## Detailed Implementation Plan
+
+### 1. Core: middleware.rs
+
+- Import `O2P_LOGIN_URL` (add to line 10)
+- In `handle_auth_error()` lines 44-45, 52-53: change `O2P_DEFAULT_REDIRECT` to `O2P_LOGIN_URL`
+- Update doc comment on `is_authenticated_redirect` (line 98)
+
+### 2. Core: session.rs
+
+- Import `O2P_LOGIN_URL` (change import at line 11)
+- In `AuthRedirect::into_response_with_method()` lines 25-26: change `O2P_DEFAULT_REDIRECT` to `O2P_LOGIN_URL`
+
+### 3. config.rs doc comments
+
+- `O2P_LOGIN_URL`: clarify middleware/AuthUser uses it for unauthenticated redirects
+- `O2P_DEFAULT_REDIRECT`: clarify it's for authenticated-user redirects only (login page bounce, logout target)
+
+### 4. Simplify demo-both
+
+- `index()` handler: change `Option<AuthUser>` to `AuthUser` (non-optional)
+- `AuthUser` extractor's `AuthRedirect` handles unauthenticated redirect automatically
+- Remove `None` branch and `O2P_LOGIN_URL` import
+
+### 5. Simplify demo-live
+
+- Same as demo-both: change `Option<AuthUser>` to `AuthUser` in `index()`
+- Requires `O2P_LOGIN_URL=/login` in `.env` (since `login-ui` is disabled)
+- Remove `O2P_LOGIN_URL` import from main.rs
+
+### 6. Documentation
+
+- `configuration.md`: fix `O2P_DEFAULT_REDIRECT` description (remove "unauthenticated users" from its role)
+- `customizing-templates.md`: already correct, minor tweaks if needed
+- `dot.env.example`: update comments
+
+### 7. CHANGELOG.md
+
+- Note breaking change in redirect behavior
 
 ## Resolution

@@ -124,27 +124,28 @@ Main route prefix for all authentication endpoints.
 O2P_ROUTE_PREFIX='/o2p'
 ```
 
+#### O2P_LOGIN_URL
+
+URL of the login page. Used by middleware and the `AuthUser` extractor to redirect unauthenticated users.
+
+- **Default**: `/o2p/user/login`
+- Set this to override the default login page URL
+- **Required** when the `login-ui` feature is disabled
+
+```bash
+O2P_LOGIN_URL='/o2p/user/login'
+```
+
 #### O2P_DEFAULT_REDIRECT
 
-Default redirect URL for authentication flows. Used when:
-- Unauthenticated users access protected routes
-- Authenticated users visit the login page
-- After logout
+Default redirect URL for authenticated-user flows. Used when:
+- Authenticated users visit the login page (bounce to app root)
+- Logout redirect target in templates
 
 - **Default**: `/`
 
 ```bash
 O2P_DEFAULT_REDIRECT='/'
-```
-
-#### O2P_LOGIN_URL
-
-URL path for the login page.
-
-- **Default**: `/o2p/user/login`
-
-```bash
-O2P_LOGIN_URL='/o2p/user/login'
 ```
 
 #### O2P_ACCOUNT_URL
