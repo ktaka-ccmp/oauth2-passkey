@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-22-13-16
 
-## Closed:
+## Closed: 2026-02-22
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -169,16 +169,16 @@ cargo clippy --all-targets --no-default-features
 
 ## Implementation Tasks
 
-- [ ] Update feature flags in Cargo.toml (login-ui, user-ui, admin-ui)
-- [ ] Create user/login.rs with login handler (gated by login-ui)
-- [ ] Create user/account.rs with account management code (gated by user-ui)
-- [ ] Move tests from optional/tests.rs to account/tests.rs
-- [ ] Update user/mod.rs to use new modules
-- [ ] Delete optional.rs and optional/tests.rs
-- [ ] Update demo-live/Cargo.toml to use features = ["user-ui", "admin-ui"]
-- [ ] Add feature combination tests to CI
-- [ ] Update documentation (README.md, docs/src/api/axum.md)
-- [ ] Verify all feature combinations compile and pass tests
+- [x] Update feature flags in Cargo.toml (login-ui, user-ui, admin-ui)
+- [x] Create user/login.rs with login handler (gated by login-ui)
+- [x] Create user/account.rs with account management code (gated by user-ui)
+- [x] Move tests from optional/tests.rs to account/tests.rs
+- [x] Update user/mod.rs to use new modules
+- [x] Delete optional.rs and optional/tests.rs
+- [x] Update demo-live/Cargo.toml to use features = ["user-ui", "admin-ui"]
+- [x] Add feature combination tests to CI
+- [x] Update documentation (README.md, docs/src/api/axum.md)
+- [x] Verify all feature combinations compile and pass tests
 
 ## Decision Log
 
@@ -197,3 +197,5 @@ cargo clippy --all-targets --no-default-features
 - Reason: Feature flags are the natural Rust mechanism for compile-time component selection. Runtime env var adds complexity for a problem that is inherently compile-time. admin-ui routes are cohesive and don't need splitting. Backward compatibility is not needed for this pre-1.0 library. `demo-live` is the concrete beneficiary: it has its own login page but cannot currently disable the built-in one without losing account/admin UI.
 
 ## Resolution
+
+Split `user-ui` into `login-ui` (login page) and `user-ui` (account management). Implemented as 3 flat, independent feature flags: `login-ui`, `user-ui`, `admin-ui`. `demo-live` updated to disable built-in login page via `features = ["user-ui", "admin-ui"]`. All feature combinations verified (build, test, clippy).
