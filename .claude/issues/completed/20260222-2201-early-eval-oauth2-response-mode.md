@@ -1,10 +1,11 @@
 # Early Evaluation of OAUTH2_RESPONSE_MODE at Startup
 
 - **ID**: 20260222-2201
-- **Status**: open
+- **Status**: completed
 - **Priority**: low
 - **Difficulty**: easy
 - **Created**: 2026-02-22
+- **Closed**: 2026-02-22
 
 ## Problem
 
@@ -30,9 +31,7 @@ All other panic-capable variables (`ORIGIN`, `OAUTH2_GOOGLE_CLIENT_ID`, `OAUTH2_
 
 ## Approach
 
-Add `let _ = &*OAUTH2_RESPONSE_MODE;` to `oauth2::init()` in the core crate, similar to how `O2P_LOGIN_URL` is force-evaluated in the axum crate's `init()` wrapper.
-
-This is a one-line change in `oauth2_passkey/src/oauth2/mod.rs`.
+Added `let _ = *config::OAUTH2_RESPONSE_MODE;` to `oauth2::init()` in the core crate, consistent with how other env vars are force-evaluated at startup.
 
 ## Risk Assessment
 
@@ -54,6 +53,12 @@ This is a one-line change in `oauth2_passkey/src/oauth2/mod.rs`.
 - Decision: Track separately as low-priority improvement
 - Reason: Different crate (core vs axum), low risk (only on explicit misconfiguration)
 
+### 2026-02-22: Implemented
+
+- Context: Quick one-line fix after completing 20260222-1315
+- Decision: Added `let _ = *config::OAUTH2_RESPONSE_MODE;` to `oauth2::init()`
+- Reason: Consistent with how other env vars are validated at startup
+
 ## Resolution
 
-(not yet resolved)
+Added `let _ = *config::OAUTH2_RESPONSE_MODE;` to `oauth2::init()` in `oauth2_passkey/src/oauth2/mod.rs`. This forces the LazyLock to evaluate at startup, so any typo in the env var value causes an immediate panic with a clear error message rather than a confusing runtime failure during the first OAuth2 login attempt.

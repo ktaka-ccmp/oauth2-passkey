@@ -114,7 +114,7 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
 
     // Force evaluation of O2P_LOGIN_URL at startup so misconfiguration
     // panics immediately rather than on the first unauthenticated request
-    let _ = &*config::O2P_LOGIN_URL;
+    let _ = *config::O2P_LOGIN_URL;
 
     Ok(())
 }
