@@ -6,21 +6,21 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (6)
+### Open (5)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260222-1315` | medium | medium | [Make O2P_LOGIN_URL Functional in Middleware](open/20260222-1315-make-login-url-functional.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 | `20260213-0145` | low | medium | [Security Integration Tests Depend on Axum Handler Behavior](open/20260213-0145-security-tests-crate-placement.md) |
 | `20260222-2201` | low | easy | [Early Evaluation of OAUTH2_RESPONSE_MODE at Startup](open/20260222-2201-early-eval-oauth2-response-mode.md) |
 
-### Completed (39)
+### Completed (40)
 
 | ID | Title |
 |----|-------|
+| `20260222-1315` | [Make O2P_LOGIN_URL Functional in Middleware](completed/20260222-1315-make-login-url-functional.md) |
 | `20260222-1316` | [user-ui Feature Flag Granularity](completed/20260222-1316-user-ui-feature-granularity.md) |
 | `20260216-1500` | [O2P_LOGIN_URL Role Clarification and user-ui Feature Granularity](completed/20260216-1500-login-url-and-user-ui-cleanup.md) |
 | `20260220-2357` | [Full Masking for Email and Name in Demo Mode](completed/20260220-2357-full-masking-email-name.md) |
