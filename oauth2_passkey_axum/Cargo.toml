@@ -13,9 +13,10 @@ categories = ["authentication", "web-programming"]
 readme = "README.md"
 
 [features]
-default = ["admin-ui", "user-ui"]
-admin-ui = []
+default = ["login-ui", "user-ui", "admin-ui"]
+login-ui = []
 user-ui = []
+admin-ui = []
 cors = ["dep:tower-http"]
 bundled-tls = ["oauth2-passkey/bundled-tls"]
 

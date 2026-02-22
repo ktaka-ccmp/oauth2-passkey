@@ -74,6 +74,14 @@ jobs:
     - name: Test axum integration (no default features)
       run: cargo test --verbose --manifest-path oauth2_passkey_axum/Cargo.toml --no-default-features
 
+    - name: Test axum integration (login-ui only)
+      run: cargo test --verbose --manifest-path oauth2_passkey_axum/Cargo.toml --no-default-features --features login-ui
+      if: matrix.rust == 'stable'
+
+    - name: Test axum integration (user-ui only)
+      run: cargo test --verbose --manifest-path oauth2_passkey_axum/Cargo.toml --no-default-features --features user-ui
+      if: matrix.rust == 'stable'
+
   security:
     name: Security Audit
     runs-on: ubuntu-latest
