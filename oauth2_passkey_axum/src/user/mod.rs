@@ -1,20 +1,26 @@
-mod default;
 #[cfg(feature = "user-ui")]
-mod optional;
+mod account;
+mod default;
+#[cfg(feature = "login-ui")]
+mod login;
 
 use axum::Router;
 
 use super::login_history;
 
 pub(super) fn router() -> Router {
-    let base = default::router().merge(login_history::user_router());
+    #[allow(unused_mut)]
+    let mut base = default::router().merge(login_history::user_router());
+
+    #[cfg(feature = "login-ui")]
+    {
+        base = base.merge(login::router());
+    }
 
     #[cfg(feature = "user-ui")]
     {
-        base.merge(optional::router())
+        base = base.merge(account::router());
     }
-    #[cfg(not(feature = "user-ui"))]
-    {
-        base
-    }
+
+    base
 }

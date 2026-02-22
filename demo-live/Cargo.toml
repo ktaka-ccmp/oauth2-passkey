@@ -8,7 +8,7 @@ default = []
 bundled-tls = ["oauth2-passkey-axum/bundled-tls"]
 
 [dependencies]
-oauth2-passkey-axum = { path = "../oauth2_passkey_axum" }
+oauth2-passkey-axum = { path = "../oauth2_passkey_axum", default-features = false, features = ["user-ui", "admin-ui"] }
 #oauth2-passkey-axum = "0.2"
 
 askama = { workspace = true }
