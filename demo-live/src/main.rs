@@ -8,7 +8,7 @@ use axum::{
 use dotenvy::dotenv;
 
 use oauth2_passkey_axum::{
-    AuthUser, O2P_CUSTOM_CSS_URL, O2P_LOGIN_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router,
+    AuthUser, O2P_CUSTOM_CSS_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router,
 };
 
 mod server;
@@ -49,20 +49,17 @@ struct IndexTemplate<'a> {
     custom_css_url: Option<&'a str>,
 }
 
-async fn index(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
-    match user {
-        Some(user) => {
-            let template = IndexTemplate {
-                user_name: &user.label,
-                prefix: O2P_ROUTE_PREFIX.as_str(),
-                custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
-            };
-            match template.render() {
-                Ok(html) => Ok(Html(html).into_response()),
-                Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
-            }
-        }
-        None => Ok(Redirect::to(O2P_LOGIN_URL.as_str()).into_response()),
+// AuthUser extractor redirects unauthenticated users to O2P_LOGIN_URL automatically
+// Set O2P_LOGIN_URL=/login in .env since login-ui feature is disabled
+async fn index(user: AuthUser) -> Result<Response, (StatusCode, String)> {
+    let template = IndexTemplate {
+        user_name: &user.label,
+        prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+    };
+    match template.render() {
+        Ok(html) => Ok(Html(html).into_response()),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
     }
 }
 

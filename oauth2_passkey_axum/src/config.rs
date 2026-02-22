@@ -4,11 +4,25 @@ use std::sync::LazyLock;
 
 use oauth2_passkey::O2P_ROUTE_PREFIX;
 
-/// URL of supplementary login page
-/// Default: "/o2p/user/login"
-pub static O2P_LOGIN_URL: LazyLock<String> = LazyLock::new(|| {
-    std::env::var("O2P_LOGIN_URL").unwrap_or_else(|_| format!("{}/user/login", *O2P_ROUTE_PREFIX))
-});
+/// URL of the login page, used by middleware and AuthUser extractor to redirect unauthenticated users
+///
+/// When `login-ui` feature is enabled: defaults to the built-in login page (`/o2p/user/login`)
+/// When `login-ui` feature is disabled: **must be set explicitly** via env var, otherwise the
+/// program will panic at startup to prevent redirect loops
+pub static O2P_LOGIN_URL: LazyLock<String> =
+    LazyLock::new(|| match std::env::var("O2P_LOGIN_URL") {
+        Ok(url) => url,
+        Err(_) => {
+            if cfg!(feature = "login-ui") {
+                format!("{}/user/login", *O2P_ROUTE_PREFIX)
+            } else {
+                panic!(
+                    "O2P_LOGIN_URL must be set when the login-ui feature is disabled. \
+                     Set it to your custom login page URL (e.g., O2P_LOGIN_URL=/login)."
+                );
+            }
+        }
+    });
 
 /// URL of the user account management page
 /// Default: "/o2p/user/account"
@@ -23,8 +37,8 @@ pub static O2P_ADMIN_URL: LazyLock<String> = LazyLock::new(|| {
     std::env::var("O2P_ADMIN_URL").unwrap_or_else(|_| format!("{}/admin/index", *O2P_ROUTE_PREFIX))
 });
 
-/// Default redirect URL for authentication flows
-/// Used when: unauthenticated users access protected routes, authenticated users visit login page, after logout
+/// Default redirect URL for authenticated-user flows
+/// Used when: authenticated users visit login page, logout redirect target in templates
 /// Default: "/"
 pub static O2P_DEFAULT_REDIRECT: LazyLock<String> =
     LazyLock::new(|| std::env::var("O2P_DEFAULT_REDIRECT").unwrap_or_else(|_| "/".to_string()));
