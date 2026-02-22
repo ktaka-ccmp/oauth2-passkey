@@ -43,18 +43,18 @@ The core crate has two categories of tests:
 | | `post_authorized_core` | **0** | Critical - OAuth2 authorization flow (POST) |
 | | `list_accounts_core` | 1 | OK |
 | | `delete_oauth2_account_core` | 2 | OK |
-| **passkey** | `handle_start_registration_core` | **0** | High - registration initiation |
-| | `handle_finish_registration_core` | **0** | Critical - registration completion |
-| | `handle_start_authentication_core` | **0** | High - authentication initiation |
-| | `handle_finish_authentication_core` | **0** | Critical - authentication completion |
-| | `list_credentials_core` | **0** | Medium - called from 5+ locations |
+| **passkey** | `handle_start_registration_core` | 4 | OK |
+| | `handle_finish_registration_core` | 2 | OK |
+| | `handle_start_authentication_core` | 4 | OK |
+| | `handle_finish_authentication_core` | 1 | OK |
+| | `list_credentials_core` | 2 | OK |
 | | `delete_passkey_credential_core` | 1 | Partial (error case only) |
 | | `update_passkey_credential_core` | 3 | OK |
 | **admin** | 8 functions | 2-5 each | OK |
 | **user** | 2 functions | 2-4 each | OK |
 | **login_history** | 4 functions | **0** | Low - query/pagination |
 
-**7 of 11 `_core()` functions have zero unit tests.** The untested functions are the most security-critical: OAuth2 authorization and passkey registration/authentication flows.
+**2 of 11 `_core()` functions have zero unit tests** (OAuth2 authorization flows, require mock provider). All 5 passkey `_core()` functions now have functional-layer tests.
 
 ## Related Issues
 
@@ -98,14 +98,14 @@ Focus on the 7 untested critical functions:
 
 ## Implementation Tasks
 
-- [ ] Investigate feasibility: can `_core()` functions be tested without HTTP mock server?
-- [ ] Add tests for `list_credentials_core` (simplest, no mock dependencies)
-- [ ] Add tests for `handle_start_registration_core` (CreateUser and AddToUser modes)
-- [ ] Add tests for `handle_start_authentication_core` (username resolution)
-- [ ] Add tests for `handle_finish_registration_core` (requires WebAuthn fixtures)
-- [ ] Add tests for `handle_finish_authentication_core` (requires WebAuthn fixtures)
-- [ ] Add tests for `get_authorized_core` / `post_authorized_core` (requires mock OAuth2 tokens)
-- [ ] Verify all tests pass
+- [x] Investigate feasibility: can `_core()` functions be tested without HTTP mock server?
+- [x] Add tests for `list_credentials_core` (2 tests: with credentials, empty)
+- [x] Add tests for `handle_start_registration_core` (4 tests: CreateUser, AddToUser, auth rejection for each)
+- [x] Add tests for `handle_start_authentication_core` (4 tests: no username, with username, nonexistent, string body)
+- [x] Add tests for `handle_finish_registration_core` (2 tests: CreateUser, AddToUser end-to-end)
+- [x] Add tests for `handle_finish_authentication_core` (1 test: full end-to-end with ECDSA signing)
+- [x] Verify all passkey tests pass (13 new tests, total 522 pass, 0 failures)
+- [ ] Add tests for `get_authorized_core` / `post_authorized_core` (deferred - requires mock OAuth2 provider)
 
 ## Decision Log
 
@@ -122,5 +122,23 @@ Focus on the 7 untested critical functions:
 - Context: Investigation revealed the original approach 2 (abstract HTTP status code assertions) has low cost-effectiveness: the problem occurred once, the fix was mechanical (14 enum value replacements), and loosening assertions risks masking real bugs. Approach 3 (core-layer tests) addresses the actual gap created by moving all integration tests to the axum crate.
 - Decision: Drop approach 2 (status code abstraction), focus entirely on approach 3 (add `_core()` function tests to the core crate). Approach 2 can be tracked separately if needed in the future.
 - Reason: The core crate now has zero integration-level tests for its most critical public API functions (OAuth2 authorization, passkey registration/authentication). This is a real coverage gap, not a theoretical fragility concern.
+
+### 2026-02-23: Passkey _core() tests completed (13 new tests)
+
+- Context: Implemented functional-layer tests for all 5 untested passkey `_core()` functions in `oauth2_passkey/src/coordination/passkey/tests.rs`. Tests use real in-memory storage (SQLite + memory cache) without any HTTP/Axum dependency.
+- Tests added:
+  - `list_credentials_core`: 2 tests (with credentials, empty list)
+  - `handle_start_registration_core`: 4 tests (CreateUser mode, AddToUser mode, auth rejection for each)
+  - `handle_start_authentication_core`: 4 tests (no username, with username, nonexistent username, string body format)
+  - `handle_finish_registration_core`: 2 tests (CreateUser end-to-end, AddToUser end-to-end with "none" attestation)
+  - `handle_finish_authentication_core`: 1 test (full end-to-end with ECDSA P-256 signing)
+- WebAuthn fixture helpers added directly in tests.rs (not a shared module):
+  - `FIRST_USER_PRIVATE_KEY` - Fixed ECDSA P-256 key pair matching `test_utils.rs` public key
+  - `build_auth_data_for_registration()` - Binary auth_data with COSE key
+  - `build_none_registration_response()` - "none" attestation format (no signature validation)
+  - `build_signed_authentication_response()` - ECDSA-signed assertion with counter management
+- Key technique: `pub(super)` fields accessed via serde serialization/deserialization
+- Result: 522 tests pass (was 509), 0 warnings, clean clippy + fmt
+- Remaining: `get_authorized_core` / `post_authorized_core` deferred (require mock OAuth2 provider with JWKS/token endpoints)
 
 ## Resolution
