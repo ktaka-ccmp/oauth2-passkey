@@ -83,4 +83,109 @@ Approaches 2 (abstract assertions) and 3 (split by layer) are tracked separately
 - Decision: Proceed with approach 1 only. Track approaches 2+3 as separate issue `20260223-0027`.
 - Reason: Approach 1 resolves the architectural boundary violation (the original complaint). The assertion fragility is a separate concern with lower priority — it only triggers when handler response formats change, which is infrequent.
 
+## Detailed Implementation Plan
+
+### Step 1: Copy test files
+
+Copy entire `oauth2_passkey/tests-security/` directory to `oauth2_passkey_axum/tests-security/`.
+
+Files (all copied as-is except `common/mod.rs`):
+
+| File | Modification |
+|------|-------------|
+| `lib.rs` | None |
+| `common/mod.rs` | Update 6 `#[path]` references |
+| `common/security_utils.rs` | None |
+| `common/attack_scenarios.rs` | None |
+| `oauth2_security.rs` | None |
+| `passkey_security.rs` | None |
+| `session_security.rs` | None |
+| `cross_flow_security.rs` | None |
+| `information_disclosure_security.rs` | None |
+| `rate_limiting_security.rs` | None |
+| `README.md` | None |
+
+### Step 2: Update `#[path]` references in `common/mod.rs`
+
+All 6 path imports change from `../../tests/common/` to `../../oauth2_passkey/tests/common/`:
+
+```rust
+// Before (relative to oauth2_passkey/tests-security/common/)
+#[path = "../../tests/common/mock_browser.rs"]
+pub mod mock_browser;
+
+// After (relative to oauth2_passkey_axum/tests-security/common/)
+#[path = "../../oauth2_passkey/tests/common/mock_browser.rs"]
+pub mod mock_browser;
+```
+
+Affected modules: `mock_browser`, `test_server`, `fixtures`, `webauthn_helpers`, `test_setup`, `axum_mock_server`
+
+### Step 3: Update `oauth2_passkey_axum/Cargo.toml`
+
+Add `[[test]]` section and dev-dependencies:
+
+```toml
+[[test]]
+name = "security"
+path = "tests-security/lib.rs"
+
+[dev-dependencies]
+# existing:
+dotenvy = { workspace = true }
+tokio = { workspace = true }
+# add for security tests:
+serial_test = { workspace = true }
+proptest = { workspace = true }
+axum = { workspace = true }
+reqwest = { workspace = true }
+base64 = { workspace = true }
+chrono = { workspace = true }
+tracing-subscriber = { workspace = true }
+regex = { workspace = true }
+```
+
+Note: `oauth2-passkey` is already a regular dependency, so it's available without adding as dev-dependency.
+
+### Step 4: Update `oauth2_passkey/Cargo.toml`
+
+Remove the `[[test]]` section only:
+
+```toml
+# DELETE these 3 lines:
+[[test]]
+name = "security"
+path = "tests-security/lib.rs"
+```
+
+Keep all dev-dependencies (still needed by positive integration tests in `tests/`).
+
+### Step 5: Verify
+
+```bash
+# Security tests from new location
+cargo test --manifest-path oauth2_passkey_axum/Cargo.toml --test security
+
+# Positive integration tests still pass
+cargo test --manifest-path oauth2_passkey/Cargo.toml --test integration
+
+# Old security test target no longer exists
+cargo test --manifest-path oauth2_passkey/Cargo.toml --test security
+# (should fail: "no test target named security")
+
+# Quality checks
+cargo fmt --all
+cargo clippy --all-targets --all-features
+```
+
+### Step 6: Delete original
+
+Remove `oauth2_passkey/tests-security/` directory.
+
+### Key notes
+
+- `.env_test` is at workspace root. `test_server.rs` loads it via `dotenvy::from_filename(".env_test")` from CWD. No change needed.
+- `crate::common::*` references in all test modules resolve to the `common` module in the same test crate. No change needed.
+- `test_server.rs` already uses `oauth2_passkey_axum::oauth2_passkey_router()` — moving makes this a same-crate dependency (cleaner).
+
 ## Resolution
