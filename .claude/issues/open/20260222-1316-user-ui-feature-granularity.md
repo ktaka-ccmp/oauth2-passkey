@@ -16,7 +16,7 @@
 
 ## Closed:
 
-## Status: deferred
+## Status: open
 
 ## Priority: low
 
