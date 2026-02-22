@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (5)
+### Open (6)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -15,6 +15,7 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 | `20260213-0145` | low | medium | [Security Integration Tests Depend on Axum Handler Behavior](open/20260213-0145-security-tests-crate-placement.md) |
+| `20260222-2201` | low | easy | [Early Evaluation of OAUTH2_RESPONSE_MODE at Startup](open/20260222-2201-early-eval-oauth2-response-mode.md) |
 
 ### Completed (39)
 
