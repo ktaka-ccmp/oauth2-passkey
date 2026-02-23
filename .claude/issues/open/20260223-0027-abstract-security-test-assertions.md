@@ -10,6 +10,7 @@
 - [Decision Log](#decision-log)
 - [Resolution](#resolution)
 - [Code Review](#code-review)
+- [Code Review 2](#code-review-2)
 
 ## ID: 20260223-0027
 
@@ -198,13 +199,24 @@ Focus on the 7 untested critical functions:
 - Accepted as-is: #2 (env var override impractical to restore), #7 (helper duplication unavoidable), #8 (fixture duplication deliberate)
 - Result: 527 tests pass (was 528, minus 1 deleted redundant test), 0 failures, clean clippy + fmt
 
+### 2026-02-23: Second review - negative security tests added (2 tests)
+
+- Context: Second review (`test_review2.md`) identified 3 additional findings. Finding 1 (medium-high): missing negative tests for security validation. Finding 2 (low): mock server lacks graceful shutdown. Finding 3 (low): fragile mock server readiness polling.
+- Disposition: Finding 1 (passkey part) addressed with 2 new tests. Finding 1 (OAuth2 part), Finding 2, and Finding 3 accepted as-is.
+- Tests added:
+  - `test_finish_authentication_core_tampered_signature` - Flips a byte in the ECDSA signature's r-value, asserts `CoordinationError::PasskeyError(_)`
+  - `test_finish_authentication_core_challenge_mismatch` - Signs with a fabricated challenge, asserts `CoordinationError::PasskeyError(_)`
+- Rationale for OAuth2 negative tests (accepted as-is): JWT signature validation belongs at `idtoken.rs` unit-test level, not coordination layer. PKCE validation is OAuth2 provider's responsibility.
+- Result: 529 tests pass (was 527), 0 failures, clean clippy + fmt
+
 ## Resolution
 
 All critical `_core()` functions now have functional-layer tests in the core crate:
-- **Passkey**: 13 new tests (5 functions) with ECDSA P-256 signing and CBOR attestation/assertion
+- **Passkey**: 15 new tests (5 functions) with ECDSA P-256 signing and CBOR attestation/assertion, including negative security tests
 - **OAuth2**: 6 new tests (2 functions) with mock OAuth2 server (HS256 JWT, PKCE, nonce)
-- Total: 19 new tests, 527 pass (was 509 at start), 0 failures
-- Review feedback: 6 of 9 findings addressed, 3 accepted as-is
+- Total: 21 new tests, 529 pass (was 509 at start), 0 failures
+- Review 1 feedback: 6 of 9 findings addressed, 3 accepted as-is
+- Review 2 feedback: 1 of 3 findings addressed (partial), 2 accepted as-is
 
 ---
 
@@ -213,7 +225,7 @@ All critical `_core()` functions now have functional-layer tests in the core cra
 ### Scope
 
 - `oauth2_passkey/src/coordination/oauth2/tests.rs` (921 lines, 10 tests)
-- `oauth2_passkey/src/coordination/passkey/tests.rs` (1005 lines, 17 tests)
+- `oauth2_passkey/src/coordination/passkey/tests.rs` (1240 lines, 19 tests)
 
 ### What Works Well
 
@@ -367,3 +379,79 @@ One minor observation from the re-review:
 All 6 fixes are correctly implemented. The assertions added for finding #5 are well-calibrated -- the CreateUser registration test has the most detailed assertions (7 checks), which is appropriate since it validates the full response structure, while other tests appropriately focus on the fields most relevant to their specific scenario (e.g., `allowCredentials` content for authentication tests). The RAII guard for finding #1 is clean and idiomatic Rust.
 
 **Status: Approved.** No remaining issues.
+
+---
+
+## Code Review 2
+
+### Overview
+
+Based on the review of the newly added functional tests in `oauth2/tests.rs` and `passkey/tests.rs` and the previous feedback in `test_review.md`, I confirm that the 6 accepted findings (such as introducing `MockUserGuard` for panic-safety and strengthening assertions in `start-*` tests) have been correctly implemented. I also agree with the reasoning for keeping the 3 unaddressed points as acceptable trade-offs for integration-level testing boundaries.
+
+However, there are a few additional areas for improvement, primarily concerning security validation testing and the robustness of the mock server.
+
+### New Findings
+
+#### 1. Missing Negative Tests for Security Validation (Important)
+
+**Severity: Medium-High**
+
+**Finding:**
+The current functional tests provide excellent coverage of the "happy paths" (successful authentication/registration) and session-state assertions (e.g., trying to add to a user without an active session). However, they lack "negative paths" that specifically test the core cryptographic and security validations by intentionally providing malformed or invalid data.
+
+**Specific Gaps:**
+*   **Passkey Authentication (`handle_finish_authentication_core`):**
+    There is no test verifying that the core correctly rejects an authentication attempt with an invalid signature or an mismatched challenge. Since the test infrastructure (`build_signed_authentication_response`) already exists, it is highly recommended to add tests that intentionally send a structurally valid assertion, but with a tampered signature or an incorrect challenge, and assert that it correctly results in an `Unauthorized` or `InvalidSignature` error. This guarantees the signature validation logic is actually protecting the application.
+*   **OAuth2 Flow:**
+    Similarly, the mock server always returns a valid, signed JWT and valid token responses. There are no tests to ensure the core correctly rejects tampering, such as:
+    *   An invalid or expired JWT signature (from the JWKS endpoint).
+    *   An incorrect PKCE code challenge.
+
+#### 2. Mock Server Lacks Graceful Shutdown
+
+**Severity: Low**
+
+**Finding:**
+In `oauth2/tests.rs`, the mock server (`MOCK_SERVER`) is spawned inside a `LazyLock` block and runs indefinitely on a detached tokio background thread until the test process exits. While this is generally acceptable for a test binary and causes no immediate harm, a cleaner approach would be to wire up `axum::serve::with_graceful_shutdown` and trigger it when the tests finish (or via a custom drop guard for the server itself), ensuring local TCP ports and resources are gracefully released.
+
+#### 3. Fragile Mock Server Readiness Polling
+
+**Severity: Low**
+
+**Finding:**
+The initialization logic for `MOCK_SERVER` waits for the mock server to bind and become ready by polling `std::net::TcpStream::connect` in a loop with `std::thread::sleep` (100ms intervals, up to 50 times). While functional, timeout-based polling can occasionally lead to flaky tests in heavily loaded CI environments.
+A more robust approach would be to use a `tokio::sync::oneshot` channel to signal exactly when the axum server has successfully bound to the port, eliminating the need for arbitrary sleep intervals and reducing test flakiness risk.
+
+### Summary
+
+The tests are well-structured and provide solid coverage of the core coordination layer. The most pressing recommendation is to **add negative tests for cryptographic operations (Finding 1)** to guarantee the security boundary of the `_core` functions. The other two findings (shutdown and polling) are minor robustness improvements for the test infrastructure.
+
+---
+
+### Author Response
+
+#### Overall Assessment
+
+The review correctly identifies security validation testing as the most important gap. The passkey-side negative tests are well-scoped and actionable. The OAuth2-side suggestions and infrastructure improvements are reasonable but warrant further discussion on where these responsibilities belong.
+
+#### Findings to Address
+
+| # | Finding | Scope | Disposition | Action |
+|---|---------|-------|-------------|--------|
+| **1** (partial) | Missing negative tests for passkey authentication | Passkey | **Agree.** The existing `build_signed_authentication_response` infrastructure already supports signing with arbitrary keys and challenges, making negative tests low-cost to add. | Add 2-3 tests: (a) tampered signature rejection, (b) challenge mismatch rejection. |
+
+#### Findings Accepted As-Is (No Action)
+
+| # | Finding | Rationale |
+|---|---------|-----------|
+| **1** (OAuth2 part) | Missing negative tests for JWT signature / PKCE | **Partially disagree on scope.** JWT signature validation is performed in `oauth2/main/idtoken.rs` (`decode_and_validate_id_token`), which is a lower-level module. Negative tests for invalid/expired JWT signatures belong at that unit-test level, not the coordination layer. The coordination tests should verify end-to-end flow correctness, not re-test cryptographic primitives already covered (or coverable) by unit tests. PKCE code challenge validation is the OAuth2 provider's responsibility -- the core library *sends* the correct `code_verifier`, but the *provider* validates it. Testing PKCE rejection would require making the mock server reject valid PKCE, which tests the mock, not the core. |
+| **2** | Mock server lacks graceful shutdown | **Accept as-is.** The mock server uses `LazyLock` with process-lifetime management, which is the standard pattern for test infrastructure. The OS reclaims all resources (TCP ports, threads) when the test process exits. Adding `with_graceful_shutdown` and a drop guard would add complexity (~20 lines) for no practical benefit -- the server is only used by `#[serial]` tests within a single binary, and no port conflicts can occur. |
+| **3** | Fragile mock server readiness polling | **Accept as-is.** The TCP polling approach (100ms x 50 = 5s timeout) has been reliable in practice and matches the pattern used in the axum crate's test infrastructure. While a `tokio::sync::oneshot` channel would be marginally more elegant, it requires restructuring the server startup to expose the channel across the `LazyLock` + `std::thread::spawn` boundary. This is a minor improvement that does not justify dedicated effort at this time. |
+
+#### Fix Results
+
+The addressed finding has been implemented and verified (529 tests pass, 0 failures, clean clippy + fmt).
+
+| # | Finding | Change |
+|---|---------|--------|
+| **1** (passkey) | Missing negative tests for security validation | Added 2 tests to `passkey/tests.rs`: (a) `test_finish_authentication_core_tampered_signature` -- builds a valid signed response, then flips a byte in the ECDSA signature's r-value before submitting; asserts `CoordinationError::PasskeyError(_)`. (b) `test_finish_authentication_core_challenge_mismatch` -- builds a signed response using a fabricated challenge instead of the server-issued one; asserts `CoordinationError::PasskeyError(_)`. Both tests reuse the existing `build_signed_authentication_response` infrastructure with minimal additional code (~60 lines each). |
