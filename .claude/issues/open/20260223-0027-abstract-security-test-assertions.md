@@ -9,6 +9,7 @@
 - [Implementation Tasks](#implementation-tasks)
 - [Decision Log](#decision-log)
 - [Resolution](#resolution)
+- [Code Review](#code-review)
 
 ## ID: 20260223-0027
 
@@ -204,3 +205,165 @@ All critical `_core()` functions now have functional-layer tests in the core cra
 - **OAuth2**: 6 new tests (2 functions) with mock OAuth2 server (HS256 JWT, PKCE, nonce)
 - Total: 19 new tests, 527 pass (was 509 at start), 0 failures
 - Review feedback: 6 of 9 findings addressed, 3 accepted as-is
+
+---
+
+## Code Review
+
+### Scope
+
+- `oauth2_passkey/src/coordination/oauth2/tests.rs` (921 lines, 10 tests)
+- `oauth2_passkey/src/coordination/passkey/tests.rs` (1005 lines, 17 tests)
+
+### What Works Well
+
+- **Real cryptography**: End-to-end passkey tests use actual ECDSA P-256 signing with a fixed key pair that matches the stored credential, exercising real signature verification.
+- **PKCE + nonce correlation**: The OAuth2 mock server validates S256 PKCE challenges and correlates nonces through the JWT, testing the full security chain.
+- **Auth boundary testing**: Each `_core()` function is tested for both success and authorization-rejection paths (unauthorized user, missing session, wrong user, etc.).
+- **Deliberate isolation**: Tests run against in-memory SQLite + memory cache with no HTTP/Axum dependency (except the mock OAuth2 server).
+
+### Issues Found
+
+#### 1. Mock server user state is not panic-safe
+
+`oauth2/tests.rs:289-301` -- Tests call `mock.configure_user(...)` at the start and `mock.reset_to_first_user()` at the end. If a test panics between these calls, subsequent `#[serial]` tests inherit the wrong user identity. This should use an RAII guard (reset on `Drop`) instead of manual cleanup at the end of each test.
+
+#### 2. `set_mock_env_vars()` permanently overrides env vars, no restoration
+
+`oauth2/tests.rs:492-508` -- This writes to `/tmp/oauth2_passkey_core_mock_env` and calls `dotenvy::from_filename_override`, which permanently overrides `OAUTH2_TOKEN_URL`, `OAUTH2_JWKS_URL`, `OAUTH2_USERINFO_URL`, `OAUTH2_EXPECTED_ISSUER` for the entire process. There is no restoration to the `.env_test` values. If any test running later in the binary happens to trigger OIDC discovery or token exchange, it would hit the mock server (port 19876) instead of the intended target (port 9876 from `.env_test`).
+
+This is safe **today** because all such tests are `#[serial]` and self-contained, but it is a latent fragility if new tests are added that depend on the original env values.
+
+#### 3. `test_get_authorized_core_add_to_user` duplicates `drive_oauth2_flow`
+
+`oauth2/tests.rs:808-920` -- This test manually replicates ~60 lines of the same HTTP flow that `drive_oauth2_flow()` implements, because the helper does not accept optional session headers. A parameterized `drive_oauth2_flow_with_session(mode, session_headers)` would eliminate this duplication.
+
+#### 4. Redundant test: `test_get_passkey_field_mappings_logic`
+
+`passkey/tests.rs:988-1004` -- This test is nearly identical to `test_get_passkey_field_mappings_defaults` (lines 963-976). Both call `get_passkey_field_mappings()` and assert `account_field == "name"` and `label_field == "display_name"`. The "logic" test adds two `!is_empty()` assertions that are strictly weaker than the equality assertions already present. Zero additional coverage.
+
+#### 5. Weak assertions in start_registration and start_authentication tests
+
+Several tests only verify `result.is_ok()` without checking the response content:
+
+- `passkey/tests.rs:556-572` `test_start_registration_core_create_user_mode` -- Does not verify the returned `RegistrationOptions` contains a challenge, user handle, or RP info.
+- `passkey/tests.rs:617-646` `test_start_registration_core_add_to_user_mode` -- Same.
+- `passkey/tests.rs:682-761` All 4 `start_authentication_core` tests -- Only check `is_ok()`, do not inspect `AuthenticationOptions` at all.
+
+Contrast with the end-to-end tests (e.g., `test_finish_authentication_core_success`) which properly verify `user_handle`, `credential_ids`, and headers. The start-* tests are essentially smoke tests that only prove the function does not error -- they would not catch regressions in the response structure.
+
+#### 6. `insert_test_passkey_credential` stores inconsistent rp_id
+
+`passkey/tests.rs:280` -- Sets `rp_id: "localhost"`, but the test origin is `http://127.0.0.1:3000` (from `.env_test`), so the RP ID should be `127.0.0.1`. This does not affect list/update/delete tests (they do not validate RP ID), but it is a correctness gap -- if any future test tries to use these credentials for authentication, it would fail for the wrong reason.
+
+#### 7. Duplicated `create_test_user_in_db` helper
+
+Both `oauth2/tests.rs:78-90` and `passkey/tests.rs:247-259` have nearly identical `create_test_user_in_db()` helpers. Since these are in separate `tests` modules that cannot share code (sibling modules under `coordination`), this is somewhat unavoidable, but worth noting as maintenance surface area.
+
+#### 8. ~500 lines of fixture infrastructure duplicated from axum crate
+
+The WebAuthn helpers (~250 lines) and mock OAuth2 server (~250 lines) substantially duplicate code from `oauth2_passkey_axum/tests/common/`. This was a deliberate design decision (the core crate cannot depend on axum test code), and the issue documents this trade-off. However, any changes to WebAuthn response format or JWT validation need to be made in both places independently.
+
+#### 9. `insert_test_passkey_credential` uses fake public key
+
+`passkey/tests.rs:278` -- `public_key: "test_public_key"` -- This is not a valid base64url-encoded EC key. For list/update/delete tests this is fine, but it silently creates credentials that cannot be used for authentication. A comment should clarify this is intentional, or the helper should use the real public key from `test_utils::generate_first_user_public_key()`.
+
+### Summary
+
+| Category | Finding | Severity |
+|----------|---------|----------|
+| Correctness | Mock server state not panic-safe | Medium |
+| Correctness | Env vars permanently overridden, no restore | Low (latent) |
+| Coverage | Start-* tests have weak assertions (is_ok only) | Medium |
+| Redundancy | `test_get_passkey_field_mappings_logic` is duplicate | Low |
+| Maintenance | `add_to_user` test duplicates `drive_oauth2_flow` | Low |
+| Maintenance | ~500 lines duplicated from axum test infra | Accepted trade-off |
+| Consistency | `rp_id: "localhost"` vs actual `127.0.0.1` | Low |
+| Consistency | `public_key: "test_public_key"` is not a real key | Low |
+
+The test code achieves its stated goal (functional-layer coverage for `_core()` functions) with real crypto and proper authorization boundary testing. The main areas for improvement are the weak assertions on start-* tests and the fragile mock server state management.
+
+---
+
+### Author Response
+
+#### Overall Assessment
+
+The review is thorough and fair. All findings are real. Below is the disposition for each.
+
+#### Findings to Address
+
+| # | Finding | Disposition | Action |
+|---|---------|-------------|--------|
+| **1** | Mock server state not panic-safe | **Agree.** Add RAII guard that calls `reset_to_first_user()` on `Drop`. ~10 lines. | Fix |
+| **3** | `add_to_user` test duplicates `drive_oauth2_flow` | **Agree.** Add optional `extra_request_headers` parameter to `drive_oauth2_flow`. Eliminates ~50 lines of duplication. | Fix |
+| **4** | Redundant `test_get_passkey_field_mappings_logic` | **Agree.** The `!is_empty()` assertions are strictly weaker than the equality checks in `_defaults`. Delete the test. | Fix |
+| **5** | Weak assertions in start-* tests | **Agree. Most important finding.** These tests only prove the function doesn't error, not that the response is correct. Will add assertions for: challenge presence/non-empty, user handle, RP ID, credential IDs (for authentication). | Fix |
+| **6** | `rp_id: "localhost"` inconsistent with origin | **Agree.** Change to `"127.0.0.1"` to match `.env_test` origin `http://127.0.0.1:3000`. | Fix |
+| **9** | `public_key: "test_public_key"` is fake | **Agree.** Use `generate_first_user_public_key()` from `test_utils` for the first user's credential. Add comment for other test credentials explaining the fake key is intentional (those tests only exercise list/update/delete paths). | Fix |
+
+#### Findings Accepted As-Is (No Action)
+
+| # | Finding | Rationale |
+|---|---------|-----------|
+| **2** | Env vars permanently overridden | The reviewer correctly notes this is safe today. Restoration is impractical: `dotenvy` has no "undo" mechanism, and key config values like `OAUTH2_RESPONSE_MODE` are `LazyLock` (evaluated once, immutable). The mock server runs for the process lifetime on a distinct port (19876 vs 9876), so the override is harmless. A comment noting this design constraint is sufficient. |
+| **7** | Duplicated `create_test_user_in_db` | Unavoidable. These are `mod tests` submodules under sibling directories (`coordination/oauth2/tests.rs` and `coordination/passkey/tests.rs`). Rust's module system provides no mechanism to share code between them without promoting the helper to a crate-level `test_utils` module, which would be over-engineering for a 12-line function. The reviewer acknowledges this. |
+| **8** | ~500 lines duplicated from axum crate | Deliberate design decision, documented in the issue. The core crate (`oauth2_passkey`) cannot depend on axum crate test code. The two implementations serve different purposes: core tests use minimal mock infrastructure (HS256, "none" attestation), while axum tests use a full-featured mock (RS256, packed attestation). Changes to WebAuthn/JWT formats are infrequent and affect both layers simultaneously, making independent maintenance acceptable. |
+
+#### Fix Results
+
+All 6 addressed findings have been implemented and verified (527 tests pass, 0 failures, clean clippy + fmt).
+
+| # | Finding | Change |
+|---|---------|--------|
+| **1** | Mock server state not panic-safe | Added `MockUserGuard` struct with `Drop` impl that calls `reset_to_first_user()`. Added `configure_user_guarded()` method. 4 tests migrated from manual `configure_user` + `reset_to_first_user` to RAII guard via `_guard` binding. |
+| **3** | `add_to_user` duplicates flow | Added `extra_request_headers: Option<&http::HeaderMap>` parameter to `drive_oauth2_flow()`. `add_to_user` test now passes session cookie through the helper instead of duplicating ~50 lines. All other call sites pass `None`. |
+| **4** | Redundant test | Deleted `test_get_passkey_field_mappings_logic` (27 lines). |
+| **5** | Weak start-* assertions | Added response structure assertions to 6 tests: `challenge` (non-empty), `rpId` (== `"127.0.0.1"`), `user.user_handle` (present), `user.name`, `user.displayName`, `rp.id`, `pubKeyCredParams`, `authId`, `allowCredentials` (empty for discoverable flow, contains expected credential for username flow, empty for nonexistent username). |
+| **6** | `rp_id: "localhost"` | Changed to `"127.0.0.1"` to match `.env_test` origin `http://127.0.0.1:3000`. |
+| **9** | Fake public key | Added doc comment to `insert_test_passkey_credential` explaining the placeholder key is intentional for list/update/delete tests that never verify signatures. |
+
+---
+
+### Reviewer Re-Review
+
+#### Verification Method
+
+Re-read both updated test files in full and verified each fix against the original finding.
+
+#### Fix Verification
+
+| # | Finding | Verdict | Notes |
+|---|---------|---------|-------|
+| **1** | Mock server state not panic-safe | **Resolved.** | `MockUserGuard` with `Drop` impl (lines 311-321). `configure_user_guarded()` returns the guard (lines 303-308). All 4 tests that configure non-default users now use `let _guard = mock.configure_user_guarded(...)` instead of manual `configure_user` + `reset_to_first_user`. The `_guard` binding keeps the guard alive for the test scope and resets on drop, including on panic. Clean implementation. |
+| **3** | `add_to_user` duplicates flow | **Resolved.** | `drive_oauth2_flow` now takes `extra_request_headers: Option<&http::HeaderMap>` (line 538). The `add_to_user` test (lines 831-892) builds session headers and passes them via `drive_oauth2_flow("add_to_user", Some(&session_request_headers))` (line 865). Previous ~60 lines of duplicated mock-auth-endpoint logic eliminated. All other call sites pass `None`. |
+| **4** | Redundant test | **Resolved.** | `test_get_passkey_field_mappings_logic` deleted. File now ends at line 1122 with only `test_get_passkey_field_mappings_defaults` remaining. |
+| **5** | Weak start-* assertions | **Resolved.** | All 6 start-* tests now verify response structure beyond `is_ok()`. Specific checks added: |
+|   |   |   | - `test_start_registration_core_create_user_mode` (lines 576-609): challenge non-empty, `rpId == "127.0.0.1"`, `rp.id == "127.0.0.1"`, `user.user_handle` present, `user.name` matches request, `user.displayName` matches request, `pubKeyCredParams` is array. Most thorough of the group -- good choice for the most detailed assertions. |
+|   |   |   | - `test_start_registration_core_add_to_user_mode` (lines 685-699): challenge, rpId, user_handle. Appropriately lighter since the response structure is the same as CreateUser mode. |
+|   |   |   | - `test_start_authentication_core_no_username` (lines 748-769): challenge, rpId, authId, `allowCredentials` empty or absent (discoverable flow). |
+|   |   |   | - `test_start_authentication_core_with_username` (lines 798-826): challenge, rpId, authId, `allowCredentials` non-empty and contains `"cred_auth_start_1"`. This is the strongest authentication start test -- verifies the credential lookup actually works. |
+|   |   |   | - `test_start_authentication_core_nonexistent_username` (lines 849-867): challenge, rpId, `allowCredentials` empty. Good contrast with the with_username test. |
+|   |   |   | - `test_start_authentication_core_string_body` (lines 889-903): challenge, rpId, authId. |
+| **6** | `rp_id: "localhost"` | **Resolved.** | Changed to `"127.0.0.1"` at line 285. Consistent with `.env_test` origin `http://127.0.0.1:3000`. |
+| **9** | Fake public key | **Resolved.** | Doc comment added at lines 261-265 explaining the placeholder key is intentional. Clear guidance to use `FIRST_USER_PRIVATE_KEY` / `generate_first_user_public_key()` for authentication tests. |
+
+#### Accepted As-Is Dispositions
+
+All 3 "no action" decisions are reasonable:
+
+- **#2** (env var override): The `LazyLock` constraint and `#![forbid(unsafe_code)]` make restoration impractical. Agreed.
+- **#7** (duplicated helper): 12-line function across sibling test modules. Promoting to `test_utils` would be over-engineering. Agreed.
+- **#8** (fixture duplication): Deliberate architecture boundary. The author's point about different purposes (HS256/"none" vs RS256/"packed") strengthens the case. Agreed.
+
+#### New Observations
+
+One minor observation from the re-review:
+
+- **`test_get_authorized_core_login_existing_user`** (oauth2/tests.rs:662-688) still uses `mock.reset_to_first_user()` directly (line 666) instead of `configure_user_guarded`. This is correct -- the test uses the default first-user identity and doesn't need a guard since there's no configure-to-different-user call. No action needed, just noting for clarity.
+
+#### Conclusion
+
+All 6 fixes are correctly implemented. The assertions added for finding #5 are well-calibrated -- the CreateUser registration test has the most detailed assertions (7 checks), which is appropriate since it validates the full response structure, while other tests appropriately focus on the fields most relevant to their specific scenario (e.g., `allowCredentials` content for authentication tests). The RAII guard for finding #1 is clean and idiomatic Rust.
+
+**Status: Approved.** No remaining issues.
