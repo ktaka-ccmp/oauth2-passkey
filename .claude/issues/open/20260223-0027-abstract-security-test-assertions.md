@@ -39,8 +39,8 @@ The core crate has two categories of tests:
 
 | Module | Function | Unit Tests | Priority |
 |--------|----------|:---:|----------|
-| **oauth2** | `get_authorized_core` | **0** | Critical - OAuth2 authorization flow |
-| | `post_authorized_core` | **0** | Critical - OAuth2 authorization flow (POST) |
+| **oauth2** | `get_authorized_core` | 4 | OK |
+| | `post_authorized_core` | 1 | OK |
 | | `list_accounts_core` | 1 | OK |
 | | `delete_oauth2_account_core` | 2 | OK |
 | **passkey** | `handle_start_registration_core` | 4 | OK |
@@ -54,7 +54,7 @@ The core crate has two categories of tests:
 | **user** | 2 functions | 2-4 each | OK |
 | **login_history** | 4 functions | **0** | Low - query/pagination |
 
-**2 of 11 `_core()` functions have zero unit tests** (OAuth2 authorization flows, require mock provider). All 5 passkey `_core()` functions now have functional-layer tests.
+**All 11 critical `_core()` functions now have functional-layer tests.** OAuth2 authorization flows tested via mock server (HS256 JWT, PKCE, nonce correlation). Passkey flows tested via constructed WebAuthn responses (ECDSA P-256, CBOR attestation/assertion).
 
 ## Related Issues
 
@@ -105,7 +105,15 @@ Focus on the 7 untested critical functions:
 - [x] Add tests for `handle_finish_registration_core` (2 tests: CreateUser, AddToUser end-to-end)
 - [x] Add tests for `handle_finish_authentication_core` (1 test: full end-to-end with ECDSA signing)
 - [x] Verify all passkey tests pass (13 new tests, total 522 pass, 0 failures)
-- [ ] Add tests for `get_authorized_core` / `post_authorized_core` (deferred - requires mock OAuth2 provider)
+- [x] Create minimal mock OAuth2 server in core crate tests (~250 lines)
+- [x] Add `drive_oauth2_flow()` test helper (~75 lines)
+- [x] Add test: `get_authorized_core` login with existing account
+- [x] Add test: `get_authorized_core` create new user
+- [x] Add test: `get_authorized_core` login with nonexistent account (error)
+- [x] Add test: `get_authorized_core` create_user_or_login mode
+- [x] Add test: `post_authorized_core` wrong response mode (error)
+- [x] Add test: `get_authorized_core` add_to_user with existing session
+- [x] Verify all tests pass (6 new tests, total 528 pass, 0 failures)
 
 ## Decision Log
 
@@ -141,4 +149,44 @@ Focus on the 7 untested critical functions:
 - Result: 522 tests pass (was 509), 0 warnings, clean clippy + fmt
 - Remaining: `get_authorized_core` / `post_authorized_core` deferred (require mock OAuth2 provider with JWKS/token endpoints)
 
+### 2026-02-23: OAuth2 _core() test implementation plan
+
+- Context: `get_authorized_core` and `post_authorized_core` internally make 3 HTTP calls (token exchange, JWKS fetch, userinfo fetch), unlike passkey functions which use local crypto only. Testing requires a mock HTTP server.
+- Decision: Create a minimal mock OAuth2 server (~180 lines) directly in `coordination/oauth2/tests.rs`, add `axum` as dev-dependency, use port 19876 (distinct from axum crate's mock on 9876).
+- Approach:
+  - Mock server: 4 endpoints (auth, token, JWKS, userinfo), HS256 JWT signing, shared state for nonce correlation
+  - Env var overrides (`OAUTH2_TOKEN_URL`, `OAUTH2_JWKS_URL`, `OAUTH2_USERINFO_URL`, `OAUTH2_EXPECTED_ISSUER`) bypass OIDC discovery entirely
+  - Test flow: `prepare_oauth2_auth_request()` -> mock auth redirect -> extract code -> `get_authorized_core()`
+  - 6 tests: login existing user, create new user, login nonexistent (error), create_user_or_login mode, wrong response mode (error), add_to_user with session
+- Constraint: `OAUTH2_RESPONSE_MODE` is `LazyLock` set to `"query"` from `.env_test`, so POST success tests are only possible in axum integration tests
+- Estimated: ~440 lines total (mock ~180, helpers ~60, tests ~200)
+- Full plan: `.claude/plans/rippling-wishing-feigenbaum.md`
+
+### 2026-02-23: OAuth2 _core() tests completed (6 new tests)
+
+- Context: Implemented functional-layer tests for `get_authorized_core` and `post_authorized_core` in `oauth2_passkey/src/coordination/oauth2/tests.rs`. Tests use a minimal mock OAuth2 server (HS256 JWT, PKCE S256, nonce correlation) running on port 19876.
+- Infrastructure added (~250 lines):
+  - `MockServerState` + `MockServerHandle` with `LazyLock` lifecycle and TCP readiness polling
+  - 4 mock handlers: auth (302 redirect), token (PKCE validation + JWT), JWKS (HS256 key), userinfo
+  - `create_mock_jwt()` - HS256 JWT with all IdInfo fields
+  - `set_mock_env_vars()` - Uses `dotenvy::from_filename_override` (avoids `#![forbid(unsafe_code)]` constraint on `std::env::set_var`)
+  - `drive_oauth2_flow()` - Full flow driver: `prepare_oauth2_auth_request` -> mock auth -> extract code -> build `AuthResponse`
+- Tests added (6):
+  - `test_post_authorized_core_wrong_response_mode` - POST with query mode returns InvalidResponseMode
+  - `test_get_authorized_core_login_existing_user` - Login with pre-existing first user succeeds
+  - `test_get_authorized_core_login_nonexistent_account` - Login with unknown account returns Conflict
+  - `test_get_authorized_core_create_new_user` - Creates user and OAuth2 account in DB
+  - `test_get_authorized_core_create_user_or_login` - Creates when new, logs in when existing
+  - `test_get_authorized_core_add_to_user` - Links new OAuth2 account to existing session user
+- Key discoveries:
+  - `From<IdInfo> for OAuth2Account` adds `"google_"` prefix to `sub` -> mock sub values must NOT include prefix
+  - `dotenvy::from_filename_override` is a safe alternative to `std::env::set_var` (unsafe in Rust 2024 edition)
+- Result: 528 tests pass (was 522), 0 warnings, clean clippy + fmt
+- All implementation tasks complete. Issue ready to close.
+
 ## Resolution
+
+All critical `_core()` functions now have functional-layer tests in the core crate:
+- **Passkey**: 13 new tests (5 functions) with ECDSA P-256 signing and CBOR attestation/assertion
+- **OAuth2**: 6 new tests (2 functions) with mock OAuth2 server (HS256 JWT, PKCE, nonce)
+- Total: 19 new tests, 528 pass (was 509 at start), 0 failures
