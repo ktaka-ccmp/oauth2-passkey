@@ -467,6 +467,78 @@ fn test_verify_signature_invalid_base64_signature() {
     ));
 }
 
+/// Test signature verification with valid HS256 signature
+///
+/// This test verifies that `verify_signature` correctly validates a JWT token
+/// signed with HS256 when using the correct secret key.
+///
+#[test]
+fn test_verify_signature_valid_hs256() {
+    #[derive(Serialize)]
+    struct TestClaims {
+        sub: String,
+    }
+
+    let secret = b"test_secret_key_for_hs256_verification";
+    let claims = TestClaims {
+        sub: "test_user".to_string(),
+    };
+    let header = jsonwebtoken::Header::new(Algorithm::HS256);
+    let token = jsonwebtoken::encode(
+        &header,
+        &claims,
+        &jsonwebtoken::EncodingKey::from_secret(secret),
+    )
+    .expect("Failed to encode JWT");
+
+    let decoding_key = DecodingKey::from_secret(secret);
+    let result = verify_signature(&token, &decoding_key, Algorithm::HS256);
+    assert!(result.is_ok(), "Verification should succeed: {result:?}");
+    assert!(
+        result.unwrap(),
+        "Signature should be valid with correct key"
+    );
+}
+
+/// Test signature verification rejects wrong HS256 key
+///
+/// This test verifies that `verify_signature` correctly rejects a JWT token
+/// when verified with a different secret key than the one used for signing.
+/// This guarantees the signature validation logic actually protects against
+/// token tampering.
+///
+#[test]
+fn test_verify_signature_wrong_key_hs256() {
+    #[derive(Serialize)]
+    struct TestClaims {
+        sub: String,
+    }
+
+    let signing_secret = b"correct_secret_key";
+    let wrong_secret = b"wrong_secret_key";
+    let claims = TestClaims {
+        sub: "test_user".to_string(),
+    };
+    let header = jsonwebtoken::Header::new(Algorithm::HS256);
+    let token = jsonwebtoken::encode(
+        &header,
+        &claims,
+        &jsonwebtoken::EncodingKey::from_secret(signing_secret),
+    )
+    .expect("Failed to encode JWT");
+
+    let wrong_key = DecodingKey::from_secret(wrong_secret);
+    let result = verify_signature(&token, &wrong_key, Algorithm::HS256);
+    assert!(
+        result.is_ok(),
+        "Wrong key should not cause an error: {result:?}"
+    );
+    assert!(
+        !result.unwrap(),
+        "Signature should be invalid with wrong key"
+    );
+}
+
 /// Test TokenVerificationError display formatting
 ///
 /// This test verifies that all TokenVerificationError variants produce the correct

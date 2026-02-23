@@ -116,6 +116,7 @@ Focus on the 7 untested critical functions:
 - [x] Add test: `post_authorized_core` wrong response mode (error)
 - [x] Add test: `get_authorized_core` add_to_user with existing session
 - [x] Verify all tests pass (6 new tests, total 528 pass, 0 failures)
+- [x] Add `verify_signature` positive/negative unit tests to `idtoken/tests.rs` (2 tests)
 
 ## Decision Log
 
@@ -209,14 +210,24 @@ Focus on the 7 untested critical functions:
 - Rationale for OAuth2 negative tests (accepted as-is): JWT signature validation belongs at `idtoken.rs` unit-test level, not coordination layer. PKCE validation is OAuth2 provider's responsibility.
 - Result: 529 tests pass (was 527), 0 failures, clean clippy + fmt
 
+### 2026-02-23: verify_signature unit tests added to idtoken/tests.rs (2 tests)
+
+- Context: Review 2 Finding 1 (OAuth2 part) recommended JWT signature negative tests. Author response argued these belong at `idtoken.rs` unit-test level, not the coordination layer. Investigation of existing `idtoken/tests.rs` (23 tests) confirmed `verify_signature` had tests for format/base64 errors but lacked cryptographic verification tests (valid signature acceptance, wrong key rejection).
+- Tests added:
+  - `test_verify_signature_valid_hs256` - Creates HS256 JWT with known secret, verifies with correct key, asserts `Ok(true)`
+  - `test_verify_signature_wrong_key_hs256` - Creates HS256 JWT with one secret, verifies with different secret, asserts signature is invalid
+- Scope: Pure synchronous unit tests, no async/HTTP, no additional dependencies
+- Result: 531 tests pass (was 529), 0 failures, clean clippy + fmt
+
 ## Resolution
 
 All critical `_core()` functions now have functional-layer tests in the core crate:
 - **Passkey**: 15 new tests (5 functions) with ECDSA P-256 signing and CBOR attestation/assertion, including negative security tests
 - **OAuth2**: 6 new tests (2 functions) with mock OAuth2 server (HS256 JWT, PKCE, nonce)
-- Total: 21 new tests, 529 pass (was 509 at start), 0 failures
+- **idtoken**: 2 new tests for `verify_signature` cryptographic validation (valid HS256, wrong key rejection)
+- Total: 23 new tests, 531 pass (was 509 at start), 0 failures
 - Review 1 feedback: 6 of 9 findings addressed, 3 accepted as-is
-- Review 2 feedback: 1 of 3 findings addressed (partial), 2 accepted as-is
+- Review 2 feedback: 1 of 3 findings addressed (partial), 2 accepted as-is; OAuth2 JWT negative tests added at `idtoken.rs` unit-test level as recommended
 
 ---
 
