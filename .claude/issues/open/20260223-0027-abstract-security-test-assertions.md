@@ -184,9 +184,23 @@ Focus on the 7 untested critical functions:
 - Result: 528 tests pass (was 522), 0 warnings, clean clippy + fmt
 - All implementation tasks complete. Issue ready to close.
 
+### 2026-02-23: Review feedback addressed (6 fixes)
+
+- Context: External review identified 9 findings (see `test_review.md`). 6 accepted for fix, 3 accepted as-is.
+- Fixes applied:
+  - #1: Added `MockUserGuard` RAII struct with `Drop` impl for panic-safe mock server state cleanup
+  - #3: Added `extra_request_headers` parameter to `drive_oauth2_flow()`, eliminated ~50 lines of duplication in `add_to_user` test
+  - #4: Deleted redundant `test_get_passkey_field_mappings_logic` (27 lines)
+  - #5: Added response structure assertions to 6 start-* tests (challenge, rpId, user_handle, allowCredentials, authId, pubKeyCredParams)
+  - #6: Changed `rp_id: "localhost"` to `"127.0.0.1"` to match `.env_test` origin
+  - #9: Added doc comment to `insert_test_passkey_credential` explaining placeholder public key is intentional
+- Accepted as-is: #2 (env var override impractical to restore), #7 (helper duplication unavoidable), #8 (fixture duplication deliberate)
+- Result: 527 tests pass (was 528, minus 1 deleted redundant test), 0 failures, clean clippy + fmt
+
 ## Resolution
 
 All critical `_core()` functions now have functional-layer tests in the core crate:
 - **Passkey**: 13 new tests (5 functions) with ECDSA P-256 signing and CBOR attestation/assertion
 - **OAuth2**: 6 new tests (2 functions) with mock OAuth2 server (HS256 JWT, PKCE, nonce)
-- Total: 19 new tests, 528 pass (was 509 at start), 0 failures
+- Total: 19 new tests, 527 pass (was 509 at start), 0 failures
+- Review feedback: 6 of 9 findings addressed, 3 accepted as-is

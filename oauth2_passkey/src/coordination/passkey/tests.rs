@@ -258,26 +258,31 @@ async fn create_test_user_in_db(user_id: &str) -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
+/// Insert a test passkey credential for list/update/delete tests.
+///
+/// Uses a placeholder public key because these tests do not perform signature
+/// verification. For end-to-end authentication tests, use the real key pair
+/// from `FIRST_USER_PRIVATE_KEY` / `generate_first_user_public_key()` instead.
 async fn insert_test_passkey_credential(
     credential_id: &str,
     user_id: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Create a simple user object for the credential
     let user = serde_json::json!({
         "name": "Test User",
         "displayName": "Test Display Name",
         "user_handle": user_id.to_string()
     });
 
-    // Convert to the required format
     let passkey_user = serde_json::from_value(user).expect("Failed to create user entity");
 
+    // Placeholder public key: not a valid EC key, but sufficient for
+    // list/update/delete tests that never verify signatures.
     let credential = PasskeyCredential {
         credential_id: credential_id.to_string(),
         user_id: user_id.to_string(),
         public_key: "test_public_key".to_string(),
         aaguid: "test-aaguid".to_string(),
-        rp_id: "localhost".to_string(),
+        rp_id: "127.0.0.1".to_string(),
         user: passkey_user,
         counter: 0,
         created_at: Utc::now(),
@@ -568,6 +573,41 @@ async fn test_start_registration_core_create_user_mode() -> Result<(), Box<dyn s
         "CreateUser mode without auth should succeed: {result:?}"
     );
 
+    let options = result.unwrap();
+    let options_json = serde_json::to_value(&options)?;
+    assert!(
+        !options_json["challenge"].as_str().unwrap_or("").is_empty(),
+        "Should contain a non-empty challenge"
+    );
+    assert_eq!(
+        options_json["rpId"].as_str().unwrap_or(""),
+        "127.0.0.1",
+        "RP ID should match the test origin host"
+    );
+    assert_eq!(
+        options_json["rp"]["id"].as_str().unwrap_or(""),
+        "127.0.0.1",
+        "RP entity ID should match rpId"
+    );
+    assert!(
+        options_json["user"]["user_handle"].is_string(),
+        "Should contain a user handle"
+    );
+    assert_eq!(
+        options_json["user"]["name"].as_str().unwrap_or(""),
+        "new_user@example.com",
+        "User name should match the requested username"
+    );
+    assert_eq!(
+        options_json["user"]["displayName"].as_str().unwrap_or(""),
+        "New User",
+        "Display name should match the requested displayname"
+    );
+    assert!(
+        options_json["pubKeyCredParams"].is_array(),
+        "Should contain pubKeyCredParams"
+    );
+
     Ok(())
 }
 
@@ -642,6 +682,22 @@ async fn test_start_registration_core_add_to_user_mode() -> Result<(), Box<dyn s
         "AddToUser mode with auth should succeed: {result:?}"
     );
 
+    let options = result.unwrap();
+    let options_json = serde_json::to_value(&options)?;
+    assert!(
+        !options_json["challenge"].as_str().unwrap_or("").is_empty(),
+        "Should contain a non-empty challenge"
+    );
+    assert_eq!(
+        options_json["rpId"].as_str().unwrap_or(""),
+        "127.0.0.1",
+        "RP ID should match the test origin host"
+    );
+    assert!(
+        options_json["user"]["user_handle"].is_string(),
+        "Should contain a user handle"
+    );
+
     Ok(())
 }
 
@@ -689,6 +745,29 @@ async fn test_start_authentication_core_no_username() -> Result<(), Box<dyn std:
         "Authentication without username should succeed: {result:?}"
     );
 
+    let options = result.unwrap();
+    let options_json = serde_json::to_value(&options)?;
+    assert!(
+        !options_json["challenge"].as_str().unwrap_or("").is_empty(),
+        "Should contain a non-empty challenge"
+    );
+    assert_eq!(
+        options_json["rpId"].as_str().unwrap_or(""),
+        "127.0.0.1",
+        "RP ID should match the test origin host"
+    );
+    assert!(
+        options_json["authId"].is_string(),
+        "Should contain an authId"
+    );
+    // Discoverable flow: allowCredentials should be empty (no username filtering)
+    assert!(
+        options_json["allowCredentials"]
+            .as_array()
+            .is_none_or(|a| a.is_empty()),
+        "Discoverable flow should have empty allowCredentials"
+    );
+
     Ok(())
 }
 
@@ -716,6 +795,36 @@ async fn test_start_authentication_core_with_username() -> Result<(), Box<dyn st
         "Authentication with known username should succeed: {result:?}"
     );
 
+    let options = result.unwrap();
+    let options_json = serde_json::to_value(&options)?;
+    assert!(
+        !options_json["challenge"].as_str().unwrap_or("").is_empty(),
+        "Should contain a non-empty challenge"
+    );
+    assert_eq!(
+        options_json["rpId"].as_str().unwrap_or(""),
+        "127.0.0.1",
+        "RP ID should match the test origin host"
+    );
+    assert!(
+        options_json["authId"].is_string(),
+        "Should contain an authId"
+    );
+    // With known username: allowCredentials should contain the matching credential
+    let allow_creds = options_json["allowCredentials"]
+        .as_array()
+        .expect("Should have allowCredentials array");
+    assert!(
+        !allow_creds.is_empty(),
+        "Should have non-empty allowCredentials for known username"
+    );
+    assert!(
+        allow_creds
+            .iter()
+            .any(|c| c["id"].as_str() == Some("cred_auth_start_1")),
+        "allowCredentials should contain the test credential"
+    );
+
     Ok(())
 }
 
@@ -737,6 +846,26 @@ async fn test_start_authentication_core_nonexistent_username()
         "Authentication with nonexistent username should succeed: {result:?}"
     );
 
+    let options = result.unwrap();
+    let options_json = serde_json::to_value(&options)?;
+    assert!(
+        !options_json["challenge"].as_str().unwrap_or("").is_empty(),
+        "Should contain a non-empty challenge"
+    );
+    assert_eq!(
+        options_json["rpId"].as_str().unwrap_or(""),
+        "127.0.0.1",
+        "RP ID should match the test origin host"
+    );
+    // Nonexistent username: allowCredentials should be empty (no matching credentials)
+    let allow_creds = options_json["allowCredentials"]
+        .as_array()
+        .expect("Should have allowCredentials array");
+    assert!(
+        allow_creds.is_empty(),
+        "Should have empty allowCredentials for nonexistent username"
+    );
+
     Ok(())
 }
 
@@ -755,6 +884,22 @@ async fn test_start_authentication_core_string_body() -> Result<(), Box<dyn std:
     assert!(
         result.is_ok(),
         "Authentication with string body should succeed: {result:?}"
+    );
+
+    let options = result.unwrap();
+    let options_json = serde_json::to_value(&options)?;
+    assert!(
+        !options_json["challenge"].as_str().unwrap_or("").is_empty(),
+        "Should contain a non-empty challenge"
+    );
+    assert_eq!(
+        options_json["rpId"].as_str().unwrap_or(""),
+        "127.0.0.1",
+        "RP ID should match the test origin host"
+    );
+    assert!(
+        options_json["authId"].is_string(),
+        "Should contain an authId"
     );
 
     Ok(())
@@ -973,32 +1118,4 @@ fn test_get_passkey_field_mappings_defaults() {
         label_field, "display_name",
         "Default label field should be 'display_name'"
     );
-}
-
-/// Test logic of field mapping function
-///
-/// This test verifies that `get_passkey_field_mappings` returns the correct field mappings
-/// based on the environment variables set. It performs the following steps:
-/// 1. Initializes a test environment
-/// 2. Sets environment variables to simulate different scenarios
-/// 3. Calls `get_passkey_field_mappings` to retrieve the field mappings
-/// 4. Verifies that the returned values are the expected values
-///
-#[test]
-fn test_get_passkey_field_mappings_logic() {
-    // Test the logic of the field mapping function by simulating different scenarios
-    // We can't test LazyLock behavior directly without environment manipulation,
-    // but we can test that the function returns reasonable defaults
-    let (account_field, label_field) = get_passkey_field_mappings();
-
-    // Verify the returned values are valid field names
-    assert!(
-        !account_field.is_empty(),
-        "Account field should not be empty"
-    );
-    assert!(!label_field.is_empty(), "Label field should not be empty");
-
-    // These should be the default values since .env_test doesn't override them
-    assert_eq!(account_field, "name");
-    assert_eq!(label_field, "display_name");
 }

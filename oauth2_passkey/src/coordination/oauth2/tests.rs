@@ -299,6 +299,25 @@ impl MockServerHandle {
             "First User",
         );
     }
+
+    /// Configure mock user and return an RAII guard that resets to the first user on drop.
+    /// This ensures cleanup even if the test panics between configure and manual reset.
+    fn configure_user_guarded(&self, email: &str, sub: &str, name: &str) -> MockUserGuard<'_> {
+        self.configure_user(email, sub, name);
+        MockUserGuard { handle: self }
+    }
+}
+
+/// RAII guard that resets mock server user state to the first user on drop.
+/// Prevents state leakage between `#[serial]` tests if a test panics.
+struct MockUserGuard<'a> {
+    handle: &'a MockServerHandle,
+}
+
+impl Drop for MockUserGuard<'_> {
+    fn drop(&mut self) {
+        self.handle.reset_to_first_user();
+    }
 }
 
 static MOCK_SERVER: LazyLock<MockServerHandle> = LazyLock::new(|| {
@@ -509,9 +528,14 @@ fn set_mock_env_vars() {
 
 /// Drive a complete OAuth2 authorization flow through the mock server.
 ///
+/// `extra_request_headers` allows injecting additional headers (e.g., session cookie)
+/// into the `prepare_oauth2_auth_request` call. This is needed for the `add_to_user`
+/// flow where a session cookie must be present so the session ID is stored in cache.
+///
 /// Returns (AuthResponse, Cookie, HeaderMap) ready for `get_authorized_core()`.
 async fn drive_oauth2_flow(
     mode: &str,
+    extra_request_headers: Option<&http::HeaderMap>,
 ) -> Result<
     (
         crate::oauth2::AuthResponse,
@@ -523,6 +547,11 @@ async fn drive_oauth2_flow(
     // 1. Prepare OAuth2 auth request (generates CSRF, nonce, PKCE, stores in cache)
     let mut request_headers = http::HeaderMap::new();
     request_headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
+    if let Some(extra) = extra_request_headers {
+        for (key, value) in extra {
+            request_headers.insert(key.clone(), value.clone());
+        }
+    }
 
     let (auth_url, response_headers) =
         crate::oauth2::prepare_oauth2_auth_request(request_headers, Some(mode)).await?;
@@ -636,7 +665,7 @@ async fn test_get_authorized_core_login_existing_user() -> Result<(), Box<dyn st
     set_mock_env_vars();
     mock.reset_to_first_user();
 
-    let (auth_response, cookie, headers) = drive_oauth2_flow("login").await?;
+    let (auth_response, cookie, headers) = drive_oauth2_flow("login", None).await?;
     let result = get_authorized_core(&auth_response, &cookie, &headers).await;
 
     assert!(
@@ -670,24 +699,22 @@ async fn test_get_authorized_core_login_nonexistent_account()
     let mock = ensure_mock_server();
     set_mock_env_vars();
 
-    // Configure mock with a user that has no existing account in the database
-    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it)
-    mock.configure_user(
+    // Configure mock with a user that has no existing account in the database.
+    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Guard resets to first user on drop (panic-safe).
+    let _guard = mock.configure_user_guarded(
         "nonexistent@example.com",
         "nonexistent-user-id",
         "Nonexistent User",
     );
 
-    let (auth_response, cookie, headers) = drive_oauth2_flow("login").await?;
+    let (auth_response, cookie, headers) = drive_oauth2_flow("login", None).await?;
     let result = get_authorized_core(&auth_response, &cookie, &headers).await;
 
     assert!(
         matches!(result, Err(CoordinationError::Conflict(_))),
         "Login with nonexistent account should return Conflict error, got: {result:?}"
     );
-
-    // Reset mock to default state for other tests
-    mock.reset_to_first_user();
 
     Ok(())
 }
@@ -703,15 +730,16 @@ async fn test_get_authorized_core_create_new_user() -> Result<(), Box<dyn std::e
     let mock = ensure_mock_server();
     set_mock_env_vars();
 
-    // Configure mock with a new user identity
-    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it)
+    // Configure mock with a new user identity.
+    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Guard resets to first user on drop (panic-safe).
     let timestamp = chrono::Utc::now().timestamp_millis();
     let new_email = format!("new-user-{timestamp}@example.com");
     let new_sub = format!("new-user-{timestamp}");
     let new_name = format!("New User {timestamp}");
-    mock.configure_user(&new_email, &new_sub, &new_name);
+    let _guard = mock.configure_user_guarded(&new_email, &new_sub, &new_name);
 
-    let (auth_response, cookie, headers) = drive_oauth2_flow("create_user").await?;
+    let (auth_response, cookie, headers) = drive_oauth2_flow("create_user", None).await?;
     let result = get_authorized_core(&auth_response, &cookie, &headers).await;
 
     assert!(
@@ -742,9 +770,6 @@ async fn test_get_authorized_core_create_new_user() -> Result<(), Box<dyn std::e
         "OAuth2 account should exist in database after creation"
     );
 
-    // Reset mock to default state
-    mock.reset_to_first_user();
-
     Ok(())
 }
 
@@ -760,15 +785,16 @@ async fn test_get_authorized_core_create_user_or_login() -> Result<(), Box<dyn s
     let mock = ensure_mock_server();
     set_mock_env_vars();
 
-    // Part 1: Create user (new OAuth2 identity)
-    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it)
+    // Part 1: Create user (new OAuth2 identity).
+    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Guard resets to first user on drop (panic-safe).
     let timestamp = chrono::Utc::now().timestamp_millis();
     let new_email = format!("dual-mode-{timestamp}@example.com");
     let new_sub = format!("dual-mode-{timestamp}");
     let new_name = format!("Dual Mode User {timestamp}");
-    mock.configure_user(&new_email, &new_sub, &new_name);
+    let _guard = mock.configure_user_guarded(&new_email, &new_sub, &new_name);
 
-    let (auth_response, cookie, headers) = drive_oauth2_flow("create_user_or_login").await?;
+    let (auth_response, cookie, headers) = drive_oauth2_flow("create_user_or_login", None).await?;
     let result = get_authorized_core(&auth_response, &cookie, &headers).await;
     assert!(
         result.is_ok(),
@@ -781,7 +807,7 @@ async fn test_get_authorized_core_create_user_or_login() -> Result<(), Box<dyn s
     );
 
     // Part 2: Login (same OAuth2 identity, now exists)
-    let (auth_response, cookie, headers) = drive_oauth2_flow("create_user_or_login").await?;
+    let (auth_response, cookie, headers) = drive_oauth2_flow("create_user_or_login", None).await?;
     let result = get_authorized_core(&auth_response, &cookie, &headers).await;
     assert!(
         result.is_ok(),
@@ -792,9 +818,6 @@ async fn test_get_authorized_core_create_user_or_login() -> Result<(), Box<dyn s
         message.contains("Signing in"),
         "Should sign in with existing account: {message}"
     );
-
-    // Reset mock to default state
-    mock.reset_to_first_user();
 
     Ok(())
 }
@@ -819,75 +842,27 @@ async fn test_get_authorized_core_add_to_user() -> Result<(), Box<dyn std::error
         .get(http::header::SET_COOKIE)
         .expect("new_session_header should set session cookie")
         .to_str()?;
+
+    // Build extra headers with session cookie for prepare_oauth2_auth_request
+    let mut session_request_headers = http::HeaderMap::new();
     let session_cookie_pair = session_set_cookie
         .split(';')
         .next()
         .expect("Set-Cookie should have name=value");
+    session_request_headers.insert(http::header::COOKIE, session_cookie_pair.parse()?);
 
-    // Step 2: Prepare OAuth2 auth request with session cookie in headers
-    // (This causes the session ID to be stored in misc_session cache)
-    let mut request_headers = http::HeaderMap::new();
-    request_headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
-    request_headers.insert(http::header::COOKIE, session_cookie_pair.parse()?);
-
-    // Configure mock with a NEW OAuth2 identity to link
-    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it)
+    // Configure mock with a NEW OAuth2 identity to link.
+    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Guard resets to first user on drop (panic-safe).
     let timestamp = chrono::Utc::now().timestamp_millis();
     let link_email = format!("linked-{timestamp}@example.com");
     let link_sub = format!("linked-{timestamp}");
     let link_name = format!("Linked User {timestamp}");
-    mock.configure_user(&link_email, &link_sub, &link_name);
+    let _guard = mock.configure_user_guarded(&link_email, &link_sub, &link_name);
 
-    let (auth_url, response_headers) =
-        crate::oauth2::prepare_oauth2_auth_request(request_headers, Some("add_to_user")).await?;
-
-    // Extract CSRF cookie
-    let set_cookie = response_headers
-        .get(http::header::SET_COOKIE)
-        .expect("Should have CSRF Set-Cookie")
-        .to_str()?;
-    let csrf_cookie_pair = set_cookie
-        .split(';')
-        .next()
-        .expect("Set-Cookie should have name=value");
-
-    // Hit mock auth endpoint
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()?;
-    let mock_response = client.get(&auth_url).send().await?;
-    let location = mock_response
-        .headers()
-        .get(http::header::LOCATION)
-        .expect("Mock auth should redirect")
-        .to_str()?;
-
-    let parsed = url::Url::parse(location)?;
-    let query_params: HashMap<String, String> = parsed.query_pairs().into_owned().collect();
-    let code = query_params.get("code").expect("Should have code").clone();
-    let state = query_params
-        .get("state")
-        .expect("Should have state")
-        .clone();
-
-    let auth_response: crate::oauth2::AuthResponse = serde_json::from_value(json!({
-        "code": code,
-        "state": state,
-        "_id_token": null,
-    }))?;
-
-    // Build cookie with CSRF token
-    let mut cookie_hmap = http::HeaderMap::new();
-    cookie_hmap.insert(http::header::COOKIE, csrf_cookie_pair.parse()?);
-    let cookie: headers::Cookie = cookie_hmap.typed_get().expect("Should parse Cookie header");
-
-    // Build request headers
-    let mut headers = http::HeaderMap::new();
-    headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
-    headers.insert(
-        http::header::REFERER,
-        format!("{MOCK_BASE_URL}/oauth2/auth").parse().unwrap(),
-    );
+    // Step 2: Drive OAuth2 flow with session headers (stores session ID in cache)
+    let (auth_response, cookie, headers) =
+        drive_oauth2_flow("add_to_user", Some(&session_request_headers)).await?;
 
     // Step 3: Call get_authorized_core
     let result = get_authorized_core(&auth_response, &cookie, &headers).await;
@@ -912,9 +887,6 @@ async fn test_get_authorized_core_add_to_user() -> Result<(), Box<dyn std::error
         "first-user",
         "Linked account should belong to the first user"
     );
-
-    // Reset mock to default state
-    mock.reset_to_first_user();
 
     Ok(())
 }
