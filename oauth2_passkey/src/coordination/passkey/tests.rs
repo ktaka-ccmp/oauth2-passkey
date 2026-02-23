@@ -1097,6 +1097,125 @@ async fn test_finish_authentication_core_success() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+/// Test handle_finish_authentication_core rejects tampered signature
+///
+/// Verifies that the core correctly rejects an authentication attempt when the
+/// signature has been tampered with. This tests the cryptographic security boundary:
+/// a structurally valid assertion with an invalid signature must be rejected.
+///
+#[tokio::test]
+#[serial]
+async fn test_finish_authentication_core_tampered_signature()
+-> Result<(), Box<dyn std::error::Error>> {
+    use base64::{Engine as _, engine::general_purpose};
+
+    init_test_environment().await;
+
+    let origin = crate::test_utils::get_test_origin();
+    let credential_id = "first-user-test-passkey-credential";
+    let user_handle = "first-user-handle";
+
+    // Step 1: Start authentication (stores challenge in cache)
+    let body = serde_json::json!({});
+    let auth_options = handle_start_authentication_core(&body).await?;
+    let options_json = serde_json::to_value(&auth_options)?;
+    let challenge = options_json["challenge"]
+        .as_str()
+        .expect("Options should contain challenge");
+    let auth_id = options_json["authId"]
+        .as_str()
+        .expect("Options should contain authId");
+
+    // Step 2: Build a valid signed response, then tamper the signature
+    let mut auth_response_json = build_signed_authentication_response(
+        credential_id,
+        challenge,
+        auth_id,
+        user_handle,
+        &origin,
+    );
+
+    // Tamper: decode the real ECDSA signature, flip a byte in the r-value,
+    // and re-encode. This preserves DER structure but invalidates the signature.
+    let sig_str = auth_response_json["response"]["signature"]
+        .as_str()
+        .expect("Response should contain signature");
+    let mut sig_bytes = general_purpose::URL_SAFE_NO_PAD
+        .decode(sig_str)
+        .expect("Signature should be valid base64url");
+    sig_bytes[10] ^= 0xFF;
+    let tampered_sig = general_purpose::URL_SAFE_NO_PAD.encode(&sig_bytes);
+    auth_response_json["response"]["signature"] = serde_json::Value::String(tampered_sig);
+
+    let auth_response: AuthenticatorResponse = serde_json::from_value(auth_response_json)?;
+
+    // Step 3: Finish authentication should reject the tampered signature
+    let result = handle_finish_authentication_core(auth_response, None).await;
+    assert!(
+        result.is_err(),
+        "Tampered signature should be rejected, but got: {result:?}"
+    );
+    assert!(
+        matches!(result, Err(CoordinationError::PasskeyError(_))),
+        "Should return PasskeyError for tampered signature: {result:?}"
+    );
+
+    Ok(())
+}
+
+/// Test handle_finish_authentication_core rejects mismatched challenge
+///
+/// Verifies that the core correctly rejects an authentication attempt when the
+/// challenge in the client data does not match the stored challenge. This tests
+/// the replay protection mechanism: each authentication must use the exact
+/// challenge that was issued by the server.
+///
+#[tokio::test]
+#[serial]
+async fn test_finish_authentication_core_challenge_mismatch()
+-> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+
+    let origin = crate::test_utils::get_test_origin();
+    let credential_id = "first-user-test-passkey-credential";
+    let user_handle = "first-user-handle";
+
+    // Step 1: Start authentication (stores challenge C1 in cache)
+    let body = serde_json::json!({});
+    let auth_options = handle_start_authentication_core(&body).await?;
+    let options_json = serde_json::to_value(&auth_options)?;
+    let auth_id = options_json["authId"]
+        .as_str()
+        .expect("Options should contain authId");
+
+    // Step 2: Build signed response using a WRONG challenge.
+    // The signature is cryptographically valid over the wrong challenge,
+    // but the server will detect the mismatch when comparing client_data.challenge
+    // against the stored challenge.
+    let wrong_challenge = "d3JvbmdfY2hhbGxlbmdlX3ZhbHVlX2Zvcl90ZXN0aW5n";
+    let auth_response_json = build_signed_authentication_response(
+        credential_id,
+        wrong_challenge,
+        auth_id,
+        user_handle,
+        &origin,
+    );
+    let auth_response: AuthenticatorResponse = serde_json::from_value(auth_response_json)?;
+
+    // Step 3: Finish authentication should reject the challenge mismatch
+    let result = handle_finish_authentication_core(auth_response, None).await;
+    assert!(
+        result.is_err(),
+        "Challenge mismatch should be rejected, but got: {result:?}"
+    );
+    assert!(
+        matches!(result, Err(CoordinationError::PasskeyError(_))),
+        "Should return PasskeyError for challenge mismatch: {result:?}"
+    );
+
+    Ok(())
+}
+
 /// Test default field mappings
 ///
 /// This test verifies that `get_passkey_field_mappings` returns the default field mappings
