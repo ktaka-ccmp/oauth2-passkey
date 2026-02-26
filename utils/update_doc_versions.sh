@@ -4,26 +4,42 @@
 # like `version = "X.Y"` and updates them to the specified version.
 #
 # Usage:
-#   ./utils/update_doc_versions.sh 0.4        # Update to 0.4
-#   ./utils/update_doc_versions.sh 0.4 --dry   # Preview changes only
+#   ./utils/update_doc_versions.sh            # Auto-detect from Cargo.toml
+#   ./utils/update_doc_versions.sh --dry      # Auto-detect, preview only
+#   ./utils/update_doc_versions.sh 0.4        # Override to 0.4
+#   ./utils/update_doc_versions.sh 0.4 --dry  # Override to 0.4, preview only
 #
 # This script is called automatically by release.sh but can also be
 # run manually when version numbers need updating outside of a release.
 
 set -e
 
-if [ -z "$1" ]; then
-    echo "Usage: $0 <major.minor> [--dry]"
-    echo "Example: $0 0.4"
-    echo "         $0 0.4 --dry"
-    exit 1
-fi
+# Auto-detect version from workspace Cargo.toml (extract major.minor from e.g. "0.3.1-dev")
+auto_detect_version() {
+    local cargo_toml="Cargo.toml"
+    if [ ! -f "$cargo_toml" ]; then
+        echo "Error: $cargo_toml not found. Run from project root." >&2
+        return 1
+    fi
+    grep '^version = ' "$cargo_toml" | head -1 | sed 's/.*"\([0-9]*\.[0-9]*\).*/\1/'
+}
 
-TARGET_VERSION="$1"
+# Parse arguments
 DRY_RUN=false
+TARGET_VERSION=""
 
-if [ "$2" = "--dry" ]; then
-    DRY_RUN=true
+for arg in "$@"; do
+    if [ "$arg" = "--dry" ]; then
+        DRY_RUN=true
+    elif [ -z "$TARGET_VERSION" ]; then
+        TARGET_VERSION="$arg"
+    fi
+done
+
+# Auto-detect if no version specified
+if [ -z "$TARGET_VERSION" ]; then
+    TARGET_VERSION=$(auto_detect_version) || exit 1
+    echo "Auto-detected version: $TARGET_VERSION (from Cargo.toml)"
 fi
 
 # Validate format: X.Y

@@ -87,4 +87,3 @@
 - [Type-Safe Validation](appendix/type-safe.md)
 - [Storage Pattern](appendix/storage-pattern.md)
 - [Troubleshooting](appendix/troubleshooting.md)
-

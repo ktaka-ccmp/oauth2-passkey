@@ -68,4 +68,3 @@ See detailed analysis and proposed solutions in `docs/src/archived/design-propos
 - Reason: This is a key usability barrier for library adoption
 
 ## Resolution
-

@@ -73,4 +73,3 @@ Review and document all public interfaces across both crates (`oauth2-passkey` a
 - Reason: 1.0 release is a major milestone requiring thorough API review
 
 ## Resolution
-

@@ -92,4 +92,3 @@ Incremental improvements prioritized by impact. Start with accessibility and ale
 - Reason: The built-in UI is functional and themed. These are polish improvements that can be done incrementally. Individual sub-tasks can be split into separate issues if needed
 
 ## Resolution
-
