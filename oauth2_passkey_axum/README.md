@@ -7,7 +7,7 @@
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![MSRV](https://img.shields.io/badge/MSRV-1.88-blue)](https://blog.rust-lang.org/2025/02/20/Rust-1.88.0.html)
 
-Axum web framework integration for the [`oauth2-passkey`](../oauth2_passkey) authentication library.
+Axum web framework integration for the [`oauth2-passkey`](https://crates.io/crates/oauth2-passkey) authentication library.
 
 This crate provides ready-to-use Axum handlers, middleware, and UI components for OAuth2 and passkey authentication in your Axum web applications.
 
@@ -54,7 +54,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-oauth2-passkey-axum = "0.2"
+oauth2-passkey-axum = "0.3"
 ```
 
 ### Prepare .env
@@ -138,15 +138,17 @@ let app = Router::new()
 
 ## Feature Flags
 
-- `default = ["admin-ui", "user-ui"]` - Enable all UI components
+- `default = ["login-ui", "user-ui", "admin-ui"]` - Enable all UI components
+- `login-ui` - Include built-in login page
+- `user-ui` - Include user account management pages
 - `admin-ui` - Include admin interface for user management
-- `user-ui` - Include user authentication pages
 
 Disable features you don't need:
 
 ```toml
 [dependencies]
-oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["user-ui"] }
+# Custom login page, keep built-in account management and admin UI
+oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["user-ui", "admin-ui"] }
 ```
 
 ## Available Routes
@@ -173,9 +175,11 @@ You can change this prefix by setting the `O2P_ROUTE_PREFIX` environment variabl
 
 ### UI Components
 
-**User Interface** (requires `user-ui` feature):
-- `GET /o2p/ui/login` - Login page
-- `GET /o2p/ui/summary` - User dashboard
+**Login Page** (requires `login-ui` feature):
+- `GET /o2p/user/login` - Login page
+
+**Account Management** (requires `user-ui` feature):
+- `GET /o2p/user/account` - User account page
 
 **Admin Interface** (requires `admin-ui` feature):
 - `GET /o2p/admin/index` - User management (admin only)

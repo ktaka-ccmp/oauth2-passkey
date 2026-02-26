@@ -1,4 +1,4 @@
-# Chapter 21: Axum Integration API (oauth2-passkey-axum)
+# Axum Integration API (oauth2-passkey-axum)
 
 ## Overview
 
@@ -405,20 +405,21 @@ Endpoints marked with * are controlled by feature flags:
 
 | Feature | Default | Endpoints Affected |
 |---------|---------|-------------------|
-| `user-ui` | ON | `/user/login`, `/user/account`, `/user/info`, `/user/csrf_token`, `/user/login_history_page`, static files |
+| `login-ui` | ON | `/user/login` |
+| `user-ui` | ON | `/user/account`, `/user/account.js`, `/user/o2p-base.css` |
 | `admin-ui` | ON | `/admin/index`, `/admin/user/{id}`, `/admin/sessions`, `/admin/user/{id}/logout`, admin static files |
 
-API endpoints (authentication, CRUD operations) are always available regardless of feature flags.
+API endpoints (`/user/info`, `/user/csrf_token`, `/user/logout`, `/user/update`, `/user/delete`, authentication, CRUD operations) are always available regardless of feature flags.
 
 ```toml
 # Disable all built-in UI
-oauth2-passkey-axum = { version = "0.2", default-features = false }
+oauth2-passkey-axum = { version = "0.3", default-features = false }
 
-# Keep user UI, disable admin UI
-oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["user-ui"] }
+# Custom login page, keep account management and admin UI
+oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["user-ui", "admin-ui"] }
 
-# Keep admin UI, disable user UI
-oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["admin-ui"] }
+# Keep admin UI only
+oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["login-ui", "admin-ui"] }
 ```
 
 ### Additional Router: `passkey_well_known_router()`

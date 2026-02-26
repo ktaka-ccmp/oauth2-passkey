@@ -41,6 +41,7 @@ pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
     let _ = *config::OAUTH2_REDIRECT_URI; // This will validate ORIGIN
     let _ = *config::OAUTH2_GOOGLE_CLIENT_ID;
     let _ = *config::OAUTH2_GOOGLE_CLIENT_SECRET;
+    let _ = *config::OAUTH2_RESPONSE_MODE;
 
     // Initialize the storage layer
     crate::storage::init()

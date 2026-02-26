@@ -92,8 +92,32 @@ pub use router::{oauth2_passkey_full_router, oauth2_passkey_router};
 // Axum extractor for authenticated users
 pub use session::AuthUser;
 
-// Re-export the route prefix and initialization function from oauth2_passkey crate
-pub use oauth2_passkey::{CsrfHeaderVerified, CsrfToken, O2P_ROUTE_PREFIX, init};
+// Re-export the route prefix and types from oauth2_passkey crate
+pub use oauth2_passkey::{CsrfHeaderVerified, CsrfToken, O2P_ROUTE_PREFIX};
+
+/// Initialize the authentication system
+///
+/// This must be called before using any authentication functionality.
+/// It initializes the underlying storage (database, cache) and validates
+/// configuration (e.g., `O2P_LOGIN_URL` when `login-ui` feature is disabled).
+///
+/// # Errors
+///
+/// Returns an error if initialization of any subsystem fails.
+///
+/// # Panics
+///
+/// Panics if `O2P_LOGIN_URL` is not set via environment variable when the
+/// `login-ui` feature is disabled. This prevents redirect loops at runtime.
+pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
+    oauth2_passkey::init().await?;
+
+    // Force evaluation of O2P_LOGIN_URL at startup so misconfiguration
+    // panics immediately rather than on the first unauthenticated request
+    let _ = *config::O2P_LOGIN_URL;
+
+    Ok(())
+}
 
 // Re-export types and functions for custom summary pages
 pub use oauth2_passkey::{

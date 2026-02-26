@@ -1,4 +1,4 @@
-# Chapter 20: Core Library API (oauth2-passkey)
+# Core Library API (oauth2-passkey)
 
 ## Overview
 

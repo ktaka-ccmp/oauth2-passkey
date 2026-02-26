@@ -13,9 +13,10 @@ categories = ["authentication", "web-programming"]
 readme = "README.md"
 
 [features]
-default = ["admin-ui", "user-ui"]
-admin-ui = []
+default = ["login-ui", "user-ui", "admin-ui"]
+login-ui = []
 user-ui = []
+admin-ui = []
 cors = ["dep:tower-http"]
 bundled-tls = ["oauth2-passkey/bundled-tls"]
 
@@ -38,5 +39,19 @@ tracing = { workspace = true }
 urlencoding = { workspace = true }
 
 [dev-dependencies]
+base64 = { workspace = true }
+ciborium = { workspace = true }
 dotenvy = { workspace = true }
+jsonwebtoken = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+ring = { workspace = true }
+sha2 = { workspace = true }
 tokio = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+
+[[test]]
+name = "security"
+path = "tests-security/lib.rs"

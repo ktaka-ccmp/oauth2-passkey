@@ -1,4 +1,4 @@
-# Chapter 8: Security Model
+# Security Model
 
 ## Overview
 

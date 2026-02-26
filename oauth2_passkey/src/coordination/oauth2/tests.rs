@@ -5,6 +5,13 @@ use crate::userdb::User;
 use chrono::Utc;
 use serial_test::serial;
 
+// Additional imports for mock OAuth2 server tests
+use axum::routing::{get, post};
+use headers::HeaderMapExt;
+use serde_json::json;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex as StdMutex};
+
 /// Test OAuth2 field mappings return expected defaults
 ///
 /// This test verifies that OAuth2 field mappings return the correct default values
@@ -234,6 +241,651 @@ async fn test_delete_oauth2_account_core_unauthorized() -> Result<(), Box<dyn st
     assert!(
         matches!(result, Err(CoordinationError::Unauthorized)),
         "Expected Unauthorized error, got: {result:?}"
+    );
+
+    Ok(())
+}
+
+// =============================================================================
+// Mock OAuth2 Server Infrastructure for core-layer testing
+// =============================================================================
+
+const MOCK_PORT: u16 = 19876;
+const MOCK_BASE_URL: &str = "http://127.0.0.1:19876";
+const JWT_SECRET: &[u8] = b"test_secret";
+
+/// Auth code -> stored request data for nonce/PKCE correlation
+struct StoredAuthRequest {
+    nonce: Option<String>,
+    code_challenge: Option<String>,
+}
+
+#[derive(Clone)]
+struct MockServerState {
+    auth_codes: Arc<StdMutex<HashMap<String, StoredAuthRequest>>>,
+    user_email: Arc<StdMutex<String>>,
+    user_sub: Arc<StdMutex<String>>,
+    user_name: Arc<StdMutex<String>>,
+}
+
+impl Default for MockServerState {
+    fn default() -> Self {
+        Self {
+            auth_codes: Arc::new(StdMutex::new(HashMap::new())),
+            user_email: Arc::new(StdMutex::new("first-user@example.com".to_string())),
+            // Note: From<IdInfo> adds "google_" prefix to sub, so sub should NOT include it.
+            // "first-user-test-google-id" -> provider_user_id = "google_first-user-test-google-id"
+            user_sub: Arc::new(StdMutex::new("first-user-test-google-id".to_string())),
+            user_name: Arc::new(StdMutex::new("First User".to_string())),
+        }
+    }
+}
+
+struct MockServerHandle {
+    state: MockServerState,
+}
+
+impl MockServerHandle {
+    fn configure_user(&self, email: &str, sub: &str, name: &str) {
+        *self.state.user_email.lock().unwrap() = email.to_string();
+        *self.state.user_sub.lock().unwrap() = sub.to_string();
+        *self.state.user_name.lock().unwrap() = name.to_string();
+    }
+
+    fn reset_to_first_user(&self) {
+        self.configure_user(
+            "first-user@example.com",
+            "first-user-test-google-id",
+            "First User",
+        );
+    }
+
+    /// Configure mock user and return an RAII guard that resets to the first user on drop.
+    /// This ensures cleanup even if the test panics between configure and manual reset.
+    fn configure_user_guarded(&self, email: &str, sub: &str, name: &str) -> MockUserGuard<'_> {
+        self.configure_user(email, sub, name);
+        MockUserGuard { handle: self }
+    }
+}
+
+/// RAII guard that resets mock server user state to the first user on drop.
+/// Prevents state leakage between `#[serial]` tests if a test panics.
+struct MockUserGuard<'a> {
+    handle: &'a MockServerHandle,
+}
+
+impl Drop for MockUserGuard<'_> {
+    fn drop(&mut self) {
+        self.handle.reset_to_first_user();
+    }
+}
+
+static MOCK_SERVER: LazyLock<MockServerHandle> = LazyLock::new(|| {
+    let state = MockServerState::default();
+    let state_for_server = state.clone();
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("Failed to create tokio runtime for core mock OAuth2 server");
+        rt.block_on(async {
+            let app = axum::Router::new()
+                .route("/oauth2/auth", get(mock_auth_handler))
+                .route("/oauth2/token", post(mock_token_handler))
+                .route("/oauth2/v3/certs", get(mock_jwks_handler))
+                .route("/oauth2/userinfo", get(mock_userinfo_handler))
+                .with_state(state_for_server);
+
+            let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{MOCK_PORT}"))
+                .await
+                .expect("Failed to bind core mock OAuth2 server");
+            axum::serve(listener, app)
+                .await
+                .expect("Core mock OAuth2 server failed");
+        });
+    });
+
+    // Wait for TCP readiness
+    for _ in 0..50 {
+        if std::net::TcpStream::connect(format!("127.0.0.1:{MOCK_PORT}")).is_ok() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    std::net::TcpStream::connect(format!("127.0.0.1:{MOCK_PORT}"))
+        .expect("Core mock OAuth2 server failed to start within timeout");
+
+    MockServerHandle { state }
+});
+
+fn ensure_mock_server() -> &'static MockServerHandle {
+    &MOCK_SERVER
+}
+
+// --- Mock server handlers ---
+
+async fn mock_auth_handler(
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+    axum::extract::State(state): axum::extract::State<MockServerState>,
+) -> axum::response::Redirect {
+    let auth_code = uuid::Uuid::new_v4().to_string();
+    let redirect_uri = params.get("redirect_uri").cloned().unwrap_or_default();
+
+    state.auth_codes.lock().unwrap().insert(
+        auth_code.clone(),
+        StoredAuthRequest {
+            nonce: params.get("nonce").cloned(),
+            code_challenge: params.get("code_challenge").cloned(),
+        },
+    );
+
+    let state_param = params.get("state").cloned().unwrap_or_default();
+    axum::response::Redirect::to(&format!(
+        "{redirect_uri}?code={auth_code}&state={state_param}"
+    ))
+}
+
+async fn mock_token_handler(
+    axum::extract::State(state): axum::extract::State<MockServerState>,
+    axum::extract::Form(params): axum::extract::Form<HashMap<String, String>>,
+) -> Result<axum::Json<serde_json::Value>, axum::http::StatusCode> {
+    let code = params
+        .get("code")
+        .ok_or(axum::http::StatusCode::BAD_REQUEST)?;
+    let code_verifier = params.get("code_verifier");
+
+    let auth_req = state
+        .auth_codes
+        .lock()
+        .unwrap()
+        .remove(code)
+        .ok_or(axum::http::StatusCode::BAD_REQUEST)?;
+
+    // Validate PKCE (S256)
+    if let Some(challenge) = &auth_req.code_challenge {
+        let verifier = code_verifier.ok_or(axum::http::StatusCode::BAD_REQUEST)?;
+        use base64::Engine as _;
+        use sha2::{Digest, Sha256};
+        let computed = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(Sha256::digest(verifier.as_bytes()));
+        if computed != *challenge {
+            return Err(axum::http::StatusCode::BAD_REQUEST);
+        }
+    }
+
+    let email = state.user_email.lock().unwrap().clone();
+    let sub = state.user_sub.lock().unwrap().clone();
+    let name = state.user_name.lock().unwrap().clone();
+    let id_token = create_mock_jwt(&email, &sub, &name, auth_req.nonce.as_deref());
+
+    Ok(axum::Json(json!({
+        "access_token": "mock_access_token",
+        "id_token": id_token,
+        "token_type": "Bearer",
+        "expires_in": 3600,
+        "scope": "openid email profile"
+    })))
+}
+
+async fn mock_jwks_handler() -> axum::Json<serde_json::Value> {
+    use base64::Engine as _;
+    axum::Json(json!({
+        "keys": [{
+            "kty": "oct",
+            "kid": "mock_key_id",
+            "use": "sig",
+            "alg": "HS256",
+            "k": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(JWT_SECRET)
+        }]
+    }))
+}
+
+async fn mock_userinfo_handler(
+    axum::extract::State(state): axum::extract::State<MockServerState>,
+) -> axum::Json<serde_json::Value> {
+    let email = state.user_email.lock().unwrap().clone();
+    let sub = state.user_sub.lock().unwrap().clone();
+    let name = state.user_name.lock().unwrap().clone();
+    let parts: Vec<&str> = name.splitn(2, ' ').collect();
+    let given_name = parts.first().copied().unwrap_or(&name);
+    let family_name = parts.get(1).copied().unwrap_or("");
+
+    axum::Json(json!({
+        "sub": sub,
+        "email": email,
+        "name": name,
+        "given_name": given_name,
+        "family_name": family_name,
+        "picture": "https://example.com/photo.jpg",
+        "email_verified": true
+    }))
+}
+
+fn create_mock_jwt(email: &str, sub: &str, name: &str, nonce: Option<&str>) -> String {
+    use jsonwebtoken::{EncodingKey, Header, encode};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let parts: Vec<&str> = name.splitn(2, ' ').collect();
+    let given_name = parts.first().copied().unwrap_or(name);
+    let family_name = parts.get(1).copied().unwrap_or("");
+
+    let mut claims = json!({
+        "iss": MOCK_BASE_URL,
+        "sub": sub,
+        "aud": "test-client-id.apps.googleusercontent.com",
+        "azp": "test-client-id.apps.googleusercontent.com",
+        "exp": now + 3600,
+        "iat": now,
+        "email": email,
+        "name": name,
+        "given_name": given_name,
+        "family_name": family_name,
+        "email_verified": true
+    });
+
+    if let Some(nonce_value) = nonce {
+        claims["nonce"] = json!(nonce_value);
+    }
+
+    let mut header = Header::new(jsonwebtoken::Algorithm::HS256);
+    header.kid = Some("mock_key_id".to_string());
+    encode(&header, &claims, &EncodingKey::from_secret(JWT_SECRET))
+        .expect("Failed to create mock JWT")
+}
+
+// =============================================================================
+// Test Helpers
+// =============================================================================
+
+/// Set environment variables to point OAuth2 endpoints at the mock server.
+///
+/// Uses dotenvy::from_filename_override to set env vars without unsafe code,
+/// since the crate has #![forbid(unsafe_code)] and std::env::set_var is unsafe
+/// in Rust 2024 edition.
+fn set_mock_env_vars() {
+    use std::io::Write;
+
+    let env_content = format!(
+        "OAUTH2_AUTH_URL='{MOCK_BASE_URL}/oauth2/auth'\n\
+         OAUTH2_TOKEN_URL='{MOCK_BASE_URL}/oauth2/token'\n\
+         OAUTH2_JWKS_URL='{MOCK_BASE_URL}/oauth2/v3/certs'\n\
+         OAUTH2_USERINFO_URL='{MOCK_BASE_URL}/oauth2/userinfo'\n\
+         OAUTH2_EXPECTED_ISSUER='{MOCK_BASE_URL}'\n"
+    );
+    let temp_path = "/tmp/oauth2_passkey_core_mock_env";
+    let mut file =
+        std::fs::File::create(temp_path).expect("Failed to create temp env file for mock");
+    file.write_all(env_content.as_bytes())
+        .expect("Failed to write temp env file for mock");
+    dotenvy::from_filename_override(temp_path).expect("Failed to load mock env vars");
+}
+
+/// Drive a complete OAuth2 authorization flow through the mock server.
+///
+/// `extra_request_headers` allows injecting additional headers (e.g., session cookie)
+/// into the `prepare_oauth2_auth_request` call. This is needed for the `add_to_user`
+/// flow where a session cookie must be present so the session ID is stored in cache.
+///
+/// Returns (AuthResponse, Cookie, HeaderMap) ready for `get_authorized_core()`.
+async fn drive_oauth2_flow(
+    mode: &str,
+    extra_request_headers: Option<&http::HeaderMap>,
+) -> Result<
+    (
+        crate::oauth2::AuthResponse,
+        headers::Cookie,
+        http::HeaderMap,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    // 1. Prepare OAuth2 auth request (generates CSRF, nonce, PKCE, stores in cache)
+    let mut request_headers = http::HeaderMap::new();
+    request_headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
+    if let Some(extra) = extra_request_headers {
+        for (key, value) in extra {
+            request_headers.insert(key.clone(), value.clone());
+        }
+    }
+
+    let (auth_url, response_headers) =
+        crate::oauth2::prepare_oauth2_auth_request(request_headers, Some(mode)).await?;
+
+    // 2. Extract CSRF cookie value from Set-Cookie header
+    let set_cookie = response_headers
+        .get(http::header::SET_COOKIE)
+        .expect("prepare_oauth2_auth_request should set CSRF cookie")
+        .to_str()?;
+    let csrf_cookie_pair = set_cookie
+        .split(';')
+        .next()
+        .expect("Set-Cookie should have name=value");
+
+    // 3. Hit mock auth endpoint (no redirect following) to get auth code
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+    let mock_response = client.get(&auth_url).send().await?;
+
+    let location = mock_response
+        .headers()
+        .get(http::header::LOCATION)
+        .expect("Mock auth should return redirect with Location header")
+        .to_str()?;
+
+    // 4. Parse code and state from redirect URL
+    let parsed = url::Url::parse(location)?;
+    let query_params: HashMap<String, String> = parsed.query_pairs().into_owned().collect();
+    let code = query_params
+        .get("code")
+        .expect("Redirect should have code param")
+        .clone();
+    let state = query_params
+        .get("state")
+        .expect("Redirect should have state param")
+        .clone();
+
+    // 5. Build AuthResponse via deserialization (fields are non-public)
+    let auth_response: crate::oauth2::AuthResponse = serde_json::from_value(json!({
+        "code": code,
+        "state": state,
+        "_id_token": null,
+    }))?;
+
+    // 6. Build Cookie with CSRF token
+    let mut cookie_header_map = http::HeaderMap::new();
+    cookie_header_map.insert(http::header::COOKIE, csrf_cookie_pair.parse()?);
+    let cookie: headers::Cookie = cookie_header_map
+        .typed_get()
+        .expect("Should parse Cookie header");
+
+    // 7. Build request headers (User-Agent + Referer for origin validation)
+    let mut headers = http::HeaderMap::new();
+    headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
+    // For query response mode (GET redirect), validate_origin checks Origin or Referer
+    headers.insert(
+        http::header::REFERER,
+        format!("{MOCK_BASE_URL}/oauth2/auth").parse().unwrap(),
+    );
+
+    Ok((auth_response, cookie, headers))
+}
+
+// =============================================================================
+// OAuth2 _core() Tests
+// =============================================================================
+
+/// Test that calling post_authorized_core fails when OAUTH2_RESPONSE_MODE is "query"
+///
+/// This test verifies the HTTP method vs response mode validation works correctly.
+/// When RESPONSE_MODE is "query", only GET is allowed; POST should be rejected
+/// immediately before any HTTP calls to the OAuth2 provider.
+#[tokio::test]
+#[serial]
+async fn test_post_authorized_core_wrong_response_mode() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+
+    // Construct a dummy AuthResponse (content doesn't matter - error is returned before processing)
+    let auth_response: crate::oauth2::AuthResponse = serde_json::from_value(json!({
+        "code": "dummy_code",
+        "state": "dummy_state",
+        "_id_token": null,
+    }))?;
+
+    // Construct dummy cookie and headers (also don't matter for this test)
+    let mut cookie_hmap = http::HeaderMap::new();
+    cookie_hmap.insert(http::header::COOKIE, "dummy=value".parse().unwrap());
+    let cookie: headers::Cookie = cookie_hmap.typed_get().expect("Should parse Cookie header");
+
+    let result = post_authorized_core(&auth_response, &cookie, &http::HeaderMap::new()).await;
+
+    assert!(
+        matches!(result, Err(CoordinationError::InvalidResponseMode(_))),
+        "Expected InvalidResponseMode error for POST with query mode, got: {result:?}"
+    );
+
+    Ok(())
+}
+
+/// Test get_authorized_core with "login" mode when the OAuth2 account already exists
+///
+/// The first test user (created by init_test_environment) has an existing OAuth2 account
+/// with provider_user_id "google_first-user-test-google-id". Logging in with matching
+/// credentials should succeed and return a session cookie.
+#[tokio::test]
+#[serial]
+async fn test_get_authorized_core_login_existing_user() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let mock = ensure_mock_server();
+    set_mock_env_vars();
+    mock.reset_to_first_user();
+
+    let (auth_response, cookie, headers) = drive_oauth2_flow("login", None).await?;
+    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+
+    assert!(
+        result.is_ok(),
+        "Login with existing account should succeed: {result:?}"
+    );
+    let (response_headers, message) = result.unwrap();
+
+    // Should have Set-Cookie header with session
+    assert!(
+        response_headers.get(http::header::SET_COOKIE).is_some(),
+        "Response should include Set-Cookie header for session"
+    );
+    assert!(
+        message.contains("Signing in"),
+        "Message should indicate sign-in: {message}"
+    );
+
+    Ok(())
+}
+
+/// Test get_authorized_core with "login" mode when the OAuth2 account does not exist
+///
+/// When a user tries to log in but their OAuth2 account is not registered,
+/// the function should return a Conflict error.
+#[tokio::test]
+#[serial]
+async fn test_get_authorized_core_login_nonexistent_account()
+-> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let mock = ensure_mock_server();
+    set_mock_env_vars();
+
+    // Configure mock with a user that has no existing account in the database.
+    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Guard resets to first user on drop (panic-safe).
+    let _guard = mock.configure_user_guarded(
+        "nonexistent@example.com",
+        "nonexistent-user-id",
+        "Nonexistent User",
+    );
+
+    let (auth_response, cookie, headers) = drive_oauth2_flow("login", None).await?;
+    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+
+    assert!(
+        matches!(result, Err(CoordinationError::Conflict(_))),
+        "Login with nonexistent account should return Conflict error, got: {result:?}"
+    );
+
+    Ok(())
+}
+
+/// Test get_authorized_core with "create_user" mode to create a new user
+///
+/// When creating a new user with a new OAuth2 identity, the function should
+/// create both a User and an OAuth2Account in the database.
+#[tokio::test]
+#[serial]
+async fn test_get_authorized_core_create_new_user() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let mock = ensure_mock_server();
+    set_mock_env_vars();
+
+    // Configure mock with a new user identity.
+    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Guard resets to first user on drop (panic-safe).
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let new_email = format!("new-user-{timestamp}@example.com");
+    let new_sub = format!("new-user-{timestamp}");
+    let new_name = format!("New User {timestamp}");
+    let _guard = mock.configure_user_guarded(&new_email, &new_sub, &new_name);
+
+    let (auth_response, cookie, headers) = drive_oauth2_flow("create_user", None).await?;
+    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+
+    assert!(
+        result.is_ok(),
+        "Creating new user should succeed: {result:?}"
+    );
+    let (response_headers, message) = result.unwrap();
+
+    assert!(
+        response_headers.get(http::header::SET_COOKIE).is_some(),
+        "Response should include Set-Cookie header for session"
+    );
+    assert!(
+        message.contains("Created new user"),
+        "Message should indicate user creation: {message}"
+    );
+
+    // Verify the OAuth2 account was created in the database
+    // From<IdInfo> adds "google_" prefix to sub -> provider_user_id
+    let expected_provider_user_id = format!("google_{new_sub}");
+    let provider = crate::oauth2::Provider::new("google".to_string()).unwrap();
+    let provider_user_id = crate::oauth2::ProviderUserId::new(expected_provider_user_id).unwrap();
+    let account =
+        crate::oauth2::OAuth2Store::get_oauth2_account_by_provider(provider, provider_user_id)
+            .await?;
+    assert!(
+        account.is_some(),
+        "OAuth2 account should exist in database after creation"
+    );
+
+    Ok(())
+}
+
+/// Test get_authorized_core with "create_user_or_login" mode
+///
+/// This mode should:
+/// - Create a new user when the OAuth2 account doesn't exist
+/// - Log in when the OAuth2 account already exists
+#[tokio::test]
+#[serial]
+async fn test_get_authorized_core_create_user_or_login() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let mock = ensure_mock_server();
+    set_mock_env_vars();
+
+    // Part 1: Create user (new OAuth2 identity).
+    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Guard resets to first user on drop (panic-safe).
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let new_email = format!("dual-mode-{timestamp}@example.com");
+    let new_sub = format!("dual-mode-{timestamp}");
+    let new_name = format!("Dual Mode User {timestamp}");
+    let _guard = mock.configure_user_guarded(&new_email, &new_sub, &new_name);
+
+    let (auth_response, cookie, headers) = drive_oauth2_flow("create_user_or_login", None).await?;
+    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+    assert!(
+        result.is_ok(),
+        "create_user_or_login with new identity should succeed: {result:?}"
+    );
+    let (_headers, message) = result.unwrap();
+    assert!(
+        message.contains("Created new user"),
+        "Should create new user: {message}"
+    );
+
+    // Part 2: Login (same OAuth2 identity, now exists)
+    let (auth_response, cookie, headers) = drive_oauth2_flow("create_user_or_login", None).await?;
+    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+    assert!(
+        result.is_ok(),
+        "create_user_or_login with existing identity should succeed: {result:?}"
+    );
+    let (_headers, message) = result.unwrap();
+    assert!(
+        message.contains("Signing in"),
+        "Should sign in with existing account: {message}"
+    );
+
+    Ok(())
+}
+
+/// Test get_authorized_core with "add_to_user" mode to link OAuth2 to an existing session
+///
+/// When a user is already logged in (has a session) and uses "add_to_user" mode,
+/// the new OAuth2 account should be linked to the existing user.
+#[tokio::test]
+#[serial]
+async fn test_get_authorized_core_add_to_user() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let mock = ensure_mock_server();
+    set_mock_env_vars();
+
+    // Step 1: Create a session for the first user (simulate being logged in)
+    let first_user_id = UserId::new("first-user".to_string()).expect("Valid user ID");
+    let session_headers = crate::session::new_session_header(first_user_id).await?;
+
+    // Extract session cookie from the response headers
+    let session_set_cookie = session_headers
+        .get(http::header::SET_COOKIE)
+        .expect("new_session_header should set session cookie")
+        .to_str()?;
+
+    // Build extra headers with session cookie for prepare_oauth2_auth_request
+    let mut session_request_headers = http::HeaderMap::new();
+    let session_cookie_pair = session_set_cookie
+        .split(';')
+        .next()
+        .expect("Set-Cookie should have name=value");
+    session_request_headers.insert(http::header::COOKIE, session_cookie_pair.parse()?);
+
+    // Configure mock with a NEW OAuth2 identity to link.
+    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Guard resets to first user on drop (panic-safe).
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let link_email = format!("linked-{timestamp}@example.com");
+    let link_sub = format!("linked-{timestamp}");
+    let link_name = format!("Linked User {timestamp}");
+    let _guard = mock.configure_user_guarded(&link_email, &link_sub, &link_name);
+
+    // Step 2: Drive OAuth2 flow with session headers (stores session ID in cache)
+    let (auth_response, cookie, headers) =
+        drive_oauth2_flow("add_to_user", Some(&session_request_headers)).await?;
+
+    // Step 3: Call get_authorized_core
+    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+    assert!(result.is_ok(), "add_to_user should succeed: {result:?}");
+    let (_response_headers, message) = result.unwrap();
+    assert!(
+        message.contains("linked"),
+        "Message should indicate account linking: {message}"
+    );
+
+    // Verify the new OAuth2 account is linked to the first user
+    // From<IdInfo> adds "google_" prefix to sub -> provider_user_id
+    let expected_provider_user_id = format!("google_{link_sub}");
+    let provider = crate::oauth2::Provider::new("google".to_string()).unwrap();
+    let provider_user_id = crate::oauth2::ProviderUserId::new(expected_provider_user_id).unwrap();
+    let account =
+        crate::oauth2::OAuth2Store::get_oauth2_account_by_provider(provider, provider_user_id)
+            .await?;
+    assert!(account.is_some(), "Linked OAuth2 account should exist");
+    assert_eq!(
+        account.unwrap().user_id,
+        "first-user",
+        "Linked account should belong to the first user"
     );
 
     Ok(())

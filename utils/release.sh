@@ -111,6 +111,26 @@ validate_version() {
     fi
 }
 
+check_doc_versions() {
+    local version=$1
+    local major_minor="${version%.*}"
+    echo "📋 Checking documentation for outdated version numbers..."
+
+    local stale_files
+    stale_files=$(grep -rn "oauth2-passkey-axum.*version.*\"[0-9]\+\.[0-9]\+\"" \
+        docs/src/ Readme.md oauth2_passkey/README.md oauth2_passkey_axum/README.md \
+        --include='*.md' 2>/dev/null | grep -v "\"$major_minor\"" | grep -v archived/ || true)
+
+    if [ -n "$stale_files" ]; then
+        echo "⚠️  Found documentation with version numbers that don't match $major_minor:"
+        echo "$stale_files"
+        echo ""
+        echo "   Update these files before releasing."
+        return 1
+    fi
+    echo "✅ All documentation version numbers match $major_minor"
+}
+
 set_workspace_version() {
     local version=$1
     echo "📦 Setting workspace version $version"
@@ -239,6 +259,8 @@ fi
 
 next=$(increment_dev_version "$VERSION")
 echo "📋 Next development version: $next"
+
+check_doc_versions "$VERSION"
 
 ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
