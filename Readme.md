@@ -30,7 +30,7 @@ No setup required. Google account needed for OAuth2. Data is ephemeral (resets o
 
 ```toml
 [dependencies]
-oauth2-passkey-axum = "0.2"
+oauth2-passkey-axum = "0.3"
 ```
 
 **2. Set your environment variables:**

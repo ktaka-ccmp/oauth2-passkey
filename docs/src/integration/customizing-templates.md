@@ -216,7 +216,7 @@ To disable the built-in admin UI and create your own:
 ```toml
 # Cargo.toml
 [dependencies]
-oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["user-ui"] }
+oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["user-ui"] }
 ```
 
 ### Admin Privilege Check
@@ -453,26 +453,30 @@ cargo run
 
 After creating your custom pages, disable the corresponding built-in UI to avoid shipping unused code.
 
-The library provides two feature flags:
+The library provides three feature flags:
 
 | Feature | Default | Controls |
 | ------- | ------- | -------- |
-| `user-ui` | ON | Login and Summary pages |
-| `admin-ui` | ON | Admin List and Admin User pages |
+| `login-ui` | ON | Login page (`/user/login`) |
+| `user-ui` | ON | Account management page (`/user/account`) |
+| `admin-ui` | ON | Admin pages (`/admin/index`, `/admin/user/{id}`) |
 
 Configure these in your `Cargo.toml` based on which pages you're replacing:
 
 ```toml
 # Replace ALL pages with custom templates (recommended for full customization)
-oauth2-passkey-axum = { version = "0.2", default-features = false }
+oauth2-passkey-axum = { version = "0.3", default-features = false }
 
-# Replace only admin pages, keep built-in login/summary
-oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["user-ui"] }
+# Custom login page only, keep built-in account management and admin UI
+oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["user-ui", "admin-ui"] }
 
-# Replace only user pages, keep built-in admin
-oauth2-passkey-axum = { version = "0.2", default-features = false, features = ["admin-ui"] }
+# Replace only admin pages, keep built-in login and account management
+oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["login-ui", "user-ui"] }
+
+# Replace only user pages, keep built-in login and admin
+oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["login-ui", "admin-ui"] }
 ```
 
 **Note:** API endpoints (logout, delete account, admin operations, etc.) are always available regardless of feature flags. Only the HTML pages and their static assets are affected.
 
-See [demo-custom-login](https://github.com/anthropics/oauth2-passkey/tree/master/demo-custom-login) for a complete example with `default-features = false`.
+See [demo-custom-login](https://github.com/ktaka-ccmp/oauth2-passkey/tree/master/demo-custom-login) for a complete example with `default-features = false`.

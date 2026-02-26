@@ -6,13 +6,24 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (3)
+### Open (14)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
+| `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
+| `20260226-2019` | high | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
+| `20260226-2020` | medium | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
+| `20260226-2021` | medium | medium | [MySQL/MariaDB Database Support](open/20260226-2021-mysql-mariadb-support.md) |
+| `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
+| `20260226-2030` | low | medium | [AAGUID-Based Credential Deletion Collision](open/20260226-2030-aaguid-credential-deletion-collision.md) |
+| `20260226-2023` | low | small | [Authentication Method Tracking in Session](open/20260226-2023-auth-method-tracking-in-session.md) |
+| `20260226-2022` | low | large | [OAuth2 Token Storage](open/20260226-2022-oauth2-token-storage.md) |
+| `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
+| `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
+| `20260226-2026` | low | large | [UI Improvements](open/20260226-2026-ui-improvements.md) |
 
 ### Completed (43)
 
@@ -69,12 +80,13 @@ This directory contains issue/task tracking files for the project.
 | `20260212-0235` | [Standalone Demo Repository](wontfix/20260212-0235-standalone-demo-repository.md) |
 | `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
-### Deferred (2)
+### Deferred (3)
 
 | ID | Title |
 |----|-------|
 | `2026-01-23-01` | [Bearer Token Authentication Support](deferred/2026-01-23-bearer-token-support.md) |
 | `2026-01-30-06` | [Passkey Endpoint (.well-known) Support](deferred/2026-01-30-passkey-endpoint-wellknown.md) |
+| `20260226-2031` | [Attestation Certificate Chain Validation](deferred/20260226-2031-attestation-certificate-validation.md) |
 
 <!-- END AUTO-UPDATED -->
 

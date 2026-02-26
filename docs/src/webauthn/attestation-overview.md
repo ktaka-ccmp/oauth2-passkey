@@ -1,4 +1,4 @@
-# Chapter 15: Attestation Overview
+# Attestation Overview
 
 ## What is Attestation?
 

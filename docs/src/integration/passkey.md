@@ -1,4 +1,4 @@
-# Chapter 7: Passkey/WebAuthn Implementation
+# Passkey/WebAuthn Implementation
 
 This chapter provides a practical guide to implementing WebAuthn/Passkey authentication using the oauth2-passkey library. It covers both client-side JavaScript implementation and server-side Rust handlers.
 
