@@ -1,228 +1,255 @@
 # Type-Safe Validation
 
-The oauth2-passkey library implements comprehensive type-safe validation throughout the codebase to prevent authentication vulnerabilities and provide compile-time safety guarantees.
+## What Is Type-Safe Validation?
 
-## Problem Statement
+In authentication code, many values are plain strings: user IDs, session IDs, credential IDs, email addresses, and so on. When functions accept raw `String` parameters, the compiler cannot tell them apart. This leads to a class of bugs where values are accidentally swapped:
 
-The type-safe validation system was implemented to address critical security and consistency issues:
+```rust
+// Both parameters are String — the compiler accepts this without complaint
+fn delete_credential(session_id: String, credential_id: String) { /* ... */ }
 
-1. **Security Vulnerabilities**: Functions were trusting session data without database validation, enabling privilege escalation attacks
-2. **Backend Inconsistency**: Redis deployments had validation while Memory deployments didn't, creating deployment-specific vulnerabilities
-3. **Parameter Confusion**: Raw string parameters could be mixed up, leading to authentication logic errors
+// Bug: arguments are swapped, but the code compiles and runs
+delete_credential(credential_id, session_id);
+```
+
+This is especially dangerous in authentication systems where such a mix-up can cause privilege escalation or silent data corruption.
+
+**Type-safe validation** solves this by wrapping each string in a dedicated type (the "newtype pattern" in Rust):
+
+```rust
+// Each type is a thin wrapper around String
+pub struct SessionId(String);
+pub struct CredentialId(String);
+
+// Now the function signature enforces correct usage
+fn delete_credential(session_id: SessionId, credential_id: CredentialId) { /* ... */ }
+
+// Bug caught at compile time — this will not compile
+delete_credential(credential_id, session_id);
+//                ^^^^^^^^^^^^^ expected `SessionId`, found `CredentialId`
+```
+
+The wrapper types also validate their contents on construction (e.g., checking length, allowed characters), so invalid values are rejected immediately rather than causing errors deep in the system.
+
+## Why This Library Uses It
+
+Authentication code handles many different string identifiers (session IDs, user IDs, credential IDs, cache keys, etc.) that pass through multiple layers. Without type-safe wrappers, two categories of bugs can occur:
+
+1. **Parameter Confusion**: Raw string parameters can be silently swapped. For example, passing a `credential_id` where a `session_id` is expected compiles and runs, but produces incorrect behavior. In authentication code, this can lead to privilege escalation or data corruption.
+2. **Unvalidated Input**: Raw strings carry no guarantee about their contents. Malformed, empty, or overly long values can propagate deep into the system before causing failures. Cache keys could contain characters that trigger Redis command injection.
+
+By wrapping each identifier in its own type, these issues are caught at the point of entry: the compiler rejects type mix-ups, and the constructor rejects invalid input.
 
 ## Core Benefits
 
-- ✅ **Compile-time safety**: Impossible to construct invalid values or mix up parameter types
-- ✅ **Single validation point**: Validate once at construction, never again
-- ✅ **Consistent behavior**: Same validation rules regardless of backend/deployment
-- ✅ **Defense-in-depth**: Multiple layers of validation protection
-- ✅ **Performance**: Zero runtime overhead after construction
-- ✅ **Maintainability**: Centralized validation logic
+- **Compile-time safety**: Impossible to mix up parameter types (compiler rejects it)
+- **Input validation at the boundary**: Invalid values are rejected at construction, never propagated
+- **Single validation point**: Validate once at construction, never again
+- **Consistent behavior**: Same validation rules regardless of backend/deployment
+- **Performance**: Zero runtime overhead after construction (just a `String` wrapper)
+- **Maintainability**: Centralized validation logic per type
 
 ## Available Types
 
+All types follow the same newtype pattern. Here is the full implementation of `SessionId` as a representative example:
+
+```rust
+pub struct SessionId(String);  // Private inner field -- cannot be constructed directly
+
+impl SessionId {
+    pub fn new(id: String) -> Result<Self, SessionError> {
+        // Must not be empty
+        if id.is_empty() { return Err(SessionError::Validation("...".into())); }
+        // Session IDs need sufficient entropy
+        if id.len() < 10 { return Err(SessionError::Validation("...".into())); }
+        if id.len() > 256 { return Err(SessionError::Validation("...".into())); }
+        // URL-safe characters only (no whitespace)
+        if !id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~')) {
+            return Err(SessionError::Validation("...".into()));
+        }
+        Ok(SessionId(id))
+    }
+
+    pub fn as_str(&self) -> &str { &self.0 }
+}
+```
+
+Every type below works the same way: `new()` validates and returns `Result`, `as_str()` returns the inner string. The differences are in what each type accepts.
+
 ### Session & User Management
 
-#### `SessionId`
-Type-safe wrapper for session identifiers used in coordination layer functions.
-
 ```rust
-use oauth2_passkey::SessionId;
+// SessionId: session identifiers for coordination layer functions
+// Length: 10-256 | Chars: a-zA-Z0-9 - _ . ~ | Error: SessionError
+pub struct SessionId(String);
 
-// Create from string (validates length and characters)
-let session_id = SessionId::new("session_abc123".to_string())?;
+// UserId: user identifiers (database IDs)
+// Length: 1-255 | Chars: a-zA-Z0-9 - _ . @ + ( ) | Rejects: .. -- __ | Error: SessionError
+pub struct UserId(String);
 
-// Use in coordination functions
-let users = get_all_users(session_id).await?;
+// SessionCookie: HTTP session cookie values
+// Length: 10-1024 | Chars: a-zA-Z0-9 - _ = . + / | Error: SessionError
+pub struct SessionCookie(String);
 ```
 
-#### `UserId`
-Type-safe wrapper for user identifiers to prevent mixing up with other ID types.
-
+Usage:
 ```rust
-use oauth2_passkey::UserId;
-
+let session_id = SessionId::new("session_abc123".to_string())?;
 let user_id = UserId::new("user_123".to_string())?;
 let user = get_user(session_id, user_id).await?;
-```
 
-#### `SessionCookie`
-Type-safe wrapper for HTTP session cookies with validation.
-
-```rust
-use oauth2_passkey::SessionCookie;
-
-// Validates length (10-1024 chars) and safe characters
 let cookie = SessionCookie::new(cookie_value.to_string())?;
 let user = get_user_from_session(&cookie).await?;
 ```
 
 ### WebAuthn/Passkey Types
 
-#### `CredentialId`
-Type-safe wrapper for passkey credential identifiers.
-
 ```rust
-use oauth2_passkey::CredentialId;
+// CredentialId: passkey credential identifiers (base64url-encoded)
+// Length: 10-1024 | Chars: a-zA-Z0-9 - _ . ~ = + / | Error: PasskeyError
+pub struct CredentialId(String);
 
+// UserHandle: WebAuthn user handles
+// NO VALIDATION -- accepts any string, returns Self (not Result)
+// WebAuthn user handles can be arbitrary binary data (base64-encoded)
+pub struct UserHandle(String);
+
+// UserName: usernames for WebAuthn registration
+// Length: 1-64 | Rejects: .. -- __ and whitespace-only | Error: PasskeyError
+pub struct UserName(String);
+
+// ChallengeType: identifies the WebAuthn operation kind
+// Length: 1-64 | Chars: a-zA-Z0-9 _ | Error: PasskeyError
+// Convenience constructors: ChallengeType::registration(), ChallengeType::authentication()
+pub struct ChallengeType(String);
+
+// ChallengeId: unique identifier for a specific challenge instance
+// Length: 8-256 | Chars: a-zA-Z0-9 - _ . + | Error: PasskeyError
+pub struct ChallengeId(String);
+```
+
+Usage:
+```rust
 let cred_id = CredentialId::new("credential_abc123".to_string())?;
-let result = delete_credential(session_id, cred_id).await?;
-```
+delete_credential(session_id, cred_id).await?;
 
-#### `UserHandle`
-Type-safe wrapper for WebAuthn user handles.
+let handle = UserHandle::new("user_handle_123".to_string()); // no ? -- always succeeds
 
-```rust
-use oauth2_passkey::UserHandle;
-
-let handle = UserHandle::new("user_handle_123".to_string());
-```
-
-#### `UserName`
-Type-safe wrapper for usernames.
-
-```rust
-use oauth2_passkey::UserName;
-
-let username = UserName::new("alice".to_string())?;
-```
-
-#### `ChallengeType`
-Type-safe wrapper for WebAuthn challenge types with validation.
-
-```rust
-use oauth2_passkey::ChallengeType;
-
-// Validates against known challenge types
-let challenge_type = ChallengeType::new("registration".to_string())?;
-
-// Or use convenience constructors
-let reg_challenge = ChallengeType::registration();
-let auth_challenge = ChallengeType::authentication();
-```
-
-#### `ChallengeId`
-Type-safe wrapper for challenge identifiers.
-
-```rust
-use oauth2_passkey::ChallengeId;
-
-let challenge_id = ChallengeId::new("challenge_xyz".to_string())?;
+let challenge_type = ChallengeType::registration(); // convenience constructor, no validation needed
 ```
 
 ### OAuth2 Types
 
-#### `OAuth2State`
-Type-safe wrapper for OAuth2 state parameters with comprehensive validation.
-
 ```rust
-use oauth2_passkey::OAuth2State;
+// OAuth2State: OAuth2 state parameter carrying CSRF protection data
+// Length: 10-8192 | Error: OAuth2Error
+// Multi-layer validation: base64url decode -> UTF-8 check -> JSON parse as StateParams
+// This is the most heavily validated type in the library.
+pub struct OAuth2State(String);
 
-// Validates base64url encoding, JSON structure, length limits
-let state = OAuth2State::new(state_param.to_string())?;
+// AccountId: database identifiers for OAuth2 accounts
+// Length: 1-255 | Chars: a-zA-Z0-9 - _ . @ + | Rejects: .. -- __ | Error: OAuth2Error
+pub struct AccountId(String);
+
+// Provider: OAuth2 provider names (e.g., "google", "github")
+// Length: 1-50 | Chars: a-zA-Z0-9 - _ . | Cannot start with - _ . | Error: OAuth2Error
+pub struct Provider(String);
+
+// ProviderUserId: external user IDs from OAuth2 providers
+// Length: 1-512 | Chars: a-zA-Z0-9 - _ . @ + = ( ) | Rejects: .. -- __ | Error: OAuth2Error
+pub struct ProviderUserId(String);
+
+// DisplayName: user display names from OAuth2 providers
+// Length: 1-100 | Rejects: .. -- __ and whitespace-only | Error: OAuth2Error
+pub struct DisplayName(String);
+
+// Email: email addresses from OAuth2 providers
+// Length: 3-254 (RFC 5321) | Must have exactly one @ with non-empty local/domain | Error: OAuth2Error
+pub struct Email(String);
+```
+
+Usage:
+```rust
+let state = OAuth2State::new(state_param.to_string())?; // validates base64url -> UTF-8 -> JSON
 let decoded = decode_state(&state)?;
-```
-
-#### `AccountId`
-Type-safe wrapper for OAuth2 account identifiers.
-
-```rust
-use oauth2_passkey::AccountId;
-
-let account_id = AccountId::new("account_123".to_string())?;
-```
-
-#### `Provider`
-Type-safe wrapper for OAuth2 provider names.
-
-```rust
-use oauth2_passkey::Provider;
 
 let provider = Provider::new("google".to_string())?;
-```
-
-#### `ProviderUserId`
-Type-safe wrapper for provider-specific user identifiers.
-
-```rust
-use oauth2_passkey::ProviderUserId;
-
-let provider_user_id = ProviderUserId::new("google_123456".to_string())?;
-```
-
-#### `DisplayName`
-Type-safe wrapper for user display names.
-
-```rust
-use oauth2_passkey::DisplayName;
-
-let name = DisplayName::new("Alice Smith".to_string())?;
-```
-
-#### `Email`
-Type-safe wrapper for email addresses.
-
-```rust
-use oauth2_passkey::Email;
-
 let email = Email::new("alice@example.com".to_string())?;
 ```
 
 ### Cache & Storage Types
 
-#### `CachePrefix`
-Type-safe wrapper for cache namespace prefixes with validation.
-
 ```rust
-use oauth2_passkey::CachePrefix;
+// CachePrefix and CacheKey share identical validation logic.
+// Both are designed to prevent Redis command injection.
+//
+// Length: max 250 bytes
+// Rejected chars: \n \r space \t
+// Rejected keywords: SET, GET, DEL, FLUSHDB, FLUSHALL, EVAL, SCRIPT,
+//                    SHUTDOWN, CONFIG, CLIENT, DEBUG, MONITOR, SYNC
+// Error: StorageError
+pub struct CachePrefix(String);
+pub struct CacheKey(String);
 
-// Validates length, safe characters, prevents Redis injection
-let prefix = CachePrefix::new("session".to_string())?;
-
-// Or use convenience constructors
-let session_prefix = CachePrefix::session();
-let oauth2_prefix = CachePrefix::oauth2();
+// CachePrefix provides convenience constructors for common prefixes.
+// These bypass validation since they are known-good compile-time constants:
+//   CachePrefix::session(), CachePrefix::csrf(), CachePrefix::jwks(),
+//   CachePrefix::pkce(), CachePrefix::nonce(), CachePrefix::aaguid(), ...
 ```
 
-#### `CacheKey`
-Type-safe wrapper for cache entry keys with validation.
-
+Usage:
 ```rust
-use oauth2_passkey::CacheKey;
+// From string (with validation)
+let prefix = CachePrefix::new("custom_prefix".to_string())?;
 
-// Same validation as CachePrefix
-let key = CacheKey::new("user_123_token".to_string())?;
+// Convenience constructors (known-good values, no validation overhead)
+let session_prefix = CachePrefix::session();
+let csrf_prefix = CachePrefix::csrf();
 ```
 
 ## Search Field Enums
 
-### `CredentialSearchField`
-Type-safe search operations for passkey credentials.
+Database queries often need to search by different fields. Without type safety, you might write:
 
 ```rust
-use oauth2_passkey::{CredentialSearchField, CredentialId, UserId, UserHandle, UserName};
-
-// Search by different field types - compile-time type safety
-let by_cred_id = CredentialSearchField::CredentialId(credential_id);
-let by_user_id = CredentialSearchField::UserId(user_id);
-let by_handle = CredentialSearchField::UserHandle(user_handle);
-let by_name = CredentialSearchField::UserName(user_name);
-
-let credentials = PasskeyStore::get_credentials_by(by_user_id).await?;
+// Dangerous: which field does this string refer to? A user ID? An email? A credential ID?
+fn get_credentials(field_name: &str, value: &str) -> Vec<Credential> { /* ... */ }
 ```
 
-### `AccountSearchField`
-Type-safe search operations for OAuth2 accounts.
+Search field enums combine the field selection and the typed value into a single type, so the compiler ensures you cannot pass an `Email` when searching by `CredentialId`:
 
 ```rust
-use oauth2_passkey::{AccountSearchField, AccountId, UserId, Provider, Email};
+// Passkey credential searches
+pub enum CredentialSearchField {
+    CredentialId(CredentialId),  // find by credential ID
+    UserId(UserId),             // find all credentials for a user
+    UserHandle(UserHandle),     // find by WebAuthn user handle
+    UserName(UserName),         // find by username
+}
 
-let by_account_id = AccountSearchField::Id(account_id);
-let by_user_id = AccountSearchField::UserId(user_id);
-let by_provider = AccountSearchField::Provider(provider);
-let by_email = AccountSearchField::Email(email);
+// OAuth2 account searches
+pub enum AccountSearchField {
+    Id(AccountId),              // find by account ID
+    UserId(UserId),             // find all accounts for a user
+    Provider(Provider),         // find by provider name
+    ProviderUserId(ProviderUserId), // find by provider-specific user ID
+    Name(DisplayName),          // find by display name
+    Email(Email),               // find by email address
+}
+```
 
-let accounts = OAuth2Store::get_accounts_by(by_email).await?;
+Usage:
+```rust
+// Each variant carries a validated typed value -- no raw strings anywhere
+let user_id = UserId::new("user_123".to_string())?;
+let credentials = PasskeyStore::get_credentials_by(
+    CredentialSearchField::UserId(user_id)  // compiler ensures UserId goes into UserId variant
+).await?;
+
+let email = Email::new("alice@example.com".to_string())?;
+let accounts = OAuth2Store::get_accounts_by(
+    AccountSearchField::Email(email)  // cannot accidentally pass a Provider here
+).await?;
 ```
 
 ## Security Guarantees
@@ -341,39 +368,21 @@ match OAuth2State::new(state_param.to_string()) {
 
 ## Migration from Raw Strings
 
-When updating code that uses raw strings:
+When migrating existing code from raw strings to typed wrappers, the change is straightforward. The key difference is that the typed version catches invalid input immediately and prevents parameter mix-ups at compile time:
 
 ```rust
-// Before (vulnerable to parameter confusion)
+// Before: raw String — no validation, no type safety
+// A malicious or malformed user_id passes through silently.
+// Swapping user_id with another String parameter compiles without error.
 let credentials = PasskeyStore::get_credentials_by(
     CredentialSearchField::UserId(user_id.to_string())
 );
 
-// After (type-safe with validation)
+// After: typed wrapper — validated on construction, type-checked by compiler
+// UserId::new() rejects empty strings, overly long values, and dangerous characters.
+// Passing a CredentialId where UserId is expected is a compile error.
 let user_id = UserId::new(user_id_string.to_string())?;
 let credentials = PasskeyStore::get_credentials_by(
     CredentialSearchField::UserId(user_id)
 );
 ```
-
-## Benefits Summary
-
-### Security Impact
-- **Eliminates privilege escalation attacks** through session validation
-- **Prevents parameter confusion vulnerabilities**
-- **Provides consistent security** across all deployment configurations
-- **Defense-in-depth validation** at multiple architectural layers
-
-### Development Benefits
-- **Compile-time error detection** for authentication logic mistakes
-- **Self-documenting APIs** through descriptive type names
-- **IDE assistance** with auto-completion and type checking
-- **Refactoring safety** with compiler-verified updates
-
-### Operational Benefits
-- **Predictable behavior** regardless of storage backend choice
-- **Centralized validation** logic for easier security auditing
-- **Future-proof architecture** for extending validation rules
-- **Professional-grade** authentication suitable for production systems
-
-The type system prevents mixing up parameters and ensures consistent validation across the entire codebase, providing robust security guarantees for authentication-critical operations.
