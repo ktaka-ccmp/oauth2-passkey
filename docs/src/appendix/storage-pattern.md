@@ -30,7 +30,7 @@ This library supports multiple storage backends (SQLite/PostgreSQL, Memory/Redis
 Instead of State, this library uses `LazyLock` globals initialized once at startup:
 
 ```rust,ignore
-// Simplified internal structure
+// Simplified internal structure (uses tokio::sync::Mutex for async access)
 static DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = LazyLock::new(|| {
     // Reads DB_TYPE from environment, creates appropriate backend
 });
