@@ -413,13 +413,13 @@ API endpoints (`/user/info`, `/user/csrf_token`, `/user/logout`, `/user/update`,
 
 ```toml
 # Disable all built-in UI
-oauth2-passkey-axum = { version = "0.4", default-features = false }
+oauth2-passkey-axum = { version = "0.3", default-features = false }
 
 # Custom login page, keep account management and admin UI
-oauth2-passkey-axum = { version = "0.4", default-features = false, features = ["user-ui", "admin-ui"] }
+oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["user-ui", "admin-ui"] }
 
 # Keep admin UI only
-oauth2-passkey-axum = { version = "0.4", default-features = false, features = ["admin-ui"] }
+oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["login-ui", "admin-ui"] }
 ```
 
 ### Additional Router: `passkey_well_known_router()`
