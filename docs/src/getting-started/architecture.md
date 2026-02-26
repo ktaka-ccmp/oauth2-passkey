@@ -1,4 +1,4 @@
-# Chapter 3: Architecture
+# Architecture
 
 ## Overview
 

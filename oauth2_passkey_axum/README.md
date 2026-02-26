@@ -7,7 +7,7 @@
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![MSRV](https://img.shields.io/badge/MSRV-1.88-blue)](https://blog.rust-lang.org/2025/02/20/Rust-1.88.0.html)
 
-Axum web framework integration for the [`oauth2-passkey`](../oauth2_passkey) authentication library.
+Axum web framework integration for the [`oauth2-passkey`](https://crates.io/crates/oauth2-passkey) authentication library.
 
 This crate provides ready-to-use Axum handlers, middleware, and UI components for OAuth2 and passkey authentication in your Axum web applications.
 

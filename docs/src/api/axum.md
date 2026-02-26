@@ -1,4 +1,4 @@
-# Chapter 21: Axum Integration API (oauth2-passkey-axum)
+# Axum Integration API (oauth2-passkey-axum)
 
 ## Overview
 

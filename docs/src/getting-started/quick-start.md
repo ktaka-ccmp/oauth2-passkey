@@ -1,4 +1,4 @@
-# Chapter 2: Quick Start
+# Quick Start
 
 This guide walks you through running the demo applications to quickly experience OAuth2 and WebAuthn/Passkey authentication.
 

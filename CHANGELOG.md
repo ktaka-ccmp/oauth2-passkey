@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking**: Middleware and `AuthUser` extractor now redirect unauthenticated users to `O2P_LOGIN_URL` (default: `/o2p/user/login`) instead of `O2P_DEFAULT_REDIRECT` (default: `/`). Applications that relied on `O2P_DEFAULT_REDIRECT` for unauthenticated redirects should set `O2P_LOGIN_URL` instead.
 - Split `user-ui` feature flag: new `login-ui` flag controls the built-in login page independently from account management UI
 - `O2P_DEFAULT_REDIRECT` now only controls authenticated-user redirects (login page bounce, logout target)
+- `O2P_DEMO_MODE` masking now covers email, name, and profile picture in addition to IP, User-Agent, and credential IDs
+- `OAUTH2_RESPONSE_MODE` is now validated at startup; invalid values cause an immediate panic instead of a delayed runtime error on first OAuth2 login attempt
 
 ## [0.3.0] - 2026-02-16
 

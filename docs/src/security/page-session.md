@@ -1,4 +1,4 @@
-# Chapter 11: Page Session Protection
+# Page Session Protection
 
 ## Overview
 

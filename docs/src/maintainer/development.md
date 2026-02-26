@@ -1,4 +1,4 @@
-# Chapter 22: Development
+# Development
 
 This chapter covers the development practices, project organization, and testing strategies for the OAuth2-Passkey library.
 

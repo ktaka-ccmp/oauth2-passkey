@@ -1,4 +1,4 @@
-# Chapter 5: Configuration
+# Configuration
 
 ## Overview
 
