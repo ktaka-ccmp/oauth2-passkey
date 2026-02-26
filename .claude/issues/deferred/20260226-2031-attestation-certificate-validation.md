@@ -91,4 +91,3 @@ Deferred because:
 - Reason: All attestation formats share the same gaps. Basic auth works without it. Enterprise attestation enforcement is niche
 
 ## Resolution
-

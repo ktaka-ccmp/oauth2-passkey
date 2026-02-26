@@ -96,4 +96,3 @@ Needs further investigation into WebAuthn specification recommendations for this
 - Reason: Silently deletes valid credentials in edge case; worth fixing but not urgent
 
 ## Resolution
-

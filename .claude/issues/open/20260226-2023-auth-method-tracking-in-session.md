@@ -89,4 +89,3 @@ None
 - Reason: Low risk, straightforward implementation, but no immediate demand
 
 ## Resolution
-

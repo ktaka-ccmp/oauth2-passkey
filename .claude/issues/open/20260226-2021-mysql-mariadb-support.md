@@ -74,4 +74,3 @@ None
 - Reason: Expands deployment options; sqlx already supports MySQL so infrastructure cost is moderate
 
 ## Resolution
-

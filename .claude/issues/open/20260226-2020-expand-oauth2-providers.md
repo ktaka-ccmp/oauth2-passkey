@@ -73,4 +73,3 @@ None
 - Reason: Multiple providers, each with unique requirements; important for adoption but not blocking current users
 
 ## Resolution
-
