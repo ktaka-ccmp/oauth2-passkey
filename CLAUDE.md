@@ -243,6 +243,7 @@ This project uses Claude Code commands for workflow management.
 |---------|-------------|
 | `/snapshot` | Create a session snapshot for context transfer between machines |
 | `/issue` | Create or update an issue for task/bug tracking |
+| `/journal` | Append a development journal entry to `.claude/issues/JOURNAL.md` |
 | `/backlog` | View all open issues |
 | `/visibility-check` | Check Rust code for minimal visibility compliance |
 
@@ -275,6 +276,7 @@ For persistent task and bug tracking across sessions:
 | Bug found but not fixing now | `/issue` |
 | Check pending work | `/backlog` |
 | Planning next session | `/backlog` then read relevant snapshots |
+| End of session work record | `/journal` |
 
 ## Commit Message Guidelines
 
