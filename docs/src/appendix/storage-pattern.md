@@ -1,142 +1,85 @@
-# Storage Pattern: Singleton vs Axum State
+# Storage Pattern: Why Singleton Instead of Axum State
 
-This document explains the design decision to use a singleton pattern instead of Axum's standard State pattern for managing shared resources.
+## The Problem with State in a Library
 
-## Background: Axum's State Pattern
+Axum applications typically manage shared resources (database pools, caches) through the **State pattern**, where a struct is attached to the router and extracted in each handler. This works well for application code, but creates friction when used inside a library.
 
-In typical Axum applications, shared resources like database connection pools, caches, and configuration are passed to handlers using the **State pattern**:
+### Users must initialize and manage library state
 
-```rust,ignore
-// 1. Define a struct holding shared resources
-#[derive(Clone)]
-struct AppState {
-    db_pool: PgPool,
-    cache: RedisPool,
-    config: AppConfig,
-}
+With State, the library would expose its internal state struct (containing database pools, caches, etc.) and require the user to construct and attach it to the router. Since Axum allows only one state type per router, a user who already has their own application state must merge the two into a single combined type using Axum's state composition mechanisms (`FromRef`, wrapper structs). Adding login should not require restructuring the application's state types.
 
-// 2. Attach state to the router
-let state = AppState { db_pool, cache, config };
-let app = Router::new()
-    .route("/users", get(list_users))
-    .route("/users/:id", get(get_user))
-    .with_state(state);
+### Internal state threading is burdensome
 
-// 3. Extract state in each handler
-async fn list_users(State(state): State<AppState>) -> impl IntoResponse {
-    let users = sqlx::query("SELECT * FROM users")
-        .fetch_all(&state.db_pool)
-        .await?;
-    Json(users)
-}
+Authentication flows pass through multiple layers. For example, an OAuth2 login traverses:
 
-async fn get_user(
-    State(state): State<AppState>,
-    Path(id): Path<i32>,
-) -> impl IntoResponse {
-    let user = sqlx::query("SELECT * FROM users WHERE id = $1")
-        .bind(id)
-        .fetch_one(&state.db_pool)
-        .await?;
-    Json(user)
-}
+```text
+google_auth()           [HTTP handler]
+  -> authorized_core()  [coordination layer]
+    -> OAuth2Store::get_account()  [storage abstraction]
+      -> database query            [SQLite or PostgreSQL]
 ```
 
-This pattern is explicit, testable, and follows Rust's ownership principles.
+With State, every function in this chain needs a state parameter -- even the intermediate layers that do not access the database themselves. The coordination layer must accept and forward state simply because a storage function three levels down needs it. When writing a handler's signature, you must already know that a function deep in the call chain requires database access. Adding a new storage call at the bottom of the chain forces signature changes through every layer above it. In this library, that would affect roughly 80-100 function signatures across the coordination, session, storage, and audit layers -- a substantial maintenance burden for a change that adds no functionality.
 
-## This Library's Approach: Singleton Pattern
+### State prevents environment-variable-only configuration
 
-This library takes a different approach using global static storage:
+This library supports multiple storage backends (SQLite/PostgreSQL, Memory/Redis). The preferable user experience is to set `DB_TYPE=postgresql` in `.env` and let the library handle backend construction internally. With State, this is not possible -- the user must construct the correct backend objects and pass them into the state struct, because State requires the application to provide its contents explicitly.
 
-```rust,ignore
-// 1. Initialize once at startup
-oauth2_passkey_axum::init().await?;
+## The Solution: Global Static Storage
 
-// 2. Router doesn't need state - just merge it
-let app = Router::new()
-    .route("/", get(home))
-    .merge(oauth2_passkey_full_router());
-
-// Internally, the library accesses global stores directly
-// No State<T> extractor needed in handlers
-```
-
-### Internal Implementation
-
-The library uses `OnceLock` (or `LazyLock`) to hold storage instances:
+Instead of State, this library uses `LazyLock` globals initialized once at startup:
 
 ```rust,ignore
-// Simplified internal structure
-static DATA_STORE: OnceLock<Box<dyn DataStore>> = OnceLock::new();
-static CACHE_STORE: OnceLock<Box<dyn CacheStore>> = OnceLock::new();
-
-// init() populates these based on environment variables
-pub async fn init() -> Result<(), Error> {
-    let db = match env::var("DB_TYPE")? {
-        "sqlite" => SqliteStore::new().await?,
-        "postgresql" => PostgresStore::new().await?,
-    };
-    DATA_STORE.set(Box::new(db))?;
-    // ...
-}
-
-// Internal functions access stores globally
-pub(crate) fn get_data_store() -> &'static dyn DataStore {
-    DATA_STORE.get().expect("Call init() first")
-}
+// Simplified internal structure (uses tokio::sync::Mutex for async access)
+static DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = LazyLock::new(|| {
+    // Reads DB_TYPE from environment, creates appropriate backend
+});
+static CACHE_STORE: LazyLock<Mutex<Box<dyn CacheStore>>> = LazyLock::new(|| {
+    // Reads CACHE_TYPE from environment, creates appropriate backend
+});
 ```
 
-## Why We Chose Singleton
-
-| Reason | Explanation |
-| --- | --- |
-| **Simpler API** | Users just call `init()` once. No need to create `AppState`, understand `State<T>`, or manage lifetimes. |
-| **Easy Router Integration** | `oauth2_passkey_full_router()` returns a stateless router. Users can simply `.merge()` it with their app. |
-| **Internal Module Sharing** | The coordination layer accesses oauth2, passkey, session, and userdb stores. Global access avoids threading state through many internal layers. |
-| **Environment Configuration** | Storage backends (SQLite/PostgreSQL, Memory/Redis) are selected via environment variables, making the singleton pattern a natural fit. |
-
-### If We Used State Pattern Instead
-
-The library API would become more complex:
+For the user, integration is two lines:
 
 ```rust,ignore
-// Hypothetical State-based API (NOT how this library works)
-let auth_state = oauth2_passkey::create_state().await?;
-
-let app = Router::new()
-    .route("/", get(home))
-    .nest(O2P_ROUTE_PREFIX.as_str(), oauth2_passkey_router())
-    .with_state(auth_state);  // Users must manage this
-
-// Problem: How to combine with user's own state?
-// This creates friction and complexity
+oauth2_passkey_axum::init().await?;  // Force-initialize global stores
+let app = Router::new().route("/", get(home)).merge(oauth2_passkey_full_router());
 ```
 
-## Trade-offs
+No state structs, no type composition, no Axum-specific boilerplate. Internally, any function in the library can access storage directly through the globals, regardless of where it sits in the call chain and without requiring callers to pass state down:
 
-The singleton pattern has limitations:
+```rust,ignore
+// Any function can read/write storage directly -- no state parameter needed
+let store = GENERIC_DATA_STORE.lock().await;
+let user = store.get_user(&user_id).await?;
 
-| Trade-off | Impact | Mitigation |
-| --- | --- | --- |
-| **Testing** | Harder to inject mock implementations | Use separate test databases; integration tests work well |
-| **Multiple Instances** | Cannot run independent instances in same process | Rarely needed for authentication systems |
-| **Global State** | Less explicit dependencies | Well-documented `init()` requirement |
+GENERIC_CACHE_STORE.lock().await.put(prefix, key, data, ttl).await?;
+```
 
-## When State Pattern Is Better
+## Limitations and How They Are Handled
 
-Consider using Axum's State pattern in your own application code when:
+### Parallel Test Isolation
 
-- You need to inject different implementations for testing
-- You're building a library that others will embed
-- You want explicit, compile-time dependency tracking
-- You need multiple independent instances
+This is the most significant practical cost. All tests in a process share the same `LazyLock`-initialized database, so parallel tests can interfere with each other's data.
 
-## Conclusion
+The library addresses this through multiple mechanisms:
 
-For this library's use case - a plug-and-play authentication system - the singleton approach provides a cleaner developer experience:
+- **Selective serialization**: Tests that modify database state use `#[serial]` (from the `serial_test` crate). Read-only tests run in parallel without restriction.
+- **Unique ID generation**: Tests generate per-test identifiers using timestamps, thread IDs, and atomic counters to avoid collisions even when running in parallel.
+- **Lock-holding deletion**: `delete_user_atomically()` holds the `GENERIC_DATA_STORE` mutex lock during the entire delete sequence (OAuth2 accounts -> passkey credentials -> user) to prevent foreign key constraint violations from interleaved operations.
 
-1. **Minimal boilerplate**: Just `init().await?` and `.nest()` the router
-2. **No state management**: Users don't need to understand `State<T>`
-3. **Environment-driven**: Configuration via `.env` files works naturally
+This approach was developed iteratively -- foreign key constraint errors in parallel tests led to the lock-holding deletion pattern. It works, but requires discipline: any new test that mutates shared state must use `#[serial]` or unique IDs.
 
-The trade-offs are acceptable because most applications need only one authentication system, and the simpler API reduces the learning curve significantly.
+### Implicit Global Dependencies
+
+Function signatures do not reveal their dependency on global storage. A function like `get_user_from_session()` internally accesses `GENERIC_CACHE_STORE` and `GENERIC_DATA_STORE`, but this is invisible to the caller and not enforced by the compiler.
+
+The practical risk is that forgetting to call `init()` causes a runtime panic on first access rather than a compile-time error. This has not been an issue in practice because `init()` is always called in `main()` and `init_test_environment()` in tests, but the compiler cannot help catch initialization ordering mistakes during refactoring.
+
+### Single Instance Per Process
+
+Running independent authentication instances in the same process is not possible. Global statics enforce a single configuration. This has not been a limitation in practice -- authentication systems typically need only one instance.
+
+## Summary
+
+This library uses `LazyLock` globals to manage storage, making database and cache access available from any function without state parameters. This approach has known costs -- parallel tests share a single database, global dependencies are invisible to the compiler, and only one instance per process is possible. However, compared to Axum's State pattern, it eliminates user-facing state composition boilerplate, avoids threading state through 80-100 internal function signatures, and enables configuration through environment variables alone -- resulting in a simpler integration experience for users.
