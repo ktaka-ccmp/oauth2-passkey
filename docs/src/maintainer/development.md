@@ -46,6 +46,34 @@ oauth2-passkey/
 3. **Flexible Storage**: Supports both development (SQLite, in-memory) and production (PostgreSQL, Redis) setups
 4. **Security First**: Built-in CSRF protection, secure sessions, and page session tokens
 
+### Adding Required Environment Variables
+
+This library uses `LazyLock` globals to read environment variables on first access rather than at program start (see [Storage Pattern](../appendix/storage-pattern.md)). A `LazyLock` with `.expect()` will panic when first accessed if the variable is missing -- but "first access" may happen during a user request rather than at startup, causing a hard-to-diagnose runtime crash.
+
+To prevent this, every required `LazyLock` must be force-evaluated in the corresponding module's `init()` function. For example, the OAuth2 module defines its required variables in `config.rs`:
+
+```rust,ignore
+// oauth2/config.rs
+pub(super) static OAUTH2_GOOGLE_CLIENT_ID: LazyLock<String> = LazyLock::new(|| {
+    std::env::var("OAUTH2_GOOGLE_CLIENT_ID").expect("OAUTH2_GOOGLE_CLIENT_ID must be set")
+});
+```
+
+And force-evaluates them at startup in its `init()` function:
+
+```rust,ignore
+// oauth2/mod.rs
+pub(crate) async fn init() -> Result<(), OAuth2Error> {
+    // Validate required environment variables early
+    let _ = *config::OAUTH2_REDIRECT_URI;
+    let _ = *config::OAUTH2_GOOGLE_CLIENT_ID;
+    let _ = *config::OAUTH2_GOOGLE_CLIENT_SECRET;
+    // ...
+}
+```
+
+When adding a new required environment variable, follow this same pattern: define the `LazyLock` with `.expect()` in the module's `config.rs`, then add a `let _ = *config::NEW_VAR;` line to the module's `init()`. Optional variables with defaults (`.unwrap_or()`, `.ok()`) do not need this treatment since they cannot panic.
+
 ## Testing Strategy
 
 The project follows a bottom-up testing approach, starting with fundamental modules and building toward integration testing.
