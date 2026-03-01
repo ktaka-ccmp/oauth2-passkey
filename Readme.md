@@ -17,6 +17,14 @@
 
 No setup required. Google account needed for OAuth2. Data is ephemeral (resets on server restart, sessions expire in 10 min).
 
+**Register with Google and add a Passkey:**
+
+<img src="https://github.com/user-attachments/assets/06f95bad-2228-4ec5-9a6c-337976151232" alt="demo-oauth2-passkey-register" width="400">
+
+**Sign in with Passkey:**
+
+<img src="https://github.com/user-attachments/assets/3f66aea4-6f02-4848-b58b-abc56732d2f5" alt="demo-passkey-login" width="400">
+
 ## ✨ What You Get
 
 - 🔑 **Passkey** - Phishing-resistant login with biometrics, inherently multi-factor (no 2FA needed)
