@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (15)
+### Open (12)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -20,11 +20,8 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 | `20260226-2030` | low | medium | [AAGUID-Based Credential Deletion Collision](open/20260226-2030-aaguid-credential-deletion-collision.md) |
 | `20260227-1703` | low | small | [Audit and Improve Silent Fallback Behavior for Optional Environment Variables](open/20260227-1703-env-var-silent-fallback-audit.md) |
-| `20260226-2023` | low | small | [Authentication Method Tracking in Session](open/20260226-2023-auth-method-tracking-in-session.md) |
-| `20260226-2022` | low | large | [OAuth2 Token Storage](open/20260226-2022-oauth2-token-storage.md) |
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
-| `20260226-2026` | low | large | [UI Improvements](open/20260226-2026-ui-improvements.md) |
 
 ### Completed (43)
 
@@ -74,17 +71,20 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-09` | [Cross-Origin Same-Site Demo (Pattern 2)](completed/2026-01-30-cross-origin-same-site-demo.md) |
 | `2026-01-31-02` | [Remove HTTPS Support from Demo Apps](completed/2026-01-31-demo-remove-https.md) |
 
-### Wontfix (2)
+### Wontfix (4)
 
 | ID | Title |
 |----|-------|
+| `20260226-2023` | [Authentication Method Tracking in Session](wontfix/20260226-2023-auth-method-tracking-in-session.md) |
+| `20260226-2026` | [UI Improvements](wontfix/20260226-2026-ui-improvements.md) |
 | `20260212-0235` | [Standalone Demo Repository](wontfix/20260212-0235-standalone-demo-repository.md) |
 | `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
-### Deferred (3)
+### Deferred (4)
 
 | ID | Title |
 |----|-------|
+| `20260226-2022` | [OAuth2 Token Storage](deferred/20260226-2022-oauth2-token-storage.md) |
 | `2026-01-23-01` | [Bearer Token Authentication Support](deferred/2026-01-23-bearer-token-support.md) |
 | `2026-01-30-06` | [Passkey Endpoint (.well-known) Support](deferred/2026-01-30-passkey-endpoint-wellknown.md) |
 | `20260226-2031` | [Attestation Certificate Chain Validation](deferred/20260226-2031-attestation-certificate-validation.md) |

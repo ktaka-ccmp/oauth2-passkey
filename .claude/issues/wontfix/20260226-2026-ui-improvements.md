@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-26
 
-## Closed:
+## Closed: 2026-03-03
 
-## Status: open
+## Status: wontfix
 
 ## Priority: low
 
@@ -92,3 +92,5 @@ Incremental improvements prioritized by impact. Start with accessibility and ale
 - Reason: The built-in UI is functional and themed. These are polish improvements that can be done incrementally. Individual sub-tasks can be split into separate issues if needed
 
 ## Resolution
+
+Closed as wontfix. The built-in UI uses browser-native `alert()` and `confirm()` dialogs which are functional across all browsers. Since this is a library, production users will build their own frontend -- investing large effort into polishing the built-in reference UI is not justified. The existing 9-theme CSS system and custom CSS support are sufficient.

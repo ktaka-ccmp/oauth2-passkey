@@ -65,26 +65,37 @@ None
 
 ## Approach
 
-Possible strategies:
+**Decided: Remove AAGUID-based deletion + add `excludeCredentials` to normal registration flow.**
 
-1. **Skip deletion entirely**: Let the WebAuthn `excludeCredentials` mechanism handle duplicates client-side instead of server-side cleanup. The authenticator itself knows which credentials it holds.
-2. **Add credential_id to the match**: Instead of matching by AAGUID alone, use a more specific identifier. However, the credential_id changes on each registration, so this does not help directly.
-3. **Keep all credentials**: Allow multiple credentials with the same AAGUID per user. The authenticator will present the correct one during authentication.
-4. **User confirmation**: When a matching AAGUID credential exists, ask the user whether to replace it.
+Two changes as a set:
 
-Needs further investigation into WebAuthn specification recommendations for this scenario.
+1. **Remove AAGUID-based credential deletion** from `register.rs`
+   - AAGUID identifies authenticator *type*, not *instance* -- server-side deletion by AAGUID is fundamentally unsafe
+   - No standard WebAuthn guidance recommends server-side AAGUID-based deletion
+   - Stale credentials in DB are harmless: the authenticator selects the correct credential during authentication
+   - Users can manually delete unwanted credentials from the account management page
+
+2. **Add `excludeCredentials` to normal registration flow** (core library)
+   - Currently only the promotion flow (`promotion.rs`) passes `excludeCredentials`
+   - Normal registration via `handle_start_registration_core()` does not
+   - Without `excludeCredentials`, the same authenticator can create duplicate credentials
+   - Pass all of the user's existing credential IDs -- the authenticator checks only the ones it holds
+   - Cannot filter by AAGUID because the new authenticator's AAGUID is unknown at registration option generation time (it is only revealed in the attestation response after registration completes)
 
 ## Related Files
 
-- `oauth2_passkey/src/passkey/main/register.rs` (lines 363-422)
+- `oauth2_passkey/src/passkey/main/register.rs` (lines 363-422) -- AAGUID-based deletion logic to remove
 - `oauth2_passkey/src/passkey/config.rs` (lines 114-119, `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL`)
+- `oauth2_passkey/src/coordination/passkey.rs` -- `handle_start_registration_core()`, add `excludeCredentials`
+- `oauth2_passkey_axum/src/passkey/promotion.rs` (lines 276-296) -- existing `excludeCredentials` implementation for reference
 
 ## Implementation Tasks
 
-- [ ] Research WebAuthn spec recommendations for same-AAGUID credential management
-- [ ] Decide on approach (skip deletion, keep all, or other)
-- [ ] Implement chosen approach
-- [ ] Add unit tests for multiple same-type authenticator scenario
+- [ ] Remove AAGUID-based credential deletion logic from `register.rs`
+- [ ] Remove related TODO comment at lines 369-373
+- [ ] Add `excludeCredentials` (all user's credential IDs) to `handle_start_registration_core()`
+- [ ] Verify promotion flow's `excludeCredentials` logic can be deduplicated or remains separate
+- [ ] Add unit tests for multiple same-AAGUID credential coexistence
 - [ ] Update documentation
 
 ## Decision Log
@@ -94,5 +105,26 @@ Needs further investigation into WebAuthn specification recommendations for this
 - Context: Migrating incomplete tasks from ToDo.md to issue tracking system
 - Decision: Create as low-priority open issue (correctness bug, rare scenario)
 - Reason: Silently deletes valid credentials in edge case; worth fixing but not urgent
+
+### 2026-03-03: Approach decided -- remove AAGUID deletion + add excludeCredentials
+
+Investigation findings:
+
+1. **AAGUID-based deletion is non-standard**: No WebAuthn spec guidance or major implementation (Google, web.dev) recommends server-side credential deletion by AAGUID. The standard approach is to use `excludeCredentials` for duplicate prevention and let users manage credentials manually.
+
+2. **Stale credentials are harmless**: When a user re-registers on the same authenticator, the old credential remains in the DB but the authenticator responds with the new one during authentication. The old entry is inert.
+
+3. **`excludeCredentials` cannot be AAGUID-filtered**: At the time the server generates registration options, the new authenticator's AAGUID is unknown (revealed only in the attestation response after registration). So `excludeCredentials` must include all of the user's credential IDs. This is correct -- each authenticator only checks credentials it holds and ignores the rest.
+
+4. **Normal registration flow lacks `excludeCredentials`**: Only the promotion flow (`promotion.rs`) currently passes it. The core registration flow must also include it to prevent duplicate credentials on the same authenticator.
+
+Rejected alternatives:
+
+- **Login-credential-aware deletion**: Only delete the credential used for the current Passkey login when re-registering with the same AAGUID. Better than deleting all same-AAGUID credentials (limits damage to one), but still fails when the device's default Password Manager differs from the one used for login (e.g., logged in via Google PM Account A, but new credential goes to Account B). Also does not apply to OAuth2 login -> Passkey registration flow (no login credential to reference).
+
+- **Tracking Password Manager via OAuth2 account association**: Store the OAuth2 Google ID alongside passkey credentials to infer which Google account's Password Manager holds each credential. Fundamentally unreliable -- the OAuth2 login account and the device's active Password Manager are independent (user may log in with Google Account A but the device's default PM is Account B, or iCloud Keychain, or 1Password).
+
+- Decision: Remove AAGUID-based deletion and add `excludeCredentials` to normal registration as a set
+- Reason: Aligns with WebAuthn standard practices, eliminates the correctness bug. Server cannot reliably identify authenticator instances (only types via AAGUID), so any server-side deletion heuristic will have false positives.
 
 ## Resolution
