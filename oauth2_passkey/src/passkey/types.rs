@@ -195,6 +195,7 @@ impl UserHandle {
     ///
     /// # Returns
     /// * A new UserHandle instance
+    #[cfg(test)]
     pub fn new(handle: String) -> Self {
         Self(handle)
     }

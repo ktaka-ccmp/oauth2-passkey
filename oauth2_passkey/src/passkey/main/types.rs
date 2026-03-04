@@ -116,6 +116,19 @@ pub struct RegistrationOptions {
     pub(super) authenticator_selection: AuthenticatorSelection,
     pub(super) timeout: u32,
     pub(super) attestation: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(super) exclude_credentials: Vec<ExcludeCredentialDescriptor>,
+}
+
+/// Descriptor for a credential to exclude during registration.
+///
+/// Used in `excludeCredentials` to prevent duplicate credential creation
+/// on the same authenticator.
+#[derive(Serialize, Debug)]
+pub(super) struct ExcludeCredentialDescriptor {
+    #[serde(rename = "type")]
+    pub(super) type_: String,
+    pub(super) id: String,
 }
 
 #[derive(Serialize, Debug)]

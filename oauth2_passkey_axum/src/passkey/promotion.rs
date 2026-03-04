@@ -2,7 +2,7 @@
 //!
 //! This module provides a promotion flow that encourages users to register a passkey
 //! after successful OAuth2 login. It wraps the existing registration core function
-//! and adds `excludeCredentials` to prevent duplicate registrations on the same authenticator.
+//! which includes `excludeCredentials` to prevent duplicate registrations on the same authenticator.
 //!
 //! The promotion flow uses the OAuth2 popup window itself:
 //! after OAuth2 callback, instead of redirecting to `popup_close.j2`,
@@ -25,8 +25,8 @@ use serde_json::json;
 use std::collections::HashMap;
 
 use oauth2_passkey::{
-    O2P_ROUTE_PREFIX, RegistrationMode, RegistrationStartRequest, SessionUser, UserId,
-    get_authenticator_info_batch, handle_start_registration_core, list_credentials_core,
+    O2P_ROUTE_PREFIX, RegistrationMode, RegistrationOptions, RegistrationStartRequest, SessionUser,
+    UserId, get_authenticator_info_batch, handle_start_registration_core, list_credentials_core,
 };
 
 use super::super::config::O2P_CUSTOM_CSS_URL;
@@ -241,15 +241,16 @@ fn is_credential_likely_available(authenticator_name: &str, ua: &str) -> bool {
 
 /// Start passkey registration for promotion flow
 ///
-/// This handler wraps `handle_start_registration_core()` and appends `excludeCredentials`
-/// from the user's existing credentials. The authenticator will reject with `InvalidStateError`
-/// if it already has a matching credential, eliminating the need for server-side per-device detection.
+/// The core registration function (`handle_start_registration_core`) already includes
+/// `excludeCredentials` in the response for AddToUser mode. The authenticator will reject
+/// with `InvalidStateError` if it already has a matching credential, eliminating the need
+/// for server-side per-device detection.
 ///
 /// Requires authentication (AddToUser mode only).
 async fn promotion_start_registration(
     auth_user: AuthUser,
     Json(request): Json<RegistrationStartRequest>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<RegistrationOptions>, (StatusCode, String)> {
     // Only allow AddToUser mode for promotion
     if request.mode != RegistrationMode::AddToUser {
         return Err((
@@ -260,42 +261,11 @@ async fn promotion_start_registration(
 
     let session_user = SessionUser::from(&auth_user);
 
-    // Call existing core function unchanged
     let registration_options = handle_start_registration_core(Some(&session_user), request)
         .await
         .into_response_error()?;
 
-    // Serialize to JSON
-    let mut options_json = serde_json::to_value(&registration_options).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to serialize registration options: {e}"),
-        )
-    })?;
-
-    // Append excludeCredentials from user's existing credentials
-    let user_id = UserId::new(auth_user.id.clone()).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Invalid user ID: {e}"),
-        )
-    })?;
-
-    let credentials = list_credentials_core(user_id).await.into_response_error()?;
-
-    let exclude_credentials: Vec<serde_json::Value> = credentials
-        .iter()
-        .map(|c| {
-            json!({
-                "type_": "public-key",
-                "id": c.credential_id
-            })
-        })
-        .collect();
-
-    options_json["excludeCredentials"] = json!(exclude_credentials);
-
-    Ok(Json(options_json))
+    Ok(Json(registration_options))
 }
 
 #[cfg(test)]
