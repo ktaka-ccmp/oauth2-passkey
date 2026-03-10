@@ -630,7 +630,7 @@ async fn test_create_registration_options_integration() {
     };
 
     // Call the function under test
-    let options = super::create_registration_options(user_info.clone()).await;
+    let options = super::create_registration_options(user_info.clone(), vec![]).await;
     assert!(options.is_ok(), "Failed to create registration options");
 
     let registration_options = options.unwrap();

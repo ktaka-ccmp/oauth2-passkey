@@ -354,6 +354,16 @@ async function startRegistration(mode, username = null, displayname = null) {
         options.challenge = base64URLToUint8Array(options.challenge);
         options.user.id = base64URLToUint8Array(userHandle);
 
+        // Transform excludeCredentials
+        if (options.excludeCredentials && Array.isArray(options.excludeCredentials)) {
+            options.excludeCredentials = options.excludeCredentials.map(credential => ({
+                type: 'public-key',
+                id: base64URLToUint8Array(credential.id),
+            }));
+        } else {
+            options.excludeCredentials = [];
+        }
+
         console.log('Registration options:', options);
         console.log('Registration user handle:', userHandle);
 

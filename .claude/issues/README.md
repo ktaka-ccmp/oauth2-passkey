@@ -80,10 +80,11 @@ This directory contains issue/task tracking files for the project.
 | `20260212-0235` | [Standalone Demo Repository](wontfix/20260212-0235-standalone-demo-repository.md) |
 | `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
-### Deferred (4)
+### Deferred (5)
 
 | ID | Title |
 |----|-------|
+| `20260303-0605` | [Adopt WebAuthn Level 3 JSON Serialization API](deferred/20260303-0605-webauthn-json-serialization-api.md) |
 | `20260226-2022` | [OAuth2 Token Storage](deferred/20260226-2022-oauth2-token-storage.md) |
 | `2026-01-23-01` | [Bearer Token Authentication Support](deferred/2026-01-23-bearer-token-support.md) |
 | `2026-01-30-06` | [Passkey Endpoint (.well-known) Support](deferred/2026-01-30-passkey-endpoint-wellknown.md) |

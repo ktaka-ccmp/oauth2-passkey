@@ -40,7 +40,9 @@ pub(crate) use main::{
 };
 
 pub(crate) use storage::PasskeyStore;
-pub(crate) use types::{CredentialSearchField, UserHandle, UserName};
+#[cfg(test)]
+pub(crate) use types::UserHandle;
+pub(crate) use types::{CredentialSearchField, UserName};
 
 pub(crate) async fn init() -> Result<(), PasskeyError> {
     // Validate required environment variables early
