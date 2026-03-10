@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- AAGUID-based credential deletion collision: replaced server-side AAGUID-based deletion with WebAuthn `excludeCredentials` to prevent accidental removal of credentials from same-type authenticators (e.g., two Google Password Manager accounts)
+
 ### Changed
 
 - **Breaking**: Middleware and `AuthUser` extractor now redirect unauthenticated users to `O2P_LOGIN_URL` (default: `/o2p/user/login`) instead of `O2P_DEFAULT_REDIRECT` (default: `/`). Applications that relied on `O2P_DEFAULT_REDIRECT` for unauthenticated redirects should set `O2P_LOGIN_URL` instead.

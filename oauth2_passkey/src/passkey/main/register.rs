@@ -357,13 +357,10 @@ pub(crate) async fn validate_registration_challenge(
     })
 }
 
-/// Prepares credential storage by handling existing credential cleanup and creating new credential
+/// Prepares a PasskeyCredential object ready for storage
 ///
-/// This function handles the database operations needed to prepare for credential storage:
-/// - Cleans up existing credentials with matching user_handle, user_id, and aaguid
-/// - Creates a new PasskeyCredential object ready for storage
-///
-/// This requires user_id and may modify the database (credential cleanup).
+/// Creates a new PasskeyCredential from validated registration data and the authenticated user ID.
+/// This is a pure data transformation with no side effects (no database modifications).
 pub(crate) async fn prepare_registration_storage(
     user_id: UserId,
     validated_data: ValidatedRegistrationData,

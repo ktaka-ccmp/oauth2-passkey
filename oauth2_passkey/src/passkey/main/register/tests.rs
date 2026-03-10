@@ -1807,3 +1807,243 @@ fn test_extract_credential_public_key_malformed_attestation_object() {
             .contains("Invalid CBOR data")
     );
 }
+
+/// Test that multiple credentials with the same AAGUID coexist without deletion
+///
+/// This test verifies that `prepare_registration_storage` does NOT delete existing
+/// credentials when a new credential has the same AAGUID. Previously, AAGUID-based
+/// deletion would incorrectly remove credentials from same-type authenticators
+/// (e.g., two Google Password Manager accounts).
+#[tokio::test]
+async fn test_multiple_same_aaguid_credentials_coexist() {
+    use crate::passkey::main::test_utils as passkey_test_utils;
+    use crate::passkey::types::CredentialSearchField;
+    use crate::session::UserId;
+    use crate::test_utils::init_test_environment;
+
+    init_test_environment().await;
+
+    let shared_aaguid = "ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4";
+    let user_id_str = "test_user_aaguid_coexist";
+    let user_handle = "test_handle_aaguid_coexist";
+
+    // Insert first credential with shared AAGUID
+    let cred1_data = passkey_test_utils::TestCredentialData::new(
+        "cred_aaguid_coexist_1",
+        user_id_str,
+        user_handle,
+        "User AAGUID Test",
+        "User AAGUID Test Display",
+        "test_public_key_1",
+        shared_aaguid,
+        0,
+    );
+    passkey_test_utils::insert_test_user_and_credential(cred1_data)
+        .await
+        .expect("Failed to insert first credential");
+
+    // Insert second credential with same AAGUID (different credential ID)
+    let cred2_data = passkey_test_utils::TestCredentialData::new(
+        "cred_aaguid_coexist_2",
+        user_id_str,
+        user_handle,
+        "User AAGUID Test",
+        "User AAGUID Test Display",
+        "test_public_key_2",
+        shared_aaguid,
+        0,
+    );
+    passkey_test_utils::insert_test_credential(cred2_data)
+        .await
+        .expect("Failed to insert second credential");
+
+    // Prepare a third credential with the same AAGUID via prepare_registration_storage
+    let validated_data = super::ValidatedRegistrationData {
+        public_key: "test_public_key_3".to_string(),
+        user_handle: user_handle.to_string(),
+        stored_user: crate::passkey::types::PublicKeyCredentialUserEntity {
+            user_handle: user_handle.to_string(),
+            name: "User AAGUID Test".to_string(),
+            display_name: "User AAGUID Test Display".to_string(),
+        },
+        credential_id: "cred_aaguid_coexist_3".to_string(),
+        aaguid: shared_aaguid.to_string(),
+        rp_id: "localhost".to_string(),
+    };
+
+    let user_id = UserId::new(user_id_str.to_string()).expect("Valid user ID");
+    let new_credential = super::prepare_registration_storage(user_id.clone(), validated_data)
+        .await
+        .expect("prepare_registration_storage should succeed");
+
+    // Verify the new credential was created correctly
+    assert_eq!(new_credential.credential_id, "cred_aaguid_coexist_3");
+    assert_eq!(new_credential.aaguid, shared_aaguid);
+    assert_eq!(new_credential.user_id, user_id_str);
+
+    // Verify both original credentials still exist (no AAGUID-based deletion)
+    let all_creds =
+        PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.clone()))
+            .await
+            .expect("Failed to get credentials");
+
+    let cred1_exists = all_creds
+        .iter()
+        .any(|c| c.credential_id == "cred_aaguid_coexist_1");
+    let cred2_exists = all_creds
+        .iter()
+        .any(|c| c.credential_id == "cred_aaguid_coexist_2");
+
+    assert!(
+        cred1_exists,
+        "First credential should still exist (not deleted by AAGUID match)"
+    );
+    assert!(
+        cred2_exists,
+        "Second credential should still exist (not deleted by AAGUID match)"
+    );
+
+    // Cleanup
+    for cred_id in ["cred_aaguid_coexist_1", "cred_aaguid_coexist_2"] {
+        let _ = passkey_test_utils::cleanup_test_credential(
+            CredentialId::new(cred_id.to_string()).expect("Valid credential ID"),
+        )
+        .await;
+    }
+}
+
+/// Test that start_registration populates excludeCredentials for logged-in users
+///
+/// When a logged-in user starts registration, the returned RegistrationOptions should
+/// include all of their existing credential IDs in the excludeCredentials field.
+/// This tells the authenticator to reject re-registration of credentials it already holds.
+#[tokio::test]
+async fn test_start_registration_populates_exclude_credentials() {
+    use crate::passkey::main::test_utils as passkey_test_utils;
+    use crate::session::User as SessionUser;
+    use crate::test_utils::init_test_environment;
+
+    init_test_environment().await;
+
+    let user_id_str = "test_user_exclude_creds";
+    let user_handle = "test_handle_exclude_creds";
+
+    // Insert user with two credentials (different AAGUIDs)
+    let cred1_data = passkey_test_utils::TestCredentialData::new(
+        "cred_exclude_test_1",
+        user_id_str,
+        user_handle,
+        "Exclude Creds User",
+        "Exclude Creds Display",
+        "test_pk_ec1",
+        "aaguid-google-pm",
+        0,
+    );
+    passkey_test_utils::insert_test_user_and_credential(cred1_data)
+        .await
+        .expect("Failed to insert first credential");
+
+    let cred2_data = passkey_test_utils::TestCredentialData::new(
+        "cred_exclude_test_2",
+        user_id_str,
+        user_handle,
+        "Exclude Creds User",
+        "Exclude Creds Display",
+        "test_pk_ec2",
+        "aaguid-yubikey-5c",
+        0,
+    );
+    passkey_test_utils::insert_test_credential(cred2_data)
+        .await
+        .expect("Failed to insert second credential");
+
+    // Call start_registration with a logged-in session user
+    let session_user = Some(SessionUser {
+        id: user_id_str.to_string(),
+        account: "exclude_creds_account".to_string(),
+        label: "Exclude Creds User".to_string(),
+        is_admin: false,
+        sequence_number: Some(99),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    });
+
+    let options = super::start_registration(
+        session_user,
+        "exclude_creds_user".to_string(),
+        "Exclude Creds Display".to_string(),
+    )
+    .await
+    .expect("start_registration should succeed");
+
+    // Verify excludeCredentials contains both credential IDs
+    let exclude_ids: Vec<&str> = options
+        .exclude_credentials
+        .iter()
+        .map(|ec| ec.id.as_str())
+        .collect();
+
+    assert!(
+        exclude_ids.contains(&"cred_exclude_test_1"),
+        "excludeCredentials should contain first credential ID, got: {:?}",
+        exclude_ids
+    );
+    assert!(
+        exclude_ids.contains(&"cred_exclude_test_2"),
+        "excludeCredentials should contain second credential ID, got: {:?}",
+        exclude_ids
+    );
+
+    // Verify all entries have type "public-key"
+    for ec in &options.exclude_credentials {
+        assert_eq!(
+            ec.type_, "public-key",
+            "excludeCredentials type should be 'public-key'"
+        );
+    }
+
+    // Cleanup credentials and challenge cache
+    for cred_id in ["cred_exclude_test_1", "cred_exclude_test_2"] {
+        let _ = passkey_test_utils::cleanup_test_credential(
+            CredentialId::new(cred_id.to_string()).expect("Valid credential ID"),
+        )
+        .await;
+    }
+
+    // Cleanup registration challenge from cache
+    let cache_prefix = CachePrefix::reg_challenge();
+    let cache_key = CacheKey::new(options.user.user_handle.clone()).unwrap();
+    let _ = passkey_test_utils::remove_from_cache(cache_prefix, cache_key).await;
+
+    // Cleanup session info from cache
+    let cache_prefix = CachePrefix::session_info();
+    let cache_key = CacheKey::new(options.user.user_handle).unwrap();
+    let _ = passkey_test_utils::remove_from_cache(cache_prefix, cache_key).await;
+}
+
+/// Test that start_registration returns empty excludeCredentials for anonymous users
+///
+/// When no user is logged in (session_user is None), excludeCredentials should be empty
+/// because there are no existing credentials to exclude.
+#[tokio::test]
+async fn test_start_registration_anonymous_has_empty_exclude_credentials() {
+    use crate::test_utils::init_test_environment;
+
+    init_test_environment().await;
+
+    let options =
+        super::start_registration(None, "anon_user".to_string(), "Anonymous User".to_string())
+            .await
+            .expect("start_registration should succeed for anonymous user");
+
+    assert!(
+        options.exclude_credentials.is_empty(),
+        "excludeCredentials should be empty for anonymous users, got: {:?}",
+        options.exclude_credentials
+    );
+
+    // Cleanup registration challenge from cache
+    let cache_prefix = CachePrefix::reg_challenge();
+    let cache_key = CacheKey::new(options.user.user_handle).unwrap();
+    let _ = crate::passkey::main::test_utils::remove_from_cache(cache_prefix, cache_key).await;
+}
