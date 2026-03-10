@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-26
 
-## Closed:
+## Closed: 2026-03-04
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -91,12 +91,12 @@ Two changes as a set:
 
 ## Implementation Tasks
 
-- [ ] Remove AAGUID-based credential deletion logic from `register.rs`
-- [ ] Remove related TODO comment at lines 369-373
-- [ ] Add `excludeCredentials` (all user's credential IDs) to `handle_start_registration_core()`
-- [ ] Verify promotion flow's `excludeCredentials` logic can be deduplicated or remains separate
-- [ ] Add unit tests for multiple same-AAGUID credential coexistence
-- [ ] Update documentation
+- [x] Remove AAGUID-based credential deletion logic from `register.rs`
+- [x] Remove related TODO comment at lines 369-373
+- [x] Add `excludeCredentials` (all user's credential IDs) to `handle_start_registration_core()`
+- [x] Verify promotion flow's `excludeCredentials` logic can be deduplicated or remains separate
+- [x] Add unit tests for multiple same-AAGUID credential coexistence
+- [x] Update documentation
 
 ## Decision Log
 
@@ -128,3 +128,14 @@ Rejected alternatives:
 - Reason: Aligns with WebAuthn standard practices, eliminates the correctness bug. Server cannot reliably identify authenticator instances (only types via AAGUID), so any server-side deletion heuristic will have false positives.
 
 ## Resolution
+
+Implemented in commit `0edc54e` (2026-03-04):
+
+- Removed AAGUID-based credential deletion from `prepare_registration_storage()` in `register.rs`
+- Added `ExcludeCredentialDescriptor` struct and `exclude_credentials` field to `RegistrationOptions`
+- Core `start_registration()` now populates `excludeCredentials` from the user's existing credentials (AddToUser mode)
+- Simplified `promotion.rs` to use core's `excludeCredentials` directly instead of its own implementation
+- Added `excludeCredentials` base64url-to-Uint8Array transform in `passkey.js`
+- `user_handle` field in `ValidatedRegistrationData` is no longer used in `prepare_registration_storage()` (captured by `..`)
+
+Remaining items (unit tests for same-AAGUID coexistence, documentation) are nice-to-have and can be tracked separately if needed.

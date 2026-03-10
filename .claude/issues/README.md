@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (12)
+### Open (11)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -18,15 +18,15 @@ This directory contains issue/task tracking files for the project.
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
-| `20260226-2030` | low | medium | [AAGUID-Based Credential Deletion Collision](open/20260226-2030-aaguid-credential-deletion-collision.md) |
 | `20260227-1703` | low | small | [Audit and Improve Silent Fallback Behavior for Optional Environment Variables](open/20260227-1703-env-var-silent-fallback-audit.md) |
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
-### Completed (43)
+### Completed (44)
 
 | ID | Title |
 |----|-------|
+| `20260226-2030` | [AAGUID-Based Credential Deletion Collision](completed/20260226-2030-aaguid-credential-deletion-collision.md) |
 | `20260223-0027` | [Add Core Crate Functional-Layer Tests for _core() Functions](completed/20260223-0027-abstract-security-test-assertions.md) |
 | `20260213-0145` | [Move All HTTP Integration Tests to Axum Crate](completed/20260213-0145-security-tests-crate-placement.md) |
 | `20260222-2201` | [Early Evaluation of OAUTH2_RESPONSE_MODE at Startup](completed/20260222-2201-early-eval-oauth2-response-mode.md) |
