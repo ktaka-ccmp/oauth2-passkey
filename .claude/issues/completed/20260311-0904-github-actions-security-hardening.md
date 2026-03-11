@@ -15,9 +15,9 @@
 
 ## Created: 2026-03-11-09-04
 
-## Closed:
+## Closed: 2026-03-11-09-33
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -135,3 +135,10 @@ None
 - Reason: Even though no Critical issues exist (no `pull_request_target`, no external input in `run:`), defense-in-depth best practices should be applied
 
 ## Resolution
+
+All 5 implementation tasks completed and verified via `/audit-workflows`:
+- Added `permissions: contents: read` to ci.yml, coverage.yml, deploy-demo.yml
+- Refactored deploy-demo.yml to use `env:` for secrets and shell variables for workflow-level env vars
+- Post-fix audit confirms all 4 workflows pass with OK rating
+- GitHub Actions security policy added to global `~/.claude/CLAUDE.md` on all machines
+- `/audit-workflows` custom command created globally for future re-audits
