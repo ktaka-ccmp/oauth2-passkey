@@ -22,10 +22,11 @@ This directory contains issue/task tracking files for the project.
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
-### Completed (44)
+### Completed (45)
 
 | ID | Title |
 |----|-------|
+| `20260311-0904` | [GitHub Actions Security Hardening](completed/20260311-0904-github-actions-security-hardening.md) |
 | `20260226-2030` | [AAGUID-Based Credential Deletion Collision](completed/20260226-2030-aaguid-credential-deletion-collision.md) |
 | `20260223-0027` | [Add Core Crate Functional-Layer Tests for _core() Functions](completed/20260223-0027-abstract-security-test-assertions.md) |
 | `20260213-0145` | [Move All HTTP Integration Tests to Axum Crate](completed/20260213-0145-security-tests-crate-placement.md) |

@@ -9,6 +9,9 @@ on:
       - 'demo-live/**'
       - '.github/workflows/deploy-demo.yml'
 
+permissions:
+  contents: read
+
 env:
   REGION: asia-northeast1
   SERVICE: oauth2-passkey-demo
@@ -33,10 +36,12 @@ jobs:
         run: gcloud builds submit --config=demo-live/cloudbuild.yaml
 
       - name: Deploy to Cloud Run
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: |
-          gcloud run deploy $SERVICE \
-            --image ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/demo/${{ env.SERVICE }} \
-            --region ${{ env.REGION }} \
+          gcloud run deploy "$SERVICE" \
+            --image "${REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/demo/${SERVICE}" \
+            --region "$REGION" \
             --port 8080 \
             --allow-unauthenticated \
             --min-instances 1 \
