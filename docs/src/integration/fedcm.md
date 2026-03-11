@@ -9,11 +9,15 @@ FedCM is a W3C browser API that provides a browser-native account chooser for fe
 ### How It Works
 
 ```
-Traditional OAuth2 flow (popup):
-  Button click -> Popup window -> Google consent -> Redirect -> Session
+Authorization Code Flow + PKCE (current):
+  User click -> Popup -> Google auth -> Redirect with code
+    -> Backend exchanges code with client_secret (server-to-server)
+    -> ID token -> Validate -> Session
 
 FedCM flow (browser-native):
-  Button click -> Browser account chooser -> ID token -> Session
+  User click -> navigator.credentials.get() -> Browser account chooser
+    -> JWT ID token returned to JS
+    -> JS POSTs token to backend -> Validate JWT signature + claims -> Session
 ```
 
 With FedCM enabled, the login flow changes from a popup-based redirect to a browser-native UI:
@@ -37,6 +41,21 @@ If FedCM is unavailable (unsupported browser, user dismissal, or error), the exi
 | Opera 108+ | Supported |
 | Safari | Not supported (fallback to popup) |
 | Firefox | Not supported (fallback to popup) |
+
+### No SDK Required
+
+FedCM is a browser-native API. `navigator.credentials.get()` is called directly without loading Google's GIS SDK or any other library. The browser handles all communication with Google's FedCM endpoints:
+
+| Endpoint | URL |
+|----------|-----|
+| Config | `https://accounts.google.com/gsi/fedcm.json` |
+| `id_assertion_endpoint` | `https://accounts.google.com/gsi/fedcm/issue` |
+| `accounts_endpoint` | `https://accounts.google.com/gsi/fedcm/listaccounts` |
+| `client_metadata_endpoint` | `https://accounts.google.com/gsi/fedcm/clientmetadata` |
+
+The browser sends all necessary headers (`Sec-Fetch-Dest: webidentity`) and cookies automatically.
+
+> **Note**: Google's FedCM endpoint returns a **JWT ID token** directly, not an authorization code. This differs from other IdPs (e.g., Seznam, IndieAuth) that return authorization codes via FedCM. The [OAuth FedCM Profile](https://github.com/aaronpk/oauth-fedcm-profile) (authorization code approach) does not apply to Google.
 
 ### Modes
 
@@ -95,10 +114,11 @@ FedCM integration is handled entirely by the library's `oauth2.js`. When `O2P_FE
 - `exp` (expiration) - token must not be expired
 - `nonce` - must match the server-generated single-use nonce
 
-**Front-Channel Token Delivery**: Unlike the Authorization Code Flow where the code is exchanged server-to-server with the client_secret, FedCM delivers the ID token directly to JavaScript. This means:
+**Front-Channel Token Delivery**: Unlike the Authorization Code Flow where the code is exchanged server-to-server with the client_secret, FedCM delivers the ID token directly to JavaScript. This is a meaningful security difference:
 
-- The ID token is accessible to any JavaScript running on the page
-- If an attacker achieves XSS, they could steal the ID token and use it within its validity window
+- In the Authorization Code Flow, even if an attacker steals the authorization code via XSS, it is **useless without the `client_secret`** (which only the backend knows)
+- In FedCM, the ID token is a **self-contained credential** — if stolen via XSS, the attacker can directly use it to authenticate against the backend within the token's validity window
+- The risk is mitigated by short token lifetimes and single-use nonce validation
 - This is the same security model used by Google's One Tap sign-in (GIS SDK), which is widely deployed
 
 **Nonce Protection**: Each FedCM login generates a unique server-side nonce that is:
@@ -109,7 +129,13 @@ FedCM integration is handled entirely by the library's `oauth2.js`. When `O2P_FE
 
 ### Recommendation
 
-FedCM provides a better user experience but has a different security trade-off than the Authorization Code Flow. For applications where the UX benefit of a browser-native login is valuable and the XSS risk profile is acceptable, FedCM is a good choice. For applications requiring the strongest possible RP authentication, the traditional flow with client_secret exchange may be preferred.
+FedCM provides a better user experience but has a different security trade-off than the Authorization Code Flow. Benefits include:
+
+- **Browser-native UI** — no popup windows or redirects
+- **Phishing resistance** — the browser-chrome account chooser cannot be spoofed by an attacker, unlike popup-based flows where the URL bar can be faked
+- **Browser-level identity management** — the browser tracks which IdP accounts are used on which sites
+
+For applications where these UX benefits are valuable and the XSS risk profile is acceptable, FedCM is a good choice. For applications requiring the strongest possible RP authentication, the traditional flow with client_secret exchange may be preferred.
 
 Both flows can coexist: FedCM is used when available, with automatic fallback to the popup flow.
 
@@ -256,7 +282,22 @@ The response includes a `Set-Cookie` header with the session cookie.
 
 ## References
 
+### Specifications and Browser Documentation
+
 - [FedCM W3C Spec](https://www.w3.org/TR/fedcm/)
 - [MDN: FedCM API](https://developer.mozilla.org/en-US/docs/Web/API/FedCM_API)
+- [MDN: RP Sign-in Guide](https://developer.mozilla.org/en-US/docs/Web/API/FedCM_API/RP_sign-in)
 - [Chrome: RP Implementation Guide](https://developer.chrome.com/docs/identity/fedcm/implement/relying-party)
+
+### Google-Specific
+
 - [Google: FedCM Migration Guide](https://developers.google.com/identity/gsi/web/guides/fedcm-migration)
+- [Google: Verify ID Token](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token)
+- [Google: GIS JS Reference](https://developers.google.com/identity/gsi/web/reference/js-reference) — documents `CredentialResponse.credential` and FedCM `select_by` values
+
+### Related Projects and Case Studies
+
+- [OAuth FedCM Profile (Aaron Parecki)](https://github.com/aaronpk/oauth-fedcm-profile) — authorization code approach, NOT applicable to Google
+- [OAuth profile for FedCM - W3C FedID Issue #599](https://github.com/w3c-fedid/FedCM/issues/599)
+- [Seznam FedCM Case Study](https://developer.chrome.com/blog/private-user-authentication-fedcm-seznam)
+- [FedCM for IndieAuth](https://indieweb.org/FedCM_for_IndieAuth)
