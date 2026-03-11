@@ -1,12 +1,12 @@
 use chrono::{Duration, Utc};
 
 use super::idtoken::{IdInfo, verify_idtoken_with_algorithm};
-use super::utils::generate_store_token;
+use super::utils::{generate_store_token, verify_and_consume_nonce};
 
 use crate::oauth2::config::get_google_client_id;
 use crate::oauth2::types::{FedCMNonceResponse, StoredToken, TokenType};
 use crate::oauth2::{OAuth2Error, OAuth2Mode};
-use crate::storage::{CacheErrorConversion, CacheKey, CachePrefix, get_data, remove_data};
+use crate::storage::{CacheKey, CachePrefix, remove_data, store_cache_auto};
 
 /// TTL for FedCM nonce tokens (seconds)
 const FEDCM_NONCE_TTL: u64 = 120;
@@ -37,12 +37,9 @@ pub async fn prepare_fedcm_nonce(mode: Option<&str>) -> Result<FedCMNonceRespons
                 ttl: FEDCM_NONCE_TTL,
             };
             let cache_prefix = CachePrefix::mode();
-            let key = crate::storage::store_cache_auto::<_, OAuth2Error>(
-                cache_prefix,
-                stored_token,
-                FEDCM_NONCE_TTL,
-            )
-            .await?;
+            let key =
+                store_cache_auto::<_, OAuth2Error>(cache_prefix, stored_token, FEDCM_NONCE_TTL)
+                    .await?;
             Some(key.as_str().to_string())
         }
         None => None,
@@ -71,34 +68,8 @@ pub(crate) async fn validate_fedcm_token(
             .await
             .map_err(|e| OAuth2Error::IdToken(e.to_string()))?;
 
-    // 2. Retrieve stored nonce from cache
-    let nonce_cache_key =
-        CacheKey::new(nonce_id.to_string()).map_err(OAuth2Error::convert_storage_error)?;
-    let nonce_session: StoredToken =
-        get_data::<StoredToken, OAuth2Error>(CachePrefix::nonce(), nonce_cache_key.clone())
-            .await?
-            .ok_or_else(|| {
-                OAuth2Error::SecurityTokenNotFound("FedCM nonce not found in cache".to_string())
-            })?;
-
-    // 3. Check nonce expiration
-    if Utc::now() > nonce_session.expires_at {
-        tracing::error!("FedCM nonce expired: {:?}", nonce_session.expires_at);
-        return Err(OAuth2Error::NonceExpired);
-    }
-
-    // 4. Verify nonce matches ID token claim
-    if idinfo.nonce != Some(nonce_session.token.clone()) {
-        tracing::error!(
-            "FedCM nonce mismatch: id_token={:?}, stored={:?}",
-            idinfo.nonce,
-            nonce_session.token
-        );
-        return Err(OAuth2Error::NonceMismatch);
-    }
-
-    // 5. Remove nonce from cache (single-use)
-    remove_data::<OAuth2Error>(CachePrefix::nonce(), nonce_cache_key).await?;
+    // 2. Verify and consume nonce (single-use)
+    verify_and_consume_nonce(nonce_id, idinfo.nonce.as_deref()).await?;
 
     Ok(idinfo)
 }
