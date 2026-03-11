@@ -3,6 +3,7 @@
 ## Table of Contents
 
 - [Description](#description)
+- [Audit Results](#audit-results)
 - [Related Issues](#related-issues)
 - [Approach](#approach)
 - [Related Files](#related-files)
@@ -32,11 +33,71 @@ No Critical issues found in this repository, but three Warning-level improvement
 - Missing explicit `permissions` declarations (ci.yml, coverage.yml, deploy-demo.yml)
 - Direct `${{ }}` expansion in `run:` steps (deploy-demo.yml)
 
-Full audit results recorded in `.claude/sessions/2026-03-04-github-actions-security-audit.md`.
-
 Reference:
 - https://www.stepsecurity.io/blog/hackerbot-claw-github-actions-exploitation
 - https://zenn.dev/aeyesec/articles/417578718dcced
+
+## Audit Results
+
+### Checks Performed
+
+1. `${{ }}` direct expansion in `run:` steps
+2. `pull_request_target` safety
+3. `permissions` configuration
+4. `secrets` exposure
+5. `self-hosted` runner usage
+6. AI review integration safety
+
+### Pre-Fix Findings
+
+| File | Rating | Issues |
+|------|--------|--------|
+| `ci.yml` | **Warning** | `permissions` not declared |
+| `coverage.yml` | **Warning** | `permissions` not declared |
+| `docs.yml` | **OK** | Properly configured |
+| `deploy-demo.yml` | **Warning** | `permissions` not declared + `${{ }}` direct expansion in `run:` |
+
+**No Critical issues.** Repository avoids the most dangerous patterns:
+- No `pull_request_target` usage
+- No external input (PR title, branch name) expanded in `run:` steps
+- No `self-hosted` runners
+- No AI review integrations
+
+### ci.yml -- Warning
+
+- **Problem**: No `permissions` declaration at workflow or job level
+- **Risk**: Relies on repository default permissions; `pull_request` trigger means external PRs fire this
+- **Fix**: Add `permissions: contents: read` after the `on:` block
+
+### coverage.yml -- Warning
+
+- **Problem**: No `permissions` declaration
+- **Risk**: Same as ci.yml; `codecov/codecov-action@v4` uses `GITHUB_TOKEN` implicitly
+- **Fix**: Add `permissions: contents: read` after the `on:` block
+
+### docs.yml -- OK
+
+- Permissions properly set: `contents: read`, `pages: write`, `id-token: write`
+- Only triggers on `push` to `master` and `workflow_dispatch` (no external PR trigger)
+- No `${{ }}` in `run:` steps
+- Has `concurrency` to prevent duplicate deploys
+
+### deploy-demo.yml -- Warning
+
+- **Problem A**: No `permissions` declaration despite using `secrets.GCP_SA_KEY` and `secrets.GCP_PROJECT_ID`
+- **Problem B**: `${{ }}` direct expansion in `run:` step (lines 37-44):
+  - `${{ env.REGION }}` -- workflow-defined constant (low risk)
+  - `${{ env.SERVICE }}` -- workflow-defined constant (low risk)
+  - `${{ secrets.GCP_PROJECT_ID }}` -- secret expanded directly in shell (low practical risk since GCP project IDs are alphanumeric, but bad pattern)
+- **Mitigating factor**: Only triggers on `push` to `dev`, not on external PRs
+- **Fix**:
+  - Add `permissions: contents: read` at workflow level
+  - Move `secrets.GCP_PROJECT_ID` to `env:` block, reference as `$GCP_PROJECT_ID`
+  - Reference workflow-level `env` vars as shell vars `$REGION`, `$SERVICE` instead of `${{ env.REGION }}`
+
+### Post-Fix Verification
+
+All 4 workflows pass with **OK** rating after fixes applied.
 
 ## Related Issues
 
@@ -57,11 +118,11 @@ None
 
 ## Implementation Tasks
 
-- [ ] Add `permissions: contents: read` to ci.yml
-- [ ] Add `permissions: contents: read` to coverage.yml
-- [ ] Add `permissions: contents: read` to deploy-demo.yml
-- [ ] Refactor deploy-demo.yml: move `secrets.GCP_PROJECT_ID` to `env:` block
-- [ ] Refactor deploy-demo.yml: replace `${{ env.* }}` with shell variable references in `run:`
+- [x] Add `permissions: contents: read` to ci.yml
+- [x] Add `permissions: contents: read` to coverage.yml
+- [x] Add `permissions: contents: read` to deploy-demo.yml
+- [x] Refactor deploy-demo.yml: move `secrets.GCP_PROJECT_ID` to `env:` block
+- [x] Refactor deploy-demo.yml: replace `${{ env.* }}` with shell variable references in `run:`
 
 ## Decision Log
 
