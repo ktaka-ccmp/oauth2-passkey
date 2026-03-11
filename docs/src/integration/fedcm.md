@@ -30,6 +30,8 @@ With FedCM enabled, the login flow changes from a popup-based redirect to a brow
 6. Backend validates JWT signature, audience, issuer, expiration, and nonce
 7. Session is established
 
+For details on what happens inside the browser during steps 2-4, see [Browser-Internal Flow Details](#browser-internal-flow-details).
+
 If FedCM is unavailable (unsupported browser, user dismissal, or error), the existing popup flow activates automatically.
 
 ### Browser Support
@@ -279,6 +281,51 @@ Response (success):
 ```
 
 The response includes a `Set-Cookie` header with the session cookie.
+
+## Browser-Internal Flow Details
+
+When `navigator.credentials.get()` is called, the browser executes several internal steps that are invisible to JavaScript:
+
+```
+User clicks "Sign in with Google"
+  |
+  v
+JS calls navigator.credentials.get({ identity: { providers, mode, context } })
+  |
+  v
+[Browser-internal: invisible to JS]
+  |
+  (1) Browser fetches configURL to discover endpoints
+  |   GET https://accounts.google.com/gsi/fedcm.json
+  |
+  (2) Browser fetches accounts_endpoint with user's Google cookies
+  |   GET https://accounts.google.com/gsi/fedcm/listaccounts
+  |   Cookie: (Google session cookies, sent automatically)
+  |   -> Returns list of logged-in Google accounts (name, email, picture)
+  |
+  (3) Browser shows native account chooser (populated from step 2)
+  |   User selects an account
+  |
+  (4) Browser POSTs to id_assertion_endpoint
+  |   POST https://accounts.google.com/gsi/fedcm/issue
+  |   Body: account_id, client_id, nonce, params (response_type, scope, ...)
+  |   -> Google validates and returns JWT ID token
+  |
+  v
+[Back to JS]
+  |
+  credential.token returned to JS (the only data JS receives)
+  |
+  v
+JS POSTs token to backend -> Validate JWT signature + claims -> Session
+```
+
+Key points:
+
+- **All browser-internal requests include `Sec-Fetch-Dest: webidentity`** — this header identifies FedCM requests to the IdP
+- **Google's cookies are sent automatically** — even under third-party cookie restrictions, the browser grants FedCM requests special cookie access to the IdP
+- **The RP's JavaScript never sees the account list** — only the final `credential.token` is returned. This is a privacy improvement over popup flows where the RP could potentially observe user behavior in the popup
+- **No SDK is involved** — the browser handles all endpoint discovery, account fetching, and token retrieval natively
 
 ## References
 
