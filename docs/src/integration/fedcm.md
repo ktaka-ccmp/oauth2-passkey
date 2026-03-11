@@ -123,6 +123,51 @@ FedCM works with passkey promotion. After a successful FedCM login, the promotio
 
 FedCM works with custom login pages. The `serve_oauth2_js` handler injects `FEDCM_ENABLED` and `OAUTH2_CLIENT_ID` constants into the served JavaScript. Any page that loads `oauth2.js` and uses `oauth2.openPopup()` gets FedCM support automatically.
 
+## Active Mode and Chrome Cooldown
+
+### Active vs Passive Mode
+
+FedCM has two UI modes controlled by the `mode` property on the `identity` object (not on individual providers):
+
+```javascript
+navigator.credentials.get({
+  identity: {
+    providers: [{ configURL: '...', clientId: '...' }],
+    mode: 'active',   // <-- must be here, at the identity level
+    context: 'signin',
+  },
+});
+```
+
+| | Active Mode | Passive Mode (default) |
+|---|---|---|
+| User gesture required | Yes (button click) | No |
+| IdP login state | Works even if logged out of IdP | Requires logged-in state |
+| Cooldown on dismiss | No | Yes (exponential) |
+| Popup after completion | Allowed (user activation preserved) | Blocked by popup blocker |
+| Chrome version | 132+ | 108+ |
+
+oauth2-passkey uses **active mode** because it is triggered by a button click and the no-cooldown behavior is essential for a good user experience.
+
+> **Warning**: Placing `mode: 'active'` inside the provider object instead of at the `identity` level causes Chrome to silently default to passive mode. The account chooser UI still appears in both modes, making this mistake hard to detect.
+
+### Chrome Cooldown (Passive Mode Only)
+
+When a user dismisses the FedCM dialog in **passive mode**, Chrome applies an exponential cooldown:
+
+| Consecutive dismissals | Cooldown duration |
+|---|---|
+| 1st | 2 hours |
+| 2nd | 1 day |
+| 3rd | 1 week |
+| 4th+ | 4 weeks |
+
+During cooldown, `navigator.credentials.get()` rejects immediately with the console message: *"FedCM was disabled either temporarily based on previous user action or permanently via site settings."*
+
+The cooldown is recorded per-origin at `chrome://settings/content/federatedIdentityApi`. Users can manually remove entries to reset the cooldown.
+
+**Active mode is exempt from cooldown.** Chromium source (`request_service.cc`) explicitly guards: `should_embargo &= rp_mode_ == RpMode::kPassive;` — the embargo is only recorded for passive mode.
+
 ## Known Limitations
 
 1. **Unsupported by Google officially**: Google documents FedCM usage only through the GIS SDK. Direct usage of `navigator.credentials.get()` with Google's FedCM endpoints is undocumented and could break without notice.
@@ -157,6 +202,14 @@ This is expected behavior for:
 - Any error during the FedCM flow
 
 Check browser console for the specific fallback reason: `FedCM failed, falling back to popup: <reason>`.
+
+### FedCM stopped working after user dismissed the dialog
+
+If using active mode correctly, dismissal should NOT cause cooldown. Check:
+
+1. Verify `mode: 'active'` is at the `identity` level, not inside the provider (see [Active vs Passive Mode](#active-vs-passive-mode))
+2. If already in cooldown state, the user can clear it at `chrome://settings/content/federatedIdentityApi` by removing the blocked entry
+3. Chrome DevTools Protocol has `FedCm.resetCooldownTime` to reset cooldown during development
 
 ## API Endpoints
 
