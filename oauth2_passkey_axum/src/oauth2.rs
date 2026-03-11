@@ -11,17 +11,18 @@ use axum_extra::{TypedHeader, headers};
 use std::collections::HashMap;
 
 use oauth2_passkey::{
-    AuthResponse, CoordinationError, O2P_ROUTE_PREFIX, OAuth2Account, Provider, ProviderUserId,
-    UserId, delete_oauth2_account_core, get_authorized_core, list_accounts_core,
-    post_authorized_core, prepare_oauth2_auth_request, verify_page_session_token,
+    AuthResponse, CoordinationError, FedCMCallbackRequest, O2P_ROUTE_PREFIX, OAuth2Account,
+    Provider, ProviderUserId, UserId, delete_oauth2_account_core, fedcm_authorized_core,
+    get_authorized_core, get_google_client_id, list_accounts_core, post_authorized_core,
+    prepare_fedcm_nonce, prepare_oauth2_auth_request, verify_page_session_token,
 };
 
-use super::config::O2P_PASSKEY_PROMOTION;
+use super::config::{O2P_FEDCM, O2P_PASSKEY_PROMOTION};
 use super::error::IntoResponseError;
 use super::session::AuthUser;
 
 pub(super) fn router() -> Router {
-    Router::new()
+    let router = Router::new()
         .route("/oauth2.js", get(serve_oauth2_js))
         .route("/google", get(google_auth))
         .route("/authorized", get(get_authorized).post(post_authorized))
@@ -30,7 +31,15 @@ pub(super) fn router() -> Router {
         .route(
             "/accounts/{provider}/{provider_user_id}",
             delete(delete_oauth2_account),
-        )
+        );
+
+    if O2P_FEDCM.is_enabled() {
+        router
+            .route("/fedcm/nonce", get(fedcm_nonce))
+            .route("/fedcm/callback", axum::routing::post(fedcm_callback))
+    } else {
+        router
+    }
 }
 
 #[derive(Template)]
@@ -63,11 +72,20 @@ async fn popup_close(
 }
 
 async fn serve_oauth2_js() -> Result<Response, (StatusCode, String)> {
-    let js_content = include_str!("../static/oauth2.js");
+    let static_js = include_str!("../static/oauth2.js");
+    let js_content = if O2P_FEDCM.is_enabled() {
+        format!(
+            "const FEDCM_ENABLED = true;\nconst OAUTH2_CLIENT_ID = '{}';\n{}",
+            get_google_client_id(),
+            static_js
+        )
+    } else {
+        static_js.to_string()
+    };
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
-        .body(js_content.to_string().into())
+        .body(js_content.into())
         .into_response_error()
 }
 
@@ -188,6 +206,38 @@ fn friendly_error_message(e: &CoordinationError) -> String {
             "This account is already linked to a different user.".to_string()
         }
         _ => format!("Authentication failed: {e}"),
+    }
+}
+
+/// FedCM nonce generation endpoint.
+/// Returns a JSON response with a nonce for `navigator.credentials.get()`.
+async fn fedcm_nonce(
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Json<oauth2_passkey::FedCMNonceResponse>, (StatusCode, String)> {
+    let mode = params.get("mode").map(|s| s.as_str());
+    let nonce_response = prepare_fedcm_nonce(mode)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(nonce_response))
+}
+
+/// FedCM callback endpoint.
+/// Validates the JWT ID token from FedCM and establishes a session.
+async fn fedcm_callback(
+    headers: HeaderMap,
+    Json(request): Json<FedCMCallbackRequest>,
+) -> Result<(StatusCode, HeaderMap, Json<serde_json::Value>), (StatusCode, String)> {
+    match fedcm_authorized_core(&request, &headers).await {
+        Ok((response_headers, message)) => Ok((
+            StatusCode::OK,
+            response_headers,
+            Json(serde_json::json!({ "message": message })),
+        )),
+        Err(e) => {
+            tracing::warn!(error = %e, "FedCM authorization failed");
+            let user_message = friendly_error_message(&e);
+            Err((StatusCode::UNAUTHORIZED, user_message))
+        }
     }
 }
 

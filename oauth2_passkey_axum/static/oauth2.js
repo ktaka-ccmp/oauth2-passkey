@@ -2,7 +2,73 @@ const oauth2 = (function() {
     let popupWindow;
     let isReloading = false;
 
-    // mode: add_to_user, create_user, login
+    // Check if FedCM is available and enabled
+    function isFedCMAvailable() {
+        return typeof FEDCM_ENABLED !== 'undefined' && FEDCM_ENABLED
+            && typeof OAUTH2_CLIENT_ID !== 'undefined'
+            && typeof IdentityCredential !== 'undefined';
+    }
+
+    // FedCM login flow: nonce -> browser credential picker -> callback
+    async function fedcmLogin(mode) {
+        // 1. Fetch nonce from server
+        const nonceResp = await fetch(
+            `${O2P_ROUTE_PREFIX}/oauth2/fedcm/nonce?mode=${mode}`
+        );
+        if (!nonceResp.ok) throw new Error('Failed to get FedCM nonce');
+        const nonceData = await nonceResp.json();
+
+        // 2. Call navigator.credentials.get() with FedCM (active/button mode)
+        // Google's FedCM endpoint requires response_type and scope via params
+        const credential = await navigator.credentials.get({
+            identity: {
+                providers: [{
+                    configURL: 'https://accounts.google.com/gsi/fedcm.json',
+                    clientId: OAUTH2_CLIENT_ID,
+                    mode: 'active',
+                    params: {
+                        nonce: nonceData.nonce,
+                        response_type: 'id_token',
+                        scope: 'email profile openid',
+                        ss_domain: window.location.origin,
+                    },
+                }],
+                context: 'signin',
+            },
+        });
+
+        // 3. Extract JWT from credential token
+        // Google FedCM may return JSON (e.g. {"token":"eyJ..."}) instead of a raw JWT
+        let token = credential.token;
+        if (token.startsWith('{')) {
+            const parsed = JSON.parse(token);
+            token = parsed.token || parsed.id_token || token;
+        }
+
+        // 4. POST the token to our callback
+        const callbackResp = await fetch(
+            `${O2P_ROUTE_PREFIX}/oauth2/fedcm/callback`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    credential: token,
+                    nonce_id: nonceData.nonce_id,
+                    mode_id: nonceData.mode_id,
+                }),
+            }
+        );
+
+        if (!callbackResp.ok) {
+            const errorText = await callbackResp.text();
+            throw new Error(errorText || 'FedCM callback failed');
+        }
+
+        // 4. Reload on success (session cookie was set by the response)
+        handlePopupClosed();
+    }
+
+    // mode: add_to_user, create_user, login, create_user_or_login
     function openPopup(mode=null, page_context=null) {
         // Only proceed if mode is one of the valid options
         if (mode !== 'add_to_user' && mode !== 'create_user' && mode !== 'login' && mode !== 'create_user_or_login') {
@@ -10,6 +76,19 @@ const oauth2 = (function() {
             return; // Exit the function early
         }
 
+        // Try FedCM for non-add_to_user modes
+        if (mode !== 'add_to_user' && isFedCMAvailable()) {
+            fedcmLogin(mode).catch(function(err) {
+                console.log('FedCM failed, falling back to popup:', err.message);
+                openPopupLegacy(mode, page_context);
+            });
+            return;
+        }
+
+        openPopupLegacy(mode, page_context);
+    }
+
+    function openPopupLegacy(mode, page_context) {
         if (mode === 'add_to_user') {
             popupWindow = window.open(
                 `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}&context=${page_context}`,
