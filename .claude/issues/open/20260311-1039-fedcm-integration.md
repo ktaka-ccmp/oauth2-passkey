@@ -104,7 +104,9 @@ Key security differences:
 | Token authenticity guarantee | server-to-server + client_secret | JWT signature verification (JWKS) |
 | XSS token exposure | Auth code briefly in popup URL (same-origin accessible in theory) | ID token explicitly in JS variable |
 
-Note: The security difference is **incremental, not fundamental**. In the current flow, the authorization code also passes through the browser (via redirect URL or form POST). The code exchange step adds client_secret authentication, but JWT signature verification (aud, iss, exp, nonce) also provides strong authenticity guarantees. This is the same model used by GIS SDK's One Tap sign-in, which is widely deployed.
+**Important: XSS impact differs significantly.** In the current flow, even if an attacker steals the authorization code via XSS, it is useless without the `client_secret` (which only the backend knows). In FedCM, the ID token is a self-contained credential — if stolen via XSS, the attacker can directly use it to authenticate against the backend within the token's validity window. This is a meaningful security difference, not merely incremental.
+
+That said, JWT signature verification (aud, iss, exp, nonce) provides strong authenticity guarantees, and this is the same model used by GIS SDK's One Tap sign-in, which is widely deployed. The risk is mitigated by short token lifetimes and nonce validation.
 
 #### 4. Existing Code Reuse
 
@@ -122,8 +124,8 @@ Note: The security difference is **incremental, not fundamental**. In the curren
 
 1. **Google does not officially support direct FedCM usage.** All Google documentation routes through GIS SDK. Direct usage is undocumented and could break without notice.
 2. **Endpoint change history**: Google changed from `/o/fedcm/authorization` to `/gsi/fedcm/issue`, breaking direct users.
-3. **Spec evolution**: Chrome 143 moved nonce to `params`, Chrome 125 added CORS requirements. GIS SDK absorbs these changes transparently; direct callers must track them.
-4. **Zero public examples**: No confirmed public implementation uses Google FedCM without GIS SDK.
+3. **Spec evolution**: Chrome 143 moved nonce to `params` (Chrome 145 removes old format). [Chrome 125 added CORS requirements](https://developers.google.com/privacy-sandbox/blog/fedcm-chrome-125-updates) for id_assertion_endpoint and changed SameSite cookie handling. GIS SDK absorbs these changes transparently; direct callers must track them.
+4. **No confirmed public examples**: No confirmed public implementation uses Google FedCM without GIS SDK. Google's documentation recommends IdPs provide SDKs and discourages RPs from self-hosting IdP interactions.
 
 #### 6. Primary Benefit
 
