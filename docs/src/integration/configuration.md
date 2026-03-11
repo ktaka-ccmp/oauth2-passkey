@@ -521,6 +521,19 @@ DB_TABLE_OAUTH2_ACCOUNTS='o2p_oauth2_accounts'
 
 ### Experimental Features
 
+#### O2P_FEDCM
+
+Enable FedCM (Federated Credential Management) for Google OAuth2 login. Uses the browser's native account chooser instead of popup windows.
+
+- **Default**: unset (disabled)
+- **Values**: `true` or `enabled` to enable, anything else to disable
+
+```bash
+O2P_FEDCM=true
+```
+
+**Requirements**: Your origin must be added to "Authorized JavaScript Origins" in Google Cloud Console. See [FedCM documentation](fedcm.md) for full setup and security considerations.
+
 #### O2P_PASSKEY_PROMOTION
 
 Prompt users to register a passkey after OAuth2 login. When a user logs in via OAuth2 without an existing passkey, a registration modal can be shown.

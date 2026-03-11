@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- FedCM (Federated Credential Management) support for Google OAuth2 login (experimental)
+  - Browser-native account chooser UI instead of popup windows
+  - `O2P_FEDCM` env var to enable (`true`/`enabled`, disabled by default)
+  - Automatic fallback to popup flow on unsupported browsers (Safari, Firefox) or errors
+  - `add_to_user` mode always uses the traditional popup flow
+  - Compatible with passkey promotion (`O2P_PASSKEY_PROMOTION`)
+  - Front-channel ID token validated server-side via JWT signature verification (JWKS)
+  - Nonce-based replay protection with single-use server-side validation
+  - **Note**: Google does not officially support direct FedCM usage without GIS SDK; endpoint URLs and behavior may change without notice
+
 ### Fixed
 
 - AAGUID-based credential deletion collision: replaced server-side AAGUID-based deletion with WebAuthn `excludeCredentials` to prevent accidental removal of credentials from same-type authenticators (e.g., two Google Password Manager accounts)

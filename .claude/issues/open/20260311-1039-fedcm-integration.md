@@ -185,16 +185,18 @@ Browser-native account chooser UI instead of popup window. No security improveme
 
 ## Implementation Tasks
 
-- [ ] PoC: Call `navigator.credentials.get()` with Google configURL without GIS SDK
-- [ ] PoC: Verify JWT ID token validation with existing `idtoken.rs`
-- [ ] Design frontend fallback strategy (FedCM -> popup flow)
-- [ ] Add `fedcm` feature flag
-- [ ] Implement frontend FedCM JS with feature detection
-- [ ] Implement backend ID token reception endpoint
-- [ ] Add nonce generation and validation for FedCM flow
+- [x] PoC: Call `navigator.credentials.get()` with Google configURL without GIS SDK
+- [x] PoC: Verify JWT ID token validation with existing `idtoken.rs`
+- [x] Design frontend fallback strategy (FedCM -> popup flow)
+- [x] Add `O2P_FEDCM` environment variable toggle (runtime, not compile-time feature flag)
+- [x] Implement frontend FedCM JS with feature detection and fallback
+- [x] Implement backend FedCM nonce and callback endpoints
+- [x] Add nonce generation and validation for FedCM flow
+- [x] Extract shared coordination logic (`process_authenticated_oauth2_user`)
+- [x] Passkey promotion support after FedCM login
 - [ ] Integration tests
 - [ ] Update demo applications
-- [ ] Documentation
+- [x] Documentation (dot.env.example, CHANGELOG, docs/)
 
 ## Decision Log
 
@@ -224,5 +226,21 @@ Browser-native account chooser UI instead of popup window. No security improveme
   5. **Significant risks remain**: Google does not officially support direct FedCM usage (only via GIS SDK), endpoint URLs have changed before, spec is evolving with breaking changes, and zero public examples exist of Google FedCM without GIS SDK.
   6. **Security trade-off**: Eliminating code exchange removes client_secret RP authentication. JWT signature verification provides authenticity guarantees, but the security model is different from the current server-to-server code exchange. This is the same model used by GIS SDK One Tap (widely deployed).
   7. **Priority stays low**: Primary benefit is UX (browser-native UI). Risks from unsupported usage pattern and evolving spec outweigh the UX gain at this time. A PoC should be done first to verify feasibility before committing to full implementation.
+
+### 2026-03-11: Implementation complete
+
+- Context: Full implementation completed and tested on Chrome 145 with demo-live
+- Decision: Ship as experimental feature behind `O2P_FEDCM` env var
+- Key findings during implementation:
+  1. **Google's FedCM requires undocumented params**: `response_type: 'id_token'`, `scope: 'email profile openid'`, `ss_domain: location.origin` must be passed via the `params` object. Discovered by reverse-engineering Google's GIS library.
+  2. **Nonce moved to `params`**: Chrome 145 deprecated top-level nonce; must be inside `params` object.
+  3. **`mode: 'active'` placement**: Must be inside the provider object, not the identity object.
+  4. **Google returns JSON-wrapped JWT**: `credential.token` is `{"token":"eyJ..."}` not a raw JWT. JS must parse before sending to backend.
+  5. **Coordination layer refactored**: Extracted `process_authenticated_oauth2_user()` from `process_oauth2_authorization()` so both OAuth2 callback and FedCM callback share user processing logic.
+  6. **FedCM config injection**: Done via `serve_oauth2_js()` prepending constants, not template injection. Works for all pages that load `oauth2.js`, including custom login pages.
+  7. **Passkey promotion**: FedCM callback returns `promotion_url` in JSON response; JS opens promotion popup after successful FedCM auth.
+- Files added: `oauth2_passkey/src/oauth2/main/fedcm.rs`
+- Files modified: 12 files (see commits `8ad18e7`, `7ca9d0d`)
+- Remaining: integration tests, demo app updates
 
 ## Resolution

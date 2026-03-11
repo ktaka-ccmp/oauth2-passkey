@@ -1,0 +1,209 @@
+# FedCM (Federated Credential Management)
+
+> **Status**: Experimental. Disabled by default. Enable with `O2P_FEDCM=true`.
+
+FedCM is a W3C browser API that provides a browser-native account chooser for federated authentication, eliminating the need for popup windows or redirects. When enabled, oauth2-passkey uses FedCM for Google OAuth2 login with automatic fallback to the traditional popup flow.
+
+## Overview
+
+### How It Works
+
+```
+Traditional OAuth2 flow (popup):
+  Button click -> Popup window -> Google consent -> Redirect -> Session
+
+FedCM flow (browser-native):
+  Button click -> Browser account chooser -> ID token -> Session
+```
+
+With FedCM enabled, the login flow changes from a popup-based redirect to a browser-native UI:
+
+1. User clicks "Sign in with Google"
+2. Browser shows a native account chooser (no popup window)
+3. User selects an account
+4. Browser obtains a JWT ID token from Google's FedCM endpoint
+5. JavaScript sends the token to the backend for validation
+6. Backend validates JWT signature, audience, issuer, expiration, and nonce
+7. Session is established
+
+If FedCM is unavailable (unsupported browser, user dismissal, or error), the existing popup flow activates automatically.
+
+### Browser Support
+
+| Browser | Support |
+|---------|---------|
+| Chrome 108+ | Supported |
+| Edge 136+ | Supported |
+| Opera 108+ | Supported |
+| Safari | Not supported (fallback to popup) |
+| Firefox | Not supported (fallback to popup) |
+
+### Modes
+
+| OAuth2 Mode | FedCM | Fallback |
+|-------------|-------|----------|
+| `login` | Yes | Popup |
+| `create_user` | Yes | Popup |
+| `create_user_or_login` | Yes | Popup |
+| `add_to_user` | Always popup | N/A |
+
+The `add_to_user` mode (linking an additional OAuth2 account) always uses the traditional popup flow because it requires page session token verification.
+
+## Setup
+
+### 1. Environment Variable
+
+```bash
+O2P_FEDCM=true
+```
+
+This is the only configuration needed on the oauth2-passkey side. FedCM is disabled by default.
+
+### 2. Google Cloud Console
+
+In addition to the standard OAuth2 setup (Authorized Redirect URIs), FedCM requires your origin in **Authorized JavaScript Origins**:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) -> APIs & Services -> Credentials
+2. Select your OAuth 2.0 Client ID
+3. Under **Authorized JavaScript origins**, add your origin (e.g., `https://your-domain.example.com`)
+4. Save
+
+> **Important**: This is separate from "Authorized redirect URIs" which is used by the traditional OAuth2 flow. FedCM requires both to be configured.
+
+### 3. No Frontend Changes Required
+
+FedCM integration is handled entirely by the library's `oauth2.js`. When `O2P_FEDCM=true`, the served JavaScript automatically includes feature detection and FedCM logic. This works for both the built-in login page and custom login pages that load `oauth2.js`.
+
+## Security Model
+
+### Comparison with Authorization Code Flow
+
+| Aspect | Authorization Code Flow + PKCE | FedCM |
+|--------|-------------------------------|-------|
+| Token type in browser | Authorization code (URL/form) | JWT ID token (JS variable) |
+| Server-to-server exchange | Yes (code + client_secret) | No |
+| RP authentication | client_secret | None (JWT signature only) |
+| Token authenticity | Code exchange + client_secret | JWT signature verification (JWKS) |
+| XSS token exposure | Code unusable without client_secret | ID token usable within validity window |
+
+### Key Considerations
+
+**JWT Signature Verification**: The backend validates the ID token using Google's JWKS (JSON Web Key Set). This verifies that the token was issued by Google and has not been tampered with. The following claims are checked:
+
+- `iss` (issuer) - must be `accounts.google.com` or `https://accounts.google.com`
+- `aud` (audience) - must match your `OAUTH2_GOOGLE_CLIENT_ID`
+- `exp` (expiration) - token must not be expired
+- `nonce` - must match the server-generated single-use nonce
+
+**Front-Channel Token Delivery**: Unlike the Authorization Code Flow where the code is exchanged server-to-server with the client_secret, FedCM delivers the ID token directly to JavaScript. This means:
+
+- The ID token is accessible to any JavaScript running on the page
+- If an attacker achieves XSS, they could steal the ID token and use it within its validity window
+- This is the same security model used by Google's One Tap sign-in (GIS SDK), which is widely deployed
+
+**Nonce Protection**: Each FedCM login generates a unique server-side nonce that is:
+- Stored in the cache with a 120-second TTL
+- Included in the `navigator.credentials.get()` request
+- Verified against the ID token's `nonce` claim
+- Removed from cache after single use (replay protection)
+
+### Recommendation
+
+FedCM provides a better user experience but has a different security trade-off than the Authorization Code Flow. For applications where the UX benefit of a browser-native login is valuable and the XSS risk profile is acceptable, FedCM is a good choice. For applications requiring the strongest possible RP authentication, the traditional flow with client_secret exchange may be preferred.
+
+Both flows can coexist: FedCM is used when available, with automatic fallback to the popup flow.
+
+## Compatibility with Other Features
+
+### Passkey Promotion (`O2P_PASSKEY_PROMOTION`)
+
+FedCM works with passkey promotion. After a successful FedCM login, the promotion popup opens automatically (same behavior as the traditional OAuth2 flow).
+
+### Custom Login Pages
+
+FedCM works with custom login pages. The `serve_oauth2_js` handler injects `FEDCM_ENABLED` and `OAUTH2_CLIENT_ID` constants into the served JavaScript. Any page that loads `oauth2.js` and uses `oauth2.openPopup()` gets FedCM support automatically.
+
+## Known Limitations
+
+1. **Unsupported by Google officially**: Google documents FedCM usage only through the GIS SDK. Direct usage of `navigator.credentials.get()` with Google's FedCM endpoints is undocumented and could break without notice.
+
+2. **Endpoint instability**: Google has changed FedCM endpoint URLs in the past (from `/o/fedcm/authorization` to `/gsi/fedcm/issue`). The GIS SDK absorbs these changes transparently; direct callers must track them.
+
+3. **Spec evolution**: The FedCM specification is actively evolving. Chrome 143 moved nonce to the `params` object (Chrome 145 removes old format). Future spec changes may require code updates.
+
+4. **Google-specific params**: Google's FedCM endpoint requires `response_type: 'id_token'`, `scope`, and `ss_domain` in the `params` object. These are not part of the FedCM spec and are Google-specific.
+
+5. **JSON-wrapped token**: Google's FedCM endpoint returns the JWT wrapped in JSON (`{"token":"eyJ..."}`). The library handles this automatically.
+
+## Troubleshooting
+
+### FedCM dialog doesn't appear
+
+- Verify `O2P_FEDCM=true` is set
+- Check browser support (Chrome 108+)
+- Ensure the page is served over HTTPS (or localhost for development)
+- Check browser console for FedCM-related errors
+
+### "Error retrieving a token" in browser console
+
+- Verify your origin is in Google Cloud Console's "Authorized JavaScript Origins"
+- Check that `OAUTH2_GOOGLE_CLIENT_ID` is correctly set
+
+### FedCM works but falls back to popup
+
+This is expected behavior for:
+- Unsupported browsers (Safari, Firefox)
+- User dismissing the FedCM dialog
+- Any error during the FedCM flow
+
+Check browser console for the specific fallback reason: `FedCM failed, falling back to popup: <reason>`.
+
+## API Endpoints
+
+When `O2P_FEDCM=true`, two additional endpoints are registered:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/oauth2/fedcm/nonce` | GET | Generates a nonce for `navigator.credentials.get()` |
+| `/oauth2/fedcm/callback` | POST | Validates the JWT ID token and establishes a session |
+
+### GET `/oauth2/fedcm/nonce`
+
+Query parameters:
+- `mode` (optional): `login`, `create_user`, or `create_user_or_login`
+
+Response:
+```json
+{
+  "nonce": "random-nonce-value",
+  "nonce_id": "cache-key-for-nonce",
+  "mode_id": "cache-key-for-mode"
+}
+```
+
+### POST `/oauth2/fedcm/callback`
+
+Request body:
+```json
+{
+  "credential": "eyJhbGciOiJSUzI1NiIs...",
+  "nonce_id": "cache-key-for-nonce",
+  "mode_id": "cache-key-for-mode"
+}
+```
+
+Response (success):
+```json
+{
+  "message": "Successfully logged in"
+}
+```
+
+The response includes a `Set-Cookie` header with the session cookie.
+
+## References
+
+- [FedCM W3C Spec](https://www.w3.org/TR/fedcm/)
+- [MDN: FedCM API](https://developer.mozilla.org/en-US/docs/Web/API/FedCM_API)
+- [Chrome: RP Implementation Guide](https://developer.chrome.com/docs/identity/fedcm/implement/relying-party)
+- [Google: FedCM Migration Guide](https://developers.google.com/identity/gsi/web/guides/fedcm-migration)

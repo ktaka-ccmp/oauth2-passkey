@@ -39,6 +39,7 @@
 # Part 4: Internals
 
 - [OAuth2 Implementation](integration/oauth2.md)
+- [FedCM (Experimental)](integration/fedcm.md)
 - [Passkey Implementation](integration/passkey.md)
 - [Development Tunneling](guides/tunneling.md)
 
