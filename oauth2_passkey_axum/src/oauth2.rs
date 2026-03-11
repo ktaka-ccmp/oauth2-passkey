@@ -228,11 +228,17 @@ async fn fedcm_callback(
     Json(request): Json<FedCMCallbackRequest>,
 ) -> Result<(StatusCode, HeaderMap, Json<serde_json::Value>), (StatusCode, String)> {
     match fedcm_authorized_core(&request, &headers).await {
-        Ok((response_headers, message)) => Ok((
-            StatusCode::OK,
-            response_headers,
-            Json(serde_json::json!({ "message": message })),
-        )),
+        Ok((response_headers, message)) => {
+            let mut response = serde_json::json!({ "message": message });
+            if O2P_PASSKEY_PROMOTION.is_enabled() {
+                response["promotion_url"] = serde_json::json!(format!(
+                    "{}/passkey/promotion/popup?message={}",
+                    O2P_ROUTE_PREFIX.as_str(),
+                    urlencoding::encode(&message)
+                ));
+            }
+            Ok((StatusCode::OK, response_headers, Json(response)))
+        }
         Err(e) => {
             tracing::warn!(error = %e, "FedCM authorization failed");
             let user_message = friendly_error_message(&e);

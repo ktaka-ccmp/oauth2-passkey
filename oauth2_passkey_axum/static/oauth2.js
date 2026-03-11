@@ -64,8 +64,22 @@ const oauth2 = (function() {
             throw new Error(errorText || 'FedCM callback failed');
         }
 
-        // 4. Reload on success (session cookie was set by the response)
-        handlePopupClosed();
+        // 5. Check for passkey promotion or reload
+        const data = await callbackResp.json();
+        if (data.promotion_url) {
+            popupWindow = window.open(
+                data.promotion_url,
+                "PopupWindow",
+                "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
+            );
+            window.addEventListener('message', function(event) {
+                if (event.data === 'auth_complete') {
+                    handlePopupClosed();
+                }
+            });
+        } else {
+            handlePopupClosed();
+        }
     }
 
     // mode: add_to_user, create_user, login, create_user_or_login
