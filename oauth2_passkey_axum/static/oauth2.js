@@ -3,12 +3,10 @@ const oauth2 = (function() {
     let isReloading = false;
 
     // Check if FedCM is available and enabled
-    // Skips FedCM if it failed earlier in this page session (e.g. Chrome cooldown)
     function isFedCMAvailable() {
         return typeof FEDCM_ENABLED !== 'undefined' && FEDCM_ENABLED
             && typeof OAUTH2_CLIENT_ID !== 'undefined'
-            && typeof IdentityCredential !== 'undefined'
-            && !sessionStorage.getItem('fedcm_disabled');
+            && typeof IdentityCredential !== 'undefined';
     }
 
     // FedCM login flow: nonce -> browser credential picker -> callback
@@ -77,8 +75,16 @@ const oauth2 = (function() {
             if (checkData && checkData.should_promote
                 && !(checkData.mode === 'ask'
                      && localStorage.getItem('passkey_promotion_dismissed') === 'true')) {
-                // Navigate current page (no popup needed, avoids popup blocker)
-                window.location.href = data.promotion_url;
+                popupWindow = window.open(
+                    data.promotion_url,
+                    "PopupWindow",
+                    "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
+                );
+                window.addEventListener('message', function(event) {
+                    if (event.data === 'auth_complete') {
+                        handlePopupClosed();
+                    }
+                });
                 return;
             }
         }
@@ -97,7 +103,6 @@ const oauth2 = (function() {
         if (mode !== 'add_to_user' && isFedCMAvailable()) {
             fedcmLogin(mode).catch(function(err) {
                 console.log('FedCM failed, falling back to popup:', err.message);
-                sessionStorage.setItem('fedcm_disabled', '1');
                 openPopupLegacy(mode, page_context);
             });
             return;
