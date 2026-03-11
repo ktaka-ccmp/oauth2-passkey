@@ -234,7 +234,7 @@ Browser-native account chooser UI instead of popup window. No security improveme
 - Key findings during implementation:
   1. **Google's FedCM requires undocumented params**: `response_type: 'id_token'`, `scope: 'email profile openid'`, `ss_domain: location.origin` must be passed via the `params` object. Discovered by reverse-engineering Google's GIS library.
   2. **Nonce moved to `params`**: Chrome 145 deprecated top-level nonce; must be inside `params` object.
-  3. **`mode: 'active'` placement**: Must be inside the provider object, not the identity object.
+  3. **`mode: 'active'` placement**: ~~Must be inside the provider object, not the identity object.~~ **WRONG** - see 2026-03-11 entry below.
   4. **Google returns JSON-wrapped JWT**: `credential.token` is `{"token":"eyJ..."}` not a raw JWT. JS must parse before sending to backend.
   5. **Coordination layer refactored**: Extracted `process_authenticated_oauth2_user()` from `process_oauth2_authorization()` so both OAuth2 callback and FedCM callback share user processing logic.
   6. **FedCM config injection**: Done via `serve_oauth2_js()` prepending constants, not template injection. Works for all pages that load `oauth2.js`, including custom login pages.
@@ -242,5 +242,23 @@ Browser-native account chooser UI instead of popup window. No security improveme
 - Files added: `oauth2_passkey/src/oauth2/main/fedcm.rs`
 - Files modified: 12 files (see commits `8ad18e7`, `7ca9d0d`)
 - Remaining: integration tests, demo app updates
+
+### 2026-03-11: FedCM mode placement bug - root cause of Chrome cooldown
+
+- Context: After FedCM cancel, Chrome permanently added the site to the FedCM block list (`chrome://settings/content/federatedIdentityApi`) with message "User declined or dismissed prompt. API exponential cool down triggered." This contradicted Chromium source code which explicitly guards against embargo in active mode: `should_embargo &= rp_mode_ == RpMode::kPassive;` (request_service.cc:1619, 1679).
+- Root cause: **`mode: 'active'` was placed inside the provider object instead of at the `identity` level.**
+  - Wrong: `identity: { providers: [{ mode: 'active', ... }] }`
+  - Correct: `identity: { providers: [{ ... }], mode: 'active' }`
+  - Chrome silently ignores the unrecognized `mode` field inside the provider, defaulting to **passive mode**.
+  - In passive mode, the `should_embargo` guard passes through, recording the dismiss embargo.
+  - Chromium source: `webid_utils.cc` `GetConsoleErrorMessageFromResult()` maps `kShouldEmbargo` -> "User declined or dismissed prompt. API exponential cool down triggered."
+  - Embargo thresholds: `kFederatedIdentityApiDismissalsBeforeBlock = 1` (one dismiss triggers embargo), with exponential durations: 2h, 1d, 7d, 28d.
+- Fix: Moved `mode: 'active'` to the `identity` object level in `oauth2.js`.
+- Lesson: FedCM API `mode` is a property of `IdentityCredentialRequestOptions` (the `identity` object), NOT of individual providers. MDN and Chrome RP docs clearly show this. The FedCM account chooser UI appears in both active and passive modes, making the mode misplacement hard to detect from behavior alone.
+- References:
+  - [MDN: CredentialsContainer.get()](https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer/get)
+  - [Chrome: RP Implementation Guide](https://developer.chrome.com/docs/identity/fedcm/implement/relying-party)
+  - [Chromium webid_utils.cc](https://blametest.sesse.net/content/browser/webid/webid_utils.cc.html)
+  - [Chromium request_service.cc embargo guard](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/content/browser/webid/request_service.cc)
 
 ## Resolution

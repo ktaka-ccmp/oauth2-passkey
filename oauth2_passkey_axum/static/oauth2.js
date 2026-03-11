@@ -3,10 +3,12 @@ const oauth2 = (function() {
     let isReloading = false;
 
     // Check if FedCM is available and enabled
+    // Skips FedCM if it failed earlier in this page session (e.g. Chrome cooldown)
     function isFedCMAvailable() {
         return typeof FEDCM_ENABLED !== 'undefined' && FEDCM_ENABLED
             && typeof OAUTH2_CLIENT_ID !== 'undefined'
-            && typeof IdentityCredential !== 'undefined';
+            && typeof IdentityCredential !== 'undefined'
+            && !sessionStorage.getItem('fedcm_disabled');
     }
 
     // FedCM login flow: nonce -> browser credential picker -> callback
@@ -25,7 +27,6 @@ const oauth2 = (function() {
                 providers: [{
                     configURL: 'https://accounts.google.com/gsi/fedcm.json',
                     clientId: OAUTH2_CLIENT_ID,
-                    mode: 'active',
                     params: {
                         nonce: nonceData.nonce,
                         response_type: 'id_token',
@@ -33,6 +34,7 @@ const oauth2 = (function() {
                         ss_domain: window.location.origin,
                     },
                 }],
+                mode: 'active',
                 context: 'signin',
             },
         });
@@ -67,19 +69,20 @@ const oauth2 = (function() {
         // 5. Check for passkey promotion or reload
         const data = await callbackResp.json();
         if (data.promotion_url) {
-            popupWindow = window.open(
-                data.promotion_url,
-                "PopupWindow",
-                "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
+            // Pre-check: only open popup if promotion is actually needed
+            const checkResp = await fetch(
+                `${O2P_ROUTE_PREFIX}/passkey/promotion/check`
             );
-            window.addEventListener('message', function(event) {
-                if (event.data === 'auth_complete') {
-                    handlePopupClosed();
-                }
-            });
-        } else {
-            handlePopupClosed();
+            const checkData = checkResp.ok ? await checkResp.json() : null;
+            if (checkData && checkData.should_promote
+                && !(checkData.mode === 'ask'
+                     && localStorage.getItem('passkey_promotion_dismissed') === 'true')) {
+                // Navigate current page (no popup needed, avoids popup blocker)
+                window.location.href = data.promotion_url;
+                return;
+            }
         }
+        handlePopupClosed();
     }
 
     // mode: add_to_user, create_user, login, create_user_or_login
@@ -94,6 +97,7 @@ const oauth2 = (function() {
         if (mode !== 'add_to_user' && isFedCMAvailable()) {
             fedcmLogin(mode).catch(function(err) {
                 console.log('FedCM failed, falling back to popup:', err.message);
+                sessionStorage.setItem('fedcm_disabled', '1');
                 openPopupLegacy(mode, page_context);
             });
             return;

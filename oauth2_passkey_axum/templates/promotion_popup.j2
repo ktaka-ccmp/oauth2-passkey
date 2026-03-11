@@ -43,12 +43,16 @@
             return outputArray;
         }
 
-        // Close popup: notify parent window and close
+        // Close popup or navigate back to origin page
         function closePopup() {
             if (window.opener) {
+                // Opened as popup (traditional OAuth2 flow)
                 window.opener.postMessage('auth_complete', window.location.origin);
+                setTimeout(function() { window.close(); }, 10);
+            } else {
+                // Navigated directly (FedCM flow) - go to site root
+                window.location.href = '/';
             }
-            setTimeout(function() { window.close(); }, 10);
         }
 
         // Check if promotion should be shown, then dispatch
