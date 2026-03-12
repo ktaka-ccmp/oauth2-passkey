@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (12)
+### Open (13)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -21,6 +21,7 @@ This directory contains issue/task tracking files for the project.
 | `20260227-1703` | low | small | [Audit and Improve Silent Fallback Behavior for Optional Environment Variables](open/20260227-1703-env-var-silent-fallback-audit.md) |
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260311-1039` | low | medium | [FedCM (Federated Credential Management) Integration](open/20260311-1039-fedcm-integration.md) |
+| `20260312-1948` | low | small | [Eliminate nonce_id from FedCM Flow](open/20260312-1948-fedcm-eliminate-nonce-id.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
 ### Completed (45)
