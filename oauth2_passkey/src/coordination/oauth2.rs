@@ -6,10 +6,9 @@ use crate::audit::{AuthMethod, AuthMethodDetails, LoginContext};
 use crate::oauth2::{
     AccountSearchField, AuthResponse, FedCMCallbackRequest, OAUTH2_CSRF_COOKIE_NAME,
     OAUTH2_RESPONSE_MODE, OAuth2Account, OAuth2Mode, OAuth2Store, Provider, ProviderUserId,
-    StateParams, cleanup_fedcm_tokens, csrf_checks, decode_state,
-    delete_session_and_misc_token_from_store, get_auth_url, get_idinfo_userinfo,
-    get_mode_from_stored_session, get_uid_from_stored_session_by_state_param, validate_fedcm_token,
-    validate_origin,
+    StateParams, csrf_checks, decode_state, delete_session_and_misc_token_from_store, get_auth_url,
+    get_idinfo_userinfo, get_mode_from_stored_session, get_uid_from_stored_session_by_state_param,
+    validate_fedcm_token, validate_origin,
 };
 
 use crate::userdb::{User as DbUser, UserStore};
@@ -423,9 +422,14 @@ pub async fn fedcm_authorized_core(
     // 2. Build OAuth2Account from the verified ID token
     let oauth2_account = OAuth2Account::from(idinfo);
 
-    // 3. Retrieve mode from cache
-    let mode = match &request.mode_id {
-        Some(mode_id) => get_mode_from_stored_session(mode_id).await?,
+    // 3. Parse mode directly from request (no cache round-trip needed for FedCM)
+    let mode = match &request.mode {
+        Some(mode_str) => {
+            let parsed: OAuth2Mode = mode_str.parse().map_err(|_| {
+                CoordinationError::InvalidState(format!("Invalid FedCM mode: {mode_str}"))
+            })?;
+            Some(parsed)
+        }
         None => None,
     };
 
@@ -450,9 +454,6 @@ pub async fn fedcm_authorized_core(
         None,
     )
     .await?;
-
-    // 7. Cleanup cached FedCM tokens (mode)
-    cleanup_fedcm_tokens(&request.mode_id).await?;
 
     Ok(result)
 }

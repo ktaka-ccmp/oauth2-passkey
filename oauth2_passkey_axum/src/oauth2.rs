@@ -211,11 +211,8 @@ fn friendly_error_message(e: &CoordinationError) -> String {
 
 /// FedCM nonce generation endpoint.
 /// Returns a JSON response with a nonce for `navigator.credentials.get()`.
-async fn fedcm_nonce(
-    Query(params): Query<HashMap<String, String>>,
-) -> Result<Json<oauth2_passkey::FedCMNonceResponse>, (StatusCode, String)> {
-    let mode = params.get("mode").map(|s| s.as_str());
-    let nonce_response = prepare_fedcm_nonce(mode)
+async fn fedcm_nonce() -> Result<Json<oauth2_passkey::FedCMNonceResponse>, (StatusCode, String)> {
+    let nonce_response = prepare_fedcm_nonce()
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(nonce_response))

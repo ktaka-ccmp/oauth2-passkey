@@ -13,7 +13,7 @@ const oauth2 = (function() {
     async function fedcmLogin(mode) {
         // 1. Fetch nonce from server
         const nonceResp = await fetch(
-            `${O2P_ROUTE_PREFIX}/oauth2/fedcm/nonce?mode=${mode}`
+            `${O2P_ROUTE_PREFIX}/oauth2/fedcm/nonce`
         );
         if (!nonceResp.ok) throw new Error('Failed to get FedCM nonce');
         const nonceData = await nonceResp.json();
@@ -54,7 +54,7 @@ const oauth2 = (function() {
                 body: JSON.stringify({
                     credential: token,
                     nonce_id: nonceData.nonce_id,
-                    mode_id: nonceData.mode_id,
+                    mode: mode,
                 }),
             }
         );

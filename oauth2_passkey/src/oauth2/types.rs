@@ -715,29 +715,27 @@ impl TokenType {
 /// Response from the FedCM nonce generation endpoint
 ///
 /// Contains the nonce for the FedCM `navigator.credentials.get()` call
-/// and cache IDs for server-side validation during callback.
+/// and the cache ID for server-side nonce validation during callback.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FedCMNonceResponse {
     /// Nonce value to pass to `navigator.credentials.get()`
     pub nonce: String,
     /// Cache key for retrieving the stored nonce during callback
     pub nonce_id: String,
-    /// Cache key for retrieving the stored OAuth2 mode during callback
-    pub mode_id: Option<String>,
 }
 
 /// Request body for the FedCM callback endpoint
 ///
-/// Contains the JWT ID token received from FedCM and cache IDs
-/// for server-side validation.
+/// Contains the JWT ID token received from FedCM, the cache ID for
+/// nonce verification, and the optional OAuth2 mode.
 #[derive(Debug, Deserialize)]
 pub struct FedCMCallbackRequest {
     /// JWT ID token from `credential.token` returned by FedCM
     pub credential: String,
     /// Cache key for the stored nonce (for verification)
     pub nonce_id: String,
-    /// Cache key for the stored OAuth2 mode
-    pub mode_id: Option<String>,
+    /// OAuth2 mode (e.g., "login", "create_user") sent directly by the client
+    pub mode: Option<String>,
 }
 
 #[cfg(test)]

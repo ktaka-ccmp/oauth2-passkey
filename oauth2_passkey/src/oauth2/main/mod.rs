@@ -8,7 +8,7 @@ pub use core::prepare_oauth2_auth_request;
 pub use fedcm::prepare_fedcm_nonce;
 
 pub(crate) use core::{csrf_checks, get_idinfo_userinfo};
-pub(crate) use fedcm::{cleanup_fedcm_tokens, validate_fedcm_token};
+pub(crate) use fedcm::validate_fedcm_token;
 pub(crate) use idtoken::IdInfo;
 
 pub(crate) use utils::{
