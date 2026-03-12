@@ -3,7 +3,7 @@ use chrono::{Duration, Utc};
 use super::idtoken::{IdInfo, verify_idtoken_with_algorithm};
 use super::utils::{generate_store_token, verify_and_consume_nonce};
 
-use crate::oauth2::config::get_google_client_id;
+use crate::oauth2::config::OAUTH2_GOOGLE_CLIENT_ID;
 use crate::oauth2::types::{FedCMNonceResponse, StoredToken, TokenType};
 use crate::oauth2::{OAuth2Error, OAuth2Mode};
 use crate::storage::{CacheKey, CachePrefix, remove_data, store_cache_auto};
@@ -64,7 +64,7 @@ pub(crate) async fn validate_fedcm_token(
 ) -> Result<IdInfo, OAuth2Error> {
     // 1. Verify JWT signature, audience, issuer, expiration
     let (idinfo, _algorithm) =
-        verify_idtoken_with_algorithm(token.to_string(), get_google_client_id().to_string())
+        verify_idtoken_with_algorithm(token.to_string(), OAUTH2_GOOGLE_CLIENT_ID.clone())
             .await
             .map_err(|e| OAuth2Error::IdToken(e.to_string()))?;
 
