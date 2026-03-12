@@ -227,6 +227,7 @@ async fn process_oauth2_authorization(
     let (mut headers, message) = process_authenticated_oauth2_user(
         oauth2_account,
         mode,
+        AuthMethod::OAuth2,
         login_context,
         uid_in_state,
         account_in_state,
@@ -255,6 +256,7 @@ async fn process_oauth2_authorization(
 async fn process_authenticated_oauth2_user(
     mut oauth2_account: OAuth2Account,
     mode: Option<OAuth2Mode>,
+    auth_method: AuthMethod,
     login_context: LoginContext,
     uid_in_state: Option<&str>,
     account_in_state: Option<&str>,
@@ -386,7 +388,7 @@ async fn process_authenticated_oauth2_user(
     // Record login history (fire-and-forget: errors are logged but don't fail the login)
     let _ = record_login_success(
         user_id_validated,
-        AuthMethod::OAuth2,
+        auth_method,
         login_context,
         AuthMethodDetails {
             provider: Some(provider_for_history),
@@ -438,9 +440,16 @@ pub async fn fedcm_authorized_core(
     let login_context = LoginContext::from_headers(headers);
 
     // 6. Process authenticated user (no state user or state params for FedCM)
-    let result =
-        process_authenticated_oauth2_user(oauth2_account, mode, login_context, None, None, None)
-            .await?;
+    let result = process_authenticated_oauth2_user(
+        oauth2_account,
+        mode,
+        AuthMethod::FedCM,
+        login_context,
+        None,
+        None,
+        None,
+    )
+    .await?;
 
     // 7. Cleanup cached FedCM tokens (mode)
     cleanup_fedcm_tokens(&request.mode_id).await?;
