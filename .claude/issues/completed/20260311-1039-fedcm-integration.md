@@ -14,9 +14,9 @@
 
 ## Created: 2026-03-11-10-39
 
-## Closed:
+## Closed: 2026-03-13-10-16
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -271,3 +271,5 @@ Browser-native account chooser UI instead of popup window. No security improveme
   4. **Demo READMEs**: Added optional FedCM config and "Authorized JavaScript origins" instructions to demo-both and demo-oauth2 READMEs.
 
 ## Resolution
+
+FedCM integration fully implemented and tested as an experimental feature behind `O2P_FEDCM` env var. All implementation tasks completed: PoC, frontend JS with fallback, backend endpoints, nonce validation, coordination layer refactoring, passkey promotion support, integration tests (7 core-level tests), demo app updates, and documentation. Key discoveries during implementation: Google requires undocumented `params` fields, `mode: 'active'` must be at identity level (not provider), and Google returns JSON-wrapped JWT.
