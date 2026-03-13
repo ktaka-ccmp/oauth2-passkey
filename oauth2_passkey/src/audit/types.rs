@@ -12,6 +12,7 @@ use std::fmt;
 pub(crate) enum AuthMethod {
     Passkey,
     OAuth2,
+    FedCM,
 }
 
 impl fmt::Display for AuthMethod {
@@ -19,6 +20,7 @@ impl fmt::Display for AuthMethod {
         match self {
             AuthMethod::Passkey => write!(f, "passkey"),
             AuthMethod::OAuth2 => write!(f, "oauth2"),
+            AuthMethod::FedCM => write!(f, "fedcm"),
         }
     }
 }

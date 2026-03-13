@@ -20,7 +20,8 @@ mod passkey;
 mod user;
 
 pub use oauth2::{
-    delete_oauth2_account_core, get_authorized_core, list_accounts_core, post_authorized_core,
+    delete_oauth2_account_core, fedcm_authorized_core, get_authorized_core, list_accounts_core,
+    post_authorized_core,
 };
 
 pub use admin::{

@@ -164,7 +164,8 @@
             return `${iconHtml}<strong>${entry.authenticator_name}</strong>`;
         }
         const icon = entry.auth_method === 'passkey' ? '🔑' : '🌐';
-        let method = entry.auth_method === 'passkey' ? 'Passkey' : 'OAuth2';
+        let method = entry.auth_method === 'passkey' ? 'Passkey'
+            : entry.auth_method === 'fedcm' ? 'FedCM' : 'OAuth2';
         if (entry.provider) method += ` (${entry.provider})`;
         return `<span class="login-icon">${icon}</span> <strong>${method}</strong>`;
     }

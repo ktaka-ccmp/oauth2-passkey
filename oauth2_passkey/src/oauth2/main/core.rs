@@ -16,7 +16,7 @@ use crate::utils::base64url_encode;
 
 use super::google::{exchange_code_for_token, fetch_user_data_from_google};
 use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken_with_algorithm};
-use super::utils::{decode_state, encode_state, generate_store_token};
+use super::utils::{decode_state, encode_state, generate_store_token, verify_and_consume_nonce};
 use crate::storage::{
     CacheErrorConversion, CacheKey, CachePrefix, get_data, remove_data, store_cache_auto,
 };
@@ -234,32 +234,7 @@ async fn verify_nonce(
     let oauth2_state = crate::OAuth2State::new(auth_response.state.clone())?;
     let state_in_response = decode_state(&oauth2_state)?;
 
-    let nonce_cache_key = CacheKey::new(state_in_response.nonce_id.clone())
-        .map_err(OAuth2Error::convert_storage_error)?;
-    let nonce_session: StoredToken =
-        get_data::<StoredToken, OAuth2Error>(CachePrefix::nonce(), nonce_cache_key.clone())
-            .await?
-            .ok_or_else(|| {
-                OAuth2Error::SecurityTokenNotFound("nonce-session not found".to_string())
-            })?;
-
-    tracing::debug!("Nonce Data: {:#?}", nonce_session);
-
-    if Utc::now() > nonce_session.expires_at {
-        tracing::error!("Nonce Expired: {:#?}", nonce_session.expires_at);
-        tracing::error!("Now: {:#?}", Utc::now());
-        return Err(OAuth2Error::NonceExpired);
-    }
-    // Verify nonce matches between ID token and stored session
-    if idinfo.nonce != Some(nonce_session.token.clone()) {
-        tracing::error!("Nonce in ID Token: {:#?}", idinfo.nonce);
-        tracing::error!("Stored Nonce: {:#?}", nonce_session.token);
-        return Err(OAuth2Error::NonceMismatch);
-    }
-
-    remove_data::<OAuth2Error>(CachePrefix::nonce(), nonce_cache_key).await?;
-
-    Ok(())
+    verify_and_consume_nonce(&state_in_response.nonce_id, idinfo.nonce.as_deref()).await
 }
 
 pub(crate) async fn csrf_checks(
