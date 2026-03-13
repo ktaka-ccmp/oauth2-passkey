@@ -68,11 +68,11 @@ Both changes are in `oauth2_passkey_axum/static/oauth2.js`.
 
 ## Implementation Tasks
 
-- [ ] Add `mediation: 'required'` to `navigator.credentials.get()` call in `fedcmLogin()`
-- [ ] Add logout helper function that calls `navigator.credentials.preventSilentAccess()` before redirecting
+- [x] Add `mediation: 'required'` to `navigator.credentials.get()` call in `fedcmLogin()`
+- [x] Add logout helper function that calls `navigator.credentials.preventSilentAccess()` before redirecting
 - [ ] Test that FedCM UI appears consistently on repeated logins
 - [ ] Test that logout clears FedCM state
-- [ ] Update FedCM documentation if needed
+- [x] Update FedCM documentation if needed
 
 ## Decision Log
 

@@ -158,12 +158,22 @@ FedCM works with custom login pages. The `serve_oauth2_js` handler injects `FEDC
 FedCM has two UI modes controlled by the `mode` property on the `identity` object (not on individual providers):
 
 ```javascript
-navigator.credentials.get({
+const credential = await navigator.credentials.get({
   identity: {
-    providers: [{ configURL: '...', clientId: '...' }],
-    mode: 'active',   // <-- must be here, at the identity level
+    providers: [{
+      configURL: 'https://accounts.google.com/gsi/fedcm.json',
+      clientId: 'YOUR_CLIENT_ID',
+      params: {
+        nonce: 'server-generated-nonce',
+        response_type: 'id_token',
+        scope: 'email profile openid',
+        ss_domain: window.location.origin,
+      },
+    }],
+    mode: 'active',      // <-- must be here, at the identity level
     context: 'signin',
   },
+  mediation: 'required', // Prevent auto re-authn, always require user interaction
 });
 ```
 
