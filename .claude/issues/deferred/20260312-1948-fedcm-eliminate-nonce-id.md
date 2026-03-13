@@ -16,7 +16,7 @@
 
 ## Closed:
 
-## Status: open
+## Status: deferred
 
 ## Priority: low
 
@@ -91,5 +91,17 @@ The nonce is 32 bytes (256 bits) of randomness, and the JWT is signed by Google.
 - Context: After completing mode_id elimination refactoring, considered whether to immediately proceed with nonce_id elimination
 - Decision: Create issue rather than implement immediately
 - Reason: The change is well-analyzed but not urgent. FedCM is still experimental. Deferring allows more reflection on whether the simplification is worth the churn.
+
+### 2026-03-13: Code reuse trade-off identified
+
+- Context: Evaluated whether eliminating nonce_id would improve or reduce code sharing between OAuth2 and FedCM
+- Finding: Eliminating nonce_id would **reduce** code reuse, not improve it
+- Details:
+  - Currently, both OAuth2 and FedCM share the same nonce infrastructure:
+    - `generate_store_token()` -- generates random token + auto-generated cache key (used by both flows)
+    - `verify_and_consume_nonce()` -- lookup by ID, compare value, delete (used by both flows)
+  - After this change, FedCM would need its own `verify_and_consume_fedcm_nonce()` with a different pattern (lookup by value, existence check only, delete), diverging from the shared utility
+  - The "password pattern" (ID + value comparison) is slightly more general than the "bearer pattern" (value as key + existence check), so keeping nonce_id maintains a single code path for both flows
+- Conclusion: This is an argument against the change. The simplification benefit (removing nonce_id relay through JS) is offset by the code divergence cost. Not a blocker, but should be weighed.
 
 ## Resolution
