@@ -14,9 +14,9 @@
 
 ## Created: 2026-03-14-02-22
 
-## Closed:
+## Closed: 2026-03-14-02-37
 
-## Status: open
+## Status: completed
 
 ## Priority: high
 
@@ -86,4 +86,12 @@ Both changes are in `oauth2_passkey_axum/static/oauth2.js`.
 
 ## Resolution
 
-<To be filled when issue is resolved>
+Fixed by adding two complementary changes to `oauth2_passkey_axum/static/oauth2.js`:
+
+1. **Added `mediation: 'required'` parameter** to the `navigator.credentials.get()` call in the FedCM login flow. This explicitly forces user interaction for every login attempt, preventing the browser from attempting automatic re-authentication that triggers the 10-minute rate limit.
+
+2. **Added `logout()` helper function** that calls `navigator.credentials.preventSilentAccess()` before redirecting to the logout endpoint. This clears the FedCM auto re-authn state when users explicitly log out, ensuring clean logout behavior.
+
+The fix prevents the issue where the browser window becomes dimmed and unresponsive when the auto re-authn rate limit is hit. Users will now always see the FedCM account chooser UI on login attempts.
+
+Commit: `62f999f` - fix: prevent FedCM auto re-authn rate limit error (20260314-0222)

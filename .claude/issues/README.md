@@ -6,13 +6,12 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (12)
+### Open (11)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2019` | high | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
-| `20260314-0222` | high | small | [FedCM Auto Re-Authentication Rate Limit Error](open/20260314-0222-fedcm-auto-reauthn-rate-limit.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `20260226-2020` | medium | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
 | `20260226-2021` | medium | medium | [MySQL/MariaDB Database Support](open/20260226-2021-mysql-mariadb-support.md) |
@@ -23,10 +22,11 @@ This directory contains issue/task tracking files for the project.
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
-### Completed (46)
+### Completed (47)
 
 | ID | Title |
 |----|-------|
+| `20260314-0222` | [FedCM Auto Re-Authentication Rate Limit Error](completed/20260314-0222-fedcm-auto-reauthn-rate-limit.md) |
 | `20260311-1039` | [FedCM (Federated Credential Management) Integration](completed/20260311-1039-fedcm-integration.md) |
 | `20260311-0904` | [GitHub Actions Security Hardening](completed/20260311-0904-github-actions-security-hardening.md) |
 | `20260226-2030` | [AAGUID-Based Credential Deletion Collision](completed/20260226-2030-aaguid-credential-deletion-collision.md) |
