@@ -78,6 +78,34 @@ impl PasskeyPromotionMode {
     }
 }
 
+/// FedCM (Federated Credential Management) mode (experimental)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FedCMMode {
+    /// Disabled (default)
+    Disabled,
+    /// Enabled
+    Enabled,
+}
+
+impl FedCMMode {
+    pub(crate) fn is_enabled(self) -> bool {
+        matches!(self, Self::Enabled)
+    }
+}
+
+/// FedCM support for OAuth2 login (experimental)
+/// Values: true/enabled (enabled), anything else (disabled, default)
+pub(crate) static O2P_FEDCM: LazyLock<FedCMMode> = LazyLock::new(|| {
+    match std::env::var("O2P_FEDCM")
+        .unwrap_or_default()
+        .to_lowercase()
+        .as_str()
+    {
+        "true" | "enabled" => FedCMMode::Enabled,
+        _ => FedCMMode::Disabled,
+    }
+});
+
 /// Passkey promotion after OAuth2 login (experimental)
 /// Values: false (disabled, default), ask (show modal), force (skip modal)
 pub(crate) static O2P_PASSKEY_PROMOTION: LazyLock<PasskeyPromotionMode> = LazyLock::new(|| {

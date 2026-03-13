@@ -182,6 +182,11 @@ pub(super) static OAUTH2_GOOGLE_CLIENT_ID: LazyLock<String> = LazyLock::new(|| {
     std::env::var("OAUTH2_GOOGLE_CLIENT_ID").expect("OAUTH2_GOOGLE_CLIENT_ID must be set")
 });
 
+/// Get the OAuth2 Google Client ID (needed by FedCM to embed in frontend)
+pub fn get_google_client_id() -> &'static str {
+    OAUTH2_GOOGLE_CLIENT_ID.as_str()
+}
+
 pub(super) static OAUTH2_GOOGLE_CLIENT_SECRET: LazyLock<String> = LazyLock::new(|| {
     std::env::var("OAUTH2_GOOGLE_CLIENT_SECRET").expect("OAUTH2_GOOGLE_CLIENT_SECRET must be set")
 });

@@ -65,9 +65,9 @@ pub use coordination::{
 pub use coordination::{
     DeleteCredentialResponse, delete_oauth2_account_admin, delete_oauth2_account_core,
     delete_passkey_credential_admin, delete_passkey_credential_core, delete_user_account,
-    delete_user_account_admin, force_logout_user, get_all_active_sessions, get_authorized_core,
-    list_accounts_core, post_authorized_core, update_passkey_credential_core, update_user_account,
-    update_user_admin_status,
+    delete_user_account_admin, fedcm_authorized_core, force_logout_user, get_all_active_sessions,
+    get_authorized_core, list_accounts_core, post_authorized_core, update_passkey_credential_core,
+    update_user_account, update_user_admin_status,
 };
 
 // Login history types and functions
@@ -89,7 +89,8 @@ pub use config::O2P_DEMO_MODE;
 
 // OAuth2 authentication types and functions
 pub use oauth2::{
-    AuthResponse, OAuth2Account, OAuth2Mode, OAuth2State, Provider, ProviderUserId,
+    AuthResponse, FedCMCallbackRequest, FedCMNonceResponse, OAuth2Account, OAuth2Mode, OAuth2State,
+    Provider, ProviderUserId, get_google_client_id, prepare_fedcm_nonce,
     prepare_oauth2_auth_request,
 };
 

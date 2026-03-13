@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-26
 
-## Closed:
+## Closed: 2026-03-03
 
-## Status: open
+## Status: wontfix
 
 ## Priority: low
 
@@ -88,4 +88,21 @@ None
 - Decision: Create as low-priority, small-difficulty issue
 - Reason: Low risk, straightforward implementation, but no immediate demand
 
+### 2026-03-03: Closed as wontfix (YAGNI)
+
+Reviewed all proposed use cases and found none are actionable:
+
+1. **Step-up authentication**: Not applicable. Both OAuth2 and Passkey rely on password managers as trust anchors, so there is no meaningful difference in authentication strength. Requiring one method after the other adds friction without improving security.
+
+2. **Conditional UI/UX based on auth method**: No concrete scenario identified where the UI should differ based on how the user logged in. Account management pages are the same regardless.
+
+3. **Security audit trails**: Already covered by login history (`LoginHistoryEntry` records `AuthMethod` for every login). Adding it to the session would be redundant.
+
+4. **Passkey promotion**: The current implementation works without session-level auth method tracking. The OAuth2 popup flow context itself implicitly identifies OAuth2 logins, and the `promotion_check` endpoint uses UA + AAGUID heuristics to decide whether to prompt. No need for `auth_method` in `StoredSession`.
+
+- Decision: Wontfix -- no real use case justifies the added complexity
+- Principle: YAGNI (You Aren't Gonna Need It)
+
 ## Resolution
+
+Closed as wontfix. All proposed use cases were reviewed and none require `auth_method` in the session. Step-up authentication is not meaningful when both auth methods share the same trust anchor (password managers). Audit logging is already handled by login history. Passkey promotion works via OAuth2 popup flow context without session-level tracking.

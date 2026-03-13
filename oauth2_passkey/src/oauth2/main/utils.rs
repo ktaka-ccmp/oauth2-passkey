@@ -65,6 +65,48 @@ pub(super) async fn generate_store_token(
     Ok((token, token_id.as_str().to_string()))
 }
 
+/// Verify a nonce against its cached value and consume it (single-use).
+///
+/// Retrieves the stored nonce from cache, checks expiration, compares with
+/// the expected value (typically from an ID token), and removes it from cache.
+pub(super) async fn verify_and_consume_nonce(
+    nonce_id: &str,
+    expected_nonce: Option<&str>,
+) -> Result<(), OAuth2Error> {
+    let nonce_cache_key =
+        CacheKey::new(nonce_id.to_string()).map_err(OAuth2Error::convert_storage_error)?;
+    let nonce_session: StoredToken =
+        get_data::<StoredToken, OAuth2Error>(CachePrefix::nonce(), nonce_cache_key.clone())
+            .await?
+            .ok_or_else(|| {
+                OAuth2Error::SecurityTokenNotFound("nonce not found in cache".to_string())
+            })?;
+
+    tracing::debug!("Nonce data: {:?}", nonce_session);
+
+    if Utc::now() > nonce_session.expires_at {
+        tracing::error!(
+            "Nonce expired: {:?}, now: {:?}",
+            nonce_session.expires_at,
+            Utc::now()
+        );
+        return Err(OAuth2Error::NonceExpired);
+    }
+
+    if expected_nonce != Some(nonce_session.token.as_str()) {
+        tracing::error!(
+            "Nonce mismatch: expected={:?}, stored={:?}",
+            expected_nonce,
+            nonce_session.token
+        );
+        return Err(OAuth2Error::NonceMismatch);
+    }
+
+    remove_data::<OAuth2Error>(CachePrefix::nonce(), nonce_cache_key).await?;
+
+    Ok(())
+}
+
 pub(crate) async fn validate_origin(
     headers: &HeaderMap,
     auth_url: &str,

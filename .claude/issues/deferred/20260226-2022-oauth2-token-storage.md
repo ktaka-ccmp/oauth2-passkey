@@ -16,7 +16,7 @@
 
 ## Closed:
 
-## Status: open
+## Status: deferred
 
 ## Priority: low
 
@@ -96,3 +96,5 @@ Defer until there is concrete demand. The security complexity is high and the fe
 - Reason: High value but high risk; requires careful security design. No concrete demand yet
 
 ## Resolution
+
+Deferred. This library is an authentication library, not an OAuth2 API client. Token storage is only needed when the backend needs to call provider APIs on behalf of users, which is outside the library's scope. If concrete demand arises, reconsider with session-scoped approach first.

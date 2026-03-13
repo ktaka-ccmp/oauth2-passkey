@@ -17,9 +17,11 @@ mod main;
 mod storage;
 mod types;
 
-pub use main::prepare_oauth2_auth_request;
+pub use config::get_google_client_id;
+pub use main::{prepare_fedcm_nonce, prepare_oauth2_auth_request};
 pub use types::{
-    AuthResponse, OAuth2Account, OAuth2Mode, OAuth2State, Provider, ProviderUserId, TokenType,
+    AuthResponse, FedCMCallbackRequest, FedCMNonceResponse, OAuth2Account, OAuth2Mode, OAuth2State,
+    Provider, ProviderUserId, TokenType,
 };
 
 use crate::storage::CacheErrorConversion;
@@ -29,7 +31,8 @@ pub(crate) use types::{StateParams, StoredToken};
 
 pub(crate) use main::{
     csrf_checks, decode_state, delete_session_and_misc_token_from_store, get_idinfo_userinfo,
-    get_mode_from_stored_session, get_uid_from_stored_session_by_state_param, validate_origin,
+    get_mode_from_stored_session, get_uid_from_stored_session_by_state_param, validate_fedcm_token,
+    validate_origin,
 };
 
 // Internal utilities needed by test setup

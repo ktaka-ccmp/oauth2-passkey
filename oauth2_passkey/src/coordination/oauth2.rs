@@ -4,10 +4,11 @@ use std::{env, sync::LazyLock};
 
 use crate::audit::{AuthMethod, AuthMethodDetails, LoginContext};
 use crate::oauth2::{
-    AccountSearchField, AuthResponse, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_RESPONSE_MODE, OAuth2Account,
-    OAuth2Mode, OAuth2Store, Provider, ProviderUserId, csrf_checks, decode_state,
-    delete_session_and_misc_token_from_store, get_auth_url, get_idinfo_userinfo,
-    get_mode_from_stored_session, get_uid_from_stored_session_by_state_param, validate_origin,
+    AccountSearchField, AuthResponse, FedCMCallbackRequest, OAUTH2_CSRF_COOKIE_NAME,
+    OAUTH2_RESPONSE_MODE, OAuth2Account, OAuth2Mode, OAuth2Store, Provider, ProviderUserId,
+    StateParams, csrf_checks, decode_state, delete_session_and_misc_token_from_store, get_auth_url,
+    get_idinfo_userinfo, get_mode_from_stored_session, get_uid_from_stored_session_by_state_param,
+    validate_fedcm_token, validate_origin,
 };
 
 use crate::userdb::{User as DbUser, UserStore};
@@ -191,31 +192,21 @@ async fn process_oauth2_authorization(
     login_context: LoginContext,
 ) -> Result<(HeaderMap, String), CoordinationError> {
     tracing::info!("Processing OAuth2 authorization core logic");
+
+    // Upsert oauth2_account and user
+    // 1. Decode the state from the auth response
+    // 2. Extract user_id from the stored session if available
+
     let (idinfo, userinfo) = get_idinfo_userinfo(auth_response).await?;
 
     // Convert GoogleUserInfo to DbUser and store it
     static OAUTH2_GOOGLE_USER: &str = "idinfo";
 
-    let mut oauth2_account = match OAUTH2_GOOGLE_USER {
+    let oauth2_account = match OAUTH2_GOOGLE_USER {
         "idinfo" => OAuth2Account::from(idinfo),
         "userinfo" => OAuth2Account::from(userinfo),
         _ => OAuth2Account::from(idinfo), // Default case
     };
-
-    // Upsert oauth2_account and user
-    // 1. Decode the state from the auth response
-    // 2. Extract user_id from the stored session if available
-    // 3. Check if the OAuth2 account exists
-
-    // Handle user and account linking
-    // 4. If user is logged in and account exists, ensure they match
-    // 5. If user is logged in but account doesn't exist, link account to user
-    // 6. If user is not logged in but account exists, create session for account
-    // 7. If neither user is logged in nor account exists, create new user and account
-
-    // Create session with user_id
-    // 8. Create a new entry in session store
-    // 9. Create a header for the session cookie
 
     // Decode the state from the auth response
     let oauth2_state = crate::OAuth2State::new(auth_response.state.clone())?;
@@ -223,11 +214,69 @@ async fn process_oauth2_authorization(
 
     // Extract user_id from the stored session if available
     let state_user = get_uid_from_stored_session_by_state_param(&state_in_response).await?;
-
     let (uid_in_state, account_in_state) = match &state_user {
-        Some(user) => (Some(&user.id), Some(&user.account)),
+        Some(user) => (Some(user.id.as_str()), Some(user.account.as_str())),
         None => (None, None),
     };
+
+    // Extract mode_id from the stored session if available
+    let mode = match &state_in_response.mode_id {
+        Some(mode_id) => get_mode_from_stored_session(mode_id).await?,
+        None => {
+            tracing::debug!("No mode ID found");
+            None
+        }
+    };
+
+    let (mut headers, message) = process_authenticated_oauth2_user(
+        oauth2_account,
+        mode,
+        AuthMethod::OAuth2,
+        login_context,
+        uid_in_state,
+        account_in_state,
+        Some(&state_in_response),
+    )
+    .await?;
+
+    // Clear CSRF cookie (OAuth2-specific cleanup)
+    let _ = header_set_cookie(
+        &mut headers,
+        OAUTH2_CSRF_COOKIE_NAME.to_string(),
+        "value".to_string(),
+        Utc::now() - Duration::seconds(86400),
+        -86400,
+        None, // CSRF cookie doesn't need domain attribute
+    )?;
+
+    Ok((headers, message))
+}
+
+/// Shared logic for processing an authenticated OAuth2/FedCM user.
+///
+/// Called after the caller has obtained the user identity (via code exchange
+/// or JWT validation), resolved the OAuth2 mode, and extracted any logged-in
+/// user context from state.
+async fn process_authenticated_oauth2_user(
+    mut oauth2_account: OAuth2Account,
+    mode: Option<OAuth2Mode>,
+    auth_method: AuthMethod,
+    login_context: LoginContext,
+    uid_in_state: Option<&str>,
+    account_in_state: Option<&str>,
+    state_params: Option<&StateParams>,
+) -> Result<(HeaderMap, String), CoordinationError> {
+    // 1. Check if the OAuth2 account exists
+    //
+    // Handle user and account linking
+    // 2. If user is logged in and account exists, ensure they match
+    // 3. If user is logged in but account doesn't exist, link account to user
+    // 4. If user is not logged in but account exists, create session for account
+    // 5. If neither user is logged in nor account exists, create new user and account
+    //
+    // Create session with user_id
+    // 6. Create a new entry in session store
+    // 7. Create a header for the session cookie
 
     // Check if the OAuth2 account exists
     let provider = Provider::new(oauth2_account.provider.clone())
@@ -242,19 +291,11 @@ async fn process_oauth2_authorization(
     let provider_user_id_for_history = oauth2_account.provider_user_id.clone();
     let email_for_history = oauth2_account.email.clone();
 
-    // Extract mode_id from the stored session if available
-    let mode = match &state_in_response.mode_id {
-        Some(mode_id) => get_mode_from_stored_session(mode_id).await?,
-        None => {
-            tracing::debug!("No mode ID found");
-            None
-        }
-    };
-
     tracing::debug!("Mode: {:?}", mode);
     tracing::debug!("User ID in state: {:?}", uid_in_state);
     tracing::debug!("Existing account: {:?}", existing_account);
     tracing::debug!("Account in state: {:?}", account_in_state);
+
     // Match on the combination of mode, auth_user and existing_account
     let (user_id, message) = match (mode.clone(), uid_in_state, &existing_account) {
         // Case 1: AddToUser mode - User is logged in and account doesn't exist (success case)
@@ -264,25 +305,33 @@ async fn process_oauth2_authorization(
                     "Missing account information in OAuth2 state".to_string(),
                 )
             })?;
+            let state_params = state_params.ok_or_else(|| {
+                CoordinationError::InvalidState("AddToUser requires state parameters".to_string())
+            })?;
             let message = format!("Successfully linked to {account_info}");
             tracing::debug!("{}", message);
-            oauth2_account.user_id = uid.clone();
+            oauth2_account.user_id = uid.to_string();
             OAuth2Store::upsert_oauth2_account(oauth2_account).await?;
-            delete_session_and_misc_token_from_store(&state_in_response).await?;
+            delete_session_and_misc_token_from_store(state_params).await?;
             (uid.to_string(), message)
         }
 
         // Case 2: AddToUser mode - User is logged in and account exists (already linked or error)
         (Some(OAuth2Mode::AddToUser), Some(uid), Some(existing)) => {
-            if uid == &existing.user_id {
+            if uid == existing.user_id {
                 let account_info = account_in_state.ok_or_else(|| {
                     CoordinationError::InvalidState(
                         "Missing account information in OAuth2 state".to_string(),
                     )
                 })?;
+                let state_params = state_params.ok_or_else(|| {
+                    CoordinationError::InvalidState(
+                        "AddToUser requires state parameters".to_string(),
+                    )
+                })?;
                 let msg = format!("Already linked to current user {account_info}");
                 tracing::debug!("{}", msg);
-                delete_session_and_misc_token_from_store(&state_in_response).await?;
+                delete_session_and_misc_token_from_store(state_params).await?;
                 (uid.to_string(), msg)
             } else {
                 return Err(CoordinationError::Conflict(
@@ -350,12 +399,12 @@ async fn process_oauth2_authorization(
 
     let user_id_validated = UserId::new(user_id)
         .map_err(|e| CoordinationError::Validation(format!("Invalid user ID: {e}")))?;
-    let mut headers = new_session_header(user_id_validated.clone()).await?;
+    let headers = new_session_header(user_id_validated.clone()).await?;
 
     // Record login history (fire-and-forget: errors are logged but don't fail the login)
     let _ = record_login_success(
         user_id_validated,
-        AuthMethod::OAuth2,
+        auth_method,
         login_context,
         AuthMethodDetails {
             provider: Some(provider_for_history),
@@ -366,16 +415,64 @@ async fn process_oauth2_authorization(
     )
     .await;
 
-    let _ = header_set_cookie(
-        &mut headers,
-        OAUTH2_CSRF_COOKIE_NAME.to_string(),
-        "value".to_string(),
-        Utc::now() - Duration::seconds(86400),
-        -86400,
-        None, // CSRF cookie doesn't need domain attribute
-    )?;
-
     Ok((headers, message))
+}
+
+/// Processes a FedCM authorization callback.
+///
+/// This function validates a JWT ID token received via FedCM's
+/// `navigator.credentials.get()`, verifies the nonce, and establishes
+/// a user session.
+///
+/// FedCM does not support `add_to_user` mode -- this mode always uses
+/// the traditional OAuth2 popup flow.
+#[tracing::instrument(skip(request, headers), fields(user_id, provider = "google"))]
+pub async fn fedcm_authorized_core(
+    request: &FedCMCallbackRequest,
+    headers: &HeaderMap,
+) -> Result<(HeaderMap, String), CoordinationError> {
+    tracing::info!("Processing FedCM authorization callback");
+
+    // 1. Validate ID token and verify nonce (single-use)
+    let idinfo = validate_fedcm_token(&request.credential, &request.nonce_id).await?;
+
+    // 2. Build OAuth2Account from the verified ID token
+    let oauth2_account = OAuth2Account::from(idinfo);
+
+    // 3. Parse mode directly from request (no cache round-trip needed for FedCM)
+    let mode = match &request.mode {
+        Some(mode_str) => {
+            let parsed: OAuth2Mode = mode_str.parse().map_err(|_| {
+                CoordinationError::InvalidState(format!("Invalid FedCM mode: {mode_str}"))
+            })?;
+            Some(parsed)
+        }
+        None => None,
+    };
+
+    // 4. Reject AddToUser mode (not supported by FedCM)
+    if matches!(mode, Some(OAuth2Mode::AddToUser)) {
+        return Err(CoordinationError::InvalidState(
+            "FedCM does not support add_to_user mode".to_string(),
+        ));
+    }
+
+    // 5. Extract login context from headers for history recording
+    let login_context = LoginContext::from_headers(headers);
+
+    // 6. Process authenticated user (no state user or state params for FedCM)
+    let result = process_authenticated_oauth2_user(
+        oauth2_account,
+        mode,
+        AuthMethod::FedCM,
+        login_context,
+        None,
+        None,
+        None,
+    )
+    .await?;
+
+    Ok(result)
 }
 
 // When creating a new user, map fields according to configuration or defaults
