@@ -164,21 +164,7 @@ const oauth2 = (function() {
         }
     });
 
-    // Logout helper: clears FedCM auto re-authn state and redirects to logout endpoint
-    function logout(redirectPath) {
-        // Clear FedCM auto re-authn state if available
-        if (typeof navigator.credentials !== 'undefined'
-            && typeof navigator.credentials.preventSilentAccess === 'function') {
-            navigator.credentials.preventSilentAccess();
-        }
-
-        // Redirect to logout endpoint
-        const redirect = redirectPath || '/';
-        window.location.href = `${O2P_ROUTE_PREFIX}/user/logout?redirect=${encodeURIComponent(redirect)}`;
-    }
-
     return {
-        openPopup: openPopup,
-        logout: logout
+        openPopup: openPopup
     };
 })();

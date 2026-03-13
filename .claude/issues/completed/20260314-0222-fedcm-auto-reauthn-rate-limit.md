@@ -48,31 +48,24 @@ When this error occurs, the browser window becomes dimmed (grayed out) and the p
 
 ## Approach
 
-Implement two complementary fixes:
+Add `mediation: 'required'` to FedCM login call:
+- Forces user interaction for every login attempt
+- Prevents auto re-authn behavior
+- Aligns with our button-triggered login flow
+- Single parameter provides complete control over the behavior
 
-1. **Add `mediation: 'required'` to FedCM login call**
-   - Forces user interaction for every login attempt
-   - Prevents auto re-authn behavior
-   - Aligns with our button-triggered login flow
-
-2. **Add `preventSilentAccess()` call on logout**
-   - Clears auto re-authn state when user explicitly logs out
-   - Best practice for clean logout behavior
-   - Ensures logged-out state is respected by FedCM
-
-Both changes are in `oauth2_passkey_axum/static/oauth2.js`.
+Changes are in `oauth2_passkey_axum/static/oauth2.js`.
 
 ## Related Files
 
-- `oauth2_passkey_axum/static/oauth2.js` - FedCM login implementation and logout helper
+- `oauth2_passkey_axum/static/oauth2.js` - FedCM login implementation
 
 ## Implementation Tasks
 
 - [x] Add `mediation: 'required'` to `navigator.credentials.get()` call in `fedcmLogin()`
-- [x] Add logout helper function that calls `navigator.credentials.preventSilentAccess()` before redirecting
-- [ ] Test that FedCM UI appears consistently on repeated logins
-- [ ] Test that logout clears FedCM state
-- [x] Update FedCM documentation if needed
+- [x] Update FedCM documentation
+- [x] Test that FedCM UI appears consistently on repeated logins
+- [x] Remove `preventSilentAccess()` implementation (decided unnecessary - mediation parameter is sufficient)
 
 ## Decision Log
 
@@ -84,13 +77,24 @@ Both changes are in `oauth2_passkey_axum/static/oauth2.js`.
 - Decision: Implement both `mediation: 'required'` (login) and `preventSilentAccess()` (logout)
 - Reason: They complement each other - mediation controls login behavior, preventSilentAccess ensures clean logout state. No conflicts, both are best practices.
 
+### 2026-03-14: Remove preventSilentAccess(), use mediation parameter only
+
+- Context: Implemented `preventSilentAccess()` in logout helper, but realized it adds complexity without clear benefit
+- Decision: Remove `preventSilentAccess()` implementation entirely, rely solely on `mediation: 'required'`
+- Reason:
+  - `mediation: 'required'` already prevents auto re-authn completely
+  - `preventSilentAccess()` has no observable effect when mediation is set
+  - If behavior should be controlled by mediation parameter, preventSilentAccess interferes with that control
+  - Simpler solution: single parameter (`mediation`) controls all behavior
+  - Avoids ad-hoc template modifications that don't work for custom templates
+
 ## Resolution
 
-Fixed by adding two complementary changes to `oauth2_passkey_axum/static/oauth2.js`:
+Fixed by adding `mediation: 'required'` parameter to `oauth2_passkey_axum/static/oauth2.js`.
 
-1. **Added `mediation: 'required'` parameter** to the `navigator.credentials.get()` call in the FedCM login flow. This explicitly forces user interaction for every login attempt, preventing the browser from attempting automatic re-authentication that triggers the 10-minute rate limit.
+**Implementation**: Added `mediation: 'required'` to the `navigator.credentials.get()` call in the FedCM login flow. This explicitly forces user interaction for every login attempt, preventing the browser from attempting automatic re-authentication that triggers the 10-minute rate limit.
 
-2. **Added `logout()` helper function** that calls `navigator.credentials.preventSilentAccess()` before redirecting to the logout endpoint. This clears the FedCM auto re-authn state when users explicitly log out, ensuring clean logout behavior.
+**Why this solution**: The `mediation` parameter provides complete control over FedCM auto re-authentication behavior. Setting it to `'required'` ensures the browser always prompts for user interaction, preventing the rate limit error entirely. This is simpler and more maintainable than implementing additional logout hooks with `preventSilentAccess()`.
 
 The fix prevents the issue where the browser window becomes dimmed and unresponsive when the auto re-authn rate limit is hit. Users will now always see the FedCM account chooser UI on login attempts.
 
