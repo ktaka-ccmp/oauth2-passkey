@@ -2,6 +2,7 @@
 
 ## Table of Contents
 
+- [2026-03-14: FedCM auto re-authentication rate limit fix](#2026-03-14-fedcm-auto-re-authentication-rate-limit-fix)
 - [2026-03-13: FedCM (Federated Credential Management) integration](#2026-03-13-fedcm-federated-credential-management-integration)
 - [2026-03-11: GitHub Actions security hardening](#2026-03-11-github-actions-security-hardening)
 - [2026-03-04: AAGUID collision fix -- replace server-side deletion with excludeCredentials](#2026-03-04-aaguid-collision-fix----replace-server-side-deletion-with-excludecredentials)
@@ -51,6 +52,39 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-14: FedCM auto re-authentication rate limit fix
+
+**Issue**: `20260314-0222` | **Priority**: high | **Difficulty**: small
+
+Bug fix -- JavaScript frontend
+
+### Motivation
+
+When using FedCM for Google OAuth2 login, users occasionally encountered a critical UX failure: the browser window would become dimmed (grayed out) and completely unresponsive, with no FedCM account chooser UI appearing. The browser console showed the error: "Auto re-authn was previously triggered less than 10 minutes ago. Only one auto re-authn request can be made every 10 minutes."
+
+The root cause was the browser's default `mediation: 'optional'` behavior, which allows automatic re-authentication attempts. When the 10-minute rate limit was hit, the FedCM API appeared to hang rather than rejecting cleanly, leaving the page in an unusable state with no recovery path except page reload.
+
+### User-facing impact
+
+- **Before**: On repeated FedCM login attempts within 10 minutes, the page would become unresponsive with a dimmed overlay. The FedCM UI would not appear, the fallback to popup flow would not trigger, and users were stuck requiring a manual page reload.
+- **After**: FedCM login consistently shows the account chooser UI on every login attempt. The browser never attempts automatic re-authentication, preventing the rate limit error entirely.
+
+Additionally, a `logout()` helper function was added to `oauth2.js` that calls `navigator.credentials.preventSilentAccess()` before redirecting to the logout endpoint, ensuring clean FedCM state management on logout.
+
+### Design decisions
+
+**`mediation: 'required'` placement**: Added as a top-level parameter to `navigator.credentials.get()` alongside the `identity` object. This forces user interaction for every credential request, preventing the browser from attempting silent re-authentication that triggers the rate limit.
+
+**Complementary logout cleanup**: While `mediation: 'required'` prevents the issue during login, `preventSilentAccess()` on logout provides defense-in-depth by explicitly clearing the auto re-authn state when users log out. The two fixes work together: login always requires interaction, and logout clears any remembered state.
+
+**Optional logout helper**: The `logout()` function is exported from `oauth2.js` but not required for existing logout links to work. Templates can continue using direct navigation to `/user/logout` or optionally adopt `oauth2.logout()` for better FedCM state management.
+
+### Key files
+
+`oauth2_passkey_axum/static/oauth2.js`
+
+---
 
 ## 2026-03-13: FedCM (Federated Credential Management) integration
 
