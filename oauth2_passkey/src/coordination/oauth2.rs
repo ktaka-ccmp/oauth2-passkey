@@ -192,6 +192,11 @@ async fn process_oauth2_authorization(
     login_context: LoginContext,
 ) -> Result<(HeaderMap, String), CoordinationError> {
     tracing::info!("Processing OAuth2 authorization core logic");
+
+    // Upsert oauth2_account and user
+    // 1. Decode the state from the auth response
+    // 2. Extract user_id from the stored session if available
+
     let (idinfo, userinfo) = get_idinfo_userinfo(auth_response).await?;
 
     // Convert GoogleUserInfo to DbUser and store it
@@ -261,6 +266,18 @@ async fn process_authenticated_oauth2_user(
     account_in_state: Option<&str>,
     state_params: Option<&StateParams>,
 ) -> Result<(HeaderMap, String), CoordinationError> {
+    // 1. Check if the OAuth2 account exists
+    //
+    // Handle user and account linking
+    // 2. If user is logged in and account exists, ensure they match
+    // 3. If user is logged in but account doesn't exist, link account to user
+    // 4. If user is not logged in but account exists, create session for account
+    // 5. If neither user is logged in nor account exists, create new user and account
+    //
+    // Create session with user_id
+    // 6. Create a new entry in session store
+    // 7. Create a header for the session cookie
+
     // Check if the OAuth2 account exists
     let provider = Provider::new(oauth2_account.provider.clone())
         .map_err(|e| CoordinationError::Validation(format!("Invalid provider: {e}")))?;

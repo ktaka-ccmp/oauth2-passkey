@@ -4,8 +4,7 @@ use axum::{
     extract::{Form, Path, Query},
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
     response::{Html, Redirect, Response},
-    routing::delete,
-    routing::get,
+    routing::{delete, get, post},
 };
 use axum_extra::{TypedHeader, headers};
 use std::collections::HashMap;
@@ -36,7 +35,7 @@ pub(super) fn router() -> Router {
     if O2P_FEDCM.is_enabled() {
         router
             .route("/fedcm/nonce", get(fedcm_nonce))
-            .route("/fedcm/callback", axum::routing::post(fedcm_callback))
+            .route("/fedcm/callback", post(fedcm_callback))
     } else {
         router
     }

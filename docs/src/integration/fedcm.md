@@ -250,15 +250,11 @@ When `O2P_FEDCM=true`, two additional endpoints are registered:
 
 ### GET `/oauth2/fedcm/nonce`
 
-Query parameters:
-- `mode` (optional): `login`, `create_user`, or `create_user_or_login`
-
 Response:
 ```json
 {
   "nonce": "random-nonce-value",
-  "nonce_id": "cache-key-for-nonce",
-  "mode_id": "cache-key-for-mode"
+  "nonce_id": "cache-key-for-nonce"
 }
 ```
 
@@ -269,9 +265,12 @@ Request body:
 {
   "credential": "eyJhbGciOiJSUzI1NiIs...",
   "nonce_id": "cache-key-for-nonce",
-  "mode_id": "cache-key-for-mode"
+  "mode": "login"
 }
 ```
+
+The `mode` field is optional. Valid values: `login`, `create_user`, `create_user_or_login`.
+The `add_to_user` mode is not supported by FedCM (always uses popup flow).
 
 Response (success):
 ```json

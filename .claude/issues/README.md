@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (12)
+### Open (11)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -20,13 +20,13 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 | `20260227-1703` | low | small | [Audit and Improve Silent Fallback Behavior for Optional Environment Variables](open/20260227-1703-env-var-silent-fallback-audit.md) |
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
-| `20260311-1039` | low | medium | [FedCM (Federated Credential Management) Integration](open/20260311-1039-fedcm-integration.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
-### Completed (45)
+### Completed (46)
 
 | ID | Title |
 |----|-------|
+| `20260311-1039` | [FedCM (Federated Credential Management) Integration](completed/20260311-1039-fedcm-integration.md) |
 | `20260311-0904` | [GitHub Actions Security Hardening](completed/20260311-0904-github-actions-security-hardening.md) |
 | `20260226-2030` | [AAGUID-Based Credential Deletion Collision](completed/20260226-2030-aaguid-credential-deletion-collision.md) |
 | `20260223-0027` | [Add Core Crate Functional-Layer Tests for _core() Functions](completed/20260223-0027-abstract-security-test-assertions.md) |
@@ -82,10 +82,11 @@ This directory contains issue/task tracking files for the project.
 | `20260212-0235` | [Standalone Demo Repository](wontfix/20260212-0235-standalone-demo-repository.md) |
 | `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
-### Deferred (5)
+### Deferred (6)
 
 | ID | Title |
 |----|-------|
+| `20260312-1948` | [Eliminate nonce_id from FedCM Flow](deferred/20260312-1948-fedcm-eliminate-nonce-id.md) |
 | `20260303-0605` | [Adopt WebAuthn Level 3 JSON Serialization API](deferred/20260303-0605-webauthn-json-serialization-api.md) |
 | `20260226-2022` | [OAuth2 Token Storage](deferred/20260226-2022-oauth2-token-storage.md) |
 | `2026-01-23-01` | [Bearer Token Authentication Support](deferred/2026-01-23-bearer-token-support.md) |
