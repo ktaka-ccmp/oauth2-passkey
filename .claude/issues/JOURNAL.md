@@ -70,19 +70,53 @@ The root cause was the browser's default `mediation: 'optional'` behavior, which
 - **Before**: On repeated FedCM login attempts within 10 minutes, the page would become unresponsive with a dimmed overlay. The FedCM UI would not appear, the fallback to popup flow would not trigger, and users were stuck requiring a manual page reload.
 - **After**: FedCM login consistently shows the account chooser UI on every login attempt. The browser never attempts automatic re-authentication, preventing the rate limit error entirely.
 
-Additionally, a `logout()` helper function was added to `oauth2.js` that calls `navigator.credentials.preventSilentAccess()` before redirecting to the logout endpoint, ensuring clean FedCM state management on logout.
+```javascript
+// Before: implicit mediation: 'optional' allows auto re-authn
+const credential = await navigator.credentials.get({
+  identity: {
+    providers: [{ configURL, clientId, params: { nonce, ... } }],
+    mode: 'active',
+    context: 'signin',
+  },
+  // mediation defaults to 'optional' - triggers auto re-authn
+});
+
+// After: explicit mediation: 'required' prevents auto re-authn
+const credential = await navigator.credentials.get({
+  identity: {
+    providers: [{ configURL, clientId, params: { nonce, ... } }],
+    mode: 'active',
+    context: 'signin',
+  },
+  mediation: 'required',  // Always require user interaction
+});
+```
 
 ### Design decisions
 
-**`mediation: 'required'` placement**: Added as a top-level parameter to `navigator.credentials.get()` alongside the `identity` object. This forces user interaction for every credential request, preventing the browser from attempting silent re-authentication that triggers the rate limit.
+**Single-parameter solution (final)**: After initially implementing both `mediation: 'required'` (login) and `preventSilentAccess()` (logout) as defense-in-depth, testing revealed that `preventSilentAccess()` had no observable effect when `mediation: 'required'` was set. The architectural principle "behavior should be controlled by the mediation parameter" led to removing the logout helper entirely.
 
-**Complementary logout cleanup**: While `mediation: 'required'` prevents the issue during login, `preventSilentAccess()` on logout provides defense-in-depth by explicitly clearing the auto re-authn state when users log out. The two fixes work together: login always requires interaction, and logout clears any remembered state.
+**Why simplicity won over defense-in-depth**:
+- `mediation: 'required'` already prevents auto re-authn completely
+- `preventSilentAccess()` adds no value when mediation is set to `'required'`
+- Having two mechanisms for the same goal creates confusion about which controls behavior
+- Ad-hoc template modifications (injecting logout handlers) don't work reliably with custom templates
+- Single parameter (`mediation`) provides complete, unambiguous control
 
-**Optional logout helper**: The `logout()` function is exported from `oauth2.js` but not required for existing logout links to work. Templates can continue using direct navigation to `/user/logout` or optionally adopt `oauth2.logout()` for better FedCM state management.
+**Initial approach (rejected)**: Attempted to add a `logout()` helper function calling `navigator.credentials.preventSilentAccess()` before logout. Discovered this wouldn't be called by existing templates (e.g., `user_account.j2` uses its own `Logout()` function). This highlighted the brittleness of ad-hoc solutions that depend on templates adopting new patterns.
+
+**Evolution of approach**:
+1. Identified auto re-authn as root cause → added `mediation: 'required'`
+2. Applied defense-in-depth → added `preventSilentAccess()` logout helper
+3. Testing showed preventSilentAccess not being called (template incompatibility)
+4. Architectural review questioned whether logout hook interferes with parameter control
+5. Final decision: remove preventSilentAccess, rely solely on `mediation: 'required'`
+
+The decision log in issue `20260314-0222` preserves this evolution for future reference.
 
 ### Key files
 
-`oauth2_passkey_axum/static/oauth2.js`
+`oauth2_passkey_axum/static/oauth2.js`, `docs/src/integration/fedcm.md`
 
 ---
 
