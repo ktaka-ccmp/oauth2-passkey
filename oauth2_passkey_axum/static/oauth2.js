@@ -35,6 +35,7 @@ const oauth2 = (function() {
                 mode: 'active',
                 context: 'signin',
             },
+            mediation: 'required',  // Prevent auto re-authn, always require user interaction
         });
 
         // 3. Extract JWT from credential token
@@ -163,7 +164,21 @@ const oauth2 = (function() {
         }
     });
 
+    // Logout helper: clears FedCM auto re-authn state and redirects to logout endpoint
+    function logout(redirectPath) {
+        // Clear FedCM auto re-authn state if available
+        if (typeof navigator.credentials !== 'undefined'
+            && typeof navigator.credentials.preventSilentAccess === 'function') {
+            navigator.credentials.preventSilentAccess();
+        }
+
+        // Redirect to logout endpoint
+        const redirect = redirectPath || '/';
+        window.location.href = `${O2P_ROUTE_PREFIX}/user/logout?redirect=${encodeURIComponent(redirect)}`;
+    }
+
     return {
-        openPopup: openPopup
+        openPopup: openPopup,
+        logout: logout
     };
 })();
