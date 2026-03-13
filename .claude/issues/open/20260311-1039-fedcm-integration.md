@@ -194,8 +194,8 @@ Browser-native account chooser UI instead of popup window. No security improveme
 - [x] Add nonce generation and validation for FedCM flow
 - [x] Extract shared coordination logic (`process_authenticated_oauth2_user`)
 - [x] Passkey promotion support after FedCM login
-- [ ] Integration tests
-- [ ] Update demo applications
+- [x] Integration tests
+- [x] Update demo applications
 - [x] Documentation (dot.env.example, CHANGELOG, docs/)
 
 ## Decision Log
@@ -260,5 +260,14 @@ Browser-native account chooser UI instead of popup window. No security improveme
   - [Chrome: RP Implementation Guide](https://developer.chrome.com/docs/identity/fedcm/implement/relying-party)
   - [Chromium webid_utils.cc](https://blametest.sesse.net/content/browser/webid/webid_utils.cc.html)
   - [Chromium request_service.cc embargo guard](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/content/browser/webid/request_service.cc)
+
+### 2026-03-13: Integration tests and demo updates completed
+
+- Context: Remaining tasks from implementation phase
+- Changes:
+  1. **Integration tests**: Added 7 core-level FedCM tests in `coordination/oauth2/tests.rs` with `drive_fedcm_flow()` helper. Tests cover: login (existing/nonexistent), create_user, create_user_or_login, add_to_user rejection, nonce replay protection, nonce mismatch.
+  2. **Docs fix**: Updated `docs/src/integration/fedcm.md` API Endpoints section -- removed stale `mode_id` references (leftover from pre-refactoring), removed non-existent `mode` query parameter from GET endpoint, added `mode` field to POST callback request.
+  3. **Config bug fix**: `demo-live/env.cloud-run.yaml` had `O2P_FEDCM: "active"` but code only recognizes `"true"` or `"enabled"`. FedCM was silently disabled in production. Fixed to `"true"`.
+  4. **Demo READMEs**: Added optional FedCM config and "Authorized JavaScript origins" instructions to demo-both and demo-oauth2 READMEs.
 
 ## Resolution

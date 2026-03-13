@@ -42,6 +42,10 @@ GENERIC_DATA_STORE_URL='sqlite:/tmp/auth.db'
 # Cache (in-memory for demo)
 GENERIC_CACHE_STORE_TYPE=memory
 GENERIC_CACHE_STORE_URL='memory'
+
+# Optional: FedCM for browser-native Google login (experimental)
+# Uses browser account chooser instead of popup. Falls back to popup on unsupported browsers.
+#O2P_FEDCM=true
 ```
 
 ### 2. Get Google OAuth2 Credentials
@@ -49,6 +53,7 @@ GENERIC_CACHE_STORE_URL='memory'
 1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 2. Create OAuth2 credentials (Web application)
 3. Add `http://localhost:3001/o2p/oauth2/authorized` to "Authorized redirect URIs"
+4. If using FedCM (`O2P_FEDCM=true`), also add `http://localhost:3001` to "Authorized JavaScript origins"
 
 ### 3. Run the Demo
 

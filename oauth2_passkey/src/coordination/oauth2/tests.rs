@@ -1,5 +1,5 @@
 use super::*;
-use crate::oauth2::OAuth2Account;
+use crate::oauth2::{FedCMCallbackRequest, OAuth2Account, prepare_fedcm_nonce};
 use crate::test_utils::init_test_environment;
 use crate::userdb::User;
 use chrono::Utc;
@@ -886,6 +886,316 @@ async fn test_get_authorized_core_add_to_user() -> Result<(), Box<dyn std::error
         account.unwrap().user_id,
         "first-user",
         "Linked account should belong to the first user"
+    );
+
+    Ok(())
+}
+
+// =============================================================================
+// FedCM _core() Tests
+// =============================================================================
+
+/// Drive a FedCM authorization flow using the mock server for JWT validation.
+///
+/// Unlike `drive_oauth2_flow`, this does not perform a redirect/code-exchange cycle.
+/// Instead it generates a nonce, creates a mock JWT containing that nonce, and calls
+/// `fedcm_authorized_core` directly.
+async fn drive_fedcm_flow(
+    mode: Option<&str>,
+) -> Result<(http::HeaderMap, String), Box<dyn std::error::Error>> {
+    // 1. Generate nonce
+    let nonce_response = prepare_fedcm_nonce().await?;
+
+    // 2. Read current mock user identity
+    let mock = ensure_mock_server();
+    let email = mock.state.user_email.lock().unwrap().clone();
+    let sub = mock.state.user_sub.lock().unwrap().clone();
+    let name = mock.state.user_name.lock().unwrap().clone();
+
+    // 3. Create JWT with nonce
+    let jwt = create_mock_jwt(&email, &sub, &name, Some(&nonce_response.nonce));
+
+    // 4. Build FedCM callback request
+    let request = FedCMCallbackRequest {
+        credential: jwt,
+        nonce_id: nonce_response.nonce_id,
+        mode: mode.map(|s| s.to_string()),
+    };
+
+    // 5. Build headers (User-Agent required for login context)
+    let mut headers = http::HeaderMap::new();
+    headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
+
+    // 6. Call fedcm_authorized_core
+    let result = fedcm_authorized_core(&request, &headers).await?;
+    Ok(result)
+}
+
+/// Test FedCM login with an existing OAuth2 account
+///
+/// The first test user has an existing OAuth2 account. Logging in with matching
+/// credentials via FedCM should succeed and return a session cookie.
+#[tokio::test]
+#[serial]
+async fn test_fedcm_login_existing_user() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let mock = ensure_mock_server();
+    set_mock_env_vars();
+    mock.reset_to_first_user();
+
+    let (response_headers, message) = drive_fedcm_flow(Some("login")).await?;
+
+    assert!(
+        response_headers.get(http::header::SET_COOKIE).is_some(),
+        "Response should include Set-Cookie header for session"
+    );
+    assert!(
+        message.contains("Signing in"),
+        "Message should indicate sign-in: {message}"
+    );
+
+    Ok(())
+}
+
+/// Test FedCM login with a nonexistent OAuth2 account
+///
+/// When a user tries to log in via FedCM but their OAuth2 account is not registered,
+/// the function should return a Conflict error.
+#[tokio::test]
+#[serial]
+async fn test_fedcm_login_nonexistent_account() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let _mock = ensure_mock_server();
+    set_mock_env_vars();
+
+    // Configure mock with a user that has no existing account in the database.
+    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    let _guard = _mock.configure_user_guarded(
+        "fedcm-nonexistent@example.com",
+        "fedcm-nonexistent-id",
+        "FedCM Nonexistent User",
+    );
+
+    let nonce_response = prepare_fedcm_nonce().await?;
+    let jwt = create_mock_jwt(
+        "fedcm-nonexistent@example.com",
+        "fedcm-nonexistent-id",
+        "FedCM Nonexistent User",
+        Some(&nonce_response.nonce),
+    );
+
+    let request = FedCMCallbackRequest {
+        credential: jwt,
+        nonce_id: nonce_response.nonce_id,
+        mode: Some("login".to_string()),
+    };
+    let mut headers = http::HeaderMap::new();
+    headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
+
+    let result = fedcm_authorized_core(&request, &headers).await;
+    assert!(
+        matches!(result, Err(CoordinationError::Conflict(_))),
+        "FedCM login with nonexistent account should return Conflict error, got: {result:?}"
+    );
+
+    Ok(())
+}
+
+/// Test FedCM with "create_user" mode to create a new user
+///
+/// Creating a new user via FedCM with a new identity should succeed.
+#[tokio::test]
+#[serial]
+async fn test_fedcm_create_new_user() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let mock = ensure_mock_server();
+    set_mock_env_vars();
+
+    let timestamp = Utc::now().timestamp_millis();
+    let new_email = format!("fedcm-new-{timestamp}@example.com");
+    let new_sub = format!("fedcm-new-{timestamp}");
+    let new_name = format!("FedCM New User {timestamp}");
+    let _guard = mock.configure_user_guarded(&new_email, &new_sub, &new_name);
+
+    let (response_headers, message) = drive_fedcm_flow(Some("create_user")).await?;
+
+    assert!(
+        response_headers.get(http::header::SET_COOKIE).is_some(),
+        "Response should include Set-Cookie header for session"
+    );
+    assert!(
+        message.contains("Created new user"),
+        "Message should indicate user creation: {message}"
+    );
+
+    // Verify the OAuth2 account was created in the database
+    let expected_provider_user_id = format!("google_{new_sub}");
+    let provider = crate::oauth2::Provider::new("google".to_string()).unwrap();
+    let provider_user_id = crate::oauth2::ProviderUserId::new(expected_provider_user_id).unwrap();
+    let account =
+        crate::oauth2::OAuth2Store::get_oauth2_account_by_provider(provider, provider_user_id)
+            .await?;
+    assert!(
+        account.is_some(),
+        "OAuth2 account should exist in database after FedCM creation"
+    );
+
+    Ok(())
+}
+
+/// Test FedCM with "create_user_or_login" mode
+///
+/// This mode should create a new user when the account doesn't exist,
+/// then log in when called again with the same identity.
+#[tokio::test]
+#[serial]
+async fn test_fedcm_create_user_or_login() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let mock = ensure_mock_server();
+    set_mock_env_vars();
+
+    let timestamp = Utc::now().timestamp_millis();
+    let new_email = format!("fedcm-dual-{timestamp}@example.com");
+    let new_sub = format!("fedcm-dual-{timestamp}");
+    let new_name = format!("FedCM Dual Mode {timestamp}");
+    let _guard = mock.configure_user_guarded(&new_email, &new_sub, &new_name);
+
+    // Part 1: Create user (new identity)
+    let (_headers, message) = drive_fedcm_flow(Some("create_user_or_login")).await?;
+    assert!(
+        message.contains("Created new user"),
+        "Should create new user: {message}"
+    );
+
+    // Part 2: Login (same identity, now exists)
+    let (_headers, message) = drive_fedcm_flow(Some("create_user_or_login")).await?;
+    assert!(
+        message.contains("Signing in"),
+        "Should sign in with existing account: {message}"
+    );
+
+    Ok(())
+}
+
+/// Test that FedCM rejects "add_to_user" mode
+///
+/// FedCM does not support account linking (add_to_user) because it requires
+/// page session token verification. This should return InvalidState error.
+#[tokio::test]
+#[serial]
+async fn test_fedcm_reject_add_to_user() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let mock = ensure_mock_server();
+    set_mock_env_vars();
+    mock.reset_to_first_user();
+
+    let nonce_response = prepare_fedcm_nonce().await?;
+    let jwt = create_mock_jwt(
+        "first-user@example.com",
+        "first-user-test-google-id",
+        "First User",
+        Some(&nonce_response.nonce),
+    );
+
+    let request = FedCMCallbackRequest {
+        credential: jwt,
+        nonce_id: nonce_response.nonce_id,
+        mode: Some("add_to_user".to_string()),
+    };
+    let mut headers = http::HeaderMap::new();
+    headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
+
+    let result = fedcm_authorized_core(&request, &headers).await;
+    assert!(
+        matches!(result, Err(CoordinationError::InvalidState(_))),
+        "FedCM should reject add_to_user mode, got: {result:?}"
+    );
+
+    Ok(())
+}
+
+/// Test FedCM nonce single-use enforcement (replay protection)
+///
+/// After a nonce is consumed by the first call, reusing the same nonce_id
+/// should fail because the nonce has been deleted from the cache.
+#[tokio::test]
+#[serial]
+async fn test_fedcm_nonce_replay() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let mock = ensure_mock_server();
+    set_mock_env_vars();
+    mock.reset_to_first_user();
+
+    // First call: generate nonce and complete FedCM flow
+    let nonce_response = prepare_fedcm_nonce().await?;
+    let jwt = create_mock_jwt(
+        "first-user@example.com",
+        "first-user-test-google-id",
+        "First User",
+        Some(&nonce_response.nonce),
+    );
+
+    let request = FedCMCallbackRequest {
+        credential: jwt.clone(),
+        nonce_id: nonce_response.nonce_id.clone(),
+        mode: Some("login".to_string()),
+    };
+    let mut headers = http::HeaderMap::new();
+    headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
+
+    let first_result = fedcm_authorized_core(&request, &headers).await;
+    assert!(
+        first_result.is_ok(),
+        "First FedCM call should succeed: {first_result:?}"
+    );
+
+    // Second call: reuse the same nonce_id (nonce already consumed)
+    let replay_request = FedCMCallbackRequest {
+        credential: jwt,
+        nonce_id: nonce_response.nonce_id,
+        mode: Some("login".to_string()),
+    };
+    let replay_result = fedcm_authorized_core(&replay_request, &headers).await;
+    assert!(
+        replay_result.is_err(),
+        "Replayed nonce should be rejected: {replay_result:?}"
+    );
+
+    Ok(())
+}
+
+/// Test FedCM with mismatched nonce
+///
+/// When the JWT's nonce claim doesn't match the stored nonce, validation should fail.
+#[tokio::test]
+#[serial]
+async fn test_fedcm_nonce_mismatch() -> Result<(), Box<dyn std::error::Error>> {
+    init_test_environment().await;
+    let mock = ensure_mock_server();
+    set_mock_env_vars();
+    mock.reset_to_first_user();
+
+    // Generate nonce but create JWT with a different nonce value
+    let nonce_response = prepare_fedcm_nonce().await?;
+    let jwt = create_mock_jwt(
+        "first-user@example.com",
+        "first-user-test-google-id",
+        "First User",
+        Some("wrong-nonce-value"), // Intentionally mismatched
+    );
+
+    let request = FedCMCallbackRequest {
+        credential: jwt,
+        nonce_id: nonce_response.nonce_id,
+        mode: Some("login".to_string()),
+    };
+    let mut headers = http::HeaderMap::new();
+    headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
+
+    let result = fedcm_authorized_core(&request, &headers).await;
+    assert!(
+        result.is_err(),
+        "Mismatched nonce should be rejected: {result:?}"
     );
 
     Ok(())
