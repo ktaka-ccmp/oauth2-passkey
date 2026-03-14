@@ -156,15 +156,27 @@ pub(crate) fn header_set_cookie<'a>(
     Ok(headers)
 }
 
+/// Ensure the ring crypto provider is installed for rustls TLS operations.
+///
+/// reqwest with `rustls-no-provider` requires a crypto provider to be set.
+/// This installs ring as the default provider. If a provider is already
+/// installed (e.g., by the application), this is a no-op.
+fn ensure_ring_provider() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 /// Build a `rustls::ClientConfig` using bundled Mozilla root certificates.
 ///
 /// This eliminates the runtime dependency on OS-provided `ca-certificates`,
 /// enabling the binary to run in minimal container images (e.g., `scratch`).
 #[cfg(feature = "bundled-tls")]
 fn rustls_config_with_webpki_roots() -> rustls::ClientConfig {
+    let provider = rustls::crypto::ring::default_provider();
     let mut root_store = rustls::RootCertStore::empty();
     root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    let mut config = rustls::ClientConfig::builder()
+    let mut config = rustls::ClientConfig::builder_with_provider(provider.into())
+        .with_safe_default_protocol_versions()
+        .expect("Failed to set TLS protocol versions")
         .with_root_certificates(root_store)
         .with_no_client_auth();
     // Set ALPN protocols to match reqwest's default TLS behavior.
@@ -185,6 +197,8 @@ fn rustls_config_with_webpki_roots() -> rustls::ClientConfig {
 /// - `pool_idle_timeout`: 90 seconds (default)
 /// - `pool_max_idle_per_host`: 32 (default)
 pub(crate) fn get_client() -> reqwest::Client {
+    ensure_ring_provider();
+
     let builder = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .pool_idle_timeout(std::time::Duration::from_secs(90))
