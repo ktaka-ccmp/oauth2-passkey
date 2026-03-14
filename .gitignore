@@ -1,5 +1,6 @@
 /target
 utils/target
+utils/Cargo.lock
 .env
 .env.*
 .vscode
