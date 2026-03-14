@@ -22,10 +22,11 @@ This directory contains issue/task tracking files for the project.
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
-### Completed (46)
+### Completed (47)
 
 | ID | Title |
 |----|-------|
+| `20260314-0222` | [FedCM Auto Re-Authentication Rate Limit Error](completed/20260314-0222-fedcm-auto-reauthn-rate-limit.md) |
 | `20260311-1039` | [FedCM (Federated Credential Management) Integration](completed/20260311-1039-fedcm-integration.md) |
 | `20260311-0904` | [GitHub Actions Security Hardening](completed/20260311-0904-github-actions-security-hardening.md) |
 | `20260226-2030` | [AAGUID-Based Credential Deletion Collision](completed/20260226-2030-aaguid-credential-deletion-collision.md) |

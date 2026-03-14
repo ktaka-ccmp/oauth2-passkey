@@ -2,6 +2,12 @@
 
 ## Table of Contents
 
+- [2026-03-14: FedCM auto re-authentication rate limit fix](#2026-03-14-fedcm-auto-re-authentication-rate-limit-fix)
+- [2026-03-13: FedCM (Federated Credential Management) integration](#2026-03-13-fedcm-federated-credential-management-integration)
+- [2026-03-11: GitHub Actions security hardening](#2026-03-11-github-actions-security-hardening)
+- [2026-03-04: AAGUID collision fix -- replace server-side deletion with excludeCredentials](#2026-03-04-aaguid-collision-fix----replace-server-side-deletion-with-excludecredentials)
+- [2026-03-03: Issue triage -- wontfix and deferral decisions](#2026-03-03-issue-triage----wontfix-and-deferral-decisions)
+- [2026-02-27: Documentation cleanup, issue system migration, and tooling](#2026-02-27-documentation-cleanup-issue-system-migration-and-tooling)
 - [2026-02-23: Core crate functional-layer tests for _core() functions](#2026-02-23-core-crate-functional-layer-tests-for-_core-functions)
 - [2026-02-23: Security test crate placement correction](#2026-02-23-security-test-crate-placement-correction)
 - [2026-02-22: Early evaluation of OAUTH2_RESPONSE_MODE at startup](#2026-02-22-early-evaluation-of-oauth2_response_mode-at-startup)
@@ -46,6 +52,268 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-14: FedCM auto re-authentication rate limit fix
+
+**Issue**: `20260314-0222` | **Priority**: high | **Difficulty**: small
+
+Bug fix -- JavaScript frontend
+
+### Motivation
+
+When using FedCM for Google OAuth2 login, users occasionally encountered a critical UX failure: the browser window would become dimmed (grayed out) and completely unresponsive, with no FedCM account chooser UI appearing. The browser console showed the error: "Auto re-authn was previously triggered less than 10 minutes ago. Only one auto re-authn request can be made every 10 minutes."
+
+The root cause was the browser's default `mediation: 'optional'` behavior, which allows automatic re-authentication attempts. When the 10-minute rate limit was hit, the FedCM API appeared to hang rather than rejecting cleanly, leaving the page in an unusable state with no recovery path except page reload.
+
+### User-facing impact
+
+- **Before**: On repeated FedCM login attempts within 10 minutes, the page would become unresponsive with a dimmed overlay. The FedCM UI would not appear, the fallback to popup flow would not trigger, and users were stuck requiring a manual page reload.
+- **After**: FedCM login consistently shows the account chooser UI on every login attempt. The browser never attempts automatic re-authentication, preventing the rate limit error entirely.
+
+```javascript
+// Before: implicit mediation: 'optional' allows auto re-authn
+const credential = await navigator.credentials.get({
+  identity: {
+    providers: [{ configURL, clientId, params: { nonce, ... } }],
+    mode: 'active',
+    context: 'signin',
+  },
+  // mediation defaults to 'optional' - triggers auto re-authn
+});
+
+// After: explicit mediation: 'required' prevents auto re-authn
+const credential = await navigator.credentials.get({
+  identity: {
+    providers: [{ configURL, clientId, params: { nonce, ... } }],
+    mode: 'active',
+    context: 'signin',
+  },
+  mediation: 'required',  // Always require user interaction
+});
+```
+
+### Design decisions
+
+**Single-parameter solution (final)**: After initially implementing both `mediation: 'required'` (login) and `preventSilentAccess()` (logout) as defense-in-depth, testing revealed that `preventSilentAccess()` had no observable effect when `mediation: 'required'` was set. The architectural principle "behavior should be controlled by the mediation parameter" led to removing the logout helper entirely.
+
+**Why simplicity won over defense-in-depth**:
+- `mediation: 'required'` already prevents auto re-authn completely
+- `preventSilentAccess()` adds no value when mediation is set to `'required'`
+- Having two mechanisms for the same goal creates confusion about which controls behavior
+- Ad-hoc template modifications (injecting logout handlers) don't work reliably with custom templates
+- Single parameter (`mediation`) provides complete, unambiguous control
+
+**Initial approach (rejected)**: Attempted to add a `logout()` helper function calling `navigator.credentials.preventSilentAccess()` before logout. Discovered this wouldn't be called by existing templates (e.g., `user_account.j2` uses its own `Logout()` function). This highlighted the brittleness of ad-hoc solutions that depend on templates adopting new patterns.
+
+**Evolution of approach**:
+1. Identified auto re-authn as root cause → added `mediation: 'required'`
+2. Applied defense-in-depth → added `preventSilentAccess()` logout helper
+3. Testing showed preventSilentAccess not being called (template incompatibility)
+4. Architectural review questioned whether logout hook interferes with parameter control
+5. Final decision: remove preventSilentAccess, rely solely on `mediation: 'required'`
+
+The decision log in issue `20260314-0222` preserves this evolution for future reference.
+
+### Key files
+
+`oauth2_passkey_axum/static/oauth2.js`, `docs/src/integration/fedcm.md`
+
+---
+
+## 2026-03-13: FedCM (Federated Credential Management) integration
+
+**Issue**: `20260311-1039` | **Priority**: low | **Difficulty**: medium
+
+New feature -- Core library + Axum integration
+
+### Motivation
+
+FedCM is a W3C browser API (`navigator.credentials.get({ identity: { providers: [...] } })`) that provides a browser-native UI for federated authentication, eliminating the need for redirect-based popups. It is designed to maintain federated identity flows after third-party cookie deprecation.
+
+While this project uses direct OAuth2 Authorization Code Flow + PKCE (not Google Identity Services SDK), FedCM offers an alternative login path with a better UX on supported browsers (Chrome 108+, Edge 136+). Safari and Firefox do not support FedCM, so fallback to the existing popup-based flow is mandatory.
+
+The primary benefit is UX: a browser-native account chooser instead of a popup window. There is no security improvement -- in fact, the security model differs because FedCM receives a JWT ID token directly in JavaScript rather than exchanging an authorization code server-to-server with a client secret.
+
+### User-facing impact
+
+- **Before**: Google OAuth2 login always used a popup window with redirect-based Authorization Code Flow + PKCE.
+- **After**: On supported browsers, a browser-native FedCM account chooser appears instead of a popup. On unsupported browsers, the existing popup flow is used automatically. FedCM is disabled by default and opt-in via `O2P_FEDCM=true` environment variable. Login history now distinguishes "FedCM" from "OAuth2" as the authentication method.
+
+New environment variable:
+```bash
+# Enable FedCM (disabled by default)
+O2P_FEDCM=true  # or "enabled"
+```
+
+The FedCM flow introduces two new endpoints:
+```
+GET  /o2p/oauth2/fedcm/nonce     -> { "nonce": "...", "nonce_id": "..." }
+POST /o2p/oauth2/fedcm/callback  -> { "token": "...", "nonce_id": "...", "mode": "active"|"passive" }
+```
+
+Frontend JavaScript automatically detects FedCM support via `IdentityCredential` existence and `navigator.credentials.get` availability. No application code changes needed.
+
+### Design decisions
+
+**Google returns JWT, not authorization code**: Unlike the OAuth FedCM Profile (Aaron Parecki) which returns authorization codes, Google's FedCM endpoint (`/gsi/fedcm/issue`) returns a JWT ID token directly. This means PKCE and code exchange are bypassed entirely in the FedCM path. The existing `idtoken.rs` JWT signature verification (JWKS, aud, iss, exp, nonce) is directly reused.
+
+**Runtime toggle, not compile-time feature flag**: FedCM is controlled by the `O2P_FEDCM` environment variable at runtime rather than a Cargo feature flag. This was chosen because FedCM shares most code with the existing OAuth2 flow and adds minimal overhead when disabled. The JS configuration is injected dynamically via `serve_oauth2_js()`.
+
+**Coordination layer refactoring**: Extracted `process_authenticated_oauth2_user()` from the existing `process_oauth2_authorization()` so both the OAuth2 callback and FedCM callback share user creation/linking/session logic. This avoids duplicating ~50 lines of complex user processing.
+
+**Shared nonce infrastructure**: Both OAuth2 and FedCM use the same nonce generation (`generate_store_token()`) and verification (`verify_and_consume_nonce()`) pattern. A follow-up issue (`20260312-1948`) analyzed whether FedCM's `nonce_id` could be eliminated since it lacks the CSRF-verified state binding that OAuth2 has, but this was deferred because it would reduce code sharing between the two flows.
+
+**Undocumented Google params discovered**: Google's FedCM requires `response_type: 'id_token'`, `scope: 'email profile openid'`, and `ss_domain: location.origin` in the `params` object. These are not documented in any public API reference and were discovered by reverse-engineering Google's GIS library.
+
+**`mode: 'active'` placement bug**: Initially placed `mode: 'active'` inside the provider object instead of at the `identity` level. Chrome silently ignored the unrecognized field, defaulting to passive mode. In passive mode, user dismissal triggers an exponential cooldown embargo (2h, 1d, 7d, 28d). Root cause was confirmed by reading Chromium source (`request_service.cc` embargo guard: `should_embargo &= rp_mode_ == RpMode::kPassive`). Fixed by moving `mode` to the correct level.
+
+**Google returns JSON-wrapped JWT**: `credential.token` from Google is `{"token":"eyJ..."}`, not a raw JWT string. The JavaScript must parse this JSON before sending to the backend.
+
+### Key files
+
+`oauth2_passkey/src/oauth2/main/fedcm.rs`, `oauth2_passkey/src/coordination/oauth2.rs`, `oauth2_passkey/src/oauth2/types.rs`, `oauth2_passkey/src/oauth2/main/utils.rs`, `oauth2_passkey_axum/src/oauth2.rs`, `oauth2_passkey_axum/static/oauth2.js`, `oauth2_passkey/src/coordination/oauth2/tests.rs`, `docs/src/integration/fedcm.md`
+
+---
+
+## 2026-03-11: GitHub Actions security hardening
+
+**Issue**: `20260311-0904` | **Priority**: low | **Difficulty**: easy
+
+Enhancement (security) -- CI/CD infrastructure
+
+### Motivation
+
+Prompted by the "hackerbot-claw" AI-powered attack campaign (February 2026) that exploited GitHub Actions vulnerabilities in major OSS repositories. While this repository had no critical vulnerabilities (no `pull_request_target`, no external input in `run:` steps, no self-hosted runners), an audit identified three Warning-level issues requiring defense-in-depth hardening.
+
+### User-facing impact
+
+- **Before**: Three workflow files (`ci.yml`, `coverage.yml`, `deploy-demo.yml`) relied on repository default permissions. `deploy-demo.yml` used direct `${{ }}` expansion in `run:` steps for secrets and env vars.
+- **After**: All workflows have explicit `permissions: contents: read`. `deploy-demo.yml` passes secrets through `env:` blocks instead of direct template expansion, and uses shell variable references (`$VAR`) instead of `${{ env.VAR }}` for proper escaping.
+
+```yaml
+# Before (deploy-demo.yml):
+run: |
+  gcloud run deploy $SERVICE \
+    --image ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/demo/${{ env.SERVICE }}
+
+# After:
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+run: |
+  gcloud run deploy "$SERVICE" \
+    --image "${REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/demo/${SERVICE}"
+```
+
+### Design decisions
+
+**Explicit permissions over defaults**: Even though repository defaults were safe, explicit `permissions: contents: read` prevents privilege escalation if defaults are changed later. `docs.yml` already had explicit permissions and required no changes.
+
+**Shell variable references over template expansion**: Direct `${{ }}` expansion in `run:` bypasses shell escaping, creating command injection surface. While GCP project IDs are alphanumeric (low risk), establishing the pattern prevents future secrets from being mishandled. Shell variables (`$VAR`) benefit from proper quoting.
+
+### Key files
+
+`.github/workflows/ci.yml`, `.github/workflows/coverage.yml`, `.github/workflows/deploy-demo.yml`
+
+---
+
+## 2026-03-04: AAGUID collision fix -- replace server-side deletion with excludeCredentials
+
+**Issue**: `20260226-2030` | **Priority**: low | **Difficulty**: medium
+
+Bug fix -- Core library + Axum integration
+
+### Motivation
+
+The passkey re-registration flow had a correctness bug: credentials were deleted based on AAGUID (Authenticator Attestation GUID) matching. AAGUID identifies the authenticator *type* (e.g., "Google Password Manager"), not individual instances. When a user had multiple instances of the same authenticator type (e.g., Google Password Manager on two different Google accounts), re-registering would incorrectly delete the other credential.
+
+**Scenario**: User registers a passkey with Google PM (Account A), then registers another with Google PM (Account B). Step 2 deleted the credential from step 1 (same AAGUID match), silently losing access via Account A's Password Manager.
+
+### User-facing impact
+
+- **Before**: Re-registering a passkey with the same authenticator type (same AAGUID) silently deleted existing credentials from that authenticator type. Users could lose passkey access without realizing it.
+- **After**: All credentials coexist regardless of AAGUID. The browser's `excludeCredentials` mechanism prevents true duplicates (authenticator returns `InvalidStateError` if the exact credential already exists). Users can manually delete unwanted credentials from the account management page.
+
+The `excludeCredentials` field is now populated in all registration flows (not just passkey promotion), so the browser-native "credential already registered" error appears consistently.
+
+### Design decisions
+
+**Remove server-side AAGUID-based deletion entirely**: AAGUID-based deletion is fundamentally unsafe because the AAGUID is only revealed *after* registration completes (in the attestation response), so the server cannot pre-filter reliably. No major WebAuthn implementation recommends this approach.
+
+**Stale credentials are harmless**: Old credentials remain in the database but the authenticator returns the correct (newest) credential during authentication. No data loss or security impact.
+
+**Rejected alternatives**: (1) Login-credential-aware deletion -- fails when device's default Password Manager differs from the one used for login. (2) OAuth2 account tracking with passkey credentials -- unreliable because OAuth2 login account and device's active PM are independent.
+
+**Unified excludeCredentials**: Removed duplicate `excludeCredentials` population code from the Axum promotion handler. The core library's `start_registration()` now handles it for all modes, providing a single source of truth.
+
+### Key files
+
+`oauth2_passkey/src/passkey/main/register.rs`, `oauth2_passkey/src/passkey/main/types.rs`, `oauth2_passkey_axum/src/passkey/promotion.rs`, `oauth2_passkey_axum/static/passkey.js`, `oauth2_passkey/src/passkey/main/register/tests.rs`
+
+---
+
+## 2026-03-03: Issue triage -- wontfix and deferral decisions
+
+**Issue**: N/A (housekeeping) | **Priority**: N/A | **Difficulty**: N/A
+
+Housekeeping -- Issue management
+
+### Motivation
+
+After migrating 11 issues from the legacy `ToDo.md` (see 2026-02-27 entry), the backlog needed triage to separate actionable work from speculative features. Three issues were evaluated against the YAGNI principle.
+
+### User-facing impact
+
+- **Before**: 3 open issues in the backlog with no clear resolution path.
+- **After**: Backlog reduced by 3 issues. Two features explicitly decided against (wontfix), one deferred as out-of-scope. Decision rationale documented for future reference.
+
+### Design decisions
+
+**UI Improvements (20260226-2026) -> wontfix**: The built-in UI is a reference implementation; library users build their own frontends. The existing 9 CSS themes and custom CSS support are sufficient. Investing in toast notifications or polished UI is not justified for a library crate.
+
+**Authentication Method Tracking in Session (20260226-2023) -> wontfix**: Reviewed all proposed use cases and found none actionable: (1) Step-up auth is not meaningful when both OAuth2 and Passkey rely on password managers as trust anchors. (2) No concrete scenario where UI needs to differ by auth method. (3) Security audit trails already covered by login history records. (4) Passkey promotion works without session-level tracking.
+
+**OAuth2 Token Storage (20260226-2022) -> deferred**: Outside library scope as an authentication library (not an OAuth2 API client). Token storage is only needed when the backend calls provider APIs on behalf of users, which is application-level concern.
+
+### Key files
+
+`.claude/issues/wontfix/20260226-2026-ui-improvements.md`, `.claude/issues/wontfix/20260226-2023-auth-method-tracking-in-session.md`, `.claude/issues/deferred/20260226-2022-oauth2-token-storage.md`
+
+---
+
+## 2026-02-27: Documentation cleanup, issue system migration, and tooling
+
+**Issue**: N/A (housekeeping) | **Priority**: N/A | **Difficulty**: N/A
+
+Housekeeping -- Documentation and project infrastructure
+
+### Motivation
+
+Multiple documentation debts accumulated before the v0.3.0 release: stale version numbers across docs, legacy `ToDo.md` with untracked tasks, inaccurate appendices, no automated version checking for releases, and no guidance for LazyLock environment variable patterns. This was a focused cleanup sprint (2/24-2/27) addressing these across 5 PRs (#239-#244).
+
+### User-facing impact
+
+- **Before**: Documentation referenced version 0.2/0.4 inconsistently. Appendices on type-safe validation and storage patterns contained inaccurate claims. No tooling to prevent version skew in releases. Developer guidance on LazyLock env var handling was missing.
+- **After**: All docs consistently reference v0.3.0. Two appendices rewritten for accuracy and motivation-first structure. `utils/update_doc_versions.sh` automates bulk version updates with auto-detection from `Cargo.toml`. `utils/release.sh` includes `check_doc_versions()` for pre-release validation. LazyLock force-evaluation guideline documented.
+
+**Issue system migration**: 11 tasks from legacy `ToDo.md` migrated to structured issue files with priority, difficulty, decision logs, and implementation tasks. `ToDo.md` moved to `docs/src/archived/`. Also created tracking issues for DBSC (Device Bound Session Credentials) and env var silent fallback audit.
+
+**Appendix rewrites**:
+- Type-safe validation: Replaced inaccurate claims about session validation with factual descriptions. Added newtype pattern code examples and enum definitions with rationale.
+- Storage pattern: Reorganized around motivation (why singleton over Axum State). Replaced verbose comparison tables with concise prose.
+
+**Other changes**: Removed mdbook chapter number prefixes from 11 files. Added demo GIF animations to README. Fixed GitHub URL (anthropics/ -> ktaka-ccmp/).
+
+### Design decisions
+
+**Issue system over ToDo.md**: Structured issue files with decision logs provide better traceability than a flat task list. Each issue captures priority, difficulty, approach, and decision history, enabling better triage and context transfer across sessions.
+
+**Version tooling approach**: `update_doc_versions.sh` auto-detects current version from `Cargo.toml` (removes `-dev` suffix) and performs bulk `sed` replacement across all doc files. `check_doc_versions()` in `release.sh` validates before publishing, catching version skew before it reaches crates.io.
+
+### Key files
+
+`utils/update_doc_versions.sh`, `utils/release.sh`, `docs/src/appendix/type-safe.md`, `docs/src/appendix/storage-pattern.md`, `docs/src/maintainer/development.md`, `.claude/issues/README.md`, `Readme.md`
+
+---
 
 ## 2026-02-23: Core crate functional-layer tests for _core() functions
 
