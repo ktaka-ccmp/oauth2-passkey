@@ -392,15 +392,19 @@ else
         exit 1
     }
 
-    gh pr create --base master --head "release-$VERSION" --title "Release $VERSION" --body "Release $VERSION of oauth2-passkey workspace" || {
+    gh pr create --base dev --head "release-$VERSION" --title "Release $VERSION" --body "Release $VERSION of oauth2-passkey workspace. Merge to dev first, then create a PR from dev to master." || {
         echo "❌ Failed to create pull request for release branch"
         exit 1
     }
-    echo "🎉 Pull request created for release branch release-$VERSION"
+    echo "🎉 Pull request created for release branch release-$VERSION -> dev"
+    echo ""
+    echo "📋 Post-release steps:"
+    echo "  1. Merge the PR (release-$VERSION -> dev)"
+    echo "  2. Create a PR from dev -> master and merge it"
 fi
 
-# Return to master branch (only in exec mode, dry-run exits earlier)
-git checkout master || {
-    echo "❌ Failed to switch back to master branch"
+# Return to dev branch (only in exec mode, dry-run exits earlier)
+git checkout dev || {
+    echo "❌ Failed to switch back to dev branch"
     exit 1
 }

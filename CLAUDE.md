@@ -208,30 +208,22 @@ After the release script completes:
 #    - https://crates.io/crates/oauth2-passkey
 #    - https://crates.io/crates/oauth2-passkey-axum
 
-# 2. Merge release branch to master via GitHub PR
+# 2. Merge release branch to dev via GitHub PR
 #    - The script creates a PR automatically (requires gh CLI)
-#    - Or create manually: release-X.Y.Z -> master
+#    - Or create manually: release-X.Y.Z -> dev
 
-# 3. Update local master
+# 3. Create and merge a PR from dev -> master
+
+# 4. Update local branches
 git checkout master
 git pull origin master
-
-# 4. Sync dev branch with master
 git checkout dev
-git rebase master
+git pull origin dev
 
-# 5. Push dev branch (force required after rebase)
-git push origin dev --force-with-lease
-
-# 6. Clean up release branch (optional, if not auto-deleted)
+# 5. Clean up release branch (optional, if not auto-deleted)
 git branch -d release-X.Y.Z
 git push origin --delete release-X.Y.Z
 ```
-
-**Note on `--force-with-lease`**:
-- Safer than `--force`: fails if remote has commits you haven't fetched
-- Required after rebase because commit history is rewritten
-- Prevents accidentally overwriting others' work on the branch
 
 ## Workflow Tools
 
