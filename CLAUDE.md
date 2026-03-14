@@ -171,9 +171,14 @@ Environment variables (see `dot.env.example`):
 
 ## Release Process
 
+### Pre-Release Checklist
+1. Update `CHANGELOG.md`: rename `[X.Y.Z-dev]` section to `[X.Y.Z] - YYYY-MM-DD`
+2. Update doc version references: `./utils/update_doc_versions.sh X.Y`
+3. Merge dev -> master via PR
+
 ### Quick Reference
 ```bash
-# 1. Merge dev -> master via PR first, then:
+# 1. Switch to master
 git checkout master
 git pull origin master
 
@@ -192,7 +197,7 @@ git pull origin master
 - Updates dependency, publishes `oauth2-passkey-axum`
 - Creates git tag `vX.Y.Z`
 - Sets next dev version (`X.Y.(Z+1)-dev`)
-- Creates PR back to master
+- Creates PR to dev (then merge dev -> master)
 
 ### Version Guidelines
 - **Patch** (0.1.3 -> 0.1.4): Bug fixes only
