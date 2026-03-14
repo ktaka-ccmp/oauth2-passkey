@@ -131,6 +131,32 @@ check_doc_versions() {
     echo "✅ All documentation version numbers match $major_minor"
 }
 
+check_changelog() {
+    local version=$1
+    echo "📋 Checking CHANGELOG.md..."
+
+    if [ ! -f CHANGELOG.md ]; then
+        echo "⚠️  CHANGELOG.md not found."
+        return 1
+    fi
+
+    # Check that [X.Y.Z] section exists (not -dev)
+    if ! grep -q "^## \[$version\]" CHANGELOG.md; then
+        echo "⚠️  CHANGELOG.md does not contain a [$version] section."
+        echo "   Rename the [-dev] section to [$version] before releasing."
+        return 1
+    fi
+
+    # Check that no -dev section remains for this version
+    if grep -q "^## \[$version-dev\]" CHANGELOG.md; then
+        echo "⚠️  CHANGELOG.md still contains a [$version-dev] section."
+        echo "   Remove or rename it before releasing."
+        return 1
+    fi
+
+    echo "✅ CHANGELOG.md contains [$version] section"
+}
+
 set_workspace_version() {
     local version=$1
     echo "📦 Setting workspace version $version"
@@ -261,6 +287,7 @@ next=$(increment_dev_version "$VERSION")
 echo "📋 Next development version: $next"
 
 check_doc_versions "$VERSION"
+check_changelog "$VERSION"
 
 ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 

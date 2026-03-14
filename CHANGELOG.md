@@ -5,7 +5,9 @@ All notable changes to oauth2-passkey will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.1-dev]
+
+## [0.4.0] - 2026-03-15
 
 ### Added
 
@@ -18,10 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Front-channel ID token validated server-side via JWT signature verification (JWKS)
   - Nonce-based replay protection with single-use server-side validation
   - **Note**: Google does not officially support direct FedCM usage without GIS SDK; endpoint URLs and behavior may change without notice
+- Functional-layer tests for passkey and OAuth2 coordination `_core()` functions (19 tests)
+- Negative security tests for passkey authentication
 
 ### Fixed
 
 - AAGUID-based credential deletion collision: replaced server-side AAGUID-based deletion with WebAuthn `excludeCredentials` to prevent accidental removal of credentials from same-type authenticators (e.g., two Google Password Manager accounts)
+- FedCM auto re-authentication rate limit error prevention
 
 ### Changed
 
@@ -30,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `O2P_DEFAULT_REDIRECT` now only controls authenticated-user redirects (login page bounce, logout target)
 - `O2P_DEMO_MODE` masking now covers email, name, and profile picture in addition to IP, User-Agent, and credential IDs
 - `OAUTH2_RESPONSE_MODE` is now validated at startup; invalid values cause an immediate panic instead of a delayed runtime error on first OAuth2 login attempt
+- HTTP integration tests moved from core crate to axum crate
+- Release workflow changed to merge via dev branch (release -> dev -> master) instead of directly to master
+
+### Security
+
+- Hardened GitHub Actions workflows (env-based variable passing, explicit permissions)
 
 ## [0.3.0] - 2026-02-16
 
@@ -237,7 +248,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full WebAuthn specification compliance
 - Comprehensive security documentation and best practices guide
 
-[Unreleased]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.3.0...HEAD
+[0.4.1-dev]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.1.2...v0.1.3
