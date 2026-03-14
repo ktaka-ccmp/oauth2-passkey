@@ -35,6 +35,7 @@ const oauth2 = (function() {
                 mode: 'active',
                 context: 'signin',
             },
+            mediation: 'required',  // Prevent auto re-authn, always require user interaction
         });
 
         // 3. Extract JWT from credential token
