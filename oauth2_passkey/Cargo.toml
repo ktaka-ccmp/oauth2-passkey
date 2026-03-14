@@ -14,7 +14,7 @@ readme = "README.md"
 
 [features]
 default = []
-bundled-tls = ["dep:webpki-roots", "dep:rustls"]
+bundled-tls = ["dep:webpki-roots"]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -42,7 +42,7 @@ url = { workspace = true }
 uuid = { workspace = true }
 webpki = { workspace = true }
 webpki-roots = { workspace = true, optional = true }
-rustls = { workspace = true, optional = true }
+rustls = { workspace = true }
 x509-parser = { workspace = true }
 
 [dev-dependencies]
