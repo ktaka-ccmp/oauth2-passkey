@@ -216,7 +216,7 @@ To disable the built-in admin UI and create your own:
 ```toml
 # Cargo.toml
 [dependencies]
-oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["user-ui"] }
+oauth2-passkey-axum = { version = "0.4", default-features = false, features = ["user-ui"] }
 ```
 
 ### Admin Privilege Check
@@ -465,16 +465,16 @@ Configure these in your `Cargo.toml` based on which pages you're replacing:
 
 ```toml
 # Replace ALL pages with custom templates (recommended for full customization)
-oauth2-passkey-axum = { version = "0.3", default-features = false }
+oauth2-passkey-axum = { version = "0.4", default-features = false }
 
 # Custom login page only, keep built-in account management and admin UI
-oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["user-ui", "admin-ui"] }
+oauth2-passkey-axum = { version = "0.4", default-features = false, features = ["user-ui", "admin-ui"] }
 
 # Replace only admin pages, keep built-in login and account management
-oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["login-ui", "user-ui"] }
+oauth2-passkey-axum = { version = "0.4", default-features = false, features = ["login-ui", "user-ui"] }
 
 # Replace only user pages, keep built-in login and admin
-oauth2-passkey-axum = { version = "0.3", default-features = false, features = ["login-ui", "admin-ui"] }
+oauth2-passkey-axum = { version = "0.4", default-features = false, features = ["login-ui", "admin-ui"] }
 ```
 
 **Note:** API endpoints (logout, delete account, admin operations, etc.) are always available regardless of feature flags. Only the HTML pages and their static assets are affected.
