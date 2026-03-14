@@ -20,19 +20,91 @@ FedCM flow (browser-native):
     -> JS POSTs token to backend -> Validate JWT signature + claims -> Session
 ```
 
-With FedCM enabled, the login flow changes from a popup-based redirect to a browser-native UI:
+With FedCM, the browser displays a native account chooser instead of a popup window. The browser communicates directly with Google's FedCM endpoints and returns a JWT ID token to JavaScript, which then sends it to the backend for validation and session establishment.
 
-1. User clicks "Sign in with Google"
-2. Browser shows a native account chooser (no popup window)
-3. User selects an account
-4. Browser obtains a JWT ID token from Google's FedCM endpoint
-5. JavaScript sends the token to the backend for validation
-6. Backend validates JWT signature, audience, issuer, expiration, and nonce
-7. Session is established
+If FedCM is unavailable (unsupported browser, user dismissal, or error), the existing popup flow activates automatically. For details on what happens inside the browser, see [Browser-Internal Flow Details](#browser-internal-flow-details).
 
-For details on what happens inside the browser during steps 2-4, see [Browser-Internal Flow Details](#browser-internal-flow-details).
+### Frontend Implementation
 
-If FedCM is unavailable (unsupported browser, user dismissal, or error), the existing popup flow activates automatically.
+The FedCM frontend implementation consists of four main steps:
+
+#### 1. Obtaining a Nonce
+
+First, obtain a nonce from the server. This nonce is a single-use value to prevent replay attacks.
+
+```javascript
+const nonceResponse = await fetch(`${O2P_ROUTE_PREFIX}/oauth2/fedcm/nonce`);
+const nonceData = await nonceResponse.json();
+// { nonce: "random string", nonce_id: "cache key" }
+```
+
+#### 2. Calling navigator.credentials.get()
+
+Use the obtained nonce to call the FedCM API:
+
+```javascript
+const credential = await navigator.credentials.get({
+    identity: {
+        providers: [{
+            configURL: 'https://accounts.google.com/gsi/fedcm.json',
+            clientId: OAUTH2_CLIENT_ID,
+            params: {
+                nonce: nonceData.nonce,
+                response_type: 'id_token',
+                scope: 'email profile openid',
+                ss_domain: window.location.origin,
+            },
+        }],
+        mode: 'active',      // Must be at identity level (not inside provider)
+        context: 'signin',
+    },
+    mediation: 'required',   // Prevent auto re-authn, always require user interaction
+});
+```
+
+The browser displays a native account chooser and returns a JWT ID token in `credential.token`.
+
+#### 3. Sending the Token to the Backend
+
+Send the obtained ID token and nonce_id to the backend:
+
+```javascript
+const response = await fetch(`${O2P_ROUTE_PREFIX}/oauth2/fedcm/callback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        credential: credential.token,
+        nonce_id: nonceData.nonce_id,
+        mode: 'login'  // or 'create_user', 'create_user_or_login'
+    })
+});
+
+if (response.ok) {
+    // Login successful, session cookie set via Set-Cookie header
+    window.location.reload();
+}
+```
+
+The backend validates the JWT ID token, establishes a session, and returns a `Set-Cookie` header.
+
+#### 4. OAuth2 Fallback
+
+If FedCM fails (unsupported browser, user closes dialog, error, etc.), automatically fall back to the traditional OAuth2 popup flow:
+
+```javascript
+function openPopup() {
+    if (isFedCMAvailable()) {
+        fedcmLogin().catch(function(err) {
+            console.log('FedCM failed, falling back to popup:', err.message);
+            openPopupOAuth2();
+        });
+        return;
+    }
+    openPopupOAuth2();
+}
+```
+
+The Promise's `.catch()` automatically initiates the popup flow when FedCM fails.
 
 ### Browser Support
 
@@ -100,12 +172,10 @@ FedCM integration is handled entirely by the library's `oauth2.js`. When `O2P_FE
 ### Comparison with Authorization Code Flow
 
 | Aspect | Authorization Code Flow + PKCE | FedCM |
-|--------|-------------------------------|-------|
-| Token type in browser | Authorization code (URL/form) | JWT ID token (JS variable) |
-| Server-to-server exchange | Yes (code + client_secret) | No |
-| RP authentication | client_secret | None (JWT signature only) |
-| Token authenticity | Code exchange + client_secret | JWT signature verification (JWKS) |
-| XSS token exposure | Code unusable without client_secret | ID token usable within validity window |
+|--------|--------------------------------|-------|
+| ID token acquisition | Server exchanges authorization code | Browser obtains directly |
+| JavaScript-accessible information | Authorization code (worthless) | JWT ID token (usable for authentication) |
+| XSS attack risk | Authorization code alone cannot authenticate | Usable for authentication within validity period |
 
 ### Key Considerations
 
@@ -155,27 +225,7 @@ FedCM works with custom login pages. The `serve_oauth2_js` handler injects `FEDC
 
 ### Active vs Passive Mode
 
-FedCM has two UI modes controlled by the `mode` property on the `identity` object (not on individual providers):
-
-```javascript
-const credential = await navigator.credentials.get({
-  identity: {
-    providers: [{
-      configURL: 'https://accounts.google.com/gsi/fedcm.json',
-      clientId: 'YOUR_CLIENT_ID',
-      params: {
-        nonce: 'server-generated-nonce',
-        response_type: 'id_token',
-        scope: 'email profile openid',
-        ss_domain: window.location.origin,
-      },
-    }],
-    mode: 'active',      // <-- must be here, at the identity level
-    context: 'signin',
-  },
-  mediation: 'required', // Prevent auto re-authn, always require user interaction
-});
-```
+FedCM has two UI modes controlled by the `mode` property on the `identity` object (not on individual providers). In the [implementation example above](#2-calling-navigatorcredentialsget), `mode: 'active'` is placed at the `identity` level.
 
 | | Active Mode | Passive Mode (default) |
 |---|---|---|
@@ -187,7 +237,7 @@ const credential = await navigator.credentials.get({
 
 oauth2-passkey uses **active mode** because it is triggered by a button click and the no-cooldown behavior is essential for a good user experience.
 
-> **Warning**: Placing `mode: 'active'` inside the provider object instead of at the `identity` level causes Chrome to silently default to passive mode. The account chooser UI still appears in both modes, making this mistake hard to detect.
+> **Warning**: Placing `mode: 'active'` inside the provider object instead of at the `identity` level causes Chrome to silently default to passive mode. The account chooser UI still appears in both modes, making this mistake hard to detect. **Consequence**: In passive mode, when a user dismisses the FedCM dialog, a cooldown occurs, preventing FedCM from being used for 2 hours to a maximum of 4 weeks. If the placement is wrong, FedCM becomes unusable for a long period just because the user closed the dialog once.
 
 ### Chrome Cooldown (Passive Mode Only)
 
@@ -214,7 +264,13 @@ The cooldown is recorded per-origin at `chrome://settings/content/federatedIdent
 
 3. **Spec evolution**: The FedCM specification is actively evolving. Chrome 143 moved nonce to the `params` object (Chrome 145 removes old format). Future spec changes may require code updates.
 
-4. **Google-specific params**: Google's FedCM endpoint requires `response_type: 'id_token'`, `scope`, and `ss_domain` in the `params` object. These are not part of the FedCM spec and are Google-specific.
+4. **Google-specific params**: Google's FedCM endpoint requires the following parameters in the `params` object. These are not part of the FedCM spec and are Google-specific:
+
+| Field | Value | Description |
+|-------|-------|-------------|
+| `response_type` | `'id_token'` | Required for Google to return JWT |
+| `scope` | `'email profile openid'` | Requested scopes |
+| `ss_domain` | `window.location.origin` | RP's origin |
 
 5. **JSON-wrapped token**: Google's FedCM endpoint returns the JWT wrapped in JSON (`{"token":"eyJ..."}`). The library handles this automatically.
 
@@ -357,3 +413,64 @@ Key points:
 - [OAuth profile for FedCM - W3C FedID Issue #599](https://github.com/w3c-fedid/FedCM/issues/599)
 - [Seznam FedCM Case Study](https://developer.chrome.com/blog/private-user-authentication-fedcm-seznam)
 - [FedCM for IndieAuth](https://indieweb.org/FedCM_for_IndieAuth)
+
+## Appendix: ID Token Forwarding and OIDC Principles
+
+### Background
+
+In traditional OpenID Connect (OIDC), the ID token is issued by the Identity Provider (IdP) directly to the Relying Party (RP) backend via server-to-server exchange. The OIDC specification states that an ID token's `aud` (audience) claim identifies the intended recipient, and the token should only be consumed by that entity—not forwarded through intermediaries.
+
+### FedCM's Deviation
+
+FedCM's design deviates from this principle:
+
+1. **Traditional OIDC (Authorization Code Flow)**:
+   - IdP issues authorization code to browser
+   - Browser sends code to RP backend
+   - RP backend exchanges code + client_secret with IdP (server-to-server)
+   - IdP returns ID token directly to RP backend
+   - **ID token never passes through JavaScript**
+
+2. **FedCM Flow**:
+   - Browser calls `navigator.credentials.get()`
+   - IdP returns ID token to browser (JavaScript)
+   - **JavaScript forwards ID token to RP backend**
+   - RP backend validates and consumes the token
+
+In the FedCM flow, JavaScript acts as an intermediary that receives and forwards the ID token, contradicting the traditional principle that "the entity receiving the token should be the one consuming it."
+
+### Specification Intent
+
+This deviation is **intentional in the FedCM specification**:
+
+- The W3C FedCM specification explicitly designs the API to return credentials to JavaScript
+- The specification's design choice to return credentials to JavaScript enables browser-native UI, deviating from traditional OIDC token handling principles
+- Google's official implementation (One Tap via GIS SDK) uses the same pattern
+
+### Intended Use Case
+
+**Question**: Was FedCM designed for the browser to POST the ID token to the backend, or was it intended for browser-only validation?
+
+**Answer**: FedCM was designed with backend validation in mind, not for pure browser-only use cases.
+
+According to MDN and Chrome documentation:
+- The FedCM workflow explicitly includes "Send the token to your backend: Pass the token from your frontend JavaScript to your backend server"
+- The ID assertion endpoint returns "a validation token that the RP can use to validate the authentication"
+- "The RP needs to follow the instructions provided by the IdP to make sure they are using it correctly"
+
+No documentation was found describing pure client-side (browser-only) validation use cases for FedCM. All official documentation assumes the RP will validate tokens on the backend server.
+
+**Why JavaScript Receives the Token**: The specification returns credentials to JavaScript to enable browser-native UI (no popups or redirects), not to enable client-side validation. This design choice inherently conflicts with traditional OIDC principles where tokens should go directly to the intended recipient.
+
+**References**:
+- [MDN: Relying party federated sign-in](https://developer.mozilla.org/en-US/docs/Web/API/FedCM_API/RP_sign-in) — describes sending token to backend for validation
+- [MDN: Identity provider integration](https://developer.mozilla.org/en-US/docs/Web/API/FedCM_API/IDP_integration) — ID assertion endpoint returns validation token for RP backend
+- [W3C FedCM Specification](https://www.w3.org/TR/fedcm/) — API explicitly designed to return credentials to JavaScript
+
+### Implications
+
+**Security**: JavaScript has access to the ID token before the backend, increasing exposure to XSS attacks compared to the Authorization Code Flow where only an unusable authorization code is exposed to JavaScript.
+
+**Compliance**: Applications with strict security requirements or compliance obligations may need to evaluate whether this deviation from traditional OIDC principles is acceptable in their threat model.
+
+**Adoption Decision**: Organizations should assess the trade-off between improved UX (browser-native UI, no popups/redirects) and the security implications of front-channel ID token delivery when deciding whether to enable FedCM.
