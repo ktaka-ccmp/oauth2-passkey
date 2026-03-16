@@ -65,7 +65,7 @@ gcloud billing projects link $PROJECT_ID --billing-account=$BILLING_ACCOUNT_ID
 gcloud services enable run.googleapis.com
 gcloud services enable artifactregistry.googleapis.com
 gcloud services enable secretmanager.googleapis.com
-gcloud services enable cloudbuild.googleapis.com
+# gcloud services enable cloudbuild.googleapis.com  # No longer needed (using GitHub Actions BuildKit)
 ```
 
 ### Step 2: Create Google OAuth2 credentials
@@ -112,18 +112,13 @@ gcloud artifacts repositories create demo \
   --repository-format=docker \
   --location=asia-northeast1
 
-# Build and push using Cloud Build
-gcloud builds submit --config=demo-live/cloudbuild.yaml
-```
-
-`demo-live/cloudbuild.yaml` specifies `demo-live/Dockerfile` and the image tag (using `$PROJECT_ID` built-in variable).
-
-Alternatively, build locally and push:
-```bash
+# Build and push manually (normally handled by GitHub Actions auto-deploy)
 docker build -f demo-live/Dockerfile \
   -t asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo .
 docker push asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo
 ```
+
+The Dockerfile uses cargo-chef for dependency caching. See the Dockerfile for the multi-stage build structure.
 
 ### Step 5: Deploy to Cloud Run
 
@@ -193,11 +188,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="serviceAccount:${SA_EMAIL}" --role="roles/iam.serviceAccountUser"
 gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:${SA_EMAIL}" --role="roles/cloudbuild.builds.editor"
-gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="serviceAccount:${SA_EMAIL}" --role="roles/artifactregistry.writer"
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:${SA_EMAIL}" --role="roles/storage.admin"
 
 # 3. Generate JSON key
 gcloud iam service-accounts keys create sa-key.json \
@@ -223,7 +214,7 @@ rm sa-key.json
 
 See `.github/workflows/deploy-demo.yml`. On each push to the trigger branch:
 1. Authenticates to GCP with service account key
-2. Builds Docker image via Cloud Build (`demo-live/cloudbuild.yaml`)
+2. Builds and pushes Docker image via BuildKit with cargo-chef dependency caching (`type=gha` cache)
 3. Full deploy to Cloud Run: image, env vars (`env.cloud-run.yaml`), and secrets
 
 This ensures environment variable changes in `env.cloud-run.yaml` are automatically applied on every deploy.
@@ -233,8 +224,10 @@ This ensures environment variable changes in `env.cloud-run.yaml` are automatica
 To rebuild and redeploy manually (equivalent to what GitHub Actions does):
 
 ```bash
-# Rebuild image
-gcloud builds submit --config=demo-live/cloudbuild.yaml
+# Rebuild and push image
+docker build -f demo-live/Dockerfile \
+  -t asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo .
+docker push asia-northeast1-docker.pkg.dev/$PROJECT_ID/demo/oauth2-passkey-demo
 
 # Full deploy (image + env vars + secrets)
 gcloud run deploy oauth2-passkey-demo \
@@ -268,10 +261,8 @@ Note: `--env-vars-file` replaces all env vars. To update individual keys without
 
 | File | Description |
 |------|-------------|
-| `Dockerfile` | Multi-stage build (rust:1.88-alpine -> scratch) |
+| `Dockerfile` | Multi-stage build with cargo-chef (rust:1.88-alpine -> scratch) |
 | `docker-compose.yml` | Local testing with env_file support |
 | `env.cloud-run.yaml` | Cloud Run environment variables |
-| `cloudbuild.yaml` | Cloud Build config (image tag, Dockerfile path) |
 | `../.dockerignore` | Excludes db/, target/, .git/, etc. |
-| `../.gcloudignore` | Excludes files from Cloud Build upload |
 | `../.github/workflows/deploy-demo.yml` | GitHub Actions auto-deploy workflow |
