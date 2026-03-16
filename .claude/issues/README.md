@@ -10,7 +10,7 @@ This directory contains issue/task tracking files for the project.
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260315-0348` | high | small | [Eliminate aws-lc-sys Dependency](open/20260315-0348-eliminate-aws-lc-sys.md) |
+| `20260316-1630` | high | small | [FedCM Promise Hangs Indefinitely in Stale Tab](open/20260316-1630-fedcm-promise-hang-stale-tab.md) |
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2019` | high | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
@@ -23,10 +23,11 @@ This directory contains issue/task tracking files for the project.
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
-### Completed (47)
+### Completed (48)
 
 | ID | Title |
 |----|-------|
+| `20260315-0348` | [Eliminate aws-lc-sys Dependency](completed/20260315-0348-eliminate-aws-lc-sys.md) |
 | `20260314-0222` | [FedCM Auto Re-Authentication Rate Limit Error](completed/20260314-0222-fedcm-auto-reauthn-rate-limit.md) |
 | `20260311-1039` | [FedCM (Federated Credential Management) Integration](completed/20260311-1039-fedcm-integration.md) |
 | `20260311-0904` | [GitHub Actions Security Hardening](completed/20260311-0904-github-actions-security-hardening.md) |

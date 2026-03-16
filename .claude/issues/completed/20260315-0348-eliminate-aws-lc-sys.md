@@ -14,9 +14,9 @@
 
 ## Created: 2026-03-15-03-48
 
-## Closed:
+## Closed: 2026-03-17-05-47
 
-## Status: open
+## Status: completed
 
 ## Priority: high
 
@@ -115,13 +115,13 @@ cargo test --manifest-path oauth2_passkey_axum/Cargo.toml --all-features
 
 ## Implementation Tasks
 
-- [ ] Modify workspace Cargo.toml: reqwest features and rustls features
-- [ ] Verify `cargo tree | grep aws-lc` returns nothing
-- [ ] Verify `cargo build` succeeds without CMake
-- [ ] Check if `install_default()` is needed or auto-detection works
-- [ ] Update bundled-tls code if needed
-- [ ] Run full test suite
-- [ ] Test demo apps manually
+- [x] Modify workspace Cargo.toml: reqwest features and rustls features
+- [x] Verify `cargo tree | grep aws-lc` returns nothing
+- [x] Verify `cargo build` succeeds without CMake
+- [x] Check if `install_default()` is needed or auto-detection works
+- [x] Update bundled-tls code if needed
+- [x] Run full test suite
+- [x] Test demo apps manually
 
 ## Decision Log
 
@@ -139,4 +139,22 @@ cargo test --manifest-path oauth2_passkey_axum/Cargo.toml --all-features
 - Decision: Use `rustls-no-provider` and add `ring` feature to rustls workspace dependency
 - Reason: This is the only way to avoid aws-lc-rs in reqwest 0.13. Cargo feature unification should propagate ring to all rustls consumers.
 
+### 2026-03-15: Auto-detection does NOT work, explicit install_default() needed
+
+- Context: Tested with only ring feature on rustls. rustls 0.23 auto-detects aws_lc_rs as default but does NOT auto-detect ring (asymmetric design).
+- Decision: Add `ensure_ring_provider()` that calls `install_default()` in `get_client()`. Make rustls a non-optional dependency. Use `builder_with_provider(ring)` in bundled-tls path.
+- Reason: Library must ensure provider is set before reqwest creates TLS connections. `install_default()` is a no-op if already installed, so it doesn't conflict with user's own provider choice.
+
 ## Resolution
+
+Eliminated aws-lc-sys (and ~20 transitive crates including cmake, quinn) by:
+
+1. Changed reqwest to `rustls-no-provider` (disables aws-lc-rs default)
+2. Changed rustls to `default-features = false, features = ["ring", "std", "tls12"]`
+3. Made rustls a non-optional dependency in oauth2_passkey (needed for provider init)
+4. Added `ensure_ring_provider()` in utils.rs to install ring as default crypto provider
+5. Updated bundled-tls to use `builder_with_provider(ring)` explicitly
+
+Result: No CMake or C++ compiler needed. `cargo build` works in minimal environments.
+
+Commit: `a3a13f0` on branch `eliminate-aws-lc-sys`
