@@ -16,7 +16,7 @@
 
 ## Closed:
 
-## Status: open
+## Status: deferred
 
 ## Priority: high
 
@@ -180,5 +180,17 @@ fedcmLogin(mode).catch(function(err) {
   - Does not affect normal FedCM operation (timeout only fires if FedCM hangs)
   - Root cause is in Chrome's internal state, not fixable from application side
   - Existing popup fallback infrastructure already handles the error path
+
+### 2026-03-17: Deferred - no good solution yet
+
+- Context: The AbortController timeout approach (5s) has a fundamental flaw: it cannot distinguish between "FedCM UI hung" and "user is taking time to choose an account." Auto-timeout would interrupt normal users. Manual fallback link is poor UX.
+- Decision: Defer this issue pending:
+  - Error reproduction (to study the problem further)
+  - Chrome improvements (Promise should reject, not hang - this is arguably a browser bug)
+  - A better detection approach emerging
+  - FedCM is still experimental support in this project, so the risk is acceptable
+- Rejected approaches:
+  - **AbortController with auto-timeout (5s)**: Cannot distinguish "FedCM UI hung" from "user is taking time to choose an account." Would interrupt normal users mid-interaction.
+  - **Manual fallback link**: Show a "try popup login" link after a delay. Poor UX - clutters the interface, requires user to understand what happened, and the timing of when to show it is still arbitrary.
 
 ## Resolution
