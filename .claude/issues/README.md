@@ -6,11 +6,10 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (13)
+### Open (12)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260316-1630` | high | small | [FedCM Promise Hangs Indefinitely in Stale Tab](open/20260316-1630-fedcm-promise-hang-stale-tab.md) |
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2019` | high | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
@@ -86,10 +85,11 @@ This directory contains issue/task tracking files for the project.
 | `20260212-0235` | [Standalone Demo Repository](wontfix/20260212-0235-standalone-demo-repository.md) |
 | `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
-### Deferred (7)
+### Deferred (8)
 
 | ID | Title |
 |----|-------|
+| `20260316-1630` | [FedCM Promise Hangs Indefinitely in Stale Tab](deferred/20260316-1630-fedcm-promise-hang-stale-tab.md) |
 | `20260315-0349` | [Eliminate ring Dependency for Full RustCrypto Migration](deferred/20260315-0349-eliminate-ring-dependency.md) |
 | `20260312-1948` | [Eliminate nonce_id from FedCM Flow](deferred/20260312-1948-fedcm-eliminate-nonce-id.md) |
 | `20260303-0605` | [Adopt WebAuthn Level 3 JSON Serialization API](deferred/20260303-0605-webauthn-json-serialization-api.md) |

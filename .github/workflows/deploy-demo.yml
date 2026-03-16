@@ -24,16 +24,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      - name: Login to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: asia-northeast1-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: demo-live/Dockerfile
+          push: true
+          tags: asia-northeast1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/demo/${{ env.SERVICE }}:latest
+          cache-from: type=gha,scope=demo-live
+          cache-to: type=gha,mode=max,scope=demo-live
+
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
-
-      - name: Build with Cloud Build
-        run: gcloud builds submit --config=demo-live/cloudbuild.yaml
 
       - name: Deploy to Cloud Run
         env:
