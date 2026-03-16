@@ -8,6 +8,7 @@ on:
       - 'oauth2_passkey_axum/**'
       - 'demo-live/**'
       - '.github/workflows/deploy-demo.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
