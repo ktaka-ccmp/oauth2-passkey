@@ -14,9 +14,9 @@
 
 ## Created: 2026-03-17-15-00
 
-## Closed:
+## Closed: 2026-03-17
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -226,12 +226,12 @@ Docker doesn't support BuildKit inline cache for intermediate stages without ext
 
 ## Implementation Tasks
 
-- [ ] Verify cargo-chef works with current Dockerfile (Alpine musl + workspace)
-- [ ] Update `demo-live/Dockerfile` with cargo-chef multi-stage build
-- [ ] Update `.github/workflows/deploy-demo.yml` with BuildKit + cache (Option A)
-- [ ] Test deployment and measure build time improvement
-- [ ] Update `demo-live/DEPLOY.md` if deployment process changes
-- [ ] Consider if `demo-live/cloudbuild.yaml` is still needed (manual fallback?)
+- [x] Verify cargo-chef works with current Dockerfile (Alpine musl + workspace)
+- [x] Update `demo-live/Dockerfile` with cargo-chef multi-stage build
+- [x] Update `.github/workflows/deploy-demo.yml` with BuildKit + cache (Option A)
+- [x] Test deployment and measure build time improvement
+- [x] Update `demo-live/DEPLOY.md` to reflect BuildKit + cargo-chef pipeline
+- [x] Remove `demo-live/cloudbuild.yaml` (no longer needed)
 
 ## Decision Log
 
@@ -260,3 +260,30 @@ Docker doesn't support BuildKit inline cache for intermediate stages without ext
   locally/in CI and push pre-built image" aligns with Option A's approach.
 
 ## Resolution
+
+Implemented Option A: GitHub Actions BuildKit + cargo-chef caching.
+
+### Results
+
+| Build | Method | Time |
+|-------|--------|------|
+| #30 | Cloud Build (old) | 19m 28s |
+| #31 | BuildKit + cargo-chef (1st run, no cache) | 11m 24s |
+| #32 | BuildKit + cargo-chef (2nd run, cached) | 3m 28s |
+
+- Cloud Build -> GitHub Actions BuildKit alone: 19m -> 11m (42% faster, due to 4 vCPU vs 1 vCPU)
+- With cargo-chef cache hit: 11m -> 3.5m (69% further reduction)
+- Overall: 19m -> 3.5m (82% reduction)
+
+### How to Test Cache Effectiveness
+
+Cache is stored per-branch in GitHub Actions (`type=gha`). To verify:
+
+1. Push a source-only change to `dev` (e.g., modify a `.rs` file)
+2. Check the "Build and push" step duration in GitHub Actions log
+3. Cached build (source-only change): ~3-4 min
+4. Uncached build (dependency change or first run): ~11 min
+
+### Prerequisites
+
+- `GCP_SA_KEY` service account must have `Artifact Registry Writer` role for direct image push from GitHub Actions

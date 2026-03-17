@@ -2,6 +2,9 @@
 
 ## Table of Contents
 
+- [2026-03-17: Cloud Run deploy optimization -- cargo-chef + BuildKit](#2026-03-17-cloud-run-deploy-optimization----cargo-chef--buildkit)
+- [2026-03-17: FedCM stale tab hang issue deferred](#2026-03-17-fedcm-stale-tab-hang-issue-deferred)
+- [2026-03-15: Eliminate aws-lc-sys dependency](#2026-03-15-eliminate-aws-lc-sys-dependency)
 - [2026-03-14: FedCM auto re-authentication rate limit fix](#2026-03-14-fedcm-auto-re-authentication-rate-limit-fix)
 - [2026-03-13: FedCM (Federated Credential Management) integration](#2026-03-13-fedcm-federated-credential-management-integration)
 - [2026-03-11: GitHub Actions security hardening](#2026-03-11-github-actions-security-hardening)
@@ -52,6 +55,126 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-17: Cloud Run deploy optimization -- cargo-chef + BuildKit
+
+**Issue**: `20260317-1500` | **Priority**: low | **Difficulty**: medium
+
+Enhancement of CI/CD pipeline
+
+### Motivation
+
+Cloud Run deployment for passkey-demo.ccmp.jp took approximately 19-25 minutes per build. The bottleneck was full Rust compilation from scratch on every build -- Cloud Build's default machine (1 vCPU, 3.75 GB RAM) compiled all workspace dependencies (tokio, axum, sqlx, rustls, etc.) with zero caching because Docker layer caches don't persist between Cloud Build runs.
+
+### User-facing impact
+
+- **Before**: Every push to `dev` triggered a ~19 minute build via Cloud Build. No caching meant even a one-line `.rs` change required full recompilation of all dependencies.
+- **After**: Cached builds complete in ~3.5 minutes (82% reduction). First build without cache takes ~11 minutes (still faster due to 4x CPU).
+
+| Build | Method | Time |
+|-------|--------|------|
+| #30 | Cloud Build (old) | 19m 28s |
+| #31 | BuildKit + cargo-chef (1st, no cache) | 11m 24s |
+| #32 | BuildKit + cargo-chef (2nd, cached) | 3m 28s |
+
+### Design decisions
+
+**Option A (chosen): GitHub Actions BuildKit + cargo-chef**
+- cargo-chef separates dependency compilation into its own Docker layer. When only `.rs` files change, the dependency layer cache hits and only the application code recompiles.
+- BuildKit `type=gha` cache stores Docker layers in GitHub Actions cache storage, persisting across CI runs.
+- `mode=max` caches all intermediate stages (not just final), which is essential for cargo-chef's dependency layer to be cached.
+
+**Option B (rejected): Cloud Build with `--cache-from` + machine upgrade**
+- `--cache-from` is image-level caching only -- intermediate stages (cargo-chef dependency layer) don't benefit.
+- cargo-chef is incompatible with Kaniko (GoogleContainerTools/kaniko#1520), ruling out Cloud Build's best caching option.
+- N1_HIGHCPU_8 upgrade would cost more and only improve to ~8-12 min.
+
+**Workflow reordering**: Steps were grouped into two logical phases -- Docker build/push and Cloud Run deploy. GCP auth (`google-github-actions/auth`) moved closer to `gcloud` usage since `docker/login-action` authenticates independently via `_json_key` + SA key JSON.
+
+**Cleanup**: Removed `demo-live/cloudbuild.yaml`, revoked unnecessary IAM roles (`cloudbuild.builds.editor`, `storage.admin`) from the GitHub Actions service account.
+
+### Key files
+
+`.github/workflows/deploy-demo.yml`, `demo-live/Dockerfile`, `demo-live/DEPLOY.md`
+
+---
+
+## 2026-03-17: FedCM stale tab hang issue deferred
+
+**Issue**: `20260316-1630` | **Priority**: high | **Difficulty**: small
+
+Not merged (deferred)
+
+### Motivation
+
+`navigator.credentials.get()` hangs indefinitely in stale tabs (likely from the passive mode era before `mode: 'active'` was added). The page dims but the FedCM account chooser never appears, the Promise never resolves or rejects, and the popup fallback never triggers. Only opening a new tab recovers.
+
+### User-facing impact
+
+- **Before**: Users in stale tabs see a dimmed, unresponsive page with no way to log in.
+- **After**: No change (deferred). The issue remains for users with stale tabs, but these will naturally diminish over time as users open new tabs.
+
+### Design decisions
+
+**AbortController with 5-second timeout (rejected)**:
+- Cannot distinguish between "FedCM UI hung" and "user is taking time to select an account". A user with multiple Google accounts who takes >5 seconds would be interrupted mid-selection and forced into the popup flow.
+
+**Fallback link after delay (rejected)**:
+- Showing a "Having trouble? Click here" link after a few seconds clutters the UI and is poor UX. Users may not notice it or understand what it means.
+
+**Deferred because**:
+- No way to programmatically detect whether the FedCM UI actually appeared (the browser API provides no such event or callback)
+- The root cause is a Chrome bug (Promise should reject, not hang silently; active mode should not be subject to cooldown per Chrome's own docs)
+- FedCM is still experimental support in this project
+- Waiting for: error reproduction, Chrome improvements, or a novel detection approach
+
+### Key files
+
+`oauth2_passkey_axum/static/oauth2.js`
+
+---
+
+## 2026-03-15: Eliminate aws-lc-sys dependency
+
+**Issue**: `20260315-0348` | **Priority**: high | **Difficulty**: small
+
+Enhancement of build system -- dependency cleanup
+
+### Motivation
+
+The `aws-lc-sys` crate was pulled into the dependency tree by reqwest 0.13's default TLS configuration (`rustls` feature -> `aws-lc-rs` provider). This required CMake and a C++ compiler at build time, which broke `cargo build` on minimal environments, complicated cross-compilation, added significant build time, and was problematic for crates.io users who expect `cargo build` to just work.
+
+The project already depended on `ring` directly (for WebAuthn signature verification), so switching rustls's crypto provider from aws-lc-rs to ring could eliminate aws-lc-sys without adding new dependencies.
+
+### User-facing impact
+
+- **Before**: `cargo build` failed on systems without CMake and a C++ compiler. aws-lc-sys pulled in ~20 transitive crates including cmake and quinn.
+- **After**: `cargo build` works in minimal environments. No CMake or C++ compiler needed.
+
+```toml
+# Before: reqwest with default rustls (aws-lc-rs)
+reqwest = { version = "0.13.2", features = ["rustls-tls"] }
+
+# After: reqwest with ring-based rustls
+reqwest = { version = "0.13.2", default-features = false, features = [
+    "rustls-no-provider", "charset", "http2", "json", "cookies", "form", "system-proxy"
+] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+```
+
+### Design decisions
+
+**ring over RustCrypto for rustls provider**: ring was already a direct dependency (WebAuthn uses it). rustls-rustcrypto is experimental. Adding ring to rustls added no new dependencies.
+
+**`rustls-no-provider` feature on reqwest**: reqwest 0.13 removed the `__rustls-ring` feature that 0.12 had. Only options were `rustls` (aws-lc-rs) or `rustls-no-provider`. This is the only way to avoid aws-lc-rs in reqwest 0.13.
+
+**Explicit `install_default()` needed**: rustls 0.23 auto-detects aws_lc_rs as default but does NOT auto-detect ring (asymmetric design). Added `ensure_ring_provider()` that calls `install_default()` in `get_client()`. Used `builder_with_provider(ring)` in the bundled-tls path.
+
+### Key files
+
+`Cargo.toml`, `oauth2_passkey/Cargo.toml`, `oauth2_passkey/src/utils.rs`
+
+---
 
 ## 2026-03-14: FedCM auto re-authentication rate limit fix
 
