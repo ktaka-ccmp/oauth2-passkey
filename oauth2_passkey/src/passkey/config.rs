@@ -102,11 +102,14 @@ pub(super) static PASSKEY_USER_VERIFICATION: LazyLock<String> =
 pub(super) static PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL: LazyLock<bool> = LazyLock::new(
     || match env::var("PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL") {
         Err(_) => false,
-        Ok(val) => val.parse().unwrap_or_else(|e| {
-            panic!(
-                "PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL='{val}' is not a valid bool: {e}"
-            )
-        }),
+        Ok(val) => match val.to_lowercase().as_str() {
+            "true" => true,
+            "false" => false,
+            _ => panic!(
+                "PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL='{val}' is invalid. \
+                 Valid values: true, false"
+            ),
+        },
     },
 );
 

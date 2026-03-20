@@ -275,6 +275,20 @@ fn test_passkey_user_handle_unique_accepts_valid() {
     assert!(output.status.success());
 }
 
+#[test]
+fn test_passkey_user_handle_unique_accepts_uppercase() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL, true);
+        return;
+    }
+    let output = run_child(
+        "passkey::config::tests::test_passkey_user_handle_unique_accepts_uppercase",
+        "PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL",
+        "TRUE",
+    );
+    assert!(output.status.success());
+}
+
 // --- Default value tests ---
 
 #[test]
