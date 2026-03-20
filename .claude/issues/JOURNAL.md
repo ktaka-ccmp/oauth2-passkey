@@ -2,6 +2,7 @@
 
 ## Table of Contents
 
+- [2026-03-21: Sequential primary keys for oauth2_accounts and passkey_credentials](#2026-03-21-sequential-primary-keys-for-oauth2_accounts-and-passkey_credentials)
 - [2026-03-20: Env var silent fallback audit -- panic on invalid values](#2026-03-20-env-var-silent-fallback-audit----panic-on-invalid-values)
 - [2026-03-20: FedCM GIS library analysis and hang investigation](#2026-03-20-fedcm-gis-library-analysis-and-hang-investigation)
 - [2026-03-17: Cloud Run deploy optimization -- cargo-chef + BuildKit](#2026-03-17-cloud-run-deploy-optimization----cargo-chef--buildkit)
@@ -57,6 +58,49 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-21: Sequential primary keys for oauth2_accounts and passkey_credentials
+
+**Issue**: `2026-01-31-01` (completed) | **Priority**: low | **Difficulty**: medium
+
+Database schema best practice alignment
+
+### Motivation
+
+The `users` table already used the recommended pattern of `sequence_number INTEGER PRIMARY KEY AUTOINCREMENT` with `id TEXT NOT NULL UNIQUE`. However, `oauth2_accounts` and `passkey_credentials` tables used TEXT columns (`id` and `credential_id` respectively) as primary keys directly. Sequential integer primary keys are a database design best practice for B-tree locality, space efficiency, and join performance -- regardless of current scale.
+
+### User-facing impact
+
+- **Before**: `oauth2_accounts` used `id TEXT PRIMARY KEY`, `passkey_credentials` used `credential_id TEXT PRIMARY KEY`
+- **After**: Both tables use `sequence_number` as primary key with original TEXT identifiers as UNIQUE constraints
+
+```sql
+-- Before (oauth2_accounts):
+id TEXT PRIMARY KEY NOT NULL,
+user_id TEXT NOT NULL REFERENCES users(id),
+
+-- After (oauth2_accounts):
+sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,  -- SQLite
+-- sequence_number BIGSERIAL PRIMARY KEY,            -- PostgreSQL
+id TEXT NOT NULL UNIQUE,
+user_id TEXT NOT NULL REFERENCES users(id),
+```
+
+**Breaking change**: Existing databases will need to be recreated (no migration provided). The `OAuth2Account` and `PasskeyCredential` structs now include `sequence_number: Option<i64>`.
+
+### Design decisions
+
+- **YAGNI does not apply**: Sequential integer primary keys are an established best practice, not a speculative feature. Deferring correct schema design is not the same as avoiding unnecessary features.
+- **No migration**: This is a pre-1.0 library. Existing deployments can recreate tables. Migration complexity is not justified at this stage.
+- **`Option<i64>` for sequence_number**: Matches the `users` table pattern. `None` when creating new records (database assigns the value), `Some(n)` when reading from database.
+- **No query changes needed**: All queries use `SELECT *` with `FromRow` derive/impl, and INSERT statements don't specify `sequence_number` (auto-generated). The change is transparent to query logic.
+- **No foreign key impact**: No other tables reference `oauth2_accounts.id` or `passkey_credentials.credential_id` via foreign keys. `login_history.credential_id` is denormalized without FK constraint.
+
+### Key files
+
+`oauth2_passkey/src/oauth2/types.rs`, `oauth2_passkey/src/passkey/types.rs`, `oauth2_passkey/src/oauth2/storage/sqlite.rs`, `oauth2_passkey/src/oauth2/storage/postgres.rs`, `oauth2_passkey/src/passkey/storage/sqlite.rs`, `oauth2_passkey/src/passkey/storage/postgres.rs`
+
+---
 
 ## 2026-03-20: Env var silent fallback audit -- panic on invalid values
 

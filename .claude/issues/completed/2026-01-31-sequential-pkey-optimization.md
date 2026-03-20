@@ -11,7 +11,9 @@
 
 ## ID: 2026-01-31-01
 
-## Status: open
+## Status: completed
+
+## Closed: 2026-03-21
 
 ## Priority: low
 
@@ -93,14 +95,14 @@ No JOIN queries exist -- all lookups are single-table. This makes the change saf
 
 ## Implementation Tasks
 
-- [ ] Add `sequence_number` to OAuth2Account type definition
-- [ ] Add `sequence_number` to PasskeyCredential type definition
-- [ ] Update oauth2_accounts SQLite schema (CREATE TABLE + queries)
-- [ ] Update oauth2_accounts PostgreSQL schema (CREATE TABLE + queries)
-- [ ] Update passkey_credentials SQLite schema (CREATE TABLE + queries)
-- [ ] Update passkey_credentials PostgreSQL schema (CREATE TABLE + queries)
-- [ ] Update test_utils (first user test data)
-- [ ] Verify: `cargo test` passes, `cargo clippy` clean
+- [x] Add `sequence_number` to OAuth2Account type definition
+- [x] Add `sequence_number` to PasskeyCredential type definition
+- [x] Update oauth2_accounts SQLite schema (CREATE TABLE + queries)
+- [x] Update oauth2_accounts PostgreSQL schema (CREATE TABLE + queries)
+- [x] Update passkey_credentials SQLite schema (CREATE TABLE + queries)
+- [x] Update passkey_credentials PostgreSQL schema (CREATE TABLE + queries)
+- [x] Update test_utils (first user test data)
+- [x] Verify: `cargo test` passes, `cargo clippy` clean
 
 ## Decision Log
 
@@ -123,3 +125,8 @@ No JOIN queries exist -- all lookups are single-table. This makes the change saf
 - Reason: Consistency across all tables. No foreign keys reference these columns from other tables, so the change is safe.
 
 ## Resolution
+
+Added `sequence_number` as sequential integer primary key to both `oauth2_accounts`
+and `passkey_credentials` tables, matching the existing `users` table pattern.
+Original TEXT identifiers (`id`, `credential_id`) changed to UNIQUE constraints.
+SQLite uses INTEGER AUTOINCREMENT, PostgreSQL uses BIGSERIAL.
