@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (13)
+### Open (11)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -20,8 +20,6 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
 | `20260227-1703` | low | small | [Audit and Improve Silent Fallback Behavior for Optional Environment Variables](open/20260227-1703-env-var-silent-fallback-audit.md) |
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
-| `20260316-1630` | high | small | [FedCM Promise Hangs Indefinitely in Stale Tab](open/20260316-1630-fedcm-promise-hang-stale-tab.md) |
-| `20260320-1410` | medium | medium | [FedCM Cancel Fallback Popup Gets Blocked by Browser](open/20260320-1410-fedcm-fallback-popup-blocked.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
 ### Completed (49)
@@ -87,10 +85,12 @@ This directory contains issue/task tracking files for the project.
 | `20260212-0235` | [Standalone Demo Repository](wontfix/20260212-0235-standalone-demo-repository.md) |
 | `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
-### Deferred (7)
+### Deferred (9)
 
 | ID | Title |
 |----|-------|
+| `20260320-1410` | [FedCM Cancel Fallback Popup Gets Blocked by Browser](deferred/20260320-1410-fedcm-fallback-popup-blocked.md) |
+| `20260316-1630` | [FedCM Promise Hangs Indefinitely in Stale Tab](deferred/20260316-1630-fedcm-promise-hang-stale-tab.md) |
 | `20260315-0349` | [Eliminate ring Dependency for Full RustCrypto Migration](deferred/20260315-0349-eliminate-ring-dependency.md) |
 | `20260312-1948` | [Eliminate nonce_id from FedCM Flow](deferred/20260312-1948-fedcm-eliminate-nonce-id.md) |
 | `20260303-0605` | [Adopt WebAuthn Level 3 JSON Serialization API](deferred/20260303-0605-webauthn-json-serialization-api.md) |

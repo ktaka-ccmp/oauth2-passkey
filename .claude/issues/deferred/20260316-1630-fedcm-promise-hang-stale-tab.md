@@ -16,7 +16,7 @@
 
 ## Closed:
 
-## Status: open
+## Status: deferred
 
 ## Priority: high
 
@@ -300,5 +300,18 @@ async function fedcmLogin(mode) {
 - Reason: Matching GIS reduces the chance that our option differences contribute to the hang. The `signal` also provides a handle for future abort if a timeout strategy is later adopted.
 - Skipped: `providers[0].url` (GIS sets `url: "https://accounts.google.com/gsi/"`) -- this is a non-standard property not in the FedCM spec. It appears to be Google-internal (possibly related to IdP login status). Adding an arbitrary URL could have unintended side effects. The standard `configURL` already points Chrome to the correct FedCM config.
 - Reference: Full GIS analysis in `docs/src/archived/gis-fedcm-analysis.md`
+
+### 2026-03-20: Deferred again - root cause unclear, multiple hypotheses
+
+- Context: Extensive investigation including GIS reverse engineering, Chromium issue tracker search, and hands-on testing. Key findings:
+  1. GIS alignment (AbortController, federated, fields) does not fix the hang
+  2. 15s timeout was implemented but reverted because the popup fallback gets blocked by browser (User Activation expired after abort)
+  3. Root cause is NOT clearly cooldown or login status mismatch -- closing excess browser tabs resolved the hang, suggesting Chrome resource constraints may be involved
+  4. Chromium #40070360 (mismatch UI not displaying) and #370796104 (error UI on active mode) are related but may not be the exact cause
+- Decision: Defer pending further observation. GIS alignment changes are kept (harmless improvements). Timeout reverted until a viable post-abort fallback method is found.
+- Blocking issues:
+  - After abort, `window.open()` fails (User Activation expired) -- see issue `20260320-1410`
+  - Root cause unclear: tab count? login status mismatch? Chrome resource limits?
+  - Need more reproduction data to narrow down
 
 ## Resolution
