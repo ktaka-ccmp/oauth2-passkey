@@ -40,11 +40,13 @@ pub(crate) use storage::OAuth2Store;
 pub(crate) use types::{AccountId, AccountSearchField};
 
 pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
-    // Validate required environment variables early
+    // Validate required and optional environment variables early
     let _ = *config::OAUTH2_REDIRECT_URI; // This will validate ORIGIN
     let _ = *config::OAUTH2_GOOGLE_CLIENT_ID;
     let _ = *config::OAUTH2_GOOGLE_CLIENT_SECRET;
     let _ = *config::OAUTH2_RESPONSE_MODE;
+    let _ = *config::OAUTH2_CSRF_COOKIE_NAME;
+    let _ = *config::OAUTH2_CSRF_COOKIE_MAX_AGE;
 
     // Initialize the storage layer
     crate::storage::init()

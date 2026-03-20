@@ -2,6 +2,8 @@
 
 ## Table of Contents
 
+- [2026-03-20: Env var silent fallback audit -- panic on invalid values](#2026-03-20-env-var-silent-fallback-audit----panic-on-invalid-values)
+- [2026-03-20: FedCM GIS library analysis and hang investigation](#2026-03-20-fedcm-gis-library-analysis-and-hang-investigation)
 - [2026-03-17: Cloud Run deploy optimization -- cargo-chef + BuildKit](#2026-03-17-cloud-run-deploy-optimization----cargo-chef--buildkit)
 - [2026-03-17: FedCM stale tab hang issue deferred](#2026-03-17-fedcm-stale-tab-hang-issue-deferred)
 - [2026-03-15: Eliminate aws-lc-sys dependency](#2026-03-15-eliminate-aws-lc-sys-dependency)
@@ -55,6 +57,74 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-20: Env var silent fallback audit -- panic on invalid values
+
+**Issue**: `20260227-1703` (completed) | **Priority**: low | **Difficulty**: small
+
+### Motivation
+
+Optional environment variables using `.ok().and_then(|s| s.parse().ok()).unwrap_or()` silently fell back to defaults when set to unparseable values. Operators who set `SESSION_COOKIE_MAX_AGE=ten_minutes` would get the default 600 without any error or warning.
+
+### What changed
+
+Implemented Option B + C:
+- **Option B**: 17 LazyLock env vars changed from silent fallback to panic on set-but-invalid values. Unset vars still use defaults.
+- **Option C**: All optional config vars force-evaluated in `init()` functions, so invalid values are caught at startup, not on first request.
+- **AUTH_SERVER_SECRET**: Replaced hardcoded default (`"default_secret_key_change_in_production"`) with random 32-byte key generation using `ring::rand::SystemRandom`.
+
+| State | Behavior (before) | Behavior (after) |
+|-------|-------------------|------------------|
+| Env var not set | Default value | Default value (unchanged) |
+| Set, valid value | That value | That value (unchanged) |
+| Set, invalid value | Silent default | **Panic at startup** |
+
+### Design decisions
+
+- **B+C over A+C**: Option A (warn + continue) still hides the problem if operators don't read logs. Panic is consistent with required variables that already use `.expect()`.
+- **`unwrap_or_else(\|e\| panic!(..., e))` over `expect(&format!(...))`**: clippy's `expect_fun_call` lint rejects `expect(&format!(...))` because `format!()` allocates even on the success path. `unwrap_or_else` only executes the closure on error, and we include the underlying parse error `e` in the message.
+- **AUTH_SERVER_SECRET random default**: Single-process deployments work out of the box. Multi-process deployments must set the env var explicitly (documented).
+
+### Key files
+
+`oauth2_passkey/src/config.rs`, `oauth2_passkey/src/session/config.rs`, `oauth2_passkey/src/oauth2/config.rs`, `oauth2_passkey/src/passkey/config.rs`, `oauth2_passkey_axum/src/config.rs`, `oauth2_passkey_axum/src/cors.rs`, `oauth2_passkey/src/lib.rs`, `oauth2_passkey_axum/src/lib.rs`
+
+---
+
+## 2026-03-20: FedCM GIS library analysis and hang investigation
+
+**Issue**: `20260316-1630` (deferred), `20260320-1410` (deferred)
+
+### Motivation
+
+FedCM `navigator.credentials.get()` hangs frequently on tabs open for a long time, causing the page to dim with no dialog and no recovery path. Reopened the deferred issue to investigate using Google's GIS library as a reference.
+
+### What was done
+
+1. **GIS library reverse engineering**: Fetched and beautified Google's GIS library (`accounts.google.com/gsi/client`, 254KB -> 7520 lines). Documented all FedCM-related functions, the abort mechanism, cooldown system, and error handling. Full analysis: `docs/src/archived/gis-fedcm-analysis.md`
+
+2. **GIS alignment**: Aligned `credentials.get()` options with GIS -- added AbortController + signal, `federated` key (backward compat), `fields` property. These are kept in the codebase even though they don't fix the hang.
+
+3. **Root cause investigation**: Explored multiple hypotheses:
+   - Cooldown from prior FedCM cancel -- insufficient (hang occurs without prior cancel)
+   - Login status mismatch -- Chrome's mismatch UI may fail to display ([Chromium #40070360](https://issues.chromium.org/issues/40070360))
+   - Active mode error UI not implemented -- [Chromium #370796104](https://issues.chromium.org/issues/370796104)
+   - **Tab count**: Closing excess browser tabs resolved the hang, suggesting Chrome resource constraints
+
+4. **Timeout attempt**: Added 15s AbortController timeout, but reverted because the popup fallback gets blocked (User Activation expired after abort).
+
+5. **New issue created**: `20260320-1410` for popup blocked on FedCM cancel fallback (User Activation timing problem). Also deferred.
+
+### Design decisions
+
+- **Deferred both issues**: Root cause still unclear (tab count? login status? Chrome resource limits?). Timeout reverted because no viable post-abort fallback exists yet.
+- **GIS alignment kept**: Harmless improvements that match Google's own implementation.
+
+### Key files
+
+`oauth2_passkey_axum/static/oauth2.js`, `docs/src/archived/gis-fedcm-analysis.md`
+
+---
 
 ## 2026-03-17: Cloud Run deploy optimization -- cargo-chef + BuildKit
 

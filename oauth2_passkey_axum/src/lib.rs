@@ -112,9 +112,19 @@ pub use oauth2_passkey::{CsrfHeaderVerified, CsrfToken, O2P_ROUTE_PREFIX};
 pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
     oauth2_passkey::init().await?;
 
-    // Force evaluation of O2P_LOGIN_URL at startup so misconfiguration
-    // panics immediately rather than on the first unauthenticated request
+    // Force evaluation of axum-specific config at startup
     let _ = *config::O2P_LOGIN_URL;
+    let _ = *config::O2P_ACCOUNT_URL;
+    let _ = *config::O2P_ADMIN_URL;
+    let _ = *config::O2P_DEFAULT_REDIRECT;
+    let _ = *config::O2P_RESPOND_WITH_X_CSRF_TOKEN;
+    let _ = *config::O2P_FEDCM;
+    let _ = *config::O2P_PASSKEY_PROMOTION;
+    #[cfg(feature = "cors")]
+    {
+        let _ = *cors::CORS_ALLOWED_ORIGINS;
+        let _ = *cors::CORS_ALLOW_CREDENTIALS;
+    }
 
     Ok(())
 }

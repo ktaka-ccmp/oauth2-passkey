@@ -45,11 +45,17 @@ pub static O2P_DEFAULT_REDIRECT: LazyLock<String> =
 
 /// Whether to add X-CSRF-Token header to responses
 /// Default: true (can be disabled by setting O2P_RESPOND_WITH_X_CSRF_TOKEN=false)
-pub static O2P_RESPOND_WITH_X_CSRF_TOKEN: LazyLock<bool> = LazyLock::new(|| {
-    std::env::var("O2P_RESPOND_WITH_X_CSRF_TOKEN")
-        .map(|val| val.to_lowercase() != "false")
-        .unwrap_or(true)
-});
+pub static O2P_RESPOND_WITH_X_CSRF_TOKEN: LazyLock<bool> =
+    LazyLock::new(|| match std::env::var("O2P_RESPOND_WITH_X_CSRF_TOKEN") {
+        Err(_) => true,
+        Ok(val) => match val.to_lowercase().as_str() {
+            "true" => true,
+            "false" => false,
+            _ => panic!(
+                "O2P_RESPOND_WITH_X_CSRF_TOKEN='{val}' is invalid. Valid values: true, false"
+            ),
+        },
+    });
 
 /// Optional URL for custom CSS to override default styles
 /// Example: O2P_CUSTOM_CSS_URL=/static/my-theme.css
@@ -95,27 +101,33 @@ impl FedCMMode {
 
 /// FedCM support for OAuth2 login (experimental)
 /// Values: true/enabled (enabled), anything else (disabled, default)
-pub(crate) static O2P_FEDCM: LazyLock<FedCMMode> = LazyLock::new(|| {
-    match std::env::var("O2P_FEDCM")
-        .unwrap_or_default()
-        .to_lowercase()
-        .as_str()
-    {
-        "true" | "enabled" => FedCMMode::Enabled,
-        _ => FedCMMode::Disabled,
-    }
-});
+pub(crate) static O2P_FEDCM: LazyLock<FedCMMode> =
+    LazyLock::new(|| match std::env::var("O2P_FEDCM") {
+        Err(_) => FedCMMode::Disabled,
+        Ok(val) => match val.to_lowercase().as_str() {
+            "true" | "enabled" => FedCMMode::Enabled,
+            "false" | "disabled" | "" => FedCMMode::Disabled,
+            _ => {
+                panic!("O2P_FEDCM='{val}' is invalid. Valid values: true, enabled, false, disabled")
+            }
+        },
+    });
 
 /// Passkey promotion after OAuth2 login (experimental)
 /// Values: false (disabled, default), ask (show modal), force (skip modal)
 pub(crate) static O2P_PASSKEY_PROMOTION: LazyLock<PasskeyPromotionMode> = LazyLock::new(|| {
-    match std::env::var("O2P_PASSKEY_PROMOTION")
-        .unwrap_or_default()
-        .to_lowercase()
-        .as_str()
-    {
-        "ask" => PasskeyPromotionMode::Ask,
-        "force" => PasskeyPromotionMode::Force,
-        _ => PasskeyPromotionMode::Disabled,
+    match std::env::var("O2P_PASSKEY_PROMOTION") {
+        Err(_) => PasskeyPromotionMode::Disabled,
+        Ok(val) => match val.to_lowercase().as_str() {
+            "ask" => PasskeyPromotionMode::Ask,
+            "force" => PasskeyPromotionMode::Force,
+            "false" | "disabled" | "" => PasskeyPromotionMode::Disabled,
+            _ => panic!(
+                "O2P_PASSKEY_PROMOTION='{val}' is invalid. Valid values: ask, force, false, disabled"
+            ),
+        },
     }
 });
+
+#[cfg(test)]
+mod tests;

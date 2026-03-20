@@ -463,5 +463,36 @@ pub fn get_test_origin() -> String {
     std::env::var("ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string())
 }
 
+/// Spawn the current test binary as a child process with a specific env var set.
+///
+/// Used for testing LazyLock config validation: each test spawns a child process
+/// with a specific env var value, then checks if the child panicked or succeeded.
+/// The `__TEST_ENV_VAR_CHILD` env var distinguishes parent (spawns child) from
+/// child (evaluates the LazyLock variable).
+pub fn run_child_with_env(
+    test_name: &str,
+    env_name: &str,
+    env_value: &str,
+) -> std::process::Output {
+    std::process::Command::new(std::env::current_exe().unwrap())
+        .args([test_name, "--exact", "--nocapture"])
+        .env("__TEST_ENV_VAR_CHILD", "1")
+        .env(env_name, env_value)
+        .output()
+        .expect("Failed to spawn child process")
+}
+
+/// Spawn the current test binary as a child process with a specific env var removed.
+///
+/// Used for testing default values when an env var is not set.
+pub fn run_child_without_env(test_name: &str, env_name: &str) -> std::process::Output {
+    std::process::Command::new(std::env::current_exe().unwrap())
+        .args([test_name, "--exact", "--nocapture"])
+        .env("__TEST_ENV_VAR_CHILD", "1")
+        .env_remove(env_name)
+        .output()
+        .expect("Failed to spawn child process")
+}
+
 #[cfg(test)]
 mod tests;

@@ -86,8 +86,9 @@ GENERIC_CACHE_STORE_URL=redis://localhost:6379
 OAUTH2_GOOGLE_CLIENT_ID=your_google_client_id
 OAUTH2_GOOGLE_CLIENT_SECRET=your_google_client_secret
 
-# Optional: Server secret for token signing (32+ characters recommended)
-AUTH_SERVER_SECRET=your_32_character_secret_key_here
+# Optional: Server secret for page session token signing
+# Default: random key at startup (single-process only; set explicitly for multi-process)
+#AUTH_SERVER_SECRET=your_32_character_secret_key_here
 
 # Optional: Session configuration
 SESSION_COOKIE_NAME=__Host-SessionId
