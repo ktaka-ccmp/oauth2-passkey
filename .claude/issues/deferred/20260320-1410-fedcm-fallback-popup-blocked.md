@@ -16,7 +16,7 @@
 
 ## Closed:
 
-## Status: open
+## Status: deferred
 
 ## Priority: medium
 
