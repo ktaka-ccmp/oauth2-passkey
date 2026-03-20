@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Docker Compose setup for MySQL 8.0 and MariaDB 11 in `db/mysql/`
   - MariaDB compatibility (JSON stored as LONGTEXT is handled transparently)
   - Updated `clear_db_cache.sh` and `monitor_db.sh` utilities for MySQL
+- Sequential integer primary keys (`sequence_number`) for `oauth2_accounts` and `passkey_credentials` tables
+  - Aligns with existing `users` table pattern for B-tree locality and join performance
+  - Original TEXT identifiers retained as UNIQUE constraints
+
+### Changed
+
+- Environment variable validation: invalid values now panic at startup instead of silently falling back to defaults
+  - Affects all optional env vars across session, oauth2, passkey, and axum config modules
+  - All config variables are force-evaluated at startup for early error detection
+- `AUTH_SERVER_SECRET`: generates random 32-byte key when not set (previously used hardcoded default)
+- `sequence_number` field hidden from all JSON API responses via `#[serde(skip_serializing)]`
+  - Applies to `User`, `OAuth2Account`, and `PasskeyCredential` types
+- `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` now accepts case-insensitive boolean values
 
 ## [0.4.0] - 2026-03-15
 
