@@ -19,7 +19,7 @@ pub static SESSION_COOKIE_MAX_AGE: LazyLock<u64> =
     LazyLock::new(|| match std::env::var("SESSION_COOKIE_MAX_AGE") {
         Ok(val) => val
             .parse()
-            .unwrap_or_else(|_| panic!("SESSION_COOKIE_MAX_AGE='{val}' is not a valid u64")),
+            .unwrap_or_else(|e| panic!("SESSION_COOKIE_MAX_AGE='{val}' is not a valid u64: {e}")),
         Err(_) => 600,
     });
 

@@ -165,9 +165,9 @@ pub(crate) static OAUTH2_CSRF_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
 
 pub(super) static OAUTH2_CSRF_COOKIE_MAX_AGE: LazyLock<u64> =
     LazyLock::new(|| match std::env::var("OAUTH2_CSRF_COOKIE_MAX_AGE") {
-        Ok(val) => val
-            .parse()
-            .unwrap_or_else(|_| panic!("OAUTH2_CSRF_COOKIE_MAX_AGE='{val}' is not a valid u64")),
+        Ok(val) => val.parse().unwrap_or_else(|e| {
+            panic!("OAUTH2_CSRF_COOKIE_MAX_AGE='{val}' is not a valid u64: {e}")
+        }),
         Err(_) => 60,
     });
 

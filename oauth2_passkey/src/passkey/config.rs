@@ -20,15 +20,15 @@ pub(super) static PASSKEY_TIMEOUT: LazyLock<u32> =
     LazyLock::new(|| match env::var("PASSKEY_TIMEOUT") {
         Ok(val) => val
             .parse()
-            .unwrap_or_else(|_| panic!("PASSKEY_TIMEOUT='{val}' is not a valid u32")),
+            .unwrap_or_else(|e| panic!("PASSKEY_TIMEOUT='{val}' is not a valid u32: {e}")),
         Err(_) => 60,
     });
 
 pub(super) static PASSKEY_CHALLENGE_TIMEOUT: LazyLock<u32> =
     LazyLock::new(|| match env::var("PASSKEY_CHALLENGE_TIMEOUT") {
-        Ok(val) => val
-            .parse()
-            .unwrap_or_else(|_| panic!("PASSKEY_CHALLENGE_TIMEOUT='{val}' is not a valid u32")),
+        Ok(val) => val.parse().unwrap_or_else(|e| {
+            panic!("PASSKEY_CHALLENGE_TIMEOUT='{val}' is not a valid u32: {e}")
+        }),
         Err(_) => 60,
     });
 
@@ -102,8 +102,10 @@ pub(super) static PASSKEY_USER_VERIFICATION: LazyLock<String> =
 pub(super) static PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL: LazyLock<bool> = LazyLock::new(
     || match env::var("PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL") {
         Err(_) => false,
-        Ok(val) => val.parse().unwrap_or_else(|_| {
-            panic!("PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL='{val}' is not a valid bool")
+        Ok(val) => val.parse().unwrap_or_else(|e| {
+            panic!(
+                "PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL='{val}' is not a valid bool: {e}"
+            )
         }),
     },
 );
