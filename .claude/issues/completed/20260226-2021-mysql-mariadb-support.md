@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-26
 
-## Closed:
+## Closed: 2026-03-21
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -81,18 +81,18 @@ Follow the existing pattern: create `mysql.rs` for each module, extend `DataStor
 
 ## Implementation Tasks
 
-- [ ] Add `"mysql"` feature to sqlx in workspace Cargo.toml
-- [ ] Add `MySqlDataStore` and `as_mysql()` to DataStore trait
-- [ ] Update config to recognize `"mysql"` store type
-- [ ] Create `userdb/storage/mysql.rs` (CREATE TABLE + CRUD)
-- [ ] Create `oauth2/storage/mysql.rs` (CREATE TABLE + CRUD)
-- [ ] Create `passkey/storage/mysql.rs` (CREATE TABLE + CRUD + FromRow)
-- [ ] Create `audit/storage/mysql.rs` (CREATE TABLE + CRUD)
-- [ ] Add `validate_mysql_table_schema()` to schema_validation.rs
-- [ ] Update all 4 store_type.rs with three-way dispatch
-- [ ] Test with MySQL via Docker (`docker compose`)
-- [ ] Test with MariaDB via Docker
-- [ ] Update documentation (configuration.md, dot.env.example, READMEs)
+- [x] Add `"mysql"` feature to sqlx in workspace Cargo.toml
+- [x] Add `MySqlDataStore` and `as_mysql()` to DataStore trait
+- [x] Update config to recognize `"mysql"` store type
+- [x] Create `userdb/storage/mysql.rs` (CREATE TABLE + CRUD)
+- [x] Create `oauth2/storage/mysql.rs` (CREATE TABLE + CRUD)
+- [x] Create `passkey/storage/mysql.rs` (CREATE TABLE + CRUD + FromRow)
+- [x] Create `audit/storage/mysql.rs` (CREATE TABLE + CRUD)
+- [x] Add `validate_mysql_table_schema()` to schema_validation.rs
+- [x] Update all 4 store_type.rs with three-way dispatch
+- [x] Test with MySQL via Docker (`docker compose`)
+- [x] Test with MariaDB via Docker
+- [x] Update documentation (configuration.md, dot.env.example, READMEs)
 
 ## Decision Log
 
@@ -116,3 +116,11 @@ Follow the existing pattern: create `mysql.rs` for each module, extend `DataStor
 - Revisit: If sqlx fixes this upstream or if `charset` in the connection string proves more robust, consider removing the CAST workaround.
 
 ## Resolution
+
+Implemented MySQL/MariaDB support in commit `bef561d`. All 4 storage modules (userdb, oauth2, passkey, audit) have mysql.rs implementations. Tested with MySQL 8.0 (port 3306) and MariaDB 11 (port 3307) via Docker Compose. Key issues discovered and resolved during implementation:
+
+1. **INFORMATION_SCHEMA BLOB issue** - MySQL returns metadata columns with binary collation; fixed with `CAST(... AS CHAR)`
+2. **MariaDB JSON as LONGTEXT** - MariaDB stores JSON type as LONGTEXT internally; added `mysql_types_compatible()` for schema validation
+3. **Key length limit** - MySQL 3072-byte index key limit with utf8mb4; reduced `credential_id` from VARCHAR(1024) to VARCHAR(768)
+
+Also updated `clear_db_cache.sh` and `monitor_db.sh` utilities with MySQL support and Redis monitoring.
