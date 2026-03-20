@@ -49,6 +49,7 @@ async fn test_get_account_and_label_from_oauth2_account() -> Result<(), Box<dyn 
 
     // Create a test OAuth2Account
     let oauth2_account = OAuth2Account {
+        sequence_number: None,
         id: "test_id".to_string(),
         user_id: "test_user".to_string(),
         provider: "google".to_string(),
@@ -100,6 +101,7 @@ async fn create_test_oauth2_account_in_db(
     let account_id = format!("test-id-{timestamp}");
 
     let oauth2_account = OAuth2Account {
+        sequence_number: None,
         id: account_id.clone(),
         user_id: user_id.to_string(),
         provider: provider.to_string(),

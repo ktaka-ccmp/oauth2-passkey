@@ -10,6 +10,7 @@ async fn create_test_account(
     provider_user_id: &str,
 ) -> OAuth2Account {
     OAuth2Account {
+        sequence_number: None,
         id: String::new(), // Will be generated
         user_id: user_id.to_string(),
         provider: provider.to_string(),

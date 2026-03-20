@@ -171,6 +171,7 @@ async fn create_first_user_oauth2_account(user_id: &str) {
     let provider = "google";
     let provider_user_id = format!("{provider}_first-user-test-google-id");
     let test_oauth2_account = OAuth2Account {
+        sequence_number: None,
         id: "first-user-oauth2-account".to_string(),
         user_id: user_id.to_string(),
         provider: provider.to_string(),
