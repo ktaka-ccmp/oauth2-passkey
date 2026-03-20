@@ -103,13 +103,72 @@ The hang reproduces on tabs that have been open for a long time **regardless of 
 
 The common factor is **time since the tab was opened**, not prior FedCM interaction history.
 
+**2026-03-20 update: Chromium issue tracker investigation**:
+
+Searched the Chromium issue tracker for related reports. No exact match for "Promise hangs indefinitely" was found, but two issues are likely related to the root cause:
+
+- [Chromium #40070360](https://issues.chromium.org/issues/40070360): "FedCM IdP Signin Status mismatch UI not displaying as expected" -- When login status is mismatched (e.g., Chrome thinks user is logged-out but they're actually logged-in, or vice versa), the mismatch UI fails to display. This could directly cause our symptom: Chrome activates the FedCM overlay (page dims), but no dialog appears, so the Promise has no way to settle.
+- [Chromium #370796104](https://issues.chromium.org/issues/370796104): "[FedCM] Implement error UI on active mode" -- Error UI for active mode is still being implemented. If active mode encounters an error state (login status mismatch, cooldown, etc.) but has no error UI to display, the flow may silently stall instead of rejecting the Promise.
+
+These two issues together suggest the following chain:
+
+1. Tab open for a long time -> Chrome's IdP login status becomes stale/mismatched
+2. `credentials.get({mode: 'active'})` is called
+3. Chrome detects login status mismatch and should show mismatch UI, but it doesn't display correctly (#40070360)
+4. Active mode has no error UI to fall back to (#370796104)
+5. Result: FedCM overlay active (page dimmed), no dialog shown, Promise never settles
+
+Other potentially related Chromium issues:
+- [#40268652](https://issues.chromium.org/issues/40268652): Reset 10 min quiet period after explicit sign in (cooldown behavior)
+- [#40929258](https://issues.chromium.org/issues/40929258): Account endpoints fail with ERR_FAILED (endpoint communication failure)
+
+Additional W3C/GitHub issues:
+- [w3c-fedid/FedCM #604](https://github.com/w3c-fedid/FedCM/issues/604): Infinite `login_url` loop when hints are not met (active mode mismatch handling)
+- [w3c-fedid/FedCM #419](https://github.com/w3c-fedid/FedCM/issues/419): Decide how to handle signin dialog closure for the IdP signin status API
+- [w3c-fedid/FedCM #488](https://github.com/w3c-fedid/FedCM/issues/488): Users confused after showing intent to sign in but sign-in failed
+- [w3c-fedid/active-mode](https://github.com/w3c-fedid/active-mode): Active mode proposal (handle logged-out users gracefully)
+
+**2026-03-20 update: Active mode mismatch behavior documented by Chrome**:
+
+Chrome's official documentation describes the expected behavior when login status is mismatched in active mode ([source](https://privacysandbox.google.com/blog/fedcm-chrome-132-updates)):
+
+> "If the login status saved in the browser for an IdP was logged-in, but no accounts for this IdP were returned by the fetch request (for example, if the user session expired, but the login status hasn't yet been updated by the browser), the mismatch UI is shown."
+
+> "For the active mode, the login dialog window is directly opened."
+
+This means the expected behavior is: session expired -> login status mismatch -> active mode opens a login popup window. In our case, this popup window either fails to open or opens but is not visible, causing the FedCM overlay to remain active with no way for the user to interact.
+
+The active mode proposal ([w3c-fedid/active-mode](https://github.com/w3c-fedid/active-mode)) explicitly states that active mode must handle logged-out users gracefully, meaning a user must be able to successfully sign in even when logged out. The hang behavior we observe violates this requirement.
+
+**2026-03-20 update: Tab count hypothesis**:
+
+After adding a 15-second AbortController timeout and testing, a critical observation was made:
+
+- The hang was occurring while many browser tabs were open
+- After closing/organizing the excess tabs, the hang state was resolved
+- FedCM started working normally again in previously-hanging tabs
+
+This suggests the root cause may be **Chrome resource constraints with many open tabs**, not login status mismatch or cooldown. Possible mechanisms:
+
+- Chrome limits concurrent FedCM operations or UI rendering across tabs
+- The FedCM dialog or login popup is being rendered but lost/hidden among many tabs/windows ([Chromium #338233148](https://issues.chromium.org/issues/338233148): FedCM prompt bubble renders outside of opening window)
+- Chrome's per-tab resource management (memory, network connections) degrades with many tabs, causing FedCM endpoints to fail silently
+
+This would explain all previous observations:
+- "New tab works" -> may have been coincidence of focusing on fewer tabs, not the tab being new
+- "Tabs open for a long time" -> long sessions correlate with accumulating more tabs
+- "Reload doesn't fix" -> tab count doesn't change on reload
+- "Closing tabs fixes it" -> directly addresses the root cause
+
+Further testing needed to determine exact threshold and whether the issue is about total tab count, Chrome resource pressure, or the FedCM dialog being hidden among many windows.
+
 ### Impact
 
 Without a fix, users who encounter this state are stuck with no recovery path:
 - The page dims and becomes unresponsive
 - No fallback to popup flow triggers (because the catch handler never fires)
 - Reloading does not help
-- Only workaround is to open a new tab
+- Workarounds: open a new tab, or close excess tabs
 
 ### Difference from Previous Issue (20260314-0222)
 

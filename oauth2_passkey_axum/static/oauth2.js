@@ -20,7 +20,11 @@ const oauth2 = (function() {
 
         // 2. Call navigator.credentials.get() with FedCM (active/button mode)
         // Options aligned with Google's GIS library implementation
+        // Timeout: abort if FedCM hangs (Chrome bug: login status mismatch
+        // in active mode can cause Promise to never settle)
+        const FEDCM_TIMEOUT_MS = 15000;
         const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), FEDCM_TIMEOUT_MS);
         const identityOptions = {
             providers: [{
                 configURL: 'https://accounts.google.com/gsi/fedcm.json',
@@ -46,7 +50,7 @@ const oauth2 = (function() {
                 signal: controller.signal,
             });
         } finally {
-            controller.signal.onabort = null;
+            clearTimeout(timeoutId);
         }
 
         // 3. Extract JWT from credential token
