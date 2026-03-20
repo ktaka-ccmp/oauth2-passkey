@@ -16,7 +16,8 @@ use crate::storage::CacheData;
 /// the provider-specific information and internal tracking data.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct OAuth2Account {
-    /// Database-assigned sequential primary key
+    /// Database-assigned sequential primary key (internal, not exposed in API responses)
+    #[serde(skip_serializing)]
     pub sequence_number: Option<i64>,
     /// Unique identifier for this OAuth2 account in our system
     pub id: String,
