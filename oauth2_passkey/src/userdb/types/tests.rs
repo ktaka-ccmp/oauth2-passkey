@@ -132,7 +132,8 @@ proptest! {
         prop_assert_eq!(user.account, deserialized.account);
         prop_assert_eq!(user.label, deserialized.label);
         prop_assert_eq!(user.is_admin, deserialized.is_admin);
-        prop_assert_eq!(user.sequence_number, deserialized.sequence_number);
+        // sequence_number is #[serde(skip_serializing)] so it's always None after roundtrip
+        prop_assert_eq!(deserialized.sequence_number, None);
     }
 
     /// Test that User::new creates valid users with expected properties
