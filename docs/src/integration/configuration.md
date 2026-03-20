@@ -467,15 +467,15 @@ PASSKEY_USER_LABEL_FIELD='display_name'
 
 #### AUTH_SERVER_SECRET
 
-Secret key used for token signing.
+Secret key used for HMAC signing of page session tokens.
 
-- **Default**: `default_secret_key_change_in_production`
+- **Default**: Random 32-byte key generated at startup
 
 ```bash
 AUTH_SERVER_SECRET='your-secret-key-here'
 ```
 
-**Warning**: Always change this value in production environments. Use a cryptographically secure random string.
+**Note**: When not set, a random key is generated at startup. This works for single-process deployments. For multi-process deployments (e.g., behind a load balancer), all processes must share the same secret -- set this variable explicitly.
 
 ### Database Table Configuration
 

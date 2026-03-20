@@ -84,13 +84,24 @@ pub static SESSION_CONFLICT_POLICY: LazyLock<SessionConflictPolicy> =
 /// and stale entries are cleaned up lazily when the mapping is read.
 pub(super) const USER_SESSIONS_MAPPING_TTL: u64 = 86400 * 30;
 
-// We're using a simple string representation for tokens instead of a struct
-// to minimize dependencies and complexity
-
+/// Secret key for HMAC signing of page session tokens.
+///
+/// When set via `AUTH_SERVER_SECRET` env var, uses that value.
+/// When not set, generates a random 32-byte key at startup.
+///
+/// **Important**: In multi-process deployments (e.g., behind a load balancer),
+/// all processes must share the same secret. Set `AUTH_SERVER_SECRET` explicitly.
+/// A random default only works for single-process deployments.
 pub(super) static AUTH_SERVER_SECRET: LazyLock<Vec<u8>> =
     LazyLock::new(|| match env::var("AUTH_SERVER_SECRET") {
         Ok(secret) => secret.into_bytes(),
-        Err(_) => "default_secret_key_change_in_production"
-            .to_string()
-            .into_bytes(),
+        Err(_) => {
+            use ring::rand::SecureRandom;
+            let rng = ring::rand::SystemRandom::new();
+            let mut secret = vec![0u8; 32];
+            rng.fill(&mut secret)
+                .expect("Failed to generate random AUTH_SERVER_SECRET");
+            tracing::info!("AUTH_SERVER_SECRET not set, using random key (single-process only)");
+            secret
+        }
     });
