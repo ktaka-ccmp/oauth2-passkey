@@ -31,6 +31,8 @@ pub(super) struct StoredOptions {
 /// it was created, updated, and last used.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PasskeyCredential {
+    /// Database-assigned sequential primary key
+    pub sequence_number: Option<i64>,
     /// Raw credential ID bytes
     pub credential_id: String,
     /// User ID associated with this credential (database ID)

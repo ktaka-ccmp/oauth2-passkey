@@ -242,6 +242,7 @@ async fn create_first_user_passkey_credential(user_id: &str) {
     // Create a test passkey credential with consistent key for testing
     // Note: We construct the user entity directly here since it's internal test code
     let test_passkey_credential = PasskeyCredential {
+        sequence_number: None,
         credential_id: "first-user-test-passkey-credential".to_string(),
         user_id: user_id.to_string(),
         public_key,
