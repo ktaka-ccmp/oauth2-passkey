@@ -44,3 +44,9 @@ pub(crate) use main::user_sessions::cleanup_stale_sessions;
 pub(crate) use main::{
     delete_session_from_store_by_session_id, get_session_id_from_headers, new_session_header,
 };
+
+pub(crate) fn init() {
+    let _ = *config::SESSION_COOKIE_NAME;
+    let _ = *config::SESSION_COOKIE_MAX_AGE;
+    let _ = *config::SESSION_CONFLICT_POLICY;
+}

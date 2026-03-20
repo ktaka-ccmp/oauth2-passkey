@@ -45,8 +45,17 @@ pub(crate) use types::UserHandle;
 pub(crate) use types::{CredentialSearchField, UserName};
 
 pub(crate) async fn init() -> Result<(), PasskeyError> {
-    // Validate required environment variables early
+    // Validate required and optional environment variables early
     let _ = *config::PASSKEY_RP_ID;
+    let _ = *config::PASSKEY_RP_NAME;
+    let _ = *config::PASSKEY_TIMEOUT;
+    let _ = *config::PASSKEY_CHALLENGE_TIMEOUT;
+    let _ = *config::PASSKEY_ATTESTATION;
+    let _ = *config::PASSKEY_AUTHENTICATOR_ATTACHMENT;
+    let _ = *config::PASSKEY_RESIDENT_KEY;
+    let _ = *config::PASSKEY_REQUIRE_RESIDENT_KEY;
+    let _ = *config::PASSKEY_USER_VERIFICATION;
+    let _ = *config::PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL;
     self::main::store_aaguids().await?;
 
     crate::storage::init()
