@@ -2,6 +2,7 @@
 
 ## Table of Contents
 
+- [2026-03-21: MySQL/MariaDB database support](#2026-03-21-mysqlmariadb-database-support)
 - [2026-03-21: Sequential primary keys for oauth2_accounts and passkey_credentials](#2026-03-21-sequential-primary-keys-for-oauth2_accounts-and-passkey_credentials)
 - [2026-03-20: Env var silent fallback audit -- panic on invalid values](#2026-03-20-env-var-silent-fallback-audit----panic-on-invalid-values)
 - [2026-03-20: FedCM GIS library analysis and hang investigation](#2026-03-20-fedcm-gis-library-analysis-and-hang-investigation)
@@ -58,6 +59,53 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-21: MySQL/MariaDB database support
+
+**Issue**: `20260226-2021` (completed) | **Priority**: medium | **Difficulty**: medium
+
+New feature
+
+### Motivation
+
+The library previously supported only SQLite and PostgreSQL via sqlx. MySQL and MariaDB have significant market share, and users with existing MySQL/MariaDB infrastructure should not need a separate PostgreSQL instance. Adding MySQL/MariaDB also implicitly covers MySQL-compatible databases like TiDB.
+
+### User-facing impact
+
+- **Before**: `GENERIC_DATA_STORE_TYPE` accepted only `sqlite` or `postgres`
+- **After**: `GENERIC_DATA_STORE_TYPE` also accepts `mysql` (works with both MySQL and MariaDB)
+
+```env
+# MySQL
+GENERIC_DATA_STORE_TYPE=mysql
+GENERIC_DATA_STORE_URL='mysql://user:password@localhost:3306/database'
+
+# MariaDB (same driver, different port)
+GENERIC_DATA_STORE_TYPE=mysql
+GENERIC_DATA_STORE_URL='mysql://user:password@localhost:3307/database'
+```
+
+Docker Compose setup provided in `db/mysql/` with MySQL 8.0 (port 3306) and MariaDB 11 (port 3307). The `clear_db_cache.sh` and `monitor_db.sh` utility scripts now support MySQL connections and include Redis cache monitoring.
+
+### Design decisions
+
+- **Follow existing pattern**: Created `mysql.rs` for each of the 4 storage modules (userdb, oauth2, passkey, audit) with identical function signatures to sqlite.rs/postgres.rs. Extended `DataStore` trait with `as_mysql()` and updated all `store_type.rs` dispatch logic.
+- **MySQL parameter binding uses `?`**: Same as SQLite, unlike PostgreSQL's `$1, $2`. This made the MySQL implementation closer to SQLite than PostgreSQL.
+- **UPSERT syntax**: MySQL uses `ON DUPLICATE KEY UPDATE ... VALUES(col)` instead of PostgreSQL's `ON CONFLICT ... DO UPDATE SET ... EXCLUDED.col` or SQLite's `ON CONFLICT ... excluded.col`.
+- **No RETURNING clause**: Like SQLite, MySQL doesn't support `RETURNING *`. All mutations that need the result do a separate SELECT after the write.
+- **VARCHAR instead of TEXT**: MySQL has a 3072-byte index key limit (with utf8mb4). `credential_id` was set to `VARCHAR(768)` (768 x 4 = 3072 bytes) instead of TEXT with UNIQUE. Other string columns use VARCHAR(255) or VARCHAR(512) based on expected content length.
+- **INFORMATION_SCHEMA BLOB workaround**: MySQL returns INFORMATION_SCHEMA columns with binary collation, causing sqlx to decode them as BLOB. Fixed with `CAST(... AS CHAR)` in schema validation queries. This is a query-level fix independent of user connection configuration. Alternative: adding `?charset=utf8mb4` to connection URL, but that depends on user configuration. Tracked for potential revisit if sqlx fixes upstream ([MySQL Bug #19443](https://bugs.mysql.com/bug.php?id=19443), [sqlx #3691](https://github.com/launchbadge/sqlx/issues/3691)).
+- **MariaDB JSON -> LONGTEXT compatibility**: MariaDB stores the JSON type internally as LONGTEXT. Added `mysql_types_compatible()` function in schema validation to treat `json` and `longtext` as equivalent, preventing false schema validation failures on MariaDB.
+- **DATETIME(6) for timestamps**: MySQL's DATETIME(6) provides microsecond precision, matching chrono's DateTime<Utc> resolution.
+- **Demo placeholder AUTO_INCREMENT reset**: After inserting a demo placeholder with explicit `sequence_number=1`, MySQL's AUTO_INCREMENT needs to be reset to avoid conflicts. PostgreSQL uses `setval()` for the same purpose; SQLite handles this automatically.
+- **Utility scripts**: `clear_db_cache.sh` and `monitor_db.sh` parse `mysql://` URLs into `mysql -h ... -P ... -u ... -p...` flags since the MySQL CLI doesn't accept URL format. Added `--skip-ssl` for local Docker development (MySQL 8.0 defaults to TLS). Also added `o2p_login_history` to the DROP TABLE list (was previously missing for all database types).
+- **No MySQL-specific unit tests**: Existing store_type tests run via in-memory SQLite. MySQL-specific code paths require a running MySQL instance, making them integration tests. Added `MySqlDataStore` to the `Send + Sync` trait bound test.
+
+### Key files
+
+`Cargo.toml`, `oauth2_passkey/src/storage/data_store/types.rs`, `oauth2_passkey/src/storage/data_store/config.rs`, `oauth2_passkey/src/storage/schema_validation.rs`, `oauth2_passkey/src/userdb/storage/mysql.rs`, `oauth2_passkey/src/oauth2/storage/mysql.rs`, `oauth2_passkey/src/passkey/storage/mysql.rs`, `oauth2_passkey/src/audit/storage/mysql.rs`, `db/mysql/docker-compose.yaml`, `utils/clear_db_cache.sh`, `utils/monitor_db.sh`
+
+---
 
 ## 2026-03-21: Sequential primary keys for oauth2_accounts and passkey_credentials
 
