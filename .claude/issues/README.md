@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (12)
+### Open (13)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -21,6 +21,7 @@ This directory contains issue/task tracking files for the project.
 | `20260227-1703` | low | small | [Audit and Improve Silent Fallback Behavior for Optional Environment Variables](open/20260227-1703-env-var-silent-fallback-audit.md) |
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260316-1630` | high | small | [FedCM Promise Hangs Indefinitely in Stale Tab](open/20260316-1630-fedcm-promise-hang-stale-tab.md) |
+| `20260320-1410` | medium | medium | [FedCM Cancel Fallback Popup Gets Blocked by Browser](open/20260320-1410-fedcm-fallback-popup-blocked.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
 ### Completed (49)
