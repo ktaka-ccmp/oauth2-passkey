@@ -28,42 +28,71 @@ Add MySQL and MariaDB support to expand deployment options. Currently the librar
 
 ### Current Storage Architecture
 
-The storage layer uses a trait-based abstraction (`DataStore`) with implementations for SQLite and PostgreSQL. The same pattern can be extended for MySQL/MariaDB.
+The storage layer uses a trait-based `DataStore` with `as_sqlite()` / `as_postgres()` accessor methods. Store type is determined by `GENERIC_DATA_STORE_TYPE` env var at startup. Each module (userdb, oauth2, passkey, audit) has parallel `sqlite.rs` and `postgres.rs` files with identical function signatures. A `store_type.rs` dispatches to the correct implementation via match.
 
-### Considerations
+### SQL Dialect Differences (PostgreSQL -> MySQL)
 
-- sqlx supports MySQL natively, so the infrastructure is already in place
-- SQL dialect differences (e.g., `TEXT` vs `VARCHAR`, auto-increment syntax, boolean handling)
-- Migration strategy for MySQL-specific schema
-- Testing infrastructure (need MySQL test container or in-memory alternative)
+| Feature | PostgreSQL | MySQL/MariaDB |
+|---------|-----------|---------------|
+| Auto-increment | `BIGSERIAL PRIMARY KEY` | `BIGINT PRIMARY KEY AUTO_INCREMENT` |
+| Parameter binding | `$1, $2, $3` | `?, ?, ?` (same as SQLite) |
+| Timestamps | `TIMESTAMPTZ` | `TIMESTAMP` (or `DATETIME`) |
+| Boolean default | `DEFAULT FALSE` | `DEFAULT FALSE` |
+| JSON | `JSONB` | `JSON` |
+| UPSERT | `ON CONFLICT ... DO UPDATE` | `ON DUPLICATE KEY UPDATE` |
+| RETURNING | `RETURNING *` | Not available (like SQLite, needs separate SELECT) |
+| Schema introspection | `information_schema.columns` | `information_schema.columns` (same) |
+| Column existence check | `ADD COLUMN IF NOT EXISTS` | `ADD COLUMN` (need to handle errors) |
 
 ## Related Issues
 
-None
+- `2026-01-31-01` Sequential Primary Keys (completed) -- all tables now use sequential integer PKs
 
 ## Approach
 
-1. Add `mysql` feature flag to sqlx dependency
-2. Implement `DataStore` trait for MySQL/MariaDB
-3. Handle SQL dialect differences in queries
-4. Add MySQL-specific migrations
-5. Add to CI testing matrix
+Follow the existing pattern: create `mysql.rs` for each module, extend `DataStore` trait, update dispatch logic.
+
+1. Add `"mysql"` to sqlx features in workspace Cargo.toml
+2. Add `MySqlDataStore` struct + `as_mysql()` to DataStore trait
+3. Update `data_store/config.rs` to recognize `"mysql"` store type
+4. Create 4 new `mysql.rs` files (userdb, oauth2, passkey, audit)
+5. Add `validate_mysql_table_schema()` to schema_validation.rs
+6. Update all 4 `store_type.rs` files with three-way dispatch
+7. Update documentation and env examples
+8. Test with MySQL and MariaDB via Docker
 
 ## Related Files
 
-- `oauth2_passkey/src/storage/` - Storage abstraction layer
-- `oauth2_passkey/src/storage/data_store/` - DataStore implementations
-- `oauth2_passkey/Cargo.toml` - Feature flags
+**New files to create** (4):
+- `oauth2_passkey/src/userdb/storage/mysql.rs`
+- `oauth2_passkey/src/oauth2/storage/mysql.rs`
+- `oauth2_passkey/src/passkey/storage/mysql.rs`
+- `oauth2_passkey/src/audit/storage/mysql.rs`
+
+**Files to modify**:
+- `Cargo.toml` (workspace) -- add `"mysql"` to sqlx features
+- `oauth2_passkey/src/storage/data_store/types.rs` -- add MySqlDataStore, as_mysql()
+- `oauth2_passkey/src/storage/data_store/config.rs` -- add "mysql" match case
+- `oauth2_passkey/src/storage/schema_validation.rs` -- add MySQL validation
+- `oauth2_passkey/src/userdb/storage/store_type.rs` -- three-way dispatch
+- `oauth2_passkey/src/oauth2/storage/store_type.rs` -- three-way dispatch
+- `oauth2_passkey/src/passkey/storage/store_type.rs` -- three-way dispatch
+- `oauth2_passkey/src/audit/storage/store_type.rs` -- three-way dispatch
 
 ## Implementation Tasks
 
-- [ ] Add `mysql` feature flag to sqlx dependencies
-- [ ] Implement MySQL DataStore
-- [ ] Create MySQL-specific schema migrations
-- [ ] Handle SQL dialect differences
-- [ ] Add MySQL to CI testing
-- [ ] Update documentation with MySQL configuration
-- [ ] Test with MariaDB compatibility
+- [ ] Add `"mysql"` feature to sqlx in workspace Cargo.toml
+- [ ] Add `MySqlDataStore` and `as_mysql()` to DataStore trait
+- [ ] Update config to recognize `"mysql"` store type
+- [ ] Create `userdb/storage/mysql.rs` (CREATE TABLE + CRUD)
+- [ ] Create `oauth2/storage/mysql.rs` (CREATE TABLE + CRUD)
+- [ ] Create `passkey/storage/mysql.rs` (CREATE TABLE + CRUD + FromRow)
+- [ ] Create `audit/storage/mysql.rs` (CREATE TABLE + CRUD)
+- [ ] Add `validate_mysql_table_schema()` to schema_validation.rs
+- [ ] Update all 4 store_type.rs with three-way dispatch
+- [ ] Test with MySQL via Docker (`docker compose`)
+- [ ] Test with MariaDB via Docker
+- [ ] Update documentation (configuration.md, dot.env.example, READMEs)
 
 ## Decision Log
 
@@ -72,5 +101,11 @@ None
 - Context: Migrating incomplete tasks from ToDo.md to issue tracking system
 - Decision: Create as medium-priority, medium-difficulty issue
 - Reason: Expands deployment options; sqlx already supports MySQL so infrastructure cost is moderate
+
+### 2026-03-21: Implementation plan created
+
+- Context: Full investigation of storage layer architecture. The pattern is consistent across all 4 modules (userdb, oauth2, passkey, audit) with parallel sqlite.rs/postgres.rs files. MySQL support follows the same pattern.
+- Decision: Create mysql.rs for each module, extend DataStore trait with as_mysql(), update dispatch logic. MySQL parameter binding uses `?` (same as SQLite), UPSERT uses `ON DUPLICATE KEY UPDATE` (different from both SQLite and PostgreSQL).
+- Reason: MySQL/MariaDB have large market share. Users with existing MySQL infrastructure should not need a separate PostgreSQL instance for this library. CockroachDB (PostgreSQL-compatible) and TiDB (MySQL-compatible) are covered implicitly.
 
 ## Resolution
