@@ -131,6 +131,7 @@ pub mod core_mocks {
         let now = Utc::now();
         let json = format!(
             r#"{{
+            "sequence_number": null,
             "credential_id": "{}",
             "user_id": "{}",
             "public_key": "{}",

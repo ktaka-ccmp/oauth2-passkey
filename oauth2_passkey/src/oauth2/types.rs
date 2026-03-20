@@ -16,6 +16,9 @@ use crate::storage::CacheData;
 /// the provider-specific information and internal tracking data.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct OAuth2Account {
+    /// Database-assigned sequential primary key (internal, not exposed in API responses)
+    #[serde(skip_serializing)]
+    pub sequence_number: Option<i64>,
     /// Unique identifier for this OAuth2 account in our system
     pub id: String,
     /// Internal user ID this OAuth2 account is linked to
@@ -41,6 +44,7 @@ pub struct OAuth2Account {
 impl Default for OAuth2Account {
     fn default() -> Self {
         Self {
+            sequence_number: None,
             id: String::new(),
             user_id: String::new(),
             provider: String::new(),
@@ -72,6 +76,7 @@ pub(crate) struct GoogleUserInfo {
 impl From<GoogleUserInfo> for OAuth2Account {
     fn from(google_user: GoogleUserInfo) -> Self {
         Self {
+            sequence_number: None,  // Will be set by database
             id: String::new(),      // Will be set during storage
             user_id: String::new(), // Will be set during upsert process
             name: google_user.name,
@@ -94,6 +99,7 @@ impl From<GoogleUserInfo> for OAuth2Account {
 impl From<GoogleIdInfo> for OAuth2Account {
     fn from(idinfo: GoogleIdInfo) -> Self {
         Self {
+            sequence_number: None,  // Will be set by database
             id: String::new(),      // Will be set during storage
             user_id: String::new(), // Will be set during upsert process
             name: idinfo.name,

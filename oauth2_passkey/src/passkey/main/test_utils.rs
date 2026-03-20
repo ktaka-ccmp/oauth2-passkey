@@ -80,6 +80,7 @@ pub async fn insert_test_credential(data: TestCredentialData) -> Result<(), Pass
     let now = Utc::now();
 
     let credential = PasskeyCredential {
+        sequence_number: None,
         credential_id: data.credential_id.clone(),
         user_id: data.user_id,
         public_key: data.public_key,

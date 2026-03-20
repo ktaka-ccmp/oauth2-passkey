@@ -19,7 +19,8 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), OAut
     sqlx::query(&format!(
         r#"
         CREATE TABLE IF NOT EXISTS {oauth2_table} (
-            id TEXT PRIMARY KEY NOT NULL,
+            sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
+            id TEXT NOT NULL UNIQUE,
             user_id TEXT NOT NULL REFERENCES {users_table}(id),
             provider TEXT NOT NULL,
             provider_user_id TEXT NOT NULL,
@@ -58,6 +59,7 @@ pub(super) async fn validate_oauth2_tables_sqlite(pool: &Pool<Sqlite>) -> Result
 
     // Define expected schema (column name, data type)
     let expected_columns = [
+        ("sequence_number", "INTEGER"),
         ("id", "TEXT"),
         ("user_id", "TEXT"),
         ("provider", "TEXT"),

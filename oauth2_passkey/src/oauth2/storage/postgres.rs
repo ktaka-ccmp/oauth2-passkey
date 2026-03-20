@@ -19,7 +19,8 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     sqlx::query(&format!(
         r#"
         CREATE TABLE IF NOT EXISTS {oauth2_table} (
-            id TEXT PRIMARY KEY NOT NULL,
+            sequence_number BIGSERIAL PRIMARY KEY,
+            id TEXT NOT NULL UNIQUE,
             user_id TEXT NOT NULL REFERENCES {users_table}(id),
             provider TEXT NOT NULL,
             provider_user_id TEXT NOT NULL,
@@ -60,6 +61,7 @@ pub(super) async fn validate_oauth2_tables_postgres(
 
     // Define expected schema (column name, data type)
     let expected_columns = [
+        ("sequence_number", "bigint"),
         ("id", "text"),
         ("user_id", "text"),
         ("provider", "text"),

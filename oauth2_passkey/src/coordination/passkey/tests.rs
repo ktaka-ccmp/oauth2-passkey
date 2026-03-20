@@ -278,6 +278,7 @@ async fn insert_test_passkey_credential(
     // Placeholder public key: not a valid EC key, but sufficient for
     // list/update/delete tests that never verify signatures.
     let credential = PasskeyCredential {
+        sequence_number: None,
         credential_id: credential_id.to_string(),
         user_id: user_id.to_string(),
         public_key: "test_public_key".to_string(),

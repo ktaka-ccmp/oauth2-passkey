@@ -26,6 +26,7 @@ fn create_test_authenticator_response(
 
 fn create_test_passkey_credential(user_handle: String) -> PasskeyCredential {
     PasskeyCredential {
+        sequence_number: None,
         credential_id: "test_credential_id".to_string(),
         user_id: "test_user_id".to_string(),
         public_key: "test_public_key".to_string(),

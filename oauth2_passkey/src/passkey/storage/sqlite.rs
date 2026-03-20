@@ -16,7 +16,8 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
     sqlx::query(&format!(
         r#"
         CREATE TABLE IF NOT EXISTS {passkey_table} (
-            credential_id TEXT PRIMARY KEY NOT NULL,
+            sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
+            credential_id TEXT NOT NULL UNIQUE,
             user_id TEXT NOT NULL REFERENCES {users_table}(id),
             public_key TEXT NOT NULL,
             counter INTEGER NOT NULL DEFAULT 0,
@@ -88,6 +89,7 @@ pub(super) async fn validate_passkey_tables_sqlite(
 
     // Define expected schema (column name, data type)
     let expected_columns = vec![
+        ("sequence_number", "INTEGER"),
         ("credential_id", "TEXT"),
         ("user_id", "TEXT"),
         ("public_key", "TEXT"),

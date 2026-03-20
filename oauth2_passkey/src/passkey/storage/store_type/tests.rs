@@ -13,6 +13,7 @@ fn create_test_credential(
 ) -> PasskeyCredential {
     let now = Utc::now();
     PasskeyCredential {
+        sequence_number: None,
         credential_id: credential_id.to_string(),
         user_id: user_id.to_string(),
         public_key: format!("test_public_key_for_{credential_id}"),
