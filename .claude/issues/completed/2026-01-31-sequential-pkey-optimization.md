@@ -124,9 +124,17 @@ No JOIN queries exist -- all lookups are single-table. This makes the change saf
 - Decision: Implement now. Follow the existing users table pattern.
 - Reason: Consistency across all tables. No foreign keys reference these columns from other tables, so the change is safe.
 
+### 2026-03-21: Hide sequence_number from API responses
+
+- Context: PR review identified that `sequence_number` leaks to JSON API responses via `Serialize` derive. `OAuth2Account` and `PasskeyCredential` are returned directly as `Json<Vec<...>>` from endpoints.
+- Decision: Add `#[serde(skip_serializing)]` to `sequence_number` on all three types (`User`, `OAuth2Account`, `PasskeyCredential`). `User` previously used `skip_serializing_if = "Option::is_none"` which still exposed the value when `Some(n)`.
+- Reason: `sequence_number` is an internal DB detail. Investigation confirmed no JS or template code consumes it from JSON. Templates use `TemplateUser` (server-side rendering), admin JS only uses `user.id` and `user.account`.
+
 ## Resolution
 
 Added `sequence_number` as sequential integer primary key to both `oauth2_accounts`
 and `passkey_credentials` tables, matching the existing `users` table pattern.
-Original TEXT identifiers (`id`, `credential_id`) changed to UNIQUE constraints.
-SQLite uses INTEGER AUTOINCREMENT, PostgreSQL uses BIGSERIAL.
+Original TEXT identifiers (`id`, `credential_id`) changed to UNIQUE constraints
+(which automatically provide indexes). SQLite uses INTEGER AUTOINCREMENT,
+PostgreSQL uses BIGSERIAL. All three types use `#[serde(skip_serializing)]` to
+hide `sequence_number` from API responses.
