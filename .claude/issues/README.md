@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (11)
+### Open (10)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -18,14 +18,14 @@ This directory contains issue/task tracking files for the project.
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
-| `20260227-1703` | low | small | [Audit and Improve Silent Fallback Behavior for Optional Environment Variables](open/20260227-1703-env-var-silent-fallback-audit.md) |
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
-### Completed (49)
+### Completed (50)
 
 | ID | Title |
 |----|-------|
+| `20260227-1703` | [Audit and Improve Silent Fallback Behavior for Optional Environment Variables](completed/20260227-1703-env-var-silent-fallback-audit.md) |
 | `20260317-1500` | [Optimize Cloud Run Deployment Build Time](completed/20260317-1500-optimize-cloud-run-deploy-time.md) |
 | `20260315-0348` | [Eliminate aws-lc-sys Dependency](completed/20260315-0348-eliminate-aws-lc-sys.md) |
 | `20260314-0222` | [FedCM Auto Re-Authentication Rate Limit Error](completed/20260314-0222-fedcm-auto-reauthn-rate-limit.md) |

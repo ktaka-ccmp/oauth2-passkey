@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-27
 
-## Closed:
+## Closed: 2026-03-20
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -179,12 +179,12 @@ These have no parse step -- any string is a valid value.
 ## Implementation Tasks
 
 - [x] Audit all LazyLock env vars for silent fallback patterns
-- [ ] Change parse-error fallback to panic for all affected variables (Option B)
-- [ ] Change enum-match fallback to panic for all affected variables (Option B)
-- [ ] Add early evaluation of all affected vars in init() functions (Option C)
-- [ ] Address AUTH_SERVER_SECRET default value security concern
-- [ ] Verify: `cargo test` passes, `cargo clippy` clean
-- [ ] Test: invalid env var value causes panic at startup
+- [x] Change parse-error fallback to panic for all affected variables (Option B)
+- [x] Change enum-match fallback to panic for all affected variables (Option B)
+- [x] Add early evaluation of all affected vars in init() functions (Option C)
+- [x] Address AUTH_SERVER_SECRET default value security concern
+- [x] Verify: `cargo test` passes, `cargo clippy` clean
+- [x] Test: invalid env var value causes panic at startup
 
 ## Decision Log
 
@@ -203,3 +203,10 @@ These have no parse step -- any string is a valid value.
 - Reason: Operators who explicitly set a variable expect it to be used. Silent fallback violates that expectation. Fail-fast at startup is preferable to running with unintended configuration.
 
 ## Resolution
+
+Implemented Option B + C:
+- 17 LazyLock env vars changed from silent fallback to panic on set-but-invalid values
+- All optional config vars force-evaluated in init() functions at startup
+- AUTH_SERVER_SECRET changed from hardcoded default to random 32-byte key generation
+- Subprocess-based tests added for validation behavior
+- Docs and env example updated
