@@ -128,3 +128,6 @@ pub(crate) static O2P_PASSKEY_PROMOTION: LazyLock<PasskeyPromotionMode> = LazyLo
         },
     }
 });
+
+#[cfg(test)]
+mod tests;

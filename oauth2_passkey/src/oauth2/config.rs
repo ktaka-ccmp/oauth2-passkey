@@ -191,3 +191,6 @@ pub fn get_google_client_id() -> &'static str {
 pub(super) static OAUTH2_GOOGLE_CLIENT_SECRET: LazyLock<String> = LazyLock::new(|| {
     std::env::var("OAUTH2_GOOGLE_CLIENT_SECRET").expect("OAUTH2_GOOGLE_CLIENT_SECRET must be set")
 });
+
+#[cfg(test)]
+mod tests;

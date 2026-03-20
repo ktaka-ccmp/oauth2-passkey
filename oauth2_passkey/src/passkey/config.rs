@@ -109,3 +109,6 @@ pub(super) static PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL: LazyLock<bool
         }),
     },
 );
+
+#[cfg(test)]
+mod tests;

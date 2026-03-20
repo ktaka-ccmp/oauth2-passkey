@@ -1,3 +1,47 @@
+use super::*;
+use std::process::Command;
+
+fn run_child(test_name: &str, env_name: &str, env_value: &str) -> std::process::Output {
+    Command::new(std::env::current_exe().unwrap())
+        .args([test_name, "--exact", "--nocapture"])
+        .env("__TEST_ENV_VAR_CHILD", "1")
+        .env(env_name, env_value)
+        .output()
+        .expect("Failed to spawn child process")
+}
+
+// --- CORS_ALLOW_CREDENTIALS ---
+
+#[test]
+fn test_cors_allow_credentials_rejects_invalid() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let _ = *CORS_ALLOW_CREDENTIALS;
+        return;
+    }
+    let output = run_child(
+        "cors::tests::test_cors_allow_credentials_rejects_invalid",
+        "CORS_ALLOW_CREDENTIALS",
+        "invalid",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("CORS_ALLOW_CREDENTIALS"));
+}
+
+#[test]
+fn test_cors_allow_credentials_accepts_valid() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*CORS_ALLOW_CREDENTIALS, true);
+        return;
+    }
+    let output = run_child(
+        "cors::tests::test_cors_allow_credentials_accepts_valid",
+        "CORS_ALLOW_CREDENTIALS",
+        "true",
+    );
+    assert!(output.status.success());
+}
+
 #[test]
 fn test_cors_allowed_origins_parsing() {
     // This test demonstrates the parsing logic
