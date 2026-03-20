@@ -1,23 +1,5 @@
 use super::*;
-use std::process::Command;
-
-fn run_child(test_name: &str, env_name: &str, env_value: &str) -> std::process::Output {
-    Command::new(std::env::current_exe().unwrap())
-        .args([test_name, "--exact", "--nocapture"])
-        .env("__TEST_ENV_VAR_CHILD", "1")
-        .env(env_name, env_value)
-        .output()
-        .expect("Failed to spawn child process")
-}
-
-fn run_child_without_env(test_name: &str, env_name: &str) -> std::process::Output {
-    Command::new(std::env::current_exe().unwrap())
-        .args([test_name, "--exact", "--nocapture"])
-        .env("__TEST_ENV_VAR_CHILD", "1")
-        .env_remove(env_name)
-        .output()
-        .expect("Failed to spawn child process")
-}
+use crate::test_utils::env_var_test::{run_child_with_env as run_child, run_child_without_env};
 
 // --- O2P_RESPOND_WITH_X_CSRF_TOKEN ---
 
