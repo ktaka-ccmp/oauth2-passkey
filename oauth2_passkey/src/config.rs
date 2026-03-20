@@ -23,15 +23,9 @@ pub static PASSKEY_SIGNAL_API_MODE: LazyLock<String> = LazyLock::new(|| {
     let mode = std::env::var("PASSKEY_SIGNAL_API_MODE").unwrap_or_else(|_| "direct".to_string());
     let valid_modes = ["direct", "sync", "direct+sync"];
     if !valid_modes.contains(&mode.as_str()) {
-        tracing::warn!(
-            "Invalid PASSKEY_SIGNAL_API_MODE '{}', valid values are: {:?}. Using 'direct'.",
-            mode,
-            valid_modes
-        );
-        "direct".to_string()
-    } else {
-        mode
+        panic!("PASSKEY_SIGNAL_API_MODE='{mode}' is invalid. Valid values: {valid_modes:?}");
     }
+    mode
 });
 
 /// Demo mode flag for public demo sites
@@ -47,10 +41,13 @@ pub static PASSKEY_SIGNAL_API_MODE: LazyLock<String> = LazyLock::new(|| {
 /// users without also enabling data masking).
 ///
 /// Default: false
-pub static O2P_DEMO_MODE: LazyLock<bool> = LazyLock::new(|| {
-    std::env::var("O2P_DEMO_MODE")
-        .map(|val| val.to_lowercase() == "true")
-        .unwrap_or(false)
+pub static O2P_DEMO_MODE: LazyLock<bool> = LazyLock::new(|| match std::env::var("O2P_DEMO_MODE") {
+    Err(_) => false,
+    Ok(val) => match val.to_lowercase().as_str() {
+        "true" => true,
+        "false" => false,
+        _ => panic!("O2P_DEMO_MODE='{val}' is invalid. Valid values: true, false"),
+    },
 });
 
 /// User ID for the demo mode placeholder user (sequence_number=1)

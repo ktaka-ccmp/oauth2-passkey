@@ -163,12 +163,13 @@ pub(crate) static OAUTH2_CSRF_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
         .unwrap_or("__Host-CsrfId".to_string())
 });
 
-pub(super) static OAUTH2_CSRF_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
-    std::env::var("OAUTH2_CSRF_COOKIE_MAX_AGE")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(60) // Default to 60 seconds if not set or invalid
-});
+pub(super) static OAUTH2_CSRF_COOKIE_MAX_AGE: LazyLock<u64> =
+    LazyLock::new(|| match std::env::var("OAUTH2_CSRF_COOKIE_MAX_AGE") {
+        Ok(val) => val
+            .parse()
+            .unwrap_or_else(|_| panic!("OAUTH2_CSRF_COOKIE_MAX_AGE='{val}' is not a valid u64")),
+        Err(_) => 60,
+    });
 
 pub(super) static OAUTH2_REDIRECT_URI: LazyLock<String> = LazyLock::new(|| {
     format!(

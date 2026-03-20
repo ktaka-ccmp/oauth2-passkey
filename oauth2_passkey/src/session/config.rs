@@ -15,12 +15,13 @@ pub static SESSION_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
         .ok()
         .unwrap_or("__Host-SessionId".to_string())
 });
-pub static SESSION_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
-    std::env::var("SESSION_COOKIE_MAX_AGE")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(600) // Default to 10 minutes if not set or invalid
-});
+pub static SESSION_COOKIE_MAX_AGE: LazyLock<u64> =
+    LazyLock::new(|| match std::env::var("SESSION_COOKIE_MAX_AGE") {
+        Ok(val) => val
+            .parse()
+            .unwrap_or_else(|_| panic!("SESSION_COOKIE_MAX_AGE='{val}' is not a valid u64")),
+        Err(_) => 600,
+    });
 
 /// Domain attribute for session cookies.
 ///
@@ -63,17 +64,18 @@ pub enum SessionConflictPolicy {
 /// - `allow` (default): Permit multiple concurrent sessions
 /// - `replace`: Invalidate all existing sessions, create new one
 /// - `reject`: Deny login if active session exists
-pub static SESSION_CONFLICT_POLICY: LazyLock<SessionConflictPolicy> = LazyLock::new(|| {
-    match env::var("SESSION_CONFLICT_POLICY")
-        .unwrap_or_default()
-        .to_lowercase()
-        .as_str()
-    {
-        "replace" => SessionConflictPolicy::Replace,
-        "reject" => SessionConflictPolicy::Reject,
-        _ => SessionConflictPolicy::Allow,
-    }
-});
+pub static SESSION_CONFLICT_POLICY: LazyLock<SessionConflictPolicy> =
+    LazyLock::new(|| match env::var("SESSION_CONFLICT_POLICY") {
+        Err(_) => SessionConflictPolicy::Allow,
+        Ok(val) => match val.to_lowercase().as_str() {
+            "allow" => SessionConflictPolicy::Allow,
+            "replace" => SessionConflictPolicy::Replace,
+            "reject" => SessionConflictPolicy::Reject,
+            _ => panic!(
+                "SESSION_CONFLICT_POLICY='{val}' is invalid. Valid values: allow, replace, reject"
+            ),
+        },
+    });
 
 /// TTL for user session mappings in seconds (30 days).
 ///
