@@ -120,24 +120,71 @@ This complements Option A by ensuring warnings appear at startup.
 
 ### Recommendation
 
-Implement Option A + C: log warnings for invalid values AND force-evaluate optional variables in init() to surface warnings early.
+Implement Option B + C: panic on set-but-unparseable values AND force-evaluate in init() to catch errors at startup.
+
+Behavior:
+- Env var not set -> use default (intentional omission)
+- Env var set, valid value -> use that value
+- Env var set, invalid value -> panic at startup (configuration error)
+
+## Audit Results
+
+### Variables with silent parse errors (B targets - panic on invalid)
+
+| Variable | File | Type | Default |
+|----------|------|------|---------|
+| `SESSION_COOKIE_MAX_AGE` | session/config.rs | u64 | 600 |
+| `OAUTH2_CSRF_COOKIE_MAX_AGE` | oauth2/config.rs | u64 | 60 |
+| `PASSKEY_TIMEOUT` | passkey/config.rs | u32 | 60 |
+| `PASSKEY_CHALLENGE_TIMEOUT` | passkey/config.rs | u32 | 60 |
+| `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` | passkey/config.rs | bool | false |
+| `O2P_DEMO_MODE` | config.rs | bool | false |
+| `O2P_RESPOND_WITH_X_CSRF_TOKEN` | axum/config.rs | bool | true |
+| `CORS_ALLOW_CREDENTIALS` | axum/cors.rs | bool | false |
+
+### Variables with enum match fallback (B targets - panic on invalid)
+
+| Variable | File | Default |
+|----------|------|---------|
+| `SESSION_CONFLICT_POLICY` | session/config.rs | Allow |
+| `PASSKEY_ATTESTATION` | passkey/config.rs | direct |
+| `PASSKEY_AUTHENTICATOR_ATTACHMENT` | passkey/config.rs | platform |
+| `PASSKEY_RESIDENT_KEY` | passkey/config.rs | required |
+| `PASSKEY_REQUIRE_RESIDENT_KEY` | passkey/config.rs | true |
+| `PASSKEY_USER_VERIFICATION` | passkey/config.rs | discouraged |
+| `PASSKEY_SIGNAL_API_MODE` | config.rs | direct |
+| `O2P_FEDCM` | axum/config.rs | Disabled |
+| `O2P_PASSKEY_PROMOTION` | axum/config.rs | Disabled |
+
+### Already strict (no change needed)
+
+`OAUTH2_RESPONSE_MODE` already panics on invalid value.
+Required variables (`ORIGIN`, `GENERIC_DATA_STORE_TYPE`, etc.) already use `.expect()`.
+
+### String-only defaults (no parse step - no change needed)
+
+`SESSION_COOKIE_NAME`, `O2P_ROUTE_PREFIX`, `DB_TABLE_PREFIX`, `OAUTH2_ISSUER_URL`, etc.
+These have no parse step -- any string is a valid value.
 
 ## Related Files
 
-- `oauth2_passkey/src/session/config.rs` - SESSION_COOKIE_MAX_AGE, AUTH_SERVER_SECRET, SESSION_COOKIE_NAME, SESSION_COOKIE_DOMAIN, SESSION_CONFLICT_POLICY
-- `oauth2_passkey/src/storage/data_store/config.rs` - GENERIC_DATA_STORE_TYPE, GENERIC_DATA_STORE_URL, DB_TABLE_PREFIX
-- `oauth2_passkey/src/storage/cache_store/config.rs` - GENERIC_CACHE_STORE_TYPE, GENERIC_CACHE_STORE_URL
-- `oauth2_passkey/src/oauth2/config.rs` - Various OAuth2 configuration variables
-- `oauth2_passkey/src/passkey/config.rs` - Various Passkey configuration variables
+- `oauth2_passkey/src/config.rs` - O2P_DEMO_MODE, PASSKEY_SIGNAL_API_MODE
+- `oauth2_passkey/src/session/config.rs` - SESSION_COOKIE_MAX_AGE, SESSION_CONFLICT_POLICY, AUTH_SERVER_SECRET
+- `oauth2_passkey/src/oauth2/config.rs` - OAUTH2_CSRF_COOKIE_MAX_AGE
+- `oauth2_passkey/src/passkey/config.rs` - PASSKEY_TIMEOUT, PASSKEY_CHALLENGE_TIMEOUT, PASSKEY_ATTESTATION, etc.
+- `oauth2_passkey_axum/src/config.rs` - O2P_RESPOND_WITH_X_CSRF_TOKEN, O2P_FEDCM, O2P_PASSKEY_PROMOTION
+- `oauth2_passkey_axum/src/cors.rs` - CORS_ALLOW_CREDENTIALS
+- `oauth2_passkey/src/storage/mod.rs` - existing init() with forced evaluation pattern
 
 ## Implementation Tasks
 
-- [ ] Audit all LazyLock env vars for silent fallback patterns
-- [ ] Add tracing::warn!() for set-but-unparseable values (Option A)
-- [ ] Add early evaluation of optional vars in init() functions (Option C)
+- [x] Audit all LazyLock env vars for silent fallback patterns
+- [ ] Change parse-error fallback to panic for all affected variables (Option B)
+- [ ] Change enum-match fallback to panic for all affected variables (Option B)
+- [ ] Add early evaluation of all affected vars in init() functions (Option C)
 - [ ] Address AUTH_SERVER_SECRET default value security concern
-- [ ] Add unit tests for warning behavior
-- [ ] Update documentation if new init() evaluations are added
+- [ ] Verify: `cargo test` passes, `cargo clippy` clean
+- [ ] Test: invalid env var value causes panic at startup
 
 ## Decision Log
 
@@ -148,5 +195,11 @@ Implement Option A + C: log warnings for invalid values AND force-evaluate optio
 - Context: Discussion about whether optional env vars truly do not need early evaluation, prompted by documenting the LazyLock force-evaluation rule in maintainer/development.md
 - Decision: Create issue to track audit and improvement of silent fallback behavior
 - Reason: Silent fallbacks can hide configuration mistakes; operators deserve visibility into whether their configuration is being used or ignored
+
+### 2026-03-20: Switch to Option B + C (strict panic)
+
+- Context: Revisited approach. Option A (warn + continue) still hides the problem if operators don't read logs. Option B (panic on invalid) + C (early eval in init) is stricter but consistent with how required variables work.
+- Decision: Implement B + C. If an env var is explicitly set to an invalid value, panic at startup. Unset variables still silently use defaults.
+- Reason: Operators who explicitly set a variable expect it to be used. Silent fallback violates that expectation. Fail-fast at startup is preferable to running with unintended configuration.
 
 ## Resolution
