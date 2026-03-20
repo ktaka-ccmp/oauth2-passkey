@@ -118,7 +118,7 @@ Without a fix, users who encounter this state are stuck with no recovery path:
 ## Approach
 
 Align our `navigator.credentials.get()` call with Google's GIS library implementation.
-GIS library analysis: `.junk/gis-fedcm-analysis.md`
+GIS library analysis: `docs/src/archived/gis-fedcm-analysis.md`
 
 ### GIS vs Our Code: Differences Found
 
@@ -230,6 +230,6 @@ async function fedcmLogin(mode) {
   4. Add `.finally()` cleanup
 - Reason: Matching GIS reduces the chance that our option differences contribute to the hang. The `signal` also provides a handle for future abort if a timeout strategy is later adopted.
 - Skipped: `providers[0].url` (GIS sets `url: "https://accounts.google.com/gsi/"`) -- this is a non-standard property not in the FedCM spec. It appears to be Google-internal (possibly related to IdP login status). Adding an arbitrary URL could have unintended side effects. The standard `configURL` already points Chrome to the correct FedCM config.
-- Reference: Full GIS analysis in `.junk/gis-fedcm-analysis.md`
+- Reference: Full GIS analysis in `docs/src/archived/gis-fedcm-analysis.md`
 
 ## Resolution
