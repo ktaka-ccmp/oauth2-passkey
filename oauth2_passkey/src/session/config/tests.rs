@@ -116,3 +116,31 @@ fn test_auth_server_secret_generates_random_when_unset() {
     );
     assert!(output.status.success());
 }
+
+// --- Default value tests ---
+
+#[test]
+fn test_session_cookie_max_age_defaults_to_600() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*SESSION_COOKIE_MAX_AGE, 600);
+        return;
+    }
+    let output = run_child_without_env(
+        "session::config::tests::test_session_cookie_max_age_defaults_to_600",
+        "SESSION_COOKIE_MAX_AGE",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_session_conflict_policy_defaults_to_allow() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*SESSION_CONFLICT_POLICY, SessionConflictPolicy::Allow);
+        return;
+    }
+    let output = run_child_without_env(
+        "session::config::tests::test_session_conflict_policy_defaults_to_allow",
+        "SESSION_CONFLICT_POLICY",
+    );
+    assert!(output.status.success());
+}

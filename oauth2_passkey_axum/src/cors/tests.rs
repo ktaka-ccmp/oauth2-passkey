@@ -10,6 +10,15 @@ fn run_child(test_name: &str, env_name: &str, env_value: &str) -> std::process::
         .expect("Failed to spawn child process")
 }
 
+fn run_child_without_env(test_name: &str, env_name: &str) -> std::process::Output {
+    Command::new(std::env::current_exe().unwrap())
+        .args([test_name, "--exact", "--nocapture"])
+        .env("__TEST_ENV_VAR_CHILD", "1")
+        .env_remove(env_name)
+        .output()
+        .expect("Failed to spawn child process")
+}
+
 // --- CORS_ALLOW_CREDENTIALS ---
 
 #[test]
@@ -38,6 +47,19 @@ fn test_cors_allow_credentials_accepts_valid() {
         "cors::tests::test_cors_allow_credentials_accepts_valid",
         "CORS_ALLOW_CREDENTIALS",
         "true",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_cors_allow_credentials_defaults_to_false() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*CORS_ALLOW_CREDENTIALS, false);
+        return;
+    }
+    let output = run_child_without_env(
+        "cors::tests::test_cors_allow_credentials_defaults_to_false",
+        "CORS_ALLOW_CREDENTIALS",
     );
     assert!(output.status.success());
 }

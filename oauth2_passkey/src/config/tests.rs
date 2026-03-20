@@ -2,12 +2,21 @@ use super::*;
 use std::process::Command;
 
 /// Spawn the current test binary as a child process with a specific env var set.
-/// The child process is identified by the __TEST_ENV_VAR_CHILD env var.
 fn run_child(test_name: &str, env_name: &str, env_value: &str) -> std::process::Output {
     Command::new(std::env::current_exe().unwrap())
         .args([test_name, "--exact", "--nocapture"])
         .env("__TEST_ENV_VAR_CHILD", "1")
         .env(env_name, env_value)
+        .output()
+        .expect("Failed to spawn child process")
+}
+
+/// Spawn the current test binary as a child process with a specific env var removed.
+fn run_child_without_env(test_name: &str, env_name: &str) -> std::process::Output {
+    Command::new(std::env::current_exe().unwrap())
+        .args([test_name, "--exact", "--nocapture"])
+        .env("__TEST_ENV_VAR_CHILD", "1")
+        .env_remove(env_name)
         .output()
         .expect("Failed to spawn child process")
 }
@@ -137,4 +146,30 @@ fn test_signal_api_mode_accepts_valid() {
         output.status.success(),
         "Should accept PASSKEY_SIGNAL_API_MODE=direct+sync"
     );
+}
+
+#[test]
+fn test_demo_mode_defaults_to_false() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*O2P_DEMO_MODE, false);
+        return;
+    }
+    let output = run_child_without_env(
+        "config::tests::test_demo_mode_defaults_to_false",
+        "O2P_DEMO_MODE",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_signal_api_mode_defaults_to_direct() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*PASSKEY_SIGNAL_API_MODE, "direct");
+        return;
+    }
+    let output = run_child_without_env(
+        "config::tests::test_signal_api_mode_defaults_to_direct",
+        "PASSKEY_SIGNAL_API_MODE",
+    );
+    assert!(output.status.success());
 }

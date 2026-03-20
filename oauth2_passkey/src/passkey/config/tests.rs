@@ -10,6 +10,15 @@ fn run_child(test_name: &str, env_name: &str, env_value: &str) -> std::process::
         .expect("Failed to spawn child process")
 }
 
+fn run_child_without_env(test_name: &str, env_name: &str) -> std::process::Output {
+    Command::new(std::env::current_exe().unwrap())
+        .args([test_name, "--exact", "--nocapture"])
+        .env("__TEST_ENV_VAR_CHILD", "1")
+        .env_remove(env_name)
+        .output()
+        .expect("Failed to spawn child process")
+}
+
 // --- PASSKEY_TIMEOUT ---
 
 #[test]
@@ -262,6 +271,112 @@ fn test_passkey_user_handle_unique_accepts_valid() {
         "passkey::config::tests::test_passkey_user_handle_unique_accepts_valid",
         "PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL",
         "true",
+    );
+    assert!(output.status.success());
+}
+
+// --- Default value tests ---
+
+#[test]
+fn test_passkey_timeout_defaults_to_60() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*PASSKEY_TIMEOUT, 60);
+        return;
+    }
+    let output = run_child_without_env(
+        "passkey::config::tests::test_passkey_timeout_defaults_to_60",
+        "PASSKEY_TIMEOUT",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_passkey_challenge_timeout_defaults_to_60() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*PASSKEY_CHALLENGE_TIMEOUT, 60);
+        return;
+    }
+    let output = run_child_without_env(
+        "passkey::config::tests::test_passkey_challenge_timeout_defaults_to_60",
+        "PASSKEY_CHALLENGE_TIMEOUT",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_passkey_attestation_defaults_to_direct() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*PASSKEY_ATTESTATION, "direct");
+        return;
+    }
+    let output = run_child_without_env(
+        "passkey::config::tests::test_passkey_attestation_defaults_to_direct",
+        "PASSKEY_ATTESTATION",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_passkey_authenticator_attachment_defaults_to_platform() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*PASSKEY_AUTHENTICATOR_ATTACHMENT, "platform");
+        return;
+    }
+    let output = run_child_without_env(
+        "passkey::config::tests::test_passkey_authenticator_attachment_defaults_to_platform",
+        "PASSKEY_AUTHENTICATOR_ATTACHMENT",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_passkey_resident_key_defaults_to_required() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*PASSKEY_RESIDENT_KEY, "required");
+        return;
+    }
+    let output = run_child_without_env(
+        "passkey::config::tests::test_passkey_resident_key_defaults_to_required",
+        "PASSKEY_RESIDENT_KEY",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_passkey_require_resident_key_defaults_to_true() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*PASSKEY_REQUIRE_RESIDENT_KEY, true);
+        return;
+    }
+    let output = run_child_without_env(
+        "passkey::config::tests::test_passkey_require_resident_key_defaults_to_true",
+        "PASSKEY_REQUIRE_RESIDENT_KEY",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_passkey_user_verification_defaults_to_discouraged() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*PASSKEY_USER_VERIFICATION, "discouraged");
+        return;
+    }
+    let output = run_child_without_env(
+        "passkey::config::tests::test_passkey_user_verification_defaults_to_discouraged",
+        "PASSKEY_USER_VERIFICATION",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_passkey_user_handle_unique_defaults_to_false() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL, false);
+        return;
+    }
+    let output = run_child_without_env(
+        "passkey::config::tests::test_passkey_user_handle_unique_defaults_to_false",
+        "PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL",
     );
     assert!(output.status.success());
 }

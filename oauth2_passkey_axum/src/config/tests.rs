@@ -10,6 +10,15 @@ fn run_child(test_name: &str, env_name: &str, env_value: &str) -> std::process::
         .expect("Failed to spawn child process")
 }
 
+fn run_child_without_env(test_name: &str, env_name: &str) -> std::process::Output {
+    Command::new(std::env::current_exe().unwrap())
+        .args([test_name, "--exact", "--nocapture"])
+        .env("__TEST_ENV_VAR_CHILD", "1")
+        .env_remove(env_name)
+        .output()
+        .expect("Failed to spawn child process")
+}
+
 // --- O2P_RESPOND_WITH_X_CSRF_TOKEN ---
 
 #[test]
@@ -102,6 +111,47 @@ fn test_passkey_promotion_accepts_ask() {
         "config::tests::test_passkey_promotion_accepts_ask",
         "O2P_PASSKEY_PROMOTION",
         "ask",
+    );
+    assert!(output.status.success());
+}
+
+// --- Default value tests ---
+
+#[test]
+fn test_respond_with_x_csrf_token_defaults_to_true() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*O2P_RESPOND_WITH_X_CSRF_TOKEN, true);
+        return;
+    }
+    let output = run_child_without_env(
+        "config::tests::test_respond_with_x_csrf_token_defaults_to_true",
+        "O2P_RESPOND_WITH_X_CSRF_TOKEN",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_fedcm_defaults_to_disabled() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert!(!O2P_FEDCM.is_enabled());
+        return;
+    }
+    let output = run_child_without_env(
+        "config::tests::test_fedcm_defaults_to_disabled",
+        "O2P_FEDCM",
+    );
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_passkey_promotion_defaults_to_disabled() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert_eq!(*O2P_PASSKEY_PROMOTION, PasskeyPromotionMode::Disabled);
+        return;
+    }
+    let output = run_child_without_env(
+        "config::tests::test_passkey_promotion_defaults_to_disabled",
+        "O2P_PASSKEY_PROMOTION",
     );
     assert!(output.status.success());
 }
