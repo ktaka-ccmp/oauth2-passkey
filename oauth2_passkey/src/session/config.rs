@@ -105,3 +105,6 @@ pub(super) static AUTH_SERVER_SECRET: LazyLock<Vec<u8>> =
             secret
         }
     });
+
+#[cfg(test)]
+mod tests;
