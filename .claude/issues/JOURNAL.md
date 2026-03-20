@@ -88,6 +88,8 @@ user_id TEXT NOT NULL REFERENCES users(id),
 
 **Breaking change**: Existing databases will need to be recreated (no migration provided). The `OAuth2Account` and `PasskeyCredential` structs now include `sequence_number: Option<i64>`.
 
+Additionally, `sequence_number` is hidden from all JSON API responses via `#[serde(skip_serializing)]` on all three types (`User`, `OAuth2Account`, `PasskeyCredential`). The `User` type previously used `skip_serializing_if = "Option::is_none"` which leaked `sequence_number` in admin API responses -- investigation confirmed no JS or template code consumes this field from JSON.
+
 ### Design decisions
 
 - **YAGNI does not apply**: Sequential integer primary keys are an established best practice, not a speculative feature. Deferring correct schema design is not the same as avoiding unnecessary features.
@@ -95,10 +97,12 @@ user_id TEXT NOT NULL REFERENCES users(id),
 - **`Option<i64>` for sequence_number**: Matches the `users` table pattern. `None` when creating new records (database assigns the value), `Some(n)` when reading from database.
 - **No query changes needed**: All queries use `SELECT *` with `FromRow` derive/impl, and INSERT statements don't specify `sequence_number` (auto-generated). The change is transparent to query logic.
 - **No foreign key impact**: No other tables reference `oauth2_accounts.id` or `passkey_credentials.credential_id` via foreign keys. `login_history.credential_id` is denormalized without FK constraint.
+- **`skip_serializing` over `skip_serializing_if`**: PR review identified that `sequence_number` was leaking to API responses. Investigation found: (1) admin templates use `TemplateUser.sequence_number` for first-user display -- this is server-side rendering, not JSON serialization; (2) `Json<Vec<DbUser>>` admin API is consumed by JS that only uses `user.id` and `user.account`; (3) `sequence_number` is an internal DB detail with no client-side use. Changed all three types to `skip_serializing` for consistency. Updated User's proptest roundtrip test to expect `None` after deserialization.
+- **UNIQUE constraint provides index**: The original TEXT identifiers (`id`, `credential_id`) changed from PRIMARY KEY to UNIQUE constraint. Both SQLite and PostgreSQL automatically create an index for UNIQUE constraints, so no explicit `CREATE INDEX` is needed for these columns.
 
 ### Key files
 
-`oauth2_passkey/src/oauth2/types.rs`, `oauth2_passkey/src/passkey/types.rs`, `oauth2_passkey/src/oauth2/storage/sqlite.rs`, `oauth2_passkey/src/oauth2/storage/postgres.rs`, `oauth2_passkey/src/passkey/storage/sqlite.rs`, `oauth2_passkey/src/passkey/storage/postgres.rs`
+`oauth2_passkey/src/oauth2/types.rs`, `oauth2_passkey/src/passkey/types.rs`, `oauth2_passkey/src/userdb/types.rs`, `oauth2_passkey/src/oauth2/storage/sqlite.rs`, `oauth2_passkey/src/oauth2/storage/postgres.rs`, `oauth2_passkey/src/passkey/storage/sqlite.rs`, `oauth2_passkey/src/passkey/storage/postgres.rs`
 
 ---
 
