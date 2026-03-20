@@ -120,8 +120,11 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
     let _ = *config::O2P_RESPOND_WITH_X_CSRF_TOKEN;
     let _ = *config::O2P_FEDCM;
     let _ = *config::O2P_PASSKEY_PROMOTION;
-    let _ = *cors::CORS_ALLOWED_ORIGINS;
-    let _ = *cors::CORS_ALLOW_CREDENTIALS;
+    #[cfg(feature = "cors")]
+    {
+        let _ = *cors::CORS_ALLOWED_ORIGINS;
+        let _ = *cors::CORS_ALLOW_CREDENTIALS;
+    }
 
     Ok(())
 }
