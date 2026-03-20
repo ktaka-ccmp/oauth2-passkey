@@ -16,7 +16,7 @@
 
 ## Closed:
 
-## Status: deferred
+## Status: open
 
 ## Priority: high
 
@@ -117,43 +117,68 @@ Without a fix, users who encounter this state are stuck with no recovery path:
 
 ## Approach
 
-Add `AbortController` with a timeout to the `navigator.credentials.get()` call. When the timeout fires, abort the request and fall back to the popup OAuth2 flow.
+Align our `navigator.credentials.get()` call with Google's GIS library implementation.
+GIS library analysis: `docs/src/archived/gis-fedcm-analysis.md`
+
+### GIS vs Our Code: Differences Found
+
+| Property | GIS | Our code | Action |
+|----------|-----|----------|--------|
+| `signal` | `new AbortController().signal` | Missing | Add |
+| `federated` | Same object as `identity` | Missing | Add |
+| `identity` | Present | Present | OK |
+| `providers[0].url` | `"https://accounts.google.com/gsi/"` | Missing | Skip (see Decision Log) |
+| `providers[0].fields` | `["name","email","picture"]` | Missing | Add |
+| `.finally()` cleanup | Clears AbortController ref | Missing | Add |
+
+### Improvement Plan
+
+Match GIS behavior without exceeding it (no auto-timeout, no fallback link):
+
+1. **Add `AbortController` and pass `signal`** -- GIS creates a fresh AbortController per call and passes `signal` to `credentials.get()`. This does not auto-abort; it provides a handle for future abort if needed (e.g., page navigation, flow restart).
+2. **Add `federated` key alongside `identity`** -- GIS sets both `federated` and `identity` to the same object for backward compatibility with older Chrome versions (pre-131).
+3. **Add `providers[0].fields`** -- GIS requests `["name", "email", "picture"]` via the `fields` property. This is part of the "unicorn" experiment that is enabled by default in current GIS.
+4. **Add `.finally()` to clean up AbortController reference** -- GIS clears the AbortController reference in `.finally()` to avoid stale references.
+
+### Code Sketch
 
 ```javascript
 async function fedcmLogin(mode) {
     // ... fetch nonce ...
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
+    const identityOptions = {
+        providers: [{
+            configURL: 'https://accounts.google.com/gsi/fedcm.json',
+            clientId: OAUTH2_CLIENT_ID,
+            fields: ['name', 'email', 'picture'],
+            params: {
+                nonce: nonceData.nonce,
+                response_type: 'id_token',
+                scope: 'email profile openid',
+                ss_domain: window.location.origin,
+            },
+        }],
+        mode: 'active',
+        context: 'signin',
+    };
+
+    let credential;
     try {
-        const credential = await navigator.credentials.get({
-            identity: { /* ... */ },
+        credential = await navigator.credentials.get({
+            identity: identityOptions,
+            federated: identityOptions,
             mediation: 'required',
             signal: controller.signal,
         });
-        clearTimeout(timeoutId);
-        // ... process credential ...
-    } catch (err) {
-        clearTimeout(timeoutId);
-        throw err; // caught by outer catch -> falls back to popup
+    } finally {
+        controller = undefined;
     }
+
+    // ... process credential ...
 }
 ```
-
-The outer catch in `openPopup()` already handles fallback:
-```javascript
-fedcmLogin(mode).catch(function(err) {
-    console.log('FedCM failed, falling back to popup:', err.message);
-    openPopupLegacy(mode, page_context);
-});
-```
-
-### Design Decisions
-
-- **Timeout duration**: 5 seconds. FedCM UI normally appears within 1-2 seconds. 5 seconds provides margin while keeping the user experience responsive.
-- **Fallback behavior**: Use existing popup flow (`openPopupLegacy`), which is already the fallback for browsers without FedCM support.
-- **No retry**: If FedCM hangs once in a tab, it will likely hang again. Falling back to popup is the correct behavior.
 
 ## Related Files
 
@@ -161,10 +186,12 @@ fedcmLogin(mode).catch(function(err) {
 
 ## Implementation Tasks
 
-- [ ] Add `AbortController` with 5-second timeout to `navigator.credentials.get()` in `fedcmLogin()`
-- [ ] Ensure `clearTimeout` is called on both success and failure paths
-- [ ] Test: FedCM works normally when not in stale state
-- [ ] Test: Fallback to popup triggers after timeout in stale tab
+- [ ] Add `AbortController` and pass `signal` to `credentials.get()`
+- [ ] Add `federated` key alongside `identity` (same object)
+- [ ] Add `fields: ['name', 'email', 'picture']` to provider
+- [ ] Add `.finally()` to clean up AbortController reference
+- [ ] Test: FedCM works normally (no regression)
+- [ ] Test: Verify behavior in previously-hanging stale tab scenario
 
 ## Decision Log
 
@@ -192,5 +219,17 @@ fedcmLogin(mode).catch(function(err) {
 - Rejected approaches:
   - **AbortController with auto-timeout (5s)**: Cannot distinguish "FedCM UI hung" from "user is taking time to choose an account." Would interrupt normal users mid-interaction.
   - **Manual fallback link**: Show a "try popup login" link after a delay. Poor UX - clutters the interface, requires user to understand what happened, and the timing of when to show it is still arbitrary.
+
+### 2026-03-19: Reopen - align with GIS library implementation
+
+- Context: The hang occurs frequently in practice. Analyzed Google's GIS library (`accounts.google.com/gsi/client`, 254KB) by beautifying the minified code and reverse-engineering the FedCM flow. Found that GIS also has no timeout/fallback for FedCM hangs, but our `credentials.get()` options differ from GIS in several ways.
+- Decision: Reopen and align our implementation with GIS as closely as possible. Do not exceed what GIS does (no auto-timeout, no fallback link). Specific changes:
+  1. Add `AbortController` + `signal`
+  2. Add `federated` key (backward compat)
+  3. Add `fields` property
+  4. Add `.finally()` cleanup
+- Reason: Matching GIS reduces the chance that our option differences contribute to the hang. The `signal` also provides a handle for future abort if a timeout strategy is later adopted.
+- Skipped: `providers[0].url` (GIS sets `url: "https://accounts.google.com/gsi/"`) -- this is a non-standard property not in the FedCM spec. It appears to be Google-internal (possibly related to IdP login status). Adding an arbitrary URL could have unintended side effects. The standard `configURL` already points Chrome to the correct FedCM config.
+- Reference: Full GIS analysis in `docs/src/archived/gis-fedcm-analysis.md`
 
 ## Resolution

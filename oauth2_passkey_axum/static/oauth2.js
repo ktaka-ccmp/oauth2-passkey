@@ -19,24 +19,35 @@ const oauth2 = (function() {
         const nonceData = await nonceResp.json();
 
         // 2. Call navigator.credentials.get() with FedCM (active/button mode)
-        // Google's FedCM endpoint requires response_type and scope via params
-        const credential = await navigator.credentials.get({
-            identity: {
-                providers: [{
-                    configURL: 'https://accounts.google.com/gsi/fedcm.json',
-                    clientId: OAUTH2_CLIENT_ID,
-                    params: {
-                        nonce: nonceData.nonce,
-                        response_type: 'id_token',
-                        scope: 'email profile openid',
-                        ss_domain: window.location.origin,
-                    },
-                }],
-                mode: 'active',
-                context: 'signin',
-            },
-            mediation: 'required',  // Prevent auto re-authn, always require user interaction
-        });
+        // Options aligned with Google's GIS library implementation
+        const controller = new AbortController();
+        const identityOptions = {
+            providers: [{
+                configURL: 'https://accounts.google.com/gsi/fedcm.json',
+                clientId: OAUTH2_CLIENT_ID,
+                fields: ['name', 'email', 'picture'],
+                params: {
+                    nonce: nonceData.nonce,
+                    response_type: 'id_token',
+                    scope: 'email profile openid',
+                    ss_domain: window.location.origin,
+                },
+            }],
+            mode: 'active',
+            context: 'signin',
+        };
+
+        let credential;
+        try {
+            credential = await navigator.credentials.get({
+                identity: identityOptions,
+                federated: identityOptions,  // Backward compat with older Chrome
+                mediation: 'required',
+                signal: controller.signal,
+            });
+        } finally {
+            controller.signal.onabort = null;
+        }
 
         // 3. Extract JWT from credential token
         // Google FedCM may return JSON (e.g. {"token":"eyJ..."}) instead of a raw JWT
