@@ -93,6 +93,16 @@ REJECTED: AbortError signal is aborted without reason
   1. Promise hanging without resolve/reject violates the expected Promise contract. The browser should reject with an error.
   2. Active mode (user-initiated, button-triggered) should not be subject to cooldown per Chrome's own documentation.
 
+**2026-03-20 update: Cooldown hypothesis is insufficient**:
+
+The hang reproduces on tabs that have been open for a long time **regardless of whether FedCM was previously cancelled in that tab**. This means cooldown from prior dismissals is NOT the sole cause. Other possible causes:
+
+- Chrome's internal IdP login status becoming stale (Google session cookie rotation / expiry while the tab is open, causing Chrome's internal state to diverge from actual login state)
+- Chrome's FedCM accounts endpoint cache becoming stale per browsing context
+- Chrome's internal network state degrading at the tab level over time
+
+The common factor is **time since the tab was opened**, not prior FedCM interaction history.
+
 ### Impact
 
 Without a fix, users who encounter this state are stuck with no recovery path:
