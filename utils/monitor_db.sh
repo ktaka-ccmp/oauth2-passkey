@@ -42,8 +42,8 @@ fi
 if [ -z "$GENERIC_DATA_STORE_TYPE" ] || [ -z "$GENERIC_DATA_STORE_URL" ]; then
     echo "ERROR: Required environment variables are not set in .env file."
     echo "Please ensure the following variables are set:"
-    echo "  GENERIC_DATA_STORE_TYPE (e.g., postgres, sqlite)"
-    echo "  GENERIC_DATA_STORE_URL (e.g., postgresql://passkey:passkey@localhost:5432/passkey)"
+    echo "  GENERIC_DATA_STORE_TYPE (e.g., postgres, sqlite, mysql)"
+    echo "  GENERIC_DATA_STORE_URL (e.g., postgresql://user:pass@localhost:5432/db, mysql://user:pass@localhost:3306/db)"
     exit 1
 fi
 
@@ -85,9 +85,27 @@ case "$GENERIC_DATA_STORE_TYPE" in
         SQLITE_MODE=".mode column"
         FORMAT_COMMAND="$SQLITE_HEADERS\n$SQLITE_MODE\n"
         ;;
+    mysql)
+        # Parse mysql://user:password@host:port/dbname
+        MYSQL_URL="${GENERIC_DATA_STORE_URL#mysql://}"
+        MYSQL_USERPASS="${MYSQL_URL%%@*}"
+        MYSQL_USER="${MYSQL_USERPASS%%:*}"
+        MYSQL_PASS="${MYSQL_USERPASS#*:}"
+        MYSQL_HOSTPORTDB="${MYSQL_URL#*@}"
+        MYSQL_HOSTPORT="${MYSQL_HOSTPORTDB%%/*}"
+        MYSQL_DB="${MYSQL_HOSTPORTDB#*/}"
+        MYSQL_DB="${MYSQL_DB%%\?*}"
+        MYSQL_HOST="${MYSQL_HOSTPORT%%:*}"
+        MYSQL_PORT="${MYSQL_HOSTPORT#*:}"
+        if [ "$MYSQL_PORT" = "$MYSQL_HOST" ]; then
+            MYSQL_PORT="3306"
+        fi
+        DB_STRING="mysql -h $MYSQL_HOST -P $MYSQL_PORT -u $MYSQL_USER -p$MYSQL_PASS --skip-ssl $MYSQL_DB"
+        FORMAT_COMMAND=""
+        ;;
     *)
         echo "ERROR: Unsupported data store type: $GENERIC_DATA_STORE_TYPE"
-        echo "Supported types: postgres, sqlite"
+        echo "Supported types: postgres, sqlite, mysql"
         exit 1
         ;;
 esac
@@ -107,11 +125,24 @@ ALL_QUERIES+="$QUERY_USERS"
 ALL_QUERIES+="$QUERY_PASSKEY_CREDENTIALS"
 ALL_QUERIES+="$QUERY_OAUTH2_ACCOUNTS"
 
+# Build Redis monitor command if Redis is configured
+REDIS_CMD=""
+if [ "$GENERIC_CACHE_STORE_TYPE" = "redis" ] && [ -n "$GENERIC_CACHE_STORE_URL" ]; then
+    REDIS_CMD="echo '=== Redis Cache ==='; redis-cli -u $GENERIC_CACHE_STORE_URL DBSIZE; echo '--- Keys (excluding aaguid) ---'; redis-cli -u $GENERIC_CACHE_STORE_URL KEYS '*' | grep -v aaguid"
+fi
+
 echo ""
 echo "Starting database monitor..."
 echo "Database type: $GENERIC_DATA_STORE_TYPE"
+if [ -n "$REDIS_CMD" ]; then
+    echo "Cache type: redis"
+fi
 echo "Press Ctrl+C to stop monitoring"
 echo ""
 
 # Run the watch command
-watch -n 1 'echo "'"$FORMAT_COMMAND$ALL_QUERIES"'" | '"$DB_STRING"
+if [ -n "$REDIS_CMD" ]; then
+    watch -n 1 'echo "'"$FORMAT_COMMAND$ALL_QUERIES"'" | '"$DB_STRING"'; echo ""; '"$REDIS_CMD"
+else
+    watch -n 1 'echo "'"$FORMAT_COMMAND$ALL_QUERIES"'" | '"$DB_STRING"
+fi

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.1-dev]
 
+### Added
+
+- MySQL/MariaDB database support via `GENERIC_DATA_STORE_TYPE=mysql`
+  - Full CRUD support for all 4 storage modules (userdb, oauth2, passkey, audit)
+  - Docker Compose setup for MySQL 8.0 and MariaDB 11 in `db/mysql/`
+  - MariaDB compatibility (JSON stored as LONGTEXT is handled transparently)
+  - Updated `clear_db_cache.sh` and `monitor_db.sh` utilities for MySQL
+
 ## [0.4.0] - 2026-03-15
 
 ### Added

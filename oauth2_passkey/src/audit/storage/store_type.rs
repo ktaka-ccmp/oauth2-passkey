@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use super::super::{LoginHistoryEntry, LoginHistoryError};
 use crate::storage::GENERIC_DATA_STORE;
 
+use super::mysql::*;
 use super::postgres::*;
 use super::sqlite::*;
 
@@ -16,15 +17,20 @@ impl LoginHistoryStore {
     pub(crate) async fn init() -> Result<(), LoginHistoryError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
-        match (store.as_sqlite(), store.as_postgres()) {
-            (Some(pool), _) => {
+        match (store.as_sqlite(), store.as_postgres(), store.as_mysql()) {
+            (Some(pool), _, _) => {
                 create_tables_sqlite(pool).await?;
                 validate_login_history_tables_sqlite(pool).await?;
                 Ok(())
             }
-            (_, Some(pool)) => {
+            (_, Some(pool), _) => {
                 create_tables_postgres(pool).await?;
                 validate_login_history_tables_postgres(pool).await?;
+                Ok(())
+            }
+            (_, _, Some(pool)) => {
+                create_tables_mysql(pool).await?;
+                validate_login_history_tables_mysql(pool).await?;
                 Ok(())
             }
             _ => Err(LoginHistoryError::Storage(
@@ -44,6 +50,8 @@ impl LoginHistoryStore {
             insert_login_history_sqlite(pool, entry).await
         } else if let Some(pool) = store.as_postgres() {
             insert_login_history_postgres(pool, entry).await
+        } else if let Some(pool) = store.as_mysql() {
+            insert_login_history_mysql(pool, entry).await
         } else {
             return Err(LoginHistoryError::Storage(
                 "Unsupported database type".to_string(),
@@ -79,6 +87,8 @@ impl LoginHistoryStore {
             get_login_history_by_user_sqlite(pool, user_id, limit, offset).await
         } else if let Some(pool) = store.as_postgres() {
             get_login_history_by_user_postgres(pool, user_id, limit, offset).await
+        } else if let Some(pool) = store.as_mysql() {
+            get_login_history_by_user_mysql(pool, user_id, limit, offset).await
         } else {
             return Err(LoginHistoryError::Storage(
                 "Unsupported database type".to_string(),
@@ -116,6 +126,9 @@ impl LoginHistoryStore {
                 pool, user_id, from, to, limit, offset,
             )
             .await
+        } else if let Some(pool) = store.as_mysql() {
+            get_login_history_by_user_with_date_range_mysql(pool, user_id, from, to, limit, offset)
+                .await
         } else {
             return Err(LoginHistoryError::Storage(
                 "Unsupported database type".to_string(),
@@ -151,6 +164,8 @@ impl LoginHistoryStore {
         } else if let Some(pool) = store.as_postgres() {
             query_login_history_admin_postgres(pool, user_id, from, to, success, limit, offset)
                 .await
+        } else if let Some(pool) = store.as_mysql() {
+            query_login_history_admin_mysql(pool, user_id, from, to, success, limit, offset).await
         } else {
             return Err(LoginHistoryError::Storage(
                 "Unsupported database type".to_string(),

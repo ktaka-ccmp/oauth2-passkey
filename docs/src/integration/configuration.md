@@ -61,6 +61,7 @@ Specifies the database backend for persistent storage.
 |-------|-------------|
 | `sqlite` | SQLite database (development/testing) |
 | `postgres` | PostgreSQL database (production) |
+| `mysql` | MySQL/MariaDB database (production) |
 
 ```bash
 GENERIC_DATA_STORE_TYPE=postgres
@@ -84,6 +85,13 @@ GENERIC_DATA_STORE_URL='sqlite:./db/sqlite/data/data.db'
 # In-memory SQLite (useful for testing)
 GENERIC_DATA_STORE_URL='sqlite:file:memdb1?mode=memory&cache=shared'
 GENERIC_DATA_STORE_URL=':memory:'
+```
+
+**MySQL/MariaDB format:**
+```bash
+GENERIC_DATA_STORE_URL='mysql://user:password@host:port/database'
+# MariaDB uses the same driver (typically on a different port)
+GENERIC_DATA_STORE_URL='mysql://user:password@host:3307/database'
 ```
 
 ## Cache Configuration

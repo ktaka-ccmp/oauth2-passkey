@@ -6,6 +6,7 @@ use crate::storage::GENERIC_DATA_STORE;
 use crate::passkey::errors::PasskeyError;
 use crate::passkey::types::{CredentialId, CredentialSearchField};
 
+use super::mysql::*;
 use super::postgres::*;
 use super::sqlite::*;
 
@@ -15,17 +16,23 @@ impl PasskeyStore {
     pub(crate) async fn init() -> Result<(), PasskeyError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
-        match (store.as_sqlite(), store.as_postgres()) {
-            (Some(pool), _) => {
+        match (store.as_sqlite(), store.as_postgres(), store.as_mysql()) {
+            (Some(pool), _, _) => {
                 create_tables_sqlite(pool).await?;
                 migrate_passkey_tables_sqlite(pool).await?;
                 validate_passkey_tables_sqlite(pool).await?;
                 Ok(())
             }
-            (_, Some(pool)) => {
+            (_, Some(pool), _) => {
                 create_tables_postgres(pool).await?;
                 migrate_passkey_tables_postgres(pool).await?;
                 validate_passkey_tables_postgres(pool).await?;
+                Ok(())
+            }
+            (_, _, Some(pool)) => {
+                create_tables_mysql(pool).await?;
+                migrate_passkey_tables_mysql(pool).await?;
+                validate_passkey_tables_mysql(pool).await?;
                 Ok(())
             }
             _ => Err(PasskeyError::Storage(
@@ -44,6 +51,8 @@ impl PasskeyStore {
             store_credential_sqlite(pool, credential_id, &credential).await
         } else if let Some(pool) = store.as_postgres() {
             store_credential_postgres(pool, credential_id, &credential).await
+        } else if let Some(pool) = store.as_mysql() {
+            store_credential_mysql(pool, credential_id, &credential).await
         } else {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }
@@ -58,6 +67,8 @@ impl PasskeyStore {
             get_credential_sqlite(pool, credential_id).await
         } else if let Some(pool) = store.as_postgres() {
             get_credential_postgres(pool, credential_id).await
+        } else if let Some(pool) = store.as_mysql() {
+            get_credential_mysql(pool, credential_id).await
         } else {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }
@@ -72,6 +83,8 @@ impl PasskeyStore {
             get_credentials_by_field_sqlite(pool, &field).await
         } else if let Some(pool) = store.as_postgres() {
             get_credentials_by_field_postgres(pool, &field).await
+        } else if let Some(pool) = store.as_mysql() {
+            get_credentials_by_field_mysql(pool, &field).await
         } else {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }
@@ -87,6 +100,8 @@ impl PasskeyStore {
             update_credential_counter_sqlite(pool, credential_id, counter).await
         } else if let Some(pool) = store.as_postgres() {
             update_credential_counter_postgres(pool, credential_id, counter).await
+        } else if let Some(pool) = store.as_mysql() {
+            update_credential_counter_mysql(pool, credential_id, counter).await
         } else {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }
@@ -101,6 +116,8 @@ impl PasskeyStore {
             delete_credential_by_field_sqlite(pool, &field).await
         } else if let Some(pool) = store.as_postgres() {
             delete_credential_by_field_postgres(pool, &field).await
+        } else if let Some(pool) = store.as_mysql() {
+            delete_credential_by_field_mysql(pool, &field).await
         } else {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }
@@ -117,6 +134,8 @@ impl PasskeyStore {
             update_credential_user_details_sqlite(pool, credential_id, name, display_name).await
         } else if let Some(pool) = store.as_postgres() {
             update_credential_user_details_postgres(pool, credential_id, name, display_name).await
+        } else if let Some(pool) = store.as_mysql() {
+            update_credential_user_details_mysql(pool, credential_id, name, display_name).await
         } else {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }
@@ -132,6 +151,8 @@ impl PasskeyStore {
             update_credential_last_used_at_sqlite(pool, credential_id, last_used_at).await
         } else if let Some(pool) = store.as_postgres() {
             update_credential_last_used_at_postgres(pool, credential_id, last_used_at).await
+        } else if let Some(pool) = store.as_mysql() {
+            update_credential_last_used_at_mysql(pool, credential_id, last_used_at).await
         } else {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }

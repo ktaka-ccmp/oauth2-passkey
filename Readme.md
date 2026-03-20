@@ -144,7 +144,7 @@ ORIGIN='https://your-domain.com'
 OAUTH2_GOOGLE_CLIENT_ID='your-google-client-id'
 OAUTH2_GOOGLE_CLIENT_SECRET='your-google-secret'
 
-# Database (SQLite by default, PostgreSQL for production)
+# Database (SQLite by default; PostgreSQL or MySQL/MariaDB for production)
 GENERIC_DATA_STORE_TYPE=sqlite
 GENERIC_DATA_STORE_URL='sqlite:data/auth.db'
 

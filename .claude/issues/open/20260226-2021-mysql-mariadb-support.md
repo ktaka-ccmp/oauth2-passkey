@@ -108,4 +108,11 @@ Follow the existing pattern: create `mysql.rs` for each module, extend `DataStor
 - Decision: Create mysql.rs for each module, extend DataStore trait with as_mysql(), update dispatch logic. MySQL parameter binding uses `?` (same as SQLite), UPSERT uses `ON DUPLICATE KEY UPDATE` (different from both SQLite and PostgreSQL).
 - Reason: MySQL/MariaDB have large market share. Users with existing MySQL infrastructure should not need a separate PostgreSQL instance for this library. CockroachDB (PostgreSQL-compatible) and TiDB (MySQL-compatible) are covered implicitly.
 
+### 2026-03-21: INFORMATION_SCHEMA BLOB workaround
+
+- Context: MySQL INFORMATION_SCHEMA returns `DATA_TYPE` and `COLUMN_NAME` columns with binary collation, causing sqlx to decode them as BLOB instead of VARCHAR. This is a known MySQL bug ([#19443](https://bugs.mysql.com/bug.php?id=19443), [#27282](https://bugs.mysql.com/27282)) also reported in [sqlx #3691](https://github.com/launchbadge/sqlx/issues/3691).
+- Decision: Use `CAST(... AS CHAR)` in `validate_mysql_table_schema()` queries. This is a query-level fix that does not depend on the user's connection string.
+- Alternative: Adding `?charset=utf8mb4` to the MySQL connection URL may also resolve it at the connection level, but this depends on user configuration and is not under library control.
+- Revisit: If sqlx fixes this upstream or if `charset` in the connection string proves more robust, consider removing the CAST workaround.
+
 ## Resolution
