@@ -75,31 +75,32 @@ credential_id TEXT NOT NULL UNIQUE,  -- Keep as WebAuthn identifier
 - Current scale (small to medium) may not benefit significantly
 - `passkey_credentials.credential_id` is WebAuthn-specified, must remain as unique identifier
 
-### When to Implement
-
-This optimization is primarily beneficial when:
-- QPS reaches thousands per second
-- Tables grow to millions of rows
-- Foreign key joins become frequent
-
-For small to medium scale deployments, the current design is sufficient.
-
 ## Related Files
 
-- `oauth2_passkey/src/oauth2/storage/sqlite.rs`
-- `oauth2_passkey/src/oauth2/storage/postgres.rs`
-- `oauth2_passkey/src/passkey/storage/sqlite.rs`
-- `oauth2_passkey/src/passkey/storage/postgres.rs`
-- `oauth2_passkey/src/oauth2/types.rs`
-- `oauth2_passkey/src/passkey/types.rs`
+- `oauth2_passkey/src/oauth2/storage/sqlite.rs` - OAuth2 SQLite schema + queries
+- `oauth2_passkey/src/oauth2/storage/postgres.rs` - OAuth2 PostgreSQL schema + queries
+- `oauth2_passkey/src/passkey/storage/sqlite.rs` - Passkey SQLite schema + queries
+- `oauth2_passkey/src/passkey/storage/postgres.rs` - Passkey PostgreSQL schema + queries
+- `oauth2_passkey/src/oauth2/types.rs` - OAuth2Account struct
+- `oauth2_passkey/src/passkey/types.rs` - PasskeyCredential struct
+- `oauth2_passkey/src/test_utils.rs` - Test data (first user credentials)
+
+## Scope
+
+No foreign keys reference oauth2_accounts.id or passkey_credentials.credential_id
+from other tables. login_history.credential_id is denormalized (no FK constraint).
+No JOIN queries exist -- all lookups are single-table. This makes the change safe.
 
 ## Implementation Tasks
 
-- [ ] Add `sequence_number` column to `oauth2_accounts` schema
-- [ ] Add `sequence_number` column to `passkey_credentials` schema
-- [ ] Update storage layer for both SQLite and PostgreSQL
-- [ ] Handle migration for existing data
-- [ ] Update type definitions
+- [ ] Add `sequence_number` to OAuth2Account type definition
+- [ ] Add `sequence_number` to PasskeyCredential type definition
+- [ ] Update oauth2_accounts SQLite schema (CREATE TABLE + queries)
+- [ ] Update oauth2_accounts PostgreSQL schema (CREATE TABLE + queries)
+- [ ] Update passkey_credentials SQLite schema (CREATE TABLE + queries)
+- [ ] Update passkey_credentials PostgreSQL schema (CREATE TABLE + queries)
+- [ ] Update test_utils (first user test data)
+- [ ] Verify: `cargo test` passes, `cargo clippy` clean
 
 ## Decision Log
 
@@ -114,5 +115,11 @@ For small to medium scale deployments, the current design is sufficient.
 - Reason: The `users` table already implements the sequential pkey pattern correctly.
   Sessions are stored in cache (Redis/memory), avoiding B-tree locality issues.
   Benefits only materialize at very large scale (millions of rows, thousands of QPS).
+
+### 2026-03-21: Implement as best practice, not optimization
+
+- Context: Sequential integer primary keys are a database design best practice regardless of scale. Deferring correct schema design is not YAGNI -- YAGNI applies to speculative features, not established patterns.
+- Decision: Implement now. Follow the existing users table pattern.
+- Reason: Consistency across all tables. No foreign keys reference these columns from other tables, so the change is safe.
 
 ## Resolution
