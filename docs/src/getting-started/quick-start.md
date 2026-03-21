@@ -109,7 +109,7 @@ Setup is similar to demo-both: copy `.env` from `dot.env.simple`, adjust for eac
 | `ORIGIN` | Yes | Base URL of your application (e.g., `http://localhost:3001`) |
 | `OAUTH2_GOOGLE_CLIENT_ID` | For OAuth2 | Google OAuth2 client ID |
 | `OAUTH2_GOOGLE_CLIENT_SECRET` | For OAuth2 | Google OAuth2 client secret |
-| `GENERIC_DATA_STORE_TYPE` | Yes | Database type: `sqlite` or `postgresql` |
+| `GENERIC_DATA_STORE_TYPE` | Yes | Database type: `sqlite`, `postgres`, or `mysql` |
 | `GENERIC_DATA_STORE_URL` | Yes | Database connection URL |
 | `GENERIC_CACHE_STORE_TYPE` | Yes | Cache type: `memory` or `redis` |
 | `GENERIC_CACHE_STORE_URL` | Yes | Cache connection URL |

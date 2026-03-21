@@ -5,6 +5,7 @@ use crate::userdb::{
     types::{User, UserSearchField},
 };
 
+use super::mysql::*;
 use super::postgres::*;
 use super::sqlite::*;
 
@@ -15,8 +16,8 @@ impl UserStore {
     pub(crate) async fn init() -> Result<(), UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
-        match (store.as_sqlite(), store.as_postgres()) {
-            (Some(pool), _) => {
+        match (store.as_sqlite(), store.as_postgres(), store.as_mysql()) {
+            (Some(pool), _, _) => {
                 create_tables_sqlite(pool).await?;
                 validate_user_tables_sqlite(pool).await?;
                 if *crate::config::O2P_DEMO_MODE {
@@ -24,11 +25,19 @@ impl UserStore {
                 }
                 Ok(())
             }
-            (_, Some(pool)) => {
+            (_, Some(pool), _) => {
                 create_tables_postgres(pool).await?;
                 validate_user_tables_postgres(pool).await?;
                 if *crate::config::O2P_DEMO_MODE {
                     insert_demo_placeholder_postgres(pool).await?;
+                }
+                Ok(())
+            }
+            (_, _, Some(pool)) => {
+                create_tables_mysql(pool).await?;
+                validate_user_tables_mysql(pool).await?;
+                if *crate::config::O2P_DEMO_MODE {
+                    insert_demo_placeholder_mysql(pool).await?;
                 }
                 Ok(())
             }
@@ -43,6 +52,8 @@ impl UserStore {
             get_all_users_sqlite(pool).await
         } else if let Some(pool) = store.as_postgres() {
             get_all_users_postgres(pool).await
+        } else if let Some(pool) = store.as_mysql() {
+            get_all_users_mysql(pool).await
         } else {
             Err(UserError::Storage("Unsupported database type".to_string()))
         }
@@ -62,6 +73,8 @@ impl UserStore {
             get_user_by_field_sqlite(pool, &field).await
         } else if let Some(pool) = store.as_postgres() {
             get_user_by_field_postgres(pool, &field).await
+        } else if let Some(pool) = store.as_mysql() {
+            get_user_by_field_mysql(pool, &field).await
         } else {
             Err(UserError::Storage("Unsupported database type".to_string()))
         };
@@ -92,6 +105,8 @@ impl UserStore {
             upsert_user_sqlite(pool, user).await
         } else if let Some(pool) = store.as_postgres() {
             upsert_user_postgres(pool, user).await
+        } else if let Some(pool) = store.as_mysql() {
+            upsert_user_mysql(pool, user).await
         } else {
             return Err(UserError::Storage("Unsupported database type".to_string()));
         }?;
@@ -107,6 +122,8 @@ impl UserStore {
                 upsert_user_sqlite(pool, admin_user).await
             } else if let Some(pool) = store.as_postgres() {
                 upsert_user_postgres(pool, admin_user).await
+            } else if let Some(pool) = store.as_mysql() {
+                upsert_user_mysql(pool, admin_user).await
             } else {
                 return Err(UserError::Storage("Unsupported database type".to_string()));
             }
@@ -138,6 +155,8 @@ impl UserStore {
             count_admin_users_sqlite(pool).await
         } else if let Some(pool) = store.as_postgres() {
             count_admin_users_postgres(pool).await
+        } else if let Some(pool) = store.as_mysql() {
+            count_admin_users_mysql(pool).await
         } else {
             Err(UserError::Storage("Unsupported database type".to_string()))
         }
@@ -150,6 +169,8 @@ impl UserStore {
             delete_user_sqlite(pool, id).await
         } else if let Some(pool) = store.as_postgres() {
             delete_user_postgres(pool, id).await
+        } else if let Some(pool) = store.as_mysql() {
+            delete_user_mysql(pool, id).await
         } else {
             Err(UserError::Storage("Unsupported database type".to_string()))
         }

@@ -34,6 +34,15 @@ GENERIC_DATA_STORE_TYPE=postgres
 GENERIC_DATA_STORE_URL='postgresql://user:password@localhost:5432/database'
 ```
 
+**MySQL/MariaDB** (production alternative):
+
+```env
+GENERIC_DATA_STORE_TYPE=mysql
+GENERIC_DATA_STORE_URL='mysql://user:password@localhost:3306/database'
+# MariaDB (same driver, typically on a different port)
+GENERIC_DATA_STORE_URL='mysql://user:password@localhost:3307/database'
+```
+
 ### Cache Store (Session Storage)
 
 Stores temporary data like sessions and challenges. Choose one:
@@ -94,6 +103,31 @@ psql postgresql://passkey:passkey@localhost:5432/passkey
 # Then run: \dt to see tables, SELECT * FROM users; etc.
 ```
 
+### MySQL/MariaDB Setup
+
+Start MySQL and MariaDB using Docker Compose:
+
+```bash
+cd db/mysql
+docker compose up -d
+docker compose ps
+```
+
+This creates two databases:
+
+- **MySQL 8.0** - Port `3306`, User: `demo`, Password: `demo`, Database: `demo`
+- **MariaDB 11** - Port `3307`, User: `demo`, Password: `demo`, Database: `demo`
+
+Monitor MySQL/MariaDB:
+
+```bash
+# Connect to MySQL
+mysql -h localhost -P 3306 -u demo -pdemo --skip-ssl demo
+# Connect to MariaDB
+mysql -h localhost -P 3307 -u demo -pdemo --skip-ssl demo
+# Then run: SHOW TABLES; SELECT * FROM o2p_users; etc.
+```
+
 ### Redis Setup
 
 Start Redis using Docker Compose:
@@ -130,6 +164,16 @@ GENERIC_CACHE_STORE_URL=''
 # PostgreSQL + Redis (scalable, persistent)
 GENERIC_DATA_STORE_TYPE=postgres
 GENERIC_DATA_STORE_URL='postgresql://user:password@db-host:5432/dbname'
+GENERIC_CACHE_STORE_TYPE=redis
+GENERIC_CACHE_STORE_URL='redis://redis-host:6379'
+```
+
+### Production Configuration (MySQL/MariaDB)
+
+```env
+# MySQL/MariaDB + Redis (scalable, persistent)
+GENERIC_DATA_STORE_TYPE=mysql
+GENERIC_DATA_STORE_URL='mysql://user:password@db-host:3306/dbname'
 GENERIC_CACHE_STORE_TYPE=redis
 GENERIC_CACHE_STORE_URL='redis://redis-host:6379'
 ```
@@ -171,6 +215,13 @@ watch -n 2 "echo 'SELECT COUNT(*) as users FROM o2p_users; SELECT COUNT(*) as cr
 watch -n 2 "echo 'SELECT COUNT(*) as users FROM o2p_users; SELECT COUNT(*) as creds FROM o2p_passkey_credentials;' | psql postgresql://passkey:passkey@localhost:5432/passkey"
 ```
 
+### MySQL/MariaDB Monitoring
+
+```bash
+# Real-time monitoring
+watch -n 2 "echo 'SELECT COUNT(*) as users FROM o2p_users; SELECT COUNT(*) as creds FROM o2p_passkey_credentials;' | mysql -h localhost -P 3306 -u demo -pdemo --skip-ssl demo"
+```
+
 ### Redis Monitoring
 
 ```bash
@@ -197,7 +248,7 @@ redis-cli --scan --pattern "challenge:*" | head -10
 **Performance Issues:**
 
 - Use Redis for cache in production (not memory)
-- Use PostgreSQL for data in production (not SQLite)
+- Use PostgreSQL or MySQL/MariaDB for data in production (not SQLite)
 - Connection pooling is automatically handled by the library
 
 ## Security Considerations

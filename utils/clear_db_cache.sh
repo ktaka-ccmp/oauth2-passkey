@@ -42,8 +42,8 @@ fi
 if [ -z "$GENERIC_DATA_STORE_TYPE" ] || [ -z "$GENERIC_DATA_STORE_URL" ] || [ -z "$GENERIC_CACHE_STORE_TYPE" ]; then
     echo "ERROR: Required environment variables are not set in .env file."
     echo "Please ensure the following variables are set:"
-    echo "  GENERIC_DATA_STORE_TYPE (e.g., postgres, sqlite)"
-    echo "  GENERIC_DATA_STORE_URL (e.g., postgresql://passkey:passkey@localhost:5432/passkey)"
+    echo "  GENERIC_DATA_STORE_TYPE (e.g., postgres, sqlite, mysql)"
+    echo "  GENERIC_DATA_STORE_URL (e.g., postgresql://user:pass@localhost:5432/db, mysql://user:pass@localhost:3306/db)"
     echo "  GENERIC_CACHE_STORE_TYPE (e.g., redis, memory)"
     echo "  GENERIC_CACHE_STORE_URL (e.g., redis://localhost:6379) - required for redis"
     exit 1
@@ -79,9 +79,28 @@ case "$GENERIC_DATA_STORE_TYPE" in
             echo "Nothing to clear."
         fi
         ;;
+    mysql)
+        # Parse mysql://user:password@host:port/dbname
+        MYSQL_URL="${GENERIC_DATA_STORE_URL#mysql://}"
+        MYSQL_USERPASS="${MYSQL_URL%%@*}"
+        MYSQL_USER="${MYSQL_USERPASS%%:*}"
+        MYSQL_PASS="${MYSQL_USERPASS#*:}"
+        MYSQL_HOSTPORTDB="${MYSQL_URL#*@}"
+        MYSQL_HOSTPORT="${MYSQL_HOSTPORTDB%%/*}"
+        MYSQL_DB="${MYSQL_HOSTPORTDB#*/}"
+        # Remove query parameters from DB name
+        MYSQL_DB="${MYSQL_DB%%\?*}"
+        MYSQL_HOST="${MYSQL_HOSTPORT%%:*}"
+        MYSQL_PORT="${MYSQL_HOSTPORT#*:}"
+        if [ "$MYSQL_PORT" = "$MYSQL_HOST" ]; then
+            MYSQL_PORT="3306"
+        fi
+        # --skip-ssl is for local Docker development; production should use TLS
+        DB_STRING="mysql -h $MYSQL_HOST -P $MYSQL_PORT -u $MYSQL_USER -p$MYSQL_PASS --skip-ssl $MYSQL_DB"
+        ;;
     *)
         echo "ERROR: Unsupported data store type: $GENERIC_DATA_STORE_TYPE"
-        echo "Supported types: postgres, sqlite"
+        echo "Supported types: postgres, sqlite, mysql"
         exit 1
         ;;
 esac
@@ -96,6 +115,7 @@ echo "Tables to be dropped:"
 echo "  - o2p_users"
 echo "  - o2p_oauth2_accounts"
 echo "  - o2p_passkey_credentials"
+echo "  - o2p_login_history"
 echo ""
 
 read -p "Are you sure you want to continue? (yes/no): " confirmation
@@ -112,6 +132,7 @@ echo "Clearing database tables..."
 if [[ "$GENERIC_DATA_STORE_TYPE" == "sqlite" && ! -f "$DB_PATH" ]]; then
     echo "SQLite database file does not exist, skipping table drops."
 else
+    echo "DROP TABLE IF EXISTS o2p_login_history;" | $DB_STRING
     echo "DROP TABLE IF EXISTS o2p_passkey_credentials;" | $DB_STRING
     echo "DROP TABLE IF EXISTS o2p_oauth2_accounts;" | $DB_STRING
     echo "DROP TABLE IF EXISTS o2p_users;" | $DB_STRING

@@ -38,4 +38,6 @@ pub(crate) use types::{CacheData, CacheKey, CachePrefix};
 pub(crate) use data_store::{DB_TABLE_PREFIX, GENERIC_DATA_STORE};
 
 // Re-export schema validation function for internal use
-pub(crate) use schema_validation::{validate_postgres_table_schema, validate_sqlite_table_schema};
+pub(crate) use schema_validation::{
+    validate_mysql_table_schema, validate_postgres_table_schema, validate_sqlite_table_schema,
+};

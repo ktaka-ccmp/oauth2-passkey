@@ -7,5 +7,6 @@ fn test_data_store_trait_bounds() {
 
     assert_send_sync::<SqliteDataStore>();
     assert_send_sync::<PostgresDataStore>();
+    assert_send_sync::<MySqlDataStore>();
     assert_send_sync::<Box<dyn DataStore>>();
 }

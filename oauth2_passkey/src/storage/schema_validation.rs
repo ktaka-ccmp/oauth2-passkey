@@ -1,4 +1,4 @@
-use sqlx::{Pool, Postgres, Row, Sqlite};
+use sqlx::{MySql, Pool, Postgres, Row, Sqlite};
 
 /// Validates that a database table schema matches what we expect
 pub(crate) async fn validate_postgres_table_schema<E>(
@@ -84,6 +84,91 @@ pub(crate) async fn validate_postgres_table_schema<E>(
     Ok(())
 }
 
+/// Validates that a MySQL/MariaDB database table schema matches what we expect
+pub(crate) async fn validate_mysql_table_schema<E>(
+    pool: &Pool<MySql>,
+    table_name: &str,
+    expected_columns: &[(&str, &str)],
+    error_mapper: impl Fn(String) -> E,
+) -> Result<(), E> {
+    // Check if table exists
+    let table_exists: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
+    )
+    .bind(table_name)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| error_mapper(e.to_string()))?;
+
+    if !table_exists {
+        return Err(error_mapper(format!(
+            "Schema validation failed: Table '{table_name}' does not exist"
+        )));
+    }
+
+    // Query actual schema from database
+    // CAST is required because MySQL INFORMATION_SCHEMA returns some columns as BLOB
+    let rows = sqlx::query(
+        "SELECT CAST(COLUMN_NAME AS CHAR) AS col_name, CAST(DATA_TYPE AS CHAR) AS data_type FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY COLUMN_NAME",
+    )
+    .bind(table_name)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| error_mapper(e.to_string()))?;
+
+    let actual_columns: Vec<(String, String)> = rows
+        .iter()
+        .map(|row| {
+            let name: String = row.get("col_name");
+            let type_: String = row.get("data_type");
+            (name, type_)
+        })
+        .collect();
+
+    // Compare schemas
+    // MariaDB maps JSON to longtext, so we treat them as equivalent
+    for (expected_name, expected_type) in expected_columns {
+        let found = actual_columns
+            .iter()
+            .find(|(name, _)| name == expected_name);
+
+        match found {
+            Some((_, actual_type)) if mysql_types_compatible(actual_type, expected_type) => {
+                // Column exists with correct type, all good
+            }
+            Some((_, actual_type)) => {
+                // Column exists but with wrong type
+                return Err(error_mapper(format!(
+                    "Schema validation failed: Column '{expected_name}' has type '{actual_type}' but expected '{expected_type}'"
+                )));
+            }
+            None => {
+                // Column doesn't exist
+                return Err(error_mapper(format!(
+                    "Schema validation failed: Missing column '{expected_name}'"
+                )));
+            }
+        }
+    }
+
+    // Check for extra columns (just log a warning)
+    for (actual_name, _) in &actual_columns {
+        if !expected_columns
+            .iter()
+            .any(|(name, _)| *name == actual_name)
+        {
+            tracing::warn!(
+                "Extra column '{}' found in table '{}'",
+                actual_name,
+                table_name
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Validates that a database table schema matches what we expect
 pub(crate) async fn validate_sqlite_table_schema<E>(
     pool: &Pool<Sqlite>,
@@ -148,4 +233,17 @@ pub(crate) async fn validate_sqlite_table_schema<E>(
     }
 
     Ok(())
+}
+
+/// Check if MySQL/MariaDB types are compatible.
+/// MariaDB stores JSON as LONGTEXT, so they should be treated as equivalent.
+fn mysql_types_compatible(actual: &str, expected: &str) -> bool {
+    if actual == expected {
+        return true;
+    }
+    // MariaDB: JSON is stored as longtext
+    matches!(
+        (actual, expected),
+        ("longtext", "json") | ("json", "longtext")
+    )
 }

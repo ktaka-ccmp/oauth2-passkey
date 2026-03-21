@@ -3,6 +3,7 @@ use crate::oauth2::types::{AccountSearchField, OAuth2Account, Provider, Provider
 use crate::session::UserId;
 use crate::storage::GENERIC_DATA_STORE;
 
+use super::mysql::*;
 use super::postgres::*;
 use super::sqlite::*;
 
@@ -43,15 +44,20 @@ impl OAuth2Store {
     pub(crate) async fn init() -> Result<(), OAuth2Error> {
         let store = GENERIC_DATA_STORE.lock().await;
 
-        match (store.as_sqlite(), store.as_postgres()) {
-            (Some(pool), _) => {
+        match (store.as_sqlite(), store.as_postgres(), store.as_mysql()) {
+            (Some(pool), _, _) => {
                 create_tables_sqlite(pool).await?;
                 validate_oauth2_tables_sqlite(pool).await?;
                 Ok(())
             }
-            (_, Some(pool)) => {
+            (_, Some(pool), _) => {
                 create_tables_postgres(pool).await?;
                 validate_oauth2_tables_postgres(pool).await?;
+                Ok(())
+            }
+            (_, _, Some(pool)) => {
+                create_tables_mysql(pool).await?;
+                validate_oauth2_tables_mysql(pool).await?;
                 Ok(())
             }
             _ => Err(OAuth2Error::Storage(
@@ -68,10 +74,10 @@ impl OAuth2Store {
 
         if let Some(pool) = store.as_sqlite() {
             get_oauth2_accounts_by_field_sqlite(pool, &AccountSearchField::UserId(user_id)).await
-            // get_oauth2_accounts_sqlite(pool, user_id).await
         } else if let Some(pool) = store.as_postgres() {
             get_oauth2_accounts_by_field_postgres(pool, &AccountSearchField::UserId(user_id)).await
-            // get_oauth2_accounts_postgres(pool, user_id).await
+        } else if let Some(pool) = store.as_mysql() {
+            get_oauth2_accounts_by_field_mysql(pool, &AccountSearchField::UserId(user_id)).await
         } else {
             Err(OAuth2Error::Storage(
                 "Unsupported database type".to_string(),
@@ -87,6 +93,8 @@ impl OAuth2Store {
             get_oauth2_accounts_by_field_sqlite(pool, &field).await
         } else if let Some(pool) = store.as_postgres() {
             get_oauth2_accounts_by_field_postgres(pool, &field).await
+        } else if let Some(pool) = store.as_mysql() {
+            get_oauth2_accounts_by_field_mysql(pool, &field).await
         } else {
             Err(OAuth2Error::Storage(
                 "Unsupported database type".to_string(),
@@ -105,6 +113,8 @@ impl OAuth2Store {
             get_oauth2_account_by_provider_sqlite(pool, provider, provider_user_id).await
         } else if let Some(pool) = store.as_postgres() {
             get_oauth2_account_by_provider_postgres(pool, provider, provider_user_id).await
+        } else if let Some(pool) = store.as_mysql() {
+            get_oauth2_account_by_provider_mysql(pool, provider, provider_user_id).await
         } else {
             Err(OAuth2Error::Storage(
                 "Unsupported database type".to_string(),
@@ -134,6 +144,8 @@ impl OAuth2Store {
             upsert_oauth2_account_sqlite(pool, account).await
         } else if let Some(pool) = store.as_postgres() {
             upsert_oauth2_account_postgres(pool, account).await
+        } else if let Some(pool) = store.as_mysql() {
+            upsert_oauth2_account_mysql(pool, account).await
         } else {
             Err(OAuth2Error::Storage(
                 "Unsupported database type".to_string(),
@@ -150,6 +162,8 @@ impl OAuth2Store {
             delete_oauth2_accounts_by_field_sqlite(pool, &field).await
         } else if let Some(pool) = store.as_postgres() {
             delete_oauth2_accounts_by_field_postgres(pool, &field).await
+        } else if let Some(pool) = store.as_mysql() {
+            delete_oauth2_accounts_by_field_mysql(pool, &field).await
         } else {
             Err(OAuth2Error::Storage(
                 "Unsupported database type".to_string(),
