@@ -54,6 +54,9 @@ pub(super) async fn validate_user_tables_mysql(pool: &Pool<MySql>) -> Result<(),
 }
 
 pub(super) async fn get_all_users_mysql(pool: &Pool<MySql>) -> Result<Vec<User>, UserError> {
+    // Ensure tables exist before any operations
+    create_tables_mysql(pool).await?;
+
     let table_name = DB_TABLE_USERS.as_str();
 
     sqlx::query_as::<_, User>(&format!(
@@ -70,6 +73,9 @@ pub(super) async fn get_user_by_field_mysql(
     pool: &Pool<MySql>,
     field: &UserSearchField,
 ) -> Result<Option<User>, UserError> {
+    // Ensure tables exist before any operations
+    create_tables_mysql(pool).await?;
+
     let table_name = DB_TABLE_USERS.as_str();
 
     match field {
@@ -108,12 +114,13 @@ pub(super) async fn upsert_user_mysql(pool: &Pool<MySql>, user: User) -> Result<
         .await
         .map_err(|e| UserError::Storage(e.to_string()))?;
 
-    let existing =
-        sqlx::query_as::<_, User>(&format!(r#"SELECT * FROM {table_name} WHERE id = ?"#))
-            .bind(&updated_user.id)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|e| UserError::Storage(e.to_string()))?;
+    let existing = sqlx::query_as::<_, User>(&format!(
+        r#"SELECT * FROM {table_name} WHERE id = ? FOR UPDATE"#
+    ))
+    .bind(&updated_user.id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
 
     if existing.is_some() {
         sqlx::query(&format!(
@@ -167,6 +174,9 @@ pub(super) async fn upsert_user_mysql(pool: &Pool<MySql>, user: User) -> Result<
 }
 
 pub(super) async fn count_admin_users_mysql(pool: &Pool<MySql>) -> Result<i64, UserError> {
+    // Ensure tables exist before any operations
+    create_tables_mysql(pool).await?;
+
     let table_name = DB_TABLE_USERS.as_str();
 
     let row: (i64,) = sqlx::query_as(&format!(
@@ -190,6 +200,12 @@ pub(super) async fn insert_demo_placeholder_mysql(pool: &Pool<MySql>) -> Result<
     let table_name = DB_TABLE_USERS.as_str();
     let now = chrono::Utc::now();
 
+    // Use a transaction to prevent race between INSERT, MAX() query, and ALTER TABLE
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| UserError::Storage(e.to_string()))?;
+
     // MySQL: INSERT IGNORE skips if duplicate key (sequence_number=1 or id conflict)
     sqlx::query(&format!(
         r#"
@@ -203,7 +219,7 @@ pub(super) async fn insert_demo_placeholder_mysql(pool: &Pool<MySql>) -> Result<
     .bind("[Demo Placeholder]")
     .bind(now)
     .bind(now)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
 
@@ -211,7 +227,7 @@ pub(super) async fn insert_demo_placeholder_mysql(pool: &Pool<MySql>) -> Result<
     let max_seq: (i64,) = sqlx::query_as(&format!(
         r#"SELECT COALESCE(MAX(sequence_number), 0) FROM {table_name}"#
     ))
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
 
@@ -219,14 +235,21 @@ pub(super) async fn insert_demo_placeholder_mysql(pool: &Pool<MySql>) -> Result<
         r#"ALTER TABLE {table_name} AUTO_INCREMENT = {}"#,
         max_seq.0 + 1
     ))
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| UserError::Storage(e.to_string()))?;
 
     Ok(())
 }
 
 pub(super) async fn delete_user_mysql(pool: &Pool<MySql>, id: UserId) -> Result<(), UserError> {
+    // Ensure tables exist before any operations
+    create_tables_mysql(pool).await?;
+
     let table_name = DB_TABLE_USERS.as_str();
 
     sqlx::query(&format!(

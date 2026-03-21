@@ -131,7 +131,7 @@ pub(super) async fn store_credential_mysql(
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     let existing = sqlx::query_as::<_, PasskeyCredential>(&format!(
-        r#"SELECT * FROM {passkey_table} WHERE credential_id = ?"#
+        r#"SELECT * FROM {passkey_table} WHERE credential_id = ? FOR UPDATE"#
     ))
     .bind(credential_id.as_str())
     .fetch_optional(&mut *tx)

@@ -154,11 +154,12 @@ pub(super) async fn upsert_oauth2_account_mysql(
         .await
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
-    // Check if the account already exists
+    // Check if the account already exists (FOR UPDATE to prevent concurrent insert race)
     let existing = sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
         SELECT * FROM {table_name}
         WHERE provider = ? AND provider_user_id = ?
+        FOR UPDATE
         "#
     ))
     .bind(&account.provider)
