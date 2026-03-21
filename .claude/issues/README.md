@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (10)
+### Open (11)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -20,6 +20,7 @@ This directory contains issue/task tracking files for the project.
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 | `20260321-1234` | low | small | [SQLite last_insert_rowid() Potential Race Condition](open/20260321-1234-sqlite-last-insert-rowid-race.md) |
+| `20260321-1346` | low | small | [Review delete_old_entries Dead Code and Retention Policy](open/20260321-1346-review-delete-old-entries-dead-code.md) |
 
 ### Completed (52)
 
