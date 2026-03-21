@@ -102,6 +102,12 @@ pub(super) async fn insert_login_history_sqlite(
     // Use a transaction to ensure last_insert_rowid() returns the correct value.
     // last_insert_rowid() is connection-scoped; without a transaction, the INSERT
     // and SELECT could run on different pool connections under concurrent load.
+    //
+    // Transaction flow:
+    //   BEGIN
+    //   INSERT INTO login_history (...) VALUES (?, ?, ?, ...)
+    //   SELECT * FROM login_history WHERE id = last_insert_rowid()
+    //   COMMIT
     let mut tx = pool
         .begin()
         .await
