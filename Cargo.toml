@@ -20,7 +20,7 @@ edition = "2024"
 
 [workspace.dependencies]
 # Common packages
-askama = { version = "0.15.4" }
+askama = { version = "0.15.5" }
 async-trait = "0.1.89"
 axum = { version = "0.8", features = ["http2", "macros", "multipart"] }
 axum-core = "0.5.6"
