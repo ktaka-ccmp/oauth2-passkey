@@ -133,15 +133,16 @@ pub(super) async fn store_credential_mysql(
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
     // MySQL uses ON DUPLICATE KEY UPDATE for upsert
+    // Use "AS new" alias syntax (MySQL 8.0.19+) instead of deprecated VALUES() function
     sqlx::query(&format!(
         r#"
         INSERT INTO {passkey_table}
         (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, rp_id, created_at, updated_at, last_used_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS new
         ON DUPLICATE KEY UPDATE
-        user_id = VALUES(user_id), public_key = VALUES(public_key), counter = VALUES(counter),
-        user_handle = VALUES(user_handle), user_name = VALUES(user_name), user_display_name = VALUES(user_display_name),
-        aaguid = VALUES(aaguid), rp_id = VALUES(rp_id), updated_at = CURRENT_TIMESTAMP(6), last_used_at = CURRENT_TIMESTAMP(6)
+        user_id = new.user_id, public_key = new.public_key, counter = new.counter,
+        user_handle = new.user_handle, user_name = new.user_name, user_display_name = new.user_display_name,
+        aaguid = new.aaguid, rp_id = new.rp_id, updated_at = CURRENT_TIMESTAMP(6), last_used_at = CURRENT_TIMESTAMP(6)
         "#
     ))
     .bind(credential_id.as_str())

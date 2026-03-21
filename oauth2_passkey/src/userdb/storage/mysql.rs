@@ -101,14 +101,15 @@ pub(super) async fn upsert_user_mysql(pool: &Pool<MySql>, user: User) -> Result<
     updated_user.updated_at = now;
 
     // MySQL uses ON DUPLICATE KEY UPDATE for upsert
+    // Use "AS new" alias syntax (MySQL 8.0.19+) instead of deprecated VALUES() function
     sqlx::query(&format!(
         r#"
         INSERT INTO {table_name} (id, account, label, is_admin, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?) AS new
         ON DUPLICATE KEY UPDATE
-            account = VALUES(account),
-            label = VALUES(label),
-            is_admin = VALUES(is_admin),
+            account = new.account,
+            label = new.label,
+            is_admin = new.is_admin,
             updated_at = ?
         "#
     ))

@@ -95,6 +95,7 @@ case "$GENERIC_DATA_STORE_TYPE" in
         if [ "$MYSQL_PORT" = "$MYSQL_HOST" ]; then
             MYSQL_PORT="3306"
         fi
+        # --skip-ssl is for local Docker development; production should use TLS
         DB_STRING="mysql -h $MYSQL_HOST -P $MYSQL_PORT -u $MYSQL_USER -p$MYSQL_PASS --skip-ssl $MYSQL_DB"
         ;;
     *)

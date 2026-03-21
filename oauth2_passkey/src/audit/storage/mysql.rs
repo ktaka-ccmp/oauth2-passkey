@@ -93,6 +93,14 @@ pub(super) async fn insert_login_history_mysql(
 
     let table_name = DB_TABLE_LOGIN_HISTORY.as_str();
 
+    // Use a transaction to ensure LAST_INSERT_ID() returns the correct value.
+    // LAST_INSERT_ID() is connection-scoped; without a transaction, the INSERT
+    // and SELECT could run on different pool connections under concurrent load.
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
+
     sqlx::query(&format!(
         r#"
         INSERT INTO {table_name} (
@@ -115,19 +123,23 @@ pub(super) async fn insert_login_history_mysql(
     .bind(&entry.failure_reason)
     .bind(&entry.aaguid)
     .bind(&entry.email)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
 
-    // Get the inserted entry with its ID (MySQL has no RETURNING clause)
+    // Fetch within the same transaction to guarantee LAST_INSERT_ID() consistency
     let result = sqlx::query_as::<_, LoginHistoryEntry>(&format!(
         r#"
         SELECT * FROM {table_name} WHERE id = LAST_INSERT_ID()
         "#
     ))
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
 
     Ok(result)
 }
