@@ -100,40 +100,70 @@ pub(super) async fn upsert_user_mysql(pool: &Pool<MySql>, user: User) -> Result<
     let mut updated_user = user;
     updated_user.updated_at = now;
 
-    // MySQL uses ON DUPLICATE KEY UPDATE for upsert
-    // Use "AS new" alias syntax (MySQL 8.0.19+) instead of deprecated VALUES() function
-    sqlx::query(&format!(
-        r#"
-        INSERT INTO {table_name} (id, account, label, is_admin, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?) AS new
-        ON DUPLICATE KEY UPDATE
-            account = new.account,
-            label = new.label,
-            is_admin = new.is_admin,
-            updated_at = ?
-        "#
-    ))
-    .bind(&updated_user.id)
-    .bind(&updated_user.account)
-    .bind(&updated_user.label)
-    .bind(updated_user.is_admin)
-    .bind(now) // created_at
-    .bind(now) // updated_at
-    .bind(now) // updated_at for the UPDATE part
-    .execute(pool)
-    .await
-    .map_err(|e| UserError::Storage(e.to_string()))?;
+    // Use SELECT+UPDATE/INSERT transaction pattern for MySQL/MariaDB compatibility.
+    // The "AS new" syntax (MySQL 8.0.19+) is not supported by MariaDB,
+    // and VALUES() is deprecated in MySQL 8.0.20+.
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| UserError::Storage(e.to_string()))?;
 
-    // Fetch the user to get the sequence_number (MySQL has no RETURNING clause)
-    sqlx::query_as::<_, User>(&format!(
-        r#"
-        SELECT * FROM {table_name} WHERE id = ?
-        "#
-    ))
-    .bind(&updated_user.id)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| UserError::Storage(e.to_string()))
+    let existing =
+        sqlx::query_as::<_, User>(&format!(r#"SELECT * FROM {table_name} WHERE id = ?"#))
+            .bind(&updated_user.id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    if existing.is_some() {
+        sqlx::query(&format!(
+            r#"
+            UPDATE {table_name} SET
+                account = ?,
+                label = ?,
+                is_admin = ?,
+                updated_at = ?
+            WHERE id = ?
+            "#
+        ))
+        .bind(&updated_user.account)
+        .bind(&updated_user.label)
+        .bind(updated_user.is_admin)
+        .bind(now)
+        .bind(&updated_user.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| UserError::Storage(e.to_string()))?;
+    } else {
+        sqlx::query(&format!(
+            r#"
+            INSERT INTO {table_name} (id, account, label, is_admin, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            "#
+        ))
+        .bind(&updated_user.id)
+        .bind(&updated_user.account)
+        .bind(&updated_user.label)
+        .bind(updated_user.is_admin)
+        .bind(now)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| UserError::Storage(e.to_string()))?;
+    }
+
+    // Fetch the user to get the sequence_number
+    let result = sqlx::query_as::<_, User>(&format!(r#"SELECT * FROM {table_name} WHERE id = ?"#))
+        .bind(&updated_user.id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    Ok(result)
 }
 
 pub(super) async fn count_admin_users_mysql(pool: &Pool<MySql>) -> Result<i64, UserError> {

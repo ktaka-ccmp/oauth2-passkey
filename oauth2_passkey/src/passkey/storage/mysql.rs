@@ -120,46 +120,75 @@ pub(super) async fn store_credential_mysql(
     credential: &PasskeyCredential,
 ) -> Result<(), PasskeyError> {
     let counter_i32 = credential.counter as i32;
-    let public_key = &credential.public_key;
-    let user_id = &credential.user_id;
-    let user_handle = &credential.user.user_handle;
-    let user_name = &credential.user.name;
-    let user_display_name = &credential.user.display_name;
-    let aaguid = &credential.aaguid;
-    let rp_id = &credential.rp_id;
-    let created_at = &credential.created_at;
-    let updated_at = &credential.updated_at;
-    let last_used_at = &credential.last_used_at;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    // MySQL uses ON DUPLICATE KEY UPDATE for upsert
-    // Use "AS new" alias syntax (MySQL 8.0.19+) instead of deprecated VALUES() function
-    sqlx::query(&format!(
-        r#"
-        INSERT INTO {passkey_table}
-        (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, rp_id, created_at, updated_at, last_used_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS new
-        ON DUPLICATE KEY UPDATE
-        user_id = new.user_id, public_key = new.public_key, counter = new.counter,
-        user_handle = new.user_handle, user_name = new.user_name, user_display_name = new.user_display_name,
-        aaguid = new.aaguid, rp_id = new.rp_id, updated_at = CURRENT_TIMESTAMP(6), last_used_at = CURRENT_TIMESTAMP(6)
-        "#
+    // Use SELECT+UPDATE/INSERT transaction pattern for MySQL/MariaDB compatibility.
+    // The "AS new" syntax (MySQL 8.0.19+) is not supported by MariaDB,
+    // and VALUES() is deprecated in MySQL 8.0.20+.
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    let existing = sqlx::query_as::<_, PasskeyCredential>(&format!(
+        r#"SELECT * FROM {passkey_table} WHERE credential_id = ?"#
     ))
     .bind(credential_id.as_str())
-    .bind(user_id)
-    .bind(public_key)
-    .bind(counter_i32)
-    .bind(user_handle)
-    .bind(user_name)
-    .bind(user_display_name)
-    .bind(aaguid)
-    .bind(rp_id)
-    .bind(created_at)
-    .bind(updated_at)
-    .bind(last_used_at)
-    .execute(pool)
+    .fetch_optional(&mut *tx)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    if existing.is_some() {
+        sqlx::query(&format!(
+            r#"
+            UPDATE {passkey_table} SET
+                user_id = ?, public_key = ?, counter = ?,
+                user_handle = ?, user_name = ?, user_display_name = ?,
+                aaguid = ?, rp_id = ?,
+                updated_at = CURRENT_TIMESTAMP(6), last_used_at = CURRENT_TIMESTAMP(6)
+            WHERE credential_id = ?
+            "#
+        ))
+        .bind(&credential.user_id)
+        .bind(&credential.public_key)
+        .bind(counter_i32)
+        .bind(&credential.user.user_handle)
+        .bind(&credential.user.name)
+        .bind(&credential.user.display_name)
+        .bind(&credential.aaguid)
+        .bind(&credential.rp_id)
+        .bind(credential_id.as_str())
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    } else {
+        sqlx::query(&format!(
+            r#"
+            INSERT INTO {passkey_table}
+            (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, rp_id, created_at, updated_at, last_used_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#
+        ))
+        .bind(credential_id.as_str())
+        .bind(&credential.user_id)
+        .bind(&credential.public_key)
+        .bind(counter_i32)
+        .bind(&credential.user.user_handle)
+        .bind(&credential.user.name)
+        .bind(&credential.user.display_name)
+        .bind(&credential.aaguid)
+        .bind(&credential.rp_id)
+        .bind(credential.created_at)
+        .bind(credential.updated_at)
+        .bind(credential.last_used_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     Ok(())
 }
