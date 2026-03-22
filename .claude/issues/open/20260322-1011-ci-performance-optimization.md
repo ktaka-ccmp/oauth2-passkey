@@ -139,6 +139,7 @@ Share compiled artifacts across jobs via `sccache` + GitHub Actions cache backen
 ## Related Files
 
 - `.github/workflows/ci.yml`
+- `.github/workflows/ci-nightly.yml` (new, weekly beta/nightly)
 - `.github/workflows/coverage.yml`
 - `.github/workflows/docs.yml` (no changes needed, already fast at 22-27s)
 - `.github/workflows/deploy-demo.yml` (no changes needed, Docker-based)
@@ -146,18 +147,18 @@ Share compiled artifacts across jobs via `sccache` + GitHub Actions cache backen
 ## Implementation Tasks
 
 ### Phase 1
-- [ ] Switch ci.yml from `actions/cache` to `Swatinem/rust-cache@v2`
-- [ ] Switch coverage.yml from `actions/cache` to `Swatinem/rust-cache@v2`
-- [ ] Replace `cargo install cargo-audit` with `taiki-e/install-action@cargo-audit`
-- [ ] Remove redundant `cargo build` steps in ci.yml
-- [ ] Add `Swatinem/rust-cache@v2` to docs job in ci.yml
-- [ ] Add `Swatinem/rust-cache@v2` to MSRV job in ci.yml
+- [x] Switch ci.yml from `actions/cache` to `Swatinem/rust-cache@v2`
+- [x] Switch coverage.yml from `actions/cache` to `Swatinem/rust-cache@v2`
+- [x] Replace `cargo install cargo-audit` with `taiki-e/install-action@cargo-audit`
+- [x] Remove redundant `cargo build` steps in ci.yml
+- [x] Add `Swatinem/rust-cache@v2` to docs job in ci.yml
+- [x] Add `Swatinem/rust-cache@v2` to MSRV job in ci.yml
 - [ ] Verify all CI jobs pass after changes
 - [ ] Compare timing before/after
 
 ### Phase 2
-- [ ] Move beta/nightly to weekly scheduled workflow
-- [ ] Split fmt/clippy into fast lint job with `needs` dependency
+- [x] Move beta/nightly to weekly scheduled workflow (ci-nightly.yml)
+- [x] Split fmt/clippy into fast lint job with `needs: lint` dependency
 
 ## Decision Log
 
@@ -166,5 +167,11 @@ Share compiled artifacts across jobs via `sccache` + GitHub Actions cache backen
 - Context: CI runs taking 6-12 minutes wall-clock, with cache restore/save consuming more time than actual builds and tests. `actions/cache` caching entire `target/` (~10 GiB) is the root cause.
 - Decision: Phased approach -- Phase 1 (quick wins with Swatinem/rust-cache, pre-built cargo-audit, remove redundant builds) should cut billable time by ~50%. Phase 2 (weekly nightly, lint job) for further optimization.
 - Reason: Phase 1 changes are low-risk and high-impact. Phase 2 requires workflow restructuring. Phase 3 (sccache) has diminishing returns and complexity.
+
+### 2026-03-22: Implemented Phase 1 + Phase 2
+
+- Context: Implementing CI performance optimizations.
+- Decision: Implemented Phase 1 (Swatinem/rust-cache, pre-built cargo-audit, remove redundant builds, add cache to msrv) and Phase 2 (lint job split, beta/nightly to weekly ci-nightly.yml) together. Skipped Phase 3 (sccache) due to diminishing returns.
+- Reason: Phase 1+2 combined address all high-impact optimizations. Phase 3 adds complexity with minimal additional benefit after rust-cache already handles dependency caching.
 
 ## Resolution
