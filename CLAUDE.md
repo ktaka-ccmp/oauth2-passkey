@@ -258,6 +258,7 @@ For persistent task and bug tracking across sessions:
 - **Purpose**: Track tasks that span multiple sessions
 - **Filename**: `YYYYMMDD-HHMM-<short-slug>.md` (legacy: `YYYY-MM-DD-<slug>.md`)
 - **ID Format**: `YYYYMMDD-HHMM` (legacy: `YYYY-MM-DD-NN`)
+- **IMPORTANT**: Always run `date +%H%M` to get the actual current time before creating an issue. Never guess or hardcode the time.
 - **Status**: `open`, `completed`, `wontfix`, `deferred`
 - **Priority**: `high`, `medium`, `low`
 - **Structure**: `open/`, `completed/`, `deferred/` subdirectories

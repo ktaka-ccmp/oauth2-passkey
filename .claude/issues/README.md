@@ -6,20 +6,23 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (10)
+### Open (13)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2019` | high | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
+| `20260322-0926` | high | medium | [Passkey Counter Verification TOCTOU Race Condition](open/20260322-0926-passkey-counter-verification-race.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `20260226-2020` | medium | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
+| `20260322-0927` | medium | large | [User Deletion Lacks Atomicity Across Multiple Stores](open/20260322-0927-user-deletion-atomicity.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 | `20260321-1346` | low | small | [Review delete_old_entries Dead Code and Retention Policy](open/20260321-1346-review-delete-old-entries-dead-code.md) |
+| `20260322-0907` | low | small | [upsert_oauth2_account SELECT after COMMIT race condition](open/20260322-0907-upsert-oauth2-account-post-tx-select-race.md) |
 
 ### Completed (53)
 
@@ -127,6 +130,8 @@ YYYYMMDD-HHMM-<short-slug>.md
 
 Example: `20260210-1430-login-history-enhancement.md`
 
+**IMPORTANT**: Always run `date +%H%M` to get the actual current time before naming the file. Never guess or hardcode the time.
+
 Legacy issues use `YYYY-MM-DD-<slug>.md` and are not renamed.
 
 ## Issue ID Format
@@ -138,7 +143,7 @@ YYYYMMDD-HHMM
 ```
 
 - `YYYYMMDD`: Creation date
-- `HHMM`: Creation time (24h format)
+- `HHMM`: Creation time (24h format) — **must be obtained by running `date +%H%M`**
 
 Example: `20260210-1430`, `20260210-1545`
 
@@ -242,11 +247,12 @@ a corresponding Decision Log entry explaining what changed and why.
 
 ## Workflow
 
-1. Create new issue in `open/` directory
-2. **Update this README's "Current Issues" table** (increment count, add row)
-3. Work on the issue
-4. When resolved, update Resolution section and move to `completed/`
-5. If postponed, move to `deferred/`
+1. **Run `date +%H%M` to get the current time** before naming the issue file or setting the ID
+2. Create new issue in `open/` directory using the confirmed timestamp
+3. **Update this README's "Current Issues" table** (increment count, add row)
+4. Work on the issue
+5. When resolved, update Resolution section and move to `completed/`
+6. If postponed, move to `deferred/`
 
 **Important**: Always update the README table when creating, completing, or moving issues.
 
