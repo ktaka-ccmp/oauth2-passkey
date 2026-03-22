@@ -240,10 +240,28 @@ fn verify_user_handle(
     Ok(())
 }
 
-/// Verifies the authenticator counter to prevent replay attacks
+/// Verifies the authenticator counter to detect credential cloning.
 ///
-/// The counter should always increase to prevent replay attacks.
-/// A counter value of 0 indicates the authenticator doesn't support counters.
+/// # Security background
+///
+/// The counter value is embedded in `authenticatorData`, which is signed by the
+/// authenticator's private key. An attacker cannot tamper with the counter without
+/// invalidating the signature (verified before this function is called).
+///
+/// The counter detects **hardware cloning** of authenticators: if a credential's
+/// private key is extracted and used on a cloned device, both devices produce valid
+/// signatures, but the server will observe the counter failing to increase
+/// monotonically (e.g., counter=7 arriving twice from different devices).
+///
+/// Replay attacks are prevented separately by the per-authentication challenge,
+/// not by the counter.
+///
+/// # Behavior
+///
+/// - `counter == 0`: The authenticator does not support counters; skip verification.
+/// - `counter > stored`: Normal case. Atomically updates the stored counter via
+///   `UPDATE ... WHERE counter < ?` to avoid TOCTOU races.
+/// - `counter <= stored`: Possible credential cloning detected; returns an error.
 async fn verify_counter(
     credential_id: CredentialId,
     auth_data: &AuthenticatorData,
