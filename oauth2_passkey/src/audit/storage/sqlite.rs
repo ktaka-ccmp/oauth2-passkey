@@ -335,7 +335,7 @@ pub(super) async fn query_login_history_admin_sqlite(
 /// Delete old login history entries (for retention policy)
 pub(super) async fn delete_old_entries_sqlite(
     pool: &Pool<Sqlite>,
-    days_to_keep: i64,
+    cutoff: DateTime<Utc>,
 ) -> Result<u64, LoginHistoryError> {
     create_tables_sqlite(pool).await?;
 
@@ -344,9 +344,10 @@ pub(super) async fn delete_old_entries_sqlite(
     let result = sqlx::query(&format!(
         r#"
         DELETE FROM {table_name}
-        WHERE timestamp < datetime('now', '-{days_to_keep} days')
+        WHERE timestamp < ?
         "#
     ))
+    .bind(cutoff)
     .execute(pool)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;

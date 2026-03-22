@@ -34,8 +34,10 @@ pub async fn cleanup_old_login_history() -> Result<u64, Box<dyn std::error::Erro
 ///     Ok(())
 /// }
 /// ```
-pub fn spawn_login_history_cleanup() -> tokio::task::JoinHandle<()> {
+pub fn spawn_login_history_cleanup() {
     tokio::spawn(async {
+        // Note: tokio::time::interval fires immediately on first tick,
+        // so cleanup runs once at startup, then every 24 hours.
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(86400));
         loop {
             interval.tick().await;
@@ -45,7 +47,7 @@ pub fn spawn_login_history_cleanup() -> tokio::task::JoinHandle<()> {
                 Err(e) => tracing::error!("Login history cleanup failed: {e}"),
             }
         }
-    })
+    });
 }
 
 #[cfg(test)]

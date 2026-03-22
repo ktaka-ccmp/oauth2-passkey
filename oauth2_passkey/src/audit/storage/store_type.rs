@@ -186,7 +186,6 @@ impl LoginHistoryStore {
 
     /// Delete login history entries older than the specified number of days.
     /// Returns the number of deleted entries.
-    #[tracing::instrument]
     pub(crate) async fn delete_old_entries(days_to_keep: u32) -> Result<u64, LoginHistoryError> {
         if days_to_keep == 0 {
             return Err(LoginHistoryError::Storage(
@@ -194,35 +193,20 @@ impl LoginHistoryStore {
             ));
         }
 
+        let cutoff = Utc::now() - chrono::Duration::days(days_to_keep as i64);
         let store = GENERIC_DATA_STORE.lock().await;
-        let days = days_to_keep as i64;
 
-        let result = if let Some(pool) = store.as_sqlite() {
-            delete_old_entries_sqlite(pool, days).await
+        if let Some(pool) = store.as_sqlite() {
+            delete_old_entries_sqlite(pool, cutoff).await
         } else if let Some(pool) = store.as_postgres() {
-            delete_old_entries_postgres(pool, days).await
+            delete_old_entries_postgres(pool, cutoff).await
         } else if let Some(pool) = store.as_mysql() {
-            delete_old_entries_mysql(pool, days).await
+            delete_old_entries_mysql(pool, cutoff).await
         } else {
-            return Err(LoginHistoryError::Storage(
+            Err(LoginHistoryError::Storage(
                 "Unsupported database type".to_string(),
-            ));
-        };
-
-        match &result {
-            Ok(count) => {
-                tracing::info!(
-                    deleted = count,
-                    days_to_keep = days_to_keep,
-                    "Login history cleanup completed"
-                );
-            }
-            Err(e) => {
-                tracing::error!(error = %e, "Failed to cleanup old login history");
-            }
+            ))
         }
-
-        result
     }
 }
 
