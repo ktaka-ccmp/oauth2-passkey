@@ -336,14 +336,12 @@ async fn test_get_credentials_by_username() {
     .await;
 }
 
-/// Test updating credential counter for replay attack prevention
-///
-/// This test verifies the ability to update the credential counter value
-/// in the database. It tests that counter values can be incremented properly
-/// to prevent replay attacks in passkey authentication.
+/// This test verifies the atomic credential counter update that only succeeds
+/// when the new counter value is greater than the stored value.
+/// This prevents TOCTOU race conditions in counter verification.
 #[tokio::test]
 #[serial]
-async fn test_update_credential_counter() {
+async fn test_atomic_update_credential_counter() {
     init_test_environment().await;
     let _ = PasskeyStore::init().await;
     let _ = UserStore::init().await;
@@ -364,30 +362,43 @@ async fn test_update_credential_counter() {
     )
     .await;
 
-    // Update counter
-    let new_counter = 42;
-    let update_result = PasskeyStore::update_credential_counter(
-        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
-        new_counter,
-    )
-    .await;
-    assert!(
-        update_result.is_ok(),
-        "Failed to update counter: {:?}",
-        update_result.err()
-    );
+    // Atomic update with higher counter should succeed
+    let cred_id = CredentialId::new(credential_id.to_string()).expect("Valid credential ID");
+    let updated = PasskeyStore::atomic_update_credential_counter(cred_id.clone(), 42)
+        .await
+        .expect("Failed to atomic update counter");
+    assert!(updated, "Counter update should succeed when new > stored");
 
     // Verify counter was updated
-    let get_result = PasskeyStore::get_credential(
-        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
-    )
-    .await
-    .unwrap()
-    .unwrap();
-    assert_eq!(
-        get_result.counter, new_counter,
-        "Counter should be updated to new value"
-    );
+    let get_result = PasskeyStore::get_credential(cred_id.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(get_result.counter, 42, "Counter should be updated to 42");
+
+    // Atomic update with same counter should fail (not less than)
+    let updated = PasskeyStore::atomic_update_credential_counter(cred_id.clone(), 42)
+        .await
+        .expect("Failed to atomic update counter");
+    assert!(!updated, "Counter update should fail when new == stored");
+
+    // Atomic update with lower counter should fail
+    let updated = PasskeyStore::atomic_update_credential_counter(cred_id.clone(), 10)
+        .await
+        .expect("Failed to atomic update counter");
+    assert!(!updated, "Counter update should fail when new < stored");
+
+    // Atomic update with higher counter should succeed again
+    let updated = PasskeyStore::atomic_update_credential_counter(cred_id.clone(), 100)
+        .await
+        .expect("Failed to atomic update counter");
+    assert!(updated, "Counter update should succeed when new > stored");
+
+    let get_result = PasskeyStore::get_credential(cred_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(get_result.counter, 100, "Counter should be updated to 100");
 
     // Cleanup
     let _ = PasskeyStore::delete_credential_by(CredentialSearchField::CredentialId(

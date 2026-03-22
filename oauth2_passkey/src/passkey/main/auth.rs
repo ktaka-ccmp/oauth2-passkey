@@ -240,10 +240,28 @@ fn verify_user_handle(
     Ok(())
 }
 
-/// Verifies the authenticator counter to prevent replay attacks
+/// Verifies the authenticator counter to detect credential cloning.
 ///
-/// The counter should always increase to prevent replay attacks.
-/// A counter value of 0 indicates the authenticator doesn't support counters.
+/// # Security background
+///
+/// The counter value is embedded in `authenticatorData`, which is signed by the
+/// authenticator's private key. An attacker cannot tamper with the counter without
+/// invalidating the signature (verified before this function is called).
+///
+/// The counter detects **hardware cloning** of authenticators: if a credential's
+/// private key is extracted and used on a cloned device, both devices produce valid
+/// signatures, but the server will observe the counter failing to increase
+/// monotonically (e.g., counter=7 arriving twice from different devices).
+///
+/// Replay attacks are prevented separately by the per-authentication challenge,
+/// not by the counter.
+///
+/// # Behavior
+///
+/// - `counter == 0`: The authenticator does not support counters; skip verification.
+/// - `counter > stored`: Normal case. Atomically updates the stored counter via
+///   `UPDATE ... WHERE counter < ?` to avoid TOCTOU races.
+/// - `counter <= stored`: Possible credential cloning detected; returns an error.
 async fn verify_counter(
     credential_id: CredentialId,
     auth_data: &AuthenticatorData,
@@ -259,26 +277,31 @@ async fn verify_counter(
     if auth_counter == 0 {
         // Counter value of 0 means the authenticator doesn't support counters
         tracing::info!("Authenticator does not support counters (received counter=0)");
-    } else if auth_counter <= stored_credential.counter {
-        // Counter value decreased or didn't change - possible cloning attack
-        tracing::warn!(
-            "Counter verification failed - stored: {}, received: {}",
-            stored_credential.counter,
-            auth_counter
-        );
-        return Err(PasskeyError::Authentication(
-            "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
-        ));
     } else {
-        // Counter increased as expected
-        tracing::debug!(
-            "Counter verification successful - stored: {}, received: {}",
-            stored_credential.counter,
-            auth_counter
-        );
+        // Atomic CHECK + UPDATE: only updates if new counter > stored counter.
+        // This prevents TOCTOU race conditions where concurrent authentications
+        // could interleave between a separate check and update.
+        let updated =
+            PasskeyStore::atomic_update_credential_counter(credential_id.clone(), auth_counter)
+                .await?;
 
-        // Update the counter
-        PasskeyStore::update_credential_counter(credential_id.clone(), auth_counter).await?;
+        if updated {
+            tracing::debug!(
+                "Counter verification successful - stored: {}, received: {}",
+                stored_credential.counter,
+                auth_counter
+            );
+        } else {
+            // rows_affected == 0: counter was not less than new value
+            tracing::warn!(
+                "Counter verification failed - stored: {}, received: {}",
+                stored_credential.counter,
+                auth_counter
+            );
+            return Err(PasskeyError::Authentication(
+                "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
+            ));
+        }
     }
 
     Ok(())
