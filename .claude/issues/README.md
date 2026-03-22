@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (13)
+### Open (14)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -18,6 +18,7 @@ This directory contains issue/task tracking files for the project.
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
 | `20260322-0927` | medium | large | [User Deletion Lacks Atomicity Across Multiple Stores](open/20260322-0927-user-deletion-atomicity.md) |
+| `20260322-1011` | medium | medium | [CI Performance Optimization](open/20260322-1011-ci-performance-optimization.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
