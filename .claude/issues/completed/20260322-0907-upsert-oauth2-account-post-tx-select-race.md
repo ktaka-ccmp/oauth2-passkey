@@ -14,9 +14,9 @@
 
 ## Created: 2026-03-22
 
-## Closed:
+## Closed: 2026-03-22
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -100,9 +100,9 @@ Ok(updated_account)
 
 ## Implementation Tasks
 
-- [ ] Move SELECT inside transaction in `upsert_oauth2_account_sqlite()`
-- [ ] Move SELECT inside transaction in `upsert_oauth2_account_postgres()`
-- [ ] Verify tests pass
+- [x] Move SELECT inside transaction in `upsert_oauth2_account_sqlite()`
+- [x] Move SELECT inside transaction in `upsert_oauth2_account_postgres()`
+- [x] Verify tests pass
 
 ## Decision Log
 
@@ -112,4 +112,12 @@ Ok(updated_account)
 - Decision: Create issue for consistency fix. MySQL version already has the correct implementation to use as reference.
 - Reason: Same category of issue -- queries that should be inside a transaction are executed on the pool instead.
 
+### 2026-03-22: Implemented fix
+
+- Context: Fixing the post-COMMIT SELECT race condition.
+- Decision: Moved SELECT before COMMIT using `&mut *tx`, matching the MySQL implementation.
+- Reason: Standard sqlx pattern for read-your-writes consistency. No alternative approaches needed.
+
 ## Resolution
+
+Moved SELECT inside the transaction (before `tx.commit()`) in both SQLite and PostgreSQL implementations, using `&mut *tx` instead of `pool`. This matches the MySQL implementation that already had the correct pattern. All three backends now consistently fetch inside the transaction for read-your-writes consistency.
