@@ -2,6 +2,8 @@
 
 ## Table of Contents
 
+- [2026-03-22: upsert_oauth2_account post-COMMIT SELECT race fix](#2026-03-22-upsert_oauth2_account-post-commit-select-race-fix)
+- [2026-03-22: Atomic passkey counter verification (TOCTOU fix)](#2026-03-22-atomic-passkey-counter-verification-toctou-fix)
 - [2026-03-22: CI performance optimization -- Phase 1+2](#2026-03-22-ci-performance-optimization----phase-12)
 - [2026-03-22: SQLite last_insert_rowid() transaction fix](#2026-03-22-sqlite-last_insert_rowid-transaction-fix)
 - [2026-03-22: Codebase transaction audit -- three new issues](#2026-03-22-codebase-transaction-audit----three-new-issues)
@@ -64,6 +66,76 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-22: upsert_oauth2_account post-COMMIT SELECT race fix
+
+**Issue**: `20260322-0907` (completed) | **Priority**: low | **Difficulty**: small
+
+Bug fix
+
+### Motivation
+
+In `upsert_oauth2_account_sqlite()` and `upsert_oauth2_account_postgres()`, after the INSERT/UPDATE transaction was committed, a SELECT query was executed on `pool` (not the transaction) to fetch the updated account. This created a race condition where the SELECT could see stale data if another concurrent request modified the same row between COMMIT and SELECT. The MySQL implementation already had the correct pattern (SELECT inside transaction).
+
+### User-facing impact
+
+- **Before**: Under concurrent OAuth2 account linking, the returned `OAuth2Account` could contain stale data from before the upsert (SQLite/PostgreSQL only)
+- **After**: SELECT executes inside the transaction via `&mut *tx`, guaranteeing read-your-writes consistency across all three backends
+
+```rust
+// Before (SQLite/PostgreSQL):
+tx.commit().await?;
+let updated = sqlx::query_as(...).fetch_one(pool).await?;  // race window
+
+// After (matches MySQL):
+let updated = sqlx::query_as(...).fetch_one(&mut *tx).await?;  // inside tx
+tx.commit().await?;
+```
+
+### Design decisions
+
+Matched the existing MySQL implementation pattern. No alternative approaches were needed -- moving the SELECT before COMMIT and using `&mut *tx` is the standard sqlx pattern for read-your-writes consistency.
+
+### Key files
+
+`oauth2_passkey/src/oauth2/storage/sqlite.rs`, `oauth2_passkey/src/oauth2/storage/postgres.rs`
+
+## 2026-03-22: Atomic passkey counter verification (TOCTOU fix)
+
+**Issue**: `20260322-0926` (completed) | **Priority**: high | **Difficulty**: medium
+
+Security fix
+
+### Motivation
+
+The WebAuthn counter verification in `passkey/main/auth.rs` used a GET -> CHECK -> UPDATE pattern across separate storage calls. Between CHECK and UPDATE, a concurrent authentication on the same credential could update the counter, creating a TOCTOU (Time-of-Check to Time-of-Use) race condition. This could potentially allow counter inconsistency, undermining the credential cloning detection mechanism.
+
+### User-facing impact
+
+- **Before**: Under concurrent passkey authentication on the same credential, the counter verification could be bypassed due to the race window between the in-memory check and the database update
+- **After**: Counter check and update are atomic via a single SQL statement (`UPDATE ... WHERE counter < ?`), eliminating the race window
+
+No API changes. The fix is entirely internal to the storage layer.
+
+### Design decisions
+
+**Approach chosen**: Atomic SQL `UPDATE ... WHERE counter < ?` (Option A from issue).
+
+- `rows_affected == 1`: counter was less than new value, update succeeded
+- `rows_affected == 0`: counter was NOT less, indicating potential credential cloning
+
+This was preferred over passing transactions through the Store trait API (Option B) because it required no API changes and the atomic SQL pattern is the standard solution for compare-and-set operations.
+
+**Additional improvements from PR review feedback**:
+
+1. **Stale log messages**: Changed log text from "stored" to "previously fetched" with a note that the actual DB value may differ due to concurrent updates
+2. **Test helper refactor**: Replaced `verify_counter_with_mock(skip_db_update: bool)` with `verify_counter_without_db()`, eliminating duplicated logic that could drift from the real implementation
+3. **i32 truncation fix**: Changed MySQL/PostgreSQL counter binding from `i32` to `i64` (matching SQLite), preventing silent truncation for counter values > 2^31
+4. **Security doc comments**: Added comprehensive documentation to `verify_counter()` explaining that the counter detects hardware cloning (not replay attacks, which are prevented by per-authentication challenges)
+
+### Key files
+
+`oauth2_passkey/src/passkey/main/auth.rs`, `oauth2_passkey/src/passkey/storage/store_type.rs`, `oauth2_passkey/src/passkey/storage/sqlite.rs`, `oauth2_passkey/src/passkey/storage/mysql.rs`, `oauth2_passkey/src/passkey/storage/postgres.rs`, `oauth2_passkey/src/passkey/main/auth/tests.rs`, `oauth2_passkey/src/passkey/storage/store_type/tests.rs`
 
 ## 2026-03-22: CI performance optimization -- Phase 1+2
 

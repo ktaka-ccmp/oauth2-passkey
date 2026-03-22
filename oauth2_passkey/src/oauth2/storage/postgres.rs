@@ -218,21 +218,20 @@ pub(super) async fn upsert_oauth2_account_postgres(
         id
     };
 
-    // Commit transaction
-    tx.commit()
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-    // Return the updated account
+    // Fetch inside the transaction for read-your-writes consistency
     let updated_account = sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
         SELECT * FROM {table_name} WHERE id = $1
         "#
     ))
     .bind(account_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     Ok(updated_account)
 }
