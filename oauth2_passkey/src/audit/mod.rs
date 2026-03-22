@@ -17,8 +17,9 @@ pub(crate) async fn init() -> Result<(), LoginHistoryError> {
     LoginHistoryStore::init().await
 }
 
+// Public exports
+pub use errors::LoginHistoryError;
 // Internal-only exports
-pub(crate) use errors::LoginHistoryError;
 pub(crate) use storage::LoginHistoryStore;
 use storage::O2P_LOGIN_HISTORY_RETENTION_DAYS;
 pub(crate) use types::AuthMethod;

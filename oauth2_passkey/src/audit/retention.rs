@@ -1,6 +1,6 @@
 //! Login history retention policy
 
-use super::{LoginHistoryStore, O2P_LOGIN_HISTORY_RETENTION_DAYS};
+use super::{LoginHistoryError, LoginHistoryStore, O2P_LOGIN_HISTORY_RETENTION_DAYS};
 
 /// Delete login history entries older than `O2P_LOGIN_HISTORY_RETENTION_DAYS`.
 ///
@@ -10,12 +10,12 @@ use super::{LoginHistoryStore, O2P_LOGIN_HISTORY_RETENTION_DAYS};
 ///
 /// This function does not run on a schedule -- use [`spawn_login_history_cleanup`]
 /// or call it periodically from your application.
-pub async fn cleanup_old_login_history() -> Result<u64, Box<dyn std::error::Error>> {
+pub async fn cleanup_old_login_history() -> Result<u64, LoginHistoryError> {
     let days = *O2P_LOGIN_HISTORY_RETENTION_DAYS;
     if days == 0 {
         return Ok(0);
     }
-    Ok(LoginHistoryStore::delete_old_entries(days).await?)
+    LoginHistoryStore::delete_old_entries(days).await
 }
 
 /// Spawn a background task that runs [`cleanup_old_login_history`] every 24 hours.

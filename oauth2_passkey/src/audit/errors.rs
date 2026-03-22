@@ -2,11 +2,14 @@
 
 use thiserror::Error;
 
+/// Errors that can occur during login history operations
 #[derive(Clone, Error, Debug)]
-pub(crate) enum LoginHistoryError {
+pub enum LoginHistoryError {
+    /// Database storage error
     #[error("Storage error: {0}")]
     Storage(String),
 
+    /// Invalid or malformed data
     #[error("Invalid data: {0}")]
     InvalidData(String),
 }

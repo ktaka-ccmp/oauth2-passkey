@@ -196,16 +196,13 @@ impl LoginHistoryStore {
         let cutoff = Utc::now() - chrono::Duration::days(days_to_keep as i64);
         let store = GENERIC_DATA_STORE.lock().await;
 
-        if let Some(pool) = store.as_sqlite() {
-            delete_old_entries_sqlite(pool, cutoff).await
-        } else if let Some(pool) = store.as_postgres() {
-            delete_old_entries_postgres(pool, cutoff).await
-        } else if let Some(pool) = store.as_mysql() {
-            delete_old_entries_mysql(pool, cutoff).await
-        } else {
-            Err(LoginHistoryError::Storage(
+        match (store.as_sqlite(), store.as_postgres(), store.as_mysql()) {
+            (Some(pool), _, _) => delete_old_entries_sqlite(pool, cutoff).await,
+            (_, Some(pool), _) => delete_old_entries_postgres(pool, cutoff).await,
+            (_, _, Some(pool)) => delete_old_entries_mysql(pool, cutoff).await,
+            _ => Err(LoginHistoryError::Storage(
                 "Unsupported database type".to_string(),
-            ))
+            )),
         }
     }
 }
