@@ -6,13 +6,12 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (13)
+### Open (12)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2019` | high | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
-| `20260322-0926` | high | medium | [Passkey Counter Verification TOCTOU Race Condition](open/20260322-0926-passkey-counter-verification-race.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `20260226-2020` | medium | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
@@ -24,10 +23,11 @@ This directory contains issue/task tracking files for the project.
 | `20260321-1346` | low | small | [Review delete_old_entries Dead Code and Retention Policy](open/20260321-1346-review-delete-old-entries-dead-code.md) |
 | `20260322-0907` | low | small | [upsert_oauth2_account SELECT after COMMIT race condition](open/20260322-0907-upsert-oauth2-account-post-tx-select-race.md) |
 
-### Completed (54)
+### Completed (55)
 
 | ID | Title |
 |----|-------|
+| `20260322-0926` | [Passkey Counter Verification TOCTOU Race Condition](completed/20260322-0926-passkey-counter-verification-race.md) |
 | `20260322-1011` | [CI Performance Optimization](completed/20260322-1011-ci-performance-optimization.md) |
 | `20260321-1234` | [SQLite last_insert_rowid() Potential Race Condition](completed/20260321-1234-sqlite-last-insert-rowid-race.md) |
 | `20260226-2021` | [MySQL/MariaDB Database Support](completed/20260226-2021-mysql-mariadb-support.md) |
