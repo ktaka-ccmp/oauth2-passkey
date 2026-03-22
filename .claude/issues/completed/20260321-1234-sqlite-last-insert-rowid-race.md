@@ -14,9 +14,9 @@
 
 ## Created: 2026-03-21-12-34
 
-## Closed:
+## Closed: 2026-03-21
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -68,8 +68,8 @@ tx.commit().await?;
 
 ## Implementation Tasks
 
-- [ ] Wrap INSERT + SELECT `last_insert_rowid()` in a transaction in `audit/storage/sqlite.rs`
-- [ ] Verify tests pass
+- [x] Wrap INSERT + SELECT `last_insert_rowid()` in a transaction in `audit/storage/sqlite.rs`
+- [x] Verify tests pass
 
 ## Decision Log
 
@@ -80,3 +80,5 @@ tx.commit().await?;
 - Reason: Keeps the MySQL PR focused on its scope while tracking the pre-existing issue.
 
 ## Resolution
+
+Fixed in commit `f6a6c95` on branch `sqlite-last-insert-rowid-race`. Wrapped INSERT + `last_insert_rowid()` SELECT in a transaction, matching the MySQL fix from commit `97b8ea6`.
