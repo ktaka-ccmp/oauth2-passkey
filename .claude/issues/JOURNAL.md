@@ -2,6 +2,7 @@
 
 ## Table of Contents
 
+- [2026-03-22: CI performance optimization -- Phase 1+2](#2026-03-22-ci-performance-optimization----phase-12)
 - [2026-03-22: SQLite last_insert_rowid() transaction fix](#2026-03-22-sqlite-last_insert_rowid-transaction-fix)
 - [2026-03-22: Codebase transaction audit -- three new issues](#2026-03-22-codebase-transaction-audit----three-new-issues)
 - [2026-03-22: rustls-webpki security update (RUSTSEC-2026-0049)](#2026-03-22-rustls-webpki-security-update-rustsec-2026-0049)
@@ -63,6 +64,55 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-22: CI performance optimization -- Phase 1+2
+
+**Issue**: `20260322-1011` (completed) | **Priority**: medium | **Difficulty**: medium
+
+Enhancement of CI/CD workflows
+
+### Motivation
+
+CI runs were taking 6-12 minutes wall-clock and 24-43 minutes billable time. The primary bottleneck was `actions/cache@v4` caching the entire `target/` directory (~10 GiB per cache entry), with download + extraction consuming 3-4 minutes per job -- more time than the actual builds and tests. Additionally, `cargo install cargo-audit` compiled from source every run (172s), beta/nightly ran on every PR despite being purely informational, and fmt/clippy ran inside the test matrix rather than as a fast gate.
+
+### User-facing impact
+
+- **Before**: Every PR triggered 6 jobs (stable/beta/nightly tests + security + docs + MSRV), taking ~12 minutes wall-clock and ~43 minutes billable. Cache restore alone consumed 3-4 minutes per job.
+- **After**: PR CI runs 5 jobs (lint + test + security + docs + MSRV) in ~5 minutes wall-clock and ~9 minutes billable. Beta/nightly run weekly instead of per-PR.
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Wall-clock | ~12m25s | ~5m22s | -57% |
+| Billable total | ~43m | ~9m | -80% |
+
+Biggest individual improvements:
+- Security Audit: 3m01s -> 8s (pre-built binary via `taiki-e/install-action`)
+- Test Suite: 9m15s -> 3m53s (Swatinem/rust-cache reducing restore from 3.4m to ~10s)
+- Documentation: 6m30s -> 1m43s (same cache improvement)
+
+### Design decisions
+
+**Phase 1 changes (quick wins):**
+
+1. `actions/cache@v4` -> `Swatinem/rust-cache@v2`: The generic cache action cached everything in `target/` including incremental build artifacts and workspace crate outputs (~10 GiB). Swatinem/rust-cache is Rust-specific and caches only dependency artifacts (1-2 GiB), auto-generates cache keys from rustc version + Cargo.lock, and cleans stale files before saving. `save-if` restricts cache writes to master/develop pushes to avoid polluting the 10 GiB cache limit from PR branches.
+
+2. `cargo install cargo-audit` -> `taiki-e/install-action@cargo-audit`: Downloads a pre-built binary (~2s) instead of compiling from source (~172s). This single change eliminated the need for any caching in the security audit job.
+
+3. Removed redundant `cargo build` steps: `cargo test` implicitly compiles, so the separate build steps added ~19s of pure overhead.
+
+4. Added Swatinem/rust-cache to MSRV and docs jobs that previously had either no cache or the slow `actions/cache`.
+
+**Phase 2 changes (structural):**
+
+5. Split fmt/clippy into a dedicated `lint` job: Test and docs jobs declare `needs: lint`, so lint failures skip expensive compilation entirely. This also removes the `if: matrix.rust == 'stable'` conditionals that were needed when lint ran inside the matrix.
+
+6. Moved beta/nightly to `ci-nightly.yml` with weekly cron schedule (Monday 06:00 UTC) + `workflow_dispatch` for manual trigger. These were `continue-on-error: true` in the main CI, purely informational, and cost ~22 minutes billable per PR.
+
+**Phase 3 (sccache) was deferred:** After Phase 1+2, dependency caching is handled by Swatinem/rust-cache. The remaining compilation is workspace crates, where sccache provides marginal benefit at significant complexity cost.
+
+### Key files
+
+`.github/workflows/ci.yml`, `.github/workflows/ci-nightly.yml` (new), `.github/workflows/coverage.yml`
 
 ## 2026-03-22: SQLite last_insert_rowid() transaction fix
 
