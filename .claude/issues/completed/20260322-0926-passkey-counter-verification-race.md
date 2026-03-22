@@ -14,9 +14,9 @@
 
 ## Created: 2026-03-22
 
-## Closed:
+## Closed: 2026-03-22
 
-## Status: open
+## Status: completed
 
 ## Priority: high
 
@@ -82,12 +82,12 @@ Option B: Pass a transaction through the Store trait API (larger refactor).
 
 ## Implementation Tasks
 
-- [ ] Design atomic counter verification approach
-- [ ] Implement atomic counter update in SQLite storage
-- [ ] Implement atomic counter update in MySQL storage
-- [ ] Implement atomic counter update in PostgreSQL storage
-- [ ] Update auth.rs to use atomic method
-- [ ] Verify tests pass
+- [x] Design atomic counter verification approach
+- [x] Implement atomic counter update in SQLite storage
+- [x] Implement atomic counter update in MySQL storage
+- [x] Implement atomic counter update in PostgreSQL storage
+- [x] Update auth.rs to use atomic method
+- [x] Verify tests pass
 
 ## Decision Log
 
@@ -97,4 +97,19 @@ Option B: Pass a transaction through the Store trait API (larger refactor).
 - Decision: Create separate high-priority issue since this has security implications (replay attack risk) and requires a different fix approach than the simpler storage-layer transaction fixes.
 - Reason: The fix crosses abstraction boundaries (auth logic <-> storage layer), making it more complex than wrapping queries in a transaction.
 
+### 2026-03-22: Implemented Option A (atomic SQL statement)
+
+- Context: Implementing the fix for the TOCTOU race condition.
+- Decision: Used `UPDATE ... SET counter = ? WHERE credential_id = ? AND counter < ?` across all three backends. Also replaced old `update_credential_counter` with `atomic_update_credential_counter`, fixed i32 truncation in MySQL/PostgreSQL by using i64, and added security doc comments to `verify_counter()`.
+- Reason: Option A is the simplest and most effective approach. No transaction API changes needed. Single SQL statement is inherently atomic.
+
 ## Resolution
+
+Implemented Option A: atomic `UPDATE ... WHERE counter < ?` for all three database backends (SQLite, MySQL, PostgreSQL).
+
+- Replaced separate CHECK + UPDATE with `atomic_update_credential_counter` that returns `bool` (true if counter was updated)
+- Removed old non-atomic `update_credential_counter` (dead code)
+- Fixed `counter as i32` truncation in MySQL/PostgreSQL by using i64 (consistent with SQLite)
+- Added security background doc comments to `verify_counter()` explaining counter's role (clone detection, not replay prevention)
+- Simplified test helper `verify_counter_with_mock` -> `verify_counter_without_db`
+- PR #282

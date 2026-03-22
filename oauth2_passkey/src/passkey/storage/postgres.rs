@@ -211,7 +211,7 @@ pub(super) async fn atomic_update_credential_counter_postgres(
     credential_id: CredentialId,
     new_counter: u32,
 ) -> Result<bool, PasskeyError> {
-    let counter_i32 = new_counter as i32;
+    let counter_i64 = new_counter as i64;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
     let result = sqlx::query(&format!(
@@ -221,7 +221,7 @@ pub(super) async fn atomic_update_credential_counter_postgres(
         WHERE credential_id = $2 AND counter < $1
         "#
     ))
-    .bind(counter_i32)
+    .bind(counter_i64)
     .bind(credential_id.as_str())
     .execute(pool)
     .await

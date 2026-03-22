@@ -244,7 +244,7 @@ pub(super) async fn atomic_update_credential_counter_mysql(
     credential_id: CredentialId,
     new_counter: u32,
 ) -> Result<bool, PasskeyError> {
-    let counter_i32 = new_counter as i32;
+    let counter_i64 = new_counter as i64;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
     let result = sqlx::query(&format!(
@@ -254,9 +254,9 @@ pub(super) async fn atomic_update_credential_counter_mysql(
         WHERE credential_id = ? AND counter < ?
         "#
     ))
-    .bind(counter_i32)
+    .bind(counter_i64)
     .bind(credential_id.as_str())
-    .bind(counter_i32)
+    .bind(counter_i64)
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;

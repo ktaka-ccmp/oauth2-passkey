@@ -287,14 +287,14 @@ async fn verify_counter(
 
         if updated {
             tracing::debug!(
-                "Counter verification successful - stored: {}, received: {}",
+                "Counter verification successful - previously fetched: {}, received: {}",
                 stored_credential.counter,
                 auth_counter
             );
         } else {
             // rows_affected == 0: counter was not less than new value
             tracing::warn!(
-                "Counter verification failed - stored: {}, received: {}",
+                "Counter verification failed - previously fetched: {}, received: {} (actual DB value may differ due to concurrent updates)",
                 stored_credential.counter,
                 auth_counter
             );

@@ -330,15 +330,8 @@ async fn test_verify_counter_valid_increment() {
     passkey.counter = 10;
     let auth_data = create_test_authenticator_data(15);
 
-    let result = verify_counter_with_mock(
-        CredentialId::new(passkey.credential_id.clone()).expect("Valid credential ID"),
-        &auth_data,
-        &passkey,
-        true,
-    )
-    .await;
+    let result = verify_counter_without_db(&auth_data, &passkey).await;
     assert!(result.is_ok());
-    // Note: In real implementation, counter would be updated in database
 }
 
 /// Test verify counter zero to positive
@@ -353,15 +346,8 @@ async fn test_verify_counter_zero_to_positive() {
     passkey.counter = 0; // Stored counter is 0 (authenticator didn't support counters before)
     let auth_data = create_test_authenticator_data(1); // Now receiving counter value 1
 
-    let result = verify_counter_with_mock(
-        CredentialId::new(passkey.credential_id.clone()).expect("Valid credential ID"),
-        &auth_data,
-        &passkey,
-        true,
-    )
-    .await;
+    let result = verify_counter_without_db(&auth_data, &passkey).await;
     assert!(result.is_ok());
-    // Note: In real implementation, counter would be updated in database
 }
 
 /// Test verify counter large increment
@@ -376,73 +362,24 @@ async fn test_verify_counter_large_increment() {
     passkey.counter = 100;
     let auth_data = create_test_authenticator_data(1000);
 
-    let result = verify_counter_with_mock(
-        CredentialId::new(passkey.credential_id.clone()).expect("Valid credential ID"),
-        &auth_data,
-        &passkey,
-        true,
-    )
-    .await;
+    let result = verify_counter_without_db(&auth_data, &passkey).await;
     assert!(result.is_ok());
-    // Note: In real implementation, counter would be updated in database
 }
 
-/// Test-friendly version of verify_counter that optionally skips database updates
+/// Test-only version of verify_counter that checks counter logic without DB access.
 #[cfg(test)]
-async fn verify_counter_with_mock(
-    credential_id: CredentialId,
+async fn verify_counter_without_db(
     auth_data: &AuthenticatorData,
     stored_credential: &PasskeyCredential,
-    skip_db_update: bool,
 ) -> Result<(), PasskeyError> {
     let auth_counter = auth_data.counter;
-    tracing::debug!(
-        "Counter verification - stored: {}, received: {}",
-        stored_credential.counter,
-        auth_counter
-    );
 
     if auth_counter == 0 {
-        // Counter value of 0 means the authenticator doesn't support counters
         tracing::info!("Authenticator does not support counters (received counter=0)");
-    } else {
-        if !skip_db_update {
-            let updated =
-                PasskeyStore::atomic_update_credential_counter(credential_id.clone(), auth_counter)
-                    .await?;
-
-            if updated {
-                tracing::debug!(
-                    "Counter verification successful - stored: {}, received: {}",
-                    stored_credential.counter,
-                    auth_counter
-                );
-            } else {
-                tracing::warn!(
-                    "Counter verification failed - stored: {}, received: {}",
-                    stored_credential.counter,
-                    auth_counter
-                );
-                return Err(PasskeyError::Authentication(
-                    "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
-                ));
-            }
-        } else if auth_counter <= stored_credential.counter {
-            tracing::warn!(
-                "Counter verification failed - stored: {}, received: {}",
-                stored_credential.counter,
-                auth_counter
-            );
-            return Err(PasskeyError::Authentication(
-                "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
-            ));
-        } else {
-            tracing::debug!(
-                "Counter verification successful - stored: {}, received: {}",
-                stored_credential.counter,
-                auth_counter
-            );
-        }
+    } else if auth_counter <= stored_credential.counter {
+        return Err(PasskeyError::Authentication(
+            "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
+        ));
     }
 
     Ok(())
