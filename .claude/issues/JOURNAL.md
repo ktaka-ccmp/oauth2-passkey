@@ -2,6 +2,8 @@
 
 ## Table of Contents
 
+- [2026-03-23: Login history retention -- PR review fixes](#2026-03-23-login-history-retention----pr-review-fixes)
+- [2026-03-23: Login history retention policy](#2026-03-23-login-history-retention-policy)
 - [2026-03-22: upsert_oauth2_account post-COMMIT SELECT race fix](#2026-03-22-upsert_oauth2_account-post-commit-select-race-fix)
 - [2026-03-22: Atomic passkey counter verification (TOCTOU fix)](#2026-03-22-atomic-passkey-counter-verification-toctou-fix)
 - [2026-03-22: CI performance optimization -- Phase 1+2](#2026-03-22-ci-performance-optimization----phase-12)
@@ -66,6 +68,93 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-23: Login history retention -- PR review fixes
+
+**Issue**: `20260321-1346` | **Priority**: low | **Difficulty**: small
+
+Enhancement of login history retention policy (PR #285 review feedback)
+
+### Motivation
+
+PR #285 review identified 5 issues: SQL string interpolation (security), first-tick behavior undocumented, missing dot.env.example entry, unused JoinHandle return, and double logging. All addressed in a follow-up commit.
+
+### User-facing impact
+
+- **Before**: `delete_old_entries_*` functions interpolated `days_to_keep` directly into SQL via `format!()`. While safe (i64 type), this was inconsistent with the rest of the codebase which uses parameterized queries.
+- **After**: Cutoff timestamp computed in Rust (`Utc::now() - Duration::days(n)`) and bound as a parameter. All three backends now use `WHERE timestamp < ?`/`$1` consistently.
+
+Other changes:
+- `spawn_login_history_cleanup()` returns `()` instead of `JoinHandle<()>` (callers weren't using it)
+- `O2P_LOGIN_HISTORY_RETENTION_DAYS` added to `dot.env.example`
+- Double logging removed (store layer no longer logs, only the spawn helper does)
+- Comment added explaining `tokio::time::interval` fires immediately on first tick
+- Tightened `O2P_LOGIN_HISTORY_RETENTION_DAYS` visibility: `pub(crate)` -> `pub(in crate::audit)`, moved early evaluation from `lib.rs init()` to `audit::init()`
+
+### Design decisions
+
+**Parameterized cutoff vs DB-side date arithmetic:** The review suggested multiple approaches (SQLite `datetime('now', '-' || ? || ' days')`, PostgreSQL `make_interval()`, MySQL `INTERVAL ? DAY`). Computing the cutoff in Rust and binding it is the simplest and most portable -- identical `WHERE timestamp < ?` across all backends, no DB-specific date functions needed.
+
+**JoinHandle removal:** The handle was returned but never used by any caller. Returning `()` is simpler. If graceful shutdown is needed in the future, it can be re-added.
+
+**Visibility tightening:** `O2P_LOGIN_HISTORY_RETENTION_DAYS` was `pub(crate)` across the re-export chain but only used within the `audit` module. Changed to `pub(in crate::audit)` at the definition site, `pub(super)` at the storage re-export, and private `use` at the audit module level. Early evaluation moved from `lib.rs init()` to `audit::init()` so `lib.rs` no longer needs access.
+
+### Key files
+
+`oauth2_passkey/src/audit/storage/sqlite.rs`, `oauth2_passkey/src/audit/storage/mysql.rs`, `oauth2_passkey/src/audit/storage/postgres.rs`, `oauth2_passkey/src/audit/storage/store_type.rs`, `oauth2_passkey/src/audit/retention.rs`, `oauth2_passkey/src/audit/storage/config.rs`, `oauth2_passkey/src/audit/mod.rs`, `oauth2_passkey/src/lib.rs`, `dot.env.example`
+
+## 2026-03-23: Login history retention policy
+
+**Issue**: `20260321-1346` (completed) | **Priority**: low | **Difficulty**: small
+
+New feature
+
+### Motivation
+
+`delete_old_entries_{sqlite,mysql,postgres}` functions existed in the audit storage layer but were marked `#[allow(dead_code)]` -- they were never wired up to any public API. The `LoginHistoryStore` had no dispatch method for them. Without a retention policy, login history tables grow indefinitely, which is a concern for long-running production deployments.
+
+### User-facing impact
+
+- **Before**: No way to clean up old login history entries. The `delete_old_entries` functions existed as dead code.
+- **After**: Two new public APIs and one new environment variable:
+
+**Environment variable:**
+- `O2P_LOGIN_HISTORY_RETENTION_DAYS` -- number of days to retain (default: 0 = disabled, no cleanup)
+
+**Public functions:**
+```rust
+// Low-level: delete entries older than configured days. Returns count deleted.
+// Ok(0) if disabled.
+oauth2_passkey::cleanup_old_login_history().await?;
+
+// Helper: spawns a background task that calls cleanup every 24 hours.
+// No-op if O2P_LOGIN_HISTORY_RETENTION_DAYS is 0 or unset.
+oauth2_passkey::spawn_login_history_cleanup();
+```
+
+Both are re-exported from `oauth2_passkey_axum`.
+
+**Demo apps** (demo-both, demo-live) now call `spawn_login_history_cleanup()` after init.
+
+### Design decisions
+
+**Option A (chosen): Wire up with env var + public API.** The functions were already implemented for all 3 backends. Adding the dispatch, env var, and public wrapper was minimal work.
+
+**Option B (rejected): Remove dead code (YAGNI).** The code was already written and tested across 3 backends -- removing it to rewrite later would be wasteful.
+
+**Library vs application scheduling:** Libraries should not silently spawn background tasks (runtime coupling, test interference, loss of control). Instead:
+- `cleanup_old_login_history()` -- pure function, app calls when it wants
+- `spawn_login_history_cleanup()` -- opt-in helper, app explicitly calls it
+
+This follows the principle that libraries provide tools, applications control execution.
+
+**`days_to_keep > 0` validation:** Added to `LoginHistoryStore::delete_old_entries()` because negative `days_to_keep` values in the SQL string interpolation would silently produce `DATE_ADD` instead of `DATE_SUB`, deleting future-dated records.
+
+**i64 for days parameter:** The backend functions accept `i64` (for SQL binding), but the dispatch takes `u32` and casts to `i64`, preventing negative values at the type level.
+
+### Key files
+
+`oauth2_passkey/src/audit/retention.rs` (new), `oauth2_passkey/src/audit/storage/config.rs`, `oauth2_passkey/src/audit/storage/store_type.rs`, `oauth2_passkey/src/lib.rs`, `oauth2_passkey_axum/src/lib.rs`, `demo-both/src/main.rs`, `demo-live/src/main.rs`
 
 ## 2026-03-22: upsert_oauth2_account post-COMMIT SELECT race fix
 
