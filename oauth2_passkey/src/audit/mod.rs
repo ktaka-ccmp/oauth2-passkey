@@ -23,6 +23,7 @@ pub(crate) use types::AuthMethod;
 
 // Public exports for external use
 pub use retention::cleanup_old_login_history;
+pub use retention::spawn_login_history_cleanup;
 pub(crate) use types::AuthMethodDetails;
 pub(crate) use types::LoginContext;
 pub use types::LoginHistoryEntry;

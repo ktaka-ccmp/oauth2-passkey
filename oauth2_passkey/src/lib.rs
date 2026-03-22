@@ -172,3 +172,4 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub use audit::cleanup_old_login_history;
+pub use audit::spawn_login_history_cleanup;

@@ -8,34 +8,44 @@ use super::{LoginHistoryStore, O2P_LOGIN_HISTORY_RETENTION_DAYS};
 /// Otherwise, deletes entries older than the configured number of days and returns
 /// the number of deleted entries.
 ///
-/// This function does not run on a schedule -- the application is responsible for
-/// calling it periodically (e.g., via `tokio::time::interval`).
-///
-/// # Example
-///
-/// ```rust,no_run
-/// use std::time::Duration;
-///
-/// async fn start_cleanup_task() {
-///     tokio::spawn(async {
-///         let mut interval = tokio::time::interval(Duration::from_secs(86400));
-///         loop {
-///             interval.tick().await;
-///             match oauth2_passkey::cleanup_old_login_history().await {
-///                 Ok(0) => {} // disabled or nothing to delete
-///                 Ok(n) => tracing::info!("Deleted {n} old login history entries"),
-///                 Err(e) => tracing::error!("Login history cleanup failed: {e}"),
-///             }
-///         }
-///     });
-/// }
-/// ```
+/// This function does not run on a schedule -- use [`spawn_login_history_cleanup`]
+/// or call it periodically from your application.
 pub async fn cleanup_old_login_history() -> Result<u64, Box<dyn std::error::Error>> {
     let days = *O2P_LOGIN_HISTORY_RETENTION_DAYS;
     if days == 0 {
         return Ok(0);
     }
     Ok(LoginHistoryStore::delete_old_entries(days).await?)
+}
+
+/// Spawn a background task that runs [`cleanup_old_login_history`] every 24 hours.
+///
+/// Returns immediately. The task is a no-op if `O2P_LOGIN_HISTORY_RETENTION_DAYS`
+/// is unset or 0.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     oauth2_passkey::init().await?;
+///     oauth2_passkey::spawn_login_history_cleanup();
+///     // ... start your server
+///     Ok(())
+/// }
+/// ```
+pub fn spawn_login_history_cleanup() -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(86400));
+        loop {
+            interval.tick().await;
+            match cleanup_old_login_history().await {
+                Ok(0) => {}
+                Ok(n) => tracing::info!("Deleted {n} old login history entries"),
+                Err(e) => tracing::error!("Login history cleanup failed: {e}"),
+            }
+        }
+    })
 }
 
 #[cfg(test)]
