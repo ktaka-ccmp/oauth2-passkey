@@ -225,3 +225,6 @@ impl LoginHistoryStore {
         result
     }
 }
+
+#[cfg(test)]
+mod tests;

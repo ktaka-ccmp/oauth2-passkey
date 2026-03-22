@@ -37,3 +37,6 @@ pub async fn cleanup_old_login_history() -> Result<u64, Box<dyn std::error::Erro
     }
     Ok(LoginHistoryStore::delete_old_entries(days).await?)
 }
+
+#[cfg(test)]
+mod tests;
