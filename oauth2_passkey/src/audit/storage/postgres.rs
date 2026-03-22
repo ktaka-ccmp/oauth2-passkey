@@ -288,7 +288,6 @@ pub(super) async fn query_login_history_admin_postgres(
 }
 
 /// Delete old login history entries (for retention policy)
-#[allow(dead_code)]
 pub(super) async fn delete_old_entries_postgres(
     pool: &Pool<Postgres>,
     days_to_keep: i64,

@@ -160,6 +160,7 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
     let _ = *config::O2P_ROUTE_PREFIX;
     let _ = *config::PASSKEY_SIGNAL_API_MODE;
     let _ = *config::O2P_DEMO_MODE;
+    let _ = *audit::O2P_LOGIN_HISTORY_RETENTION_DAYS;
     session::init();
 
     // Initialize the underlying stores
@@ -169,3 +170,5 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
     audit::init().await?;
     Ok(())
 }
+
+pub use audit::cleanup_old_login_history;
