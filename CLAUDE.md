@@ -244,6 +244,7 @@ This project uses Claude Code commands for workflow management.
 | `/journal` | Append a development journal entry to `.claude/issues/JOURNAL.md` |
 | `/backlog` | View all open issues |
 | `/visibility-check` | Check Rust code for minimal visibility compliance |
+| `/changelog` | Review changes since last release and update CHANGELOG.md |
 
 ### Session Snapshots (`.claude/sessions/`)
 
