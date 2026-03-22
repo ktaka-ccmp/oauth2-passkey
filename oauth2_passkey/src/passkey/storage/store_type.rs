@@ -91,12 +91,8 @@ impl PasskeyStore {
     }
 
     /// Atomically update credential counter only if the new value is greater.
-    ///
-    /// Uses `UPDATE ... WHERE counter < ?` to perform the check and update in a
-    /// single SQL statement, avoiding TOCTOU races from separate GET/CHECK/UPDATE.
-    ///
-    /// Returns `true` if the update was applied, `false` if the stored counter
-    /// was not less than the new value.
+    /// Returns true if the update was applied, false if the counter was not less
+    /// than the new value (potential replay/clone attack).
     pub(crate) async fn atomic_update_credential_counter(
         credential_id: CredentialId,
         new_counter: u32,
