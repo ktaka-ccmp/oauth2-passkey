@@ -203,29 +203,28 @@ pub(super) async fn get_credentials_by_field_sqlite(
         .map_err(|e| PasskeyError::Storage(e.to_string()))
 }
 
-pub(super) async fn atomic_update_credential_counter_sqlite(
+pub(super) async fn update_credential_counter_sqlite(
     pool: &Pool<Sqlite>,
     credential_id: CredentialId,
-    new_counter: u32,
-) -> Result<bool, PasskeyError> {
-    let counter_i64 = new_counter as i64;
+    counter: u32,
+) -> Result<(), PasskeyError> {
+    let counter_i64 = counter as i64;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    let result = sqlx::query(&format!(
+    sqlx::query(&format!(
         r#"
         UPDATE {passkey_table}
         SET counter = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE credential_id = ? AND counter < ?
+        WHERE credential_id = ?
         "#
     ))
     .bind(counter_i64)
     .bind(credential_id.as_str())
-    .bind(counter_i64)
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    Ok(result.rows_affected() > 0)
+    Ok(())
 }
 
 pub(super) async fn delete_credential_by_field_sqlite(

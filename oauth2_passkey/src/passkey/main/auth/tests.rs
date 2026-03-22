@@ -405,43 +405,27 @@ async fn verify_counter_with_mock(
     if auth_counter == 0 {
         // Counter value of 0 means the authenticator doesn't support counters
         tracing::info!("Authenticator does not support counters (received counter=0)");
+    } else if auth_counter <= stored_credential.counter {
+        // Counter value decreased or didn't change - possible cloning attack
+        tracing::warn!(
+            "Counter verification failed - stored: {}, received: {}",
+            stored_credential.counter,
+            auth_counter
+        );
+        return Err(PasskeyError::Authentication(
+            "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
+        ));
     } else {
-        if !skip_db_update {
-            let updated =
-                PasskeyStore::atomic_update_credential_counter(credential_id.clone(), auth_counter)
-                    .await?;
+        // Counter increased as expected
+        tracing::debug!(
+            "Counter verification successful - stored: {}, received: {}",
+            stored_credential.counter,
+            auth_counter
+        );
 
-            if updated {
-                tracing::debug!(
-                    "Counter verification successful - stored: {}, received: {}",
-                    stored_credential.counter,
-                    auth_counter
-                );
-            } else {
-                tracing::warn!(
-                    "Counter verification failed - stored: {}, received: {}",
-                    stored_credential.counter,
-                    auth_counter
-                );
-                return Err(PasskeyError::Authentication(
-                    "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
-                ));
-            }
-        } else if auth_counter <= stored_credential.counter {
-            tracing::warn!(
-                "Counter verification failed - stored: {}, received: {}",
-                stored_credential.counter,
-                auth_counter
-            );
-            return Err(PasskeyError::Authentication(
-                "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
-            ));
-        } else {
-            tracing::debug!(
-                "Counter verification successful - stored: {}, received: {}",
-                stored_credential.counter,
-                auth_counter
-            );
+        // Update the counter only if not skipping for tests
+        if !skip_db_update {
+            PasskeyStore::update_credential_counter(credential_id.clone(), auth_counter).await?;
         }
     }
 

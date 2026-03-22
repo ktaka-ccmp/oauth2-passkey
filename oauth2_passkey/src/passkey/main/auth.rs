@@ -259,31 +259,26 @@ async fn verify_counter(
     if auth_counter == 0 {
         // Counter value of 0 means the authenticator doesn't support counters
         tracing::info!("Authenticator does not support counters (received counter=0)");
+    } else if auth_counter <= stored_credential.counter {
+        // Counter value decreased or didn't change - possible cloning attack
+        tracing::warn!(
+            "Counter verification failed - stored: {}, received: {}",
+            stored_credential.counter,
+            auth_counter
+        );
+        return Err(PasskeyError::Authentication(
+            "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
+        ));
     } else {
-        // Atomic CHECK + UPDATE: only updates if new counter > stored counter.
-        // This prevents TOCTOU race conditions where concurrent authentications
-        // could interleave between a separate check and update.
-        let updated =
-            PasskeyStore::atomic_update_credential_counter(credential_id.clone(), auth_counter)
-                .await?;
+        // Counter increased as expected
+        tracing::debug!(
+            "Counter verification successful - stored: {}, received: {}",
+            stored_credential.counter,
+            auth_counter
+        );
 
-        if updated {
-            tracing::debug!(
-                "Counter verification successful - stored: {}, received: {}",
-                stored_credential.counter,
-                auth_counter
-            );
-        } else {
-            // rows_affected == 0: counter was not less than new value
-            tracing::warn!(
-                "Counter verification failed - stored: {}, received: {}",
-                stored_credential.counter,
-                auth_counter
-            );
-            return Err(PasskeyError::Authentication(
-                "Counter value decreased - possible credential cloning detected. For more details, run with RUST_LOG=debug".into(),
-            ));
-        }
+        // Update the counter
+        PasskeyStore::update_credential_counter(credential_id.clone(), auth_counter).await?;
     }
 
     Ok(())

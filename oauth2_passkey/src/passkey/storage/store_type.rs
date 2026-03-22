@@ -90,21 +90,18 @@ impl PasskeyStore {
         }
     }
 
-    /// Atomically update credential counter only if the new value is greater.
-    /// Returns true if the update was applied, false if the counter was not less
-    /// than the new value (potential replay/clone attack).
-    pub(crate) async fn atomic_update_credential_counter(
+    pub(crate) async fn update_credential_counter(
         credential_id: CredentialId,
-        new_counter: u32,
-    ) -> Result<bool, PasskeyError> {
+        counter: u32,
+    ) -> Result<(), PasskeyError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
         if let Some(pool) = store.as_sqlite() {
-            atomic_update_credential_counter_sqlite(pool, credential_id, new_counter).await
+            update_credential_counter_sqlite(pool, credential_id, counter).await
         } else if let Some(pool) = store.as_postgres() {
-            atomic_update_credential_counter_postgres(pool, credential_id, new_counter).await
+            update_credential_counter_postgres(pool, credential_id, counter).await
         } else if let Some(pool) = store.as_mysql() {
-            atomic_update_credential_counter_mysql(pool, credential_id, new_counter).await
+            update_credential_counter_mysql(pool, credential_id, counter).await
         } else {
             Err(PasskeyError::Storage("Unsupported database type".into()))
         }

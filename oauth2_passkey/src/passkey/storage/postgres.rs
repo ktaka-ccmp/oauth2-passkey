@@ -206,28 +206,29 @@ pub(super) async fn get_credentials_by_field_postgres(
         .map_err(|e| PasskeyError::Storage(e.to_string()))
 }
 
-pub(super) async fn atomic_update_credential_counter_postgres(
+pub(super) async fn update_credential_counter_postgres(
     pool: &Pool<Postgres>,
     credential_id: CredentialId,
-    new_counter: u32,
-) -> Result<bool, PasskeyError> {
-    let counter_i32 = new_counter as i32;
+    counter: u32,
+) -> Result<(), PasskeyError> {
+    let counter_i32 = counter as i32;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    let result = sqlx::query(&format!(
+    sqlx::query_as::<_, (i32,)>(&format!(
         r#"
         UPDATE {passkey_table}
         SET counter = $1, updated_at = CURRENT_TIMESTAMP
-        WHERE credential_id = $2 AND counter < $1
+        WHERE credential_id = $2
+        RETURNING 1
         "#
     ))
     .bind(counter_i32)
     .bind(credential_id.as_str())
-    .execute(pool)
+    .fetch_optional(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    Ok(result.rows_affected() > 0)
+    Ok(())
 }
 
 pub(super) async fn delete_credential_by_field_postgres(
