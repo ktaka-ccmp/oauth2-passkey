@@ -14,9 +14,9 @@
 
 ## Created: 2026-03-22
 
-## Closed:
+## Closed: 2026-03-22
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -153,8 +153,8 @@ Share compiled artifacts across jobs via `sccache` + GitHub Actions cache backen
 - [x] Remove redundant `cargo build` steps in ci.yml
 - [x] Add `Swatinem/rust-cache@v2` to docs job in ci.yml
 - [x] Add `Swatinem/rust-cache@v2` to MSRV job in ci.yml
-- [ ] Verify all CI jobs pass after changes
-- [ ] Compare timing before/after
+- [x] Verify all CI jobs pass after changes
+- [x] Compare timing before/after
 
 ### Phase 2
 - [x] Move beta/nightly to weekly scheduled workflow (ci-nightly.yml)
@@ -175,3 +175,29 @@ Share compiled artifacts across jobs via `sccache` + GitHub Actions cache backen
 - Reason: Phase 1+2 combined address all high-impact optimizations. Phase 3 adds complexity with minimal additional benefit after rust-cache already handles dependency caching.
 
 ## Resolution
+
+Implemented Phase 1 + Phase 2 optimizations in PR #279. All CI jobs pass.
+
+### Measured results (Before -> After)
+
+| Job | Before | After | Change |
+|-----|--------|-------|--------|
+| Test Suite (stable) | 9m15s | 3m53s | -5m22s |
+| Test Suite (beta) | 12m25s | weekly | removed from PR CI |
+| Test Suite (nightly) | 10m08s | weekly | removed from PR CI |
+| Lint | - | 1m22s | new (fmt + clippy) |
+| Documentation | 6m30s | 1m43s | -4m47s |
+| Security Audit | 3m01s | 0m08s | -2m53s |
+| MSRV | 1m52s | 1m53s | ~same |
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Wall-clock | ~12m25s | ~5m22s | -57% |
+| Billable total | ~43m | ~9m | -80% |
+
+### Key improvements
+
+- **Swatinem/rust-cache@v2**: Cache restore from 3-4 min to ~10s per job (cache size ~10 GiB -> ~1-2 GiB)
+- **taiki-e/install-action@cargo-audit**: 3m01s -> 8s (pre-built binary vs compile from source)
+- **Lint job gate**: fmt/clippy failures skip test + docs jobs early
+- **Beta/nightly weekly**: Removed from PR CI, runs Monday 06:00 UTC via ci-nightly.yml
