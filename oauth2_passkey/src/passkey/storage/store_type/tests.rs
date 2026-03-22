@@ -336,8 +336,6 @@ async fn test_get_credentials_by_username() {
     .await;
 }
 
-/// Test updating credential counter for replay attack prevention
-///
 /// This test verifies the atomic credential counter update that only succeeds
 /// when the new counter value is greater than the stored value.
 /// This prevents TOCTOU race conditions in counter verification.
