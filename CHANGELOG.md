@@ -27,6 +27,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sequence_number` field hidden from all JSON API responses via `#[serde(skip_serializing)]`
   - Applies to `User`, `OAuth2Account`, and `PasskeyCredential` types
 - `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` now accepts case-insensitive boolean values
+- Switched rustls to ring crypto provider, eliminating the aws-lc-sys build dependency
+  - Faster builds and simpler cross-compilation (no C compiler required for aws-lc)
+
+### Fixed
+
+- SQLite `last_insert_rowid()` race condition in login history insertion (#276)
+  - INSERT and SELECT now wrapped in a transaction to guarantee same-connection execution
+- MySQL `LAST_INSERT_ID()` race condition in login history insertion (#274)
+  - Same transaction fix applied during MySQL implementation
+
+### Security
+
+- Update rustls-webpki 0.103.9 -> 0.103.10 (RUSTSEC-2026-0049: CRL Distribution Point matching logic) (#275)
 
 ## [0.4.0] - 2026-03-15
 

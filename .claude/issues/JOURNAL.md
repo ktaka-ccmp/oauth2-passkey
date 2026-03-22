@@ -2,6 +2,10 @@
 
 ## Table of Contents
 
+- [2026-03-22: SQLite last_insert_rowid() transaction fix](#2026-03-22-sqlite-last_insert_rowid-transaction-fix)
+- [2026-03-22: Codebase transaction audit -- three new issues](#2026-03-22-codebase-transaction-audit----three-new-issues)
+- [2026-03-22: rustls-webpki security update (RUSTSEC-2026-0049)](#2026-03-22-rustls-webpki-security-update-rustsec-2026-0049)
+- [2026-03-22: git commit hook enforcement](#2026-03-22-git-commit-hook-enforcement)
 - [2026-03-21: MySQL/MariaDB database support](#2026-03-21-mysqlmariadb-database-support)
 - [2026-03-21: Sequential primary keys for oauth2_accounts and passkey_credentials](#2026-03-21-sequential-primary-keys-for-oauth2_accounts-and-passkey_credentials)
 - [2026-03-20: Env var silent fallback audit -- panic on invalid values](#2026-03-20-env-var-silent-fallback-audit----panic-on-invalid-values)
@@ -59,6 +63,124 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-22: SQLite last_insert_rowid() transaction fix
+
+**Issue**: `20260321-1234` (completed) | **Priority**: low | **Difficulty**: small
+
+Bug fix
+
+### Motivation
+
+In `audit/storage/sqlite.rs`, `insert_login_history_sqlite()` executed an INSERT and a SELECT `last_insert_rowid()` as separate queries on `pool`. With connection pooling, the two queries could run on different connections, causing `last_insert_rowid()` to return a stale or incorrect value. The same pattern had already been identified and fixed in the MySQL implementation during PR #274 review.
+
+### User-facing impact
+
+- **Before**: Under concurrent load with connection pooling, `insert_login_history_sqlite()` could theoretically return the wrong login history entry (wrong `id` from a different connection's last insert)
+- **After**: INSERT and SELECT are guaranteed to run on the same connection via a transaction
+
+```rust
+// Before: queries on pool (potentially different connections)
+sqlx::query(...).execute(pool).await?;
+let result = sqlx::query_as(...).fetch_one(pool).await?;
+
+// After: queries on transaction (same connection guaranteed)
+let mut tx = pool.begin().await?;
+sqlx::query(...).execute(&mut *tx).await?;
+let result = sqlx::query_as(...).fetch_one(&mut *tx).await?;
+tx.commit().await?;
+```
+
+### Design decisions
+
+- **Match MySQL fix pattern**: The MySQL version was already fixed with a transaction in commit `97b8ea6`. Applied the identical pattern to SQLite for consistency across all backends. PostgreSQL is not affected (uses `RETURNING *`).
+- **Added transaction flow comment**: Documented the actual SQL flow (`BEGIN`, `INSERT`, `SELECT`, `COMMIT`) in the code comment to make the transaction behavior explicit for future readers.
+
+### Key files
+
+`oauth2_passkey/src/audit/storage/sqlite.rs`
+
+---
+
+## 2026-03-22: Codebase transaction audit -- three new issues
+
+Bug fix (issues filed, not yet implemented)
+
+### Motivation
+
+After fixing the `last_insert_rowid()` race condition in audit/storage, performed a deep audit of all SQL operations across the codebase to find similar transaction consistency issues. The audit examined all storage modules (userdb, oauth2, passkey, audit) across all three database backends (SQLite, MySQL, PostgreSQL), plus the coordination layer.
+
+### User-facing impact
+
+Three issues were discovered but not yet fixed in this session:
+
+1. **`20260322-0907` (low/small)**: `upsert_oauth2_account_sqlite()` and `upsert_oauth2_account_postgres()` execute SELECT on `pool` after committing the transaction. The MySQL version already does this correctly. Fix: move SELECT inside the transaction before COMMIT.
+
+2. **`20260322-0926` (high/medium)**: Passkey authentication counter verification in `passkey/main/auth.rs` follows a GET->CHECK->UPDATE pattern across separate storage calls without atomicity. This is a TOCTOU race with security implications (counter inconsistency, potential replay attack under concurrent load). Fix requires either an atomic SQL operation or storage API changes.
+
+3. **`20260322-0927` (medium/large)**: User deletion in `coordination/user.rs` performs sequential DELETE operations across OAuth2Store, PasskeyStore, and UserStore without a shared transaction. Also, the admin count check before deletion has a race condition. Fix requires cross-store transaction support or storage layer redesign.
+
+### Design decisions
+
+- **Filed as separate issues by difficulty**: The three findings have very different fix complexities. Issue 0907 is a simple in-function change. Issue 0926 crosses the auth logic / storage boundary. Issue 0927 requires multi-store transaction support.
+- **Modules confirmed clean**: userdb storage (all backends use single UPSERT or proper transactions), passkey storage (INSERT OR REPLACE / ON CONFLICT), session storage (cache-based, no SQL transactions needed).
+
+### Key files
+
+`.claude/issues/open/20260322-0907-upsert-oauth2-account-post-tx-select-race.md`, `.claude/issues/open/20260322-0926-passkey-counter-verification-race.md`, `.claude/issues/open/20260322-0927-user-deletion-atomicity.md`
+
+---
+
+## 2026-03-22: rustls-webpki security update (RUSTSEC-2026-0049)
+
+Enhancement (dependency update)
+
+### Motivation
+
+GitHub Actions `cargo audit` flagged RUSTSEC-2026-0049: rustls-webpki 0.103.9 had a CRL Distribution Point matching logic vulnerability. The fix required upgrading to >=0.103.10.
+
+### User-facing impact
+
+- **Before**: CRLs were not considered authoritative by Distribution Point due to faulty matching logic in rustls-webpki 0.103.9
+- **After**: CRL validation works correctly with rustls-webpki 0.103.10
+
+Also updated: askama 0.15.4->0.15.5, zerocopy 0.8.42->0.8.47, itoa 1.0.17->1.0.18, tinyvec 1.10.0->1.11.0.
+
+### Design decisions
+
+- Committed on a separate `chore-deps-update` branch and merged to `dev` first, so the `sqlite-last-insert-rowid-race` branch could rebase on top.
+
+### Key files
+
+`Cargo.toml`, `Cargo.lock`
+
+---
+
+## 2026-03-22: git commit hook enforcement
+
+Enhancement (tooling)
+
+### Motivation
+
+Claude Code repeatedly executed `git commit` without explicit user approval despite CLAUDE.md rules and memory entries prohibiting this. Memory-based rules proved insufficient to prevent the behavior reliably.
+
+### User-facing impact
+
+- **Before**: Claude Code could execute `git commit` autonomously, sometimes committing without user approval
+- **After**: A PreToolUse hook in `.claude/settings.local.json` blocks any `git commit` command at the system level. Commits must be run by the user via `! git commit ...`
+
+### Design decisions
+
+- **Hook over memory**: Memory entries were tried and failed multiple times. A system-level hook is a hard technical blocker that cannot be bypassed by the AI.
+- **git add not blocked**: Initially considered blocking both `git add` and `git commit`, but `git add` alone is harmless and blocking it would add unnecessary friction.
+- **Removed `Bash(git commit:*)` from allow list**: Also removed the permission rule that auto-approved git commit commands.
+- **Updated issue naming rules**: Added `date +%H%M` requirement to CLAUDE.md, `.claude/issues/README.md` (3 locations), and memory to prevent incorrect timestamps in issue IDs.
+
+### Key files
+
+`.claude/settings.local.json`, `CLAUDE.md`, `.claude/issues/README.md`
+
+---
 
 ## 2026-03-21: MySQL/MariaDB database support
 
