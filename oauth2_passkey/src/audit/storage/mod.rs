@@ -6,6 +6,6 @@ mod postgres;
 mod sqlite;
 mod store_type;
 
-// Re-export only the specific items needed for the public API
-pub(crate) use config::O2P_LOGIN_HISTORY_RETENTION_DAYS;
+// Re-export only the specific items needed
+pub(super) use config::O2P_LOGIN_HISTORY_RETENTION_DAYS;
 pub(crate) use store_type::LoginHistoryStore;
