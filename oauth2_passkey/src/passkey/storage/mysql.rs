@@ -239,28 +239,29 @@ pub(super) async fn get_credentials_by_field_mysql(
         .map_err(|e| PasskeyError::Storage(e.to_string()))
 }
 
-pub(super) async fn update_credential_counter_mysql(
+pub(super) async fn atomic_update_credential_counter_mysql(
     pool: &Pool<MySql>,
     credential_id: CredentialId,
-    counter: u32,
-) -> Result<(), PasskeyError> {
-    let counter_i32 = counter as i32;
+    new_counter: u32,
+) -> Result<bool, PasskeyError> {
+    let counter_i32 = new_counter as i32;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query(&format!(
+    let result = sqlx::query(&format!(
         r#"
         UPDATE {passkey_table}
         SET counter = ?, updated_at = CURRENT_TIMESTAMP(6)
-        WHERE credential_id = ?
+        WHERE credential_id = ? AND counter < ?
         "#
     ))
     .bind(counter_i32)
     .bind(credential_id.as_str())
+    .bind(counter_i32)
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    Ok(())
+    Ok(result.rows_affected() > 0)
 }
 
 pub(super) async fn delete_credential_by_field_mysql(
