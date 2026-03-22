@@ -9,6 +9,7 @@ use dotenvy::dotenv;
 
 use oauth2_passkey_axum::{
     AuthUser, O2P_CUSTOM_CSS_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router,
+    spawn_login_history_cleanup,
 };
 
 mod server;
@@ -69,6 +70,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     dotenv().ok();
     oauth2_passkey_axum::init().await?;
+
+    spawn_login_history_cleanup();
 
     let app = Router::new()
         .route("/", get(index))

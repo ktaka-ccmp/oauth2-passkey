@@ -2,6 +2,7 @@
 
 ## Table of Contents
 
+- [2026-03-23: Login history retention policy](#2026-03-23-login-history-retention-policy)
 - [2026-03-22: upsert_oauth2_account post-COMMIT SELECT race fix](#2026-03-22-upsert_oauth2_account-post-commit-select-race-fix)
 - [2026-03-22: Atomic passkey counter verification (TOCTOU fix)](#2026-03-22-atomic-passkey-counter-verification-toctou-fix)
 - [2026-03-22: CI performance optimization -- Phase 1+2](#2026-03-22-ci-performance-optimization----phase-12)
@@ -66,6 +67,56 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-23: Login history retention policy
+
+**Issue**: `20260321-1346` (completed) | **Priority**: low | **Difficulty**: small
+
+New feature
+
+### Motivation
+
+`delete_old_entries_{sqlite,mysql,postgres}` functions existed in the audit storage layer but were marked `#[allow(dead_code)]` -- they were never wired up to any public API. Without a retention policy, login history tables grow indefinitely, which is a concern for long-running production deployments.
+
+### User-facing impact
+
+- **Before**: No way to clean up old login history entries. The `delete_old_entries` functions existed as dead code.
+- **After**: Two new public APIs, one new error type, and one new environment variable:
+
+**Environment variable:**
+- `O2P_LOGIN_HISTORY_RETENTION_DAYS` -- number of days to retain (default: 0 = disabled, no cleanup)
+
+**Public functions:**
+```rust
+// Delete entries older than configured days. Returns count deleted. Ok(0) if disabled.
+oauth2_passkey::cleanup_old_login_history().await?;
+
+// Opt-in background task: calls cleanup every 24 hours (no-op if disabled).
+oauth2_passkey::spawn_login_history_cleanup();
+```
+
+**Public error type:**
+- `LoginHistoryError` -- typed error returned by `cleanup_old_login_history()` (follows project `thiserror` convention instead of `Box<dyn Error>`)
+
+All re-exported from `oauth2_passkey_axum`. Demo apps (demo-both, demo-live) call `spawn_login_history_cleanup()` after init.
+
+### Design decisions
+
+**Wire up vs remove (YAGNI):** The functions were already implemented for all 3 backends. Wiring up was minimal work vs removing to rewrite later.
+
+**Library vs application scheduling:** Libraries should not silently spawn background tasks (runtime coupling, test interference, loss of control). Two-tier API:
+- `cleanup_old_login_history()` -- pure function, app calls when it wants
+- `spawn_login_history_cleanup()` -- opt-in helper, app explicitly calls it
+
+**Parameterized cutoff timestamp:** The original `delete_old_entries_*` functions interpolated `days_to_keep` into SQL via `format!()`. Replaced with computing `cutoff = Utc::now() - Duration::days(n)` in Rust and binding as a parameter -- portable across all backends, consistent with parameterized queries used elsewhere.
+
+**Typed error over Box\<dyn Error\>:** `LoginHistoryError` was `pub(crate)` because no public API existed before. Made `pub` so `cleanup_old_login_history()` returns `Result<u64, LoginHistoryError>` instead of `Box<dyn Error>`, following the project convention of using `thiserror` for library crates.
+
+**Visibility:** `O2P_LOGIN_HISTORY_RETENTION_DAYS` scoped to `pub(in crate::audit)` -- not exposed beyond the audit module. Early evaluation in `audit::init()`, not `lib.rs`.
+
+### Key files
+
+`oauth2_passkey/src/audit/retention.rs` (new), `oauth2_passkey/src/audit/errors.rs`, `oauth2_passkey/src/audit/storage/config.rs`, `oauth2_passkey/src/audit/storage/store_type.rs`, `oauth2_passkey/src/lib.rs`, `oauth2_passkey_axum/src/lib.rs`, `demo-both/src/main.rs`, `demo-live/src/main.rs`
 
 ## 2026-03-22: upsert_oauth2_account post-COMMIT SELECT race fix
 

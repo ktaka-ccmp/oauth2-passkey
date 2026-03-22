@@ -183,4 +183,29 @@ impl LoginHistoryStore {
 
         result
     }
+
+    /// Delete login history entries older than the specified number of days.
+    /// Returns the number of deleted entries.
+    pub(crate) async fn delete_old_entries(days_to_keep: u32) -> Result<u64, LoginHistoryError> {
+        if days_to_keep == 0 {
+            return Err(LoginHistoryError::Storage(
+                "days_to_keep must be greater than 0".to_string(),
+            ));
+        }
+
+        let cutoff = Utc::now() - chrono::Duration::days(days_to_keep as i64);
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        match (store.as_sqlite(), store.as_postgres(), store.as_mysql()) {
+            (Some(pool), _, _) => delete_old_entries_sqlite(pool, cutoff).await,
+            (_, Some(pool), _) => delete_old_entries_postgres(pool, cutoff).await,
+            (_, _, Some(pool)) => delete_old_entries_mysql(pool, cutoff).await,
+            _ => Err(LoginHistoryError::Storage(
+                "Unsupported database type".to_string(),
+            )),
+        }
+    }
 }
+
+#[cfg(test)]
+mod tests;
