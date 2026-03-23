@@ -31,7 +31,7 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), Passke
             created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
             updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
             last_used_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-            FOREIGN KEY (user_id) REFERENCES {users_table}(id)
+            FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE
         )
         "#
     ))
@@ -54,32 +54,6 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), Passke
     ))
     .execute(pool)
     .await;
-
-    Ok(())
-}
-
-/// Migrates the passkey credentials table to add the rp_id column if it doesn't exist.
-/// This is needed for existing databases that were created before rp_id was added.
-pub(super) async fn migrate_passkey_tables_mysql(pool: &Pool<MySql>) -> Result<(), PasskeyError> {
-    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
-
-    // Check if rp_id column exists using INFORMATION_SCHEMA
-    let has_rp_id: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'rp_id'",
-    )
-    .bind(passkey_table)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-    if !has_rp_id {
-        sqlx::query(&format!(
-            "ALTER TABLE {passkey_table} ADD COLUMN rp_id VARCHAR(255) NOT NULL DEFAULT ''"
-        ))
-        .execute(pool)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-    }
 
     Ok(())
 }

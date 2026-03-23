@@ -261,29 +261,24 @@ pub async fn delete_user_account_admin(
         .log()
     })?;
 
-    // Prevent deleting the last admin user
+    tracing::debug!("Deleting user account: {:#?}", user);
+
+    // Delete the user account. Related OAuth2 accounts and Passkey credentials
+    // are automatically removed via ON DELETE CASCADE foreign key constraints.
     if user.has_admin_privileges() {
-        let admin_count = UserStore::count_admin_users()
+        // Atomic: only deletes if other admins exist (prevents last-admin deletion race)
+        let deleted = UserStore::delete_user_if_not_last_admin(user_id)
             .await
             .map_err(|e| CoordinationError::Database(e.to_string()))?;
-        if admin_count <= 1 {
+        if !deleted {
             return Err(CoordinationError::Conflict(
                 "Cannot delete the last admin user".to_string(),
             )
             .log());
         }
+    } else {
+        UserStore::delete_user(user_id).await?;
     }
-
-    tracing::debug!("Deleting user account: {:#?}", user);
-
-    // Delete all OAuth2 accounts for this user
-    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.clone())).await?;
-
-    // Delete all Passkey credentials for this user
-    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.clone())).await?;
-
-    // Finally, delete the user account
-    UserStore::delete_user(user_id).await?;
 
     Ok(())
 }
@@ -341,26 +336,28 @@ pub async fn update_user_admin_status(
         return Err(CoordinationError::Conflict("Cannot demote the first user".to_string()).log());
     }
 
-    // Prevent demoting the last admin user
+    // Update the user with the new admin status
     if !is_admin && user.has_admin_privileges() {
-        let admin_count = UserStore::count_admin_users()
+        // Atomic: only demotes if other admins exist (prevents last-admin demotion race)
+        let demoted = UserStore::demote_user_if_not_last_admin(user_id.clone())
             .await
             .map_err(|e| CoordinationError::Database(e.to_string()))?;
-        if admin_count <= 1 {
+        if !demoted {
             return Err(CoordinationError::Conflict(
                 "Cannot demote the last admin user".to_string(),
             )
             .log());
         }
+        // Fetch updated user to return
+        let user = UserStore::get_user(user_id).await?.ok_or_else(|| {
+            CoordinationError::Internal("User disappeared after demotion".to_string())
+        })?;
+        Ok(user)
+    } else {
+        let updated_user = User { is_admin, ..user };
+        let user = UserStore::upsert_user(updated_user).await?;
+        Ok(user)
     }
-
-    // Update the user with the new admin status
-    let updated_user = User { is_admin, ..user };
-
-    // Save the updated user
-    let user = UserStore::upsert_user(updated_user).await?;
-
-    Ok(user)
 }
 
 /// Gets active session counts for all users.

@@ -36,7 +36,8 @@ pub(crate) static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = Lazy
             let mut opts = sqlx::sqlite::SqliteConnectOptions::from_str(store_url)
                 .expect("Failed to parse SQLite connection string")
                 .create_if_missing(true)
-                .busy_timeout(std::time::Duration::from_secs(30));
+                .busy_timeout(std::time::Duration::from_secs(30))
+                .foreign_keys(true);
 
             if is_in_memory {
                 // In-memory SQLite: enable shared cache so all pool connections

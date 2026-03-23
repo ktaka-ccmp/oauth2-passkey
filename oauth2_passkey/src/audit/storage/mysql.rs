@@ -13,6 +13,8 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), LoginH
     let table_name = DB_TABLE_LOGIN_HISTORY.as_str();
 
     // Create login_history table
+    // Note: user_id intentionally has NO FK constraint to users table.
+    // Login history is retained as an audit trail even after user deletion.
     sqlx::query(&format!(
         r#"
         CREATE TABLE IF NOT EXISTS {table_name} (
