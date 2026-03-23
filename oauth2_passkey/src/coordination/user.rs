@@ -1,4 +1,3 @@
-use crate::oauth2::{AccountSearchField, OAuth2Store};
 #[cfg(test)]
 use crate::passkey::CredentialId;
 use crate::passkey::{CredentialSearchField, PasskeyStore};
@@ -136,7 +135,7 @@ pub async fn delete_user_account(
 
     tracing::debug!("Deleting user account: {:#?}", user);
 
-    // Get all Passkey credentials for this user before deleting them
+    // Get all Passkey credential IDs before deletion (for client-side Signal API notification)
     let credentials =
         PasskeyStore::get_credentials_by(CredentialSearchField::UserId(user_id.clone())).await?;
     let credential_ids: Vec<String> = credentials
@@ -144,13 +143,8 @@ pub async fn delete_user_account(
         .map(|c| c.credential_id.clone())
         .collect();
 
-    // Delete all OAuth2 accounts for this user
-    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.clone())).await?;
-
-    // Delete all Passkey credentials for this user
-    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.clone())).await?;
-
-    // Finally, delete the user account
+    // Delete the user account. Related OAuth2 accounts and Passkey credentials
+    // are automatically removed via ON DELETE CASCADE foreign key constraints.
     UserStore::delete_user(user_id).await?;
 
     // Returns a list of deleted passkey credential IDs for client-side notification

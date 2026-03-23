@@ -18,7 +18,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
         CREATE TABLE IF NOT EXISTS {passkey_table} (
             sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
             credential_id TEXT NOT NULL UNIQUE,
-            user_id TEXT NOT NULL REFERENCES {users_table}(id),
+            user_id TEXT NOT NULL,
             public_key TEXT NOT NULL,
             counter INTEGER NOT NULL DEFAULT 0,
             user_handle TEXT NOT NULL,
@@ -29,7 +29,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES {users_table}(id)
+            FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE
         )
         "#
     ))
@@ -76,6 +76,78 @@ pub(super) async fn migrate_passkey_tables_sqlite(pool: &Pool<Sqlite>) -> Result
         .execute(pool)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    }
+
+    // Migrate FK to add ON DELETE CASCADE (table recreation required for SQLite)
+    let users_table = DB_TABLE_USERS.as_str();
+    let has_cascade: bool = sqlx::query_scalar(&format!(
+        "SELECT COUNT(*) > 0 FROM pragma_foreign_key_list('{passkey_table}') WHERE on_delete = 'CASCADE'"
+    ))
+    .fetch_one(pool)
+    .await
+    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    if !has_cascade {
+        let temp_table = format!("{passkey_table}_migration_tmp");
+        sqlx::query(&format!(
+            r#"
+            CREATE TABLE {temp_table} (
+                sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
+                credential_id TEXT NOT NULL UNIQUE,
+                user_id TEXT NOT NULL,
+                public_key TEXT NOT NULL,
+                counter INTEGER NOT NULL DEFAULT 0,
+                user_handle TEXT NOT NULL,
+                user_name TEXT NOT NULL,
+                user_display_name TEXT NOT NULL,
+                aaguid TEXT NOT NULL,
+                rp_id TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE
+            )
+            "#
+        ))
+        .execute(pool)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+        sqlx::query(&format!(
+            "INSERT INTO {temp_table} SELECT * FROM {passkey_table}"
+        ))
+        .execute(pool)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+        sqlx::query(&format!("DROP TABLE {passkey_table}"))
+            .execute(pool)
+            .await
+            .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+        sqlx::query(&format!(
+            "ALTER TABLE {temp_table} RENAME TO {passkey_table}"
+        ))
+        .execute(pool)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+        // Recreate indexes
+        sqlx::query(&format!(
+            r#"
+            CREATE INDEX IF NOT EXISTS idx_{}_user_name ON {}(user_name);
+            CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id);
+            "#,
+            passkey_table.replace(".", "_"),
+            passkey_table,
+            passkey_table.replace(".", "_"),
+            passkey_table
+        ))
+        .execute(pool)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+        tracing::info!("Migrated {passkey_table}: added ON DELETE CASCADE to user_id FK");
     }
 
     Ok(())

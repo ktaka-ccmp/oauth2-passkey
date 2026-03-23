@@ -276,13 +276,8 @@ pub async fn delete_user_account_admin(
 
     tracing::debug!("Deleting user account: {:#?}", user);
 
-    // Delete all OAuth2 accounts for this user
-    OAuth2Store::delete_oauth2_accounts_by(AccountSearchField::UserId(user_id.clone())).await?;
-
-    // Delete all Passkey credentials for this user
-    PasskeyStore::delete_credential_by(CredentialSearchField::UserId(user_id.clone())).await?;
-
-    // Finally, delete the user account
+    // Delete the user account. Related OAuth2 accounts and Passkey credentials
+    // are automatically removed via ON DELETE CASCADE foreign key constraints.
     UserStore::delete_user(user_id).await?;
 
     Ok(())

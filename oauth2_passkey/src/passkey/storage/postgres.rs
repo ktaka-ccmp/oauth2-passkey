@@ -20,7 +20,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
         CREATE TABLE IF NOT EXISTS {passkey_table} (
             sequence_number BIGSERIAL PRIMARY KEY,
             credential_id TEXT NOT NULL UNIQUE,
-            user_id TEXT NOT NULL REFERENCES {users_table}(id),
+            user_id TEXT NOT NULL,
             public_key TEXT NOT NULL,
             counter INTEGER NOT NULL DEFAULT 0,
             user_handle TEXT NOT NULL,
@@ -31,7 +31,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_used_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES {users_table}(id)
+            FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE
         )
         "#
     ))
@@ -77,6 +77,57 @@ pub(super) async fn migrate_passkey_tables_postgres(
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    // Migrate FK to add ON DELETE CASCADE
+    let users_table = DB_TABLE_USERS.as_str();
+    let has_cascade: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.referential_constraints rc
+            JOIN information_schema.table_constraints tc
+                ON rc.constraint_name = tc.constraint_name
+            WHERE tc.table_name = $1
+                AND rc.delete_rule = 'CASCADE'
+        )
+        "#,
+    )
+    .bind(passkey_table)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    if !has_cascade {
+        // Find and drop existing FK constraint(s)
+        let constraint_names: Vec<(String,)> = sqlx::query_as(
+            r#"
+            SELECT tc.constraint_name
+            FROM information_schema.table_constraints tc
+            WHERE tc.table_name = $1 AND tc.constraint_type = 'FOREIGN KEY'
+            "#,
+        )
+        .bind(passkey_table)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+        for (name,) in &constraint_names {
+            sqlx::query(&format!(
+                "ALTER TABLE {passkey_table} DROP CONSTRAINT {name}"
+            ))
+            .execute(pool)
+            .await
+            .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+        }
+
+        sqlx::query(&format!(
+            "ALTER TABLE {passkey_table} ADD CONSTRAINT fk_{passkey_table}_user_id FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE"
+        ))
+        .execute(pool)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+        tracing::info!("Migrated {passkey_table}: added ON DELETE CASCADE to user_id FK");
+    }
 
     Ok(())
 }

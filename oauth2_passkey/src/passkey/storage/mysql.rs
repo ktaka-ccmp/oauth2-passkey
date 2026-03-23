@@ -31,7 +31,7 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), Passke
             created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
             updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
             last_used_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-            FOREIGN KEY (user_id) REFERENCES {users_table}(id)
+            FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE
         )
         "#
     ))
@@ -79,6 +79,41 @@ pub(super) async fn migrate_passkey_tables_mysql(pool: &Pool<MySql>) -> Result<(
         .execute(pool)
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+    }
+
+    // Migrate FK to add ON DELETE CASCADE
+    let users_table = DB_TABLE_USERS.as_str();
+    let fk_info: Vec<(String, String)> = sqlx::query_as(&format!(
+        r#"
+        SELECT CONSTRAINT_NAME, DELETE_RULE
+        FROM information_schema.REFERENTIAL_CONSTRAINTS
+        WHERE TABLE_NAME = '{passkey_table}'
+            AND CONSTRAINT_SCHEMA = DATABASE()
+        "#
+    ))
+    .fetch_all(pool)
+    .await
+    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+    let has_cascade = fk_info.iter().any(|(_, rule)| rule == "CASCADE");
+    if !has_cascade {
+        for (name, _) in &fk_info {
+            sqlx::query(&format!(
+                "ALTER TABLE {passkey_table} DROP FOREIGN KEY {name}"
+            ))
+            .execute(pool)
+            .await
+            .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+        }
+
+        sqlx::query(&format!(
+            "ALTER TABLE {passkey_table} ADD CONSTRAINT fk_{passkey_table}_user_id FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE"
+        ))
+        .execute(pool)
+        .await
+        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
+
+        tracing::info!("Migrated {passkey_table}: added ON DELETE CASCADE to user_id FK");
     }
 
     Ok(())

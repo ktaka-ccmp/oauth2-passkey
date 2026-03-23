@@ -2,7 +2,7 @@ use super::*;
 use crate::test_utils::init_test_environment;
 use serial_test::serial;
 
-use crate::oauth2::OAuth2Store;
+use crate::oauth2::{AccountSearchField, OAuth2Store};
 use crate::passkey::{PasskeyCredential, PasskeyStore};
 use crate::session::{SessionId, UserId, insert_test_session, insert_test_user};
 use crate::userdb::{User as DbUser, UserStore};
