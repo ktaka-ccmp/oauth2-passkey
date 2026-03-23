@@ -53,68 +53,6 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     Ok(())
 }
 
-/// Migrates the OAuth2 accounts table to add ON DELETE CASCADE to the FK constraint.
-pub(super) async fn migrate_oauth2_tables_postgres(
-    pool: &Pool<Postgres>,
-) -> Result<(), OAuth2Error> {
-    let oauth2_table = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
-    let users_table = DB_TABLE_USERS.as_str();
-
-    // Check if FK already has CASCADE
-    let has_cascade: bool = sqlx::query_scalar(
-        r#"
-        SELECT EXISTS (
-            SELECT 1 FROM information_schema.referential_constraints rc
-            JOIN information_schema.table_constraints tc
-                ON rc.constraint_name = tc.constraint_name
-            WHERE tc.table_name = $1
-                AND rc.delete_rule = 'CASCADE'
-        )
-        "#,
-    )
-    .bind(oauth2_table)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-    if has_cascade {
-        return Ok(());
-    }
-
-    // Find the FK constraint name
-    let constraint_name: Option<String> = sqlx::query_scalar(
-        r#"
-        SELECT tc.constraint_name
-        FROM information_schema.table_constraints tc
-        WHERE tc.table_name = $1 AND tc.constraint_type = 'FOREIGN KEY'
-        LIMIT 1
-        "#,
-    )
-    .bind(oauth2_table)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-    if let Some(name) = constraint_name {
-        sqlx::query(&format!(
-            "ALTER TABLE {oauth2_table} DROP CONSTRAINT {name}"
-        ))
-        .execute(pool)
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-    }
-
-    sqlx::query(&format!(
-        "ALTER TABLE {oauth2_table} ADD CONSTRAINT fk_{oauth2_table}_user_id FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE"
-    ))
-    .execute(pool)
-    .await
-    .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-    tracing::info!("Migrated {oauth2_table}: added ON DELETE CASCADE to user_id FK");
-    Ok(())
-}
-
 /// Validates that the OAuth2 account table schema matches what we expect
 pub(super) async fn validate_oauth2_tables_postgres(
     pool: &Pool<Postgres>,

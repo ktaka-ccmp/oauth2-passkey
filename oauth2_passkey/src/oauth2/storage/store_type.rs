@@ -47,19 +47,16 @@ impl OAuth2Store {
         match (store.as_sqlite(), store.as_postgres(), store.as_mysql()) {
             (Some(pool), _, _) => {
                 create_tables_sqlite(pool).await?;
-                migrate_oauth2_tables_sqlite(pool).await?;
                 validate_oauth2_tables_sqlite(pool).await?;
                 Ok(())
             }
             (_, Some(pool), _) => {
                 create_tables_postgres(pool).await?;
-                migrate_oauth2_tables_postgres(pool).await?;
                 validate_oauth2_tables_postgres(pool).await?;
                 Ok(())
             }
             (_, _, Some(pool)) => {
                 create_tables_mysql(pool).await?;
-                migrate_oauth2_tables_mysql(pool).await?;
                 validate_oauth2_tables_mysql(pool).await?;
                 Ok(())
             }

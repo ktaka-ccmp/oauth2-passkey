@@ -51,50 +51,6 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), OAuth2
     Ok(())
 }
 
-/// Migrates the OAuth2 accounts table to add ON DELETE CASCADE to the FK constraint.
-pub(super) async fn migrate_oauth2_tables_mysql(pool: &Pool<MySql>) -> Result<(), OAuth2Error> {
-    let oauth2_table = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
-    let users_table = DB_TABLE_USERS.as_str();
-
-    // Check if FK already has CASCADE
-    let fk_info: Vec<(String, String)> = sqlx::query_as(&format!(
-        r#"
-        SELECT CONSTRAINT_NAME, DELETE_RULE
-        FROM information_schema.REFERENTIAL_CONSTRAINTS
-        WHERE TABLE_NAME = '{oauth2_table}'
-            AND CONSTRAINT_SCHEMA = DATABASE()
-        "#
-    ))
-    .fetch_all(pool)
-    .await
-    .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-    let has_cascade = fk_info.iter().any(|(_, rule)| rule == "CASCADE");
-    if has_cascade {
-        return Ok(());
-    }
-
-    // Drop existing FK and re-add with CASCADE
-    for (name, _) in &fk_info {
-        sqlx::query(&format!(
-            "ALTER TABLE {oauth2_table} DROP FOREIGN KEY {name}"
-        ))
-        .execute(pool)
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-    }
-
-    sqlx::query(&format!(
-        "ALTER TABLE {oauth2_table} ADD CONSTRAINT fk_{oauth2_table}_user_id FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE"
-    ))
-    .execute(pool)
-    .await
-    .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-    tracing::info!("Migrated {oauth2_table}: added ON DELETE CASCADE to user_id FK");
-    Ok(())
-}
-
 /// Validates that the OAuth2 account table schema matches what we expect
 pub(super) async fn validate_oauth2_tables_mysql(pool: &Pool<MySql>) -> Result<(), OAuth2Error> {
     let oauth2_table = DB_TABLE_OAUTH2_ACCOUNTS.as_str();

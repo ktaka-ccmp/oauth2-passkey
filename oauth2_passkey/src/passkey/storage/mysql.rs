@@ -58,67 +58,6 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), Passke
     Ok(())
 }
 
-/// Migrates the passkey credentials table to add the rp_id column if it doesn't exist.
-/// This is needed for existing databases that were created before rp_id was added.
-pub(super) async fn migrate_passkey_tables_mysql(pool: &Pool<MySql>) -> Result<(), PasskeyError> {
-    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
-
-    // Check if rp_id column exists using INFORMATION_SCHEMA
-    let has_rp_id: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'rp_id'",
-    )
-    .bind(passkey_table)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-    if !has_rp_id {
-        sqlx::query(&format!(
-            "ALTER TABLE {passkey_table} ADD COLUMN rp_id VARCHAR(255) NOT NULL DEFAULT ''"
-        ))
-        .execute(pool)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-    }
-
-    // Migrate FK to add ON DELETE CASCADE
-    let users_table = DB_TABLE_USERS.as_str();
-    let fk_info: Vec<(String, String)> = sqlx::query_as(&format!(
-        r#"
-        SELECT CONSTRAINT_NAME, DELETE_RULE
-        FROM information_schema.REFERENTIAL_CONSTRAINTS
-        WHERE TABLE_NAME = '{passkey_table}'
-            AND CONSTRAINT_SCHEMA = DATABASE()
-        "#
-    ))
-    .fetch_all(pool)
-    .await
-    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-    let has_cascade = fk_info.iter().any(|(_, rule)| rule == "CASCADE");
-    if !has_cascade {
-        for (name, _) in &fk_info {
-            sqlx::query(&format!(
-                "ALTER TABLE {passkey_table} DROP FOREIGN KEY {name}"
-            ))
-            .execute(pool)
-            .await
-            .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-        }
-
-        sqlx::query(&format!(
-            "ALTER TABLE {passkey_table} ADD CONSTRAINT fk_{passkey_table}_user_id FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE"
-        ))
-        .execute(pool)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-        tracing::info!("Migrated {passkey_table}: added ON DELETE CASCADE to user_id FK");
-    }
-
-    Ok(())
-}
-
 /// Validates that the Passkey credential table schema matches what we expect
 pub(super) async fn validate_passkey_tables_mysql(pool: &Pool<MySql>) -> Result<(), PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
