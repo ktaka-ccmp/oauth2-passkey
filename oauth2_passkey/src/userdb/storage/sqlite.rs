@@ -143,24 +143,6 @@ pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Resul
     .map_err(|e| UserError::Storage(e.to_string()))
 }
 
-pub(super) async fn count_admin_users_sqlite(pool: &Pool<Sqlite>) -> Result<i64, UserError> {
-    // Ensure tables exist before any operations - this is critical for in-memory databases
-    create_tables_sqlite(pool).await?;
-
-    let table_name = DB_TABLE_USERS.as_str();
-
-    let row: (i64,) = sqlx::query_as(&format!(
-        r#"
-        SELECT COUNT(*) FROM {table_name} WHERE is_admin = true OR sequence_number = 1
-        "#
-    ))
-    .fetch_one(pool)
-    .await
-    .map_err(|e| UserError::Storage(e.to_string()))?;
-
-    Ok(row.0)
-}
-
 /// Insert a demo placeholder user with sequence_number=1
 ///
 /// This occupies seq=1 so no real user gets first-user protections.
@@ -186,6 +168,30 @@ pub(super) async fn insert_demo_placeholder_sqlite(pool: &Pool<Sqlite>) -> Resul
     .map_err(|e| UserError::Storage(e.to_string()))?;
 
     Ok(())
+}
+
+/// Atomically demote a user only if they are not the last admin.
+/// Returns true if demoted, false if they were the last admin.
+pub(super) async fn demote_user_if_not_last_admin_sqlite(
+    pool: &Pool<Sqlite>,
+    id: UserId,
+) -> Result<bool, UserError> {
+    create_tables_sqlite(pool).await?;
+
+    let table_name = DB_TABLE_USERS.as_str();
+
+    let result = sqlx::query(&format!(
+        r#"
+        UPDATE {table_name} SET is_admin = false, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND (SELECT COUNT(*) FROM {table_name} WHERE is_admin = true) > 1
+        "#
+    ))
+    .bind(id.as_str())
+    .execute(pool)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    Ok(result.rows_affected() > 0)
 }
 
 /// Atomically delete a user only if they are not the last admin.
