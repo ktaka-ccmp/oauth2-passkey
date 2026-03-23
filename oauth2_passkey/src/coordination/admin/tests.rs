@@ -1049,18 +1049,14 @@ async fn test_delete_admin_allowed_when_others_exist() {
 
 /// Test that after the first user is deleted, the remaining last admin is still protected.
 ///
-/// This verifies that the `count_admin_users` SQL query (`WHERE is_admin = true OR sequence_number = 1`)
-/// works correctly when sequence_number=1 no longer exists in the database: the `OR sequence_number = 1`
-/// clause becomes a no-op and only `is_admin = true` is effective, correctly counting the remaining admin.
-///
-/// Note: The actual deletion may encounter FK constraint errors when parallel non-serial
-/// tests re-create child records via `init_test_environment()` between the child record
-/// deletion and user deletion. In that case, `delete_user_atomically()` is used as a
-/// fallback to complete the deletion while holding the GENERIC_DATA_STORE lock.
+/// This verifies that `delete_user_if_not_last_admin` correctly prevents deletion of the
+/// last admin user, even after the first user (sequence_number=1) has been removed from
+/// the database. The atomic `WHERE (SELECT COUNT(*) ... WHERE is_admin = true) > 1`
+/// check only counts actual admin users, not sequence_number.
 #[serial]
 #[tokio::test]
 async fn test_last_admin_protected_after_first_user_deleted() {
-    use crate::test_utils::{delete_user_atomically, restore_first_user_after_deletion};
+    use crate::test_utils::restore_first_user_after_deletion;
 
     init_test_environment().await;
 
@@ -1081,23 +1077,11 @@ async fn test_last_admin_protected_after_first_user_deleted() {
     .await;
 
     // The guard should allow this deletion (not Conflict).
-    // In the full test suite, parallel tests may re-create child records between
-    // the child delete and user delete, causing an FK constraint error.
-    match &delete_result {
-        Ok(_) => {
-            // Guard passed and deletion succeeded
-        }
-        Err(CoordinationError::Conflict(_)) => {
-            panic!(
-                "Should be able to delete first-user when other admin exists (guard blocked), got: {delete_result:?}"
-            );
-        }
-        Err(_) => {
-            // FK constraint error or other DB error -- guard passed but parallel test interference
-            // Complete the deletion atomically
-            delete_user_atomically("first-user").await;
-        }
-    }
+    // With ON DELETE CASCADE, FK constraint errors no longer occur.
+    assert!(
+        delete_result.is_ok(),
+        "Should be able to delete first-user when other admin exists, got: {delete_result:?}"
+    );
 
     // Verify first-user no longer exists
     let first_user =

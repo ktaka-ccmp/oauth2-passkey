@@ -519,14 +519,10 @@ async fn test_gen_new_user_id_max_retries() {
 /// after creating another admin. After deletion, all remaining admins are protected equally
 /// by the last-admin guard only.
 ///
-/// Note: The actual deletion may encounter FK constraint errors when parallel non-serial
-/// tests re-create child records via `init_test_environment()` between the child record
-/// deletion and user deletion. In that case, `delete_user_atomically()` is used as a
-/// fallback to complete the deletion while holding the GENERIC_DATA_STORE lock.
 #[serial]
 #[tokio::test]
 async fn test_first_user_escape_hatch_self_delete() {
-    use crate::test_utils::{delete_user_atomically, restore_first_user_after_deletion};
+    use crate::test_utils::restore_first_user_after_deletion;
 
     init_test_environment().await;
 
@@ -566,24 +562,11 @@ async fn test_first_user_escape_hatch_self_delete() {
     .await;
 
     // The guard should allow this deletion (not Conflict).
-    // In the full test suite, parallel tests may re-create child records between
-    // the child delete and user delete, causing an FK constraint error.
-    // This is a test infrastructure race condition, not a logic bug.
-    match &result {
-        Ok(_) => {
-            // Guard passed and deletion succeeded
-        }
-        Err(CoordinationError::Conflict(_)) => {
-            panic!(
-                "First user should be able to self-delete when other admins exist (guard blocked), got: {result:?}"
-            );
-        }
-        Err(_) => {
-            // FK constraint error or other DB error -- guard passed but parallel test interference
-            // Complete the deletion atomically
-            delete_user_atomically("first-user").await;
-        }
-    }
+    // With ON DELETE CASCADE, FK constraint errors no longer occur.
+    assert!(
+        result.is_ok(),
+        "First user should be able to self-delete when other admins exist, got: {result:?}"
+    );
 
     // Verify first-user no longer exists
     let deleted_user =

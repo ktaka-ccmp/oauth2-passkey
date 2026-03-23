@@ -228,6 +228,8 @@ pub(super) async fn insert_demo_placeholder_mysql(pool: &Pool<MySql>) -> Result<
     Ok(())
 }
 
+/// Atomically demote a user only if they are not the last admin.
+/// Returns true if demoted, false if they were the last admin.
 pub(super) async fn demote_user_if_not_last_admin_mysql(
     pool: &Pool<MySql>,
     id: UserId,
@@ -250,6 +252,8 @@ pub(super) async fn demote_user_if_not_last_admin_mysql(
     Ok(result.rows_affected() > 0)
 }
 
+/// Atomically delete a user only if they are not the last admin.
+/// Returns true if deleted, false if they were the last admin.
 pub(super) async fn delete_user_if_not_last_admin_mysql(
     pool: &Pool<MySql>,
     id: UserId,
