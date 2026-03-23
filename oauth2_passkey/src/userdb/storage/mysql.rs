@@ -246,6 +246,28 @@ pub(super) async fn insert_demo_placeholder_mysql(pool: &Pool<MySql>) -> Result<
     Ok(())
 }
 
+pub(super) async fn delete_user_if_not_last_admin_mysql(
+    pool: &Pool<MySql>,
+    id: UserId,
+) -> Result<bool, UserError> {
+    create_tables_mysql(pool).await?;
+
+    let table_name = DB_TABLE_USERS.as_str();
+
+    let result = sqlx::query(&format!(
+        r#"
+        DELETE FROM {table_name}
+        WHERE id = ? AND (SELECT COUNT(*) FROM {table_name} WHERE is_admin = true) > 1
+        "#
+    ))
+    .bind(id.as_str())
+    .execute(pool)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    Ok(result.rows_affected() > 0)
+}
+
 pub(super) async fn delete_user_mysql(pool: &Pool<MySql>, id: UserId) -> Result<(), UserError> {
     // Ensure tables exist before any operations
     create_tables_mysql(pool).await?;

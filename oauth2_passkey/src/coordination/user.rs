@@ -120,19 +120,6 @@ pub async fn delete_user_account(
         })?
     };
 
-    // Prevent deleting the last admin user (applies to both self-deletion and admin deletion)
-    if user.has_admin_privileges() {
-        let admin_count = UserStore::count_admin_users()
-            .await
-            .map_err(|e| CoordinationError::Database(e.to_string()))?;
-        if admin_count <= 1 {
-            return Err(CoordinationError::Conflict(
-                "Cannot delete the last admin user".to_string(),
-            )
-            .log());
-        }
-    }
-
     tracing::debug!("Deleting user account: {:#?}", user);
 
     // Get all Passkey credential IDs before deletion (for client-side Signal API notification)
@@ -145,7 +132,20 @@ pub async fn delete_user_account(
 
     // Delete the user account. Related OAuth2 accounts and Passkey credentials
     // are automatically removed via ON DELETE CASCADE foreign key constraints.
-    UserStore::delete_user(user_id).await?;
+    if user.has_admin_privileges() {
+        // Atomic: only deletes if other admins exist (prevents last-admin deletion race)
+        let deleted = UserStore::delete_user_if_not_last_admin(user_id)
+            .await
+            .map_err(|e| CoordinationError::Database(e.to_string()))?;
+        if !deleted {
+            return Err(CoordinationError::Conflict(
+                "Cannot delete the last admin user".to_string(),
+            )
+            .log());
+        }
+    } else {
+        UserStore::delete_user(user_id).await?;
+    }
 
     // Returns a list of deleted passkey credential IDs for client-side notification
     Ok(credential_ids)

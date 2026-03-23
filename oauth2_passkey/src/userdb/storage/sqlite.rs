@@ -188,6 +188,30 @@ pub(super) async fn insert_demo_placeholder_sqlite(pool: &Pool<Sqlite>) -> Resul
     Ok(())
 }
 
+/// Atomically delete a user only if they are not the last admin.
+/// Returns true if deleted, false if they were the last admin.
+pub(super) async fn delete_user_if_not_last_admin_sqlite(
+    pool: &Pool<Sqlite>,
+    id: UserId,
+) -> Result<bool, UserError> {
+    create_tables_sqlite(pool).await?;
+
+    let table_name = DB_TABLE_USERS.as_str();
+
+    let result = sqlx::query(&format!(
+        r#"
+        DELETE FROM {table_name}
+        WHERE id = ? AND (SELECT COUNT(*) FROM {table_name} WHERE is_admin = true) > 1
+        "#
+    ))
+    .bind(id.as_str())
+    .execute(pool)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    Ok(result.rows_affected() > 0)
+}
+
 pub(super) async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: UserId) -> Result<(), UserError> {
     // Ensure tables exist before any operations - this is critical for in-memory databases
     create_tables_sqlite(pool).await?;

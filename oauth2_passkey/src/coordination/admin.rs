@@ -261,24 +261,24 @@ pub async fn delete_user_account_admin(
         .log()
     })?;
 
-    // Prevent deleting the last admin user
+    tracing::debug!("Deleting user account: {:#?}", user);
+
+    // Delete the user account. Related OAuth2 accounts and Passkey credentials
+    // are automatically removed via ON DELETE CASCADE foreign key constraints.
     if user.has_admin_privileges() {
-        let admin_count = UserStore::count_admin_users()
+        // Atomic: only deletes if other admins exist (prevents last-admin deletion race)
+        let deleted = UserStore::delete_user_if_not_last_admin(user_id)
             .await
             .map_err(|e| CoordinationError::Database(e.to_string()))?;
-        if admin_count <= 1 {
+        if !deleted {
             return Err(CoordinationError::Conflict(
                 "Cannot delete the last admin user".to_string(),
             )
             .log());
         }
+    } else {
+        UserStore::delete_user(user_id).await?;
     }
-
-    tracing::debug!("Deleting user account: {:#?}", user);
-
-    // Delete the user account. Related OAuth2 accounts and Passkey credentials
-    // are automatically removed via ON DELETE CASCADE foreign key constraints.
-    UserStore::delete_user(user_id).await?;
 
     Ok(())
 }

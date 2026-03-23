@@ -189,6 +189,26 @@ pub(super) async fn insert_demo_placeholder_postgres(
     Ok(())
 }
 
+pub(super) async fn delete_user_if_not_last_admin_postgres(
+    pool: &Pool<Postgres>,
+    id: UserId,
+) -> Result<bool, UserError> {
+    let table_name = DB_TABLE_USERS.as_str();
+
+    let result = sqlx::query(&format!(
+        r#"
+        DELETE FROM {table_name}
+        WHERE id = $1 AND (SELECT COUNT(*) FROM {table_name} WHERE is_admin = true) > 1
+        "#
+    ))
+    .bind(id.as_str())
+    .execute(pool)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
+
+    Ok(result.rows_affected() > 0)
+}
+
 pub(super) async fn delete_user_postgres(
     pool: &Pool<Postgres>,
     id: UserId,
