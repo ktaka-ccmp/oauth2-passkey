@@ -93,10 +93,11 @@ This directory contains issue/task tracking files for the project.
 | `20260212-0235` | [Standalone Demo Repository](wontfix/20260212-0235-standalone-demo-repository.md) |
 | `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
-### Deferred (9)
+### Deferred (10)
 
 | ID | Title |
 |----|-------|
+| `20260323-1505` | [DPoP (Demonstration of Proof-of-Possession) Support](deferred/20260323-1505-dpop-sender-constrained-tokens.md) |
 | `20260320-1410` | [FedCM Cancel Fallback Popup Gets Blocked by Browser](deferred/20260320-1410-fedcm-fallback-popup-blocked.md) |
 | `20260316-1630` | [FedCM Promise Hangs Indefinitely in Stale Tab](deferred/20260316-1630-fedcm-promise-hang-stale-tab.md) |
 | `20260315-0349` | [Eliminate ring Dependency for Full RustCrypto Migration](deferred/20260315-0349-eliminate-ring-dependency.md) |
