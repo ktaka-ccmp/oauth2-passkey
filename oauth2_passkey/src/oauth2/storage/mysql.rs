@@ -31,7 +31,7 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), OAuth2
             created_at DATETIME(6) NOT NULL,
             updated_at DATETIME(6) NOT NULL,
             UNIQUE KEY uq_provider_user (provider, provider_user_id),
-            FOREIGN KEY (user_id) REFERENCES {users_table}(id)
+            FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE
         )
         "#
     ))

@@ -148,17 +148,29 @@ impl UserStore {
         final_result
     }
 
-    pub(crate) async fn count_admin_users() -> Result<i64, UserError> {
+    /// Atomically demote a user only if they are not the last admin.
+    /// Returns true if demoted, false if they were the last admin.
+    pub(crate) async fn demote_user_if_not_last_admin(id: UserId) -> Result<bool, UserError> {
         let store = GENERIC_DATA_STORE.lock().await;
 
-        if let Some(pool) = store.as_sqlite() {
-            count_admin_users_sqlite(pool).await
-        } else if let Some(pool) = store.as_postgres() {
-            count_admin_users_postgres(pool).await
-        } else if let Some(pool) = store.as_mysql() {
-            count_admin_users_mysql(pool).await
-        } else {
-            Err(UserError::Storage("Unsupported database type".to_string()))
+        match (store.as_sqlite(), store.as_postgres(), store.as_mysql()) {
+            (Some(pool), _, _) => demote_user_if_not_last_admin_sqlite(pool, id).await,
+            (_, Some(pool), _) => demote_user_if_not_last_admin_postgres(pool, id).await,
+            (_, _, Some(pool)) => demote_user_if_not_last_admin_mysql(pool, id).await,
+            _ => Err(UserError::Storage("Unsupported database type".to_string())),
+        }
+    }
+
+    /// Atomically delete a user only if they are not the last admin.
+    /// Returns true if deleted, false if they were the last admin.
+    pub(crate) async fn delete_user_if_not_last_admin(id: UserId) -> Result<bool, UserError> {
+        let store = GENERIC_DATA_STORE.lock().await;
+
+        match (store.as_sqlite(), store.as_postgres(), store.as_mysql()) {
+            (Some(pool), _, _) => delete_user_if_not_last_admin_sqlite(pool, id).await,
+            (_, Some(pool), _) => delete_user_if_not_last_admin_postgres(pool, id).await,
+            (_, _, Some(pool)) => delete_user_if_not_last_admin_mysql(pool, id).await,
+            _ => Err(UserError::Storage("Unsupported database type".to_string())),
         }
     }
 

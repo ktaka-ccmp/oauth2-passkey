@@ -18,7 +18,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
         CREATE TABLE IF NOT EXISTS {passkey_table} (
             sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
             credential_id TEXT NOT NULL UNIQUE,
-            user_id TEXT NOT NULL REFERENCES {users_table}(id),
+            user_id TEXT NOT NULL,
             public_key TEXT NOT NULL,
             counter INTEGER NOT NULL DEFAULT 0,
             user_handle TEXT NOT NULL,
@@ -29,7 +29,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES {users_table}(id)
+            FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE
         )
         "#
     ))
@@ -50,33 +50,6 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Pass
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-    Ok(())
-}
-
-/// Migrates the passkey credentials table to add the rp_id column if it doesn't exist.
-/// This is needed for existing databases that were created before rp_id was added.
-pub(super) async fn migrate_passkey_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), PasskeyError> {
-    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
-
-    // Check if rp_id column exists using PRAGMA table_info
-    let columns: Vec<(String,)> = sqlx::query_as(&format!(
-        "SELECT name FROM pragma_table_info('{passkey_table}')"
-    ))
-    .fetch_all(pool)
-    .await
-    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-    let has_rp_id = columns.iter().any(|(name,)| name == "rp_id");
-
-    if !has_rp_id {
-        sqlx::query(&format!(
-            "ALTER TABLE {passkey_table} ADD COLUMN rp_id TEXT NOT NULL DEFAULT ''"
-        ))
-        .execute(pool)
-        .await
-        .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-    }
 
     Ok(())
 }

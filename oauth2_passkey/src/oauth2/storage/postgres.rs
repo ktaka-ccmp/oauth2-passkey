@@ -21,7 +21,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
         CREATE TABLE IF NOT EXISTS {oauth2_table} (
             sequence_number BIGSERIAL PRIMARY KEY,
             id TEXT NOT NULL UNIQUE,
-            user_id TEXT NOT NULL REFERENCES {users_table}(id),
+            user_id TEXT NOT NULL REFERENCES {users_table}(id) ON DELETE CASCADE,
             provider TEXT NOT NULL,
             provider_user_id TEXT NOT NULL,
             name TEXT NOT NULL,

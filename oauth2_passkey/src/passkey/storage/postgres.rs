@@ -20,7 +20,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
         CREATE TABLE IF NOT EXISTS {passkey_table} (
             sequence_number BIGSERIAL PRIMARY KEY,
             credential_id TEXT NOT NULL UNIQUE,
-            user_id TEXT NOT NULL REFERENCES {users_table}(id),
+            user_id TEXT NOT NULL,
             public_key TEXT NOT NULL,
             counter INTEGER NOT NULL DEFAULT 0,
             user_handle TEXT NOT NULL,
@@ -31,7 +31,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_used_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES {users_table}(id)
+            FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE
         )
         "#
     ))
@@ -56,23 +56,6 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
         "#,
         passkey_table.replace(".", "_"),
         passkey_table
-    ))
-    .execute(pool)
-    .await
-    .map_err(|e| PasskeyError::Storage(e.to_string()))?;
-
-    Ok(())
-}
-
-/// Migrates the passkey credentials table to add the rp_id column if it doesn't exist.
-/// This is needed for existing databases that were created before rp_id was added.
-pub(super) async fn migrate_passkey_tables_postgres(
-    pool: &Pool<Postgres>,
-) -> Result<(), PasskeyError> {
-    let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
-
-    sqlx::query(&format!(
-        "ALTER TABLE {passkey_table} ADD COLUMN IF NOT EXISTS rp_id TEXT NOT NULL DEFAULT ''"
     ))
     .execute(pool)
     .await
