@@ -212,7 +212,7 @@ For minimal container deployments (scratch or alpine Docker images) where system
 
 ```toml
 [dependencies]
-oauth2-passkey-axum = { version = "0.4", features = ["bundled-tls"] }
+oauth2-passkey-axum = { version = "0.5", features = ["bundled-tls"] }
 ```
 
 This bundles certificates from the `webpki-roots` crate and configures ALPN protocol negotiation for proper TLS handshakes.
@@ -251,7 +251,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenvy = "0.15"
 askama = "0.12"
-oauth2-passkey-axum = "0.4"
+oauth2-passkey-axum = "0.5"
 ```
 
 ## Startup Sequence
