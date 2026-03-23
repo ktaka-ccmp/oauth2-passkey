@@ -2,6 +2,7 @@
 
 ## Table of Contents
 
+- [2026-03-23: User deletion atomicity -- CASCADE DELETE and atomic admin checks](#2026-03-23-user-deletion-atomicity----cascade-delete-and-atomic-admin-checks)
 - [2026-03-23: Login history retention policy](#2026-03-23-login-history-retention-policy)
 - [2026-03-22: upsert_oauth2_account post-COMMIT SELECT race fix](#2026-03-22-upsert_oauth2_account-post-commit-select-race-fix)
 - [2026-03-22: Atomic passkey counter verification (TOCTOU fix)](#2026-03-22-atomic-passkey-counter-verification-toctou-fix)
@@ -67,6 +68,55 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-23: User deletion atomicity -- CASCADE DELETE and atomic admin checks
+
+**Issue**: `20260322-0927` (completed) | **Priority**: medium | **Difficulty**: medium
+
+Breaking change + Security fix
+
+### Motivation
+
+User deletion in `coordination/user.rs` had two atomicity problems:
+
+1. **Non-atomic multi-store deletion**: Three sequential `DELETE` calls across OAuth2Store, PasskeyStore, and UserStore. If one failed mid-way, orphaned records would remain.
+2. **Admin count TOCTOU race**: `count_admin_users()` followed by `delete_user()` as separate operations. Two concurrent admin deletions could both pass the count check and delete, leaving zero admins.
+
+The same TOCTOU pattern existed in admin demotion (`update_user_admin_status`).
+
+### User-facing impact
+
+- **Before**: User deletion required 3 separate DELETE operations. Partial failure left orphaned OAuth2/Passkey records. Concurrent admin deletions could violate the last-admin constraint.
+- **After**: Single `UserStore::delete_user()` atomically removes user + all related records via CASCADE. Admin deletion and demotion use atomic SQL that prevents last-admin violations.
+
+**Breaking**: Existing databases must be recreated. Migration functions removed (pre-1.0). Run `utils/clear_db_cache.sh`.
+
+**New storage API**:
+```rust
+// Atomic: only deletes if other admins exist
+UserStore::delete_user_if_not_last_admin(user_id) -> Result<bool, UserError>
+
+// Atomic: only demotes if other admins exist
+UserStore::demote_user_if_not_last_admin(user_id) -> Result<bool, UserError>
+```
+
+**Removed**: `count_admin_users()` from all 3 backends (replaced by atomic operations).
+
+### Design decisions
+
+**CASCADE DELETE (Option C) over transaction-aware API (Option A):** FK constraints already existed on all 3 backends (`REFERENCES users(id)`), just without CASCADE. Adding `ON DELETE CASCADE` was minimal change. Option A (passing transactions through Store trait API) deferred to 1.0 API design.
+
+**SQLite `foreign_keys(true)`:** SQLite ignores FK constraints by default. Without this, CASCADE wouldn't work. Added to `SqliteConnectOptions` so all pool connections enforce FKs.
+
+**Migration removal:** Pre-1.0 with only demo site + developer as known users. `CREATE TABLE` already defines the latest schema. Migration functions (rp_id column addition, CASCADE FK) added unnecessary startup overhead.
+
+**Atomic admin checks:** Same pattern as the passkey counter fix -- `DELETE/UPDATE ... WHERE (SELECT COUNT(*) FROM users WHERE is_admin = true) > 1`. `rows_affected == 0` means last admin, return error.
+
+**login_history intentionally has no FK:** Audit trail should be retained even after user deletion. Documented with comments on all 3 backends' CREATE TABLE.
+
+### Key files
+
+`oauth2_passkey/src/coordination/user.rs`, `oauth2_passkey/src/coordination/admin.rs`, `oauth2_passkey/src/userdb/storage/{sqlite,postgres,mysql}.rs`, `oauth2_passkey/src/userdb/storage/store_type.rs`, `oauth2_passkey/src/storage/data_store/config.rs`, `oauth2_passkey/src/oauth2/storage/{sqlite,postgres,mysql}.rs`, `oauth2_passkey/src/passkey/storage/{sqlite,postgres,mysql}.rs`
 
 ## 2026-03-23: Login history retention policy
 

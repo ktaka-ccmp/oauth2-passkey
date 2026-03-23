@@ -14,9 +14,9 @@
 
 ## Created: 2026-03-22
 
-## Closed:
+## Closed: 2026-03-23
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -83,13 +83,17 @@ Option C: Use database-level foreign key CASCADE DELETE so that deleting the use
 ## Implementation Tasks
 
 - [x] Evaluate approach -> Option C (CASCADE DELETE)
-- [ ] Add `ON DELETE CASCADE` to FK in SQLite (requires table recreation via migration)
-- [ ] Add `ON DELETE CASCADE` to FK in PostgreSQL (ALTER TABLE DROP/ADD CONSTRAINT)
-- [ ] Add `ON DELETE CASCADE` to FK in MySQL (ALTER TABLE DROP/ADD FOREIGN KEY)
-- [ ] Enable `PRAGMA foreign_keys = ON` for SQLite connections
-- [ ] Simplify `coordination/user.rs`: remove explicit OAuth2/Passkey deletes, keep only `UserStore::delete_user`
-- [ ] Add atomic admin count check: `DELETE ... WHERE (SELECT COUNT(*) ...) > 1`
-- [ ] Verify tests pass
+- [x] Add `ON DELETE CASCADE` to FK in CREATE TABLE for all 3 backends
+- [x] Enable `PRAGMA foreign_keys = ON` for SQLite connections
+- [x] Simplify `coordination/user.rs` and `admin.rs`: remove explicit OAuth2/Passkey deletes
+- [x] Remove migration functions (pre-1.0, DB recreation required)
+- [x] Add atomic admin count check via `delete_user_if_not_last_admin()`
+- [x] Update coordination layer to use atomic admin delete
+- [x] Add login_history orphan retention comment
+- [x] Add atomic admin demotion via `demote_user_if_not_last_admin()`
+- [x] Update coordination/admin.rs `update_user_admin_status` to use atomic demotion
+- [x] Remove now-unused `count_admin_users` from all 3 backends
+- [x] Verify tests pass
 
 ## Decision Log
 
@@ -105,4 +109,26 @@ Option C: Use database-level foreign key CASCADE DELETE so that deleting the use
 - Decision: Add `ON DELETE CASCADE` to existing FK constraints. Simplify coordination layer to single `UserStore::delete_user()`. Add atomic admin count check in the DELETE statement.
 - Reason: Minimal change -- FK constraints are already in place, CASCADE is the standard RDB pattern for parent-child deletion. No Store API redesign needed. Option A (transaction-aware API) deferred to 1.0 API design.
 
+### 2026-03-23: Atomic admin count check via DELETE with subquery
+
+- Context: PR #286 review identified that the admin count TOCTOU race (Problem 2) was not addressed by CASCADE DELETE.
+- Decision: Add `UserStore::delete_user_if_not_last_admin()` using `DELETE FROM users WHERE id = ? AND (SELECT COUNT(*) FROM users WHERE is_admin = true) > 1`. Same atomic pattern as the passkey counter fix. Coordination layer uses this for admin users, regular `delete_user` for non-admins. Remove separate `count_admin_users` + check.
+- Reason: Single SQL statement is inherently atomic. No transaction API changes needed.
+
+### 2026-03-23: Atomic admin demotion
+
+- Context: Same TOCTOU pattern exists in `update_user_admin_status` when demoting an admin. count_admin_users + upsert_user are separate operations.
+- Decision: Add `UserStore::demote_user_if_not_last_admin()` using `UPDATE users SET is_admin = false WHERE id = ? AND (SELECT COUNT(*) FROM users WHERE is_admin = true) > 1`. Same atomic pattern as deletion.
+- Reason: Completes the fix for all admin count race conditions in one issue.
+
 ## Resolution
+
+Both sub-problems resolved:
+
+**Problem 1 (Non-atomic multi-store deletion):** Added `ON DELETE CASCADE` to FK constraints on `oauth2_accounts` and `passkey_credentials` tables. `UserStore::delete_user()` now atomically removes user + all related records at the database level. Explicit OAuth2/Passkey deletes removed from coordination layer.
+
+**Problem 2 (Admin count race condition):** Replaced separate `count_admin_users` + `delete_user`/`upsert_user` TOCTOU pattern with atomic SQL:
+- `delete_user_if_not_last_admin()`: `DELETE ... WHERE (SELECT COUNT(*) WHERE is_admin = true) > 1`
+- `demote_user_if_not_last_admin()`: `UPDATE ... SET is_admin = false WHERE (SELECT COUNT(*) WHERE is_admin = true) > 1`
+
+Additional: `PRAGMA foreign_keys = ON` enabled for SQLite. Migration functions removed (pre-1.0, DB recreation required). `login_history.user_id` intentionally has no FK (audit trail retention).

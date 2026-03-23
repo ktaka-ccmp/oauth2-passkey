@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (10)
+### Open (9)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -16,15 +16,15 @@ This directory contains issue/task tracking files for the project.
 | `20260226-2020` | medium | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
-| `20260322-0927` | medium | large | [User Deletion Lacks Atomicity Across Multiple Stores](open/20260322-0927-user-deletion-atomicity.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
-### Completed (57)
+### Completed (58)
 
 | ID | Title |
 |----|-------|
+| `20260322-0927` | [User Deletion Lacks Atomicity Across Multiple Stores](completed/20260322-0927-user-deletion-atomicity.md) |
 | `20260321-1346` | [Review delete_old_entries Dead Code and Retention Policy](completed/20260321-1346-review-delete-old-entries-dead-code.md) |
 | `20260322-0907` | [upsert_oauth2_account SELECT after COMMIT race condition](completed/20260322-0907-upsert-oauth2-account-post-tx-select-race.md) |
 | `20260322-0926` | [Passkey Counter Verification TOCTOU Race Condition](completed/20260322-0926-passkey-counter-verification-race.md) |

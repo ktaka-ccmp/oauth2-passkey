@@ -34,6 +34,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` now accepts case-insensitive boolean values
 - Switched rustls to ring crypto provider, eliminating the aws-lc-sys build dependency
   - Faster builds and simpler cross-compilation (no C compiler required for aws-lc)
+- `ON DELETE CASCADE` on `oauth2_accounts` and `passkey_credentials` foreign keys (#286)
+  - User deletion now atomically removes all related records at the database level
+  - SQLite foreign key enforcement enabled (`PRAGMA foreign_keys = ON`)
+  - **Breaking**: existing databases must be recreated (`utils/clear_db_cache.sh`)
+- `LoginHistoryError` is now a public type
+  - `cleanup_old_login_history()` returns `Result<u64, LoginHistoryError>` instead of `Box<dyn Error>`
+- User deletion and admin demotion use atomic SQL to prevent last-admin race condition
+  - Replaces separate count + delete/update pattern with single-statement `DELETE/UPDATE ... WHERE (SELECT COUNT(*) ...) > 1`
+
+### Removed
+
+- Migration functions for `rp_id` column and CASCADE FK (pre-1.0, database recreation required instead)
 
 ### Fixed
 
