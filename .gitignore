@@ -4,6 +4,9 @@ utils/Cargo.lock
 .env
 .env.*
 .vscode
+.backup
+.junk
+assets
 
 # GCP service account keys
 sa-key.json
