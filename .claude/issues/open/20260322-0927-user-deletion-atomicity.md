@@ -20,7 +20,7 @@
 
 ## Priority: medium
 
-## Difficulty: large
+## Difficulty: medium
 
 ## Description
 
@@ -62,8 +62,8 @@ Between the count check and the delete, another concurrent request could delete 
 
 ## Related Issues
 
-- `20260322-0926` Passkey counter verification race (open) -- same category, also crosses abstraction boundaries
-- `20260322-0907` upsert_oauth2_account post-tx SELECT race (open) -- simpler transaction issue
+- `20260322-0926` Passkey counter verification race (completed) -- same category
+- `20260322-0907` upsert_oauth2_account post-tx SELECT race (completed) -- simpler transaction issue
 
 ## Approach
 
@@ -82,11 +82,13 @@ Option C: Use database-level foreign key CASCADE DELETE so that deleting the use
 
 ## Implementation Tasks
 
-- [ ] Evaluate approach (transaction-aware API vs CASCADE DELETE vs single function)
-- [ ] Implement chosen approach for SQLite
-- [ ] Implement chosen approach for MySQL
-- [ ] Implement chosen approach for PostgreSQL
-- [ ] Add admin count + delete atomicity
+- [x] Evaluate approach -> Option C (CASCADE DELETE)
+- [ ] Add `ON DELETE CASCADE` to FK in SQLite (requires table recreation via migration)
+- [ ] Add `ON DELETE CASCADE` to FK in PostgreSQL (ALTER TABLE DROP/ADD CONSTRAINT)
+- [ ] Add `ON DELETE CASCADE` to FK in MySQL (ALTER TABLE DROP/ADD FOREIGN KEY)
+- [ ] Enable `PRAGMA foreign_keys = ON` for SQLite connections
+- [ ] Simplify `coordination/user.rs`: remove explicit OAuth2/Passkey deletes, keep only `UserStore::delete_user`
+- [ ] Add atomic admin count check: `DELETE ... WHERE (SELECT COUNT(*) ...) > 1`
 - [ ] Verify tests pass
 
 ## Decision Log
@@ -96,5 +98,11 @@ Option C: Use database-level foreign key CASCADE DELETE so that deleting the use
 - Context: Deep audit found that user deletion in coordination/user.rs performs multiple store operations without atomicity. Two related problems: non-atomic deletion and admin count race.
 - Decision: Create single issue covering both sub-problems since they share the same root cause (cross-store operations without shared transactions) and the fix will likely address both together.
 - Reason: The fix requires a storage layer design change, making this the largest of the transaction audit findings.
+
+### 2026-03-23: Chose Option C (CASCADE DELETE)
+
+- Context: Investigation revealed FK constraints already exist on all 3 backends (`REFERENCES users(id)`), just without CASCADE. User/OAuth2/Passkey have clear parent-child relationships. Registration order already correct (user first, then children).
+- Decision: Add `ON DELETE CASCADE` to existing FK constraints. Simplify coordination layer to single `UserStore::delete_user()`. Add atomic admin count check in the DELETE statement.
+- Reason: Minimal change -- FK constraints are already in place, CASCADE is the standard RDB pattern for parent-child deletion. No Store API redesign needed. Option A (transaction-aware API) deferred to 1.0 API design.
 
 ## Resolution
