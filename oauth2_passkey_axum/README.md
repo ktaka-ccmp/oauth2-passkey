@@ -75,8 +75,9 @@ GENERIC_CACHE_STORE_URL=redis://localhost:6379
 OAUTH2_GOOGLE_CLIENT_ID=your_google_client_id
 OAUTH2_GOOGLE_CLIENT_SECRET=your_google_client_secret
 
-# Optional: Server secret (for token signing)
-AUTH_SERVER_SECRET=your_32_character_secret_key_here
+# Optional: Server secret for page session token signing
+# Default: random key at startup (set explicitly for multi-process deployments)
+#AUTH_SERVER_SECRET=your_32_character_secret_key_here
 ```
 
 See [dot.env.example](../dot.env.example) for available options.

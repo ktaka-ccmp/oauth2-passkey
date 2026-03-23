@@ -87,6 +87,35 @@ pub mod mocks {
     }
 }
 
+/// Helpers for subprocess-based env var validation testing
+pub mod env_var_test {
+    use std::process::Command;
+
+    /// Spawn the current test binary as a child process with a specific env var set.
+    pub fn run_child_with_env(
+        test_name: &str,
+        env_name: &str,
+        env_value: &str,
+    ) -> std::process::Output {
+        Command::new(std::env::current_exe().unwrap())
+            .args([test_name, "--exact", "--nocapture"])
+            .env("__TEST_ENV_VAR_CHILD", "1")
+            .env(env_name, env_value)
+            .output()
+            .expect("Failed to spawn child process")
+    }
+
+    /// Spawn the current test binary as a child process with a specific env var removed.
+    pub fn run_child_without_env(test_name: &str, env_name: &str) -> std::process::Output {
+        Command::new(std::env::current_exe().unwrap())
+            .args([test_name, "--exact", "--nocapture"])
+            .env("__TEST_ENV_VAR_CHILD", "1")
+            .env_remove(env_name)
+            .output()
+            .expect("Failed to spawn child process")
+    }
+}
+
 /// Core function mocks for testing without external dependencies
 pub mod core_mocks {
     use super::*;
@@ -102,6 +131,7 @@ pub mod core_mocks {
         let now = Utc::now();
         let json = format!(
             r#"{{
+            "sequence_number": null,
             "credential_id": "{}",
             "user_id": "{}",
             "public_key": "{}",

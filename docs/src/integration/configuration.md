@@ -61,6 +61,7 @@ Specifies the database backend for persistent storage.
 |-------|-------------|
 | `sqlite` | SQLite database (development/testing) |
 | `postgres` | PostgreSQL database (production) |
+| `mysql` | MySQL/MariaDB database (production) |
 
 ```bash
 GENERIC_DATA_STORE_TYPE=postgres
@@ -84,6 +85,13 @@ GENERIC_DATA_STORE_URL='sqlite:./db/sqlite/data/data.db'
 # In-memory SQLite (useful for testing)
 GENERIC_DATA_STORE_URL='sqlite:file:memdb1?mode=memory&cache=shared'
 GENERIC_DATA_STORE_URL=':memory:'
+```
+
+**MySQL/MariaDB format:**
+```bash
+GENERIC_DATA_STORE_URL='mysql://user:password@host:port/database'
+# MariaDB uses the same driver (typically on a different port)
+GENERIC_DATA_STORE_URL='mysql://user:password@host:3307/database'
 ```
 
 ## Cache Configuration
@@ -467,15 +475,15 @@ PASSKEY_USER_LABEL_FIELD='display_name'
 
 #### AUTH_SERVER_SECRET
 
-Secret key used for token signing.
+Secret key used for HMAC signing of page session tokens.
 
-- **Default**: `default_secret_key_change_in_production`
+- **Default**: Random 32-byte key generated at startup
 
 ```bash
 AUTH_SERVER_SECRET='your-secret-key-here'
 ```
 
-**Warning**: Always change this value in production environments. Use a cryptographically secure random string.
+**Note**: When not set, a random key is generated at startup. This works for single-process deployments. For multi-process deployments (e.g., behind a load balancer), all processes must share the same secret -- set this variable explicitly.
 
 ### Database Table Configuration
 

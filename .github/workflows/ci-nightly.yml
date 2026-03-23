@@ -1,0 +1,44 @@
+name: CI (Beta/Nightly)
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 06:00 UTC
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: Test Suite (${{ matrix.rust }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [beta, nightly]
+    continue-on-error: true
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ matrix.rust }}
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
+
+    - name: Test core library
+      run: cargo test --verbose --manifest-path oauth2_passkey/Cargo.toml
+
+    - name: Test axum integration (all features)
+      run: cargo test --verbose --manifest-path oauth2_passkey_axum/Cargo.toml --all-features
+
+    - name: Test axum integration (no default features)
+      run: cargo test --verbose --manifest-path oauth2_passkey_axum/Cargo.toml --no-default-features

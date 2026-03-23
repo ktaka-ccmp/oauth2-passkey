@@ -153,6 +153,15 @@ pub use userdb::User as DbUser;
 /// }
 /// ```
 pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
+    // Force-evaluate optional config variables at startup (Option C)
+    // so that invalid values panic here, not on first use during a request.
+    // Force-evaluate optional config variables at startup
+    // so that invalid values panic here, not on first use during a request.
+    let _ = *config::O2P_ROUTE_PREFIX;
+    let _ = *config::PASSKEY_SIGNAL_API_MODE;
+    let _ = *config::O2P_DEMO_MODE;
+    session::init();
+
     // Initialize the underlying stores
     userdb::init().await?;
     oauth2::init().await?;
@@ -160,3 +169,7 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
     audit::init().await?;
     Ok(())
 }
+
+pub use audit::LoginHistoryError;
+pub use audit::cleanup_old_login_history;
+pub use audit::spawn_login_history_cleanup;

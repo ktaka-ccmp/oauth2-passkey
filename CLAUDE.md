@@ -146,6 +146,7 @@ Environment variables (see `dot.env.example`):
 14. **Test Placement**: Place unit tests in a separate `tests.rs` file under a directory with the module name
     - Example: For `foo.rs`, create `foo/tests.rs` for tests
     - In `foo.rs`, add `#[cfg(test)] mod tests;` at the bottom
+    - Do NOT convert `foo.rs` to `foo/mod.rs` — Rust 2018+ allows `foo.rs` to coexist with a `foo/` directory
     - `tests.rs` can access private items from the parent module
     - This keeps test code separate from logic, making it easy to identify what changed (logic vs tests) from file names
 15. **Use Test Utils**: Utilize the `test_utils` module for data store and cache initialization
@@ -243,6 +244,7 @@ This project uses Claude Code commands for workflow management.
 | `/journal` | Append a development journal entry to `.claude/issues/JOURNAL.md` |
 | `/backlog` | View all open issues |
 | `/visibility-check` | Check Rust code for minimal visibility compliance |
+| `/changelog` | Review changes since last release and update CHANGELOG.md |
 
 ### Session Snapshots (`.claude/sessions/`)
 
@@ -257,6 +259,7 @@ For persistent task and bug tracking across sessions:
 - **Purpose**: Track tasks that span multiple sessions
 - **Filename**: `YYYYMMDD-HHMM-<short-slug>.md` (legacy: `YYYY-MM-DD-<slug>.md`)
 - **ID Format**: `YYYYMMDD-HHMM` (legacy: `YYYY-MM-DD-NN`)
+- **IMPORTANT**: Always run `date +%H%M` to get the actual current time before creating an issue. Never guess or hardcode the time.
 - **Status**: `open`, `completed`, `wontfix`, `deferred`
 - **Priority**: `high`, `medium`, `low`
 - **Structure**: `open/`, `completed/`, `deferred/` subdirectories

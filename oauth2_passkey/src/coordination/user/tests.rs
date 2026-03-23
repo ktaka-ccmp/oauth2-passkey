@@ -27,6 +27,7 @@ fn create_test_credential(id: &str, user_id: &str) -> PasskeyCredential {
     // This avoids using private types that aren't re-exported
     let now = chrono::Utc::now();
     PasskeyCredential {
+        sequence_number: None,
         credential_id: id.to_string(),
         user_id: user_id.to_string(),
         public_key: String::new(),
@@ -53,6 +54,7 @@ fn create_test_oauth2_account(
     provider_user_id: &str,
 ) -> crate::OAuth2Account {
     crate::OAuth2Account {
+        sequence_number: None,
         id: id.to_string(),
         user_id: user_id.to_string(),
         provider: provider.to_string(),

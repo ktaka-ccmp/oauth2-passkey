@@ -6,27 +6,35 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (12)
+### Open (10)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260315-0348` | high | small | [Eliminate aws-lc-sys Dependency](open/20260315-0348-eliminate-aws-lc-sys.md) |
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2019` | high | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `20260226-2020` | medium | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
-| `20260226-2021` | medium | medium | [MySQL/MariaDB Database Support](open/20260226-2021-mysql-mariadb-support.md) |
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
+| `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
+| `20260322-0927` | medium | large | [User Deletion Lacks Atomicity Across Multiple Stores](open/20260322-0927-user-deletion-atomicity.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
-| `2026-01-31-01` | low | medium | [Sequential Primary Keys Optimization](open/2026-01-31-sequential-pkey-optimization.md) |
-| `20260227-1703` | low | small | [Audit and Improve Silent Fallback Behavior for Optional Environment Variables](open/20260227-1703-env-var-silent-fallback-audit.md) |
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 
-### Completed (47)
+### Completed (57)
 
 | ID | Title |
 |----|-------|
+| `20260321-1346` | [Review delete_old_entries Dead Code and Retention Policy](completed/20260321-1346-review-delete-old-entries-dead-code.md) |
+| `20260322-0907` | [upsert_oauth2_account SELECT after COMMIT race condition](completed/20260322-0907-upsert-oauth2-account-post-tx-select-race.md) |
+| `20260322-0926` | [Passkey Counter Verification TOCTOU Race Condition](completed/20260322-0926-passkey-counter-verification-race.md) |
+| `20260322-1011` | [CI Performance Optimization](completed/20260322-1011-ci-performance-optimization.md) |
+| `20260321-1234` | [SQLite last_insert_rowid() Potential Race Condition](completed/20260321-1234-sqlite-last-insert-rowid-race.md) |
+| `20260226-2021` | [MySQL/MariaDB Database Support](completed/20260226-2021-mysql-mariadb-support.md) |
+| `2026-01-31-01` | [Sequential Primary Keys Optimization](completed/2026-01-31-sequential-pkey-optimization.md) |
+| `20260227-1703` | [Audit and Improve Silent Fallback Behavior for Optional Environment Variables](completed/20260227-1703-env-var-silent-fallback-audit.md) |
+| `20260317-1500` | [Optimize Cloud Run Deployment Build Time](completed/20260317-1500-optimize-cloud-run-deploy-time.md) |
+| `20260315-0348` | [Eliminate aws-lc-sys Dependency](completed/20260315-0348-eliminate-aws-lc-sys.md) |
 | `20260314-0222` | [FedCM Auto Re-Authentication Rate Limit Error](completed/20260314-0222-fedcm-auto-reauthn-rate-limit.md) |
 | `20260311-1039` | [FedCM (Federated Credential Management) Integration](completed/20260311-1039-fedcm-integration.md) |
 | `20260311-0904` | [GitHub Actions Security Hardening](completed/20260311-0904-github-actions-security-hardening.md) |
@@ -84,10 +92,12 @@ This directory contains issue/task tracking files for the project.
 | `20260212-0235` | [Standalone Demo Repository](wontfix/20260212-0235-standalone-demo-repository.md) |
 | `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
-### Deferred (7)
+### Deferred (9)
 
 | ID | Title |
 |----|-------|
+| `20260320-1410` | [FedCM Cancel Fallback Popup Gets Blocked by Browser](deferred/20260320-1410-fedcm-fallback-popup-blocked.md) |
+| `20260316-1630` | [FedCM Promise Hangs Indefinitely in Stale Tab](deferred/20260316-1630-fedcm-promise-hang-stale-tab.md) |
 | `20260315-0349` | [Eliminate ring Dependency for Full RustCrypto Migration](deferred/20260315-0349-eliminate-ring-dependency.md) |
 | `20260312-1948` | [Eliminate nonce_id from FedCM Flow](deferred/20260312-1948-fedcm-eliminate-nonce-id.md) |
 | `20260303-0605` | [Adopt WebAuthn Level 3 JSON Serialization API](deferred/20260303-0605-webauthn-json-serialization-api.md) |
@@ -121,6 +131,8 @@ YYYYMMDD-HHMM-<short-slug>.md
 
 Example: `20260210-1430-login-history-enhancement.md`
 
+**IMPORTANT**: Always run `date +%H%M` to get the actual current time before naming the file. Never guess or hardcode the time.
+
 Legacy issues use `YYYY-MM-DD-<slug>.md` and are not renamed.
 
 ## Issue ID Format
@@ -132,7 +144,7 @@ YYYYMMDD-HHMM
 ```
 
 - `YYYYMMDD`: Creation date
-- `HHMM`: Creation time (24h format)
+- `HHMM`: Creation time (24h format) — **must be obtained by running `date +%H%M`**
 
 Example: `20260210-1430`, `20260210-1545`
 
@@ -236,11 +248,12 @@ a corresponding Decision Log entry explaining what changed and why.
 
 ## Workflow
 
-1. Create new issue in `open/` directory
-2. **Update this README's "Current Issues" table** (increment count, add row)
-3. Work on the issue
-4. When resolved, update Resolution section and move to `completed/`
-5. If postponed, move to `deferred/`
+1. **Run `date +%H%M` to get the current time** before naming the issue file or setting the ID
+2. Create new issue in `open/` directory using the confirmed timestamp
+3. **Update this README's "Current Issues" table** (increment count, add row)
+4. Work on the issue
+5. When resolved, update Resolution section and move to `completed/`
+6. If postponed, move to `deferred/`
 
 **Important**: Always update the README table when creating, completing, or moving issues.
 

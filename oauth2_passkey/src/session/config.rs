@@ -15,12 +15,13 @@ pub static SESSION_COOKIE_NAME: LazyLock<String> = LazyLock::new(|| {
         .ok()
         .unwrap_or("__Host-SessionId".to_string())
 });
-pub static SESSION_COOKIE_MAX_AGE: LazyLock<u64> = LazyLock::new(|| {
-    std::env::var("SESSION_COOKIE_MAX_AGE")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(600) // Default to 10 minutes if not set or invalid
-});
+pub static SESSION_COOKIE_MAX_AGE: LazyLock<u64> =
+    LazyLock::new(|| match std::env::var("SESSION_COOKIE_MAX_AGE") {
+        Ok(val) => val
+            .parse()
+            .unwrap_or_else(|e| panic!("SESSION_COOKIE_MAX_AGE='{val}' is not a valid u64: {e}")),
+        Err(_) => 600,
+    });
 
 /// Domain attribute for session cookies.
 ///
@@ -63,17 +64,18 @@ pub enum SessionConflictPolicy {
 /// - `allow` (default): Permit multiple concurrent sessions
 /// - `replace`: Invalidate all existing sessions, create new one
 /// - `reject`: Deny login if active session exists
-pub static SESSION_CONFLICT_POLICY: LazyLock<SessionConflictPolicy> = LazyLock::new(|| {
-    match env::var("SESSION_CONFLICT_POLICY")
-        .unwrap_or_default()
-        .to_lowercase()
-        .as_str()
-    {
-        "replace" => SessionConflictPolicy::Replace,
-        "reject" => SessionConflictPolicy::Reject,
-        _ => SessionConflictPolicy::Allow,
-    }
-});
+pub static SESSION_CONFLICT_POLICY: LazyLock<SessionConflictPolicy> =
+    LazyLock::new(|| match env::var("SESSION_CONFLICT_POLICY") {
+        Err(_) => SessionConflictPolicy::Allow,
+        Ok(val) => match val.to_lowercase().as_str() {
+            "allow" => SessionConflictPolicy::Allow,
+            "replace" => SessionConflictPolicy::Replace,
+            "reject" => SessionConflictPolicy::Reject,
+            _ => panic!(
+                "SESSION_CONFLICT_POLICY='{val}' is invalid. Valid values: allow, replace, reject"
+            ),
+        },
+    });
 
 /// TTL for user session mappings in seconds (30 days).
 ///
@@ -82,13 +84,27 @@ pub static SESSION_CONFLICT_POLICY: LazyLock<SessionConflictPolicy> = LazyLock::
 /// and stale entries are cleaned up lazily when the mapping is read.
 pub(super) const USER_SESSIONS_MAPPING_TTL: u64 = 86400 * 30;
 
-// We're using a simple string representation for tokens instead of a struct
-// to minimize dependencies and complexity
-
+/// Secret key for HMAC signing of page session tokens.
+///
+/// When set via `AUTH_SERVER_SECRET` env var, uses that value.
+/// When not set, generates a random 32-byte key at startup.
+///
+/// **Important**: In multi-process deployments (e.g., behind a load balancer),
+/// all processes must share the same secret. Set `AUTH_SERVER_SECRET` explicitly.
+/// A random default only works for single-process deployments.
 pub(super) static AUTH_SERVER_SECRET: LazyLock<Vec<u8>> =
     LazyLock::new(|| match env::var("AUTH_SERVER_SECRET") {
         Ok(secret) => secret.into_bytes(),
-        Err(_) => "default_secret_key_change_in_production"
-            .to_string()
-            .into_bytes(),
+        Err(_) => {
+            use ring::rand::SecureRandom;
+            let rng = ring::rand::SystemRandom::new();
+            let mut secret = vec![0u8; 32];
+            rng.fill(&mut secret)
+                .expect("Failed to generate random AUTH_SERVER_SECRET");
+            tracing::info!("AUTH_SERVER_SECRET not set, using random key (single-process only)");
+            secret
+        }
     });
+
+#[cfg(test)]
+mod tests;

@@ -1,0 +1,26 @@
+services:
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: demo
+      MYSQL_USER: demo
+      MYSQL_PASSWORD: demo
+      MYSQL_DATABASE: demo
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    restart: always
+
+  mariadb:
+    image: mariadb:11
+    ports:
+      - "3307:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: demo
+      MARIADB_USER: demo
+      MARIADB_PASSWORD: demo
+      MARIADB_DATABASE: demo
+    volumes:
+      - ./data/mariadb:/var/lib/mysql
+    restart: always

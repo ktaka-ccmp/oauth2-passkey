@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.1-dev]
 
+### Added
+
+- MySQL/MariaDB database support via `GENERIC_DATA_STORE_TYPE=mysql`
+  - Full CRUD support for all 4 storage modules (userdb, oauth2, passkey, audit)
+  - Docker Compose setup for MySQL 8.0 and MariaDB 11 in `db/mysql/`
+  - MariaDB compatibility (JSON stored as LONGTEXT is handled transparently)
+  - Updated `clear_db_cache.sh` and `monitor_db.sh` utilities for MySQL
+- Sequential integer primary keys (`sequence_number`) for `oauth2_accounts` and `passkey_credentials` tables
+  - Aligns with existing `users` table pattern for B-tree locality and join performance
+  - Original TEXT identifiers retained as UNIQUE constraints
+- Login history retention policy via `O2P_LOGIN_HISTORY_RETENTION_DAYS` env var
+  - Set to number of days to retain (default: 0 = disabled, no automatic cleanup)
+  - `cleanup_old_login_history()` for on-demand cleanup
+  - `spawn_login_history_cleanup()` for opt-in background task (runs every 24h)
+  - Both functions re-exported from `oauth2_passkey_axum`
+
+### Changed
+
+- Environment variable validation: invalid values now panic at startup instead of silently falling back to defaults
+  - Affects all optional env vars across session, oauth2, passkey, and axum config modules
+  - All config variables are force-evaluated at startup for early error detection
+- `AUTH_SERVER_SECRET`: generates random 32-byte key when not set (previously used hardcoded default)
+- `sequence_number` field hidden from all JSON API responses via `#[serde(skip_serializing)]`
+  - Applies to `User`, `OAuth2Account`, and `PasskeyCredential` types
+- `PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL` now accepts case-insensitive boolean values
+- Switched rustls to ring crypto provider, eliminating the aws-lc-sys build dependency
+  - Faster builds and simpler cross-compilation (no C compiler required for aws-lc)
+
+### Fixed
+
+- SQLite `last_insert_rowid()` race condition in login history insertion (#276)
+  - INSERT and SELECT now wrapped in a transaction to guarantee same-connection execution
+- MySQL `LAST_INSERT_ID()` race condition in login history insertion (#274)
+  - Same transaction fix applied during MySQL implementation
+- `upsert_oauth2_account` post-COMMIT SELECT race in SQLite/PostgreSQL (#284)
+  - SELECT moved inside transaction for read-your-writes consistency
+
+### Security
+
+- Atomic passkey counter verification to prevent TOCTOU race condition (#282)
+  - Replaced separate GET -> CHECK -> UPDATE with atomic `UPDATE ... WHERE counter < ?`
+  - Eliminates race window where concurrent authentications could bypass clone detection
+- Update rustls-webpki 0.103.9 -> 0.103.10 (RUSTSEC-2026-0049: CRL Distribution Point matching logic) (#275)
+
 ## [0.4.0] - 2026-03-15
 
 ### Added

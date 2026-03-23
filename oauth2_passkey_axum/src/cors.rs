@@ -59,11 +59,15 @@ pub static CORS_ALLOWED_ORIGINS: LazyLock<Option<Vec<String>>> = LazyLock::new(|
 ///
 /// Set to `true` for cookie-based authentication across origins.
 /// When enabled, `CORS_ALLOWED_ORIGINS` cannot be `*`.
-pub static CORS_ALLOW_CREDENTIALS: LazyLock<bool> = LazyLock::new(|| {
-    std::env::var("CORS_ALLOW_CREDENTIALS")
-        .map(|v| v.to_lowercase() == "true")
-        .unwrap_or(false)
-});
+pub static CORS_ALLOW_CREDENTIALS: LazyLock<bool> =
+    LazyLock::new(|| match std::env::var("CORS_ALLOW_CREDENTIALS") {
+        Err(_) => false,
+        Ok(val) => match val.to_lowercase().as_str() {
+            "true" => true,
+            "false" => false,
+            _ => panic!("CORS_ALLOW_CREDENTIALS='{val}' is invalid. Valid values: true, false"),
+        },
+    });
 
 /// Creates a CORS layer based on environment configuration.
 ///

@@ -171,6 +171,7 @@ async fn create_first_user_oauth2_account(user_id: &str) {
     let provider = "google";
     let provider_user_id = format!("{provider}_first-user-test-google-id");
     let test_oauth2_account = OAuth2Account {
+        sequence_number: None,
         id: "first-user-oauth2-account".to_string(),
         user_id: user_id.to_string(),
         provider: provider.to_string(),
@@ -241,6 +242,7 @@ async fn create_first_user_passkey_credential(user_id: &str) {
     // Create a test passkey credential with consistent key for testing
     // Note: We construct the user entity directly here since it's internal test code
     let test_passkey_credential = PasskeyCredential {
+        sequence_number: None,
         credential_id: "first-user-test-passkey-credential".to_string(),
         user_id: user_id.to_string(),
         public_key,
@@ -461,6 +463,37 @@ fn extract_sqlite_file_path_from_url(url: &str) -> Option<String> {
 /// for consistent test environment configuration. Falls back to localhost if not set.
 pub fn get_test_origin() -> String {
     std::env::var("ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string())
+}
+
+/// Spawn the current test binary as a child process with a specific env var set.
+///
+/// Used for testing LazyLock config validation: each test spawns a child process
+/// with a specific env var value, then checks if the child panicked or succeeded.
+/// The `__TEST_ENV_VAR_CHILD` env var distinguishes parent (spawns child) from
+/// child (evaluates the LazyLock variable).
+pub fn run_child_with_env(
+    test_name: &str,
+    env_name: &str,
+    env_value: &str,
+) -> std::process::Output {
+    std::process::Command::new(std::env::current_exe().unwrap())
+        .args([test_name, "--exact", "--nocapture"])
+        .env("__TEST_ENV_VAR_CHILD", "1")
+        .env(env_name, env_value)
+        .output()
+        .expect("Failed to spawn child process")
+}
+
+/// Spawn the current test binary as a child process with a specific env var removed.
+///
+/// Used for testing default values when an env var is not set.
+pub fn run_child_without_env(test_name: &str, env_name: &str) -> std::process::Output {
+    std::process::Command::new(std::env::current_exe().unwrap())
+        .args([test_name, "--exact", "--nocapture"])
+        .env("__TEST_ENV_VAR_CHILD", "1")
+        .env_remove(env_name)
+        .output()
+        .expect("Failed to spawn child process")
 }
 
 #[cfg(test)]

@@ -99,6 +99,20 @@ pub(super) async fn insert_login_history_sqlite(
 
     let table_name = DB_TABLE_LOGIN_HISTORY.as_str();
 
+    // Use a transaction to ensure last_insert_rowid() returns the correct value.
+    // last_insert_rowid() is connection-scoped; without a transaction, the INSERT
+    // and SELECT could run on different pool connections under concurrent load.
+    //
+    // Transaction flow:
+    //   BEGIN
+    //   INSERT INTO login_history (...) VALUES (?, ?, ?, ...)
+    //   SELECT * FROM login_history WHERE id = last_insert_rowid()
+    //   COMMIT
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
+
     sqlx::query(&format!(
         r#"
         INSERT INTO {table_name} (
@@ -121,19 +135,23 @@ pub(super) async fn insert_login_history_sqlite(
     .bind(&entry.failure_reason)
     .bind(&entry.aaguid)
     .bind(&entry.email)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
 
-    // Get the inserted entry with its ID
+    // Fetch within the same transaction to guarantee last_insert_rowid() consistency
     let result = sqlx::query_as::<_, LoginHistoryEntry>(&format!(
         r#"
         SELECT * FROM {table_name} WHERE id = last_insert_rowid()
         "#
     ))
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
 
     Ok(result)
 }
@@ -315,10 +333,9 @@ pub(super) async fn query_login_history_admin_sqlite(
 }
 
 /// Delete old login history entries (for retention policy)
-#[allow(dead_code)]
 pub(super) async fn delete_old_entries_sqlite(
     pool: &Pool<Sqlite>,
-    days_to_keep: i64,
+    cutoff: DateTime<Utc>,
 ) -> Result<u64, LoginHistoryError> {
     create_tables_sqlite(pool).await?;
 
@@ -327,9 +344,10 @@ pub(super) async fn delete_old_entries_sqlite(
     let result = sqlx::query(&format!(
         r#"
         DELETE FROM {table_name}
-        WHERE timestamp < datetime('now', '-{days_to_keep} days')
+        WHERE timestamp < ?
         "#
     ))
+    .bind(cutoff)
     .execute(pool)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;

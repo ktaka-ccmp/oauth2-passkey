@@ -381,6 +381,7 @@ pub(crate) async fn prepare_registration_storage(
 
     // Create the credential object ready for storage
     let credential = PasskeyCredential {
+        sequence_number: None,
         credential_id: credential_id.clone(),
         user_id: user_id.as_str().to_string(),
         public_key,

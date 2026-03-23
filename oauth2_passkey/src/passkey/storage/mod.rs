@@ -1,4 +1,5 @@
 mod config;
+mod mysql;
 mod postgres;
 mod sqlite;
 mod store_type;

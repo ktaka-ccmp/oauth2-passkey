@@ -3,7 +3,7 @@
 use std::{env, str::FromStr, sync::LazyLock};
 use tokio::sync::Mutex;
 
-use super::types::{DataStore, PostgresDataStore, SqliteDataStore};
+use super::types::{DataStore, MySqlDataStore, PostgresDataStore, SqliteDataStore};
 
 // Configuration
 static GENERIC_DATA_STORE_TYPE: LazyLock<String> = LazyLock::new(|| {
@@ -71,7 +71,12 @@ pub(crate) static GENERIC_DATA_STORE: LazyLock<Mutex<Box<dyn DataStore>>> = Lazy
         "postgres" => Box::new(PostgresDataStore {
             pool: sqlx::PgPool::connect_lazy(store_url).expect("Failed to create Postgres pool"),
         }) as Box<dyn DataStore>,
-        t => panic!("Unsupported store type: {t}. Supported types are 'sqlite' and 'postgres'"),
+        "mysql" => Box::new(MySqlDataStore {
+            pool: sqlx::MySqlPool::connect_lazy(store_url).expect("Failed to create MySQL pool"),
+        }) as Box<dyn DataStore>,
+        t => panic!(
+            "Unsupported store type: {t}. Supported types are 'sqlite', 'postgres', and 'mysql' (also works with MariaDB)"
+        ),
     };
 
     tracing::info!(

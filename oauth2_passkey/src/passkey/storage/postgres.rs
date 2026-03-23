@@ -18,7 +18,8 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     sqlx::query(&format!(
         r#"
         CREATE TABLE IF NOT EXISTS {passkey_table} (
-            credential_id TEXT PRIMARY KEY NOT NULL,
+            sequence_number BIGSERIAL PRIMARY KEY,
+            credential_id TEXT NOT NULL UNIQUE,
             user_id TEXT NOT NULL REFERENCES {users_table}(id),
             public_key TEXT NOT NULL,
             counter INTEGER NOT NULL DEFAULT 0,
@@ -88,6 +89,7 @@ pub(super) async fn validate_passkey_tables_postgres(
 
     // Define expected schema (column name, data type)
     let expected_columns = [
+        ("sequence_number", "bigint"),
         ("credential_id", "text"),
         ("user_id", "text"),
         ("public_key", "text"),
@@ -204,29 +206,28 @@ pub(super) async fn get_credentials_by_field_postgres(
         .map_err(|e| PasskeyError::Storage(e.to_string()))
 }
 
-pub(super) async fn update_credential_counter_postgres(
+pub(super) async fn atomic_update_credential_counter_postgres(
     pool: &Pool<Postgres>,
     credential_id: CredentialId,
-    counter: u32,
-) -> Result<(), PasskeyError> {
-    let counter_i32 = counter as i32;
+    new_counter: u32,
+) -> Result<bool, PasskeyError> {
+    let counter_i64 = new_counter as i64;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query_as::<_, (i32,)>(&format!(
+    let result = sqlx::query(&format!(
         r#"
         UPDATE {passkey_table}
         SET counter = $1, updated_at = CURRENT_TIMESTAMP
-        WHERE credential_id = $2
-        RETURNING 1
+        WHERE credential_id = $2 AND counter < $1
         "#
     ))
-    .bind(counter_i32)
+    .bind(counter_i64)
     .bind(credential_id.as_str())
-    .fetch_optional(pool)
+    .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    Ok(())
+    Ok(result.rows_affected() > 0)
 }
 
 pub(super) async fn delete_credential_by_field_postgres(
@@ -288,6 +289,7 @@ use sqlx::{FromRow, Row, postgres::PgRow, sqlite::SqliteRow};
 // Implement FromRow for PasskeyCredential to handle the flattened database structure for SQLite
 impl<'r> FromRow<'r, SqliteRow> for PasskeyCredential {
     fn from_row(row: &'r SqliteRow) -> Result<Self, sqlx::Error> {
+        let sequence_number: Option<i64> = row.try_get("sequence_number")?;
         let credential_id: String = row.try_get("credential_id")?;
         let user_id: String = row.try_get("user_id")?;
         let public_key: String = row.try_get("public_key")?;
@@ -302,6 +304,7 @@ impl<'r> FromRow<'r, SqliteRow> for PasskeyCredential {
         let last_used_at: DateTime<Utc> = row.try_get("last_used_at")?;
 
         Ok(PasskeyCredential {
+            sequence_number,
             credential_id,
             user_id,
             public_key,
@@ -323,6 +326,7 @@ impl<'r> FromRow<'r, SqliteRow> for PasskeyCredential {
 // Implement FromRow for PasskeyCredential to handle the flattened database structure for PostgreSQL
 impl<'r> FromRow<'r, PgRow> for PasskeyCredential {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        let sequence_number: Option<i64> = row.try_get("sequence_number")?;
         let credential_id: String = row.try_get("credential_id")?;
         let user_id: String = row.try_get("user_id")?;
         let public_key: String = row.try_get("public_key")?;
@@ -337,6 +341,7 @@ impl<'r> FromRow<'r, PgRow> for PasskeyCredential {
         let last_used_at: DateTime<Utc> = row.try_get("last_used_at")?;
 
         Ok(PasskeyCredential {
+            sequence_number,
             credential_id,
             user_id,
             public_key,

@@ -19,7 +19,8 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     sqlx::query(&format!(
         r#"
         CREATE TABLE IF NOT EXISTS {oauth2_table} (
-            id TEXT PRIMARY KEY NOT NULL,
+            sequence_number BIGSERIAL PRIMARY KEY,
+            id TEXT NOT NULL UNIQUE,
             user_id TEXT NOT NULL REFERENCES {users_table}(id),
             provider TEXT NOT NULL,
             provider_user_id TEXT NOT NULL,
@@ -60,6 +61,7 @@ pub(super) async fn validate_oauth2_tables_postgres(
 
     // Define expected schema (column name, data type)
     let expected_columns = [
+        ("sequence_number", "bigint"),
         ("id", "text"),
         ("user_id", "text"),
         ("provider", "text"),
@@ -216,21 +218,20 @@ pub(super) async fn upsert_oauth2_account_postgres(
         id
     };
 
-    // Commit transaction
-    tx.commit()
-        .await
-        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
-
-    // Return the updated account
+    // Fetch inside the transaction for read-your-writes consistency
     let updated_account = sqlx::query_as::<_, OAuth2Account>(&format!(
         r#"
         SELECT * FROM {table_name} WHERE id = $1
         "#
     ))
     .bind(account_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     Ok(updated_account)
 }

@@ -2,6 +2,21 @@
 
 ## Table of Contents
 
+- [2026-03-23: Login history retention policy](#2026-03-23-login-history-retention-policy)
+- [2026-03-22: upsert_oauth2_account post-COMMIT SELECT race fix](#2026-03-22-upsert_oauth2_account-post-commit-select-race-fix)
+- [2026-03-22: Atomic passkey counter verification (TOCTOU fix)](#2026-03-22-atomic-passkey-counter-verification-toctou-fix)
+- [2026-03-22: CI performance optimization -- Phase 1+2](#2026-03-22-ci-performance-optimization----phase-12)
+- [2026-03-22: SQLite last_insert_rowid() transaction fix](#2026-03-22-sqlite-last_insert_rowid-transaction-fix)
+- [2026-03-22: Codebase transaction audit -- three new issues](#2026-03-22-codebase-transaction-audit----three-new-issues)
+- [2026-03-22: rustls-webpki security update (RUSTSEC-2026-0049)](#2026-03-22-rustls-webpki-security-update-rustsec-2026-0049)
+- [2026-03-22: git commit hook enforcement](#2026-03-22-git-commit-hook-enforcement)
+- [2026-03-21: MySQL/MariaDB database support](#2026-03-21-mysqlmariadb-database-support)
+- [2026-03-21: Sequential primary keys for oauth2_accounts and passkey_credentials](#2026-03-21-sequential-primary-keys-for-oauth2_accounts-and-passkey_credentials)
+- [2026-03-20: Env var silent fallback audit -- panic on invalid values](#2026-03-20-env-var-silent-fallback-audit----panic-on-invalid-values)
+- [2026-03-20: FedCM GIS library analysis and hang investigation](#2026-03-20-fedcm-gis-library-analysis-and-hang-investigation)
+- [2026-03-17: Cloud Run deploy optimization -- cargo-chef + BuildKit](#2026-03-17-cloud-run-deploy-optimization----cargo-chef--buildkit)
+- [2026-03-17: FedCM stale tab hang issue deferred](#2026-03-17-fedcm-stale-tab-hang-issue-deferred)
+- [2026-03-15: Eliminate aws-lc-sys dependency](#2026-03-15-eliminate-aws-lc-sys-dependency)
 - [2026-03-14: FedCM auto re-authentication rate limit fix](#2026-03-14-fedcm-auto-re-authentication-rate-limit-fix)
 - [2026-03-13: FedCM (Federated Credential Management) integration](#2026-03-13-fedcm-federated-credential-management-integration)
 - [2026-03-11: GitHub Actions security hardening](#2026-03-11-github-actions-security-hardening)
@@ -52,6 +67,575 @@
 - [2026-01-24: Demo applications for user data integration (demo-profile, demo-todo)](#2026-01-24-demo-applications-for-user-data-integration-demo-profile-demo-todo)
 - [2026-01-23: CSRF documentation reorganization and session snapshot system](#2026-01-23-csrf-documentation-reorganization-and-session-snapshot-system)
 - [2026-01-23: CI/CD pipeline documentation](#2026-01-23-cicd-pipeline-documentation)
+
+## 2026-03-23: Login history retention policy
+
+**Issue**: `20260321-1346` (completed) | **Priority**: low | **Difficulty**: small
+
+New feature
+
+### Motivation
+
+`delete_old_entries_{sqlite,mysql,postgres}` functions existed in the audit storage layer but were marked `#[allow(dead_code)]` -- they were never wired up to any public API. Without a retention policy, login history tables grow indefinitely, which is a concern for long-running production deployments.
+
+### User-facing impact
+
+- **Before**: No way to clean up old login history entries. The `delete_old_entries` functions existed as dead code.
+- **After**: Two new public APIs, one new error type, and one new environment variable:
+
+**Environment variable:**
+- `O2P_LOGIN_HISTORY_RETENTION_DAYS` -- number of days to retain (default: 0 = disabled, no cleanup)
+
+**Public functions:**
+```rust
+// Delete entries older than configured days. Returns count deleted. Ok(0) if disabled.
+oauth2_passkey::cleanup_old_login_history().await?;
+
+// Opt-in background task: calls cleanup every 24 hours (no-op if disabled).
+oauth2_passkey::spawn_login_history_cleanup();
+```
+
+**Public error type:**
+- `LoginHistoryError` -- typed error returned by `cleanup_old_login_history()` (follows project `thiserror` convention instead of `Box<dyn Error>`)
+
+All re-exported from `oauth2_passkey_axum`. Demo apps (demo-both, demo-live) call `spawn_login_history_cleanup()` after init.
+
+### Design decisions
+
+**Wire up vs remove (YAGNI):** The functions were already implemented for all 3 backends. Wiring up was minimal work vs removing to rewrite later.
+
+**Library vs application scheduling:** Libraries should not silently spawn background tasks (runtime coupling, test interference, loss of control). Two-tier API:
+- `cleanup_old_login_history()` -- pure function, app calls when it wants
+- `spawn_login_history_cleanup()` -- opt-in helper, app explicitly calls it
+
+**Parameterized cutoff timestamp:** The original `delete_old_entries_*` functions interpolated `days_to_keep` into SQL via `format!()`. Replaced with computing `cutoff = Utc::now() - Duration::days(n)` in Rust and binding as a parameter -- portable across all backends, consistent with parameterized queries used elsewhere.
+
+**Typed error over Box\<dyn Error\>:** `LoginHistoryError` was `pub(crate)` because no public API existed before. Made `pub` so `cleanup_old_login_history()` returns `Result<u64, LoginHistoryError>` instead of `Box<dyn Error>`, following the project convention of using `thiserror` for library crates.
+
+**Visibility:** `O2P_LOGIN_HISTORY_RETENTION_DAYS` scoped to `pub(in crate::audit)` -- not exposed beyond the audit module. Early evaluation in `audit::init()`, not `lib.rs`.
+
+### Key files
+
+`oauth2_passkey/src/audit/retention.rs` (new), `oauth2_passkey/src/audit/errors.rs`, `oauth2_passkey/src/audit/storage/config.rs`, `oauth2_passkey/src/audit/storage/store_type.rs`, `oauth2_passkey/src/lib.rs`, `oauth2_passkey_axum/src/lib.rs`, `demo-both/src/main.rs`, `demo-live/src/main.rs`
+
+## 2026-03-22: upsert_oauth2_account post-COMMIT SELECT race fix
+
+**Issue**: `20260322-0907` (completed) | **Priority**: low | **Difficulty**: small
+
+Bug fix
+
+### Motivation
+
+In `upsert_oauth2_account_sqlite()` and `upsert_oauth2_account_postgres()`, after the INSERT/UPDATE transaction was committed, a SELECT query was executed on `pool` (not the transaction) to fetch the updated account. This created a race condition where the SELECT could see stale data if another concurrent request modified the same row between COMMIT and SELECT. The MySQL implementation already had the correct pattern (SELECT inside transaction).
+
+### User-facing impact
+
+- **Before**: Under concurrent OAuth2 account linking, the returned `OAuth2Account` could contain stale data from before the upsert (SQLite/PostgreSQL only)
+- **After**: SELECT executes inside the transaction via `&mut *tx`, guaranteeing read-your-writes consistency across all three backends
+
+```rust
+// Before (SQLite/PostgreSQL):
+tx.commit().await?;
+let updated = sqlx::query_as(...).fetch_one(pool).await?;  // race window
+
+// After (matches MySQL):
+let updated = sqlx::query_as(...).fetch_one(&mut *tx).await?;  // inside tx
+tx.commit().await?;
+```
+
+### Design decisions
+
+Matched the existing MySQL implementation pattern. No alternative approaches were needed -- moving the SELECT before COMMIT and using `&mut *tx` is the standard sqlx pattern for read-your-writes consistency.
+
+### Key files
+
+`oauth2_passkey/src/oauth2/storage/sqlite.rs`, `oauth2_passkey/src/oauth2/storage/postgres.rs`
+
+## 2026-03-22: Atomic passkey counter verification (TOCTOU fix)
+
+**Issue**: `20260322-0926` (completed) | **Priority**: high | **Difficulty**: medium
+
+Security fix
+
+### Motivation
+
+The WebAuthn counter verification in `passkey/main/auth.rs` used a GET -> CHECK -> UPDATE pattern across separate storage calls. Between CHECK and UPDATE, a concurrent authentication on the same credential could update the counter, creating a TOCTOU (Time-of-Check to Time-of-Use) race condition. This could potentially allow counter inconsistency, undermining the credential cloning detection mechanism.
+
+### User-facing impact
+
+- **Before**: Under concurrent passkey authentication on the same credential, the counter verification could be bypassed due to the race window between the in-memory check and the database update
+- **After**: Counter check and update are atomic via a single SQL statement (`UPDATE ... WHERE counter < ?`), eliminating the race window
+
+No API changes. The fix is entirely internal to the storage layer.
+
+### Design decisions
+
+**Approach chosen**: Atomic SQL `UPDATE ... WHERE counter < ?` (Option A from issue).
+
+- `rows_affected == 1`: counter was less than new value, update succeeded
+- `rows_affected == 0`: counter was NOT less, indicating potential credential cloning
+
+This was preferred over passing transactions through the Store trait API (Option B) because it required no API changes and the atomic SQL pattern is the standard solution for compare-and-set operations.
+
+**Additional improvements from PR review feedback**:
+
+1. **Stale log messages**: Changed log text from "stored" to "previously fetched" with a note that the actual DB value may differ due to concurrent updates
+2. **Test helper refactor**: Replaced `verify_counter_with_mock(skip_db_update: bool)` with `verify_counter_without_db()`, eliminating duplicated logic that could drift from the real implementation
+3. **i32 truncation fix**: Changed MySQL/PostgreSQL counter binding from `i32` to `i64` (matching SQLite), preventing silent truncation for counter values > 2^31
+4. **Security doc comments**: Added comprehensive documentation to `verify_counter()` explaining that the counter detects hardware cloning (not replay attacks, which are prevented by per-authentication challenges)
+
+### Key files
+
+`oauth2_passkey/src/passkey/main/auth.rs`, `oauth2_passkey/src/passkey/storage/store_type.rs`, `oauth2_passkey/src/passkey/storage/sqlite.rs`, `oauth2_passkey/src/passkey/storage/mysql.rs`, `oauth2_passkey/src/passkey/storage/postgres.rs`, `oauth2_passkey/src/passkey/main/auth/tests.rs`, `oauth2_passkey/src/passkey/storage/store_type/tests.rs`
+
+## 2026-03-22: CI performance optimization -- Phase 1+2
+
+**Issue**: `20260322-1011` (completed) | **Priority**: medium | **Difficulty**: medium
+
+Enhancement of CI/CD workflows
+
+### Motivation
+
+CI runs were taking 6-12 minutes wall-clock and 24-43 minutes billable time. The primary bottleneck was `actions/cache@v4` caching the entire `target/` directory (~10 GiB per cache entry), with download + extraction consuming 3-4 minutes per job -- more time than the actual builds and tests. Additionally, `cargo install cargo-audit` compiled from source every run (172s), beta/nightly ran on every PR despite being purely informational, and fmt/clippy ran inside the test matrix rather than as a fast gate.
+
+### User-facing impact
+
+- **Before**: Every PR triggered 6 jobs (stable/beta/nightly tests + security + docs + MSRV), taking ~12 minutes wall-clock and ~43 minutes billable. Cache restore alone consumed 3-4 minutes per job.
+- **After**: PR CI runs 5 jobs (lint + test + security + docs + MSRV) in ~5 minutes wall-clock and ~9 minutes billable. Beta/nightly run weekly instead of per-PR.
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Wall-clock | ~12m25s | ~5m22s | -57% |
+| Billable total | ~43m | ~9m | -80% |
+
+Biggest individual improvements:
+- Security Audit: 3m01s -> 8s (pre-built binary via `taiki-e/install-action`)
+- Test Suite: 9m15s -> 3m53s (Swatinem/rust-cache reducing restore from 3.4m to ~10s)
+- Documentation: 6m30s -> 1m43s (same cache improvement)
+
+### Design decisions
+
+**Phase 1 changes (quick wins):**
+
+1. `actions/cache@v4` -> `Swatinem/rust-cache@v2`: The generic cache action cached everything in `target/` including incremental build artifacts and workspace crate outputs (~10 GiB). Swatinem/rust-cache is Rust-specific and caches only dependency artifacts (1-2 GiB), auto-generates cache keys from rustc version + Cargo.lock, and cleans stale files before saving. `save-if` restricts cache writes to master/develop pushes to avoid polluting the 10 GiB cache limit from PR branches.
+
+2. `cargo install cargo-audit` -> `taiki-e/install-action@cargo-audit`: Downloads a pre-built binary (~2s) instead of compiling from source (~172s). This single change eliminated the need for any caching in the security audit job.
+
+3. Removed redundant `cargo build` steps: `cargo test` implicitly compiles, so the separate build steps added ~19s of pure overhead.
+
+4. Added Swatinem/rust-cache to MSRV and docs jobs that previously had either no cache or the slow `actions/cache`.
+
+**Phase 2 changes (structural):**
+
+5. Split fmt/clippy into a dedicated `lint` job: Test and docs jobs declare `needs: lint`, so lint failures skip expensive compilation entirely. This also removes the `if: matrix.rust == 'stable'` conditionals that were needed when lint ran inside the matrix.
+
+6. Moved beta/nightly to `ci-nightly.yml` with weekly cron schedule (Monday 06:00 UTC) + `workflow_dispatch` for manual trigger. These were `continue-on-error: true` in the main CI, purely informational, and cost ~22 minutes billable per PR.
+
+**Phase 3 (sccache) was deferred:** After Phase 1+2, dependency caching is handled by Swatinem/rust-cache. The remaining compilation is workspace crates, where sccache provides marginal benefit at significant complexity cost.
+
+### Key files
+
+`.github/workflows/ci.yml`, `.github/workflows/ci-nightly.yml` (new), `.github/workflows/coverage.yml`
+
+## 2026-03-22: SQLite last_insert_rowid() transaction fix
+
+**Issue**: `20260321-1234` (completed) | **Priority**: low | **Difficulty**: small
+
+Bug fix
+
+### Motivation
+
+In `audit/storage/sqlite.rs`, `insert_login_history_sqlite()` executed an INSERT and a SELECT `last_insert_rowid()` as separate queries on `pool`. With connection pooling, the two queries could run on different connections, causing `last_insert_rowid()` to return a stale or incorrect value. The same pattern had already been identified and fixed in the MySQL implementation during PR #274 review.
+
+### User-facing impact
+
+- **Before**: Under concurrent load with connection pooling, `insert_login_history_sqlite()` could theoretically return the wrong login history entry (wrong `id` from a different connection's last insert)
+- **After**: INSERT and SELECT are guaranteed to run on the same connection via a transaction
+
+```rust
+// Before: queries on pool (potentially different connections)
+sqlx::query(...).execute(pool).await?;
+let result = sqlx::query_as(...).fetch_one(pool).await?;
+
+// After: queries on transaction (same connection guaranteed)
+let mut tx = pool.begin().await?;
+sqlx::query(...).execute(&mut *tx).await?;
+let result = sqlx::query_as(...).fetch_one(&mut *tx).await?;
+tx.commit().await?;
+```
+
+### Design decisions
+
+- **Match MySQL fix pattern**: The MySQL version was already fixed with a transaction in commit `97b8ea6`. Applied the identical pattern to SQLite for consistency across all backends. PostgreSQL is not affected (uses `RETURNING *`).
+- **Added transaction flow comment**: Documented the actual SQL flow (`BEGIN`, `INSERT`, `SELECT`, `COMMIT`) in the code comment to make the transaction behavior explicit for future readers.
+
+### Key files
+
+`oauth2_passkey/src/audit/storage/sqlite.rs`
+
+---
+
+## 2026-03-22: Codebase transaction audit -- three new issues
+
+Bug fix (issues filed, not yet implemented)
+
+### Motivation
+
+After fixing the `last_insert_rowid()` race condition in audit/storage, performed a deep audit of all SQL operations across the codebase to find similar transaction consistency issues. The audit examined all storage modules (userdb, oauth2, passkey, audit) across all three database backends (SQLite, MySQL, PostgreSQL), plus the coordination layer.
+
+### User-facing impact
+
+Three issues were discovered but not yet fixed in this session:
+
+1. **`20260322-0907` (low/small)**: `upsert_oauth2_account_sqlite()` and `upsert_oauth2_account_postgres()` execute SELECT on `pool` after committing the transaction. The MySQL version already does this correctly. Fix: move SELECT inside the transaction before COMMIT.
+
+2. **`20260322-0926` (high/medium)**: Passkey authentication counter verification in `passkey/main/auth.rs` follows a GET->CHECK->UPDATE pattern across separate storage calls without atomicity. This is a TOCTOU race with security implications (counter inconsistency, potential replay attack under concurrent load). Fix requires either an atomic SQL operation or storage API changes.
+
+3. **`20260322-0927` (medium/large)**: User deletion in `coordination/user.rs` performs sequential DELETE operations across OAuth2Store, PasskeyStore, and UserStore without a shared transaction. Also, the admin count check before deletion has a race condition. Fix requires cross-store transaction support or storage layer redesign.
+
+### Design decisions
+
+- **Filed as separate issues by difficulty**: The three findings have very different fix complexities. Issue 0907 is a simple in-function change. Issue 0926 crosses the auth logic / storage boundary. Issue 0927 requires multi-store transaction support.
+- **Modules confirmed clean**: userdb storage (all backends use single UPSERT or proper transactions), passkey storage (INSERT OR REPLACE / ON CONFLICT), session storage (cache-based, no SQL transactions needed).
+
+### Key files
+
+`.claude/issues/open/20260322-0907-upsert-oauth2-account-post-tx-select-race.md`, `.claude/issues/open/20260322-0926-passkey-counter-verification-race.md`, `.claude/issues/open/20260322-0927-user-deletion-atomicity.md`
+
+---
+
+## 2026-03-22: rustls-webpki security update (RUSTSEC-2026-0049)
+
+Enhancement (dependency update)
+
+### Motivation
+
+GitHub Actions `cargo audit` flagged RUSTSEC-2026-0049: rustls-webpki 0.103.9 had a CRL Distribution Point matching logic vulnerability. The fix required upgrading to >=0.103.10.
+
+### User-facing impact
+
+- **Before**: CRLs were not considered authoritative by Distribution Point due to faulty matching logic in rustls-webpki 0.103.9
+- **After**: CRL validation works correctly with rustls-webpki 0.103.10
+
+Also updated: askama 0.15.4->0.15.5, zerocopy 0.8.42->0.8.47, itoa 1.0.17->1.0.18, tinyvec 1.10.0->1.11.0.
+
+### Design decisions
+
+- Committed on a separate `chore-deps-update` branch and merged to `dev` first, so the `sqlite-last-insert-rowid-race` branch could rebase on top.
+
+### Key files
+
+`Cargo.toml`, `Cargo.lock`
+
+---
+
+## 2026-03-22: git commit hook enforcement
+
+Enhancement (tooling)
+
+### Motivation
+
+Claude Code repeatedly executed `git commit` without explicit user approval despite CLAUDE.md rules and memory entries prohibiting this. Memory-based rules proved insufficient to prevent the behavior reliably.
+
+### User-facing impact
+
+- **Before**: Claude Code could execute `git commit` autonomously, sometimes committing without user approval
+- **After**: A PreToolUse hook in `.claude/settings.local.json` blocks any `git commit` command at the system level. Commits must be run by the user via `! git commit ...`
+
+### Design decisions
+
+- **Hook over memory**: Memory entries were tried and failed multiple times. A system-level hook is a hard technical blocker that cannot be bypassed by the AI.
+- **git add not blocked**: Initially considered blocking both `git add` and `git commit`, but `git add` alone is harmless and blocking it would add unnecessary friction.
+- **Removed `Bash(git commit:*)` from allow list**: Also removed the permission rule that auto-approved git commit commands.
+- **Updated issue naming rules**: Added `date +%H%M` requirement to CLAUDE.md, `.claude/issues/README.md` (3 locations), and memory to prevent incorrect timestamps in issue IDs.
+
+### Key files
+
+`.claude/settings.local.json`, `CLAUDE.md`, `.claude/issues/README.md`
+
+---
+
+## 2026-03-21: MySQL/MariaDB database support
+
+**Issue**: `20260226-2021` (completed) | **Priority**: medium | **Difficulty**: medium
+
+New feature
+
+### Motivation
+
+The library previously supported only SQLite and PostgreSQL via sqlx. MySQL and MariaDB have significant market share, and users with existing MySQL/MariaDB infrastructure should not need a separate PostgreSQL instance. Adding MySQL/MariaDB also implicitly covers MySQL-compatible databases like TiDB.
+
+### User-facing impact
+
+- **Before**: `GENERIC_DATA_STORE_TYPE` accepted only `sqlite` or `postgres`
+- **After**: `GENERIC_DATA_STORE_TYPE` also accepts `mysql` (works with both MySQL and MariaDB)
+
+```env
+# MySQL
+GENERIC_DATA_STORE_TYPE=mysql
+GENERIC_DATA_STORE_URL='mysql://user:password@localhost:3306/database'
+
+# MariaDB (same driver, different port)
+GENERIC_DATA_STORE_TYPE=mysql
+GENERIC_DATA_STORE_URL='mysql://user:password@localhost:3307/database'
+```
+
+Docker Compose setup provided in `db/mysql/` with MySQL 8.0 (port 3306) and MariaDB 11 (port 3307). The `clear_db_cache.sh` and `monitor_db.sh` utility scripts now support MySQL connections and include Redis cache monitoring.
+
+### Design decisions
+
+- **Follow existing pattern**: Created `mysql.rs` for each of the 4 storage modules (userdb, oauth2, passkey, audit) with identical function signatures to sqlite.rs/postgres.rs. Extended `DataStore` trait with `as_mysql()` and updated all `store_type.rs` dispatch logic.
+- **MySQL parameter binding uses `?`**: Same as SQLite, unlike PostgreSQL's `$1, $2`. This made the MySQL implementation closer to SQLite than PostgreSQL.
+- **UPSERT syntax**: MySQL uses `ON DUPLICATE KEY UPDATE ... VALUES(col)` instead of PostgreSQL's `ON CONFLICT ... DO UPDATE SET ... EXCLUDED.col` or SQLite's `ON CONFLICT ... excluded.col`.
+- **No RETURNING clause**: Like SQLite, MySQL doesn't support `RETURNING *`. All mutations that need the result do a separate SELECT after the write.
+- **VARCHAR instead of TEXT**: MySQL has a 3072-byte index key limit (with utf8mb4). `credential_id` was set to `VARCHAR(768)` (768 x 4 = 3072 bytes) instead of TEXT with UNIQUE. Other string columns use VARCHAR(255) or VARCHAR(512) based on expected content length.
+- **INFORMATION_SCHEMA BLOB workaround**: MySQL returns INFORMATION_SCHEMA columns with binary collation, causing sqlx to decode them as BLOB. Fixed with `CAST(... AS CHAR)` in schema validation queries. This is a query-level fix independent of user connection configuration. Alternative: adding `?charset=utf8mb4` to connection URL, but that depends on user configuration. Tracked for potential revisit if sqlx fixes upstream ([MySQL Bug #19443](https://bugs.mysql.com/bug.php?id=19443), [sqlx #3691](https://github.com/launchbadge/sqlx/issues/3691)).
+- **MariaDB JSON -> LONGTEXT compatibility**: MariaDB stores the JSON type internally as LONGTEXT. Added `mysql_types_compatible()` function in schema validation to treat `json` and `longtext` as equivalent, preventing false schema validation failures on MariaDB.
+- **DATETIME(6) for timestamps**: MySQL's DATETIME(6) provides microsecond precision, matching chrono's DateTime<Utc> resolution.
+- **Demo placeholder AUTO_INCREMENT reset**: After inserting a demo placeholder with explicit `sequence_number=1`, MySQL's AUTO_INCREMENT needs to be reset to avoid conflicts. PostgreSQL uses `setval()` for the same purpose; SQLite handles this automatically.
+- **Utility scripts**: `clear_db_cache.sh` and `monitor_db.sh` parse `mysql://` URLs into `mysql -h ... -P ... -u ... -p...` flags since the MySQL CLI doesn't accept URL format. Added `--skip-ssl` for local Docker development (MySQL 8.0 defaults to TLS). Also added `o2p_login_history` to the DROP TABLE list (was previously missing for all database types).
+- **No MySQL-specific unit tests**: Existing store_type tests run via in-memory SQLite. MySQL-specific code paths require a running MySQL instance, making them integration tests. Added `MySqlDataStore` to the `Send + Sync` trait bound test.
+
+### Key files
+
+`Cargo.toml`, `oauth2_passkey/src/storage/data_store/types.rs`, `oauth2_passkey/src/storage/data_store/config.rs`, `oauth2_passkey/src/storage/schema_validation.rs`, `oauth2_passkey/src/userdb/storage/mysql.rs`, `oauth2_passkey/src/oauth2/storage/mysql.rs`, `oauth2_passkey/src/passkey/storage/mysql.rs`, `oauth2_passkey/src/audit/storage/mysql.rs`, `db/mysql/docker-compose.yaml`, `utils/clear_db_cache.sh`, `utils/monitor_db.sh`
+
+---
+
+## 2026-03-21: Sequential primary keys for oauth2_accounts and passkey_credentials
+
+**Issue**: `2026-01-31-01` (completed) | **Priority**: low | **Difficulty**: medium
+
+Database schema best practice alignment
+
+### Motivation
+
+The `users` table already used the recommended pattern of `sequence_number INTEGER PRIMARY KEY AUTOINCREMENT` with `id TEXT NOT NULL UNIQUE`. However, `oauth2_accounts` and `passkey_credentials` tables used TEXT columns (`id` and `credential_id` respectively) as primary keys directly. Sequential integer primary keys are a database design best practice for B-tree locality, space efficiency, and join performance -- regardless of current scale.
+
+### User-facing impact
+
+- **Before**: `oauth2_accounts` used `id TEXT PRIMARY KEY`, `passkey_credentials` used `credential_id TEXT PRIMARY KEY`
+- **After**: Both tables use `sequence_number` as primary key with original TEXT identifiers as UNIQUE constraints
+
+```sql
+-- Before (oauth2_accounts):
+id TEXT PRIMARY KEY NOT NULL,
+user_id TEXT NOT NULL REFERENCES users(id),
+
+-- After (oauth2_accounts):
+sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,  -- SQLite
+-- sequence_number BIGSERIAL PRIMARY KEY,            -- PostgreSQL
+id TEXT NOT NULL UNIQUE,
+user_id TEXT NOT NULL REFERENCES users(id),
+```
+
+**Breaking change**: Existing databases will need to be recreated (no migration provided). The `OAuth2Account` and `PasskeyCredential` structs now include `sequence_number: Option<i64>`.
+
+Additionally, `sequence_number` is hidden from all JSON API responses via `#[serde(skip_serializing)]` on all three types (`User`, `OAuth2Account`, `PasskeyCredential`). The `User` type previously used `skip_serializing_if = "Option::is_none"` which leaked `sequence_number` in admin API responses -- investigation confirmed no JS or template code consumes this field from JSON.
+
+### Design decisions
+
+- **YAGNI does not apply**: Sequential integer primary keys are an established best practice, not a speculative feature. Deferring correct schema design is not the same as avoiding unnecessary features.
+- **No migration**: This is a pre-1.0 library. Existing deployments can recreate tables. Migration complexity is not justified at this stage.
+- **`Option<i64>` for sequence_number**: Matches the `users` table pattern. `None` when creating new records (database assigns the value), `Some(n)` when reading from database.
+- **No query changes needed**: All queries use `SELECT *` with `FromRow` derive/impl, and INSERT statements don't specify `sequence_number` (auto-generated). The change is transparent to query logic.
+- **No foreign key impact**: No other tables reference `oauth2_accounts.id` or `passkey_credentials.credential_id` via foreign keys. `login_history.credential_id` is denormalized without FK constraint.
+- **`skip_serializing` over `skip_serializing_if`**: PR review identified that `sequence_number` was leaking to API responses. Investigation found: (1) admin templates use `TemplateUser.sequence_number` for first-user display -- this is server-side rendering, not JSON serialization; (2) `Json<Vec<DbUser>>` admin API is consumed by JS that only uses `user.id` and `user.account`; (3) `sequence_number` is an internal DB detail with no client-side use. Changed all three types to `skip_serializing` for consistency. Updated User's proptest roundtrip test to expect `None` after deserialization.
+- **UNIQUE constraint provides index**: The original TEXT identifiers (`id`, `credential_id`) changed from PRIMARY KEY to UNIQUE constraint. Both SQLite and PostgreSQL automatically create an index for UNIQUE constraints, so no explicit `CREATE INDEX` is needed for these columns.
+
+### Key files
+
+`oauth2_passkey/src/oauth2/types.rs`, `oauth2_passkey/src/passkey/types.rs`, `oauth2_passkey/src/userdb/types.rs`, `oauth2_passkey/src/oauth2/storage/sqlite.rs`, `oauth2_passkey/src/oauth2/storage/postgres.rs`, `oauth2_passkey/src/passkey/storage/sqlite.rs`, `oauth2_passkey/src/passkey/storage/postgres.rs`
+
+---
+
+## 2026-03-20: Env var silent fallback audit -- panic on invalid values
+
+**Issue**: `20260227-1703` (completed) | **Priority**: low | **Difficulty**: small
+
+### Motivation
+
+Optional environment variables using `.ok().and_then(|s| s.parse().ok()).unwrap_or()` silently fell back to defaults when set to unparseable values. Operators who set `SESSION_COOKIE_MAX_AGE=ten_minutes` would get the default 600 without any error or warning.
+
+### What changed
+
+Implemented Option B + C:
+- **Option B**: 17 LazyLock env vars changed from silent fallback to panic on set-but-invalid values. Unset vars still use defaults.
+- **Option C**: All optional config vars force-evaluated in `init()` functions, so invalid values are caught at startup, not on first request.
+- **AUTH_SERVER_SECRET**: Replaced hardcoded default (`"default_secret_key_change_in_production"`) with random 32-byte key generation using `ring::rand::SystemRandom`.
+
+| State | Behavior (before) | Behavior (after) |
+|-------|-------------------|------------------|
+| Env var not set | Default value | Default value (unchanged) |
+| Set, valid value | That value | That value (unchanged) |
+| Set, invalid value | Silent default | **Panic at startup** |
+
+### Design decisions
+
+- **B+C over A+C**: Option A (warn + continue) still hides the problem if operators don't read logs. Panic is consistent with required variables that already use `.expect()`.
+- **`unwrap_or_else(\|e\| panic!(..., e))` over `expect(&format!(...))`**: clippy's `expect_fun_call` lint rejects `expect(&format!(...))` because `format!()` allocates even on the success path. `unwrap_or_else` only executes the closure on error, and we include the underlying parse error `e` in the message.
+- **AUTH_SERVER_SECRET random default**: Single-process deployments work out of the box. Multi-process deployments must set the env var explicitly (documented).
+
+### Key files
+
+`oauth2_passkey/src/config.rs`, `oauth2_passkey/src/session/config.rs`, `oauth2_passkey/src/oauth2/config.rs`, `oauth2_passkey/src/passkey/config.rs`, `oauth2_passkey_axum/src/config.rs`, `oauth2_passkey_axum/src/cors.rs`, `oauth2_passkey/src/lib.rs`, `oauth2_passkey_axum/src/lib.rs`
+
+---
+
+## 2026-03-20: FedCM GIS library analysis and hang investigation
+
+**Issue**: `20260316-1630` (deferred), `20260320-1410` (deferred)
+
+### Motivation
+
+FedCM `navigator.credentials.get()` hangs frequently on tabs open for a long time, causing the page to dim with no dialog and no recovery path. Reopened the deferred issue to investigate using Google's GIS library as a reference.
+
+### What was done
+
+1. **GIS library reverse engineering**: Fetched and beautified Google's GIS library (`accounts.google.com/gsi/client`, 254KB -> 7520 lines). Documented all FedCM-related functions, the abort mechanism, cooldown system, and error handling. Full analysis: `docs/src/archived/gis-fedcm-analysis.md`
+
+2. **GIS alignment**: Aligned `credentials.get()` options with GIS -- added AbortController + signal, `federated` key (backward compat), `fields` property. These are kept in the codebase even though they don't fix the hang.
+
+3. **Root cause investigation**: Explored multiple hypotheses:
+   - Cooldown from prior FedCM cancel -- insufficient (hang occurs without prior cancel)
+   - Login status mismatch -- Chrome's mismatch UI may fail to display ([Chromium #40070360](https://issues.chromium.org/issues/40070360))
+   - Active mode error UI not implemented -- [Chromium #370796104](https://issues.chromium.org/issues/370796104)
+   - **Tab count**: Closing excess browser tabs resolved the hang, suggesting Chrome resource constraints
+
+4. **Timeout attempt**: Added 15s AbortController timeout, but reverted because the popup fallback gets blocked (User Activation expired after abort).
+
+5. **New issue created**: `20260320-1410` for popup blocked on FedCM cancel fallback (User Activation timing problem). Also deferred.
+
+### Design decisions
+
+- **Deferred both issues**: Root cause still unclear (tab count? login status? Chrome resource limits?). Timeout reverted because no viable post-abort fallback exists yet.
+- **GIS alignment kept**: Harmless improvements that match Google's own implementation.
+
+### Key files
+
+`oauth2_passkey_axum/static/oauth2.js`, `docs/src/archived/gis-fedcm-analysis.md`
+
+---
+
+## 2026-03-17: Cloud Run deploy optimization -- cargo-chef + BuildKit
+
+**Issue**: `20260317-1500` | **Priority**: low | **Difficulty**: medium
+
+Enhancement of CI/CD pipeline
+
+### Motivation
+
+Cloud Run deployment for passkey-demo.ccmp.jp took approximately 19-25 minutes per build. The bottleneck was full Rust compilation from scratch on every build -- Cloud Build's default machine (1 vCPU, 3.75 GB RAM) compiled all workspace dependencies (tokio, axum, sqlx, rustls, etc.) with zero caching because Docker layer caches don't persist between Cloud Build runs.
+
+### User-facing impact
+
+- **Before**: Every push to `dev` triggered a ~19 minute build via Cloud Build. No caching meant even a one-line `.rs` change required full recompilation of all dependencies.
+- **After**: Cached builds complete in ~3.5 minutes (82% reduction). First build without cache takes ~11 minutes (still faster due to 4x CPU).
+
+| Build | Method | Time |
+|-------|--------|------|
+| #30 | Cloud Build (old) | 19m 28s |
+| #31 | BuildKit + cargo-chef (1st, no cache) | 11m 24s |
+| #32 | BuildKit + cargo-chef (2nd, cached) | 3m 28s |
+
+### Design decisions
+
+**Option A (chosen): GitHub Actions BuildKit + cargo-chef**
+- cargo-chef separates dependency compilation into its own Docker layer. When only `.rs` files change, the dependency layer cache hits and only the application code recompiles.
+- BuildKit `type=gha` cache stores Docker layers in GitHub Actions cache storage, persisting across CI runs.
+- `mode=max` caches all intermediate stages (not just final), which is essential for cargo-chef's dependency layer to be cached.
+
+**Option B (rejected): Cloud Build with `--cache-from` + machine upgrade**
+- `--cache-from` is image-level caching only -- intermediate stages (cargo-chef dependency layer) don't benefit.
+- cargo-chef is incompatible with Kaniko (GoogleContainerTools/kaniko#1520), ruling out Cloud Build's best caching option.
+- N1_HIGHCPU_8 upgrade would cost more and only improve to ~8-12 min.
+
+**Workflow reordering**: Steps were grouped into two logical phases -- Docker build/push and Cloud Run deploy. GCP auth (`google-github-actions/auth`) moved closer to `gcloud` usage since `docker/login-action` authenticates independently via `_json_key` + SA key JSON.
+
+**Cleanup**: Removed `demo-live/cloudbuild.yaml`, revoked unnecessary IAM roles (`cloudbuild.builds.editor`, `storage.admin`) from the GitHub Actions service account.
+
+### Key files
+
+`.github/workflows/deploy-demo.yml`, `demo-live/Dockerfile`, `demo-live/DEPLOY.md`
+
+---
+
+## 2026-03-17: FedCM stale tab hang issue deferred
+
+**Issue**: `20260316-1630` | **Priority**: high | **Difficulty**: small
+
+Not merged (deferred)
+
+### Motivation
+
+`navigator.credentials.get()` hangs indefinitely in stale tabs (likely from the passive mode era before `mode: 'active'` was added). The page dims but the FedCM account chooser never appears, the Promise never resolves or rejects, and the popup fallback never triggers. Only opening a new tab recovers.
+
+### User-facing impact
+
+- **Before**: Users in stale tabs see a dimmed, unresponsive page with no way to log in.
+- **After**: No change (deferred). The issue remains for users with stale tabs, but these will naturally diminish over time as users open new tabs.
+
+### Design decisions
+
+**AbortController with 5-second timeout (rejected)**:
+- Cannot distinguish between "FedCM UI hung" and "user is taking time to select an account". A user with multiple Google accounts who takes >5 seconds would be interrupted mid-selection and forced into the popup flow.
+
+**Fallback link after delay (rejected)**:
+- Showing a "Having trouble? Click here" link after a few seconds clutters the UI and is poor UX. Users may not notice it or understand what it means.
+
+**Deferred because**:
+- No way to programmatically detect whether the FedCM UI actually appeared (the browser API provides no such event or callback)
+- The root cause is a Chrome bug (Promise should reject, not hang silently; active mode should not be subject to cooldown per Chrome's own docs)
+- FedCM is still experimental support in this project
+- Waiting for: error reproduction, Chrome improvements, or a novel detection approach
+
+### Key files
+
+`oauth2_passkey_axum/static/oauth2.js`
+
+---
+
+## 2026-03-15: Eliminate aws-lc-sys dependency
+
+**Issue**: `20260315-0348` | **Priority**: high | **Difficulty**: small
+
+Enhancement of build system -- dependency cleanup
+
+### Motivation
+
+The `aws-lc-sys` crate was pulled into the dependency tree by reqwest 0.13's default TLS configuration (`rustls` feature -> `aws-lc-rs` provider). This required CMake and a C++ compiler at build time, which broke `cargo build` on minimal environments, complicated cross-compilation, added significant build time, and was problematic for crates.io users who expect `cargo build` to just work.
+
+The project already depended on `ring` directly (for WebAuthn signature verification), so switching rustls's crypto provider from aws-lc-rs to ring could eliminate aws-lc-sys without adding new dependencies.
+
+### User-facing impact
+
+- **Before**: `cargo build` failed on systems without CMake and a C++ compiler. aws-lc-sys pulled in ~20 transitive crates including cmake and quinn.
+- **After**: `cargo build` works in minimal environments. No CMake or C++ compiler needed.
+
+```toml
+# Before: reqwest with default rustls (aws-lc-rs)
+reqwest = { version = "0.13.2", features = ["rustls-tls"] }
+
+# After: reqwest with ring-based rustls
+reqwest = { version = "0.13.2", default-features = false, features = [
+    "rustls-no-provider", "charset", "http2", "json", "cookies", "form", "system-proxy"
+] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+```
+
+### Design decisions
+
+**ring over RustCrypto for rustls provider**: ring was already a direct dependency (WebAuthn uses it). rustls-rustcrypto is experimental. Adding ring to rustls added no new dependencies.
+
+**`rustls-no-provider` feature on reqwest**: reqwest 0.13 removed the `__rustls-ring` feature that 0.12 had. Only options were `rustls` (aws-lc-rs) or `rustls-no-provider`. This is the only way to avoid aws-lc-rs in reqwest 0.13.
+
+**Explicit `install_default()` needed**: rustls 0.23 auto-detects aws_lc_rs as default but does NOT auto-detect ring (asymmetric design). Added `ensure_ring_provider()` that calls `install_default()` in `get_client()`. Used `builder_with_provider(ring)` in the bundled-tls path.
+
+### Key files
+
+`Cargo.toml`, `oauth2_passkey/Cargo.toml`, `oauth2_passkey/src/utils.rs`
+
+---
 
 ## 2026-03-14: FedCM auto re-authentication rate limit fix
 

@@ -6,8 +6,8 @@ use std::fmt;
 /// Represents a core user identity in the system
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, PartialEq)]
 pub struct User {
-    /// Database-assigned sequence number (primary key)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Database-assigned sequence number (primary key, internal only)
+    #[serde(skip_serializing)]
     pub sequence_number: Option<i64>,
     /// Unique user identifier
     pub id: String,
