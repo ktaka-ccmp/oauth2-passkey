@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (10)
+### Open (11)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -20,6 +20,7 @@ This directory contains issue/task tracking files for the project.
 | `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
+| `20260331-1517` | low | small | [PASSKEY_AUTHENTICATOR_ATTACHMENT=none sends non-standard string instead of omitting field](open/20260331-1517-passkey-authenticator-attachment-none-serialization.md) |
 
 ### Completed (58)
 
