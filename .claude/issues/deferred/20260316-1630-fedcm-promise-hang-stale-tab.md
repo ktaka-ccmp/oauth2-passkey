@@ -314,4 +314,15 @@ async function fedcmLogin(mode) {
   - Root cause unclear: tab count? login status mismatch? Chrome resource limits?
   - Need more reproduction data to narrow down
 
+### 2026-03-31: Tab group hypothesis - narrowing down the root cause
+
+- Context: New observation during demo site testing. FedCM hang behavior is more precisely tied to **browser tab groups** than to "long-lived tabs" in general.
+- Observation:
+  - Whether or not the user has previously visited passkey-demo.ccmp.jp or localhost:3001 is irrelevant.
+  - If a tab group containing the relevant tab is currently open in the browser -> hang occurs.
+  - If the tab was previously a member of a tab group, but that group is not currently open in this browser session -> no hang.
+- Implication: This refines the 2026-03-20 "tab count / Chrome resource constraints" hypothesis. Chrome may be sharing or conflicting FedCM internal state (IdP login status cache, FedCM overlay state, etc.) at the **tab group** level, not just at the tab or window level.
+- Next steps: Reproduce with a controlled number of tabs (one group open vs. closed) to confirm the tab group as the decisive factor.
+- Additional observation (same date): Detaching a hanging tab from its tab group (making it a standalone tab) **resolves the stale state** for that tab. FedCM works normally after detachment. This strongly implies the stale FedCM state is scoped to the tab group context, not to the individual tab itself.
+
 ## Resolution
