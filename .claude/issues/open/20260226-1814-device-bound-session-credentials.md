@@ -18,7 +18,7 @@
 
 ## Status: open
 
-## Priority: low
+## Priority: high
 
 ## Difficulty: large
 
