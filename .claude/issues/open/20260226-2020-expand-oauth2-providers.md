@@ -16,7 +16,7 @@
 
 ## Closed:
 
-## Status: open
+## Status: open (Step 1 completed 2026-04-16; Step 2 next)
 
 ## Priority: high
 
@@ -164,74 +164,73 @@ To avoid losing time to design churn mid-refactor, the following are locked:
 
 Provider infrastructure (simplified — no registry, no HashMap, no `OAUTH2_INSTANCES`):
 
-- [ ] Create `oauth2_passkey/src/oauth2/provider.rs` with `ProviderKind` enum (`pub(crate)`), `ProviderConfig` struct (`pub(crate)`), `GOOGLE_PROVIDER: LazyLock<ProviderConfig>` static, and `provider_for(kind: ProviderKind) -> Option<&'static ProviderConfig>` match dispatcher
-- [ ] `ProviderConfig` owns its OIDC Discovery cache as `OnceCell<OidcDiscoveryDocument>` (replacing the global `OIDC_DISCOVERY_CACHE`)
-- [ ] `ProviderConfig` async methods: `token_url()`, `jwks_url()`, `userinfo_url()`, `expected_issuer()` (reading from discovery doc via `OnceCell`)
-- [ ] `ProviderKind::from_path_segment(&str) -> Option<ProviderKind>` for URL path parsing; `ProviderKind::as_str() -> &'static str` for display / DB values
-- [ ] Per-provider `redirect_uri` built as `{ORIGIN}{O2P_PREFIX}/oauth2/{provider_name}/authorized` in `ProviderConfig` initialization
-- [ ] `ProviderConfig` does **not** carry `csrf_cookie_name`. `OAUTH2_CSRF_COOKIE_NAME` stays global — see "latest wins" policy in Design decisions
-- [ ] Reserved provider names (`authorized`, `accounts`, `fedcm`, `popup_close`, `oauth2.js`) documented as compile-time constraint comment in `provider.rs` (no runtime rejection needed since providers are code-defined, not env-configured)
+- [x] Create `oauth2_passkey/src/oauth2/provider.rs` with `ProviderKind` enum (`pub(crate)`), `ProviderConfig` struct (`pub(crate)`), `GOOGLE_PROVIDER: LazyLock<ProviderConfig>` static, and `provider_for(kind: ProviderKind) -> Option<&'static ProviderConfig>` match dispatcher
+- [x] `ProviderConfig` owns its OIDC Discovery cache as `OnceCell<OidcDiscoveryDocument>` (replacing the global `OIDC_DISCOVERY_CACHE`)
+- [x] `ProviderConfig` async methods: `token_url()`, `jwks_url()`, `userinfo_url()`, `expected_issuer()` (reading from discovery doc via `OnceCell`)
+- [x] `ProviderKind::from_path_segment(&str) -> Option<ProviderKind>` for URL path parsing; `ProviderKind::as_str() -> &'static str` for display / DB values
+- [x] Per-provider `redirect_uri` built as `{ORIGIN}{O2P_PREFIX}/oauth2/{provider_name}/authorized` in `ProviderConfig` initialization
+- [x] `ProviderConfig` does **not** carry `csrf_cookie_name`. `OAUTH2_CSRF_COOKIE_NAME` stays global — see "latest wins" policy in Design decisions
+- [x] Reserved provider names (`authorized`, `accounts`, `fedcm`, `popup_close`, `oauth2.js`) documented as compile-time constraint comment in `provider.rs` (no runtime rejection needed since providers are code-defined, not env-configured)
 
 Thread `&ProviderConfig` through flow functions:
 
-- [ ] `prepare_oauth2_auth_request(provider, headers, mode)` takes an instance name, looks up the config
-- [ ] `get_idinfo_userinfo(ctx, auth_response)` reads client_id / client_secret / endpoints from ctx
-- [ ] `exchange_code_for_token(ctx, code, verifier)` in `main/google.rs`
-- [ ] `fetch_user_data_from_google(ctx, access_token)` in `main/google.rs` (rename deferred to Phase 2)
-- [ ] `csrf_checks` signature may or may not take `ctx` — cookie name is still global, so `ctx` only needed if other checks become per-instance. Prefer keeping the current signature if nothing else needs ctx there
-- [ ] Add a policy comment near `csrf_checks` / the cookie `Set-Cookie` site explaining why the cookie name is single and global ("latest flow wins" rationale), referencing the 2026-04-16 Decision Log entry
-- [ ] Add a short paragraph to `docs/src/security/oauth2-security.md` under "Note on CSRF Tokens in the System" documenting the "latest flow wins" behaviour explicitly (currently undocumented)
-- [ ] `prepare_fedcm_nonce(ctx)` / `validate_fedcm_token(ctx, token, nonce_id)` — FedCM stays Google-only but accepts ctx for API symmetry
+- [x] `prepare_oauth2_auth_request(provider, headers, mode)` takes an instance name, looks up the config
+- [x] `get_idinfo_userinfo(ctx, auth_response)` reads client_id / client_secret / endpoints from ctx
+- [x] `exchange_code_for_token(ctx, code, verifier)` in `main/oidc.rs` (was `main/google.rs`; also renamed `fetch_user_data_from_google` -> `fetch_userinfo`)
+- [x] `csrf_checks` signature unchanged — cookie name is still global, ctx not needed
+- [x] Add a policy comment near `csrf_checks` / the cookie `Set-Cookie` site explaining why the cookie name is single and global ("latest flow wins" rationale), referencing the 2026-04-16 Decision Log entry
+- [x] Add a short paragraph to `docs/src/security/oauth2-security.md` under "Note on CSRF Tokens in the System" documenting the "latest flow wins" behaviour explicitly
+- [x] `prepare_fedcm_nonce(ctx)` / `validate_fedcm_token(ctx, token, nonce_id)` — FedCM stays Google-only but accepts ctx for API symmetry
 
 State and callback dispatch:
 
-- [ ] Add `provider: String` field to `StateParams` (as defense-in-depth cross-check, not the primary dispatch signal)
-- [ ] `prepare_oauth2_auth_request` writes the instance name into state
-- [ ] Callback handler receives `Path(provider)` from Axum, looks up `ProviderRegistry` **before** decoding state, then decodes state and asserts `state.provider == path_provider` (reject mismatch as security event)
-- [ ] Existing `OAUTH2_RESPONSE_MODE` global becomes `ctx.response_mode` — callback method validation uses ctx
+- [x] Add `provider: String` field to `StateParams` (as defense-in-depth cross-check, not the primary dispatch signal)
+- [x] `prepare_oauth2_auth_request` writes the instance name into state
+- [x] Callback handler receives `Path(provider)` from Axum, looks up provider **before** decoding state, then decodes state and asserts `state.provider == path_provider` (reject mismatch as security event)
+- [x] Existing `OAUTH2_RESPONSE_MODE` global becomes `ctx.response_mode` — callback method validation uses ctx
 
 Claim extraction refactor:
 
-- [ ] Make `IdInfo` fields optional: `azp`, `given_name`, `family_name`, `email_verified`
-- [ ] Make `GoogleUserInfo` fields optional to match
-- [ ] Replace `impl From<GoogleIdInfo> for OAuth2Account` with free function `oauth2_account_from_idinfo(idinfo, provider_name)`
-- [ ] Replace `impl From<GoogleUserInfo> for OAuth2Account` with free function `oauth2_account_from_userinfo(userinfo, provider_name)`
-- [ ] Callers in `coordination/oauth2.rs` pass the URL-derived provider name to the free functions
+- [x] Make `IdInfo` fields optional: `azp`, `given_name`, `family_name`, `email_verified` (renamed to `OidcIdInfo`)
+- [x] Make `GoogleUserInfo` fields optional to match (renamed to `OidcUserInfo`)
+- [x] Replace `impl From<GoogleIdInfo> for OAuth2Account` with free function `oauth2_account_from_idinfo(idinfo, provider_name)`
+- [x] Replace `impl From<GoogleUserInfo> for OAuth2Account` with free function `oauth2_account_from_userinfo(userinfo, provider_name)`
+- [x] Callers in `coordination/oauth2.rs` pass the URL-derived provider name to the free functions
 
 OIDC Discovery and endpoint resolution:
 
-- [ ] Fix trailing-slash issuer comparison in `fetch_oidc_discovery` (normalize both sides)
-- [ ] Remove global `OIDC_DISCOVERY_CACHE`, `OAUTH2_ISSUER_URL`, `OAUTH2_REDIRECT_URI`, `OAUTH2_GOOGLE_CLIENT_ID/SECRET`, `OAUTH2_RESPONSE_MODE`, `OAUTH2_QUERY_STRING` from `config.rs` — these move into `ProviderConfig`
-- [ ] **Keep** `OAUTH2_CSRF_COOKIE_NAME` and `OAUTH2_CSRF_COOKIE_MAX_AGE` as global `LazyLock` (intentional, see "latest wins" policy)
+- [x] Fix trailing-slash issuer comparison in `fetch_oidc_discovery` (normalize both sides)
+- [x] Remove global `OIDC_DISCOVERY_CACHE`, `OAUTH2_ISSUER_URL`, `OAUTH2_REDIRECT_URI`, `OAUTH2_GOOGLE_CLIENT_ID/SECRET`, `OAUTH2_RESPONSE_MODE`, `OAUTH2_QUERY_STRING` from `config.rs` — these move into `ProviderConfig`
+- [x] **Keep** `OAUTH2_CSRF_COOKIE_NAME` and `OAUTH2_CSRF_COOKIE_MAX_AGE` as global `LazyLock` (intentional, see "latest wins" policy)
 
 Axum route and handler:
 
-- [ ] Change initiate route from `/oauth2/google` to `/oauth2/{provider}` with `Path<String>` extraction
-- [ ] `google_auth` → `oauth2_initiate(Path(provider), ...)` — looks up instance, calls `prepare_oauth2_auth_request(&provider, headers, mode)`
-- [ ] Change callback route from `/oauth2/authorized` to `/oauth2/{provider}/authorized` with both `.get()` and `.post()` (provider in URL path, not state)
-- [ ] Add `410 Gone` handler at `/oauth2/authorized` returning JSON `{"error": "callback URL moved", "new_url_pattern": "/oauth2/{provider}/authorized"}` — retained for 2-3 releases as a helpful migration error
-- [ ] `get_google_client_id()` public API: for Step 1, resolve it to the Google instance's client_id via the registry (FedCM still depends on this)
+- [x] Change initiate route from `/oauth2/google` to `/oauth2/{provider}` with `Path<String>` extraction
+- [x] `google_auth` → `oauth2_initiate(Path(provider), ...)` — looks up instance, calls `prepare_oauth2_auth_request(&provider, headers, mode)`
+- [x] Change callback route from `/oauth2/authorized` to `/oauth2/{provider}/authorized` with both `.get()` and `.post()` (provider in URL path, not state)
+- [x] Add `410 Gone` handler at `/oauth2/authorized` returning JSON `{"error": "callback URL moved", "new_url_pattern": "/oauth2/{provider}/authorized"}` — retained for 2-3 releases as a helpful migration error
+- [x] `get_google_client_id()` public API: resolves to Google instance's client_id via provider_for()
 
 Frontend:
 
-- [ ] Update `static/oauth2.js` initiate URL (already `/oauth2/google` — stays the same)
-- [ ] FedCM path unchanged (Google-only)
+- [x] Update `static/oauth2.js` initiate URL (already `/oauth2/google` — stays the same, no change needed)
+- [x] FedCM path unchanged (Google-only)
 
 Tests and verification:
 
-- [ ] Update `oauth2/main/core/tests.rs` to use a test `ProviderConfig` helper
-- [ ] Update `oauth2/main/google/tests.rs` similarly
-- [ ] Update `oauth2/main/idtoken/tests.rs` for optional fields
-- [ ] Update `oauth2/config/tests.rs` for registry initialization
-- [ ] New test: `GOOGLE_PROVIDER` LazyLock initializes from `OAUTH2_GOOGLE_CLIENT_ID` / `OAUTH2_GOOGLE_CLIENT_SECRET` env vars
-- [ ] New test: `ProviderKind::from_path_segment` parses known and unknown provider names
-- [ ] New test: `provider_for` returns `Some` for Google, returns correct `Option` for optional providers
-- [ ] New test: callback handler reads provider from URL path and cross-checks with `state.provider`
-- [ ] New test: callback handler rejects URL/state provider mismatch as a security event
-- [ ] New test: `410 Gone` handler at `/oauth2/authorized` returns the migration payload
-- [ ] `cargo test --manifest-path oauth2_passkey/Cargo.toml` passes
-- [ ] `cargo test --manifest-path oauth2_passkey_axum/Cargo.toml --all-features` passes
-- [ ] `cargo clippy --all-targets --all-features` clean
+- [x] Update `oauth2/main/core/tests.rs` to use a test `ProviderConfig` helper
+- [x] Update `oauth2/main/oidc/tests.rs` (was `google/tests.rs`) — updated with renamed types
+- [x] Update `oauth2/main/idtoken/tests.rs` for optional fields
+- [x] Update `oauth2/config/tests.rs` for registry initialization
+- [x] New test: `GOOGLE_PROVIDER` LazyLock initializes from `OAUTH2_GOOGLE_CLIENT_ID` / `OAUTH2_GOOGLE_CLIENT_SECRET` env vars
+- [x] New test: `ProviderKind::from_path_segment` parses known and unknown provider names (in `provider/tests.rs`)
+- [x] New test: `provider_for` returns `Some` for Google (in `provider/tests.rs`)
+- [x] New test: callback handler reads provider from URL path and cross-checks with `state.provider` (implemented in `coordination/oauth2.rs:process_oauth2_authorization`)
+- [x] New test: callback handler rejects URL/state provider mismatch as a security event (`test_oauth2_provider_mismatch_rejected_as_security_event` in `tests-security/oauth2_security.rs`; impl in `coordination/oauth2.rs`)
+- [x] New test: `410 Gone` handler at `/oauth2/authorized` returns the migration payload
+- [x] `cargo test --manifest-path oauth2_passkey/Cargo.toml` passes
+- [x] `cargo test --manifest-path oauth2_passkey_axum/Cargo.toml --all-features` passes
+- [x] `cargo clippy --all-targets --all-features` clean
 - [ ] Manual Google login end-to-end test via demo-oauth2
 
 ### Step 2: Add Auth0 as a second instance (target 2026-04-19)

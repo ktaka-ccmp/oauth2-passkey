@@ -542,3 +542,38 @@ async fn test_oauth2_account_linking() -> Result<(), Box<dyn std::error::Error>>
     println!("🎯 === CONSOLIDATED OAUTH2 ACCOUNT LINKING TEST COMPLETED ===");
     Ok(())
 }
+
+/// Test that the old `/oauth2/authorized` callback URL returns 410 Gone.
+///
+/// When a client (or bookmarked redirect URI) hits the old single-provider
+/// callback URL, they should get a 410 with a JSON body pointing them to
+/// the new per-provider URL pattern.
+#[tokio::test]
+async fn test_old_oauth2_authorized_returns_410() -> Result<(), Box<dyn std::error::Error>> {
+    let setup = TestSetup::new().await?;
+
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+
+    // GET /auth/oauth2/authorized — old single-provider callback URL
+    let response = client
+        .get(format!("{}/auth/oauth2/authorized", setup.server.base_url))
+        .send()
+        .await?;
+
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::GONE,
+        "Old /oauth2/authorized should return 410 Gone"
+    );
+
+    let body = response.text().await?;
+    assert!(
+        body.contains("new_url_pattern"),
+        "410 response should contain migration hint, got: {body}"
+    );
+
+    setup.shutdown().await;
+    Ok(())
+}

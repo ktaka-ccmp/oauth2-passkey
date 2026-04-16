@@ -9,6 +9,69 @@ use crate::userdb::User;
 use chrono::Utc;
 use serial_test::serial;
 
+/// Test-accessible variant of `get_authorized_core` that accepts a pre-built
+/// `ProviderConfig` directly, bypassing the global provider static.
+/// This allows tests to inject mock server URLs without touching `LazyLock`s.
+async fn get_authorized_core_with_ctx(
+    ctx: &ProviderConfig,
+    auth_response: &AuthResponse,
+    cookies: &headers::Cookie,
+    headers: &HeaderMap,
+) -> Result<(HeaderMap, String), CoordinationError> {
+    authorized_core(ctx, HttpMethod::Get, auth_response, cookies, headers).await
+}
+
+/// Test-accessible variant of `post_authorized_core` that accepts a pre-built
+/// `ProviderConfig` directly, bypassing the global provider static.
+async fn post_authorized_core_with_ctx(
+    ctx: &ProviderConfig,
+    auth_response: &AuthResponse,
+    cookies: &headers::Cookie,
+    headers: &HeaderMap,
+) -> Result<(HeaderMap, String), CoordinationError> {
+    authorized_core(ctx, HttpMethod::Post, auth_response, cookies, headers).await
+}
+
+/// Test-accessible variant of `fedcm_authorized_core` that accepts a pre-built
+/// `ProviderConfig` directly, bypassing the global provider static.
+async fn fedcm_authorized_core_with_ctx(
+    ctx: &ProviderConfig,
+    request: &FedCMCallbackRequest,
+    headers: &HeaderMap,
+) -> Result<(HeaderMap, String), CoordinationError> {
+    let idinfo = validate_fedcm_token(ctx, &request.credential, &request.nonce_id).await?;
+    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx.kind.as_str());
+
+    let mode = match &request.mode {
+        Some(mode_str) => {
+            let parsed: OAuth2Mode = mode_str.parse().map_err(|_| {
+                CoordinationError::InvalidState(format!("Invalid FedCM mode: {mode_str}"))
+            })?;
+            Some(parsed)
+        }
+        None => None,
+    };
+
+    if matches!(mode, Some(OAuth2Mode::AddToUser)) {
+        return Err(CoordinationError::InvalidState(
+            "FedCM does not support add_to_user mode".to_string(),
+        ));
+    }
+
+    let login_context = LoginContext::from_headers(headers);
+    let result = process_authenticated_oauth2_user(
+        oauth2_account,
+        mode,
+        AuthMethod::FedCM,
+        login_context,
+        None,
+        None,
+        None,
+    )
+    .await?;
+    Ok(result)
+}
+
 // Additional imports for mock OAuth2 server tests
 use axum::routing::{get, post};
 use headers::HeaderMapExt;

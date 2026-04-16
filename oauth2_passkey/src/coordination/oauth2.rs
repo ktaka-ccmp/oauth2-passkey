@@ -207,31 +207,6 @@ pub async fn post_authorized_core(
     authorized_core(ctx, HttpMethod::Post, auth_response, cookies, headers).await
 }
 
-/// Test-accessible variant of `get_authorized_core` that accepts a pre-built
-/// `ProviderConfig` directly, bypassing the global `GOOGLE_PROVIDER` static.
-/// This allows tests to inject mock server URLs without touching `LazyLock`s.
-#[cfg(test)]
-pub(crate) async fn get_authorized_core_with_ctx(
-    ctx: &ProviderConfig,
-    auth_response: &AuthResponse,
-    cookies: &headers::Cookie,
-    headers: &HeaderMap,
-) -> Result<(HeaderMap, String), CoordinationError> {
-    authorized_core(ctx, HttpMethod::Get, auth_response, cookies, headers).await
-}
-
-/// Test-accessible variant of `post_authorized_core` that accepts a pre-built
-/// `ProviderConfig` directly, bypassing the global `GOOGLE_PROVIDER` static.
-#[cfg(test)]
-pub(crate) async fn post_authorized_core_with_ctx(
-    ctx: &ProviderConfig,
-    auth_response: &AuthResponse,
-    cookies: &headers::Cookie,
-    headers: &HeaderMap,
-) -> Result<(HeaderMap, String), CoordinationError> {
-    authorized_core(ctx, HttpMethod::Post, auth_response, cookies, headers).await
-}
-
 #[tracing::instrument(skip(ctx, auth_response, login_context), fields(user_id, provider, state = %auth_response.state))]
 async fn process_oauth2_authorization(
     ctx: &ProviderConfig,
@@ -242,9 +217,27 @@ async fn process_oauth2_authorization(
     tracing::Span::current().record("provider", provider_name);
     tracing::info!("Processing OAuth2 authorization core logic");
 
-    // Upsert oauth2_account and user
-    // 1. Decode the state from the auth response
-    // 2. Extract user_id from the stored session if available
+    // Decode the state from the auth response first so we can cross-check the provider
+    // before doing any expensive token exchange.
+    let oauth2_state = crate::OAuth2State::new(auth_response.state.clone())?;
+    let state_in_response = decode_state(&oauth2_state)?;
+
+    // Defense-in-depth: the URL path provider is the authoritative dispatch signal.
+    // The `provider` field in `StateParams` is a cross-check to detect URL/state
+    // mismatches (e.g. an attacker submitting a Google state to an Auth0 callback).
+    // Reject on mismatch so the flow never reaches the token exchange.
+    if state_in_response.provider != provider_name {
+        tracing::error!(
+            security_event = "provider_mismatch",
+            state_provider = %state_in_response.provider,
+            url_path_provider = %provider_name,
+            "Provider mismatch: state.provider does not match URL path provider"
+        );
+        return Err(CoordinationError::InvalidState(format!(
+            "Provider mismatch: state contains '{}' but URL path is '{}'",
+            state_in_response.provider, provider_name
+        )));
+    }
 
     let (idinfo, userinfo) = get_idinfo_userinfo(ctx, auth_response).await?;
 
@@ -256,10 +249,6 @@ async fn process_oauth2_authorization(
         "userinfo" => oauth2_account_from_userinfo(&userinfo, provider_name),
         _ => oauth2_account_from_idinfo(&idinfo, provider_name), // Default case
     };
-
-    // Decode the state from the auth response
-    let oauth2_state = crate::OAuth2State::new(auth_response.state.clone())?;
-    let state_in_response = decode_state(&oauth2_state)?;
 
     // Extract user_id from the stored session if available
     let state_user = get_uid_from_stored_session_by_state_param(&state_in_response).await?;
@@ -526,48 +515,6 @@ pub async fn fedcm_authorized_core(
     )
     .await?;
 
-    Ok(result)
-}
-
-/// Test-accessible variant of `fedcm_authorized_core` that accepts a pre-built
-/// `ProviderConfig` directly, bypassing the global `GOOGLE_PROVIDER` static.
-/// This allows tests to inject mock server URLs without touching `LazyLock`s.
-#[cfg(test)]
-pub(crate) async fn fedcm_authorized_core_with_ctx(
-    ctx: &ProviderConfig,
-    request: &FedCMCallbackRequest,
-    headers: &HeaderMap,
-) -> Result<(HeaderMap, String), CoordinationError> {
-    let idinfo = validate_fedcm_token(ctx, &request.credential, &request.nonce_id).await?;
-    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx.kind.as_str());
-
-    let mode = match &request.mode {
-        Some(mode_str) => {
-            let parsed: OAuth2Mode = mode_str.parse().map_err(|_| {
-                CoordinationError::InvalidState(format!("Invalid FedCM mode: {mode_str}"))
-            })?;
-            Some(parsed)
-        }
-        None => None,
-    };
-
-    if matches!(mode, Some(OAuth2Mode::AddToUser)) {
-        return Err(CoordinationError::InvalidState(
-            "FedCM does not support add_to_user mode".to_string(),
-        ));
-    }
-
-    let login_context = LoginContext::from_headers(headers);
-    let result = process_authenticated_oauth2_user(
-        oauth2_account,
-        mode,
-        AuthMethod::FedCM,
-        login_context,
-        None,
-        None,
-        None,
-    )
-    .await?;
     Ok(result)
 }
 

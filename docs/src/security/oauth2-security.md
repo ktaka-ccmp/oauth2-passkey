@@ -121,3 +121,13 @@ It's important to understand that there are distinct CSRF protection mechanisms 
    - Used to verify that the user who loaded a page is the same one making a subsequent request
    - Implemented as a query parameter for certain actions
 These mechanisms work together but serve different purposes in the security architecture of the system.
+
+### "Latest flow wins" policy for the OAuth2 CSRF cookie
+
+The OAuth2 CSRF cookie (`__Host-CsrfId` by default) uses a **single global name across all providers**, not a per-provider name. This is a deliberate security decision that implements the "latest flow wins" policy:
+
+When a user starts a new OAuth2 flow while a previous one is still in flight, the new flow overwrites the CSRF cookie. If the abandoned flow's callback later arrives, `csrf_checks` will fail because the cookie token no longer matches the cached token stored under that flow's `csrf_id`. The abandoned callback is rejected.
+
+This fail-closed behavior is intentional. OAuth2 callbacks have irreversible side effects — session rotation, account linking, and login history insertion. Silently completing an abandoned parallel flow would create state the user did not consent to. A per-provider cookie name would allow two concurrent flows (one Google, one Auth0) to each carry a valid cookie simultaneously, undermining this protection.
+
+**Do not make the CSRF cookie name per-provider.** Any future change to this policy must first justify why concurrent abandoned flows completing silently is acceptable.

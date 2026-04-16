@@ -48,8 +48,14 @@ pub(super) fn router() -> Router {
 
 /// Returns 410 Gone for the old `/oauth2/authorized` route.
 /// Clients that followed the old redirect should update their redirect_uri.
-async fn gone() -> StatusCode {
-    StatusCode::GONE
+async fn gone() -> (StatusCode, Json<serde_json::Value>) {
+    (
+        StatusCode::GONE,
+        Json(serde_json::json!({
+            "error": "callback URL moved",
+            "new_url_pattern": "/oauth2/{provider}/authorized"
+        })),
+    )
 }
 
 #[derive(Template)]
