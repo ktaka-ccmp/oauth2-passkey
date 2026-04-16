@@ -23,8 +23,13 @@ use super::session::AuthUser;
 pub(super) fn router() -> Router {
     let router = Router::new()
         .route("/oauth2.js", get(serve_oauth2_js))
-        .route("/google", get(google_auth))
-        .route("/authorized", get(get_authorized).post(post_authorized))
+        .route("/{provider}", get(oauth2_initiate))
+        .route(
+            "/{provider}/authorized",
+            get(get_authorized).post(post_authorized),
+        )
+        // Keep the old route returning 410 Gone so bookmarked links get a clear signal.
+        .route("/authorized", get(gone).post(gone))
         .route("/popup_close", get(popup_close))
         .route("/accounts", get(list_oauth2_accounts))
         .route(
@@ -39,6 +44,18 @@ pub(super) fn router() -> Router {
     } else {
         router
     }
+}
+
+/// Returns 410 Gone for the old `/oauth2/authorized` route.
+/// Clients that followed the old redirect should update their redirect_uri.
+async fn gone() -> (StatusCode, Json<serde_json::Value>) {
+    (
+        StatusCode::GONE,
+        Json(serde_json::json!({
+            "error": "callback URL moved",
+            "new_url_pattern": "/oauth2/{provider}/authorized"
+        })),
+    )
 }
 
 #[derive(Template)]
@@ -88,7 +105,8 @@ async fn serve_oauth2_js() -> Result<Response, (StatusCode, String)> {
         .into_response_error()
 }
 
-async fn google_auth(
+async fn oauth2_initiate(
+    Path(provider): Path<String>,
     auth_user: Option<AuthUser>,
     headers: HeaderMap,
     Query(params): Query<HashMap<String, String>>,
@@ -113,7 +131,7 @@ async fn google_auth(
         }
     }
 
-    let (auth_url, headers) = prepare_oauth2_auth_request(headers, mode.as_deref())
+    let (auth_url, headers) = prepare_oauth2_auth_request(&provider, headers, mode.as_deref())
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -121,11 +139,12 @@ async fn google_auth(
 }
 
 async fn get_authorized(
+    Path(provider): Path<String>,
     Query(query): Query<AuthResponse>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> (HeaderMap, Redirect) {
-    match get_authorized_core(&query, &cookies, &headers).await {
+    match get_authorized_core(&provider, &query, &cookies, &headers).await {
         Ok((response_headers, message)) => {
             let redirect_url = build_success_redirect_url(&message);
             (response_headers, Redirect::to(&redirect_url))
@@ -148,11 +167,12 @@ async fn get_authorized(
 /// 4. Therefore, we can only access headers (which may contain some cookies) but not the
 ///    typed Cookie header that would be available in a standard browser navigation
 async fn post_authorized(
+    Path(provider): Path<String>,
     headers: HeaderMap,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     Form(form): Form<AuthResponse>,
 ) -> (HeaderMap, Redirect) {
-    match post_authorized_core(&form, &cookies, &headers).await {
+    match post_authorized_core(&provider, &form, &cookies, &headers).await {
         Ok((response_headers, message)) => {
             let redirect_url = build_success_redirect_url(&message);
             (response_headers, Redirect::to(&redirect_url))

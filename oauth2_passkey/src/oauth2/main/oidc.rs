@@ -1,16 +1,15 @@
-use crate::oauth2::config::{
-    OAUTH2_GOOGLE_CLIENT_ID, OAUTH2_GOOGLE_CLIENT_SECRET, OAUTH2_REDIRECT_URI, get_userinfo_url,
-};
 use crate::oauth2::errors::OAuth2Error;
-use crate::oauth2::types::{GoogleUserInfo, OidcTokenResponse};
+use crate::oauth2::provider::ProviderConfig;
+use crate::oauth2::types::{OidcTokenResponse, OidcUserInfo};
 
 use crate::utils::get_client;
 
-pub(super) async fn fetch_user_data_from_google(
+pub(super) async fn fetch_userinfo(
+    ctx: &ProviderConfig,
     access_token: String,
-) -> Result<GoogleUserInfo, OAuth2Error> {
+) -> Result<OidcUserInfo, OAuth2Error> {
     let client = get_client();
-    let userinfo_url = get_userinfo_url().await?;
+    let userinfo_url = ctx.userinfo_url().await?;
     let response = client
         .get(&userinfo_url)
         .bearer_auth(access_token)
@@ -24,7 +23,7 @@ pub(super) async fn fetch_user_data_from_google(
         .map_err(|e| OAuth2Error::FetchUserInfo(e.to_string()))?;
 
     tracing::debug!("Response Body: {:#?}", response_body);
-    let user_data: GoogleUserInfo = serde_json::from_str(&response_body)
+    let user_data: OidcUserInfo = serde_json::from_str(&response_body)
         .map_err(|e| OAuth2Error::Serde(format!("Failed to deserialize response body: {e}")))?;
 
     tracing::debug!("User data: {:#?}", user_data);
@@ -32,18 +31,19 @@ pub(super) async fn fetch_user_data_from_google(
 }
 
 pub(super) async fn exchange_code_for_token(
+    ctx: &ProviderConfig,
     code: String,
     code_verifier: String,
 ) -> Result<(String, String), OAuth2Error> {
     let client = get_client();
-    let token_url = crate::oauth2::config::get_token_url().await?;
+    let token_url = ctx.token_url().await?;
     let response = client
         .post(&token_url)
         .form(&[
             ("code", code),
-            ("client_id", OAUTH2_GOOGLE_CLIENT_ID.to_string()),
-            ("client_secret", OAUTH2_GOOGLE_CLIENT_SECRET.to_string()),
-            ("redirect_uri", OAUTH2_REDIRECT_URI.to_string()),
+            ("client_id", ctx.client_id.clone()),
+            ("client_secret", ctx.client_secret.clone()),
+            ("redirect_uri", ctx.redirect_uri.clone()),
             ("grant_type", "authorization_code".to_string()),
             ("code_verifier", code_verifier),
         ])

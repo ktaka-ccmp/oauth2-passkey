@@ -1,15 +1,17 @@
 mod core;
 mod fedcm;
-mod google;
 mod idtoken;
+mod oidc;
 mod utils;
 
 pub use core::prepare_oauth2_auth_request;
 pub use fedcm::prepare_fedcm_nonce;
 
+#[cfg(test)]
+pub(crate) use core::prepare_oauth2_auth_request_inner;
 pub(crate) use core::{csrf_checks, get_idinfo_userinfo};
 pub(crate) use fedcm::validate_fedcm_token;
-pub(crate) use idtoken::IdInfo;
+pub(crate) use idtoken::OidcIdInfo;
 
 pub(crate) use utils::{
     decode_state, delete_session_and_misc_token_from_store, get_mode_from_stored_session,

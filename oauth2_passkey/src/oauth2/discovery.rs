@@ -79,9 +79,11 @@ pub(crate) async fn fetch_oidc_discovery(
 
     let document: OidcDiscoveryDocument = response.json().await?;
 
-    // Validate that the issuer in the document matches the expected issuer
-    // This is a security requirement per OIDC specification
-    if document.issuer != issuer_url {
+    // Validate that the issuer in the document matches the expected issuer.
+    // This is a security requirement per OIDC specification.
+    // Normalise both sides: some providers (e.g. Auth0) return a trailing
+    // slash in their issuer field even though the discovery URL had none.
+    if document.issuer.trim_end_matches('/') != issuer_url {
         tracing::error!(
             "Issuer mismatch in discovery document. Expected: {}, Found: {}",
             issuer_url,

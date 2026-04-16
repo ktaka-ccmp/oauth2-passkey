@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
-use crate::oauth2::config::get_jwks_url;
+use crate::oauth2::provider::ProviderConfig;
 use crate::storage::{
     CacheData, CacheErrorConversion, CacheKey, CachePrefix, StorageError, get_data, remove_data,
     store_cache_keyed,
@@ -31,17 +31,21 @@ struct Jwk {
 
 #[allow(unused)]
 #[derive(Debug, Deserialize, Clone)]
-pub struct IdInfo {
+pub struct OidcIdInfo {
     pub iss: String,
     pub sub: String,
-    pub azp: String,
+    /// Google-specific; absent in many other OIDC providers (e.g. Auth0).
+    pub azp: Option<String>,
     pub aud: String,
     pub email: String,
-    pub email_verified: bool,
+    /// Some providers omit this claim; treat absence as unverified.
+    pub email_verified: Option<bool>,
     pub name: String,
     pub picture: Option<String>,
-    pub given_name: String,
-    pub family_name: String,
+    /// Absent in many non-Google OIDC providers.
+    pub given_name: Option<String>,
+    /// Absent in many non-Google OIDC providers.
+    pub family_name: Option<String>,
     pub locale: Option<String>,
     pub iat: i64,
     pub exp: i64,
@@ -234,14 +238,14 @@ fn convert_jwk_to_decoding_key(jwk: &Jwk) -> Result<DecodingKey, TokenVerificati
     }
 }
 
-fn decode_token(token: &str) -> Result<IdInfo, TokenVerificationError> {
+fn decode_token(token: &str) -> Result<OidcIdInfo, TokenVerificationError> {
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() != 3 {
         return Err(TokenVerificationError::InvalidTokenFormat);
     }
     let payload = parts[1];
     let decoded_payload = decode_base64_url_safe(payload)?;
-    let idinfo: IdInfo = serde_json::from_slice(&decoded_payload)?;
+    let idinfo: OidcIdInfo = serde_json::from_slice(&decoded_payload)?;
     Ok(idinfo)
 }
 
@@ -265,18 +269,10 @@ fn verify_signature(
     }
 }
 
-pub(super) async fn _verify_idtoken(
-    token: String,
-    audience: String,
-) -> Result<IdInfo, TokenVerificationError> {
-    let (idinfo, _algorithm) = verify_idtoken_with_algorithm(token, audience).await?;
-    Ok(idinfo)
-}
-
 pub(super) async fn verify_idtoken_with_algorithm(
+    ctx: &ProviderConfig,
     token: String,
-    audience: String,
-) -> Result<(IdInfo, Algorithm), TokenVerificationError> {
+) -> Result<(OidcIdInfo, Algorithm), TokenVerificationError> {
     let header = jsonwebtoken::decode_header(&token)?;
 
     let kid = header
@@ -285,12 +281,12 @@ pub(super) async fn verify_idtoken_with_algorithm(
             "kid".to_string(),
         ))?;
     let alg = header.alg;
-    let idinfo: IdInfo = decode_token(&token)?;
+    let idinfo: OidcIdInfo = decode_token(&token)?;
 
     tracing::debug!("Algorithm from JWT header: {:?}", alg);
     tracing::debug!("Decoded id_token payload: {:#?}", idinfo);
 
-    let jwks_url = get_jwks_url().await?;
+    let jwks_url = ctx.jwks_url().await?;
     let jwks = fetch_jwks(&jwks_url).await?;
     let jwk = find_jwk(&jwks, &kid).ok_or(TokenVerificationError::NoMatchingKey)?;
 
@@ -301,14 +297,15 @@ pub(super) async fn verify_idtoken_with_algorithm(
         return Err(TokenVerificationError::InvalidTokenSignature);
     }
 
-    if idinfo.aud != audience {
+    let audience = &ctx.client_id;
+    if idinfo.aud != *audience {
         return Err(TokenVerificationError::InvalidTokenAudience(
-            audience,
+            audience.clone(),
             idinfo.aud.to_string(),
         ));
     }
 
-    let expected_issuer = crate::oauth2::config::get_expected_issuer().await?;
+    let expected_issuer = ctx.expected_issuer().await?;
     if idinfo.iss != expected_issuer {
         return Err(TokenVerificationError::InvalidTokenIssuer(
             idinfo.iss.to_string(),

@@ -44,6 +44,7 @@ fn test_encode_decode_state() {
         pkce_id: "pkce789".to_string(),
         misc_id: Some("misc123".to_string()),
         mode_id: Some("mode456".to_string()),
+        provider: "google".to_string(),
     };
 
     // Encode the state
@@ -63,6 +64,7 @@ fn test_encode_decode_state() {
     assert_eq!(decoded.pkce_id, "pkce789");
     assert_eq!(decoded.misc_id, Some("misc123".to_string()));
     assert_eq!(decoded.mode_id, Some("mode456".to_string()));
+    assert_eq!(decoded.provider, "google");
 }
 
 /// Test state parameter encoding and decoding with minimal fields
@@ -81,6 +83,7 @@ fn test_encode_decode_state_minimal() {
         pkce_id: "pkce789".to_string(),
         misc_id: None,
         mode_id: None,
+        provider: "google".to_string(),
     };
 
     // Encode the state
@@ -537,6 +540,7 @@ async fn test_get_uid_from_stored_session_no_misc_id() {
         pkce_id: "pkce789".to_string(),
         misc_id: None,
         mode_id: None,
+        provider: "google".to_string(),
     };
 
     // Call the function
@@ -566,6 +570,7 @@ async fn test_get_uid_from_stored_session_token_not_found() {
         pkce_id: "pkce789".to_string(),
         misc_id: Some("nonexistent_misc_id".to_string()),
         mode_id: None,
+        provider: "google".to_string(),
     };
 
     // Call the function
@@ -595,6 +600,7 @@ async fn test_delete_session_and_misc_token_no_misc_id() {
         pkce_id: "pkce789".to_string(),
         misc_id: None,
         mode_id: None,
+        provider: "google".to_string(),
     };
 
     // Call the function
@@ -623,6 +629,7 @@ async fn test_delete_session_and_misc_token_token_not_found() {
         pkce_id: "pkce789".to_string(),
         misc_id: Some("nonexistent_misc_id".to_string()),
         mode_id: None,
+        provider: "google".to_string(),
     };
 
     // Call the function

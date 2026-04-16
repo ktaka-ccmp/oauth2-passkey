@@ -14,6 +14,7 @@ mod config;
 mod discovery;
 mod errors;
 mod main;
+pub(crate) mod provider;
 mod storage;
 mod types;
 
@@ -25,10 +26,13 @@ pub use types::{
 };
 
 use crate::storage::CacheErrorConversion;
-pub(crate) use config::{OAUTH2_CSRF_COOKIE_NAME, OAUTH2_RESPONSE_MODE, get_auth_url};
+pub(crate) use config::OAUTH2_CSRF_COOKIE_NAME;
 pub(crate) use errors::OAuth2Error;
 pub(crate) use types::{StateParams, StoredToken};
+pub(crate) use types::{oauth2_account_from_idinfo, oauth2_account_from_userinfo};
 
+#[cfg(test)]
+pub(crate) use main::prepare_oauth2_auth_request_inner;
 pub(crate) use main::{
     csrf_checks, decode_state, delete_session_and_misc_token_from_store, get_idinfo_userinfo,
     get_mode_from_stored_session, get_uid_from_stored_session_by_state_param, validate_fedcm_token,
@@ -40,11 +44,25 @@ pub(crate) use storage::OAuth2Store;
 pub(crate) use types::{AccountId, AccountSearchField};
 
 pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
-    // Validate required and optional environment variables early
-    let _ = *config::OAUTH2_REDIRECT_URI; // This will validate ORIGIN
-    let _ = *config::OAUTH2_GOOGLE_CLIENT_ID;
-    let _ = *config::OAUTH2_GOOGLE_CLIENT_SECRET;
-    let _ = *config::OAUTH2_RESPONSE_MODE;
+    // Validate required env vars at startup (fail fast before serving requests).
+    // We do NOT force-initialize GOOGLE_PROVIDER here so that tests can override
+    // env vars (e.g. OAUTH2_ISSUER_URL) before the first provider access.
+    if std::env::var("OAUTH2_GOOGLE_CLIENT_ID").is_err() {
+        return Err(errors::OAuth2Error::Validation(
+            "OAUTH2_GOOGLE_CLIENT_ID must be set".to_string(),
+        ));
+    }
+    if std::env::var("OAUTH2_GOOGLE_CLIENT_SECRET").is_err() {
+        return Err(errors::OAuth2Error::Validation(
+            "OAUTH2_GOOGLE_CLIENT_SECRET must be set".to_string(),
+        ));
+    }
+    if std::env::var("ORIGIN").is_err() {
+        return Err(errors::OAuth2Error::Validation(
+            "ORIGIN must be set".to_string(),
+        ));
+    }
+
     let _ = *config::OAUTH2_CSRF_COOKIE_NAME;
     let _ = *config::OAUTH2_CSRF_COOKIE_MAX_AGE;
 
