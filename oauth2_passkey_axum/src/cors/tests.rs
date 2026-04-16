@@ -22,7 +22,7 @@ fn test_cors_allow_credentials_rejects_invalid() {
 #[test]
 fn test_cors_allow_credentials_accepts_valid() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*CORS_ALLOW_CREDENTIALS, true);
+        assert!(*CORS_ALLOW_CREDENTIALS);
         return;
     }
     let output = run_child(
@@ -36,7 +36,7 @@ fn test_cors_allow_credentials_accepts_valid() {
 #[test]
 fn test_cors_allow_credentials_defaults_to_false() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*CORS_ALLOW_CREDENTIALS, false);
+        assert!(!(*CORS_ALLOW_CREDENTIALS));
         return;
     }
     let output = run_child_without_env(

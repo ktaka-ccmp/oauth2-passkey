@@ -22,7 +22,7 @@ fn test_respond_with_x_csrf_token_rejects_invalid() {
 #[test]
 fn test_respond_with_x_csrf_token_accepts_valid() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*O2P_RESPOND_WITH_X_CSRF_TOKEN, false);
+        assert!(!(*O2P_RESPOND_WITH_X_CSRF_TOKEN));
         return;
     }
     let output = run_child(
@@ -102,7 +102,7 @@ fn test_passkey_promotion_accepts_ask() {
 #[test]
 fn test_respond_with_x_csrf_token_defaults_to_true() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*O2P_RESPOND_WITH_X_CSRF_TOKEN, true);
+        assert!(*O2P_RESPOND_WITH_X_CSRF_TOKEN);
         return;
     }
     let output = run_child_without_env(

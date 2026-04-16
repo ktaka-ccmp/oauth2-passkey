@@ -585,7 +585,7 @@ checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 
 [[package]]
 name = "demo-both"
-version = "0.4.1-dev"
+version = "0.5.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -601,7 +601,7 @@ dependencies = [
 
 [[package]]
 name = "demo-cross-origin"
-version = "0.4.1-dev"
+version = "0.5.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -617,7 +617,7 @@ dependencies = [
 
 [[package]]
 name = "demo-custom-login"
-version = "0.4.1-dev"
+version = "0.5.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -630,7 +630,7 @@ dependencies = [
 
 [[package]]
 name = "demo-live"
-version = "0.4.1-dev"
+version = "0.5.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -644,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "demo-oauth2"
-version = "0.4.1-dev"
+version = "0.5.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -658,7 +658,7 @@ dependencies = [
 
 [[package]]
 name = "demo-passkey"
-version = "0.4.1-dev"
+version = "0.5.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -673,7 +673,7 @@ dependencies = [
 
 [[package]]
 name = "demo-profile"
-version = "0.4.1-dev"
+version = "0.5.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -691,7 +691,7 @@ dependencies = [
 
 [[package]]
 name = "demo-todo"
-version = "0.4.1-dev"
+version = "0.5.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -1785,7 +1785,7 @@ dependencies = [
 
 [[package]]
 name = "oauth2-passkey"
-version = "0.4.1-dev"
+version = "0.5.1-dev"
 dependencies = [
  "async-trait",
  "axum",
@@ -1821,7 +1821,7 @@ dependencies = [
 
 [[package]]
 name = "oauth2-passkey-axum"
-version = "0.4.1-dev"
+version = "0.5.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -2452,9 +2452,9 @@ checksum = "f87165f0995f63a9fbeea62b64d10b4d9d8e78ec6d7d51fb2125fda7bb36788f"
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.10"
+version = "0.103.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df33b2b81ac578cabaf06b89b0631153a3f416b0a886e8a7a1707fb51abbd1ef"
+checksum = "8279bb85272c9f10811ae6a6c547ff594d6a7f3c6c6b02ee9726d1d0dcfcdd06"
 dependencies = [
  "ring",
  "rustls-pki-types",
