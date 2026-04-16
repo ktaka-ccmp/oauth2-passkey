@@ -231,7 +231,7 @@ Tests and verification:
 - [x] `cargo test --manifest-path oauth2_passkey/Cargo.toml` passes
 - [x] `cargo test --manifest-path oauth2_passkey_axum/Cargo.toml --all-features` passes
 - [x] `cargo clippy --all-targets --all-features` clean
-- [ ] Manual Google login end-to-end test via demo-oauth2
+- [x] Manual Google login end-to-end test via demo-oauth2
 
 ### Step 2: Add Auth0 as a second instance (target 2026-04-19)
 
