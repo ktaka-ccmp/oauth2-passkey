@@ -182,7 +182,7 @@ fn test_passkey_require_resident_key_rejects_invalid() {
 #[test]
 fn test_passkey_require_resident_key_accepts_valid() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_REQUIRE_RESIDENT_KEY, false);
+        assert!(!(*PASSKEY_REQUIRE_RESIDENT_KEY));
         return;
     }
     let output = run_child(
@@ -246,7 +246,7 @@ fn test_passkey_user_handle_unique_rejects_invalid() {
 #[test]
 fn test_passkey_user_handle_unique_accepts_valid() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL, true);
+        assert!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL);
         return;
     }
     let output = run_child(
@@ -260,7 +260,7 @@ fn test_passkey_user_handle_unique_accepts_valid() {
 #[test]
 fn test_passkey_user_handle_unique_accepts_uppercase() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL, true);
+        assert!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL);
         return;
     }
     let output = run_child(
@@ -341,7 +341,7 @@ fn test_passkey_resident_key_defaults_to_required() {
 #[test]
 fn test_passkey_require_resident_key_defaults_to_true() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_REQUIRE_RESIDENT_KEY, true);
+        assert!(*PASSKEY_REQUIRE_RESIDENT_KEY);
         return;
     }
     let output = run_child_without_env(
@@ -367,7 +367,7 @@ fn test_passkey_user_verification_defaults_to_discouraged() {
 #[test]
 fn test_passkey_user_handle_unique_defaults_to_false() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL, false);
+        assert!(!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL));
         return;
     }
     let output = run_child_without_env(
