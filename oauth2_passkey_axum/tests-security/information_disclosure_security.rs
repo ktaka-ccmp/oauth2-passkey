@@ -168,7 +168,7 @@ async fn test_consolidated_user_enumeration_attacks() -> Result<(), Box<dyn std:
         let response = setup
             .browser()
             .get(&format!(
-                "/auth/oauth2/authorized?code={auth_code}&state={state}"
+                "/auth/oauth2/google/authorized?code={auth_code}&state={state}"
             ))
             .await?;
 

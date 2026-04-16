@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 use sqlx::FromRow;
 
 use super::errors::OAuth2Error;
-use super::main::IdInfo as GoogleIdInfo;
+use super::main::OidcIdInfo;
 
 use crate::session::UserId;
 use crate::storage::CacheData;
@@ -59,63 +59,81 @@ impl Default for OAuth2Account {
     }
 }
 
-// The user data we'll get back from Google
+/// Userinfo endpoint response.
+///
+/// All fields except `sub`, `name`, and `email` are optional because
+/// non-Google OIDC providers may omit them.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct GoogleUserInfo {
+pub(crate) struct OidcUserInfo {
     pub(crate) sub: String,
-    pub(crate) family_name: String,
+    pub(crate) family_name: Option<String>,
     pub name: String,
     pub picture: Option<String>,
     pub(crate) email: String,
-    pub(crate) given_name: String,
+    pub(crate) given_name: Option<String>,
     pub(crate) hd: Option<String>,
-    pub(crate) email_verified: bool,
+    pub(crate) email_verified: Option<bool>,
 }
 
-// Add these implementations
-impl From<GoogleUserInfo> for OAuth2Account {
-    fn from(google_user: GoogleUserInfo) -> Self {
-        Self {
-            sequence_number: None,  // Will be set by database
-            id: String::new(),      // Will be set during storage
-            user_id: String::new(), // Will be set during upsert process
-            name: google_user.name,
-            email: google_user.email,
-            picture: google_user.picture,
-            provider: "google".to_string(),
-            provider_user_id: format!("google_{}", google_user.sub),
-            metadata: json!({
-                "family_name": google_user.family_name,
-                "given_name": google_user.given_name,
-                "hd": google_user.hd,
-                "email_verified": google_user.email_verified,
-            }),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        }
+/// Build an `OAuth2Account` from an ID token payload.
+///
+/// Free function rather than `impl From<OidcIdInfo>` because `From` takes only one
+/// argument and cannot accept the `provider_name` parameter.
+///
+/// `provider_name` is taken from the URL path (primary dispatch signal) and
+/// cross-checked against `StateParams.provider`.  It is **not** hardcoded,
+/// so DB rows reflect the actual provider that issued the token.
+pub(crate) fn oauth2_account_from_idinfo(
+    idinfo: &OidcIdInfo,
+    provider_name: &str,
+) -> OAuth2Account {
+    OAuth2Account {
+        sequence_number: None,
+        id: String::new(),
+        user_id: String::new(),
+        name: idinfo.name.clone(),
+        email: idinfo.email.clone(),
+        picture: idinfo.picture.clone(),
+        provider: provider_name.to_string(),
+        provider_user_id: format!("{}_{}", provider_name, idinfo.sub),
+        metadata: json!({
+            "family_name": idinfo.family_name,
+            "given_name": idinfo.given_name,
+            "hd": idinfo.hd,
+            "verified_email": idinfo.email_verified,
+        }),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     }
 }
 
-impl From<GoogleIdInfo> for OAuth2Account {
-    fn from(idinfo: GoogleIdInfo) -> Self {
-        Self {
-            sequence_number: None,  // Will be set by database
-            id: String::new(),      // Will be set during storage
-            user_id: String::new(), // Will be set during upsert process
-            name: idinfo.name,
-            email: idinfo.email,
-            picture: idinfo.picture,
-            provider: "google".to_string(),
-            provider_user_id: format!("google_{}", idinfo.sub),
-            metadata: json!({
-                "family_name": idinfo.family_name,
-                "given_name": idinfo.given_name,
-                "hd": idinfo.hd,
-                "verified_email": idinfo.email_verified,
-            }),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        }
+/// Build an `OAuth2Account` from a userinfo endpoint response.
+///
+/// Free function rather than `impl From<OidcUserInfo>` because `From` takes only one
+/// argument and cannot accept the `provider_name` parameter.
+///
+/// See `oauth2_account_from_idinfo` for the `provider_name` semantics.
+pub(crate) fn oauth2_account_from_userinfo(
+    userinfo: &OidcUserInfo,
+    provider_name: &str,
+) -> OAuth2Account {
+    OAuth2Account {
+        sequence_number: None,
+        id: String::new(),
+        user_id: String::new(),
+        name: userinfo.name.clone(),
+        email: userinfo.email.clone(),
+        picture: userinfo.picture.clone(),
+        provider: provider_name.to_string(),
+        provider_user_id: format!("{}_{}", provider_name, userinfo.sub),
+        metadata: json!({
+            "family_name": userinfo.family_name,
+            "given_name": userinfo.given_name,
+            "hd": userinfo.hd,
+            "email_verified": userinfo.email_verified,
+        }),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     }
 }
 
@@ -126,6 +144,10 @@ pub(crate) struct StateParams {
     pub(crate) pkce_id: String,
     pub(crate) misc_id: Option<String>,
     pub(crate) mode_id: Option<String>,
+    /// Provider name embedded in state as a defense-in-depth cross-check.
+    /// The URL path (`/oauth2/{provider}/authorized`) is the primary dispatch
+    /// signal; this field is only used to detect URL/state mismatches.
+    pub(crate) provider: String,
 }
 
 #[derive(Serialize, Clone, Deserialize, Debug)]

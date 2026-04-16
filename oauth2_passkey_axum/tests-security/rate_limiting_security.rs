@@ -54,7 +54,7 @@ impl RateLimitingTestSetup {
             let response = self
                 .browser()
                 .get(&format!(
-                    "/auth/oauth2/authorized?code={invalid_code}&state={invalid_state}"
+                    "/auth/oauth2/google/authorized?code={invalid_code}&state={invalid_state}"
                 ))
                 .await?;
 

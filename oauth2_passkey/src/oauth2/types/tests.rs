@@ -2,27 +2,27 @@ use super::*;
 use chrono::{Duration, Utc};
 use serde_json::json;
 
-/// Test conversion from GoogleUserInfo to OAuth2Account
+/// Test conversion from OidcUserInfo to OAuth2Account via free function
 ///
-/// This test verifies that a GoogleUserInfo struct can be correctly converted into
-/// an OAuth2Account using the From trait implementation. It creates a GoogleUserInfo
+/// This test verifies that a OidcUserInfo struct can be correctly converted into
+/// an OAuth2Account using `oauth2_account_from_userinfo`. It creates a OidcUserInfo
 /// object in memory with sample data and validates that all fields are properly
 /// mapped to the resulting OAuth2Account structure.
 ///
 #[test]
 fn test_from_google_user_info() {
-    let google_user = GoogleUserInfo {
+    let google_user = OidcUserInfo {
         sub: "12345".to_string(),
-        family_name: "Doe".to_string(),
+        family_name: Some("Doe".to_string()),
         name: "John Doe".to_string(),
         picture: Some("https://example.com/pic.jpg".to_string()),
         email: "john@example.com".to_string(),
-        given_name: "John".to_string(),
+        given_name: Some("John".to_string()),
         hd: Some("example.com".to_string()),
-        email_verified: true,
+        email_verified: Some(true),
     };
 
-    let account = OAuth2Account::from(google_user.clone());
+    let account = oauth2_account_from_userinfo(&google_user, "google");
 
     // Check that fields are correctly mapped
     assert_eq!(account.name, "John Doe");
@@ -42,28 +42,28 @@ fn test_from_google_user_info() {
     assert_eq!(metadata["email_verified"], json!(true));
 }
 
-/// Test conversion from GoogleIdInfo to OAuth2Account
+/// Test conversion from OidcIdInfo to OAuth2Account via free function
 ///
-/// This test verifies that a GoogleIdInfo struct can be correctly converted into
-/// an OAuth2Account using the From trait implementation. It creates a GoogleIdInfo
+/// This test verifies that a OidcIdInfo struct can be correctly converted into
+/// an OAuth2Account using `oauth2_account_from_idinfo`. It creates a OidcIdInfo
 /// object in memory with ID token claims and validates that all fields are properly
 /// mapped to the resulting OAuth2Account structure.
 ///
 #[test]
 fn test_from_google_id_info() {
-    // Create a mock GoogleIdInfo
-    let id_info = GoogleIdInfo {
+    // Create a mock OidcIdInfo
+    let id_info = OidcIdInfo {
         iss: "https://accounts.google.com".to_string(),
-        azp: "client_id".to_string(),
+        azp: Some("client_id".to_string()),
         aud: "client_id".to_string(),
         sub: "12345".to_string(),
         email: "john@example.com".to_string(),
-        email_verified: true,
+        email_verified: Some(true),
         at_hash: Some("hash".to_string()),
         name: "John Doe".to_string(),
         picture: Some("https://example.com/pic.jpg".to_string()),
-        given_name: "John".to_string(),
-        family_name: "Doe".to_string(),
+        given_name: Some("John".to_string()),
+        family_name: Some("Doe".to_string()),
         locale: Some("en".to_string()),
         iat: 0,
         exp: 0,
@@ -73,7 +73,7 @@ fn test_from_google_id_info() {
         hd: Some("example.com".to_string()),
     };
 
-    let account = OAuth2Account::from(id_info.clone());
+    let account = oauth2_account_from_idinfo(&id_info, "google");
 
     // Check that fields are correctly mapped
     assert_eq!(account.name, "John Doe");

@@ -106,7 +106,7 @@ impl OAuth2SecurityTestSetup {
         let result = match response_mode.as_str() {
             "query" => {
                 // Query mode: use GET request with query parameters
-                let url = format!("/auth/oauth2/authorized?code={code}&state={state}");
+                let url = format!("/auth/oauth2/google/authorized?code={code}&state={state}");
                 match headers {
                     Some(headers) => self.browser.get_with_headers(&url, headers).await?,
                     None => self.browser.get(&url).await?,
@@ -119,7 +119,7 @@ impl OAuth2SecurityTestSetup {
                     Some(headers) => {
                         self.browser
                             .post_form_with_headers_old(
-                                "/auth/oauth2/authorized",
+                                "/auth/oauth2/google/authorized",
                                 &form_data,
                                 headers,
                             )
@@ -127,7 +127,7 @@ impl OAuth2SecurityTestSetup {
                     }
                     None => {
                         self.browser
-                            .post_form("/auth/oauth2/authorized", &form_data)
+                            .post_form("/auth/oauth2/google/authorized", &form_data)
                             .await?
                     }
                 }
@@ -385,7 +385,8 @@ async fn test_consolidated_oauth2_authorization_code_security()
         let valid_code = "valid_auth_code_123";
 
         // For form_post mode, using GET should be rejected
-        let get_url = format!("/auth/oauth2/authorized?code={valid_code}&state={real_state}");
+        let get_url =
+            format!("/auth/oauth2/google/authorized?code={valid_code}&state={real_state}");
         let valid_origin_headers = vec![
             ("Origin", "http://127.0.0.1:9876"),
             ("Referer", "http://127.0.0.1:9876/auth"),

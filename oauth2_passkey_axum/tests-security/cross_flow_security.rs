@@ -162,7 +162,7 @@ async fn test_consolidated_cross_flow_session_attacks() -> Result<(), Box<dyn st
     let response = setup
         .browser
         .post_form(
-            "/auth/oauth2/authorized",
+            "/auth/oauth2/google/authorized",
             &[("code", "test_code"), ("state", "test_state")],
         )
         .await?;

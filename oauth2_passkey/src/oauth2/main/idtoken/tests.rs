@@ -400,11 +400,11 @@ fn test_decode_token_invalid_json_payload() {
 /// Test token decoding with valid payload
 ///
 /// This test verifies that `decode_token` successfully decodes a token with a valid
-/// JSON payload, creating a proper IdInfo struct with the expected field values.
+/// JSON payload, creating a proper OidcIdInfo struct with the expected field values.
 ///
 #[test]
 fn test_decode_token_valid_payload() {
-    // Create a valid IdInfo JSON payload
+    // Create a valid OidcIdInfo JSON payload
     let id_info_json = r#"{
         "iss": "https://accounts.google.com",
         "sub": "123456789",
@@ -429,7 +429,7 @@ fn test_decode_token_valid_payload() {
     assert_eq!(id_info.iss, "https://accounts.google.com");
     assert_eq!(id_info.sub, "123456789");
     assert_eq!(id_info.email, "test@example.com");
-    assert!(id_info.email_verified);
+    assert_eq!(id_info.email_verified, Some(true));
     assert_eq!(id_info.name, "Test User");
 }
 

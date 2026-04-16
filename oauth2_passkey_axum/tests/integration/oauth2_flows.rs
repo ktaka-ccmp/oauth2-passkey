@@ -100,7 +100,9 @@ async fn complete_oauth2_callback(
             // Query mode: GET request with query parameters and headers
             browser
                 .get_with_headers(
-                    &format!("/auth/oauth2/authorized?code={auth_code}&state={received_state}"),
+                    &format!(
+                        "/auth/oauth2/google/authorized?code={auth_code}&state={received_state}"
+                    ),
                     &[
                         ("Origin", oauth2_issuer_url),
                         ("Referer", &format!("{oauth2_issuer_url}/oauth2/auth")),
@@ -112,7 +114,7 @@ async fn complete_oauth2_callback(
             // Form_post mode: POST request with form data
             browser
                 .post_form_with_headers_old(
-                    "/auth/oauth2/authorized",
+                    "/auth/oauth2/google/authorized",
                     &[("code", auth_code), ("state", received_state)],
                     &[
                         ("Origin", oauth2_issuer_url),
