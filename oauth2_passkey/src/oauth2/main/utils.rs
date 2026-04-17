@@ -119,10 +119,15 @@ pub(crate) async fn validate_origin(
         .map_or("".to_string(), |p| format!(":{p}"));
     let expected_origin = format!("{scheme}://{host}{port}");
 
-    let origin = headers
-        .get("Origin")
-        .or_else(|| headers.get("Referer"))
-        .and_then(|h| h.to_str().ok());
+    // Browsers send `Origin: null` for cross-origin form_post redirects (e.g. Auth0).
+    // Treat the literal string "null" the same as absent and fall back to Referer.
+    let origin = {
+        let raw = headers.get("Origin").and_then(|h| h.to_str().ok());
+        match raw {
+            Some("null") | None => headers.get("Referer").and_then(|h| h.to_str().ok()),
+            some => some,
+        }
+    };
 
     match origin {
         Some(origin) if origin.starts_with(&expected_origin) => Ok(()),

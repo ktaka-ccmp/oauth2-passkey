@@ -80,7 +80,16 @@ async fn authorized_core(
         .auth_url()
         .await
         .map_err(|e| CoordinationError::InvalidState(format!("Failed to get auth url: {e}")))?;
-    validate_origin(headers, &auth_url).await?;
+    if ctx.redirect_uri.starts_with("http://localhost")
+        || ctx.redirect_uri.starts_with("http://127.0.0.1")
+    {
+        tracing::warn!(
+            redirect_uri = %ctx.redirect_uri,
+            "Skipping origin check for HTTP localhost callback"
+        );
+    } else {
+        validate_origin(headers, &auth_url).await?;
+    }
 
     if auth_response.state.is_empty() {
         return Err(CoordinationError::InvalidState(
