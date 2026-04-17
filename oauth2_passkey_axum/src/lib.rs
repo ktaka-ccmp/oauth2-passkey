@@ -131,7 +131,8 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
 
 // Re-export types and functions for custom summary pages
 pub use oauth2_passkey::{
-    OAuth2Account, PasskeyCredential, UserId, list_accounts_core, list_credentials_core,
+    OAuth2Account, PasskeyCredential, UserId, is_provider_enabled, list_accounts_core,
+    list_credentials_core,
 };
 
 // Re-export types and functions for custom admin pages

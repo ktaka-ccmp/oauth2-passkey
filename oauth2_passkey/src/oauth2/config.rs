@@ -43,5 +43,15 @@ pub fn get_google_client_id() -> &'static str {
     &crate::oauth2::provider::GOOGLE_PROVIDER.client_id
 }
 
+/// Returns true if the named OAuth2 provider is configured and enabled.
+///
+/// `name` is the URL path segment identifying the provider (e.g. `"google"`,
+/// `"auth0"`). Unknown names return `false`.
+pub fn is_provider_enabled(name: &str) -> bool {
+    crate::oauth2::provider::ProviderKind::from_path_segment(name)
+        .and_then(crate::oauth2::provider::provider_for)
+        .is_some()
+}
+
 #[cfg(test)]
 mod tests;
