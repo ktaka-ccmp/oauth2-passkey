@@ -25,6 +25,9 @@ pub(crate) enum ProviderKind {
 }
 
 impl ProviderKind {
+    /// All supported provider kinds in stable display order.
+    pub(crate) const ALL: &'static [Self] = &[Self::Google, Self::Auth0];
+
     pub(crate) const fn as_str(&self) -> &'static str {
         match self {
             Self::Google => "google",
@@ -41,6 +44,20 @@ impl ProviderKind {
             _ => None,
         }
     }
+}
+
+/// Public information about a single enabled OAuth2 provider.
+///
+/// Returned by [`enabled_providers`](crate::oauth2::enabled_providers).
+/// Carries only the protocol identifier for this provider — presentation data
+/// (human-readable label, CSS classes) lives in the axum integration crate's
+/// `ProviderView`.  Future protocol-level attributes (e.g. `supports_pkce`,
+/// `is_oidc`) can be added here as non-breaking field additions.
+#[derive(Debug, Clone)]
+pub struct ProviderInfo {
+    /// URL path segment used in OAuth2 state, DB rows, and route matching
+    /// (e.g. `"google"`, `"auth0"`).
+    pub name: &'static str,
 }
 
 impl std::fmt::Display for ProviderKind {

@@ -53,5 +53,20 @@ pub fn is_provider_enabled(name: &str) -> bool {
         .is_some()
 }
 
+/// Returns UI info for every currently enabled OAuth2 provider, in stable
+/// display order (Google first, then optional providers).
+pub fn enabled_providers() -> Vec<crate::oauth2::provider::ProviderInfo> {
+    crate::oauth2::provider::ProviderKind::ALL
+        .iter()
+        .filter_map(|&kind| {
+            crate::oauth2::provider::provider_for(kind).map(|_| {
+                crate::oauth2::provider::ProviderInfo {
+                    name: kind.as_str(),
+                }
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests;

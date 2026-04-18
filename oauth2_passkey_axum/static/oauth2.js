@@ -124,6 +124,24 @@ const oauth2 = (function() {
         openPopupLegacy(mode, page_context, provider);
     }
 
+    // Opens a provider-selection popup. When only one provider is enabled, the
+    // server redirects directly to that provider — no extra click needed.
+    function openSelectPopup(mode, page_context) {
+        const url = page_context
+            ? `${O2P_ROUTE_PREFIX}/oauth2/select?mode=${mode}&context=${page_context}`
+            : `${O2P_ROUTE_PREFIX}/oauth2/select?mode=${mode}`;
+        popupWindow = window.open(
+            url,
+            "PopupWindow",
+            "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
+        );
+        window.addEventListener('message', function(event) {
+            if (event.data === 'auth_complete') {
+                handlePopupClosed();
+            }
+        });
+    }
+
     function openPopupLegacy(mode, page_context, provider='google') {
         if (mode === 'add_to_user') {
             popupWindow = window.open(
@@ -177,6 +195,7 @@ const oauth2 = (function() {
     });
 
     return {
-        openPopup: openPopup
+        openPopup: openPopup,
+        openSelectPopup: openSelectPopup,
     };
 })();

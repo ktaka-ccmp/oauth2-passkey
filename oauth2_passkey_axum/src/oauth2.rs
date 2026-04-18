@@ -3,7 +3,7 @@ use axum::{
     Json, Router,
     extract::{Form, Path, Query},
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
-    response::{Html, Redirect, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::{delete, get, post},
 };
 use axum_extra::{TypedHeader, headers};
@@ -11,12 +11,57 @@ use std::collections::HashMap;
 
 use oauth2_passkey::{
     AuthResponse, CoordinationError, FedCMCallbackRequest, O2P_ROUTE_PREFIX, OAuth2Account,
-    Provider, ProviderUserId, UserId, delete_oauth2_account_core, fedcm_authorized_core,
-    get_authorized_core, get_google_client_id, list_accounts_core, post_authorized_core,
-    prepare_fedcm_nonce, prepare_oauth2_auth_request, verify_page_session_token,
+    Provider, ProviderUserId, UserId, delete_oauth2_account_core, enabled_providers,
+    fedcm_authorized_core, get_authorized_core, get_google_client_id, list_accounts_core,
+    post_authorized_core, prepare_fedcm_nonce, prepare_oauth2_auth_request,
+    verify_page_session_token,
 };
 
-use super::config::{O2P_FEDCM, O2P_PASSKEY_PROMOTION};
+/// Human-readable presentation data for an OAuth2 provider.
+///
+/// Owned by this crate so that CSS class names and display labels stay out of
+/// the framework-agnostic core. Downstream crates writing custom login pages
+/// can use this type directly or derive their own from `enabled_providers()`.
+#[derive(Debug, Clone)]
+pub struct ProviderView {
+    /// URL path segment that identifies the provider (e.g. `"google"`, `"auth0"`).
+    pub name: &'static str,
+    /// Human-readable label for login buttons (e.g. `"Google"`, `"Auth0"`).
+    pub display_name: &'static str,
+    /// CSS classes for the login button (e.g. `"btn-oauth2 btn-google"`).
+    pub button_class: &'static str,
+}
+
+/// Returns [`ProviderView`] for every currently enabled OAuth2 provider, in
+/// stable display order (Google first, then optional providers).
+pub fn enabled_provider_views() -> Vec<ProviderView> {
+    enabled_providers()
+        .into_iter()
+        .map(|info| provider_view(info.name))
+        .collect()
+}
+
+fn provider_view(name: &'static str) -> ProviderView {
+    match name {
+        "google" => ProviderView {
+            name,
+            display_name: "Google",
+            button_class: "btn-oauth2 btn-google",
+        },
+        "auth0" => ProviderView {
+            name,
+            display_name: "Auth0",
+            button_class: "btn-oauth2 btn-auth0",
+        },
+        _ => ProviderView {
+            name,
+            display_name: name,
+            button_class: "btn-oauth2",
+        },
+    }
+}
+
+use super::config::{O2P_CUSTOM_CSS_URL, O2P_FEDCM, O2P_PASSKEY_PROMOTION};
 use super::error::IntoResponseError;
 use super::session::AuthUser;
 
@@ -35,7 +80,8 @@ pub(super) fn router() -> Router {
         .route(
             "/accounts/{provider}/{provider_user_id}",
             delete(delete_oauth2_account),
-        );
+        )
+        .route("/select", get(oauth2_select));
 
     if O2P_FEDCM.is_enabled() {
         router
@@ -136,6 +182,73 @@ async fn oauth2_initiate(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok((headers, Redirect::to(&auth_url)))
+}
+
+#[derive(Template)]
+#[template(path = "select_provider.j2")]
+struct SelectProviderTemplate<'a> {
+    o2p_route_prefix: &'a str,
+    custom_css_url: Option<&'a str>,
+    providers: Vec<ProviderView>,
+    mode: &'a str,
+    context: &'a str,
+}
+
+async fn oauth2_select(
+    auth_user: Option<AuthUser>,
+    headers: HeaderMap,
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Response, (StatusCode, String)> {
+    let mode = params.get("mode").cloned();
+    let context = params.get("context").cloned();
+
+    if mode.as_deref() == Some("add_to_user") {
+        if context.is_none() {
+            return Err((StatusCode::BAD_REQUEST, "Missing Context".to_string()));
+        }
+        if auth_user.is_none() {
+            return Err((StatusCode::BAD_REQUEST, "Missing Session".to_string()));
+        }
+        if let Some(context_value) = &context {
+            verify_page_session_token(&headers, Some(context_value))
+                .await
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        }
+    }
+
+    let providers = enabled_provider_views();
+    if providers.len() == 1 {
+        let p = &providers[0];
+        let url = match context.as_deref() {
+            Some(ctx) => format!(
+                "{}/oauth2/{}?mode={}&context={}",
+                O2P_ROUTE_PREFIX.as_str(),
+                p.name,
+                mode.as_deref().unwrap_or(""),
+                ctx
+            ),
+            None => format!(
+                "{}/oauth2/{}?mode={}",
+                O2P_ROUTE_PREFIX.as_str(),
+                p.name,
+                mode.as_deref().unwrap_or(""),
+            ),
+        };
+        return Ok(Redirect::to(&url).into_response());
+    }
+
+    let tmpl = SelectProviderTemplate {
+        o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+        providers,
+        mode: mode.as_deref().unwrap_or(""),
+        context: context.as_deref().unwrap_or(""),
+    };
+    Ok(Html(
+        tmpl.render()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+    )
+    .into_response())
 }
 
 async fn get_authorized(

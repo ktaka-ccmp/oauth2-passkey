@@ -8,6 +8,8 @@ use axum::{
 
 use oauth2_passkey::O2P_ROUTE_PREFIX;
 
+use crate::oauth2::{ProviderView, enabled_provider_views};
+
 use crate::config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT};
 use crate::session::AuthUser;
 
@@ -21,6 +23,7 @@ struct LoginTemplate<'a> {
     message: &'a str,
     o2p_route_prefix: &'a str,
     custom_css_url: Option<&'a str>,
+    providers: Vec<ProviderView>,
 }
 
 async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
@@ -31,6 +34,7 @@ async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
                 message: "Sign in or create an account",
                 o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
                 custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+                providers: enabled_provider_views(),
             };
             let html = Html(
                 template

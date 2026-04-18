@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choose provider</title>
+    <link rel="stylesheet" href="{{o2p_route_prefix}}/user/o2p-base.css">
+    {% if let Some(css_url) = custom_css_url %}
+    <link rel="stylesheet" href="{{css_url}}">
+    {% endif %}
+</head>
+
+<body class="login-page">
+    <div class="login-card">
+        <h1>Choose a provider</h1>
+        <p class="subtitle">Select which account to link</p>
+
+        <div class="auth-section">
+            <div class="auth-buttons">
+                {% for p in providers %}
+                <a class="btn {{p.button_class}} btn-block"
+                   href="{{o2p_route_prefix}}/oauth2/{{p.name}}?mode={{mode}}{% if context != "" %}&amp;context={{context}}{% endif %}">
+                    Continue with {{p.display_name}}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

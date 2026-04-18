@@ -90,8 +90,8 @@ pub use config::O2P_DEMO_MODE;
 // OAuth2 authentication types and functions
 pub use oauth2::{
     AuthResponse, FedCMCallbackRequest, FedCMNonceResponse, OAuth2Account, OAuth2Mode, OAuth2State,
-    Provider, ProviderUserId, get_google_client_id, is_provider_enabled, prepare_fedcm_nonce,
-    prepare_oauth2_auth_request,
+    Provider, ProviderInfo, ProviderUserId, enabled_providers, get_google_client_id,
+    is_provider_enabled, prepare_fedcm_nonce, prepare_oauth2_auth_request,
 };
 
 // WebAuthn/Passkey types and functions

@@ -33,22 +33,6 @@
         .auth-buttons {
             gap: 16px !important;
         }
-        .btn-google {
-            background-color: var(--o2p-oauth2, #6366f1);
-            color: white;
-            padding: 12px 16px;
-        }
-        .btn-google:hover {
-            background-color: var(--o2p-oauth2-hover, #4f46e5);
-        }
-        .btn-auth0 {
-            background-color: #eb5424;
-            color: white;
-            padding: 12px 16px;
-        }
-        .btn-auth0:hover {
-            background-color: #c94419;
-        }
         .btn-passkey-alt {
             background-color: var(--o2p-passkey, #818cf8);
             color: white;
@@ -115,20 +99,13 @@
 
         <div class="auth-section">
             <div class="auth-buttons">
+                {% for p in providers %}
                 <div>
-                    <button class="btn btn-google btn-block" onclick="oauth2.openPopup('create_user_or_login')">
-                        Register / Sign in with Google
+                    <button class="btn {{p.button_class}} btn-block" onclick="oauth2.openPopup('create_user_or_login', null, '{{p.name}}')">
+                        Register / Sign in with {{p.display_name}}
                     </button>
-                    <span class="btn-hint">New here? Start here</span>
                 </div>
-                {% if auth0_enabled %}
-                <div>
-                    <button class="btn btn-auth0 btn-block" onclick="oauth2.openPopup('create_user_or_login', null, 'auth0')">
-                        Register / Sign in with Auth0
-                    </button>
-                    <span class="btn-hint">Or use Auth0</span>
-                </div>
-                {% endif %}
+                {% endfor %}
                 <div>
                     <button class="btn btn-passkey-alt btn-block" onclick="startAuthentication(false)">
                         Sign in with Passkey

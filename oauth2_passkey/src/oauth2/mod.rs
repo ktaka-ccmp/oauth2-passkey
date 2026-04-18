@@ -18,8 +18,9 @@ pub(crate) mod provider;
 mod storage;
 mod types;
 
-pub use config::{get_google_client_id, is_provider_enabled};
+pub use config::{enabled_providers, get_google_client_id, is_provider_enabled};
 pub use main::{prepare_fedcm_nonce, prepare_oauth2_auth_request};
+pub use provider::ProviderInfo;
 pub use types::{
     AuthResponse, FedCMCallbackRequest, FedCMNonceResponse, OAuth2Account, OAuth2Mode, OAuth2State,
     Provider, ProviderUserId, TokenType,
