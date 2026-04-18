@@ -80,6 +80,13 @@ async fn authorized_core(
         .auth_url()
         .await
         .map_err(|e| CoordinationError::InvalidState(format!("Failed to get auth url: {e}")))?;
+    // Origin validation is skipped only for plain-HTTP localhost callbacks.
+    // This is a protocol-level concession, not provider-specific: browsers
+    // handle `Origin` inconsistently on cross-site `form_post` redirects to
+    // insecure origins during local development, and there is no HTTPS to
+    // anchor to. Production callbacks always use HTTPS, so this branch is
+    // never taken outside dev/test setups. If a future provider uses a
+    // different dev-only scheme, narrow further at that point.
     if ctx.redirect_uri.starts_with("http://localhost")
         || ctx.redirect_uri.starts_with("http://127.0.0.1")
     {

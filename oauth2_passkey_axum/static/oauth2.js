@@ -104,12 +104,19 @@ const oauth2 = (function() {
     }
 
     // mode: add_to_user, create_user, login, create_user_or_login
-    // provider: 'google' (default), 'auth0', or any configured provider name
-    function openPopup(mode=null, page_context=null, provider='google') {
+    // provider: optional. If omitted, routes through the selection popup
+    //   (which 302-redirects when only one provider is enabled, so single-
+    //   provider setups still work without an extra click).
+    function openPopup(mode=null, page_context=null, provider=null) {
         // Only proceed if mode is one of the valid options
         if (mode !== 'add_to_user' && mode !== 'create_user' && mode !== 'login' && mode !== 'create_user_or_login') {
             console.log('Invalid or missing mode parameter');
             return; // Exit the function early
+        }
+
+        if (provider === null) {
+            openSelectPopup(mode, page_context);
+            return;
         }
 
         // Try FedCM for non-add_to_user modes (Google only)

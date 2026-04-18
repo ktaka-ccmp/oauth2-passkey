@@ -54,6 +54,7 @@ impl ProviderKind {
 /// `ProviderView`.  Future protocol-level attributes (e.g. `supports_pkce`,
 /// `is_oidc`) can be added here as non-breaking field additions.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ProviderInfo {
     /// URL path segment used in OAuth2 state, DB rows, and route matching
     /// (e.g. `"google"`, `"auth0"`).

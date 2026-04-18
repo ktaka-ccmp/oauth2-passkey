@@ -14,7 +14,13 @@
 <body class="login-page">
     <div class="login-card">
         <h1>Choose a provider</h1>
-        <p class="subtitle">Select which account to link</p>
+        <p class="subtitle">
+            {% if mode == "add_to_user" %}
+            Select which account to link
+            {% else %}
+            Choose how to sign in
+            {% endif %}
+        </p>
 
         <div class="auth-section">
             <div class="auth-buttons">
