@@ -8,12 +8,16 @@ use crate::oauth2::discovery::{OidcDiscoveryDocument, OidcDiscoveryError, fetch_
 
 /// Identifies a supported OAuth2/OIDC provider.
 ///
-/// Adding a new provider requires four lock-step edits, all in this file:
-/// 1. A new variant here
-/// 2. A new arm in `as_str`
-/// 3. A new arm in `from_path_segment`
-/// 4. A corresponding static (`LazyLock<ProviderConfig>` or
+/// Adding a new provider requires these lock-step edits, all in this file:
+/// 1. A new variant in `ProviderKind`
+/// 2. Include it in `ProviderKind::ALL`
+/// 3. A new arm in `as_str`
+/// 4. A new arm in `from_path_segment`
+/// 5. A corresponding static (`LazyLock<ProviderConfig>` or
 ///    `LazyLock<Option<ProviderConfig>>`) and a new arm in `provider_for`
+/// 6. If the provider is optional, return its env-var contract from
+///    `optional_env_contract` so startup validation catches the
+///    "trigger set but dependent missing" case
 ///
 /// Reserved names that must never become enum variants (they collide with
 /// existing literal routes under `/oauth2/*`):
@@ -28,6 +32,31 @@ pub(crate) enum ProviderKind {
 impl ProviderKind {
     /// All supported provider kinds in stable display order.
     pub(crate) const ALL: &'static [Self] = &[Self::Google, Self::Auth0, Self::Keycloak];
+
+    /// Env-var validation contract for optional providers.
+    ///
+    /// Returns `Some((trigger, dependents))` for providers activated by one
+    /// env var that require additional env vars when that trigger is set.
+    /// Returns `None` for unconditional providers (validated directly in `init`).
+    ///
+    /// Used by `init` to fail fast at startup instead of panicking mid-request
+    /// via the `LazyLock.expect()` inside the matching static.
+    pub(crate) fn optional_env_contract(&self) -> Option<(&'static str, &'static [&'static str])> {
+        match self {
+            Self::Google => None,
+            Self::Auth0 => Some((
+                "OAUTH2_AUTH0_CLIENT_ID",
+                &["OAUTH2_AUTH0_CLIENT_SECRET", "OAUTH2_AUTH0_ISSUER_URL"],
+            )),
+            Self::Keycloak => Some((
+                "OAUTH2_KEYCLOAK_CLIENT_ID",
+                &[
+                    "OAUTH2_KEYCLOAK_CLIENT_SECRET",
+                    "OAUTH2_KEYCLOAK_ISSUER_URL",
+                ],
+            )),
+        }
+    }
 
     pub(crate) const fn as_str(&self) -> &'static str {
         match self {

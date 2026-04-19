@@ -79,11 +79,13 @@ pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
         ));
     }
 
-    // Auth0 (optional) — activated by OAUTH2_AUTH0_CLIENT_ID
-    require_env_if_trigger_set(
-        "OAUTH2_AUTH0_CLIENT_ID",
-        &["OAUTH2_AUTH0_CLIENT_SECRET", "OAUTH2_AUTH0_ISSUER_URL"],
-    )?;
+    // Optional providers — each declares its own env-var contract in provider.rs.
+    // Adding a provider automatically picks up this check.
+    for kind in provider::ProviderKind::ALL {
+        if let Some((trigger, required)) = kind.optional_env_contract() {
+            require_env_if_trigger_set(trigger, required)?;
+        }
+    }
 
     let _ = *config::OAUTH2_CSRF_COOKIE_NAME;
     let _ = *config::OAUTH2_CSRF_COOKIE_MAX_AGE;
