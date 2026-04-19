@@ -16,7 +16,7 @@
 
 ## Closed:
 
-## Status: open (Step 1 completed 2026-04-16; Step 2 next)
+## Status: open (Step 1 completed 2026-04-16; Step 2 completed 2026-04-20, pending LT screenshots + Phase 2+)
 
 ## Priority: high
 
@@ -235,25 +235,16 @@ Tests and verification:
 
 ### Step 2: Add Auth0 as a second instance (target 2026-04-19)
 
-- [ ] Create Auth0 tenant and register a regular web application
-- [ ] Configure allowed callback URL `{ORIGIN}/o2p/oauth2/auth0/authorized`
-- [ ] Update existing Google Cloud Console redirect URI to `{ORIGIN}/o2p/oauth2/google/authorized` (for demo environment)
-- [ ] Add Auth0 example block to `dot.env.example`
-- [ ] Configure demo-oauth2 `.env` with `OAUTH2_INSTANCES=google,auth0` plus `OAUTH2_AUTH0_*` settings
-- [ ] Run demo, log in via Auth0 button, verify DB row has `provider="auth0"` and correct `sub`
-- [ ] Verify Google login still works concurrently
+- [x] Create Auth0 tenant and register a regular web application
+- [x] Configure allowed callback URL `{ORIGIN}/o2p/oauth2/auth0/authorized`
+- [x] Update existing Google Cloud Console redirect URI to `{ORIGIN}/o2p/oauth2/google/authorized` (for demo environment)
+- [x] Add Auth0 example block to `dot.env.example`
+- [x] Configure `demo-live/env.cloud-run.yaml` with `OAUTH2_AUTH0_*` settings (ISSUER_URL / RESPONSE_MODE / SCOPE), plus GSM secrets for CLIENT_ID / CLIENT_SECRET and `--set-secrets` wiring in `.github/workflows/deploy-demo.yml`
+- [x] Run demo, log in via Auth0 button, verify DB row has `provider="auth0"` and correct `sub`
+- [x] Verify Google login still works concurrently
 - [ ] Capture screenshots for LT
-- [ ] If any code change is needed here, mark Step 1 as incomplete and address
+- [x] If any code change is needed here, mark Step 1 as incomplete and address (no code changes required)
 
-### Fallback: Phase 0 minimal (prepared preemptively on 2026-04-15, used only if Step 1 stalls)
-
-- [ ] Branch off `feature/expand-oauth2-providers` on 2026-04-15 as `feature/auth0-switch-mode`
-- [ ] Fix OIDC Discovery issuer trailing-slash comparison
-- [ ] Make `IdInfo` fields optional
-- [ ] Make `GoogleUserInfo` fields optional
-- [ ] Add `OAUTH2_PROVIDER_NAME` env var (default `"google"`), read in claim-to-account conversion
-- [ ] Add Auth0 example to `dot.env.example` (switch mode)
-- [ ] Activate only if Step 1 is not on track by 2026-04-18 morning
 
 ### Phase 2: GitHub (non-OIDC)
 
@@ -718,5 +709,17 @@ Additional reasons B1 wins:
 functions in `oauth2_passkey` take `provider: &str` at their boundary — the
 axum crate's API surface is identical to what B2 would produce. The coupling
 question was resolved in favour of B1.
+
+### 2026-04-20: Step 2 repo-side complete — demo-live deployment config
+
+Step 2 was originally described around demo-oauth2 local `.env` configuration, but the actual implementation targeted the demo-live Cloud Run production deployment instead. The step goal ("Auth0 as a second instance") is equivalent; only the deployment target changed.
+
+Key decisions:
+
+- `OAUTH2_INSTANCES` env var (locked on 2026-04-15, second revision) was superseded by the 2026-04-16 simplified design. The original Step 2 task `:242` referenced it; rewritten to reflect the actual implementation.
+- `OAUTH2_AUTH0_RESPONSE_MODE: form_post` (library default) was chosen instead of `query` for demo-live, matching Auth0 form_post behavior on production HTTPS. The plan had suggested `query` for consistency with Google, but the user's choice is functionally correct.
+- No Rust code changes were required, confirming Step 1 was complete.
+- Three files modified: `demo-live/env.cloud-run.yaml`, `.github/workflows/deploy-demo.yml`, `demo-live/DEPLOY.md` (commits `cbc36e5`, `a9cd8f3`).
+- Remaining: Google Cloud Console redirect URI update (user-side, external), post-deploy end-to-end verification.
 
 ## Resolution

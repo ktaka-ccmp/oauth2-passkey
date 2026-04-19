@@ -8,12 +8,16 @@ use crate::oauth2::discovery::{OidcDiscoveryDocument, OidcDiscoveryError, fetch_
 
 /// Identifies a supported OAuth2/OIDC provider.
 ///
-/// Adding a new provider requires four lock-step edits, all in this file:
-/// 1. A new variant here
-/// 2. A new arm in `as_str`
-/// 3. A new arm in `from_path_segment`
-/// 4. A corresponding static (`LazyLock<ProviderConfig>` or
+/// Adding a new provider requires these lock-step edits, all in this file:
+/// 1. A new variant in `ProviderKind`
+/// 2. Include it in `ProviderKind::ALL`
+/// 3. A new arm in `as_str`
+/// 4. A new arm in `from_path_segment`
+/// 5. A corresponding static (`LazyLock<ProviderConfig>` or
 ///    `LazyLock<Option<ProviderConfig>>`) and a new arm in `provider_for`
+/// 6. If the provider is optional, return its env-var contract from
+///    `optional_env_contract` so startup validation catches the
+///    "trigger set but dependent missing" case
 ///
 /// Reserved names that must never become enum variants (they collide with
 /// existing literal routes under `/oauth2/*`):
@@ -22,16 +26,43 @@ use crate::oauth2::discovery::{OidcDiscoveryDocument, OidcDiscoveryError, fetch_
 pub(crate) enum ProviderKind {
     Google,
     Auth0,
+    Keycloak,
 }
 
 impl ProviderKind {
     /// All supported provider kinds in stable display order.
-    pub(crate) const ALL: &'static [Self] = &[Self::Google, Self::Auth0];
+    pub(crate) const ALL: &'static [Self] = &[Self::Google, Self::Auth0, Self::Keycloak];
+
+    /// Env-var validation contract for optional providers.
+    ///
+    /// Returns `Some((trigger, dependents))` for providers activated by one
+    /// env var that require additional env vars when that trigger is set.
+    /// Returns `None` for unconditional providers (validated directly in `init`).
+    ///
+    /// Used by `init` to fail fast at startup instead of panicking mid-request
+    /// via the `LazyLock.expect()` inside the matching static.
+    pub(crate) fn optional_env_contract(&self) -> Option<(&'static str, &'static [&'static str])> {
+        match self {
+            Self::Google => None,
+            Self::Auth0 => Some((
+                "OAUTH2_AUTH0_CLIENT_ID",
+                &["OAUTH2_AUTH0_CLIENT_SECRET", "OAUTH2_AUTH0_ISSUER_URL"],
+            )),
+            Self::Keycloak => Some((
+                "OAUTH2_KEYCLOAK_CLIENT_ID",
+                &[
+                    "OAUTH2_KEYCLOAK_CLIENT_SECRET",
+                    "OAUTH2_KEYCLOAK_ISSUER_URL",
+                ],
+            )),
+        }
+    }
 
     pub(crate) const fn as_str(&self) -> &'static str {
         match self {
             Self::Google => "google",
             Self::Auth0 => "auth0",
+            Self::Keycloak => "keycloak",
         }
     }
 
@@ -41,6 +72,7 @@ impl ProviderKind {
         match s {
             "google" => Some(Self::Google),
             "auth0" => Some(Self::Auth0),
+            "keycloak" => Some(Self::Keycloak),
             _ => None,
         }
     }
@@ -222,6 +254,40 @@ pub(crate) static AUTH0_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
     })
 });
 
+/// Keycloak provider — optional, enabled by setting `OAUTH2_KEYCLOAK_CLIENT_ID`.
+/// Issuer URL format: `http(s)://{host}/realms/{realm-name}` (no trailing slash).
+pub(crate) static KEYCLOAK_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::new(|| {
+    let client_id = env::var("OAUTH2_KEYCLOAK_CLIENT_ID").ok()?;
+    let client_secret = env::var("OAUTH2_KEYCLOAK_CLIENT_SECRET")
+        .expect("OAUTH2_KEYCLOAK_CLIENT_ID set but OAUTH2_KEYCLOAK_CLIENT_SECRET missing");
+    let issuer_url = env::var("OAUTH2_KEYCLOAK_ISSUER_URL")
+        .expect("OAUTH2_KEYCLOAK_CLIENT_ID set but OAUTH2_KEYCLOAK_ISSUER_URL missing");
+    let origin = env::var("ORIGIN").expect("Missing ORIGIN!");
+    let redirect_uri = format!(
+        "{}{}/oauth2/keycloak/authorized",
+        origin,
+        O2P_ROUTE_PREFIX.as_str()
+    );
+    let response_mode =
+        env::var("OAUTH2_KEYCLOAK_RESPONSE_MODE").unwrap_or_else(|_| "form_post".to_string());
+    let scope =
+        env::var("OAUTH2_KEYCLOAK_SCOPE").unwrap_or_else(|_| "openid+email+profile".to_string());
+    let query_string = format!(
+        "&response_type=code&scope={}&response_mode={}&prompt=consent",
+        scope, response_mode
+    );
+    Some(ProviderConfig {
+        kind: ProviderKind::Keycloak,
+        client_id,
+        client_secret,
+        issuer_url,
+        redirect_uri,
+        response_mode,
+        query_string,
+        discovery: OnceLock::new(),
+    })
+});
+
 /// Resolve a `ProviderKind` to its `&'static ProviderConfig`.
 ///
 /// Returns `None` if the provider is optional and not configured (its env vars
@@ -230,6 +296,7 @@ pub(crate) fn provider_for(kind: ProviderKind) -> Option<&'static ProviderConfig
     match kind {
         ProviderKind::Google => Some(&GOOGLE_PROVIDER),
         ProviderKind::Auth0 => AUTH0_PROVIDER.as_ref(),
+        ProviderKind::Keycloak => KEYCLOAK_PROVIDER.as_ref(),
     }
 }
 

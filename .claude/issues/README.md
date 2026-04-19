@@ -6,10 +6,11 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (11)
+### Open (12)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
+| `20260420-0402` | medium | small | [Admin unlink/delete fails in demo mode ("Invalid user ID")](open/20260420-0402-admin-unlink-demo-mode.md) |
 | `20260226-2020` | high | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
@@ -22,10 +23,11 @@ This directory contains issue/task tracking files for the project.
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
 | `20260331-1517` | low | small | [PASSKEY_AUTHENTICATOR_ATTACHMENT=none sends non-standard string instead of omitting field](open/20260331-1517-passkey-authenticator-attachment-none-serialization.md) |
 
-### Completed (58)
+### Completed (59)
 
 | ID | Title |
 |----|-------|
+| `20260420-0307` | [Add Keycloak as OIDC Provider](completed/20260420-0307-add-keycloak-provider.md) |
 | `20260322-0927` | [User Deletion Lacks Atomicity Across Multiple Stores](completed/20260322-0927-user-deletion-atomicity.md) |
 | `20260321-1346` | [Review delete_old_entries Dead Code and Retention Policy](completed/20260321-1346-review-delete-old-entries-dead-code.md) |
 | `20260322-0907` | [upsert_oauth2_account SELECT after COMMIT race condition](completed/20260322-0907-upsert-oauth2-account-post-tx-select-race.md) |

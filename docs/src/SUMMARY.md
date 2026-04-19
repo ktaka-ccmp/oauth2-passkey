@@ -42,6 +42,8 @@
 - [FedCM (Experimental)](integration/fedcm.md)
 - [Passkey Implementation](integration/passkey.md)
 - [Development Tunneling](guides/tunneling.md)
+- [Auth0 Provider Setup](guides/auth0.md)
+- [Keycloak Provider Setup](guides/keycloak.md)
 
 ---
 
