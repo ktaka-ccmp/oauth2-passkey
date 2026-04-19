@@ -75,14 +75,35 @@ gcloud services enable secretmanager.googleapis.com
 3. Application type: "Web application"
 4. Name: e.g. "oauth2-passkey-demo"
 5. Authorized redirect URIs:
-   - `http://localhost:3001/o2p/oauth2/authorized` (local development)
-   - `https://passkey-demo.ccmp.jp/o2p/oauth2/authorized` (production)
+   - `http://localhost:3001/o2p/oauth2/google/authorized` (local development)
+   - `https://passkey-demo.ccmp.jp/o2p/oauth2/google/authorized` (production)
 6. Save the **Client ID** and **Client Secret**
 
 ```bash
 export OAUTH2_GOOGLE_CLIENT_ID="your-client-id"
 export OAUTH2_GOOGLE_CLIENT_SECRET="your-client-secret"
 ```
+
+### Step 2a: Create Auth0 credentials (optional)
+
+Auth0 provides an alternative OAuth2/OIDC provider. Skip this step if you only need Google login.
+
+1. Log in to [Auth0 Dashboard](https://manage.auth0.com/)
+2. Applications > Create Application
+3. Application type: "Regular Web Application"
+4. Allowed Callback URLs:
+   - `http://localhost:3001/o2p/oauth2/auth0/authorized` (local development)
+   - `https://passkey-demo.ccmp.jp/o2p/oauth2/auth0/authorized` (production)
+5. Allowed Logout URLs: `https://passkey-demo.ccmp.jp/`
+6. Save the **Domain**, **Client ID**, and **Client Secret**
+
+```bash
+export OAUTH2_AUTH0_CLIENT_ID="your-auth0-client-id"
+export OAUTH2_AUTH0_CLIENT_SECRET="your-auth0-client-secret"
+export OAUTH2_AUTH0_ISSUER_URL="https://your-tenant.auth0.com"  # no trailing slash
+```
+
+For local development, see `dot.env.example` for all Auth0 environment variables.
 
 ### Step 3: Store secrets in Secret Manager
 
@@ -92,10 +113,18 @@ echo -n "$OAUTH2_GOOGLE_CLIENT_ID" | gcloud secrets create OAUTH2_GOOGLE_CLIENT_
 echo -n "$OAUTH2_GOOGLE_CLIENT_SECRET" | gcloud secrets create OAUTH2_GOOGLE_CLIENT_SECRET --data-file=-
 openssl rand -base64 32 | gcloud secrets create AUTH_SERVER_SECRET --data-file=-
 
+# Auth0 secrets (first time only, if using Auth0)
+echo -n "$OAUTH2_AUTH0_CLIENT_ID" | gcloud secrets create OAUTH2_AUTH0_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_AUTH0_CLIENT_SECRET" | gcloud secrets create OAUTH2_AUTH0_CLIENT_SECRET --data-file=-
+
 # Update secrets (add a new version to existing secrets)
 echo -n "$OAUTH2_GOOGLE_CLIENT_ID" | gcloud secrets versions add OAUTH2_GOOGLE_CLIENT_ID --data-file=-
 echo -n "$OAUTH2_GOOGLE_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_GOOGLE_CLIENT_SECRET --data-file=-
 openssl rand -base64 32 | gcloud secrets versions add AUTH_SERVER_SECRET --data-file=-
+
+# Auth0 secret rotation
+echo -n "$OAUTH2_AUTH0_CLIENT_ID" | gcloud secrets versions add OAUTH2_AUTH0_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_AUTH0_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_AUTH0_CLIENT_SECRET --data-file=-
 
 # Grant Cloud Run's default service account access to secrets
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
@@ -103,6 +132,8 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
 ```
+
+`OAUTH2_AUTH0_ISSUER_URL` is not a secret — add it to `env.cloud-run.yaml` instead (see Step 5).
 
 ### Step 4: Build and push Docker image
 
@@ -130,10 +161,13 @@ gcloud run deploy oauth2-passkey-demo \
   --allow-unauthenticated \
   --min-instances 1 \
   --env-vars-file demo-live/env.cloud-run.yaml \
-  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest"
+  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_AUTH0_CLIENT_ID=OAUTH2_AUTH0_CLIENT_ID:latest,OAUTH2_AUTH0_CLIENT_SECRET=OAUTH2_AUTH0_CLIENT_SECRET:latest"
 ```
 
 All environment variables including `ORIGIN` are managed in `env.cloud-run.yaml`.
+For Auth0, also add `OAUTH2_AUTH0_ISSUER_URL` (and optionally `OAUTH2_AUTH0_RESPONSE_MODE`,
+`OAUTH2_AUTH0_SCOPE`) to `env.cloud-run.yaml`. If Auth0 is not used, omit the
+`OAUTH2_AUTH0_*` entries from `--set-secrets`.
 
 ### Step 6: Configure custom domain
 
@@ -237,7 +271,7 @@ gcloud run deploy oauth2-passkey-demo \
   --allow-unauthenticated \
   --min-instances 1 \
   --env-vars-file demo-live/env.cloud-run.yaml \
-  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest"
+  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_AUTH0_CLIENT_ID=OAUTH2_AUTH0_CLIENT_ID:latest,OAUTH2_AUTH0_CLIENT_SECRET=OAUTH2_AUTH0_CLIENT_SECRET:latest"
 ```
 
 To update only environment variables (without rebuilding the image):
@@ -255,7 +289,7 @@ Note: `--env-vars-file` replaces all env vars. To update individual keys without
 - Authentication is free (no charges)
 - Test mode: max 100 test users (only added test users can log in)
 - Public access requires Google verification review (review is free)
-- Redirect URI: `https://passkey-demo.ccmp.jp/o2p/oauth2/authorized`
+- Redirect URI: `https://passkey-demo.ccmp.jp/o2p/oauth2/google/authorized`
 
 ## Related Files
 
