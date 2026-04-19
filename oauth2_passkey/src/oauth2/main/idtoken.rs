@@ -20,7 +20,8 @@ struct Jwks {
 struct Jwk {
     kty: String,
     kid: String,
-    alg: String,
+    /// Optional: some providers (e.g. Entra) omit `alg`; fall back to kty-derived default.
+    alg: Option<String>,
     n: Option<String>,
     e: Option<String>,
     x: Option<String>,
@@ -37,10 +38,12 @@ pub struct OidcIdInfo {
     /// Google-specific; absent in many other OIDC providers (e.g. Auth0).
     pub azp: Option<String>,
     pub aud: String,
-    pub email: String,
+    /// Optional per OIDC Core 1.0; absent for some Microsoft personal accounts.
+    pub email: Option<String>,
     /// Some providers omit this claim; treat absence as unverified.
     pub email_verified: Option<bool>,
-    pub name: String,
+    /// Optional per OIDC Core 1.0; absent when profile scope not granted.
+    pub name: Option<String>,
     pub picture: Option<String>,
     /// Absent in many non-Google OIDC providers.
     pub given_name: Option<String>,
@@ -54,6 +57,9 @@ pub struct OidcIdInfo {
     pub nonce: Option<String>,
     pub hd: Option<String>,
     pub at_hash: Option<String>,
+    /// Fallback for `email` when the provider omits the standard claim
+    /// (e.g. Microsoft personal accounts).
+    pub preferred_username: Option<String>,
 }
 
 #[derive(Error, Debug)]
@@ -201,7 +207,15 @@ fn decode_base64_url_safe(input: &str) -> Result<Vec<u8>, TokenVerificationError
 }
 
 fn convert_jwk_to_decoding_key(jwk: &Jwk) -> Result<DecodingKey, TokenVerificationError> {
-    match jwk.alg.as_str() {
+    // When `alg` is absent, infer from `kty` (Entra and some other providers omit `alg`).
+    let alg_default = match jwk.kty.as_str() {
+        "RSA" => "RS256",
+        "EC" => "ES256",
+        "oct" => "HS256",
+        _ => "",
+    };
+    let alg = jwk.alg.as_deref().unwrap_or(alg_default);
+    match alg {
         "RS256" | "RS384" | "RS512" => {
             let n = jwk
                 .n

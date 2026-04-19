@@ -31,8 +31,8 @@ fn test_oidc_userinfo_deserialization() {
         "Should successfully deserialize valid Google user info"
     );
     let user_info = user_info.expect("Already verified result is Ok");
-    assert_eq!(user_info.email, "test@example.com");
-    assert_eq!(user_info.name, "Test User");
+    assert_eq!(user_info.email, Some("test@example.com".to_string()));
+    assert_eq!(user_info.name, Some("Test User".to_string()));
 }
 
 /// Test successful deserialization of OIDC token response with id_token

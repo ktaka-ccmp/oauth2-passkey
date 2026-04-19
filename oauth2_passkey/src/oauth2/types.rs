@@ -61,18 +61,22 @@ impl Default for OAuth2Account {
 
 /// Userinfo endpoint response.
 ///
-/// All fields except `sub`, `name`, and `email` are optional because
-/// non-Google OIDC providers may omit them.
+/// `email` and `name` are optional per OIDC Core 1.0 (they are standard claims,
+/// not required ones).  When `email` is absent the implementation falls back to
+/// `preferred_username` (e.g. Microsoft personal accounts return email only there).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct OidcUserInfo {
     pub(crate) sub: String,
     pub(crate) family_name: Option<String>,
-    pub name: String,
+    pub name: Option<String>,
     pub picture: Option<String>,
-    pub(crate) email: String,
+    pub(crate) email: Option<String>,
     pub(crate) given_name: Option<String>,
     pub(crate) hd: Option<String>,
     pub(crate) email_verified: Option<bool>,
+    /// Fallback for `email` when the provider omits the standard claim
+    /// (e.g. Microsoft personal accounts return email only in `preferred_username`).
+    pub(crate) preferred_username: Option<String>,
 }
 
 /// Build an `OAuth2Account` from an ID token payload.
@@ -86,13 +90,23 @@ pub(crate) struct OidcUserInfo {
 pub(crate) fn oauth2_account_from_idinfo(
     idinfo: &OidcIdInfo,
     provider_name: &str,
-) -> OAuth2Account {
-    OAuth2Account {
+) -> Result<OAuth2Account, OAuth2Error> {
+    let email = idinfo
+        .email
+        .clone()
+        .or_else(|| idinfo.preferred_username.clone())
+        .ok_or_else(|| {
+            OAuth2Error::Validation(format!(
+                "OIDC id_token from '{provider_name}' is missing both `email` and `preferred_username` claims"
+            ))
+        })?;
+    let name = idinfo.name.clone().unwrap_or_else(|| email.clone());
+    Ok(OAuth2Account {
         sequence_number: None,
         id: String::new(),
         user_id: String::new(),
-        name: idinfo.name.clone(),
-        email: idinfo.email.clone(),
+        name,
+        email,
         picture: idinfo.picture.clone(),
         provider: provider_name.to_string(),
         provider_user_id: format!("{}_{}", provider_name, idinfo.sub),
@@ -104,7 +118,7 @@ pub(crate) fn oauth2_account_from_idinfo(
         }),
         created_at: Utc::now(),
         updated_at: Utc::now(),
-    }
+    })
 }
 
 /// Build an `OAuth2Account` from a userinfo endpoint response.
@@ -116,13 +130,23 @@ pub(crate) fn oauth2_account_from_idinfo(
 pub(crate) fn oauth2_account_from_userinfo(
     userinfo: &OidcUserInfo,
     provider_name: &str,
-) -> OAuth2Account {
-    OAuth2Account {
+) -> Result<OAuth2Account, OAuth2Error> {
+    let email = userinfo
+        .email
+        .clone()
+        .or_else(|| userinfo.preferred_username.clone())
+        .ok_or_else(|| {
+            OAuth2Error::Validation(format!(
+                "OIDC userinfo from '{provider_name}' is missing both `email` and `preferred_username` claims"
+            ))
+        })?;
+    let name = userinfo.name.clone().unwrap_or_else(|| email.clone());
+    Ok(OAuth2Account {
         sequence_number: None,
         id: String::new(),
         user_id: String::new(),
-        name: userinfo.name.clone(),
-        email: userinfo.email.clone(),
+        name,
+        email,
         picture: userinfo.picture.clone(),
         provider: provider_name.to_string(),
         provider_user_id: format!("{}_{}", provider_name, userinfo.sub),
@@ -134,7 +158,7 @@ pub(crate) fn oauth2_account_from_userinfo(
         }),
         created_at: Utc::now(),
         updated_at: Utc::now(),
-    }
+    })
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -31,6 +31,16 @@ fn test_provider_kind_as_str() {
     assert_eq!(ProviderKind::Google.as_str(), "google");
 }
 
+// --- from_path_segment: entra ---
+
+#[test]
+fn test_provider_kind_from_path_segment_entra() {
+    assert_eq!(
+        ProviderKind::from_path_segment("entra"),
+        Some(ProviderKind::Entra)
+    );
+}
+
 // --- optional_env_contract ---
 
 #[test]

@@ -58,6 +58,11 @@ fn provider_view(name: &'static str) -> ProviderView {
             display_name: "Keycloak",
             button_class: "btn-oauth2 btn-keycloak",
         },
+        "entra" => ProviderView {
+            name,
+            display_name: "Microsoft",
+            button_class: "btn-oauth2 btn-entra",
+        },
         _ => ProviderView {
             name,
             display_name: name,
