@@ -22,16 +22,18 @@ use crate::oauth2::discovery::{OidcDiscoveryDocument, OidcDiscoveryError, fetch_
 pub(crate) enum ProviderKind {
     Google,
     Auth0,
+    Keycloak,
 }
 
 impl ProviderKind {
     /// All supported provider kinds in stable display order.
-    pub(crate) const ALL: &'static [Self] = &[Self::Google, Self::Auth0];
+    pub(crate) const ALL: &'static [Self] = &[Self::Google, Self::Auth0, Self::Keycloak];
 
     pub(crate) const fn as_str(&self) -> &'static str {
         match self {
             Self::Google => "google",
             Self::Auth0 => "auth0",
+            Self::Keycloak => "keycloak",
         }
     }
 
@@ -41,6 +43,7 @@ impl ProviderKind {
         match s {
             "google" => Some(Self::Google),
             "auth0" => Some(Self::Auth0),
+            "keycloak" => Some(Self::Keycloak),
             _ => None,
         }
     }
@@ -222,6 +225,40 @@ pub(crate) static AUTH0_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
     })
 });
 
+/// Keycloak provider — optional, enabled by setting `OAUTH2_KEYCLOAK_CLIENT_ID`.
+/// Issuer URL format: `http(s)://{host}/realms/{realm-name}` (no trailing slash).
+pub(crate) static KEYCLOAK_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::new(|| {
+    let client_id = env::var("OAUTH2_KEYCLOAK_CLIENT_ID").ok()?;
+    let client_secret = env::var("OAUTH2_KEYCLOAK_CLIENT_SECRET")
+        .expect("OAUTH2_KEYCLOAK_CLIENT_ID set but OAUTH2_KEYCLOAK_CLIENT_SECRET missing");
+    let issuer_url = env::var("OAUTH2_KEYCLOAK_ISSUER_URL")
+        .expect("OAUTH2_KEYCLOAK_CLIENT_ID set but OAUTH2_KEYCLOAK_ISSUER_URL missing");
+    let origin = env::var("ORIGIN").expect("Missing ORIGIN!");
+    let redirect_uri = format!(
+        "{}{}/oauth2/keycloak/authorized",
+        origin,
+        O2P_ROUTE_PREFIX.as_str()
+    );
+    let response_mode =
+        env::var("OAUTH2_KEYCLOAK_RESPONSE_MODE").unwrap_or_else(|_| "form_post".to_string());
+    let scope =
+        env::var("OAUTH2_KEYCLOAK_SCOPE").unwrap_or_else(|_| "openid+email+profile".to_string());
+    let query_string = format!(
+        "&response_type=code&scope={}&response_mode={}&prompt=consent",
+        scope, response_mode
+    );
+    Some(ProviderConfig {
+        kind: ProviderKind::Keycloak,
+        client_id,
+        client_secret,
+        issuer_url,
+        redirect_uri,
+        response_mode,
+        query_string,
+        discovery: OnceLock::new(),
+    })
+});
+
 /// Resolve a `ProviderKind` to its `&'static ProviderConfig`.
 ///
 /// Returns `None` if the provider is optional and not configured (its env vars
@@ -230,6 +267,7 @@ pub(crate) fn provider_for(kind: ProviderKind) -> Option<&'static ProviderConfig
     match kind {
         ProviderKind::Google => Some(&GOOGLE_PROVIDER),
         ProviderKind::Auth0 => AUTH0_PROVIDER.as_ref(),
+        ProviderKind::Keycloak => KEYCLOAK_PROVIDER.as_ref(),
     }
 }
 

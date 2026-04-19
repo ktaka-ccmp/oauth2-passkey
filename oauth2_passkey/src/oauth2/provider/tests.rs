@@ -12,6 +12,14 @@ fn test_provider_kind_from_path_segment_known() {
 }
 
 #[test]
+fn test_provider_kind_from_path_segment_keycloak() {
+    assert_eq!(
+        ProviderKind::from_path_segment("keycloak"),
+        Some(ProviderKind::Keycloak)
+    );
+}
+
+#[test]
 fn test_provider_kind_from_path_segment_unknown() {
     assert_eq!(ProviderKind::from_path_segment("github"), None);
     assert_eq!(ProviderKind::from_path_segment(""), None);
