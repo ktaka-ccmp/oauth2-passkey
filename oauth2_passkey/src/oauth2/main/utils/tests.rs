@@ -195,6 +195,44 @@ async fn test_validate_origin_with_referer() {
     assert!(result.is_ok());
 }
 
+/// Test origin validation when Origin header is the literal string "null"
+///
+/// Browsers send `Origin: null` for cross-origin form_post redirects.
+/// The function should fall back to the Referer header in this case.
+#[tokio::test]
+async fn test_validate_origin_null_with_referer() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Origin", HeaderValue::from_static("null"));
+    headers.insert(
+        "Referer",
+        HeaderValue::from_static("https://example.com/login"),
+    );
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    assert!(
+        result.is_ok(),
+        "Origin: null should fall back to matching Referer"
+    );
+}
+
+/// Test origin validation when Origin is "null" and no Referer is present
+///
+/// When Origin is "null" and there is no Referer to fall back to, validation
+/// must still reject the request.
+#[tokio::test]
+async fn test_validate_origin_null_without_referer() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Origin", HeaderValue::from_static("null"));
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    assert!(result.is_err());
+    match result {
+        Err(OAuth2Error::InvalidOrigin(_)) => {}
+        Ok(_) => unreachable!("Expected InvalidOrigin error but got Ok"),
+        Err(err) => unreachable!("Expected InvalidOrigin error, got {:?}", err),
+    }
+}
+
 /// Tests for validate_origin with mismatched origin
 ///
 /// This test verifies that `validate_origin` correctly validates an origin

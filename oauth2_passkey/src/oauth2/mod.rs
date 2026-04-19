@@ -18,8 +18,9 @@ pub(crate) mod provider;
 mod storage;
 mod types;
 
-pub use config::get_google_client_id;
+pub use config::{enabled_providers, get_google_client_id, is_provider_enabled};
 pub use main::{prepare_fedcm_nonce, prepare_oauth2_auth_request};
+pub use provider::ProviderInfo;
 pub use types::{
     AuthResponse, FedCMCallbackRequest, FedCMNonceResponse, OAuth2Account, OAuth2Mode, OAuth2State,
     Provider, ProviderUserId, TokenType,
@@ -43,6 +44,21 @@ pub(crate) use main::{
 pub(crate) use storage::OAuth2Store;
 pub(crate) use types::{AccountId, AccountSearchField};
 
+/// Validates that `required` vars are all set whenever `trigger` var is present.
+/// Returns `Err(OAuth2Error::Validation)` naming the first missing var.
+fn require_env_if_trigger_set(trigger: &str, required: &[&str]) -> Result<(), errors::OAuth2Error> {
+    if std::env::var(trigger).is_ok() {
+        for var in required {
+            if std::env::var(var).is_err() {
+                return Err(errors::OAuth2Error::Validation(format!(
+                    "{trigger} is set but {var} is missing"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
     // Validate required env vars at startup (fail fast before serving requests).
     // We do NOT force-initialize GOOGLE_PROVIDER here so that tests can override
@@ -62,6 +78,12 @@ pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
             "ORIGIN must be set".to_string(),
         ));
     }
+
+    // Auth0 (optional) — activated by OAUTH2_AUTH0_CLIENT_ID
+    require_env_if_trigger_set(
+        "OAUTH2_AUTH0_CLIENT_ID",
+        &["OAUTH2_AUTH0_CLIENT_SECRET", "OAUTH2_AUTH0_ISSUER_URL"],
+    )?;
 
     let _ = *config::OAUTH2_CSRF_COOKIE_NAME;
     let _ = *config::OAUTH2_CSRF_COOKIE_MAX_AGE;

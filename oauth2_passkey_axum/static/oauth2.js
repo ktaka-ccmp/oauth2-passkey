@@ -104,35 +104,61 @@ const oauth2 = (function() {
     }
 
     // mode: add_to_user, create_user, login, create_user_or_login
-    function openPopup(mode=null, page_context=null) {
+    // provider: optional. If omitted, routes through the selection popup
+    //   (which 302-redirects when only one provider is enabled, so single-
+    //   provider setups still work without an extra click).
+    function openPopup(mode=null, page_context=null, provider=null) {
         // Only proceed if mode is one of the valid options
         if (mode !== 'add_to_user' && mode !== 'create_user' && mode !== 'login' && mode !== 'create_user_or_login') {
             console.log('Invalid or missing mode parameter');
             return; // Exit the function early
         }
 
-        // Try FedCM for non-add_to_user modes
-        if (mode !== 'add_to_user' && isFedCMAvailable()) {
+        if (provider === null) {
+            openSelectPopup(mode, page_context);
+            return;
+        }
+
+        // Try FedCM for non-add_to_user modes (Google only)
+        if (provider === 'google' && mode !== 'add_to_user' && isFedCMAvailable()) {
             fedcmLogin(mode).catch(function(err) {
                 console.log('FedCM failed, falling back to popup:', err.message);
-                openPopupLegacy(mode, page_context);
+                openPopupLegacy(mode, page_context, provider);
             });
             return;
         }
 
-        openPopupLegacy(mode, page_context);
+        openPopupLegacy(mode, page_context, provider);
     }
 
-    function openPopupLegacy(mode, page_context) {
+    // Opens a provider-selection popup. When only one provider is enabled, the
+    // server redirects directly to that provider — no extra click needed.
+    function openSelectPopup(mode, page_context) {
+        const url = page_context
+            ? `${O2P_ROUTE_PREFIX}/oauth2/select?mode=${mode}&context=${page_context}`
+            : `${O2P_ROUTE_PREFIX}/oauth2/select?mode=${mode}`;
+        popupWindow = window.open(
+            url,
+            "PopupWindow",
+            "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
+        );
+        window.addEventListener('message', function(event) {
+            if (event.data === 'auth_complete') {
+                handlePopupClosed();
+            }
+        });
+    }
+
+    function openPopupLegacy(mode, page_context, provider='google') {
         if (mode === 'add_to_user') {
             popupWindow = window.open(
-                `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}&context=${page_context}`,
+                `${O2P_ROUTE_PREFIX}/oauth2/${provider}?mode=${mode}&context=${page_context}`,
                 "PopupWindow",
                 "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
             );
         } else {
             popupWindow = window.open(
-                `${O2P_ROUTE_PREFIX}/oauth2/google?mode=${mode}`,
+                `${O2P_ROUTE_PREFIX}/oauth2/${provider}?mode=${mode}`,
                 "PopupWindow",
                 "width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes"
             );
@@ -176,6 +202,7 @@ const oauth2 = (function() {
     });
 
     return {
-        openPopup: openPopup
+        openPopup: openPopup,
+        openSelectPopup: openSelectPopup,
     };
 })();

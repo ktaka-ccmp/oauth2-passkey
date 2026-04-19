@@ -132,7 +132,7 @@
     <div class="section">
         <div class="section-header">
             <h2 class="section-title">OAuth2 Accounts</h2>
-            <button onclick="oauth2.openPopup('add_to_user', PAGE_SESSION_TOKEN)" class="action-button">Add New OAuth2 Account</button>
+            <button onclick="oauth2.openSelectPopup('add_to_user', PAGE_SESSION_TOKEN)" class="action-button">Add New OAuth2 Account</button>
         </div>
         {% if oauth2_accounts.is_empty() %}
             <p>You don't have any linked OAuth2 accounts yet.</p>

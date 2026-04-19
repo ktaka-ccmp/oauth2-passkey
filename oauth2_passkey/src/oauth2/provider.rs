@@ -21,14 +21,17 @@ use crate::oauth2::discovery::{OidcDiscoveryDocument, OidcDiscoveryError, fetch_
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum ProviderKind {
     Google,
-    // Step 2: Auth0,
+    Auth0,
 }
 
 impl ProviderKind {
+    /// All supported provider kinds in stable display order.
+    pub(crate) const ALL: &'static [Self] = &[Self::Google, Self::Auth0];
+
     pub(crate) const fn as_str(&self) -> &'static str {
         match self {
             Self::Google => "google",
-            // Self::Auth0 => "auth0",
+            Self::Auth0 => "auth0",
         }
     }
 
@@ -37,10 +40,25 @@ impl ProviderKind {
     pub(crate) fn from_path_segment(s: &str) -> Option<Self> {
         match s {
             "google" => Some(Self::Google),
-            // "auth0"  => Some(Self::Auth0),
+            "auth0" => Some(Self::Auth0),
             _ => None,
         }
     }
+}
+
+/// Public information about a single enabled OAuth2 provider.
+///
+/// Returned by [`enabled_providers`](crate::oauth2::enabled_providers).
+/// Carries only the protocol identifier for this provider — presentation data
+/// (human-readable label, CSS classes) lives in the axum integration crate's
+/// `ProviderView`.  Future protocol-level attributes (e.g. `supports_pkce`,
+/// `is_oidc`) can be added here as non-breaking field additions.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct ProviderInfo {
+    /// URL path segment used in OAuth2 state, DB rows, and route matching
+    /// (e.g. `"google"`, `"auth0"`).
+    pub name: &'static str,
 }
 
 impl std::fmt::Display for ProviderKind {
@@ -168,34 +186,41 @@ pub(crate) static GOOGLE_PROVIDER: LazyLock<ProviderConfig> = LazyLock::new(|| {
     }
 });
 
-// Step 2: Auth0 (optional — enabled by setting OAUTH2_AUTH0_CLIENT_ID)
-//
-// pub(crate) static AUTH0_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::new(|| {
-//     let client_id = env::var("OAUTH2_AUTH0_CLIENT_ID").ok()?;
-//     let client_secret = env::var("OAUTH2_AUTH0_CLIENT_SECRET")
-//         .expect("OAUTH2_AUTH0_CLIENT_ID set but OAUTH2_AUTH0_CLIENT_SECRET missing");
-//     let issuer_url = env::var("OAUTH2_AUTH0_ISSUER_URL")
-//         .expect("OAUTH2_AUTH0_CLIENT_ID set but OAUTH2_AUTH0_ISSUER_URL missing");
-//     let origin = env::var("ORIGIN").expect("Missing ORIGIN!");
-//     let redirect_uri = format!(
-//         "{}{}/oauth2/auth0/authorized",
-//         origin, O2P_ROUTE_PREFIX.as_str()
-//     );
-//     let response_mode = env::var("OAUTH2_AUTH0_RESPONSE_MODE")
-//         .unwrap_or_else(|_| "form_post".to_string());
-//     let scope = env::var("OAUTH2_AUTH0_SCOPE")
-//         .unwrap_or_else(|_| "openid+email+profile".to_string());
-//     let response_type = "code".to_string();
-//     let query_string = format!(
-//         "&response_type={}&scope={}&response_mode={}&access_type=online&prompt=consent",
-//         response_type, scope, response_mode
-//     );
-//     Some(ProviderConfig {
-//         kind: ProviderKind::Auth0,
-//         client_id, client_secret, issuer_url, redirect_uri,
-//         response_mode, query_string, discovery: OnceLock::new(),
-//     })
-// });
+/// Auth0 provider — optional, enabled by setting `OAUTH2_AUTH0_CLIENT_ID`.
+/// Panics at first access if `CLIENT_ID` is set but `CLIENT_SECRET` or
+/// `ISSUER_URL` are missing (mis-configured, not intentionally absent).
+pub(crate) static AUTH0_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::new(|| {
+    let client_id = env::var("OAUTH2_AUTH0_CLIENT_ID").ok()?;
+    let client_secret = env::var("OAUTH2_AUTH0_CLIENT_SECRET")
+        .expect("OAUTH2_AUTH0_CLIENT_ID set but OAUTH2_AUTH0_CLIENT_SECRET missing");
+    let issuer_url = env::var("OAUTH2_AUTH0_ISSUER_URL")
+        .expect("OAUTH2_AUTH0_CLIENT_ID set but OAUTH2_AUTH0_ISSUER_URL missing");
+    let origin = env::var("ORIGIN").expect("Missing ORIGIN!");
+    let redirect_uri = format!(
+        "{}{}/oauth2/auth0/authorized",
+        origin,
+        O2P_ROUTE_PREFIX.as_str()
+    );
+    let response_mode =
+        env::var("OAUTH2_AUTH0_RESPONSE_MODE").unwrap_or_else(|_| "form_post".to_string());
+    let scope =
+        env::var("OAUTH2_AUTH0_SCOPE").unwrap_or_else(|_| "openid+email+profile".to_string());
+    // Note: `access_type=online` is Google-specific and omitted here.
+    let query_string = format!(
+        "&response_type=code&scope={}&response_mode={}&prompt=consent",
+        scope, response_mode
+    );
+    Some(ProviderConfig {
+        kind: ProviderKind::Auth0,
+        client_id,
+        client_secret,
+        issuer_url,
+        redirect_uri,
+        response_mode,
+        query_string,
+        discovery: OnceLock::new(),
+    })
+});
 
 /// Resolve a `ProviderKind` to its `&'static ProviderConfig`.
 ///
@@ -204,7 +229,7 @@ pub(crate) static GOOGLE_PROVIDER: LazyLock<ProviderConfig> = LazyLock::new(|| {
 pub(crate) fn provider_for(kind: ProviderKind) -> Option<&'static ProviderConfig> {
     match kind {
         ProviderKind::Google => Some(&GOOGLE_PROVIDER),
-        // Step 2: ProviderKind::Auth0 => AUTH0_PROVIDER.as_ref(),
+        ProviderKind::Auth0 => AUTH0_PROVIDER.as_ref(),
     }
 }
 
