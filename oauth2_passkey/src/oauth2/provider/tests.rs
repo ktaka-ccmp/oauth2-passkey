@@ -71,6 +71,16 @@ fn test_optional_env_contract_keycloak() {
     );
 }
 
+#[test]
+fn test_optional_env_contract_entra() {
+    let (trigger, required) = ProviderKind::Entra.optional_env_contract().unwrap();
+    assert_eq!(trigger, "OAUTH2_ENTRA_CLIENT_ID");
+    assert_eq!(
+        required,
+        ["OAUTH2_ENTRA_CLIENT_SECRET", "OAUTH2_ENTRA_ISSUER_URL"]
+    );
+}
+
 // --- provider_for ---
 
 #[test]

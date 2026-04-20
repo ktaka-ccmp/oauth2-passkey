@@ -331,6 +331,33 @@ fn test_convert_jwk_to_decoding_key_hs256_valid() {
     assert!(result.is_ok());
 }
 
+/// Test JWK to decoding key conversion when `alg` is absent.
+///
+/// Some providers (notably Microsoft Entra) publish JWKS entries without
+/// the optional `alg` field. `convert_jwk_to_decoding_key` must infer the
+/// algorithm from `kty`: RSA -> RS256.
+///
+#[test]
+fn test_convert_jwk_to_decoding_key_alg_none_rsa_defaults_to_rs256() {
+    let jwk = Jwk {
+        kty: "RSA".to_string(),
+        kid: "test_key".to_string(),
+        alg: None, // Provider omitted `alg`; should default to RS256.
+        n: Some("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw".to_string()),
+        e: Some("AQAB".to_string()),
+        x: None,
+        y: None,
+        crv: None,
+        k: None,
+    };
+
+    let result = convert_jwk_to_decoding_key(&jwk);
+    assert!(
+        result.is_ok(),
+        "expected RSA with alg: None to succeed via RS256 default, got: {result:?}"
+    );
+}
+
 /// Test token decoding with too few parts
 ///
 /// This test verifies that `decode_token` returns InvalidTokenFormat error
