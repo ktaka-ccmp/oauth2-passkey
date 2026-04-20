@@ -166,7 +166,7 @@ async fn test_validate_origin_success() {
     headers.insert("Origin", HeaderValue::from_static("https://example.com"));
 
     // Validate against matching URL
-    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
 
     // Should succeed
     assert!(result.is_ok());
@@ -189,7 +189,7 @@ async fn test_validate_origin_with_referer() {
     );
 
     // Validate against matching URL
-    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
 
     // Should succeed
     assert!(result.is_ok());
@@ -208,7 +208,7 @@ async fn test_validate_origin_null_with_referer() {
         HeaderValue::from_static("https://example.com/login"),
     );
 
-    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
     assert!(
         result.is_ok(),
         "Origin: null should fall back to matching Referer"
@@ -224,7 +224,7 @@ async fn test_validate_origin_null_without_referer() {
     let mut headers = HeaderMap::new();
     headers.insert("Origin", HeaderValue::from_static("null"));
 
-    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
     assert!(result.is_err());
     match result {
         Err(OAuth2Error::InvalidOrigin(_)) => {}
@@ -249,7 +249,7 @@ async fn test_validate_origin_mismatch() {
     headers.insert("Origin", HeaderValue::from_static("https://attacker.com"));
 
     // Validate against different URL
-    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
 
     // Should fail
     assert!(result.is_err());
@@ -279,7 +279,7 @@ async fn test_validate_origin_missing() {
     let headers = HeaderMap::new();
 
     // Validate against URL
-    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
 
     // Should fail
     assert!(result.is_err());
@@ -292,6 +292,36 @@ async fn test_validate_origin_missing() {
             unreachable!("Expected InvalidOrigin error, got {:?}", err);
         }
     }
+}
+
+/// Test origin validation accepts an origin listed in `additional_allowed_origins`
+///
+/// Providers like Microsoft Entra B2C route credential entry through a different
+/// host than the OIDC endpoints (e.g. `login.live.com` vs `login.microsoftonline.com`),
+/// so the Referer on the `form_post` callback is that alternate host. The provider
+/// config declares it via `additional_allowed_origins`, and `validate_origin` must
+/// accept it even though it doesn't match the authorization endpoint's origin.
+#[tokio::test]
+async fn test_validate_origin_additional_allowed() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Origin", HeaderValue::from_static("null"));
+    headers.insert(
+        "Referer",
+        HeaderValue::from_static("https://login.live.com/oauth20_authorize.srf"),
+    );
+
+    let allowed = vec!["https://login.live.com".to_string()];
+    let result = validate_origin(
+        &headers,
+        "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        &allowed,
+    )
+    .await;
+
+    assert!(
+        result.is_ok(),
+        "Referer on an additional_allowed_origins host should be accepted"
+    );
 }
 
 /// Test token storage and retrieval roundtrip in cache

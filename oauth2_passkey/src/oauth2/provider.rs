@@ -136,6 +136,14 @@ pub(crate) struct ProviderConfig {
     pub(crate) query_string: String,
     /// Per-provider OIDC discovery document cache.
     pub(crate) discovery: OnceLock<OidcDiscoveryDocument>,
+    /// Extra origins that `validate_origin` should accept in addition to the
+    /// authorization endpoint's origin. Needed for providers whose login UI
+    /// is hosted on a different host than the OIDC endpoints — notably
+    /// Microsoft Entra B2C (personal MS accounts) routes credential entry
+    /// through `login.live.com` while the OIDC endpoints remain on
+    /// `login.microsoftonline.com`. Empty for providers where the login UI
+    /// and the authorization endpoint share an origin.
+    pub(crate) additional_allowed_origins: Vec<String>,
 }
 
 impl ProviderConfig {
@@ -223,6 +231,7 @@ pub(crate) static GOOGLE_PROVIDER: LazyLock<ProviderConfig> = LazyLock::new(|| {
         response_mode,
         query_string,
         discovery: OnceLock::new(),
+        additional_allowed_origins: Vec::new(),
     }
 });
 
@@ -259,6 +268,7 @@ pub(crate) static AUTH0_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         response_mode,
         query_string,
         discovery: OnceLock::new(),
+        additional_allowed_origins: Vec::new(),
     })
 });
 
@@ -293,6 +303,7 @@ pub(crate) static KEYCLOAK_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock
         response_mode,
         query_string,
         discovery: OnceLock::new(),
+        additional_allowed_origins: Vec::new(),
     })
 });
 
@@ -329,6 +340,10 @@ pub(crate) static ENTRA_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         response_mode,
         query_string,
         discovery: OnceLock::new(),
+        // Microsoft routes personal MS account (B2C / consumers tenant) login
+        // through `login.live.com`; its Referer on the form_post callback is
+        // that host rather than `login.microsoftonline.com`.
+        additional_allowed_origins: vec!["https://login.live.com".to_string()],
     })
 });
 
