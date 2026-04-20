@@ -105,6 +105,35 @@ export OAUTH2_AUTH0_ISSUER_URL="https://your-tenant.auth0.com"  # no trailing sl
 
 For local development, see `dot.env.example` for all Auth0 environment variables.
 
+### Step 2b: Create Microsoft Entra ID credentials (optional)
+
+Entra ID is Microsoft's OAuth2/OIDC provider. Skip this step if you don't need Microsoft login.
+Full background (B2B vs B2C, consumers UUID, email claim handling) is in
+[docs/src/guides/entra.md](../docs/src/guides/entra.md); the condensed deploy-time
+steps are:
+
+1. Open the [Azure Portal](https://portal.azure.com/) > Microsoft Entra ID > App registrations > New registration
+2. Supported account types: choose "Single tenant" (B2B) or "Personal Microsoft accounts only" (B2C)
+3. Authentication > Add a platform > Web > Redirect URIs:
+   - `http://localhost:3001/o2p/oauth2/entra/authorized` (local development)
+   - `https://passkey-demo.ccmp.jp/o2p/oauth2/entra/authorized` (production)
+4. Certificates & secrets > New client secret — copy the **Value** immediately (not shown again)
+5. (B2B only) Token configuration > Add optional claim > Token type: ID > check **email**
+6. Save the **Application (client) ID**, **client secret Value**, and build the issuer URL:
+
+```bash
+export OAUTH2_ENTRA_CLIENT_ID="your-application-client-id"
+export OAUTH2_ENTRA_CLIENT_SECRET="your-client-secret-value"
+# Work/school (B2B): use your tenant ID
+export OAUTH2_ENTRA_ISSUER_URL="https://login.microsoftonline.com/<tenant-id>/v2.0"
+# Personal MS accounts (B2C): use Microsoft's fixed consumer tenant UUID
+# export OAUTH2_ENTRA_ISSUER_URL="https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0"
+```
+
+The `/v2.0` suffix is required — the v1 endpoint uses a different issuer format
+(`sts.windows.net`) that will fail issuer validation. The `common` and
+`organizations` aliases are also not supported.
+
 ### Step 3: Store secrets in Secret Manager
 
 ```bash
@@ -117,6 +146,10 @@ openssl rand -base64 32 | gcloud secrets create AUTH_SERVER_SECRET --data-file=-
 echo -n "$OAUTH2_AUTH0_CLIENT_ID" | gcloud secrets create OAUTH2_AUTH0_CLIENT_ID --data-file=-
 echo -n "$OAUTH2_AUTH0_CLIENT_SECRET" | gcloud secrets create OAUTH2_AUTH0_CLIENT_SECRET --data-file=-
 
+# Entra secrets (first time only, if using Entra)
+echo -n "$OAUTH2_ENTRA_CLIENT_ID" | gcloud secrets create OAUTH2_ENTRA_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_ENTRA_CLIENT_SECRET" | gcloud secrets create OAUTH2_ENTRA_CLIENT_SECRET --data-file=-
+
 # Update secrets (add a new version to existing secrets)
 echo -n "$OAUTH2_GOOGLE_CLIENT_ID" | gcloud secrets versions add OAUTH2_GOOGLE_CLIENT_ID --data-file=-
 echo -n "$OAUTH2_GOOGLE_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_GOOGLE_CLIENT_SECRET --data-file=-
@@ -126,6 +159,10 @@ openssl rand -base64 32 | gcloud secrets versions add AUTH_SERVER_SECRET --data-
 echo -n "$OAUTH2_AUTH0_CLIENT_ID" | gcloud secrets versions add OAUTH2_AUTH0_CLIENT_ID --data-file=-
 echo -n "$OAUTH2_AUTH0_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_AUTH0_CLIENT_SECRET --data-file=-
 
+# Entra secret rotation (Azure client secrets expire; max 24 months)
+echo -n "$OAUTH2_ENTRA_CLIENT_ID" | gcloud secrets versions add OAUTH2_ENTRA_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_ENTRA_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_ENTRA_CLIENT_SECRET --data-file=-
+
 # Grant Cloud Run's default service account access to secrets
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
 gcloud projects add-iam-policy-binding $PROJECT_ID \
@@ -133,7 +170,8 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
   --role="roles/secretmanager.secretAccessor"
 ```
 
-`OAUTH2_AUTH0_ISSUER_URL` is not a secret — add it to `env.cloud-run.yaml` instead (see Step 5).
+`OAUTH2_AUTH0_ISSUER_URL` and `OAUTH2_ENTRA_ISSUER_URL` are not secrets — add them to
+`env.cloud-run.yaml` instead (see Step 5).
 
 ### Step 4: Build and push Docker image
 
@@ -161,13 +199,17 @@ gcloud run deploy oauth2-passkey-demo \
   --allow-unauthenticated \
   --min-instances 1 \
   --env-vars-file demo-live/env.cloud-run.yaml \
-  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_AUTH0_CLIENT_ID=OAUTH2_AUTH0_CLIENT_ID:latest,OAUTH2_AUTH0_CLIENT_SECRET=OAUTH2_AUTH0_CLIENT_SECRET:latest"
+  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_AUTH0_CLIENT_ID=OAUTH2_AUTH0_CLIENT_ID:latest,OAUTH2_AUTH0_CLIENT_SECRET=OAUTH2_AUTH0_CLIENT_SECRET:latest,OAUTH2_ENTRA_CLIENT_ID=OAUTH2_ENTRA_CLIENT_ID:latest,OAUTH2_ENTRA_CLIENT_SECRET=OAUTH2_ENTRA_CLIENT_SECRET:latest"
 ```
 
 All environment variables including `ORIGIN` are managed in `env.cloud-run.yaml`.
 For Auth0, also add `OAUTH2_AUTH0_ISSUER_URL` (and optionally `OAUTH2_AUTH0_RESPONSE_MODE`,
 `OAUTH2_AUTH0_SCOPE`) to `env.cloud-run.yaml`. If Auth0 is not used, omit the
 `OAUTH2_AUTH0_*` entries from `--set-secrets`.
+
+For Entra, also add `OAUTH2_ENTRA_ISSUER_URL` (and optionally
+`OAUTH2_ENTRA_RESPONSE_MODE`, `OAUTH2_ENTRA_SCOPE`) to `env.cloud-run.yaml`. If
+Entra is not used, omit the `OAUTH2_ENTRA_*` entries from `--set-secrets`.
 
 ### Step 6: Configure custom domain
 
@@ -271,7 +313,7 @@ gcloud run deploy oauth2-passkey-demo \
   --allow-unauthenticated \
   --min-instances 1 \
   --env-vars-file demo-live/env.cloud-run.yaml \
-  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_AUTH0_CLIENT_ID=OAUTH2_AUTH0_CLIENT_ID:latest,OAUTH2_AUTH0_CLIENT_SECRET=OAUTH2_AUTH0_CLIENT_SECRET:latest"
+  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_AUTH0_CLIENT_ID=OAUTH2_AUTH0_CLIENT_ID:latest,OAUTH2_AUTH0_CLIENT_SECRET=OAUTH2_AUTH0_CLIENT_SECRET:latest,OAUTH2_ENTRA_CLIENT_ID=OAUTH2_ENTRA_CLIENT_ID:latest,OAUTH2_ENTRA_CLIENT_SECRET=OAUTH2_ENTRA_CLIENT_SECRET:latest"
 ```
 
 To update only environment variables (without rebuilding the image):
