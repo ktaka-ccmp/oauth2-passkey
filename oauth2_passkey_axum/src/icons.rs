@@ -1,14 +1,19 @@
 //! Provider icon routes
 //!
 //! Serves branded SVG icons for OAuth2 providers at
-//! `{O2P_ROUTE_PREFIX}/icons/<name>.svg`. Sourced from Simple Icons
-//! (https://simpleicons.org/, CC0). Brand trademarks remain with the
-//! respective owners; usage here is nominative (identifying a linked
-//! account).
+//! `{O2P_ROUTE_PREFIX}/icons/<name>.svg`. Provider marks (Google,
+//! Microsoft, Auth0, Keycloak) are sourced from svgl
+//! (https://svgl.app/); the neutral OpenID fallback is from Simple
+//! Icons (https://simpleicons.org/, CC0). Brand trademarks remain with
+//! the respective owners; usage here is nominative (identifying a
+//! linked account).
 
 use axum::{
     Router,
-    http::{StatusCode, header::CONTENT_TYPE},
+    http::{
+        StatusCode,
+        header::{CACHE_CONTROL, CONTENT_TYPE},
+    },
     response::Response,
     routing::get,
 };
@@ -26,8 +31,9 @@ fn svg_response(content: &'static str) -> Response {
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "image/svg+xml")
+        .header(CACHE_CONTROL, "public, max-age=604800, immutable")
         .body(content.into())
-        .unwrap_or_else(|_| Response::new("Failed to build response".into()))
+        .expect("static SVG response is always buildable")
 }
 
 async fn serve_google() -> Response {
