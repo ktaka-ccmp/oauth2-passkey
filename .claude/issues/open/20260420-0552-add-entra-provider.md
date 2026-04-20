@@ -136,29 +136,29 @@ Env vars:
 ## Implementation Tasks
 
 ### Part 1: Type relaxation
-- [ ] Relax `OidcUserInfo` (`email` / `name` → `Option<String>`, add `preferred_username`)
-- [ ] Relax `OidcIdInfo` (same)
-- [ ] Change `oauth2_account_from_userinfo` return type + fallback logic
-- [ ] Change `oauth2_account_from_idinfo` return type + fallback logic
-- [ ] Update call sites in `coordination/oauth2.rs` (`?` propagation)
-- [ ] Update call site in `coordination/oauth2/tests.rs`
-- [ ] Update existing tests in `types/tests.rs`
-- [ ] Add new tests: preferred_username fallback, missing-both-errors path
-- [ ] Verify `cargo fmt --all` + `cargo clippy --all-targets --all-features` + `cargo test` clean
-- [ ] Regression: Google / Auth0 / Keycloak login still work in `demo-both`
+- [x] Relax `OidcUserInfo` (`email` / `name` → `Option<String>`, add `preferred_username`)
+- [x] Relax `OidcIdInfo` (same) + add `preferred_username`
+- [x] Change `oauth2_account_from_userinfo` return type + fallback logic
+- [x] Change `oauth2_account_from_idinfo` return type + fallback logic
+- [x] Update call sites in `coordination/oauth2.rs` (`?` propagation)
+- [x] Update call site in `coordination/oauth2/tests.rs`
+- [x] Update existing tests in `types/tests.rs`
+- [x] Add new tests: preferred_username fallback, missing-both-errors path
+- [x] Verify `cargo fmt --all` + `cargo clippy --all-targets --all-features` + `cargo test` clean
+- [x] Regression: Google / Auth0 / Keycloak login still work in `demo-both`
 - [ ] Commit Part 1
 
 ### Part 2: Entra provider
-- [ ] Add `Entra` variant + 6 lock-step edits in `provider.rs`
-- [ ] Add 2 tests in `provider/tests.rs`
-- [ ] Add `"entra"` arm in `provider_view`
-- [ ] Add CSS vars + `.btn-entra` styles
-- [ ] Write `docs/entra.md`
-- [ ] Verify `cargo fmt --all` + `cargo clippy --all-targets --all-features` + `cargo test` clean
-- [ ] End-to-end: Entra work account login succeeds, DB row has `provider = "entra"`
-- [ ] End-to-end: Entra personal MS account login succeeds via `preferred_username` fallback
-- [ ] Regression: mis-configured Entra (trigger set, secret missing) fails at startup
-- [ ] Commit Part 2
+- [x] Add `Entra` variant + 6 lock-step edits in `provider.rs`
+- [x] Add 2 tests in `provider/tests.rs`
+- [x] Add `"entra"` arm in `provider_view`
+- [x] Add CSS vars + `.btn-entra` styles
+- [x] Write `docs/src/guides/entra.md`
+- [x] Verify `cargo fmt --all` + `cargo clippy --all-targets --all-features` + `cargo test` clean
+- [x] End-to-end: Entra work account login succeeds, DB row has `provider = "entra"`
+- [x] End-to-end: Entra personal MS account login succeeds via `preferred_username` fallback
+- [x] Regression: mis-configured Entra (trigger set, secret missing) fails at startup
+- [ ] Commit Part 1 + Part 2
 
 ## Decision Log
 
@@ -185,6 +185,16 @@ Env vars:
 - Reason: Multi-tenant issuer validation is non-trivial (pattern-match `{tenantid}` against
   the actual tenant ID from the id_token) and is orthogonal to the Entra-specific work.
   If demand appears, handle as a follow-up.
+
+### 2026-04-20: Made `Jwk.alg` optional to fix Entra JWKS parsing
+
+- Context: Entra's JWKS endpoint omits the `alg` field from key entries; the existing
+  `Jwk` struct had `alg: String` (required), causing serde deserialization to fail with
+  "error decoding response body" when the JWKS was fetched.
+- Decision: Changed `Jwk.alg` to `Option<String>`. `convert_jwk_to_decoding_key` falls
+  back to a `kty`-derived default (`RSA` → `RS256`, `EC` → `ES256`, `oct` → `HS256`).
+- Reason: The fix is minimal and backward-compatible. Google and other providers that
+  include `alg` continue to work unchanged; the fallback only activates when absent.
 
 ### 2026-04-20: Kept `OAuth2Account.email` / `.name` required
 
