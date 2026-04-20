@@ -23,6 +23,7 @@ use super::masking::Masker;
 use crate::{
     O2P_ADMIN_URL,
     config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT},
+    oauth2::{display_name_for, icon_slug_for},
     session::AuthUser,
 };
 
@@ -168,6 +169,8 @@ struct TemplateAccount {
     pub id: String,
     pub user_id: String,
     pub provider: String,
+    pub provider_display_name: String,
+    pub provider_icon_slug: &'static str,
     pub provider_user_id: String,
     pub name: String,
     pub email: String,
@@ -354,10 +357,14 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
     let oauth2_accounts = oauth2_accounts
         .into_iter()
         .map(|account| {
+            let provider_display_name = display_name_for(&account.provider).to_string();
+            let provider_icon_slug = icon_slug_for(&account.provider);
             TemplateAccount {
                 id: account.id,
                 user_id: account.user_id,
                 provider: account.provider,
+                provider_display_name,
+                provider_icon_slug,
                 provider_user_id: account.provider_user_id,
                 name: account.name,
                 email: account.email,

@@ -704,8 +704,7 @@ nav a:hover {
    Provider Icon
    -----------------------------------------------------------------------------
    Small branded mark displayed in the top-right corner of an OAuth2 account
-   card (`.item.oauth2`). Sourced from Simple Icons (CC0). See the crate README
-   for attribution. */
+   card (`.item.oauth2`). See the crate README for attribution. */
 .provider-icon {
     position: absolute;
     top: var(--o2p-space-sm);
@@ -713,7 +712,6 @@ nav a:hover {
     width: 24px;
     height: 24px;
     object-fit: contain;
-    pointer-events: none;
 }
 
 /* -----------------------------------------------------------------------------

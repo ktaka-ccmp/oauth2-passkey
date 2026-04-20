@@ -67,12 +67,21 @@ set of enum variants (e.g. `Custom1`..`Custom4`), not a dynamic registry.
 - `20260420-0552` Add Entra Provider (relationship: validates the OIDC code
   path that generic slots reuse)
 - `20260420-1643` Show IDP Icon and Provider Name on OAuth2 Account Cards
-  (relationship: account-page icon work. Ships `openid.svg` fallback that
-  custom slots here reuse — no additional icon work needed in this issue.
-  If 1511 lands first, 1643's "display_name" task collapses to using
-  `ProviderConfig.display_name` directly; if 1643 lands first, the source
-  of truth moves from `ProviderKind::display_name()` to
-  `ProviderConfig.display_name` as part of this issue.)
+  (relationship: account-page icon work — landed 2026-04-20 ahead of this
+  issue. Ships `openid.svg` fallback that custom slots here reuse; no new
+  icon assets needed in this issue. Consolidation pending here:
+  - 1643 landed with free functions `display_name_for(&str) -> &str` and
+    `icon_slug_for(&str) -> &'static str` in
+    `oauth2_passkey_axum/src/oauth2.rs` (not a method on `ProviderKind`).
+    When this issue adds `ProviderConfig.display_name` /
+    `ProviderConfig.button_class`, migrate the source of truth to
+    `ProviderConfig` and delete both helpers. `provider_view` in the
+    axum crate already duplicates the same provider table and should be
+    folded into the same migration.
+  - `icon_slug_for` currently returns `"openid"` for any unknown slug,
+    which is the right behavior for generic OIDC slots: custom slots
+    render with the neutral OpenID mark. No per-slot icon env var is
+    needed (YAGNI — revisit if deployers ask).)
 
 ## Approach
 
