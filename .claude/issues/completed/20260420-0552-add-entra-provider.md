@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-20-05-52
 
-## Closed:
+## Closed: 2026-04-20-14-37
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -146,7 +146,7 @@ Env vars:
 - [x] Add new tests: preferred_username fallback, missing-both-errors path
 - [x] Verify `cargo fmt --all` + `cargo clippy --all-targets --all-features` + `cargo test` clean
 - [x] Regression: Google / Auth0 / Keycloak login still work in `demo-both`
-- [ ] Commit Part 1
+- [x] Commit Part 1
 
 ### Part 2: Entra provider
 - [x] Add `Entra` variant + 6 lock-step edits in `provider.rs`
@@ -158,7 +158,7 @@ Env vars:
 - [x] End-to-end: Entra work account login succeeds, DB row has `provider = "entra"`
 - [x] End-to-end: Entra personal MS account login succeeds via `preferred_username` fallback
 - [x] Regression: mis-configured Entra (trigger set, secret missing) fails at startup
-- [ ] Commit Part 1 + Part 2
+- [x] Commit Part 1 + Part 2
 
 ## Decision Log
 
@@ -207,3 +207,34 @@ Env vars:
   sufficient for the realistic failure cases.
 
 ## Resolution
+
+Microsoft Entra ID is now available as a fourth optional OIDC provider. The
+implementation surfaced three latent issues that were fixed as part of the
+work:
+
+1. **OIDC type compliance** — `OidcUserInfo.email` / `.name` and
+   `OidcIdInfo.email` / `.name` were required (`String`) despite being
+   standard (not required) claims per OIDC Core 1.0. Relaxed to
+   `Option<String>`; added `preferred_username` as a documented fallback
+   with clear error paths when both are absent.
+2. **JWKS parsing** — `Jwk.alg` was required (`String`) but Entra's JWKS
+   endpoint omits it. Made optional with kty-derived defaults (`RSA` →
+   `RS256`, `EC` → `ES256`, `oct` → `HS256`).
+3. **Consumers tenant UUID** — Documented that `consumers` alias fails
+   issuer validation; users must configure the fixed UUID
+   (`9188040d-6c67-4c5b-b112-36a304b66dad`) for B2C personal-account
+   deployments.
+
+**Verified scenarios:**
+- Work/school account (single-tenant) login succeeds with `email` claim
+- Personal MS account login succeeds with `preferred_username` fallback
+- Mis-configured Entra (trigger set, dependencies missing) fails at startup
+- Regression: Google / Auth0 / Keycloak continue to work
+
+**Commits:**
+- `b75b2f7` feat: add Microsoft Entra ID as optional OIDC provider
+- `997dad7` docs: expand Entra setup guide for personal Microsoft accounts
+
+**Out of scope (potential follow-up):**
+- Multi-tenant issuer validation (`common` / `organizations` endpoints) to
+  support work + personal accounts in a single app registration
