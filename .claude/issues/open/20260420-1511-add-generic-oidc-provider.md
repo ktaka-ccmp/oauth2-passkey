@@ -66,6 +66,13 @@ set of enum variants (e.g. `Custom1`..`Custom4`), not a dynamic registry.
 - `20260226-2020` Expand OAuth2 Provider Support (relationship: part of)
 - `20260420-0552` Add Entra Provider (relationship: validates the OIDC code
   path that generic slots reuse)
+- `20260420-1643` Show IDP Icon and Provider Name on OAuth2 Account Cards
+  (relationship: account-page icon work. Ships `openid.svg` fallback that
+  custom slots here reuse — no additional icon work needed in this issue.
+  If 1511 lands first, 1643's "display_name" task collapses to using
+  `ProviderConfig.display_name` directly; if 1643 lands first, the source
+  of truth moves from `ProviderKind::display_name()` to
+  `ProviderConfig.display_name` as part of this issue.)
 
 ## Approach
 
