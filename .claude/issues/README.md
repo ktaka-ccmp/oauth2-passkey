@@ -6,12 +6,13 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (12)
+### Open (17)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `20260420-0402` | medium | small | [Admin unlink/delete fails in demo mode ("Invalid user ID")](open/20260420-0402-admin-unlink-demo-mode.md) |
 | `20260226-2020` | high | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
+| `20260420-1511` | high | medium | [Add Generic OIDC Provider Slots](open/20260420-1511-add-generic-oidc-provider.md) |
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 | `20260226-1814` | high | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
@@ -19,9 +20,13 @@ This directory contains issue/task tracking files for the project.
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
+| `20260420-1456` | medium | medium | [Add LINE Login as OAuth2 Provider](open/20260420-1456-add-line-provider.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
 | `20260331-1517` | low | small | [PASSKEY_AUTHENTICATOR_ATTACHMENT=none sends non-standard string instead of omitting field](open/20260331-1517-passkey-authenticator-attachment-none-serialization.md) |
+| `20260420-1457` | low | large | [Add Sign in with Apple as OAuth2 Provider](open/20260420-1457-add-apple-provider.md) |
+| `20260420-1458` | low | large | [Add GitHub as OAuth2 Provider (non-OIDC)](open/20260420-1458-add-github-provider.md) |
+| `20260420-1521` | low | small | [Remove `OAUTH2_GOOGLE_USER` Dead Code and `oauth2_account_from_userinfo`](open/20260420-1521-remove-oauth2-google-user-dead-code.md) |
 
 ### Completed (60)
 
