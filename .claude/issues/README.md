@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (17)
+### Open (18)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -27,6 +27,7 @@ This directory contains issue/task tracking files for the project.
 | `20260420-1457` | low | large | [Add Sign in with Apple as OAuth2 Provider](open/20260420-1457-add-apple-provider.md) |
 | `20260420-1458` | low | large | [Add GitHub as OAuth2 Provider (non-OIDC)](open/20260420-1458-add-github-provider.md) |
 | `20260420-1521` | low | small | [Remove `OAUTH2_GOOGLE_USER` Dead Code and `oauth2_account_from_userinfo`](open/20260420-1521-remove-oauth2-google-user-dead-code.md) |
+| `20260420-1643` | low | small | [Show IDP Icon and Provider Name on OAuth2 Account Cards](open/20260420-1643-oauth2-account-provider-icons.md) |
 
 ### Completed (60)
 

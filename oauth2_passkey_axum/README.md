@@ -255,6 +255,10 @@ For detailed implementation guide including form-based CSRF and manual verificat
 
 This crate is built on top of [`oauth2-passkey`](../oauth2_passkey). See that crate's documentation for core authentication concepts and advanced usage.
 
+## Attribution
+
+Provider icons under `static/icons/` are sourced from [svgl](https://svgl.app/) (Google, Microsoft, Auth0, Keycloak) and [Simple Icons](https://simpleicons.org/) (OpenID, CC0 1.0). Brand trademarks and trade dress remain the property of their respective owners; icons are used here nominatively to indicate a linked provider account, not to claim affiliation or endorsement.
+
 ## License
 
 Licensed under either of

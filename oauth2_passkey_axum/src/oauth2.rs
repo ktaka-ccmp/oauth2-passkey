@@ -71,6 +71,34 @@ fn provider_view(name: &'static str) -> ProviderView {
     }
 }
 
+/// Human-readable label for a provider slug. Used on post-auth UI
+/// (e.g. linked-account cards) where the slug comes from the DB as a
+/// runtime `String`. Unknown slugs pass through unchanged so generic
+/// OIDC providers (see issue `20260420-1511`) render with their own
+/// slug as the label until that issue lands a richer display model.
+pub(crate) fn display_name_for(slug: &str) -> &str {
+    match slug {
+        "google" => "Google",
+        "auth0" => "Auth0",
+        "keycloak" => "Keycloak",
+        "entra" => "Microsoft",
+        other => other,
+    }
+}
+
+/// Basename of the SVG served under `{O2P_ROUTE_PREFIX}/icons/` for a
+/// provider slug. Unknown slugs fall back to `"openid"` — a neutral
+/// OpenID Connect mark.
+pub(crate) fn icon_slug_for(slug: &str) -> &'static str {
+    match slug {
+        "google" => "google",
+        "auth0" => "auth0",
+        "keycloak" => "keycloak",
+        "entra" => "entra",
+        _ => "openid",
+    }
+}
+
 use super::config::{O2P_CUSTOM_CSS_URL, O2P_FEDCM, O2P_PASSKEY_PROMOTION};
 use super::error::IntoResponseError;
 use super::session::AuthUser;
