@@ -95,7 +95,7 @@ async fn authorized_core(
             "Skipping origin check for HTTP localhost callback"
         );
     } else {
-        validate_origin(headers, &auth_url).await?;
+        validate_origin(headers, &auth_url, &ctx.additional_allowed_origins).await?;
     }
 
     if auth_response.state.is_empty() {

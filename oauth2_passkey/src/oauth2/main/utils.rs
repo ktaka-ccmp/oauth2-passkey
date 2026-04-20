@@ -110,6 +110,7 @@ pub(super) async fn verify_and_consume_nonce(
 pub(crate) async fn validate_origin(
     headers: &HeaderMap,
     auth_url: &str,
+    additional_allowed_origins: &[String],
 ) -> Result<(), OAuth2Error> {
     let parsed_url = Url::parse(auth_url).expect("Invalid URL");
     let scheme = parsed_url.scheme();
@@ -129,13 +130,24 @@ pub(crate) async fn validate_origin(
         }
     };
 
+    let matches = |candidate: &str| {
+        candidate.starts_with(&expected_origin)
+            || additional_allowed_origins
+                .iter()
+                .any(|allowed| candidate.starts_with(allowed))
+    };
+
     match origin {
-        Some(origin) if origin.starts_with(&expected_origin) => Ok(()),
+        Some(origin) if matches(origin) => Ok(()),
         _ => {
             tracing::error!("Expected Origin: {:#?}", expected_origin);
+            tracing::error!(
+                "Additional allowed origins: {:#?}",
+                additional_allowed_origins
+            );
             tracing::error!("Actual Origin: {:#?}", origin);
             Err(OAuth2Error::InvalidOrigin(format!(
-                "Expected Origin: {expected_origin:#?}, Actual Origin: {origin:#?}"
+                "Expected Origin: {expected_origin:#?} (or one of {additional_allowed_origins:?}), Actual Origin: {origin:#?}"
             )))
         }
     }

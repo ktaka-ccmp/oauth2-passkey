@@ -177,6 +177,7 @@ impl ProviderConfig {
             response_mode: response_mode.to_string(),
             query_string,
             discovery,
+            additional_allowed_origins: Vec::new(),
         }
     }
 
@@ -209,6 +210,7 @@ impl ProviderConfig {
             response_mode: response_mode.to_string(),
             query_string,
             discovery,
+            additional_allowed_origins: Vec::new(),
         }
     }
 }
