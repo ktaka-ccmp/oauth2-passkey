@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-20-16-43
 
-## Closed:
+## Closed: 2026-04-20
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -157,56 +157,46 @@ fall back to the raw slug for unknown providers (generic OIDC slots, future prov
 
 ### Display-name resolution (order-dependent with `20260420-1511`)
 
-Pick **one** path based on whether `20260420-1511` (generic OIDC slots) has landed:
-
-- **If 1511 has NOT landed yet**: add `ProviderKind::display_name(&self) -> &'static
-  str` returning `"Google"`, `"Auth0"`, `"Keycloak"`, `"Microsoft"` (note: Entra's
-  UI label is "Microsoft" to match the login button). Unit test all variants in
-  `oauth2_passkey/src/oauth2/provider/tests.rs`.
-- **If 1511 HAS landed**: skip the enum method — `ProviderConfig` already exposes
-  `display_name` as a field. Use `provider_for(kind).map(|c| c.display_name)` with
-  a slug fallback for unknown providers (generic OIDC custom slots store their own
-  `display_name` per-slot). In this case the only lookup work is in the handler.
+Neither of the two originally-planned paths was taken. Instead, implementation
+landed two free functions — `display_name_for(&str) -> &str` and
+`icon_slug_for(&str) -> &'static str` — in `oauth2_passkey_axum/src/oauth2.rs`,
+co-located with the existing `provider_view` table. This keeps the provider
+string table inside the axum crate (where the template is rendered) and sidesteps
+the core-crate churn that would have been needed for a `ProviderKind::display_name()`
+method when 1511 is expected to relocate the source of truth to
+`ProviderConfig` anyway. The consolidation debt is tracked in `20260420-1511`.
 
 ### Everything else
 
-- [ ] Extend the handler that builds `UserAccountTemplate` context (find in
+- [x] Extend the handler that builds `UserAccountTemplate` context (find in
       `oauth2_passkey_axum/src/`) to compute a `provider_display_name` per OAuth2
       account, falling back to the raw slug when the provider isn't recognised
-- [ ] Download four branded Simple Icons SVGs into
-      `oauth2_passkey_axum/static/icons/` (google.svg, auth0.svg, keycloak.svg,
-      entra.svg — using the `microsoft` source for Entra since the Microsoft
-      multi-color tile is the user-facing brand)
-- [ ] Download one neutral fallback SVG: `openid.svg` from Simple Icons. This is
-      the icon that `20260420-1511` custom slots (and any future unrecognised
-      provider with `OAUTH2_*` credentials) will render with. Shipping it as part
-      of this issue means 1511 does not need any icon work of its own
-- [ ] Update `user_account.j2`:
-      - Add `<img class="provider-icon" src="{static_prefix}/icons/{{ icon_slug }}.svg"
-        alt="{{ provider_display_name }}" title="{{ provider_display_name }}">` at
-        the top of each `.item.oauth2` block
-      - `icon_slug` is `account.provider` if a branded SVG exists for it, otherwise
-        `"openid"` — resolution happens in the handler when building the template
-        context, not in the template
-      - Uncomment the Provider detail row; use `{{ provider_display_name }}`
-- [ ] Update `o2p-base.css`:
+      — done in `user/account.rs` (PR #313) **and** `admin/optional.rs` (PR #314,
+      scope expansion)
+- [x] Download four branded SVGs into `oauth2_passkey_axum/static/icons/`
+      (google.svg, auth0.svg, keycloak.svg, entra.svg) — **sourced from
+      [svgl](https://svgl.app/) instead of Simple Icons** (svgl ships the
+      official multi-color brand marks; Simple Icons is monochrome-only)
+- [x] Download one neutral fallback SVG: `openid.svg` from Simple Icons (CC0).
+      This is the icon that `20260420-1511` custom slots (and any future
+      unrecognised provider with `OAUTH2_*` credentials) will render with.
+      Shipping it as part of this issue means 1511 does not need any icon work
+      of its own
+- [x] Update `user_account.j2` with `<img class="provider-icon">` at the top of
+      each `.item.oauth2` block and an uncommented Provider detail row using
+      `{{ account.provider_display_name }}` (PR #313)
+- [x] Update `o2p-base.css`:
       - `.item.oauth2 { position: relative; }`
-      - `.provider-icon { position: absolute; top: …; right: …; width: 24px; height: 24px; object-fit: contain; }`
-      - Responsive check: on narrow viewports (`@media (max-width: …)`), confirm
-        the icon doesn't overlap the profile picture
-- [ ] Add Simple Icons attribution (CC0 but courtesy attribution) to
-      `oauth2_passkey_axum/README.md` or a new `CREDITS.md`
-- [ ] Manual verification on `demo-both` with all four providers linked:
-      - Google icon visible, correct color, not clipped
-      - Auth0 icon visible
-      - Keycloak icon visible (local keycloak idp)
-      - Entra icon visible (personal MS account via passkey-demo.ccmp.jp)
-      - Layout doesn't break when account has no profile picture (Keycloak/Entra)
-      - Layout doesn't break when account has long email/name
-      - Dark-mode (if applicable) doesn't tint the icon oddly — Simple Icons
-        full-color SVGs should render identically
-- [ ] `cargo fmt --all && cargo clippy --all-targets --all-features && cargo test`
-- [ ] Screenshot before/after in the PR description
+      - `.provider-icon { position: absolute; top: ...; right: ...; width: 24px; height: 24px; object-fit: contain; }`
+- [x] Add attribution for both icon sources (svgl + Simple Icons) to
+      `oauth2_passkey_axum/README.md` (under new "Attribution" section — no
+      separate `CREDITS.md` file created)
+- [x] Manual verification — checked on **demo-live** (passkey-demo.ccmp.jp) with
+      all four providers linked; layout intact with and without profile picture
+- [x] `cargo fmt --all && cargo clippy --all-targets --all-features && cargo test`
+      — CI green after `a715fa0` (rustdoc bare-URL fix)
+- [ ] Screenshot before/after in the PR description — not attached; skipped by
+      agreement
 
 ## Decision Log
 
@@ -248,6 +238,38 @@ Pick **one** path based on whether `20260420-1511` (generic OIDC slots) has land
   Template-side if/elif would duplicate the variant list across Rust and Jinja, and
   handler-side lookup tables would fragment the same mapping.
 
+### 2026-04-20: Free functions in axum crate over `ProviderKind::display_name()`
+
+- Context: The originally-planned Option C was a method `display_name(&self)` on
+  `ProviderKind` in the core crate, to keep the per-provider string table in one
+  place. During implementation, issue `20260420-1511` was finalised as
+  `high`-priority and will migrate `display_name` onto `ProviderConfig` — which
+  would immediately make a core-crate enum method vestigial.
+- Decision: Skip the `ProviderKind` method entirely. Add two free functions in
+  `oauth2_passkey_axum/src/oauth2.rs`: `display_name_for(&str) -> &str` and
+  `icon_slug_for(&str) -> &'static str`. Both are `pub(crate)`, consumed only by
+  the user/admin account handlers.
+- Reason: Keeps all the churn inside the axum crate where the templates live;
+  avoids core-crate changes that 1511 is about to supersede; the fallback
+  behaviour (pass-through slug for display, `"openid"` for icon) is trivial in a
+  free function. When 1511 lands, these two helpers fold into `ProviderConfig`
+  together with the duplicate `provider_view` table — see 1511's Related Issues
+  section.
+
+### 2026-04-20: svgl for branded marks, Simple Icons for OpenID fallback only
+
+- Context: The original plan called for four Simple Icons SVGs + one Simple
+  Icons OpenID fallback. Simple Icons distributes single-color (monochrome)
+  SVGs — fine for the OpenID neutral mark, but flattens Google's 4-color "G"
+  and Microsoft's 4-color tile.
+- Decision: Use [svgl](https://svgl.app/) for the four branded icons (Google,
+  Microsoft, Auth0, Keycloak) and keep Simple Icons (CC0) only for `openid.svg`.
+- Reason: svgl ships the official multi-color brand marks in SVG form, which
+  matches the "Render: <img>, not mask-image" decision above — the whole point
+  of that earlier choice was to preserve multi-color rendering. Simple Icons
+  would have required a separate tinting strategy per provider. Attribution in
+  `README.md` covers both sources.
+
 ### 2026-04-20: Coordination with `20260420-1511` (Generic OIDC Slots)
 
 - Context: Issue `20260420-1511` plans to add `display_name` / `button_class` / etc.
@@ -271,5 +293,54 @@ Pick **one** path based on whether `20260420-1511` (generic OIDC slots) has land
 
 ## Resolution
 
-<!-- filled in when closed -->
+Shipped in two merged PRs on 2026-04-20:
+
+- **PR #313** — user-facing account cards (`/o2p/user/account`):
+  - `ea30538` feat(ui): show IDP icon and provider name on OAuth2 account cards
+  - `a601513` style(ui): shrink OAuth2 profile picture to 80px
+- **PR #314** — admin user detail page (`/o2p/admin/user/`) + review follow-ups:
+  - `2f058a0` fix(oauth2-axum): address PR #313 review follow-ups
+    (attribution cleanup, `Cache-Control: public, max-age=604800, immutable`
+    on icon SVGs, `.expect()` over silent fallback in `svg_response`,
+    removed `pointer-events: none` so the `title` tooltip works, 4 unit
+    tests for `display_name_for` / `icon_slug_for`)
+  - `93d9983` feat(ui): show IDP icon and provider name on admin user
+    detail page
+  - `a715fa0` fix(docs): wrap bare URLs in `icons.rs` as rustdoc hyperlinks
+    (CI bare-url lint fix)
+
+### Key files
+
+- `oauth2_passkey_axum/src/oauth2.rs` — `display_name_for` / `icon_slug_for`
+  helpers (`pub(crate)`)
+- `oauth2_passkey_axum/src/icons.rs` — new `/icons/*.svg` router with
+  long-cache headers; `pub(crate) fn router()` mounted under `O2P_ROUTE_PREFIX`
+- `oauth2_passkey_axum/static/icons/` — `google.svg`, `auth0.svg`,
+  `keycloak.svg`, `entra.svg` (svgl), `openid.svg` (Simple Icons CC0)
+- `oauth2_passkey_axum/src/user/account.rs` + `templates/user_account.j2`
+- `oauth2_passkey_axum/src/admin/optional.rs` + `templates/admin_user_page.j2`
+- `oauth2_passkey_axum/static/o2p-base.css` — `.provider-icon` positioning
+- `oauth2_passkey_axum/README.md` — Attribution section
+
+### Scope deviations from original plan
+
+- **Admin user detail page** added mid-stream (not in the original Implementation
+  Tasks) — landed in PR #314 as a direct mirror of the user-account markup.
+- **Display-name resolution**: neither planned path taken; used free functions
+  in the axum crate instead (see Decision Log 2026-04-20).
+- **Icon source**: svgl for branded marks + Simple Icons only for OpenID
+  fallback (see Decision Log 2026-04-20).
+
+### Outstanding debt (tracked elsewhere)
+
+- Consolidation: fold `display_name_for` / `icon_slug_for` / `provider_view`
+  into `ProviderConfig` fields when `20260420-1511` (Generic OIDC Slots) lands.
+  Cross-reference already recorded in that issue's Related Issues section.
+
+### Verification
+
+- CI green (`a715fa0`)
+- Manual check on demo-live (passkey-demo.ccmp.jp) across Google / Auth0 /
+  Keycloak / Entra — icons render with correct brand colors and `title`
+  tooltip; layout holds with and without profile picture.
 
