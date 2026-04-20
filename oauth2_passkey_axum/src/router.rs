@@ -34,6 +34,7 @@ pub fn oauth2_passkey_router() -> Router {
         .nest("/user", super::user::router())
         .nest("/admin", super::admin::router())
         .nest("/themes", super::themes::router())
+        .nest("/icons", super::icons::router())
 }
 
 /// Creates a complete router with all authentication endpoints

@@ -417,6 +417,7 @@ a:hover {
 
 .item.oauth2 {
     border-left-color: var(--o2p-secondary);
+    position: relative;
 }
 
 .item-detail {
@@ -697,6 +698,22 @@ nav a:hover {
     max-height: 80px;
     border-radius: 50%;
     border: 2px solid var(--o2p-border-light);
+}
+
+/* -----------------------------------------------------------------------------
+   Provider Icon
+   -----------------------------------------------------------------------------
+   Small branded mark displayed in the top-right corner of an OAuth2 account
+   card (`.item.oauth2`). Sourced from Simple Icons (CC0). See the crate README
+   for attribution. */
+.provider-icon {
+    position: absolute;
+    top: var(--o2p-space-sm);
+    right: var(--o2p-space-sm);
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    pointer-events: none;
 }
 
 /* -----------------------------------------------------------------------------

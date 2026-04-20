@@ -59,6 +59,7 @@ mod config;
 #[cfg(feature = "cors")]
 mod cors;
 mod error;
+mod icons;
 mod login_history;
 mod middleware;
 mod oauth2;

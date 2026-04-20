@@ -139,6 +139,10 @@
         {% else %}
             {% for account in oauth2_accounts %}
                 <div class="item oauth2">
+                    <img class="provider-icon"
+                         src="{{ o2p_route_prefix }}/icons/{{ account.provider_icon_slug }}.svg"
+                         alt="{{ account.provider_display_name }}"
+                         title="{{ account.provider_display_name }}">
                     {% if account.picture != "" %}
                     <div class="account-picture">
                         <img src="{{ account.picture }}" alt="Profile Picture" style="max-width: 100px; max-height: 100px; border-radius: 50%;">
@@ -147,13 +151,13 @@
                     <!--
                     <div class="item-detail"><strong>ID:</strong> {{ account.id }}</div>
                     <div class="item-detail"><strong>User ID:</strong> {{ account.user_id }}</div>
-                    <div class="item-detail"><strong>Provider:</strong> {{ account.provider }}</div>
                     <div class="item-detail"><strong>Provider User ID:</strong> {{ account.provider_user_id }}</div>
                     {% if account.metadata_str != "" %}
                         <div class="item-detail"><strong>Metadata:</strong> {{ account.metadata_str }}</div>
                     {% endif %}
                     <div class="item-detail"><strong>Updated:</strong> {{ account.updated_at }}</div>
                     -->
+                    <div class="item-detail"><strong>Provider:</strong> {{ account.provider_display_name }}</div>
                     {% if account.email != "" %}
                         <div class="item-detail"><strong>Email:</strong> {{ account.email }}</div>
                     {% endif %}
