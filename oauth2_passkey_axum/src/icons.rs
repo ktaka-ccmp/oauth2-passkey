@@ -3,8 +3,8 @@
 //! Serves branded SVG icons for OAuth2 providers at
 //! `{O2P_ROUTE_PREFIX}/icons/<name>.svg`. Provider marks (Google,
 //! Microsoft, Auth0, Keycloak) are sourced from svgl
-//! (https://svgl.app/); the neutral OpenID fallback is from Simple
-//! Icons (https://simpleicons.org/, CC0). Brand trademarks remain with
+//! (<https://svgl.app/>); the neutral OpenID fallback is from Simple
+//! Icons (<https://simpleicons.org/>, CC0). Brand trademarks remain with
 //! the respective owners; usage here is nominative (identifying a
 //! linked account).
 
