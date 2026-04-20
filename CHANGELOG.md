@@ -5,6 +5,20 @@ All notable changes to oauth2-passkey will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1-dev]
+
+### Changed
+
+- **Breaking**: `OidcIdInfo.email` and `OidcIdInfo.name` are now `Option<String>`
+  (previously `String`) to comply with OIDC Core 1.0, which classifies them as
+  standard — not required — claims. Required for Microsoft Entra and other
+  providers that may omit these claims.
+  - Added `OidcIdInfo.preferred_username: Option<String>` as a documented
+    fallback for `email` (used by Microsoft personal accounts).
+  - `OAuth2Account.email` / `.name` remain non-optional; the conversion layer
+    uses `preferred_username` or errors with `OAuth2Error::Validation` if no
+    email claim is available.
+
 ## [0.5.0] - 2026-03-23
 
 ### Added

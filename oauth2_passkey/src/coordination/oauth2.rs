@@ -261,9 +261,9 @@ async fn process_oauth2_authorization(
     static OAUTH2_GOOGLE_USER: &str = "idinfo";
 
     let oauth2_account = match OAUTH2_GOOGLE_USER {
-        "idinfo" => oauth2_account_from_idinfo(&idinfo, provider_name),
-        "userinfo" => oauth2_account_from_userinfo(&userinfo, provider_name),
-        _ => oauth2_account_from_idinfo(&idinfo, provider_name), // Default case
+        "idinfo" => oauth2_account_from_idinfo(&idinfo, provider_name)?,
+        "userinfo" => oauth2_account_from_userinfo(&userinfo, provider_name)?,
+        _ => oauth2_account_from_idinfo(&idinfo, provider_name)?, // Default case
     };
 
     // Extract user_id from the stored session if available
@@ -496,7 +496,7 @@ pub async fn fedcm_authorized_core(
     let idinfo = validate_fedcm_token(ctx, &request.credential, &request.nonce_id).await?;
 
     // 2. Build OAuth2Account from the verified ID token
-    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx.kind.as_str());
+    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx.kind.as_str())?;
 
     // 3. Parse mode directly from request (no cache round-trip needed for FedCM)
     let mode = match &request.mode {

@@ -40,7 +40,7 @@ async fn fedcm_authorized_core_with_ctx(
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
     let idinfo = validate_fedcm_token(ctx, &request.credential, &request.nonce_id).await?;
-    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx.kind.as_str());
+    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx.kind.as_str())?;
 
     let mode = match &request.mode {
         Some(mode_str) => {

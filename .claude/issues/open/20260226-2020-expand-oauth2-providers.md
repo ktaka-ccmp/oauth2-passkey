@@ -16,7 +16,7 @@
 
 ## Closed:
 
-## Status: open (Step 1 completed 2026-04-16; Step 2 completed 2026-04-20, pending LT screenshots + Phase 2+)
+## Status: open (Step 1 + 2 complete; Auth0/Keycloak/Entra shipped; LINE/Apple/GitHub tracked as sub-issues)
 
 ## Priority: high
 
@@ -24,22 +24,48 @@
 
 ## Description
 
-Currently only Google OAuth2/OIDC is supported. Add support for additional OAuth2 providers to expand the library's utility:
+Originally only Google OAuth2/OIDC was supported. This umbrella issue tracks
+expansion to additional providers so that the library is useful for a wider
+range of deployments.
 
-- **GitHub** - Popular for developer-facing applications
-- **Apple** - Required for iOS apps using third-party login
-- **Microsoft** (Azure AD / Entra ID) - Common in enterprise environments
+### Provider status
+
+| Provider | Flow | Status | Tracking issue |
+|----------|------|--------|----------------|
+| Google | OIDC | shipped (v0.5.1) | — (baseline) |
+| Auth0 | OIDC | shipped (v0.5.1) | Step 2 below |
+| Keycloak | OIDC | shipped | `20260420-0307` (completed) |
+| Microsoft Entra ID | OIDC | shipped | `20260420-0552` (completed) |
+| LINE | OIDC | planned | `20260420-1456` |
+| Apple | OIDC + dynamic JWT secret | planned | `20260420-1457` |
+| GitHub | plain OAuth2 (non-OIDC) | planned | `20260420-1458` |
+| Generic OIDC slots (Okta, Zitadel, AWS Cognito, Ory Hydra, Dex, Authelia, ...) | OIDC | planned | `20260420-1511` |
 
 ### Design Considerations
 
-- The existing provider system was designed with extensibility in mind (OIDC Discovery, typed `Provider` wrapper)
+- The provider system uses a fixed `ProviderKind` enum + per-variant
+  `LazyLock<Option<ProviderConfig>>` statics (Step 1, 2026-04-16). Adding a
+  new OIDC provider = 6 lock-step edits in `provider.rs` + UI + docs.
 - Each provider has slightly different OAuth2/OIDC implementations and quirks
-- Apple Sign-In has unique requirements (form_post response mode, private email relay)
-- GitHub uses OAuth2 but not full OIDC (no ID token by default)
+  (e.g. Entra omits `email` for personal accounts, JWKS omits `alg`).
+- Apple Sign-In has unique requirements: `response_mode=form_post` forced,
+  `client_secret` as ES256 JWT generated from a P8 private key, name/email
+  only in the initial authorization.
+- GitHub uses OAuth2 but not OIDC: no id_token, no discovery, no JWKS;
+  identity is fetched from `/user` and `/user/emails` REST endpoints. This
+  requires introducing a non-OIDC flow path alongside the existing OIDC one.
 
 ## Related Issues
 
-None
+Completed sub-issues:
+- `20260420-0307` Add Keycloak as OIDC Provider (completed)
+- `20260420-0552` Add Microsoft Entra ID as OAuth2 Provider (completed)
+
+Open sub-issues:
+- `20260420-1456` Add LINE Login as OAuth2 Provider
+- `20260420-1457` Add Sign in with Apple as OAuth2 Provider
+- `20260420-1458` Add GitHub as OAuth2 Provider (non-OIDC)
+- `20260420-1511` Add Generic OIDC Provider Slots
 
 ## Approach
 
@@ -246,25 +272,42 @@ Tests and verification:
 - [x] If any code change is needed here, mark Step 1 as incomplete and address (no code changes required)
 
 
-### Phase 2: GitHub (non-OIDC)
+### Additional OIDC providers (completed after Step 2)
 
-- [ ] Introduce `OAuth2Flow` trait with OIDC and non-OIDC implementations
-- [ ] GitHub flow: code exchange + `GET /user` + `GET /user/emails`, no id_token, no nonce
-- [ ] GitHub-specific claim mapping
-- [ ] Integration test with mocked GitHub API
+- [x] Add Keycloak as OIDC provider — see sub-issue `20260420-0307`
+- [x] Add Microsoft Entra ID as OIDC provider — see sub-issue `20260420-0552`
+  - Surfaced and fixed two latent issues: `OidcIdInfo` / `OidcUserInfo`
+    `email`/`name` relaxed to `Option<String>` with `preferred_username`
+    fallback; `Jwk.alg` relaxed to `Option<String>` with kty-derived default.
 
-### Phase 3: Apple Sign-In
+### Phase 2: LINE (OIDC — same pattern as Entra)
 
-- [ ] Force `response_mode=form_post` per instance
-- [ ] Generate `client_secret` as ES256 JWT from Apple private key
-- [ ] Extract name/email from initial form body (first authorization only)
-- [ ] Handle Apple private email relay
-- [ ] Integration test
+Tracked as sub-issue `20260420-1456`. Straightforward lock-step edits; no
+architectural changes required. ES256 is already supported; main caveat is
+LINE's email-permission approval requirement.
 
-### Phase 4: FedCM multi-provider (optional)
+### Phase 3: GitHub (non-OIDC) — was "Phase 2" in earlier revisions
+
+Tracked as sub-issue `20260420-1458`. Requires introducing a non-OIDC flow
+path (enum `ProviderFlow` or a trait abstraction) because GitHub does not
+issue id_tokens and has no discovery endpoint for end-user login.
+
+### Phase 4: Apple Sign-In — was "Phase 3" in earlier revisions
+
+Tracked as sub-issue `20260420-1457`. Requires introducing a dynamic-secret
+strategy (`ClientSecret::AppleJwt` with ES256 JWT generation from a P8
+private key, with caching).
+
+### Phase 5: FedCM multi-provider (optional)
 
 - [ ] Per-instance FedCM configURL
 - [ ] Frontend FedCM `providers: [...]` array support
+
+### Phase 6 (potential, not currently tracked): Multi-tenant Entra
+
+Support `common` / `organizations` Entra endpoints for work+personal mixed
+apps. Requires pattern-matching issuer URLs against a `{tenantid}` placeholder.
+See the Entra sub-issue's Decision Log for context.
 
 ## Decision Log
 

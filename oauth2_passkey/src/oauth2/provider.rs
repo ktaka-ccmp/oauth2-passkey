@@ -27,11 +27,13 @@ pub(crate) enum ProviderKind {
     Google,
     Auth0,
     Keycloak,
+    Entra,
 }
 
 impl ProviderKind {
     /// All supported provider kinds in stable display order.
-    pub(crate) const ALL: &'static [Self] = &[Self::Google, Self::Auth0, Self::Keycloak];
+    pub(crate) const ALL: &'static [Self] =
+        &[Self::Google, Self::Auth0, Self::Keycloak, Self::Entra];
 
     /// Env-var validation contract for optional providers.
     ///
@@ -55,6 +57,10 @@ impl ProviderKind {
                     "OAUTH2_KEYCLOAK_ISSUER_URL",
                 ],
             )),
+            Self::Entra => Some((
+                "OAUTH2_ENTRA_CLIENT_ID",
+                &["OAUTH2_ENTRA_CLIENT_SECRET", "OAUTH2_ENTRA_ISSUER_URL"],
+            )),
         }
     }
 
@@ -63,6 +69,7 @@ impl ProviderKind {
             Self::Google => "google",
             Self::Auth0 => "auth0",
             Self::Keycloak => "keycloak",
+            Self::Entra => "entra",
         }
     }
 
@@ -73,6 +80,7 @@ impl ProviderKind {
             "google" => Some(Self::Google),
             "auth0" => Some(Self::Auth0),
             "keycloak" => Some(Self::Keycloak),
+            "entra" => Some(Self::Entra),
             _ => None,
         }
     }
@@ -288,6 +296,42 @@ pub(crate) static KEYCLOAK_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock
     })
 });
 
+/// Microsoft Entra ID provider — optional, enabled by setting `OAUTH2_ENTRA_CLIENT_ID`.
+/// Issuer URL format: `https://login.microsoftonline.com/{tenant_id}/v2.0` (single-tenant only).
+/// Multi-tenant endpoints (`common`, `organizations`) are not supported because the discovery
+/// document returns a `{tenantid}` placeholder that fails issuer validation.
+pub(crate) static ENTRA_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::new(|| {
+    let client_id = env::var("OAUTH2_ENTRA_CLIENT_ID").ok()?;
+    let client_secret = env::var("OAUTH2_ENTRA_CLIENT_SECRET")
+        .expect("OAUTH2_ENTRA_CLIENT_ID set but OAUTH2_ENTRA_CLIENT_SECRET missing");
+    let issuer_url = env::var("OAUTH2_ENTRA_ISSUER_URL")
+        .expect("OAUTH2_ENTRA_CLIENT_ID set but OAUTH2_ENTRA_ISSUER_URL missing");
+    let origin = env::var("ORIGIN").expect("Missing ORIGIN!");
+    let redirect_uri = format!(
+        "{}{}/oauth2/entra/authorized",
+        origin,
+        O2P_ROUTE_PREFIX.as_str()
+    );
+    let response_mode =
+        env::var("OAUTH2_ENTRA_RESPONSE_MODE").unwrap_or_else(|_| "form_post".to_string());
+    let scope =
+        env::var("OAUTH2_ENTRA_SCOPE").unwrap_or_else(|_| "openid+email+profile".to_string());
+    let query_string = format!(
+        "&response_type=code&scope={}&response_mode={}&prompt=consent",
+        scope, response_mode
+    );
+    Some(ProviderConfig {
+        kind: ProviderKind::Entra,
+        client_id,
+        client_secret,
+        issuer_url,
+        redirect_uri,
+        response_mode,
+        query_string,
+        discovery: OnceLock::new(),
+    })
+});
+
 /// Resolve a `ProviderKind` to its `&'static ProviderConfig`.
 ///
 /// Returns `None` if the provider is optional and not configured (its env vars
@@ -297,6 +341,7 @@ pub(crate) fn provider_for(kind: ProviderKind) -> Option<&'static ProviderConfig
         ProviderKind::Google => Some(&GOOGLE_PROVIDER),
         ProviderKind::Auth0 => AUTH0_PROVIDER.as_ref(),
         ProviderKind::Keycloak => KEYCLOAK_PROVIDER.as_ref(),
+        ProviderKind::Entra => ENTRA_PROVIDER.as_ref(),
     }
 }
 

@@ -31,6 +31,16 @@ fn test_provider_kind_as_str() {
     assert_eq!(ProviderKind::Google.as_str(), "google");
 }
 
+// --- from_path_segment: entra ---
+
+#[test]
+fn test_provider_kind_from_path_segment_entra() {
+    assert_eq!(
+        ProviderKind::from_path_segment("entra"),
+        Some(ProviderKind::Entra)
+    );
+}
+
 // --- optional_env_contract ---
 
 #[test]
@@ -58,6 +68,16 @@ fn test_optional_env_contract_keycloak() {
             "OAUTH2_KEYCLOAK_CLIENT_SECRET",
             "OAUTH2_KEYCLOAK_ISSUER_URL"
         ]
+    );
+}
+
+#[test]
+fn test_optional_env_contract_entra() {
+    let (trigger, required) = ProviderKind::Entra.optional_env_contract().unwrap();
+    assert_eq!(trigger, "OAUTH2_ENTRA_CLIENT_ID");
+    assert_eq!(
+        required,
+        ["OAUTH2_ENTRA_CLIENT_SECRET", "OAUTH2_ENTRA_ISSUER_URL"]
     );
 }
 
