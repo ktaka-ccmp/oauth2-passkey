@@ -136,4 +136,25 @@ Regression check: Google / Auth0 / Keycloak / Entra login still work.
   attack. Cheap extra HTTPS call, real security value. Removing it is a
   separate decision that would require its own issue.
 
+### 2026-04-21: Partial resolution — dead match removed, but
+`oauth2_account_from_userinfo` stays alive
+
+- Context: Zitadel E2E verification under `20260420-1511` revealed that
+  some OIDC providers do not assert `email` in the id_token at all,
+  only via the UserInfo endpoint. Building the account from `idinfo`
+  alone fails for them.
+- Decision:
+  - **Done now (under `20260420-1511` PR)**: remove the
+    `OAUTH2_GOOGLE_USER` constant and the dead `match` in
+    `coordination/oauth2.rs`. The call site is now a single call to
+    `oauth2_account_from_userinfo`.
+  - **Reversed from the original plan**: do **NOT** delete
+    `oauth2_account_from_userinfo` from `types.rs`. It is now the live
+    path for the main OAuth2 callback.
+- Follow-up: `20260421-0105` supersedes this issue for the final
+  architecture — a merged `idinfo+userinfo` account builder that
+  prefers userinfo and falls back to idinfo. Close this issue once
+  that one lands, or mark it completed now that the dead `match` /
+  `OAUTH2_GOOGLE_USER` removal is done.
+
 ## Resolution

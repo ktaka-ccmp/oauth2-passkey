@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-20-15-11
 
-## Closed:
+## Closed: 2026-04-21
 
-## Status: open
+## Status: completed
 
 ## Priority: high
 
@@ -242,4 +242,110 @@ Approach A is simpler and keeps the CSS file static.
   would reintroduce all the architectural complexity those issues are
   designed to handle carefully. Independent issues keep scope clean.
 
+### 2026-04-20: 1643 presentation migration folded into this issue
+
+- Context: Issue `20260420-1643` left `display_name_for(&str)` and
+  `icon_slug_for(&str)` free functions in `oauth2_passkey_axum/src/oauth2.rs`
+  with a note to migrate the source of truth to `ProviderConfig` when
+  `display_name` / `button_class` fields landed.
+- Decision: Do the migration here. `ProviderConfig` gains
+  `path_segment`, `display_name`, `button_class`, `icon_slug`,
+  `button_color`, `button_hover_color`. Public `ProviderInfo` carries
+  the presentation fields. Axum's `provider_view` becomes a thin
+  `ProviderInfo`-to-`ProviderView` mapping; both free helpers deleted.
+- Reason: Custom slots must source presentation data from config anyway
+  (env-driven). Keeping named providers on the hardcoded match while
+  custom slots go through config would leave two parallel systems. One
+  source of truth is simpler.
+
+### 2026-04-20: CSS approach — hybrid CSS vars + inline `<style>` block
+
+- Context: Three options considered — (A) all CSS rules inline in the
+  template, (B) per-button `style="--o2p-customN: #..."` attributes, or
+  hybrid (`.btn-customN` classes in `o2p-base.css` using CSS vars, plus
+  inline `<style>` in the template setting `:root { --o2p-customN: #...; }`
+  for enabled slots).
+- Decision: Hybrid.
+- Reason: `o2p-base.css` already defines `.btn-google`, `.btn-auth0`
+  etc. using `var(--o2p-<provider>)`, and `theme-*.css` files override
+  via `:root`. Hybrid extends the existing pattern instead of introducing
+  a third styling mechanism. Four extra classes in the base CSS is a
+  trivial cost.
+
+### 2026-04-20: E2E verification scope — Zitadel + Ory Hydra (OSS only)
+
+- Context: The issue's task list lists Okta, Zitadel/Ory Hydra, and AWS
+  Cognito as candidates for real-IdP E2E verification.
+- Decision: Verify against Zitadel and Ory Hydra (both self-hostable via
+  Docker). Skip Okta and Cognito for this issue.
+- Reason: Two structurally different OSS OIDC stacks validate the generic
+  code path without depending on external accounts. Cloud IdP coverage
+  can be added in a follow-up if operators report breakage.
+
+### 2026-04-20: Implementation plan finalized
+
+Plan file: `/home/ktaka/.claude/plans/optimized-tinkering-pudding.md`
+(personal, not checked in). Contains concrete code sketches for
+`CustomSlot`, extended `ProviderConfig`, `validate_custom_slots`, the
+hybrid CSS approach, and the 11-step build sequence.
+
 ## Resolution
+
+Landed on branch `feature/generic-oidc-provider-slots` (to be merged via PR).
+
+### What was implemented
+
+- `ProviderKind::Custom(CustomSlot)` with 8 slots (`Slot1..Slot8`) —
+  expanded from the originally planned 4 after real-world use indicated
+  operators might want to run more than 4 simultaneous custom IdPs (e.g.
+  parallel testing of Zitadel, Hydra, Authentik, Okta without re-shuffling
+  slot numbers).
+- `ProviderConfig` extended with `path_segment`, `display_name`,
+  `button_class`, `icon_slug`, `button_color`, `button_hover_color` —
+  single source of truth for all presentation data (folds in the
+  `20260420-1643` migration).
+- `CUSTOM{1..8}_PROVIDER` `LazyLock<Option<ProviderConfig>>` statics, each
+  reading `OAUTH2_CUSTOM{N}_*` env vars with sensible defaults
+  (`response_mode=form_post`, `scope=openid+email+profile`, neutral gray
+  buttons).
+- `validate_custom_slots()` pass in `oauth2::init()` enforcing path_segment
+  shape (`[a-z0-9_-]+`), no collision with named providers or reserved
+  routes, no duplicates among enabled slots.
+- Axum layer: `provider_view` and `enabled_providers` consume the new
+  `ProviderConfig` fields directly; `display_name_for` and `icon_slug_for`
+  free helpers removed.
+- Templates: `custom_css_vars_block()` emits inline `:root { --o2p-customN: ... }`
+  in `<head>` for enabled slots only; `.btn-custom1..8` classes in
+  `o2p-base.css` pick up the variables.
+- Docs: new `docs/src/guides/generic-oidc.md` with step-by-step setup for
+  Zitadel, Ory Hydra, Authentik, and Okta (all E2E-verified);
+  `dot.env.example` documents the CUSTOM1 block and notes slots 2-8
+  share the same shape.
+- IdP bring-up scripts under `idp/` (Zitadel v1/v4, Ory Hydra, Authentik)
+  with `idp/README.md` covering Docker Compose setup and per-provider
+  gotchas discovered during verification.
+
+### E2E verification performed
+
+Beyond the originally planned Zitadel + Ory Hydra scope:
+
+- **Zitadel** (self-host, Docker) — works.
+- **Ory Hydra** (self-host, Docker) — works. Required documenting two
+  upstream quirks: `token_endpoint_auth_method=client_secret_post`
+  (library uses form-body credentials) and the reference consent app's
+  `CONFORMITY_FAKE_CLAIMS=1` for emitting email/preferred_username/picture.
+- **Authentik** (self-host, Docker) — works.
+- **Okta** (cloud, developer edition) — works. Required documenting the
+  two-layer policy model: App Authentication Policy must allow login, and
+  the Custom Authorization Server needs its own Access Policy. System Log
+  (`no_matching_policy`) is authoritative for diagnosing either.
+- Named-provider regression (Google / Auth0 / Keycloak / Entra) — all
+  still work unchanged.
+
+### Deviations from the plan
+
+- Slot count: 4 → 8 (noted above).
+- Okta added to the E2E list mid-flight once a real operator request
+  surfaced; docs updated with the full policy-layer gotcha.
+- Hybrid CSS approach implemented as planned.
+- `1643` presentation migration folded in as planned.
