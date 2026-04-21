@@ -32,31 +32,3 @@ async fn test_serve_oauth2_js() {
         );
     }
 }
-
-#[test]
-fn display_name_for_known_slugs() {
-    assert_eq!(display_name_for("google"), "Google");
-    assert_eq!(display_name_for("auth0"), "Auth0");
-    assert_eq!(display_name_for("keycloak"), "Keycloak");
-    assert_eq!(display_name_for("entra"), "Microsoft");
-}
-
-#[test]
-fn display_name_for_unknown_slug_passes_through() {
-    assert_eq!(display_name_for("okta"), "okta");
-    assert_eq!(display_name_for(""), "");
-}
-
-#[test]
-fn icon_slug_for_known_slugs() {
-    assert_eq!(icon_slug_for("google"), "google");
-    assert_eq!(icon_slug_for("auth0"), "auth0");
-    assert_eq!(icon_slug_for("keycloak"), "keycloak");
-    assert_eq!(icon_slug_for("entra"), "entra");
-}
-
-#[test]
-fn icon_slug_for_unknown_slug_falls_back_to_openid() {
-    assert_eq!(icon_slug_for("okta"), "openid");
-    assert_eq!(icon_slug_for(""), "openid");
-}

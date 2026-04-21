@@ -69,7 +69,7 @@ pub(crate) async fn prepare_oauth2_auth_request_inner(
 ) -> Result<(String, HeaderMap), OAuth2Error> {
     let auth_base_url = ctx.auth_url().await?;
     let response_mode = ctx.response_mode.as_str();
-    let provider_name = ctx.kind.as_str();
+    let provider_name = ctx.path_segment;
 
     let expires_at = Utc::now() + Duration::seconds((*OAUTH2_CSRF_COOKIE_MAX_AGE) as i64);
     let ttl = *OAUTH2_CSRF_COOKIE_MAX_AGE;

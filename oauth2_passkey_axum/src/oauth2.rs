@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use oauth2_passkey::{
     AuthResponse, CoordinationError, FedCMCallbackRequest, O2P_ROUTE_PREFIX, OAuth2Account,
-    Provider, ProviderUserId, UserId, delete_oauth2_account_core, enabled_providers,
+    Provider, ProviderInfo, ProviderUserId, UserId, delete_oauth2_account_core, enabled_providers,
     fedcm_authorized_core, get_authorized_core, get_google_client_id, list_accounts_core,
     post_authorized_core, prepare_fedcm_nonce, prepare_oauth2_auth_request,
     verify_page_session_token,
@@ -35,67 +35,50 @@ pub struct ProviderView {
 /// Returns [`ProviderView`] for every currently enabled OAuth2 provider, in
 /// stable display order (Google first, then optional providers).
 pub fn enabled_provider_views() -> Vec<ProviderView> {
-    enabled_providers()
-        .into_iter()
-        .map(|info| provider_view(info.name))
-        .collect()
+    enabled_providers().into_iter().map(provider_view).collect()
 }
 
-fn provider_view(name: &'static str) -> ProviderView {
-    match name {
-        "google" => ProviderView {
-            name,
-            display_name: "Google",
-            button_class: "btn-oauth2 btn-google",
-        },
-        "auth0" => ProviderView {
-            name,
-            display_name: "Auth0",
-            button_class: "btn-oauth2 btn-auth0",
-        },
-        "keycloak" => ProviderView {
-            name,
-            display_name: "Keycloak",
-            button_class: "btn-oauth2 btn-keycloak",
-        },
-        "entra" => ProviderView {
-            name,
-            display_name: "Microsoft",
-            button_class: "btn-oauth2 btn-entra",
-        },
-        _ => ProviderView {
-            name,
-            display_name: name,
-            button_class: "btn-oauth2",
-        },
+fn provider_view(info: ProviderInfo) -> ProviderView {
+    ProviderView {
+        name: info.name,
+        display_name: info.display_name,
+        button_class: info.button_class,
     }
 }
 
-/// Human-readable label for a provider slug. Used on post-auth UI
-/// (e.g. linked-account cards) where the slug comes from the DB as a
-/// runtime `String`. Unknown slugs pass through unchanged so generic
-/// OIDC providers (see issue `20260420-1511`) render with their own
-/// slug as the label until that issue lands a richer display model.
-pub(crate) fn display_name_for(slug: &str) -> &str {
-    match slug {
-        "google" => "Google",
-        "auth0" => "Auth0",
-        "keycloak" => "Keycloak",
-        "entra" => "Microsoft",
-        other => other,
+/// Build the inline `:root { ... }` CSS block injecting `--o2p-custom{N}` /
+/// `--o2p-custom{N}-hover` variables for every enabled generic OIDC slot.
+///
+/// Returns `None` if no slot is enabled (so the template can skip emitting an
+/// empty `<style>` tag). Only `ProviderInfo` entries carrying
+/// `Some(button_color)` contribute — named providers are styled by the base
+/// CSS and theme files.
+///
+/// The variable suffix is extracted from the second class in `button_class`
+/// (e.g. `"btn-oauth2 btn-custom1"` → `"custom1"`). This matches the
+/// `.btn-custom{N}` rules declared in `o2p-base.css`.
+pub fn custom_css_vars_block() -> Option<String> {
+    let mut entries = Vec::new();
+    for info in enabled_providers() {
+        let (Some(color), Some(hover)) = (info.button_color, info.button_hover_color) else {
+            continue;
+        };
+        let Some(suffix) = info
+            .button_class
+            .split_whitespace()
+            .nth(1)
+            .and_then(|c| c.strip_prefix("btn-"))
+        else {
+            continue;
+        };
+        entries.push(format!(
+            "    --o2p-{suffix}: {color};\n    --o2p-{suffix}-hover: {hover};"
+        ));
     }
-}
-
-/// Basename of the SVG served under `{O2P_ROUTE_PREFIX}/icons/` for a
-/// provider slug. Unknown slugs fall back to `"openid"` — a neutral
-/// OpenID Connect mark.
-pub(crate) fn icon_slug_for(slug: &str) -> &'static str {
-    match slug {
-        "google" => "google",
-        "auth0" => "auth0",
-        "keycloak" => "keycloak",
-        "entra" => "entra",
-        _ => "openid",
+    if entries.is_empty() {
+        None
+    } else {
+        Some(format!(":root {{\n{}\n}}", entries.join("\n")))
     }
 }
 
@@ -227,6 +210,7 @@ async fn oauth2_initiate(
 struct SelectProviderTemplate<'a> {
     o2p_route_prefix: &'a str,
     custom_css_url: Option<&'a str>,
+    custom_css_vars: Option<String>,
     providers: Vec<ProviderView>,
     mode: &'a str,
     context: &'a str,
@@ -278,6 +262,7 @@ async fn oauth2_select(
     let tmpl = SelectProviderTemplate {
         o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
         custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+        custom_css_vars: custom_css_vars_block(),
         providers,
         mode: mode.as_deref().unwrap_or(""),
         context: context.as_deref().unwrap_or(""),

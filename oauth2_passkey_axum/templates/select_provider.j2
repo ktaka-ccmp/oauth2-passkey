@@ -9,6 +9,9 @@
     {% if let Some(css_url) = custom_css_url %}
     <link rel="stylesheet" href="{{css_url}}">
     {% endif %}
+    {% if let Some(css_vars) = custom_css_vars %}
+    <style>{{css_vars|safe}}</style>
+    {% endif %}
 </head>
 
 <body class="login-page">

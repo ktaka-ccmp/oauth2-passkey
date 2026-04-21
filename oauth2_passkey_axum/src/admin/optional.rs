@@ -16,14 +16,13 @@ use std::{
 use oauth2_passkey::{
     AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, force_logout_user,
     get_all_active_sessions, get_all_users, get_authenticator_info_batch, get_user,
-    list_accounts_core, list_credentials_core,
+    list_accounts_core, list_credentials_core, provider_info,
 };
 
 use super::masking::Masker;
 use crate::{
     O2P_ADMIN_URL,
     config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT},
-    oauth2::{display_name_for, icon_slug_for},
     session::AuthUser,
 };
 
@@ -357,8 +356,12 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
     let oauth2_accounts = oauth2_accounts
         .into_iter()
         .map(|account| {
-            let provider_display_name = display_name_for(&account.provider).to_string();
-            let provider_icon_slug = icon_slug_for(&account.provider);
+            let info = provider_info(&account.provider);
+            let provider_display_name = info
+                .as_ref()
+                .map(|p| p.display_name.to_string())
+                .unwrap_or_else(|| account.provider.clone());
+            let provider_icon_slug = info.map(|p| p.icon_slug).unwrap_or("openid");
             TemplateAccount {
                 id: account.id,
                 user_id: account.user_id,

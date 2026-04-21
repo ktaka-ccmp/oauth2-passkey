@@ -91,7 +91,7 @@ pub use config::O2P_DEMO_MODE;
 pub use oauth2::{
     AuthResponse, FedCMCallbackRequest, FedCMNonceResponse, OAuth2Account, OAuth2Mode, OAuth2State,
     Provider, ProviderInfo, ProviderUserId, enabled_providers, get_google_client_id,
-    is_provider_enabled, prepare_fedcm_nonce, prepare_oauth2_auth_request,
+    is_provider_enabled, prepare_fedcm_nonce, prepare_oauth2_auth_request, provider_info,
 };
 
 // WebAuthn/Passkey types and functions

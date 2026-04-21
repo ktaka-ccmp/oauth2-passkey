@@ -203,7 +203,7 @@ pub(super) struct OidcTokenResponse {
     token_type: String,
     expires_in: u64,
     refresh_token: Option<String>,
-    scope: String,
+    scope: Option<String>,
     pub(super) id_token: Option<String>,
 }
 

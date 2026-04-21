@@ -53,15 +53,42 @@ pub fn is_provider_enabled(name: &str) -> bool {
         .is_some()
 }
 
+/// Returns [`ProviderInfo`] for the currently enabled provider whose URL
+/// path segment matches `name`. Returns `None` if no such provider is
+/// enabled (either the name is unknown or the provider's env vars are not
+/// configured).
+///
+/// Use this to map a runtime provider slug (e.g. from a DB row or URL
+/// segment) back to its display metadata without allocating a full
+/// [`enabled_providers`] vector.
+pub fn provider_info(name: &str) -> Option<crate::oauth2::provider::ProviderInfo> {
+    crate::oauth2::provider::ProviderKind::from_path_segment(name)
+        .and_then(crate::oauth2::provider::provider_for)
+        .map(|cfg| crate::oauth2::provider::ProviderInfo {
+            name: cfg.path_segment,
+            display_name: cfg.display_name,
+            button_class: cfg.button_class,
+            icon_slug: cfg.icon_slug,
+            button_color: cfg.button_color,
+            button_hover_color: cfg.button_hover_color,
+        })
+}
+
 /// Returns UI info for every currently enabled OAuth2 provider, in stable
-/// display order (Google first, then optional providers).
+/// display order (Google first, then Auth0/Keycloak/Entra, then configured
+/// generic OIDC slots Custom1..Custom4).
 pub fn enabled_providers() -> Vec<crate::oauth2::provider::ProviderInfo> {
     crate::oauth2::provider::ProviderKind::ALL
         .iter()
         .filter_map(|&kind| {
-            crate::oauth2::provider::provider_for(kind).map(|_| {
+            crate::oauth2::provider::provider_for(kind).map(|cfg| {
                 crate::oauth2::provider::ProviderInfo {
-                    name: kind.as_str(),
+                    name: cfg.path_segment,
+                    display_name: cfg.display_name,
+                    button_class: cfg.button_class,
+                    icon_slug: cfg.icon_slug,
+                    button_color: cfg.button_color,
+                    button_hover_color: cfg.button_hover_color,
                 }
             })
         })

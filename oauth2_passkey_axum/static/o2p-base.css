@@ -193,6 +193,81 @@ a:hover {
     background-color: var(--o2p-entra-hover);
 }
 
+/* Generic OIDC slots. Colors come from --o2p-customN / --o2p-customN-hover,
+   injected as a :root { ... } block by the login / select_provider templates
+   when the corresponding slot is enabled (see ProviderInfo.button_color). */
+.btn-custom1 {
+    background-color: var(--o2p-custom1);
+    padding: 12px 16px;
+}
+
+.btn-custom1:hover {
+    background-color: var(--o2p-custom1-hover);
+}
+
+.btn-custom2 {
+    background-color: var(--o2p-custom2);
+    padding: 12px 16px;
+}
+
+.btn-custom2:hover {
+    background-color: var(--o2p-custom2-hover);
+}
+
+.btn-custom3 {
+    background-color: var(--o2p-custom3);
+    padding: 12px 16px;
+}
+
+.btn-custom3:hover {
+    background-color: var(--o2p-custom3-hover);
+}
+
+.btn-custom4 {
+    background-color: var(--o2p-custom4);
+    padding: 12px 16px;
+}
+
+.btn-custom4:hover {
+    background-color: var(--o2p-custom4-hover);
+}
+
+.btn-custom5 {
+    background-color: var(--o2p-custom5);
+    padding: 12px 16px;
+}
+
+.btn-custom5:hover {
+    background-color: var(--o2p-custom5-hover);
+}
+
+.btn-custom6 {
+    background-color: var(--o2p-custom6);
+    padding: 12px 16px;
+}
+
+.btn-custom6:hover {
+    background-color: var(--o2p-custom6-hover);
+}
+
+.btn-custom7 {
+    background-color: var(--o2p-custom7);
+    padding: 12px 16px;
+}
+
+.btn-custom7:hover {
+    background-color: var(--o2p-custom7-hover);
+}
+
+.btn-custom8 {
+    background-color: var(--o2p-custom8);
+    padding: 12px 16px;
+}
+
+.btn-custom8:hover {
+    background-color: var(--o2p-custom8-hover);
+}
+
 .btn-passkey {
     background-color: var(--o2p-passkey);
     color: white;

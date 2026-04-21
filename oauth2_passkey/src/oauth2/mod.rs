@@ -18,7 +18,7 @@ pub(crate) mod provider;
 mod storage;
 mod types;
 
-pub use config::{enabled_providers, get_google_client_id, is_provider_enabled};
+pub use config::{enabled_providers, get_google_client_id, is_provider_enabled, provider_info};
 pub use main::{prepare_fedcm_nonce, prepare_oauth2_auth_request};
 pub use provider::ProviderInfo;
 pub use types::{
@@ -86,6 +86,10 @@ pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
             require_env_if_trigger_set(trigger, required)?;
         }
     }
+
+    // Value-level validation for generic OIDC slots (path_segment shape and
+    // collision checks). Env-presence is already covered by the loop above.
+    provider::validate_custom_slots().map_err(errors::OAuth2Error::Validation)?;
 
     let _ = *config::OAUTH2_CSRF_COOKIE_NAME;
     let _ = *config::OAUTH2_CSRF_COOKIE_MAX_AGE;

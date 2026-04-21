@@ -14,11 +14,10 @@ use std::{
 
 use oauth2_passkey::{
     AuthenticatorInfo, O2P_ROUTE_PREFIX, UserId, generate_page_session_token,
-    get_authenticator_info_batch, list_accounts_core, list_credentials_core,
+    get_authenticator_info_batch, list_accounts_core, list_credentials_core, provider_info,
 };
 
 use crate::config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT};
-use crate::oauth2::{display_name_for, icon_slug_for};
 use crate::session::AuthUser;
 
 pub(super) fn router() -> Router<()> {
@@ -196,8 +195,12 @@ async fn user_account(auth_user: AuthUser) -> Result<Html<String>, (StatusCode, 
     let oauth2_accounts = oauth2_accounts
         .into_iter()
         .map(|account| {
-            let provider_display_name = display_name_for(&account.provider).to_string();
-            let provider_icon_slug = icon_slug_for(&account.provider);
+            let info = provider_info(&account.provider);
+            let provider_display_name = info
+                .as_ref()
+                .map(|p| p.display_name.to_string())
+                .unwrap_or_else(|| account.provider.clone());
+            let provider_icon_slug = info.map(|p| p.icon_slug).unwrap_or("openid");
             TemplateAccount {
                 id: account.id,
                 user_id: account.user_id,

@@ -41,7 +41,7 @@ fn test_from_google_id_info() {
     let id_info = OidcIdInfo {
         iss: "https://accounts.google.com".to_string(),
         azp: Some("client_id".to_string()),
-        aud: "client_id".to_string(),
+        aud: vec!["client_id".to_string()],
         sub: "12345".to_string(),
         email: Some("john@example.com".to_string()),
         email_verified: Some(true),
@@ -146,7 +146,7 @@ fn test_idinfo_preferred_username_fallback() {
         iss: "https://login.microsoftonline.com/tenant/v2.0".to_string(),
         sub: "msa_99".to_string(),
         azp: None,
-        aud: "client".to_string(),
+        aud: vec!["client".to_string()],
         email: None,
         preferred_username: Some("dave@hotmail.com".to_string()),
         email_verified: None,

@@ -142,6 +142,344 @@ fn test_google_provider_init_accepts_valid_env() {
     );
 }
 
+// --- CustomSlot unit tests ---
+
+#[test]
+fn custom_slot_all_has_eight_entries() {
+    assert_eq!(CustomSlot::ALL.len(), 8);
+    assert_eq!(CustomSlot::ALL[0], CustomSlot::Slot1);
+    assert_eq!(CustomSlot::ALL[7], CustomSlot::Slot8);
+}
+
+#[test]
+fn custom_slot_labels() {
+    assert_eq!(CustomSlot::Slot1.label(), "custom1");
+    assert_eq!(CustomSlot::Slot2.label(), "custom2");
+    assert_eq!(CustomSlot::Slot3.label(), "custom3");
+    assert_eq!(CustomSlot::Slot4.label(), "custom4");
+    assert_eq!(CustomSlot::Slot5.label(), "custom5");
+    assert_eq!(CustomSlot::Slot6.label(), "custom6");
+    assert_eq!(CustomSlot::Slot7.label(), "custom7");
+    assert_eq!(CustomSlot::Slot8.label(), "custom8");
+}
+
+#[test]
+fn custom_slot_env_prefixes() {
+    assert_eq!(CustomSlot::Slot1.env_prefix(), "OAUTH2_CUSTOM1");
+    assert_eq!(CustomSlot::Slot8.env_prefix(), "OAUTH2_CUSTOM8");
+}
+
+#[test]
+fn custom_slot_button_classes() {
+    assert_eq!(CustomSlot::Slot1.button_class(), "btn-oauth2 btn-custom1");
+    assert_eq!(CustomSlot::Slot2.button_class(), "btn-oauth2 btn-custom2");
+    assert_eq!(CustomSlot::Slot3.button_class(), "btn-oauth2 btn-custom3");
+    assert_eq!(CustomSlot::Slot4.button_class(), "btn-oauth2 btn-custom4");
+}
+
+#[test]
+fn provider_kind_all_includes_named_and_custom() {
+    assert_eq!(ProviderKind::ALL.len(), 12);
+    assert!(ProviderKind::ALL.contains(&ProviderKind::Google));
+    assert!(ProviderKind::ALL.contains(&ProviderKind::Custom(CustomSlot::Slot1)));
+    assert!(ProviderKind::ALL.contains(&ProviderKind::Custom(CustomSlot::Slot8)));
+}
+
+#[test]
+fn custom_slot_optional_env_contract_slot1() {
+    let (trigger, required) = ProviderKind::Custom(CustomSlot::Slot1)
+        .optional_env_contract()
+        .unwrap();
+    assert_eq!(trigger, "OAUTH2_CUSTOM1_CLIENT_ID");
+    assert_eq!(
+        required,
+        [
+            "OAUTH2_CUSTOM1_CLIENT_SECRET",
+            "OAUTH2_CUSTOM1_ISSUER_URL",
+            "OAUTH2_CUSTOM1_DISPLAY_NAME",
+            "OAUTH2_CUSTOM1_PATH_SEGMENT",
+        ]
+    );
+}
+
+#[test]
+fn custom_slot_optional_env_contract_slot4() {
+    let (trigger, required) = ProviderKind::Custom(CustomSlot::Slot4)
+        .optional_env_contract()
+        .unwrap();
+    assert_eq!(trigger, "OAUTH2_CUSTOM4_CLIENT_ID");
+    assert_eq!(required.len(), 4);
+    assert!(required.contains(&"OAUTH2_CUSTOM4_DISPLAY_NAME"));
+    assert!(required.contains(&"OAUTH2_CUSTOM4_PATH_SEGMENT"));
+}
+
+#[test]
+fn custom_slot_as_str_returns_label() {
+    assert_eq!(ProviderKind::Custom(CustomSlot::Slot1).as_str(), "custom1");
+    assert_eq!(ProviderKind::Custom(CustomSlot::Slot4).as_str(), "custom4");
+}
+
+#[test]
+fn is_valid_custom_path_segment_accepts_valid() {
+    assert!(is_valid_custom_path_segment("okta"));
+    assert!(is_valid_custom_path_segment("my-sso"));
+    assert!(is_valid_custom_path_segment("my_sso"));
+    assert!(is_valid_custom_path_segment("sso1"));
+    assert!(is_valid_custom_path_segment("a"));
+}
+
+#[test]
+fn is_valid_custom_path_segment_rejects_invalid() {
+    assert!(!is_valid_custom_path_segment(""));
+    assert!(!is_valid_custom_path_segment("My-SSO")); // uppercase
+    assert!(!is_valid_custom_path_segment("my/sso")); // slash
+    assert!(!is_valid_custom_path_segment("my sso")); // space
+    assert!(!is_valid_custom_path_segment("my.sso")); // dot
+}
+
+#[test]
+fn reserved_path_segments_cover_named_providers_and_literal_routes() {
+    for segment in ["google", "auth0", "keycloak", "entra"] {
+        assert!(
+            RESERVED_PATH_SEGMENTS.contains(&segment),
+            "named provider '{segment}' must be reserved"
+        );
+    }
+    for segment in [
+        "authorized",
+        "accounts",
+        "fedcm",
+        "popup_close",
+        "oauth2.js",
+        "select",
+    ] {
+        assert!(
+            RESERVED_PATH_SEGMENTS.contains(&segment),
+            "literal route '{segment}' must be reserved"
+        );
+    }
+}
+
+// --- Custom slot subprocess tests ---
+//
+// These launch the current test binary as a child with controlled env vars so
+// the CUSTOM{N}_PROVIDER LazyLocks initialize cleanly. They verify LazyLock
+// panic behavior and `validate_custom_slots` outcomes.
+
+/// Run this test binary as a child, with a set of custom env vars applied on
+/// top of the current environment. Caller must pass test name in full path
+/// form (e.g. `oauth2::provider::tests::<fn_name>`).
+fn run_child_with_env_set(test_name: &str, env: &[(&str, &str)]) -> std::process::Output {
+    let mut cmd = std::process::Command::new(std::env::current_exe().unwrap());
+    cmd.args([test_name, "--exact", "--nocapture"])
+        .env("__TEST_ENV_VAR_CHILD", "1")
+        .env("OAUTH2_GOOGLE_CLIENT_ID", "test-client-id")
+        .env("OAUTH2_GOOGLE_CLIENT_SECRET", "test-secret")
+        .env("ORIGIN", "https://example.com");
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    cmd.output().expect("failed to run child process")
+}
+
+#[test]
+fn custom_slot_missing_client_secret_panics_on_access() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        // Child: trigger set, secret missing — LazyLock access panics.
+        let _ = &*CUSTOM1_PROVIDER;
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_missing_client_secret_panics_on_access",
+        &[("OAUTH2_CUSTOM1_CLIENT_ID", "id")],
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("OAUTH2_CUSTOM1_CLIENT_SECRET"));
+}
+
+#[test]
+fn custom_slot_valid_config_initializes() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg = provider_for(ProviderKind::Custom(CustomSlot::Slot1))
+            .expect("slot1 should be enabled with full env");
+        assert_eq!(cfg.client_id, "id");
+        assert_eq!(cfg.display_name, "My SSO");
+        assert_eq!(cfg.path_segment, "my-sso");
+        assert_eq!(cfg.icon_slug, "openid");
+        assert_eq!(cfg.button_class, "btn-oauth2 btn-custom1");
+        // Defaults applied
+        assert_eq!(cfg.response_mode, "form_post");
+        assert_eq!(cfg.button_color, Some("#6b7280"));
+        assert_eq!(cfg.button_hover_color, Some("#4b5563"));
+        // from_path_segment should resolve the operator-configured segment
+        assert_eq!(
+            ProviderKind::from_path_segment("my-sso"),
+            Some(ProviderKind::Custom(CustomSlot::Slot1))
+        );
+        // validate_custom_slots should pass
+        validate_custom_slots().expect("valid config should pass validation");
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_valid_config_initializes",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "My SSO"),
+            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "my-sso"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_invalid_path_segment_fails_validation() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        // Force LazyLock init to populate path_segment with the bad value.
+        let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot1));
+        let err = validate_custom_slots().expect_err("invalid path segment must be rejected");
+        assert!(err.contains("OAUTH2_CUSTOM1_PATH_SEGMENT"));
+        assert!(err.contains("[a-z0-9_-]+"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_invalid_path_segment_fails_validation",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "My/SSO"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_reserved_path_segment_rejected() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot1));
+        let err = validate_custom_slots().expect_err("reserved segment must be rejected");
+        assert!(err.contains("reserved"));
+        assert!(err.contains("authorized"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_reserved_path_segment_rejected",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "authorized"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_named_provider_collision_rejected() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot1));
+        let err = validate_custom_slots().expect_err("collision with named provider");
+        assert!(err.contains("reserved"));
+        assert!(err.contains("google"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_named_provider_collision_rejected",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "google"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_duplicate_path_segment_rejected() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        // Initialize both slots' LazyLocks.
+        let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot1));
+        let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot2));
+        let err = validate_custom_slots().expect_err("duplicate segment across slots");
+        assert!(err.contains("OAUTH2_CUSTOM2_PATH_SEGMENT"));
+        assert!(err.contains("OAUTH2_CUSTOM1_PATH_SEGMENT"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_duplicate_path_segment_rejected",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id1"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec1"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp1.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "IdP One"),
+            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "shared"),
+            ("OAUTH2_CUSTOM2_CLIENT_ID", "id2"),
+            ("OAUTH2_CUSTOM2_CLIENT_SECRET", "sec2"),
+            ("OAUTH2_CUSTOM2_ISSUER_URL", "https://idp2.example.com"),
+            ("OAUTH2_CUSTOM2_DISPLAY_NAME", "IdP Two"),
+            ("OAUTH2_CUSTOM2_PATH_SEGMENT", "shared"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_custom_button_colors_applied() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg =
+            provider_for(ProviderKind::Custom(CustomSlot::Slot1)).expect("slot1 should be enabled");
+        assert_eq!(cfg.button_color, Some("#ff0000"));
+        assert_eq!(cfg.button_hover_color, Some("#cc0000"));
+        assert_eq!(cfg.response_mode, "query");
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_custom_button_colors_applied",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "x"),
+            ("OAUTH2_CUSTOM1_BUTTON_COLOR", "#ff0000"),
+            ("OAUTH2_CUSTOM1_BUTTON_HOVER_COLOR", "#cc0000"),
+            ("OAUTH2_CUSTOM1_RESPONSE_MODE", "query"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 impl ProviderConfig {
     /// Build a `ProviderConfig` pointing at a local mock server.
     ///
@@ -178,6 +516,12 @@ impl ProviderConfig {
             query_string,
             discovery,
             additional_allowed_origins: Vec::new(),
+            path_segment: "google",
+            display_name: "Google",
+            button_class: "btn-oauth2 btn-google",
+            icon_slug: "google",
+            button_color: None,
+            button_hover_color: None,
         }
     }
 
@@ -211,6 +555,12 @@ impl ProviderConfig {
             query_string,
             discovery,
             additional_allowed_origins: Vec::new(),
+            path_segment: "google",
+            display_name: "Google",
+            button_class: "btn-oauth2 btn-google",
+            icon_slug: "google",
+            button_color: None,
+            button_hover_color: None,
         }
     }
 }

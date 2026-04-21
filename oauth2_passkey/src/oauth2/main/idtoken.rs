@@ -1,7 +1,7 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
@@ -37,7 +37,10 @@ pub struct OidcIdInfo {
     pub sub: String,
     /// Google-specific; absent in many other OIDC providers (e.g. Auth0).
     pub azp: Option<String>,
-    pub aud: String,
+    /// OIDC Core 1.0 §2 allows `aud` to be either a single string or an array
+    /// of strings. Normalized to `Vec<String>` for uniform validation.
+    #[serde(deserialize_with = "deserialize_aud")]
+    pub aud: Vec<String>,
     /// Optional per OIDC Core 1.0; absent for some Microsoft personal accounts.
     pub email: Option<String>,
     /// Some providers omit this claim; treat absence as unverified.
@@ -60,6 +63,45 @@ pub struct OidcIdInfo {
     /// Fallback for `email` when the provider omits the standard claim
     /// (e.g. Microsoft personal accounts).
     pub preferred_username: Option<String>,
+}
+
+fn deserialize_aud<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::{Error, SeqAccess, Visitor};
+    use std::fmt;
+
+    struct AudVisitor;
+
+    impl<'de> Visitor<'de> for AudVisitor {
+        type Value = Vec<String>;
+
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("a string or array of strings")
+        }
+
+        fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
+            Ok(vec![v.to_string()])
+        }
+
+        fn visit_string<E: Error>(self, v: String) -> Result<Self::Value, E> {
+            Ok(vec![v])
+        }
+
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+            let mut out: Vec<String> = Vec::new();
+            while let Some(s) = seq.next_element::<String>()? {
+                out.push(s);
+            }
+            if out.is_empty() {
+                return Err(Error::custom("aud array is empty"));
+            }
+            Ok(out)
+        }
+    }
+
+    deserializer.deserialize_any(AudVisitor)
 }
 
 #[derive(Error, Debug)]
@@ -312,10 +354,10 @@ pub(super) async fn verify_idtoken_with_algorithm(
     }
 
     let audience = &ctx.client_id;
-    if idinfo.aud != *audience {
+    if !idinfo.aud.iter().any(|a| a == audience) {
         return Err(TokenVerificationError::InvalidTokenAudience(
             audience.clone(),
-            idinfo.aud.to_string(),
+            idinfo.aud.join(","),
         ));
     }
 
