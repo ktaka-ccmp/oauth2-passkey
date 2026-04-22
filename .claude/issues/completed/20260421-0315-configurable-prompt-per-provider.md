@@ -192,3 +192,10 @@ Key changes:
   values, and invalid-value startup rejection.
 - Docs: `dot.env.example`, `docs/src/guides/generic-oidc.md`,
   `idp/README.md` all updated.
+
+Post-review fixes (PR #322 review follow-up):
+- Flattened `parse_prompt` inner match (removed `v @` binding and `unreachable!()`
+  arm; four literal string arms are already `&'static str`).
+- Replaced non-ASCII `→` arrows with `->` in `parse_prompt` doc comment.
+- Added `prompt_custom_login_applied` subprocess test (locks in `login` arm after
+  the simplification).
