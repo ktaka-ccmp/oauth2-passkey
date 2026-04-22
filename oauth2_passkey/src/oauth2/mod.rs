@@ -91,6 +91,13 @@ pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
     // collision checks). Env-presence is already covered by the loop above.
     provider::validate_custom_slots().map_err(errors::OAuth2Error::Validation)?;
 
+    // Value-level validation for named-provider STRICT_DISPLAY_CLAIMS. Custom
+    // slots already get this via validate_custom_slots' LazyLock force-init;
+    // named providers are lazy (see comment above) so we must validate env
+    // values directly to avoid a request-time panic.
+    provider::validate_named_provider_strict_display_claims()
+        .map_err(errors::OAuth2Error::Validation)?;
+
     let _ = *config::OAUTH2_CSRF_COOKIE_NAME;
     let _ = *config::OAUTH2_CSRF_COOKIE_MAX_AGE;
 

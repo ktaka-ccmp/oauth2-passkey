@@ -383,6 +383,15 @@ pub(crate) struct ProviderConfig {
     /// providers (they rely on `.btn-<name>` rules + theme variables); for
     /// custom slots this is `"custom1".."custom8"` (i.e. `CustomSlot::label`).
     pub(crate) css_var_suffix: Option<&'static str>,
+    /// When `true` (default), any divergence of display-tier claims
+    /// (`name`, `picture`, `family_name`, `given_name`) between the
+    /// verified ID token and the `/userinfo` response is rejected.
+    /// When `false`, such divergence is logged as a warning and the
+    /// id_token value is used (Option B merge priority preserved).
+    /// Identity-tier claims (`email`, `email_verified`,
+    /// `preferred_username`, `hd`) are always hardcoded-strict; this
+    /// flag does not affect them.
+    pub(crate) strict_display_claims: bool,
 }
 
 impl ProviderConfig {
@@ -461,6 +470,7 @@ pub(crate) static GOOGLE_PROVIDER: LazyLock<ProviderConfig> = LazyLock::new(|| {
         "&response_type={}&scope={}&response_mode={}&access_type=online&prompt=consent",
         response_type, scope, response_mode
     );
+    let strict_display_claims = read_strict_display_claims("OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS");
     ProviderConfig {
         kind: ProviderKind::Google,
         client_id,
@@ -478,6 +488,7 @@ pub(crate) static GOOGLE_PROVIDER: LazyLock<ProviderConfig> = LazyLock::new(|| {
         button_color: None,
         button_hover_color: None,
         css_var_suffix: None,
+        strict_display_claims,
     }
 });
 
@@ -505,6 +516,7 @@ pub(crate) static AUTH0_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         "&response_type=code&scope={}&response_mode={}&prompt=consent",
         scope, response_mode
     );
+    let strict_display_claims = read_strict_display_claims("OAUTH2_AUTH0_STRICT_DISPLAY_CLAIMS");
     Some(ProviderConfig {
         kind: ProviderKind::Auth0,
         client_id,
@@ -522,6 +534,7 @@ pub(crate) static AUTH0_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         button_color: None,
         button_hover_color: None,
         css_var_suffix: None,
+        strict_display_claims,
     })
 });
 
@@ -547,6 +560,7 @@ pub(crate) static KEYCLOAK_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock
         "&response_type=code&scope={}&response_mode={}&prompt=consent",
         scope, response_mode
     );
+    let strict_display_claims = read_strict_display_claims("OAUTH2_KEYCLOAK_STRICT_DISPLAY_CLAIMS");
     Some(ProviderConfig {
         kind: ProviderKind::Keycloak,
         client_id,
@@ -564,6 +578,7 @@ pub(crate) static KEYCLOAK_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock
         button_color: None,
         button_hover_color: None,
         css_var_suffix: None,
+        strict_display_claims,
     })
 });
 
@@ -591,6 +606,7 @@ pub(crate) static ENTRA_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         "&response_type=code&scope={}&response_mode={}&prompt=consent",
         scope, response_mode
     );
+    let strict_display_claims = read_strict_display_claims("OAUTH2_ENTRA_STRICT_DISPLAY_CLAIMS");
     Some(ProviderConfig {
         kind: ProviderKind::Entra,
         client_id,
@@ -611,6 +627,7 @@ pub(crate) static ENTRA_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         button_color: None,
         button_hover_color: None,
         css_var_suffix: None,
+        strict_display_claims,
     })
 });
 
@@ -628,6 +645,46 @@ const CUSTOM_DEFAULT_BUTTON_HOVER_COLOR: &str = "#4b5563";
 /// slot per process, as `LazyLock` initializes once.
 fn leak_static(s: String) -> &'static str {
     Box::leak(s.into_boxed_str())
+}
+
+/// Parse an `OAUTH2_*_STRICT_DISPLAY_CLAIMS` env var. Unset or `"true"`
+/// yields `Ok(true)`; `"false"` yields `Ok(false)`; any other value yields
+/// `Err(message)` so callers can choose between startup-time rejection
+/// (pure validator) and `LazyLock`-time panic.
+fn parse_strict_display_claims(env_var: &str) -> Result<bool, String> {
+    match env::var(env_var).ok().as_deref() {
+        None | Some("true") => Ok(true),
+        Some("false") => Ok(false),
+        Some(other) => Err(format!(
+            "Invalid {env_var} '{other}'. Must be 'true' or 'false'."
+        )),
+    }
+}
+
+/// `LazyLock`-time wrapper around `parse_strict_display_claims`. Matches the
+/// on-invalid strict-parse style of `OAUTH2_RESPONSE_MODE`.
+fn read_strict_display_claims(env_var: &str) -> bool {
+    parse_strict_display_claims(env_var).unwrap_or_else(|msg| panic!("{msg}"))
+}
+
+/// Validate `OAUTH2_*_STRICT_DISPLAY_CLAIMS` for every named provider at
+/// startup without forcing their `LazyLock`s to initialize.
+///
+/// Custom slots go through `LazyLock` init in `validate_custom_slots`, so
+/// their STRICT_DISPLAY_CLAIMS gets checked there. Named providers
+/// (Google/Auth0/Keycloak/Entra) are intentionally lazy so tests can
+/// override other env vars after `init()`; without this function a bad
+/// value would survive startup and crash the first login request instead.
+pub(crate) fn validate_named_provider_strict_display_claims() -> Result<(), String> {
+    for var in [
+        "OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS",
+        "OAUTH2_AUTH0_STRICT_DISPLAY_CLAIMS",
+        "OAUTH2_KEYCLOAK_STRICT_DISPLAY_CLAIMS",
+        "OAUTH2_ENTRA_STRICT_DISPLAY_CLAIMS",
+    ] {
+        parse_strict_display_claims(var)?;
+    }
+    Ok(())
 }
 
 /// Build a `ProviderConfig` for a custom OIDC slot from its env vars.
@@ -658,6 +715,8 @@ fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
         .unwrap_or_else(|_| CUSTOM_DEFAULT_BUTTON_COLOR.to_string());
     let button_hover_color_raw = env::var(format!("{prefix}_BUTTON_HOVER_COLOR"))
         .unwrap_or_else(|_| CUSTOM_DEFAULT_BUTTON_HOVER_COLOR.to_string());
+    let strict_display_claims =
+        read_strict_display_claims(&format!("{prefix}_STRICT_DISPLAY_CLAIMS"));
 
     let provider_name = leak_static(provider_name_raw);
     let display_name = leak_static(display_name_raw);
@@ -692,6 +751,7 @@ fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
         button_color: Some(button_color),
         button_hover_color: Some(button_hover_color),
         css_var_suffix: Some(slot.label()),
+        strict_display_claims,
     })
 }
 

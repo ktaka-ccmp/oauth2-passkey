@@ -262,8 +262,7 @@ async fn process_oauth2_authorization(
     // Keycloak configs) succeed. `get_idinfo_userinfo` has already verified
     // `idinfo.sub == userinfo.sub`, so the ID token remains the identity
     // binding.
-    let oauth2_account =
-        oauth2_account_from_idinfo_and_userinfo(&idinfo, &userinfo, provider_name)?;
+    let oauth2_account = oauth2_account_from_idinfo_and_userinfo(&idinfo, &userinfo, ctx)?;
 
     // Extract user_id from the stored session if available
     let state_user = get_uid_from_stored_session_by_state_param(&state_in_response).await?;
@@ -495,7 +494,7 @@ pub async fn fedcm_authorized_core(
     let idinfo = validate_fedcm_token(ctx, &request.credential, &request.nonce_id).await?;
 
     // 2. Build OAuth2Account from the verified ID token
-    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx.provider_name)?;
+    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx)?;
 
     // 3. Parse mode directly from request (no cache round-trip needed for FedCM)
     let mode = match &request.mode {

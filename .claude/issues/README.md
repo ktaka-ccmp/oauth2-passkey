@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (19)
+### Open (20)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -15,6 +15,7 @@ This directory contains issue/task tracking files for the project.
 | `20260422-1552` | medium | small | [Detect claim mismatch between id_token and /userinfo](open/20260422-1552-detect-claim-mismatch-idinfo-userinfo.md) |
 | `20260421-0045` | low | trivial | [Make `expires_in` in OidcTokenResponse optional](open/20260421-0045-oidc-token-response-expires-in-optional.md) |
 | `20260421-0315` | low | small | [Configurable `prompt` parameter per OAuth2 provider](open/20260421-0315-configurable-prompt-per-provider.md) |
+| `20260422-2055` | low | medium | [Introduce `ProviderName` newtype for stringly-typed provider identifiers](open/20260422-2055-providername-newtype-typesafety.md) |
 | `20260226-2020` | high | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
