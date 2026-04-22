@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-20-15-21
 
-## Closed:
+## Closed: 2026-04-22
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -158,3 +158,25 @@ Regression check: Google / Auth0 / Keycloak / Entra login still work.
   `OAUTH2_GOOGLE_USER` removal is done.
 
 ## Resolution
+
+Fully resolved across two PR #316 commits:
+
+- **`db680fe`** (feat: add 8 generic OIDC provider slots): removed
+  the `OAUTH2_GOOGLE_USER` constant and the dead three-arm `match`
+  in `coordination/oauth2.rs`. The call site became a single call
+  to `oauth2_account_from_userinfo` (at that point — subsequently
+  replaced; see below).
+- **`3f74d37`** (fix: merge idinfo+userinfo when building
+  OAuth2Account — issue `20260421-0105`): deleted
+  `oauth2_account_from_userinfo` entirely after the callback
+  switched to the new merged builder
+  `oauth2_account_from_idinfo_and_userinfo`. No remaining callers.
+
+Surviving related code:
+
+- `oauth2_account_from_idinfo` stays — still used by the FedCM
+  callback (`coordination/oauth2.rs` post-merged-builder line ~497)
+  because FedCM has no `/userinfo` endpoint to fetch from.
+- `fetch_userinfo` and `OidcUserInfo` stay per the earlier decision
+  log — they power the `idinfo.sub == userinfo.sub` consistency
+  check in `get_idinfo_userinfo`.

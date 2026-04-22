@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-21-01-05
 
-## Closed:
+## Closed: 2026-04-22
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -141,4 +141,49 @@ merge function if it has no other callers by then.
 
 ## Resolution
 
-(pending)
+**Landed in commit `3f74d37`** (`fix(oauth2): merge idinfo+userinfo
+when building OAuth2Account`) on branch
+`feature/generic-oidc-provider-slots`, prompted by an external code
+review flagging the userinfo-only callback as a regression for
+providers that emit profile claims only in the ID token.
+
+Implementation details:
+
+- Added `oauth2_account_from_idinfo_and_userinfo(idinfo, userinfo,
+  provider_name)` in `oauth2/types.rs`, replacing the userinfo-only
+  builder.
+- Removed `oauth2_account_from_userinfo` entirely (no remaining
+  callers after the switch); FedCM stays on
+  `oauth2_account_from_idinfo` since FedCM has no `/userinfo`.
+- Switched `coordination/oauth2.rs` main callback to the merged
+  builder, dropped the TODO marker.
+- Replaced the 4 existing `oauth2_account_from_userinfo` tests with
+  7 merged-view tests (idinfo-primary, userinfo fallback, id wins
+  per-field, preferred_username fallback, email-only-in-idinfo,
+  missing-everywhere error, name-falls-back-to-email).
+
+### Deviation from the original Approach
+
+The Approach section proposed *userinfo-first, idinfo fallback*
+(Option A). Implementation used *idinfo-first, userinfo fallback*
+(Option B). Reason: the ID token is cryptographically signed and its
+`aud`/`iss`/`nonce` are already verified, making it the stronger
+trust root for identity-critical claims; `/userinfo` is retrieved
+over TLS using an access token and is not itself signed. When both
+sources populate a field, the signed source should win and the
+unsigned source should be used only to fill gaps. Option B also
+keeps behavior closer to the pre-PR default (idinfo-only) with a
+fallback added, which is the minimal change that fixes the Zitadel
+case without introducing a new trust direction.
+
+Verified green: 645 unit + 71 integration + 11 axum unit + 22 axum
+integration + 24+10 doctests. Clippy clean.
+
+### Follow-up
+
+The merged builder currently cross-checks only `sub` (enforced
+upstream by `get_idinfo_userinfo`). Silent per-field preference for
+idinfo may hide legitimate IdP / operator misconfiguration. Tracked
+as `20260422-1552` (detect claim mismatch between id_token and
+/userinfo) — Tier 1 hardcoded strict reject on identity-critical
+fields, Tier 2 env-var-controlled reject/warn on display fields.
