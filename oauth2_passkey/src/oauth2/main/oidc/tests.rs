@@ -98,6 +98,39 @@ fn test_oidc_token_response_missing_id_token() {
     );
 }
 
+/// Test deserialization of OIDC token response without expires_in
+///
+/// Per RFC 6749 §5.1 `expires_in` is RECOMMENDED, not REQUIRED. This test
+/// verifies that `OidcTokenResponse` can be correctly deserialized from a
+/// JSON response that omits it (e.g. older Keycloak builds, some Ory Hydra
+/// configs).
+///
+#[test]
+fn test_oidc_token_response_missing_expires_in() {
+    let json_data = json!({
+        "access_token": "ya29.access_token_value",
+        "scope": "openid email profile",
+        "token_type": "Bearer",
+        "id_token": "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20ifQ.signature"
+        // Missing expires_in field
+    });
+
+    let json_str = serde_json::to_string(&json_data)
+        .expect("JSON serialization should not fail for valid data");
+    let token_response: Result<OidcTokenResponse, _> = serde_json::from_str(&json_str);
+
+    assert!(
+        token_response.is_ok(),
+        "Should successfully deserialize token response without expires_in"
+    );
+    let token_response = token_response.expect("Already verified result is Ok");
+    assert_eq!(token_response.access_token, "ya29.access_token_value");
+    assert!(
+        token_response.id_token.is_some(),
+        "id_token should still be present"
+    );
+}
+
 /// Test OIDC user info deserialization with missing required fields
 ///
 /// This test verifies that deserializing OIDC user info JSON fails appropriately

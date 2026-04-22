@@ -231,7 +231,10 @@ pub struct AuthResponse {
 pub(super) struct OidcTokenResponse {
     pub(super) access_token: String,
     token_type: String,
-    expires_in: u64,
+    // Optional per RFC 6749 §5.1 (RECOMMENDED, not REQUIRED). Some
+    // providers (e.g. older Keycloak builds, some Ory Hydra configs)
+    // omit it entirely.
+    expires_in: Option<u64>,
     refresh_token: Option<String>,
     scope: Option<String>,
     pub(super) id_token: Option<String>,
