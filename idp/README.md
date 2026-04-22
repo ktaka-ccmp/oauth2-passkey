@@ -587,15 +587,19 @@ After a first successful login, repeated clicks on **Continue with
 Zitadel** redirect back to the demo without showing a password or
 account-picker screen — Zitadel reuses the previous session silently.
 
-This is Zitadel's SSO behavior working as specified: oauth2-passkey
-sends `prompt=consent` (which is hardcoded across all providers in
-`oauth2/provider.rs`), and per OIDC Core that only asks the IdP to
-redisplay the *consent* screen — it does **not** force
-re-authentication or account selection. v4's login-v2 service takes
-this literally and skips straight to consent (often auto-granted),
-while v2's V1 login historically tended to show an account picker
-even with an active session, which is why the difference is
-noticeable.
+This is Zitadel's SSO behavior working as specified: per OIDC Core 1.0,
+`prompt=consent` only asks the IdP to redisplay the *consent* screen —
+it does **not** force re-authentication or account selection. v4's
+login-v2 service takes this literally and skips straight to consent
+(often auto-granted), while v2's V1 login historically tended to show
+an account picker even with an active session.
+
+**Fix**: set `OAUTH2_CUSTOM{N}_PROMPT=select_account` (force account
+picker) or `OAUTH2_CUSTOM{N}_PROMPT=login` (force re-authentication) in
+your `.env`. See the
+[IdP signs the user in without prompting](../guides/generic-oidc.md#idp-signs-the-user-in-without-prompting)
+troubleshooting entry in the generic-OIDC guide for full details and all
+valid values.
 
 If the Zitadel console shares the browser with the demo, logging into
 `/ui/console` creates a session that the OAuth2 flow will then reuse
@@ -604,6 +608,8 @@ during setup).
 
 Workarounds while testing:
 
+- Set `OAUTH2_CUSTOM{N}_PROMPT=select_account` in `.env` for an explicit
+  account-picker on every sign-in
 - Use a **private browsing window** for the demo and close it between
   runs
 - Hit Zitadel's `end_session_endpoint`
@@ -611,11 +617,6 @@ Workarounds while testing:
   session
 - Avoid logging into `/ui/console` with the same browser you use for
   the demo; create a separate test user and sign in only via the demo
-
-A permanent fix would require making `prompt` configurable per slot
-(e.g. `OAUTH2_CUSTOM{N}_PROMPT=login|select_account|consent|none`); this
-is out of scope for the generic-OIDC slot work and should be tracked
-as a separate issue if needed.
 
 ### Claim mismatch between id_token and /userinfo
 

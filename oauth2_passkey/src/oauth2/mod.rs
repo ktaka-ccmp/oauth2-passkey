@@ -103,6 +103,7 @@ pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
     // values directly to avoid a request-time panic.
     provider::validate_named_provider_strict_display_claims()
         .map_err(errors::OAuth2Error::Validation)?;
+    provider::validate_named_provider_prompt().map_err(errors::OAuth2Error::Validation)?;
 
     let _ = *config::OAUTH2_CSRF_COOKIE_NAME;
     let _ = *config::OAUTH2_CSRF_COOKIE_MAX_AGE;

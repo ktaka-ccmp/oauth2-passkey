@@ -6,13 +6,12 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (17)
+### Open (16)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `20260423-0136` | low | medium | [Consolidate idp/README.md into docs/](open/20260423-0136-idp-readme-docs-consolidation.md) |
 | `20260420-0402` | medium | small | [Admin unlink/delete fails in demo mode ("Invalid user ID")](open/20260420-0402-admin-unlink-demo-mode.md) |
-| `20260421-0315` | low | small | [Configurable `prompt` parameter per OAuth2 provider](open/20260421-0315-configurable-prompt-per-provider.md) |
 | `20260226-2020` | high | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
@@ -28,10 +27,11 @@ This directory contains issue/task tracking files for the project.
 | `20260420-1457` | low | large | [Add Sign in with Apple as OAuth2 Provider](open/20260420-1457-add-apple-provider.md) |
 | `20260420-1458` | low | large | [Add GitHub as OAuth2 Provider (non-OIDC)](open/20260420-1458-add-github-provider.md) |
 
-### Completed (68)
+### Completed (69)
 
 | ID | Title |
 |----|-------|
+| `20260421-0315` | [Configurable `prompt` parameter per OAuth2 provider](completed/20260421-0315-configurable-prompt-per-provider.md) |
 | `20260422-2055` | [Introduce `ProviderName` newtype for stringly-typed provider identifiers](completed/20260422-2055-providername-newtype-typesafety.md) |
 | `20260422-1636` | [Unify non-Google providers under Custom slot with presets](completed/20260422-1636-unify-non-google-providers-via-custom-slot-preset.md) |
 | `20260422-1552` | [Detect claim mismatch between id_token and /userinfo](completed/20260422-1552-detect-claim-mismatch-idinfo-userinfo.md) |

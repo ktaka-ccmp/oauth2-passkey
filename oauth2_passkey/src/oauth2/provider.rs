@@ -560,9 +560,11 @@ pub(crate) static GOOGLE_PROVIDER: LazyLock<ProviderConfig> = LazyLock::new(|| {
     };
     let scope = env::var("OAUTH2_SCOPE").unwrap_or_else(|_| "openid+email+profile".to_string());
     let response_type = env::var("OAUTH2_RESPONSE_TYPE").unwrap_or_else(|_| "code".to_string());
+    let prompt = parse_prompt("OAUTH2_GOOGLE_PROMPT").unwrap_or_else(|msg| panic!("{msg}"));
+    let prompt_segment = prompt.map(|p| format!("&prompt={p}")).unwrap_or_default();
     let query_string = format!(
-        "&response_type={}&scope={}&response_mode={}&access_type=online&prompt=consent",
-        response_type, scope, response_mode
+        "&response_type={}&scope={}&response_mode={}&access_type=online{}",
+        response_type, scope, response_mode, prompt_segment
     );
     let strict_display_claims = read_strict_display_claims("OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS");
     ProviderConfig {
@@ -632,6 +634,34 @@ fn read_strict_display_claims(env_var: &str) -> bool {
 /// crash the first login request instead.
 pub(crate) fn validate_named_provider_strict_display_claims() -> Result<(), String> {
     parse_strict_display_claims("OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS")?;
+    Ok(())
+}
+
+/// Parse an `OAUTH2_*_PROMPT` env var.
+/// - Unset -> `Ok(Some("consent"))` (preserves current behavior)
+/// - `""` -> `Ok(None)` (operator explicitly omits `&prompt=` from the URL)
+/// - `"none" | "login" | "consent" | "select_account"` -> `Ok(Some(value))`
+/// - Any other value -> `Err(message)` for startup-time rejection
+fn parse_prompt(env_var: &str) -> Result<Option<&'static str>, String> {
+    match env::var(env_var).ok().as_deref() {
+        None => Ok(Some("consent")),
+        Some("") => Ok(None),
+        Some("none") => Ok(Some("none")),
+        Some("login") => Ok(Some("login")),
+        Some("consent") => Ok(Some("consent")),
+        Some("select_account") => Ok(Some("select_account")),
+        Some(other) => Err(format!(
+            "Invalid {env_var} '{other}'. \
+             Must be one of: none, login, consent, select_account \
+             (or empty to omit the parameter)."
+        )),
+    }
+}
+
+/// Validate `OAUTH2_GOOGLE_PROMPT` at startup without forcing `GOOGLE_PROVIDER`'s
+/// `LazyLock` to initialize. Custom slots are caught via `validate_custom_slots`.
+pub(crate) fn validate_named_provider_prompt() -> Result<(), String> {
+    parse_prompt("OAUTH2_GOOGLE_PROMPT")?;
     Ok(())
 }
 
@@ -724,9 +754,11 @@ fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
         O2P_ROUTE_PREFIX.as_str(),
         provider_name
     );
+    let prompt = parse_prompt(&format!("{prefix}_PROMPT")).unwrap_or_else(|msg| panic!("{msg}"));
+    let prompt_segment = prompt.map(|p| format!("&prompt={p}")).unwrap_or_default();
     let query_string = format!(
-        "&response_type=code&scope={}&response_mode={}&prompt=consent",
-        scope, response_mode
+        "&response_type=code&scope={}&response_mode={}{}",
+        scope, response_mode, prompt_segment
     );
 
     Some(ProviderConfig {
@@ -931,6 +963,7 @@ pub(crate) fn validate_custom_slot_preset_shape() -> Result<(), String> {
                 ));
             }
         }
+        parse_prompt(&format!("{prefix}_PROMPT"))?;
     }
     Ok(())
 }
