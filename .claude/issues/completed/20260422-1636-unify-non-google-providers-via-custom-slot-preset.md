@@ -17,9 +17,9 @@
 
 ## Created: 2026-04-22-16-36
 
-## Closed:
+## Closed: 2026-04-23-01-36
 
-## Status: open
+## Status: completed
 
 ## Priority: medium-high
 
@@ -297,31 +297,31 @@ schema, which defeats the unification purpose.
 
 ## Implementation Tasks
 
-- [ ] Define `ProviderPreset` struct and the 3 consts
+- [x] Define `ProviderPreset` struct and the 3 consts
       (`AUTH0_PRESET`, `KEYCLOAK_PRESET`, `ENTRA_PRESET`)
-- [ ] Remove `Auth0` / `Keycloak` / `Entra` from `ProviderKind`;
+- [x] Remove `Auth0` / `Keycloak` / `Entra` from `ProviderKind`;
       delete the three matching `LazyLock` statics and their
       `provider_for` arms
-- [ ] Extend `build_custom_provider` to consult the preset (via a
+- [x] Extend `build_custom_provider` to consult the preset (via a
       new `OAUTH2_CUSTOM{N}_PRESET` env var lookup) and merge preset
       defaults with explicit env-var overrides
-- [ ] Add `OAUTH2_CUSTOM{N}_ICON_SLUG` env var support (was
+- [x] Add `OAUTH2_CUSTOM{N}_ICON_SLUG` env var support (was
       deferred in `20260420-1511`)
-- [ ] Extend `optional_env_contract` / `validate_custom_slots` to
+- [x] Extend `optional_env_contract` / `validate_custom_slots` to
       validate PRESET values and ICON_SLUG shape
-- [ ] Unit tests:
+- [x] Unit tests:
       - preset resolves expected defaults
       - preset override works per field
       - invalid PRESET value rejected at init
       - `additional_allowed_origins` from preset applied to origin
         validator
-- [ ] Update `.env` / `.env.example` / `demo-*/.env*` to use the
+- [x] Update `.env` / `.env.example` / `demo-*/.env*` to use the
       unified form
-- [ ] Update docs (`auth0.md`, `keycloak.md`, `entra.md`,
+- [x] Update docs (`auth0.md`, `keycloak.md`, `entra.md`,
       `generic-oidc.md`, `SUMMARY.md`)
-- [ ] `cargo fmt --all` / `cargo clippy --all-targets --all-features`
+- [x] `cargo fmt --all` / `cargo clippy --all-targets --all-features`
       / `cargo test`
-- [ ] E2E regression:
+- [x] E2E regression:
       - Google (named, unchanged) — login + demo flows
       - Auth0 via `PRESET=auth0`
       - Keycloak via `PRESET=keycloak`
@@ -353,4 +353,21 @@ schema, which defeats the unification purpose.
 
 ## Resolution
 
-(pending)
+Implemented in PR #319 (`refactor/provider-preset-unification`) across
+commits 1–5 (2026-04-22/23):
+
+- `ProviderPreset` struct + `AUTH0_PRESET` / `KEYCLOAK_PRESET` / `ENTRA_PRESET`
+  consts added to `oauth2_passkey/src/oauth2/provider.rs`
+- `ProviderKind::{Auth0, Keycloak, Entra}` variants and their `LazyLock`
+  statics removed; `ProviderKind::ALL` is now `[Google]`
+- `build_custom_provider` consults `OAUTH2_CUSTOM{N}_PRESET` with a 3-level
+  fallback (env var > preset default > hardcoded default)
+- `OAUTH2_CUSTOM{N}_ICON_SLUG` env var added; shape validated via
+  `is_valid_custom_provider_name` at startup
+- `resolve_preset` validates preset keys at init; unknown value = fatal error
+- Zitadel / Okta / Authentik presets added in commit 5, extending coverage to
+  6 presets total
+- Per-provider guides (`auth0.md`, `keycloak.md`, `entra.md`) rewritten to
+  show `PRESET=...` syntax; `generic-oidc.md` preset table extended to 6 rows
+- Local `.env` reorganized: CUSTOM1=Auth0, CUSTOM2=Keycloak, CUSTOM3=Entra,
+  CUSTOM4=Zitadel, CUSTOM5=Hydra(bare), CUSTOM6=Authentik, CUSTOM7=Okta

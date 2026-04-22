@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-22-20-55
 
-## Closed:
+## Closed: 2026-04-23-01-36
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -117,17 +117,17 @@ Estimated scope — to be confirmed during execution:
 
 ## Implementation Tasks
 
-- [ ] Decide newtype shape (single `ProviderName` vs. split
+- [x] Decide newtype shape (single `ProviderName` vs. split
   `ProviderName` + `ProviderSlug`)
-- [ ] Introduce type and validated constructors; cover with unit tests
-- [ ] Replace `&'static str` / `&str` usages inside `oauth2_passkey`
-- [ ] Ripple storage column (de)serialization — verify wire format
+- [x] Introduce type and validated constructors; cover with unit tests
+- [x] Replace `&'static str` / `&str` usages inside `oauth2_passkey`
+- [x] Ripple storage column (de)serialization — verify wire format
   unchanged to avoid migration
-- [ ] Ripple `oauth2_passkey_axum` router / handler types
-- [ ] `cargo fmt --all` / `cargo clippy --all-targets --all-features`
+- [x] Ripple `oauth2_passkey_axum` router / handler types
+- [x] `cargo fmt --all` / `cargo clippy --all-targets --all-features`
       / `cargo test` — full green
-- [ ] Verify no public API break (or document it in CHANGELOG)
-- [ ] E2E smoke test against one named and one Custom provider
+- [x] Verify no public API break (or document it in CHANGELOG)
+- [x] E2E smoke test against one named and one Custom provider
 
 ## Decision Log
 
@@ -150,4 +150,20 @@ Estimated scope — to be confirmed during execution:
 
 ## Resolution
 
-(pending)
+Implemented in PR #319 (`refactor/provider-preset-unification`) commits 1–2
+(2026-04-22):
+
+- `ProviderName(&'static str)` newtype introduced in
+  `oauth2_passkey/src/oauth2/provider.rs` with three construction paths:
+  - `pub fn from_registered(s: &'static str)` — for known registered names
+    (validated by the caller; used by LazyLock statics and preset consts)
+  - `pub(crate) const fn from_static(s: &'static str)` — for compile-time
+    const usage in preset definitions
+  - `pub(crate) fn from_env_leaked(s: String)` — leaks a `Box<str>` to
+    obtain `&'static str` from env-var-supplied values at init time
+- `ProviderConfig.provider_name` changed from `&'static str` to `ProviderName`
+- `oauth2_passkey_axum` router / handler types ripple-updated
+- `OAuth2Account.provider` intentionally kept as `String` (DB column; a
+  `ProviderName` would require `&'static str` which cannot be reconstructed
+  from DB rows without a registry lookup)
+- All tests green; no public API break
