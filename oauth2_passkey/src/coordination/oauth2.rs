@@ -165,7 +165,7 @@ pub async fn get_authorized_core(
     cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    let kind = ProviderKind::from_path_segment(provider).ok_or_else(|| {
+    let kind = ProviderKind::from_provider_name(provider).ok_or_else(|| {
         CoordinationError::InvalidState(format!("Unknown OAuth2 provider: {provider}"))
     })?;
     let ctx = provider_for(kind).ok_or_else(|| {
@@ -214,7 +214,7 @@ pub async fn post_authorized_core(
     cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    let kind = ProviderKind::from_path_segment(provider).ok_or_else(|| {
+    let kind = ProviderKind::from_provider_name(provider).ok_or_else(|| {
         CoordinationError::InvalidState(format!("Unknown OAuth2 provider: {provider}"))
     })?;
     let ctx = provider_for(kind).ok_or_else(|| {
@@ -229,7 +229,7 @@ async fn process_oauth2_authorization(
     auth_response: &AuthResponse,
     login_context: LoginContext,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    let provider_name = ctx.path_segment;
+    let provider_name = ctx.provider_name;
     tracing::Span::current().record("provider", provider_name);
     tracing::info!("Processing OAuth2 authorization core logic");
 
@@ -495,7 +495,7 @@ pub async fn fedcm_authorized_core(
     let idinfo = validate_fedcm_token(ctx, &request.credential, &request.nonce_id).await?;
 
     // 2. Build OAuth2Account from the verified ID token
-    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx.path_segment)?;
+    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx.provider_name)?;
 
     // 3. Parse mode directly from request (no cache round-trip needed for FedCM)
     let mode = match &request.mode {

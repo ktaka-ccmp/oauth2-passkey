@@ -51,7 +51,7 @@ pub async fn prepare_oauth2_auth_request(
     headers: HeaderMap,
     mode: Option<&str>,
 ) -> Result<(String, HeaderMap), OAuth2Error> {
-    let kind = ProviderKind::from_path_segment(provider)
+    let kind = ProviderKind::from_provider_name(provider)
         .ok_or_else(|| OAuth2Error::Validation(format!("Unknown provider: {provider}")))?;
     let ctx = provider_for(kind)
         .ok_or_else(|| OAuth2Error::Validation(format!("Provider not enabled: {provider}")))?;
@@ -69,7 +69,7 @@ pub(crate) async fn prepare_oauth2_auth_request_inner(
 ) -> Result<(String, HeaderMap), OAuth2Error> {
     let auth_base_url = ctx.auth_url().await?;
     let response_mode = ctx.response_mode.as_str();
-    let provider_name = ctx.path_segment;
+    let provider_name = ctx.provider_name;
 
     let expires_at = Utc::now() + Duration::seconds((*OAUTH2_CSRF_COOKIE_MAX_AGE) as i64);
     let ttl = *OAUTH2_CSRF_COOKIE_MAX_AGE;

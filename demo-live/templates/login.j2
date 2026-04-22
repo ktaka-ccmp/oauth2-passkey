@@ -104,7 +104,7 @@
             <div class="auth-buttons">
                 {% for p in providers %}
                 <div>
-                    <button class="btn {{p.button_class}} btn-block" onclick="oauth2.openPopup('create_user_or_login', null, '{{p.name}}')">
+                    <button class="btn {{p.button_class}} btn-block" onclick="oauth2.openPopup('create_user_or_login', null, '{{p.provider_name}}')">
                         Register / Sign in with {{p.display_name}}
                     </button>
                 </div>

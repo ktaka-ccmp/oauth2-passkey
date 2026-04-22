@@ -33,7 +33,7 @@ Collapse the parallel "named provider" path (`Auth0`, `Keycloak`,
 (FedCM, Google-specific query string, `hd` claim handling) that are
 not expressible as a plain OIDC provider. All other providers become
 Custom slots, optionally pre-populated by a preset that fills in
-display name, path segment, icon slug, button colors, and any
+display name, provider name, icon slug, button colors, and any
 library-side quirks (e.g. additional allowed origins).
 
 Outcome:
@@ -112,8 +112,8 @@ exposed as env vars on the bare Custom slot today:
 pub(crate) struct ProviderPreset {
     /// Human-readable label for login buttons.
     display_name: &'static str,
-    /// Default URL path segment (operator can override).
-    path_segment: &'static str,
+    /// Default URL provider name (operator can override).
+    provider_name: &'static str,
     /// SVG icon basename under `/icons/{slug}.svg`.
     icon_slug: &'static str,
     /// Default button background color.
@@ -130,7 +130,7 @@ pub(crate) struct ProviderPreset {
 
 const AUTH0_PRESET: ProviderPreset = ProviderPreset {
     display_name: "Auth0",
-    path_segment: "auth0",
+    provider_name: "auth0",
     icon_slug: "auth0",
     button_color: "#eb5424",
     button_hover_color: "#c7431f",
@@ -157,7 +157,7 @@ OAUTH2_CUSTOM1_CLIENT_SECRET=<from Auth0>
 OAUTH2_CUSTOM1_ISSUER_URL=https://dev-xxx.auth0.com
 ```
 
-Preset fills in `DISPLAY_NAME`, `PATH_SEGMENT`, `ICON_SLUG`,
+Preset fills in `DISPLAY_NAME`, `NAME`, `ICON_SLUG`,
 `BUTTON_COLOR`, `BUTTON_HOVER_COLOR`, and `additional_allowed_origins`.
 
 Any individual preset field can be overridden explicitly:
@@ -167,13 +167,13 @@ OAUTH2_CUSTOM1_PRESET=auth0
 OAUTH2_CUSTOM1_CLIENT_ID=...
 OAUTH2_CUSTOM1_CLIENT_SECRET=...
 OAUTH2_CUSTOM1_ISSUER_URL=...
-OAUTH2_CUSTOM1_PATH_SEGMENT=company-sso   # override preset default "auth0"
+OAUTH2_CUSTOM1_NAME=company-sso   # override preset default "auth0"
 OAUTH2_CUSTOM1_BUTTON_COLOR='#ff0000'
 OAUTH2_CUSTOM1_DISPLAY_NAME='Company SSO'
 ```
 
 Plain Custom slots (no preset) keep current behavior: operator must
-supply `DISPLAY_NAME` and `PATH_SEGMENT`; button colors default to
+supply `DISPLAY_NAME` and `NAME`; button colors default to
 neutral gray; `icon_slug` defaults to `openid`.
 
 ### New / changed fields
@@ -234,7 +234,7 @@ the 3-env-var UX, which the preset system already provides.
 
 ### Alternative 2: delete named without adding preset — operators write 5 env vars
 
-Rejected. `DISPLAY_NAME` / `PATH_SEGMENT` / `BUTTON_COLOR` /
+Rejected. `DISPLAY_NAME` / `NAME` / `BUTTON_COLOR` /
 `BUTTON_HOVER_COLOR` are the same for every operator using Auth0.
 Forcing each of them to re-type these is pure UX regression for no
 library benefit.

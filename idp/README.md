@@ -37,10 +37,10 @@ state so you can `down` and bring the stack back up without losing data.
 Redirect URI format for every Custom slot is:
 
 ```
-{ORIGIN}/o2p/oauth2/{OAUTH2_CUSTOM{N}_PATH_SEGMENT}/authorized
+{ORIGIN}/o2p/oauth2/{OAUTH2_CUSTOM{N}_NAME}/authorized
 ```
 
-e.g. with `ORIGIN=http://localhost:3001` and `OAUTH2_CUSTOM1_PATH_SEGMENT=zitadel`:
+e.g. with `ORIGIN=http://localhost:3001` and `OAUTH2_CUSTOM1_NAME=zitadel`:
 
 ```
 http://localhost:3001/o2p/oauth2/zitadel/authorized
@@ -112,7 +112,7 @@ OAUTH2_CUSTOM1_CLIENT_ID=<paste from Zitadel>
 OAUTH2_CUSTOM1_CLIENT_SECRET=<paste from Zitadel>
 OAUTH2_CUSTOM1_ISSUER_URL=http://localhost:8080
 OAUTH2_CUSTOM1_DISPLAY_NAME=Zitadel
-OAUTH2_CUSTOM1_PATH_SEGMENT=zitadel
+OAUTH2_CUSTOM1_NAME=zitadel
 OAUTH2_CUSTOM1_BUTTON_COLOR=#000000
 OAUTH2_CUSTOM1_BUTTON_HOVER_COLOR=#1a1a1a
 OAUTH2_CUSTOM1_RESPONSE_MODE=query
@@ -219,7 +219,7 @@ OAUTH2_CUSTOM2_CLIENT_ID=<paste from Hydra>
 OAUTH2_CUSTOM2_CLIENT_SECRET=<paste from Hydra>
 OAUTH2_CUSTOM2_ISSUER_URL=http://localhost:4444
 OAUTH2_CUSTOM2_DISPLAY_NAME=Ory Hydra
-OAUTH2_CUSTOM2_PATH_SEGMENT=hydra
+OAUTH2_CUSTOM2_NAME=hydra
 OAUTH2_CUSTOM2_BUTTON_COLOR=#5528ff
 OAUTH2_CUSTOM2_BUTTON_HOVER_COLOR=#3d1bcc
 OAUTH2_CUSTOM2_RESPONSE_MODE=query
@@ -323,7 +323,7 @@ OAUTH2_CUSTOM3_CLIENT_ID=<from Authentik provider>
 OAUTH2_CUSTOM3_CLIENT_SECRET=<from Authentik provider>
 OAUTH2_CUSTOM3_ISSUER_URL=http://localhost:9000/application/o/oauth2-passkey-demo/
 OAUTH2_CUSTOM3_DISPLAY_NAME=Authentik
-OAUTH2_CUSTOM3_PATH_SEGMENT=authentik
+OAUTH2_CUSTOM3_NAME=authentik
 OAUTH2_CUSTOM3_BUTTON_COLOR='#fd4b2d'
 OAUTH2_CUSTOM3_BUTTON_HOVER_COLOR='#e03d1f'
 ```
@@ -367,7 +367,7 @@ Admin console -> **Applications -> Applications -> Create App Integration**.
 - **Grant type**: `Authorization Code` (default)
 - **Sign-in redirect URIs**: exactly
   `http://localhost:3001/o2p/oauth2/okta/authorized` (adjust `ORIGIN`
-  and `PATH_SEGMENT` as needed)
+  and `NAME` as needed)
 - **Controlled access**: pick `Allow everyone in your organization` for
   fastest setup (can tighten later). If you skip assignment here, you
   must come back in 4.4.
@@ -460,7 +460,7 @@ OAUTH2_CUSTOM5_CLIENT_ID=<Client ID from Okta>
 OAUTH2_CUSTOM5_CLIENT_SECRET=<Client Secret from Okta>
 OAUTH2_CUSTOM5_ISSUER_URL=https://<tenant>.okta.com/oauth2/default
 OAUTH2_CUSTOM5_DISPLAY_NAME=Okta
-OAUTH2_CUSTOM5_PATH_SEGMENT=okta
+OAUTH2_CUSTOM5_NAME=okta
 OAUTH2_CUSTOM5_BUTTON_COLOR='#000000'
 OAUTH2_CUSTOM5_BUTTON_HOVER_COLOR='#333333'
 ```
@@ -511,7 +511,7 @@ Once a stack is configured:
        "SELECT provider, provider_user_id, email FROM oauth2_accounts;"
    ```
    You should see a row with `provider` matching your
-   `OAUTH2_CUSTOM{N}_PATH_SEGMENT`.
+   `OAUTH2_CUSTOM{N}_NAME`.
 
 ### Regression checks
 
@@ -534,9 +534,9 @@ After verifying a Custom slot, sign out and confirm that:
 
 The init routine fails fast if:
 
-- `OAUTH2_CUSTOM{N}_PATH_SEGMENT` is invalid (must match
+- `OAUTH2_CUSTOM{N}_NAME` is invalid (must match
   `[a-z0-9_-]+`, so lowercase only, no slashes).
-- Two enabled slots share the same `PATH_SEGMENT`.
+- Two enabled slots share the same `NAME`.
 - A slot collides with a reserved route (`google`, `auth0`,
   `keycloak`, `entra`, `authorized`, `accounts`, `fedcm`,
   `popup_close`, `oauth2.js`, `select`).

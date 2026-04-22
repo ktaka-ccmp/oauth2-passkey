@@ -48,7 +48,7 @@ pub fn get_google_client_id() -> &'static str {
 /// `name` is the URL path segment identifying the provider (e.g. `"google"`,
 /// `"auth0"`). Unknown names return `false`.
 pub fn is_provider_enabled(name: &str) -> bool {
-    crate::oauth2::provider::ProviderKind::from_path_segment(name)
+    crate::oauth2::provider::ProviderKind::from_provider_name(name)
         .and_then(crate::oauth2::provider::provider_for)
         .is_some()
 }
@@ -62,10 +62,10 @@ pub fn is_provider_enabled(name: &str) -> bool {
 /// segment) back to its display metadata without allocating a full
 /// [`enabled_providers`] vector.
 pub fn provider_info(name: &str) -> Option<crate::oauth2::provider::ProviderInfo> {
-    crate::oauth2::provider::ProviderKind::from_path_segment(name)
+    crate::oauth2::provider::ProviderKind::from_provider_name(name)
         .and_then(crate::oauth2::provider::provider_for)
         .map(|cfg| crate::oauth2::provider::ProviderInfo {
-            name: cfg.path_segment,
+            provider_name: cfg.provider_name,
             display_name: cfg.display_name,
             button_class: cfg.button_class,
             icon_slug: cfg.icon_slug,
@@ -84,7 +84,7 @@ pub fn enabled_providers() -> Vec<crate::oauth2::provider::ProviderInfo> {
         .filter_map(|&kind| {
             crate::oauth2::provider::provider_for(kind).map(|cfg| {
                 crate::oauth2::provider::ProviderInfo {
-                    name: cfg.path_segment,
+                    provider_name: cfg.provider_name,
                     display_name: cfg.display_name,
                     button_class: cfg.button_class,
                     icon_slug: cfg.icon_slug,

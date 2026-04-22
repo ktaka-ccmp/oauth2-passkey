@@ -4,26 +4,26 @@ use crate::test_utils::run_child_without_env;
 // --- ProviderKind ---
 
 #[test]
-fn test_provider_kind_from_path_segment_known() {
+fn test_provider_kind_from_provider_name_known() {
     assert_eq!(
-        ProviderKind::from_path_segment("google"),
+        ProviderKind::from_provider_name("google"),
         Some(ProviderKind::Google)
     );
 }
 
 #[test]
-fn test_provider_kind_from_path_segment_keycloak() {
+fn test_provider_kind_from_provider_name_keycloak() {
     assert_eq!(
-        ProviderKind::from_path_segment("keycloak"),
+        ProviderKind::from_provider_name("keycloak"),
         Some(ProviderKind::Keycloak)
     );
 }
 
 #[test]
-fn test_provider_kind_from_path_segment_unknown() {
-    assert_eq!(ProviderKind::from_path_segment("github"), None);
-    assert_eq!(ProviderKind::from_path_segment(""), None);
-    assert_eq!(ProviderKind::from_path_segment("Google"), None); // case-sensitive
+fn test_provider_kind_from_provider_name_unknown() {
+    assert_eq!(ProviderKind::from_provider_name("github"), None);
+    assert_eq!(ProviderKind::from_provider_name(""), None);
+    assert_eq!(ProviderKind::from_provider_name("Google"), None); // case-sensitive
 }
 
 #[test]
@@ -31,12 +31,12 @@ fn test_provider_kind_as_str() {
     assert_eq!(ProviderKind::Google.as_str(), "google");
 }
 
-// --- from_path_segment: entra ---
+// --- from_provider_name: entra ---
 
 #[test]
-fn test_provider_kind_from_path_segment_entra() {
+fn test_provider_kind_from_provider_name_entra() {
     assert_eq!(
-        ProviderKind::from_path_segment("entra"),
+        ProviderKind::from_provider_name("entra"),
         Some(ProviderKind::Entra)
     );
 }
@@ -197,7 +197,7 @@ fn custom_slot_optional_env_contract_slot1() {
             "OAUTH2_CUSTOM1_CLIENT_SECRET",
             "OAUTH2_CUSTOM1_ISSUER_URL",
             "OAUTH2_CUSTOM1_DISPLAY_NAME",
-            "OAUTH2_CUSTOM1_PATH_SEGMENT",
+            "OAUTH2_CUSTOM1_NAME",
         ]
     );
 }
@@ -210,7 +210,7 @@ fn custom_slot_optional_env_contract_slot4() {
     assert_eq!(trigger, "OAUTH2_CUSTOM4_CLIENT_ID");
     assert_eq!(required.len(), 4);
     assert!(required.contains(&"OAUTH2_CUSTOM4_DISPLAY_NAME"));
-    assert!(required.contains(&"OAUTH2_CUSTOM4_PATH_SEGMENT"));
+    assert!(required.contains(&"OAUTH2_CUSTOM4_NAME"));
 }
 
 #[test]
@@ -220,21 +220,21 @@ fn custom_slot_as_str_returns_label() {
 }
 
 #[test]
-fn is_valid_custom_path_segment_accepts_valid() {
-    assert!(is_valid_custom_path_segment("okta"));
-    assert!(is_valid_custom_path_segment("my-sso"));
-    assert!(is_valid_custom_path_segment("my_sso"));
-    assert!(is_valid_custom_path_segment("sso1"));
-    assert!(is_valid_custom_path_segment("a"));
+fn is_valid_custom_provider_name_accepts_valid() {
+    assert!(is_valid_custom_provider_name("okta"));
+    assert!(is_valid_custom_provider_name("my-sso"));
+    assert!(is_valid_custom_provider_name("my_sso"));
+    assert!(is_valid_custom_provider_name("sso1"));
+    assert!(is_valid_custom_provider_name("a"));
 }
 
 #[test]
-fn is_valid_custom_path_segment_rejects_invalid() {
-    assert!(!is_valid_custom_path_segment(""));
-    assert!(!is_valid_custom_path_segment("My-SSO")); // uppercase
-    assert!(!is_valid_custom_path_segment("my/sso")); // slash
-    assert!(!is_valid_custom_path_segment("my sso")); // space
-    assert!(!is_valid_custom_path_segment("my.sso")); // dot
+fn is_valid_custom_provider_name_rejects_invalid() {
+    assert!(!is_valid_custom_provider_name(""));
+    assert!(!is_valid_custom_provider_name("My-SSO")); // uppercase
+    assert!(!is_valid_custom_provider_name("my/sso")); // slash
+    assert!(!is_valid_custom_provider_name("my sso")); // space
+    assert!(!is_valid_custom_provider_name("my.sso")); // dot
 }
 
 #[test]
@@ -265,10 +265,10 @@ fn is_valid_css_color_rejects_invalid() {
 }
 
 #[test]
-fn reserved_path_segments_cover_named_providers_and_literal_routes() {
+fn reserved_provider_names_cover_named_providers_and_literal_routes() {
     for segment in ["google", "auth0", "keycloak", "entra"] {
         assert!(
-            RESERVED_PATH_SEGMENTS.contains(&segment),
+            RESERVED_PROVIDER_NAMES.contains(&segment),
             "named provider '{segment}' must be reserved"
         );
     }
@@ -281,7 +281,7 @@ fn reserved_path_segments_cover_named_providers_and_literal_routes() {
         "select",
     ] {
         assert!(
-            RESERVED_PATH_SEGMENTS.contains(&segment),
+            RESERVED_PROVIDER_NAMES.contains(&segment),
             "literal route '{segment}' must be reserved"
         );
     }
@@ -332,16 +332,16 @@ fn custom_slot_valid_config_initializes() {
             .expect("slot1 should be enabled with full env");
         assert_eq!(cfg.client_id, "id");
         assert_eq!(cfg.display_name, "My SSO");
-        assert_eq!(cfg.path_segment, "my-sso");
+        assert_eq!(cfg.provider_name, "my-sso");
         assert_eq!(cfg.icon_slug, "openid");
         assert_eq!(cfg.button_class, "btn-oauth2 btn-custom1");
         // Defaults applied
         assert_eq!(cfg.response_mode, "form_post");
         assert_eq!(cfg.button_color, Some("#6b7280"));
         assert_eq!(cfg.button_hover_color, Some("#4b5563"));
-        // from_path_segment should resolve the operator-configured segment
+        // from_provider_name should resolve the operator-configured segment
         assert_eq!(
-            ProviderKind::from_path_segment("my-sso"),
+            ProviderKind::from_provider_name("my-sso"),
             Some(ProviderKind::Custom(CustomSlot::Slot1))
         );
         // validate_custom_slots should pass
@@ -355,7 +355,7 @@ fn custom_slot_valid_config_initializes() {
             ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
             ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
             ("OAUTH2_CUSTOM1_DISPLAY_NAME", "My SSO"),
-            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "my-sso"),
+            ("OAUTH2_CUSTOM1_NAME", "my-sso"),
         ],
     );
     assert!(
@@ -366,23 +366,23 @@ fn custom_slot_valid_config_initializes() {
 }
 
 #[test]
-fn custom_slot_invalid_path_segment_fails_validation() {
+fn custom_slot_invalid_provider_name_fails_validation() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        // Force LazyLock init to populate path_segment with the bad value.
+        // Force LazyLock init to populate provider_name with the bad value.
         let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot1));
         let err = validate_custom_slots().expect_err("invalid path segment must be rejected");
-        assert!(err.contains("OAUTH2_CUSTOM1_PATH_SEGMENT"));
+        assert!(err.contains("OAUTH2_CUSTOM1_NAME"));
         assert!(err.contains("[a-z0-9_-]+"));
         return;
     }
     let output = run_child_with_env_set(
-        "oauth2::provider::tests::custom_slot_invalid_path_segment_fails_validation",
+        "oauth2::provider::tests::custom_slot_invalid_provider_name_fails_validation",
         &[
             ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
             ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
             ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
             ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
-            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "My/SSO"),
+            ("OAUTH2_CUSTOM1_NAME", "My/SSO"),
         ],
     );
     assert!(
@@ -393,7 +393,7 @@ fn custom_slot_invalid_path_segment_fails_validation() {
 }
 
 #[test]
-fn custom_slot_reserved_path_segment_rejected() {
+fn custom_slot_reserved_provider_name_rejected() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
         let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot1));
         let err = validate_custom_slots().expect_err("reserved segment must be rejected");
@@ -402,13 +402,13 @@ fn custom_slot_reserved_path_segment_rejected() {
         return;
     }
     let output = run_child_with_env_set(
-        "oauth2::provider::tests::custom_slot_reserved_path_segment_rejected",
+        "oauth2::provider::tests::custom_slot_reserved_provider_name_rejected",
         &[
             ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
             ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
             ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
             ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
-            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "authorized"),
+            ("OAUTH2_CUSTOM1_NAME", "authorized"),
         ],
     );
     assert!(
@@ -434,7 +434,7 @@ fn custom_slot_named_provider_collision_rejected() {
             ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
             ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
             ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
-            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "google"),
+            ("OAUTH2_CUSTOM1_NAME", "google"),
         ],
     );
     assert!(
@@ -445,29 +445,29 @@ fn custom_slot_named_provider_collision_rejected() {
 }
 
 #[test]
-fn custom_slot_duplicate_path_segment_rejected() {
+fn custom_slot_duplicate_provider_name_rejected() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
         // Initialize both slots' LazyLocks.
         let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot1));
         let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot2));
         let err = validate_custom_slots().expect_err("duplicate segment across slots");
-        assert!(err.contains("OAUTH2_CUSTOM2_PATH_SEGMENT"));
-        assert!(err.contains("OAUTH2_CUSTOM1_PATH_SEGMENT"));
+        assert!(err.contains("OAUTH2_CUSTOM2_NAME"));
+        assert!(err.contains("OAUTH2_CUSTOM1_NAME"));
         return;
     }
     let output = run_child_with_env_set(
-        "oauth2::provider::tests::custom_slot_duplicate_path_segment_rejected",
+        "oauth2::provider::tests::custom_slot_duplicate_provider_name_rejected",
         &[
             ("OAUTH2_CUSTOM1_CLIENT_ID", "id1"),
             ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec1"),
             ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp1.example.com"),
             ("OAUTH2_CUSTOM1_DISPLAY_NAME", "IdP One"),
-            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "shared"),
+            ("OAUTH2_CUSTOM1_NAME", "shared"),
             ("OAUTH2_CUSTOM2_CLIENT_ID", "id2"),
             ("OAUTH2_CUSTOM2_CLIENT_SECRET", "sec2"),
             ("OAUTH2_CUSTOM2_ISSUER_URL", "https://idp2.example.com"),
             ("OAUTH2_CUSTOM2_DISPLAY_NAME", "IdP Two"),
-            ("OAUTH2_CUSTOM2_PATH_SEGMENT", "shared"),
+            ("OAUTH2_CUSTOM2_NAME", "shared"),
         ],
     );
     assert!(
@@ -493,7 +493,7 @@ fn custom_slot_invalid_button_color_rejected() {
             ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
             ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
             ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
-            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "x"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
             // CSS-break-out attempt — must not reach the inline <style> block.
             ("OAUTH2_CUSTOM1_BUTTON_COLOR", "red; } body { display:none;"),
         ],
@@ -521,7 +521,7 @@ fn custom_slot_invalid_button_hover_color_rejected() {
             ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
             ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
             ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
-            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "x"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
             ("OAUTH2_CUSTOM1_BUTTON_HOVER_COLOR", "rgb(0,0,0)"),
         ],
     );
@@ -549,7 +549,7 @@ fn custom_slot_custom_button_colors_applied() {
             ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
             ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
             ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
-            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "x"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
             ("OAUTH2_CUSTOM1_BUTTON_COLOR", "#ff0000"),
             ("OAUTH2_CUSTOM1_BUTTON_HOVER_COLOR", "#cc0000"),
             ("OAUTH2_CUSTOM1_RESPONSE_MODE", "query"),
@@ -598,7 +598,7 @@ impl ProviderConfig {
             query_string,
             discovery,
             additional_allowed_origins: Vec::new(),
-            path_segment: "google",
+            provider_name: "google",
             display_name: "Google",
             button_class: "btn-oauth2 btn-google",
             icon_slug: "google",
@@ -638,7 +638,7 @@ impl ProviderConfig {
             query_string,
             discovery,
             additional_allowed_origins: Vec::new(),
-            path_segment: "google",
+            provider_name: "google",
             display_name: "Google",
             button_class: "btn-oauth2 btn-google",
             icon_slug: "google",

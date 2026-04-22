@@ -24,8 +24,10 @@ use oauth2_passkey::{
 /// can use this type directly or derive their own from `enabled_providers()`.
 #[derive(Debug, Clone)]
 pub struct ProviderView {
-    /// URL path segment that identifies the provider (e.g. `"google"`, `"auth0"`).
-    pub name: &'static str,
+    /// Provider identifier used in URL routing, DB rows, OAuth2 state, and
+    /// templates (e.g. `"google"`, `"auth0"`, or an operator-configured
+    /// value for a Custom slot).
+    pub provider_name: &'static str,
     /// Human-readable label for login buttons (e.g. `"Google"`, `"Auth0"`).
     pub display_name: &'static str,
     /// CSS classes for the login button (e.g. `"btn-oauth2 btn-google"`).
@@ -40,7 +42,7 @@ pub fn enabled_provider_views() -> Vec<ProviderView> {
 
 fn provider_view(info: ProviderInfo) -> ProviderView {
     ProviderView {
-        name: info.name,
+        provider_name: info.provider_name,
         display_name: info.display_name,
         button_class: info.button_class,
     }
@@ -241,14 +243,14 @@ async fn oauth2_select(
             Some(ctx) => format!(
                 "{}/oauth2/{}?mode={}&context={}",
                 O2P_ROUTE_PREFIX.as_str(),
-                p.name,
+                p.provider_name,
                 mode.as_deref().unwrap_or(""),
                 ctx
             ),
             None => format!(
                 "{}/oauth2/{}?mode={}",
                 O2P_ROUTE_PREFIX.as_str(),
-                p.name,
+                p.provider_name,
                 mode.as_deref().unwrap_or(""),
             ),
         };

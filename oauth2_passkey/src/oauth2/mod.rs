@@ -87,7 +87,7 @@ pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
         }
     }
 
-    // Value-level validation for generic OIDC slots (path_segment shape and
+    // Value-level validation for generic OIDC slots (provider_name shape and
     // collision checks). Env-presence is already covered by the loop above.
     provider::validate_custom_slots().map_err(errors::OAuth2Error::Validation)?;
 

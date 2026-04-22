@@ -29,7 +29,7 @@
             <div class="auth-buttons">
                 {% for p in providers %}
                 <a class="btn {{p.button_class}} btn-block"
-                   href="{{o2p_route_prefix}}/oauth2/{{p.name}}?mode={{mode}}{% if context != "" %}&amp;context={{context}}{% endif %}">
+                   href="{{o2p_route_prefix}}/oauth2/{{p.provider_name}}?mode={{mode}}{% if context != "" %}&amp;context={{context}}{% endif %}">
                     Continue with {{p.display_name}}
                 </a>
                 {% endfor %}

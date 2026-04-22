@@ -13,7 +13,7 @@ use crate::oauth2::discovery::{OidcDiscoveryDocument, OidcDiscoveryError, fetch_
 /// 1. A new variant in `ProviderKind`
 /// 2. Include it in `ProviderKind::ALL`
 /// 3. A new arm in `as_str`
-/// 4. A new arm in `from_path_segment`
+/// 4. A new arm in `from_provider_name`
 /// 5. A corresponding static (`LazyLock<ProviderConfig>` or
 ///    `LazyLock<Option<ProviderConfig>>`) and a new arm in `provider_for`
 /// 6. If the provider is optional, return its env-var contract from
@@ -68,7 +68,7 @@ impl CustomSlot {
 
     /// Stable internal label for this slot — `"custom1".."custom8"`.
     /// Used for diagnostics; NOT the URL path segment (that comes from
-    /// `OAUTH2_CUSTOM{N}_PATH_SEGMENT` and lives on `ProviderConfig`).
+    /// `OAUTH2_CUSTOM{N}_NAME` and lives on `ProviderConfig`).
     pub(crate) const fn label(self) -> &'static str {
         match self {
             Self::Slot1 => "custom1",
@@ -164,7 +164,7 @@ impl ProviderKind {
                     "OAUTH2_CUSTOM1_CLIENT_SECRET",
                     "OAUTH2_CUSTOM1_ISSUER_URL",
                     "OAUTH2_CUSTOM1_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM1_PATH_SEGMENT",
+                    "OAUTH2_CUSTOM1_NAME",
                 ],
             )),
             Self::Custom(CustomSlot::Slot2) => Some((
@@ -173,7 +173,7 @@ impl ProviderKind {
                     "OAUTH2_CUSTOM2_CLIENT_SECRET",
                     "OAUTH2_CUSTOM2_ISSUER_URL",
                     "OAUTH2_CUSTOM2_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM2_PATH_SEGMENT",
+                    "OAUTH2_CUSTOM2_NAME",
                 ],
             )),
             Self::Custom(CustomSlot::Slot3) => Some((
@@ -182,7 +182,7 @@ impl ProviderKind {
                     "OAUTH2_CUSTOM3_CLIENT_SECRET",
                     "OAUTH2_CUSTOM3_ISSUER_URL",
                     "OAUTH2_CUSTOM3_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM3_PATH_SEGMENT",
+                    "OAUTH2_CUSTOM3_NAME",
                 ],
             )),
             Self::Custom(CustomSlot::Slot4) => Some((
@@ -191,7 +191,7 @@ impl ProviderKind {
                     "OAUTH2_CUSTOM4_CLIENT_SECRET",
                     "OAUTH2_CUSTOM4_ISSUER_URL",
                     "OAUTH2_CUSTOM4_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM4_PATH_SEGMENT",
+                    "OAUTH2_CUSTOM4_NAME",
                 ],
             )),
             Self::Custom(CustomSlot::Slot5) => Some((
@@ -200,7 +200,7 @@ impl ProviderKind {
                     "OAUTH2_CUSTOM5_CLIENT_SECRET",
                     "OAUTH2_CUSTOM5_ISSUER_URL",
                     "OAUTH2_CUSTOM5_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM5_PATH_SEGMENT",
+                    "OAUTH2_CUSTOM5_NAME",
                 ],
             )),
             Self::Custom(CustomSlot::Slot6) => Some((
@@ -209,7 +209,7 @@ impl ProviderKind {
                     "OAUTH2_CUSTOM6_CLIENT_SECRET",
                     "OAUTH2_CUSTOM6_ISSUER_URL",
                     "OAUTH2_CUSTOM6_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM6_PATH_SEGMENT",
+                    "OAUTH2_CUSTOM6_NAME",
                 ],
             )),
             Self::Custom(CustomSlot::Slot7) => Some((
@@ -218,7 +218,7 @@ impl ProviderKind {
                     "OAUTH2_CUSTOM7_CLIENT_SECRET",
                     "OAUTH2_CUSTOM7_ISSUER_URL",
                     "OAUTH2_CUSTOM7_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM7_PATH_SEGMENT",
+                    "OAUTH2_CUSTOM7_NAME",
                 ],
             )),
             Self::Custom(CustomSlot::Slot8) => Some((
@@ -227,7 +227,7 @@ impl ProviderKind {
                     "OAUTH2_CUSTOM8_CLIENT_SECRET",
                     "OAUTH2_CUSTOM8_ISSUER_URL",
                     "OAUTH2_CUSTOM8_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM8_PATH_SEGMENT",
+                    "OAUTH2_CUSTOM8_NAME",
                 ],
             )),
         }
@@ -235,7 +235,7 @@ impl ProviderKind {
 
     /// Stable internal identifier. For `Custom(slot)` returns
     /// `"custom1".."custom8"` — the **slot label**, not the configurable
-    /// URL path segment. Use `ProviderConfig::path_segment` when you need
+    /// URL path segment. Use `ProviderConfig::provider_name` when you need
     /// the URL-facing identifier.
     pub(crate) const fn as_str(&self) -> &'static str {
         match self {
@@ -251,11 +251,11 @@ impl ProviderKind {
     /// configured segment) into a `ProviderKind`.
     ///
     /// For named providers the match is a compile-time literal. For custom
-    /// slots the segment is read from `ProviderConfig::path_segment` of
+    /// slots the segment is read from `ProviderConfig::provider_name` of
     /// each enabled slot.
     ///
     /// Returns `None` if the segment does not match any configured provider.
-    pub(crate) fn from_path_segment(s: &str) -> Option<Self> {
+    pub(crate) fn from_provider_name(s: &str) -> Option<Self> {
         match s {
             "google" => Some(Self::Google),
             "auth0" => Some(Self::Auth0),
@@ -265,7 +265,7 @@ impl ProviderKind {
                 .iter()
                 .copied()
                 .find(|&slot| {
-                    provider_for(Self::Custom(slot)).is_some_and(|cfg| cfg.path_segment == s)
+                    provider_for(Self::Custom(slot)).is_some_and(|cfg| cfg.provider_name == s)
                 })
                 .map(Self::Custom),
         }
@@ -285,10 +285,11 @@ impl ProviderKind {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct ProviderInfo {
-    /// URL path segment used in OAuth2 state, DB rows, and route matching
-    /// (e.g. `"google"`, `"auth0"`, or an operator-configured segment like
-    /// `"my-sso"` for a custom slot).
-    pub name: &'static str,
+    /// Provider identifier used in URL routing (`/oauth2/{provider_name}/`),
+    /// DB rows (`oauth2_accounts.provider`), OAuth2 state (`StateParams.provider`),
+    /// and templates. E.g. `"google"`, `"auth0"`, or an operator-configured
+    /// value like `"my-sso"` for a custom slot.
+    pub provider_name: &'static str,
     /// Human-readable label for login buttons (e.g. `"Google"`, `"Microsoft"`).
     pub display_name: &'static str,
     /// CSS classes for the login button (e.g. `"btn-oauth2 btn-google"`).
@@ -359,9 +360,9 @@ pub(crate) struct ProviderConfig {
     pub(crate) additional_allowed_origins: Vec<String>,
     /// URL path segment used to route `/oauth2/{segment}/*` to this provider.
     /// For named providers this equals `kind.as_str()`. For `Custom(slot)`
-    /// it is the operator-supplied `OAUTH2_CUSTOM{N}_PATH_SEGMENT`,
+    /// it is the operator-supplied `OAUTH2_CUSTOM{N}_NAME`,
     /// `Box::leak`ed to `'static` at `LazyLock` init.
-    pub(crate) path_segment: &'static str,
+    pub(crate) provider_name: &'static str,
     /// Human-readable label for login buttons (e.g. `"Google"`, `"My SSO"`).
     pub(crate) display_name: &'static str,
     /// CSS classes for the login button (e.g. `"btn-oauth2 btn-google"`).
@@ -470,7 +471,7 @@ pub(crate) static GOOGLE_PROVIDER: LazyLock<ProviderConfig> = LazyLock::new(|| {
         query_string,
         discovery: OnceLock::new(),
         additional_allowed_origins: Vec::new(),
-        path_segment: "google",
+        provider_name: "google",
         display_name: "Google",
         button_class: "btn-oauth2 btn-google",
         icon_slug: "google",
@@ -514,7 +515,7 @@ pub(crate) static AUTH0_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         query_string,
         discovery: OnceLock::new(),
         additional_allowed_origins: Vec::new(),
-        path_segment: "auth0",
+        provider_name: "auth0",
         display_name: "Auth0",
         button_class: "btn-oauth2 btn-auth0",
         icon_slug: "auth0",
@@ -556,7 +557,7 @@ pub(crate) static KEYCLOAK_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock
         query_string,
         discovery: OnceLock::new(),
         additional_allowed_origins: Vec::new(),
-        path_segment: "keycloak",
+        provider_name: "keycloak",
         display_name: "Keycloak",
         button_class: "btn-oauth2 btn-keycloak",
         icon_slug: "keycloak",
@@ -603,7 +604,7 @@ pub(crate) static ENTRA_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         // through `login.live.com`; its Referer on the form_post callback is
         // that host rather than `login.microsoftonline.com`.
         additional_allowed_origins: vec!["https://login.live.com".to_string()],
-        path_segment: "entra",
+        provider_name: "entra",
         display_name: "Microsoft",
         button_class: "btn-oauth2 btn-entra",
         icon_slug: "entra",
@@ -645,8 +646,8 @@ fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
         .unwrap_or_else(|_| panic!("{prefix}_CLIENT_ID set but {prefix}_ISSUER_URL missing"));
     let display_name_raw = env::var(format!("{prefix}_DISPLAY_NAME"))
         .unwrap_or_else(|_| panic!("{prefix}_CLIENT_ID set but {prefix}_DISPLAY_NAME missing"));
-    let path_segment_raw = env::var(format!("{prefix}_PATH_SEGMENT"))
-        .unwrap_or_else(|_| panic!("{prefix}_CLIENT_ID set but {prefix}_PATH_SEGMENT missing"));
+    let provider_name_raw = env::var(format!("{prefix}_NAME"))
+        .unwrap_or_else(|_| panic!("{prefix}_CLIENT_ID set but {prefix}_NAME missing"));
     let origin = env::var("ORIGIN").expect("Missing ORIGIN!");
 
     let response_mode =
@@ -658,7 +659,7 @@ fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
     let button_hover_color_raw = env::var(format!("{prefix}_BUTTON_HOVER_COLOR"))
         .unwrap_or_else(|_| CUSTOM_DEFAULT_BUTTON_HOVER_COLOR.to_string());
 
-    let path_segment = leak_static(path_segment_raw);
+    let provider_name = leak_static(provider_name_raw);
     let display_name = leak_static(display_name_raw);
     let button_color: &'static str = leak_static(button_color_raw);
     let button_hover_color: &'static str = leak_static(button_hover_color_raw);
@@ -667,7 +668,7 @@ fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
         "{}{}/oauth2/{}/authorized",
         origin,
         O2P_ROUTE_PREFIX.as_str(),
-        path_segment
+        provider_name
     );
     let query_string = format!(
         "&response_type=code&scope={}&response_mode={}&prompt=consent",
@@ -684,7 +685,7 @@ fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
         query_string,
         discovery: OnceLock::new(),
         additional_allowed_origins: Vec::new(),
-        path_segment,
+        provider_name,
         display_name,
         button_class: slot.button_class(),
         icon_slug: "openid",
@@ -727,8 +728,8 @@ pub(crate) static CUSTOM8_PROVIDER: LazyLock<Option<ProviderConfig>> =
     LazyLock::new(|| build_custom_provider(CustomSlot::Slot8));
 
 /// Named-provider path segments and literal routes under `/oauth2/*` that a
-/// custom-slot `PATH_SEGMENT` must not collide with.
-pub(crate) const RESERVED_PATH_SEGMENTS: &[&str] = &[
+/// custom-slot `NAME` must not collide with.
+pub(crate) const RESERVED_PROVIDER_NAMES: &[&str] = &[
     "google",
     "auth0",
     "keycloak",
@@ -743,7 +744,7 @@ pub(crate) const RESERVED_PATH_SEGMENTS: &[&str] = &[
 
 /// Returns `true` iff `s` is non-empty and every character is in the
 /// allowed path-segment alphabet (`[a-z0-9_-]+`).
-fn is_valid_custom_path_segment(s: &str) -> bool {
+fn is_valid_custom_provider_name(s: &str) -> bool {
     !s.is_empty()
         && s.chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
@@ -771,10 +772,10 @@ fn is_valid_css_color(s: &str) -> bool {
 /// `optional_env_contract`. This function covers the checks that operate
 /// on resolved `ProviderConfig` values:
 ///
-/// - `path_segment` matches `[a-z0-9_-]+` (non-empty)
-/// - `path_segment` does not collide with named providers or reserved routes
-///   (see `RESERVED_PATH_SEGMENTS`)
-/// - No two enabled custom slots share the same `path_segment`
+/// - `provider_name` matches `[a-z0-9_-]+` (non-empty)
+/// - `provider_name` does not collide with named providers or reserved routes
+///   (see `RESERVED_PROVIDER_NAMES`)
+/// - No two enabled custom slots share the same `provider_name`
 ///
 /// Returns an `Err` with a descriptive message on the first violation so
 /// `init()` can fail fast before any request is served.
@@ -784,25 +785,25 @@ pub(crate) fn validate_custom_slots() -> Result<(), String> {
         let Some(cfg) = provider_for(ProviderKind::Custom(slot)) else {
             continue;
         };
-        let seg = cfg.path_segment;
+        let seg = cfg.provider_name;
 
-        if !is_valid_custom_path_segment(seg) {
+        if !is_valid_custom_provider_name(seg) {
             return Err(format!(
-                "{}_PATH_SEGMENT='{}' is invalid: must match [a-z0-9_-]+",
+                "{}_NAME='{}' is invalid: must match [a-z0-9_-]+",
                 slot.env_prefix(),
                 seg
             ));
         }
-        if RESERVED_PATH_SEGMENTS.contains(&seg) {
+        if RESERVED_PROVIDER_NAMES.contains(&seg) {
             return Err(format!(
-                "{}_PATH_SEGMENT='{}' collides with a reserved name",
+                "{}_NAME='{}' collides with a reserved name",
                 slot.env_prefix(),
                 seg
             ));
         }
         if let Some((other_slot, _)) = enabled_segments.iter().find(|(_, s)| *s == seg) {
             return Err(format!(
-                "{}_PATH_SEGMENT='{}' collides with {}_PATH_SEGMENT",
+                "{}_NAME='{}' collides with {}_NAME",
                 slot.env_prefix(),
                 seg,
                 other_slot.env_prefix()

@@ -17,7 +17,7 @@ provider** at the bottom of this page.
 > default. If your deployment uses a different origin, substitute
 > accordingly — the library reads `ORIGIN` from the environment at
 > startup and the redirect URI follows the shape
-> `{ORIGIN}/o2p/oauth2/{PATH_SEGMENT}/authorized`.
+> `{ORIGIN}/o2p/oauth2/{NAME}/authorized`.
 
 ## When to Use Custom Slots vs Named Providers
 
@@ -26,7 +26,7 @@ provider** at the bottom of this page.
 | Google | Built-in (always on when `OAUTH2_GOOGLE_CLIENT_ID` is set) |
 | Auth0, Keycloak, Microsoft Entra ID | Dedicated guide — enable via `OAUTH2_{NAME}_*` env vars |
 | Okta, AWS Cognito, Zitadel, Ory Hydra, Authentik, Dex, Authelia, any other OIDC IdP | A Custom slot |
-| A *second* instance of a named provider (e.g. extra Keycloak realm) | A Custom slot with a distinct `PATH_SEGMENT` |
+| A *second* instance of a named provider (e.g. extra Keycloak realm) | A Custom slot with a distinct `NAME` |
 
 The custom slots go through the exact same OIDC code path as the named
 providers. The only constraint is that the IdP must implement standard OIDC
@@ -41,15 +41,15 @@ OAUTH2_CUSTOM{N}_CLIENT_ID='your-client-id'
 OAUTH2_CUSTOM{N}_CLIENT_SECRET='your-client-secret'
 OAUTH2_CUSTOM{N}_ISSUER_URL='https://idp.example.com'
 OAUTH2_CUSTOM{N}_DISPLAY_NAME='My SSO'
-OAUTH2_CUSTOM{N}_PATH_SEGMENT='my-sso'
+OAUTH2_CUSTOM{N}_NAME='my-sso'
 ```
 
 - `ISSUER_URL`: the base URL from which oauth2-passkey fetches
   `/.well-known/openid-configuration`. No trailing slash.
 - `DISPLAY_NAME`: the label shown on the login button ("Continue with
   `{DISPLAY_NAME}`").
-- `PATH_SEGMENT`: the URL segment used in routes
-  (`/o2p/oauth2/{PATH_SEGMENT}`) and stored in the database `provider`
+- `NAME`: the URL segment used in routes
+  (`/o2p/oauth2/{NAME}`) and stored in the database `provider`
   column. Must match `[a-z0-9_-]+` and must not collide with the named
   providers (`google`, `auth0`, `keycloak`, `entra`) or the reserved
   literals `authorized`, `accounts`, `fedcm`, `popup_close`, `oauth2.js`,
@@ -58,7 +58,7 @@ OAUTH2_CUSTOM{N}_PATH_SEGMENT='my-sso'
 The redirect URI you register at the IdP is:
 
 ```
-{ORIGIN}/o2p/oauth2/{PATH_SEGMENT}/authorized
+{ORIGIN}/o2p/oauth2/{NAME}/authorized
 ```
 
 ## Optional Environment Variables
@@ -130,7 +130,7 @@ OAUTH2_CUSTOM1_CLIENT_ID='<client-id-from-zitadel>'
 OAUTH2_CUSTOM1_CLIENT_SECRET='<client-secret-from-zitadel>'
 OAUTH2_CUSTOM1_ISSUER_URL='http://localhost:8080'
 OAUTH2_CUSTOM1_DISPLAY_NAME='Zitadel'
-OAUTH2_CUSTOM1_PATH_SEGMENT='zitadel'
+OAUTH2_CUSTOM1_NAME='zitadel'
 OAUTH2_CUSTOM1_RESPONSE_MODE='query'
 ```
 
@@ -181,7 +181,7 @@ Two Hydra-specific requirements:
   `client_secret_basic` (HTTP Basic), which will fail with `401 Unauthorized`
   at token exchange.
 - **`--redirect-uri` must exactly match** what the library sends —
-  `http://localhost:3001/o2p/oauth2/{PATH_SEGMENT}/authorized` — or
+  `http://localhost:3001/o2p/oauth2/{NAME}/authorized` — or
   Hydra rejects the authorization request with `invalid_request`.
 
 Copy the returned `client_id` and `client_secret` (Hydra only shows the
@@ -194,7 +194,7 @@ OAUTH2_CUSTOM2_CLIENT_ID='<client-id-from-hydra>'
 OAUTH2_CUSTOM2_CLIENT_SECRET='<client-secret-from-hydra>'
 OAUTH2_CUSTOM2_ISSUER_URL='http://localhost:4444'
 OAUTH2_CUSTOM2_DISPLAY_NAME='Ory Hydra'
-OAUTH2_CUSTOM2_PATH_SEGMENT='hydra'
+OAUTH2_CUSTOM2_NAME='hydra'
 ```
 
 ### Step 4: Login / Consent App
@@ -310,7 +310,7 @@ OAUTH2_CUSTOM{N}_CLIENT_ID='<from Authentik provider>'
 OAUTH2_CUSTOM{N}_CLIENT_SECRET='<from Authentik provider>'
 OAUTH2_CUSTOM{N}_ISSUER_URL='http://localhost:9000/application/o/oauth2-passkey-demo/'
 OAUTH2_CUSTOM{N}_DISPLAY_NAME='Authentik'
-OAUTH2_CUSTOM{N}_PATH_SEGMENT='authentik'
+OAUTH2_CUSTOM{N}_NAME='authentik'
 OAUTH2_CUSTOM{N}_BUTTON_COLOR='#fd4b2d'
 OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#e03d1f'
 ```
@@ -341,7 +341,7 @@ layer. Walk through the steps in order.
    - **Application type**: `Web Application`
    - **Grant type**: `Authorization Code`
    - **Sign-in redirect URIs**: exactly
-     `http://localhost:3001/o2p/oauth2/{PATH_SEGMENT}/authorized`
+     `http://localhost:3001/o2p/oauth2/{NAME}/authorized`
    - **Controlled access**: pick **Allow everyone in your organization**
      for fastest setup.
 
@@ -362,7 +362,7 @@ OAUTH2_CUSTOM{N}_CLIENT_ID='<Client ID from Okta>'
 OAUTH2_CUSTOM{N}_CLIENT_SECRET='<Client Secret from Okta>'
 OAUTH2_CUSTOM{N}_ISSUER_URL='https://<tenant>.okta.com/oauth2/default'
 OAUTH2_CUSTOM{N}_DISPLAY_NAME='Okta'
-OAUTH2_CUSTOM{N}_PATH_SEGMENT='okta'
+OAUTH2_CUSTOM{N}_NAME='okta'
 ```
 
 ### Step 4: Assign users
@@ -459,7 +459,7 @@ OAUTH2_CUSTOM{N}_CLIENT_ID='o2p'
 OAUTH2_CUSTOM{N}_CLIENT_SECRET='<client-secret-from-keycloak>'
 OAUTH2_CUSTOM{N}_ISSUER_URL='http://localhost:8180/realms/o2p'
 OAUTH2_CUSTOM{N}_DISPLAY_NAME='Keycloak2'
-OAUTH2_CUSTOM{N}_PATH_SEGMENT='keycloak2'
+OAUTH2_CUSTOM{N}_NAME='keycloak2'
 OAUTH2_CUSTOM{N}_BUTTON_COLOR='#fd4b2d'
 OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#e03d1f'
 ```
@@ -478,7 +478,7 @@ accounts in oauth2-passkey even when they share the backing realm.
 
 The same pattern works for Auth0 and Microsoft Entra ID — set
 `OAUTH2_CUSTOM{N}_CLIENT_ID` / `_SECRET` / `_ISSUER_URL` to the
-values from the IdP, pick a distinct `PATH_SEGMENT`, and you have a
+values from the IdP, pick a distinct `NAME`, and you have a
 second instance. Google is slightly less interesting because its
 single OIDC tenant does not benefit from multiple client slots, but
 it works the same way if needed.
@@ -500,7 +500,7 @@ discovery document, which in turn must match your configured
   `hostname` or `frontendUrl` so the advertised issuer matches the
   public URL
 
-### `validate_custom_slots` rejects `PATH_SEGMENT` at startup
+### `validate_custom_slots` rejects `NAME` at startup
 
 Possible causes:
 
@@ -509,7 +509,7 @@ Possible causes:
 - The segment collides with a named provider (`google`, `auth0`, ...) or
   a reserved route (`authorized`, `accounts`, `fedcm`, `popup_close`,
   `oauth2.js`, `select`)
-- Two different custom slots declare the same `PATH_SEGMENT`
+- Two different custom slots declare the same `NAME`
 
 The error message names the offending env var.
 
