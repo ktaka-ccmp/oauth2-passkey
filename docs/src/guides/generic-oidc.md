@@ -1,7 +1,7 @@
 # Generic OIDC Provider Setup
 
-oauth2-passkey ships with four "Custom" OIDC slots (`Custom1` through
-`Custom4`) that let operators enable any standards-compliant OpenID Connect
+oauth2-passkey ships with eight "Custom" OIDC slots (`Custom1` through
+`Custom8`) that let operators enable any standards-compliant OpenID Connect
 provider via environment variables alone — no code change required.
 
 Use these slots for providers without dedicated built-in support, such as
@@ -22,7 +22,7 @@ Discovery at `{issuer}/.well-known/openid-configuration`.
 
 ## Required Environment Variables
 
-For each enabled slot `N` (1, 2, 3, or 4):
+For each enabled slot `N` (1..8):
 
 ```bash
 OAUTH2_CUSTOM{N}_CLIENT_ID='your-client-id'

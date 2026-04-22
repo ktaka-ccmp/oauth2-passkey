@@ -1,7 +1,7 @@
 # Generic OIDC Provider — End-to-End Verification
 
 This directory holds `docker compose` definitions for self-hosted OIDC
-providers used to verify the **Custom1..Custom4** generic slots added by
+providers used to verify the **Custom1..Custom8** generic slots added by
 `oauth2_passkey`.
 
 Each stack is self-contained: bring it up, register a client, plug the

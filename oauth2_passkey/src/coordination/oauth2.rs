@@ -265,7 +265,7 @@ async fn process_oauth2_authorization(
     // `idinfo.sub == userinfo.sub` invariant, so the ID token's role as the
     // identity binding is preserved.
     //
-    // TODO(20260421-0156): prefer a merged idinfo+userinfo view so that a
+    // TODO(20260421-0105): prefer a merged idinfo+userinfo view so that a
     // field absent in userinfo can fall back to idinfo (and vice versa).
     let oauth2_account = oauth2_account_from_userinfo(&userinfo, provider_name)?;
 

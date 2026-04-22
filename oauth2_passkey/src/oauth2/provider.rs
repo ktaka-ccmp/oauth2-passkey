@@ -234,7 +234,7 @@ impl ProviderKind {
     }
 
     /// Stable internal identifier. For `Custom(slot)` returns
-    /// `"custom1".."custom4"` — the **slot label**, not the configurable
+    /// `"custom1".."custom8"` — the **slot label**, not the configurable
     /// URL path segment. Use `ProviderConfig::path_segment` when you need
     /// the URL-facing identifier.
     pub(crate) const fn as_str(&self) -> &'static str {
@@ -305,6 +305,13 @@ pub struct ProviderInfo {
     /// Inline CSS `background-color` for the `:hover` state. `None` for
     /// named providers; `Some(color)` for custom slots.
     pub button_hover_color: Option<&'static str>,
+    /// Suffix used in the `--o2p-{suffix}` / `--o2p-{suffix}-hover` CSS
+    /// variables the login template injects for this provider. `None` for
+    /// named providers (styled via `.btn-<name>` rules + theme variables);
+    /// for custom slots this is `"custom1".."custom8"`. The framework crate
+    /// uses this to build the `:root { ... }` block without re-parsing
+    /// `button_class`.
+    pub css_var_suffix: Option<&'static str>,
 }
 
 impl std::fmt::Display for ProviderKind {
@@ -370,6 +377,11 @@ pub(crate) struct ProviderConfig {
     /// Inline CSS `background-color` for the `:hover` state of the button.
     /// `None` for named providers; `Some(color)` for custom slots.
     pub(crate) button_hover_color: Option<&'static str>,
+    /// Suffix used in the `--o2p-{suffix}` / `--o2p-{suffix}-hover` CSS
+    /// variables the template injects for this provider. `None` for named
+    /// providers (they rely on `.btn-<name>` rules + theme variables); for
+    /// custom slots this is `"custom1".."custom8"` (i.e. `CustomSlot::label`).
+    pub(crate) css_var_suffix: Option<&'static str>,
 }
 
 impl ProviderConfig {
@@ -464,6 +476,7 @@ pub(crate) static GOOGLE_PROVIDER: LazyLock<ProviderConfig> = LazyLock::new(|| {
         icon_slug: "google",
         button_color: None,
         button_hover_color: None,
+        css_var_suffix: None,
     }
 });
 
@@ -507,6 +520,7 @@ pub(crate) static AUTH0_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         icon_slug: "auth0",
         button_color: None,
         button_hover_color: None,
+        css_var_suffix: None,
     })
 });
 
@@ -548,6 +562,7 @@ pub(crate) static KEYCLOAK_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock
         icon_slug: "keycloak",
         button_color: None,
         button_hover_color: None,
+        css_var_suffix: None,
     })
 });
 
@@ -594,6 +609,7 @@ pub(crate) static ENTRA_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         icon_slug: "entra",
         button_color: None,
         button_hover_color: None,
+        css_var_suffix: None,
     })
 });
 
@@ -674,6 +690,7 @@ fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
         icon_slug: "openid",
         button_color: Some(button_color),
         button_hover_color: Some(button_hover_color),
+        css_var_suffix: Some(slot.label()),
     })
 }
 
@@ -732,6 +749,22 @@ fn is_valid_custom_path_segment(s: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
 }
 
+/// Returns `true` iff `s` is a hex (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`) or
+/// a lowercase alphabetic CSS color keyword (3-30 letters). The value is
+/// emitted into an inline `<style>` block, so this guard rejects syntax that
+/// could break out of the CSS var declaration.
+fn is_valid_css_color(s: &str) -> bool {
+    match s.strip_prefix('#') {
+        Some(hex) => {
+            matches!(hex.len(), 3 | 4 | 6 | 8) && hex.chars().all(|c| c.is_ascii_hexdigit())
+        }
+        None => {
+            let len = s.len();
+            (3..=30).contains(&len) && s.chars().all(|c| c.is_ascii_lowercase())
+        }
+    }
+}
+
 /// Validates value-level constraints on enabled custom OIDC slots.
 ///
 /// Env-presence (trigger → dependents) is already covered by
@@ -776,6 +809,25 @@ pub(crate) fn validate_custom_slots() -> Result<(), String> {
             ));
         }
         enabled_segments.push((slot, seg));
+
+        if let Some(color) = cfg.button_color
+            && !is_valid_css_color(color)
+        {
+            return Err(format!(
+                "{}_BUTTON_COLOR='{}' is invalid: expected '#rgb[a]', '#rrggbb[aa]', or a CSS color keyword (3-30 lowercase letters)",
+                slot.env_prefix(),
+                color
+            ));
+        }
+        if let Some(color) = cfg.button_hover_color
+            && !is_valid_css_color(color)
+        {
+            return Err(format!(
+                "{}_BUTTON_HOVER_COLOR='{}' is invalid: expected '#rgb[a]', '#rrggbb[aa]', or a CSS color keyword (3-30 lowercase letters)",
+                slot.env_prefix(),
+                color
+            ));
+        }
     }
     Ok(())
 }

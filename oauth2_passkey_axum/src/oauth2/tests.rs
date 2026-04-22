@@ -32,3 +32,31 @@ async fn test_serve_oauth2_js() {
         );
     }
 }
+
+#[test]
+fn css_vars_block_from_returns_none_when_empty() {
+    assert_eq!(css_vars_block_from(&[]), None);
+}
+
+#[test]
+fn css_vars_block_from_emits_root_block_for_single_slot() {
+    let block = css_vars_block_from(&[("custom1", "#abcdef", "#123456")])
+        .expect("non-empty input must produce a block");
+    assert_eq!(
+        block,
+        ":root {\n    --o2p-custom1: #abcdef;\n    --o2p-custom1-hover: #123456;\n}"
+    );
+}
+
+#[test]
+fn css_vars_block_from_emits_each_entry_for_multiple_slots() {
+    let block = css_vars_block_from(&[
+        ("custom1", "#111111", "#222222"),
+        ("custom4", "tomato", "firebrick"),
+    ])
+    .expect("non-empty input must produce a block");
+    assert_eq!(
+        block,
+        ":root {\n    --o2p-custom1: #111111;\n    --o2p-custom1-hover: #222222;\n    --o2p-custom4: tomato;\n    --o2p-custom4-hover: firebrick;\n}"
+    );
+}

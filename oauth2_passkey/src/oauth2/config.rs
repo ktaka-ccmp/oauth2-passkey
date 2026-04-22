@@ -71,12 +71,13 @@ pub fn provider_info(name: &str) -> Option<crate::oauth2::provider::ProviderInfo
             icon_slug: cfg.icon_slug,
             button_color: cfg.button_color,
             button_hover_color: cfg.button_hover_color,
+            css_var_suffix: cfg.css_var_suffix,
         })
 }
 
 /// Returns UI info for every currently enabled OAuth2 provider, in stable
 /// display order (Google first, then Auth0/Keycloak/Entra, then configured
-/// generic OIDC slots Custom1..Custom4).
+/// generic OIDC slots Custom1..Custom8).
 pub fn enabled_providers() -> Vec<crate::oauth2::provider::ProviderInfo> {
     crate::oauth2::provider::ProviderKind::ALL
         .iter()
@@ -89,6 +90,7 @@ pub fn enabled_providers() -> Vec<crate::oauth2::provider::ProviderInfo> {
                     icon_slug: cfg.icon_slug,
                     button_color: cfg.button_color,
                     button_hover_color: cfg.button_hover_color,
+                    css_var_suffix: cfg.css_var_suffix,
                 }
             })
         })

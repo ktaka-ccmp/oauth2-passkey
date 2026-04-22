@@ -238,6 +238,33 @@ fn is_valid_custom_path_segment_rejects_invalid() {
 }
 
 #[test]
+fn is_valid_css_color_accepts_valid() {
+    assert!(is_valid_css_color("#abc")); // 3-digit hex
+    assert!(is_valid_css_color("#abcd")); // 4-digit hex (with alpha)
+    assert!(is_valid_css_color("#aabbcc")); // 6-digit hex
+    assert!(is_valid_css_color("#aabbccdd")); // 8-digit hex (with alpha)
+    assert!(is_valid_css_color("#6B7280")); // mixed case hex
+    assert!(is_valid_css_color("red")); // 3-letter keyword
+    assert!(is_valid_css_color("tomato"));
+    assert!(is_valid_css_color("lightgoldenrodyellow")); // 20-letter keyword
+}
+
+#[test]
+fn is_valid_css_color_rejects_invalid() {
+    assert!(!is_valid_css_color("")); // empty
+    assert!(!is_valid_css_color("#")); // hex prefix only
+    assert!(!is_valid_css_color("#ab")); // too short
+    assert!(!is_valid_css_color("#abcde")); // 5-digit hex (not a valid CSS form)
+    assert!(!is_valid_css_color("#abcdefg")); // 7-digit hex
+    assert!(!is_valid_css_color("#abcdefghi")); // too long
+    assert!(!is_valid_css_color("#xyzxyz")); // non-hex chars
+    assert!(!is_valid_css_color("Red")); // uppercase keyword
+    assert!(!is_valid_css_color("red ")); // trailing space
+    assert!(!is_valid_css_color("rgb(0,0,0)")); // function form not supported
+    assert!(!is_valid_css_color("red; } body { display:none;")); // CSS injection attempt
+}
+
+#[test]
 fn reserved_path_segments_cover_named_providers_and_literal_routes() {
     for segment in ["google", "auth0", "keycloak", "entra"] {
         assert!(
@@ -522,6 +549,7 @@ impl ProviderConfig {
             icon_slug: "google",
             button_color: None,
             button_hover_color: None,
+            css_var_suffix: None,
         }
     }
 
@@ -561,6 +589,7 @@ impl ProviderConfig {
             icon_slug: "google",
             button_color: None,
             button_hover_color: None,
+            css_var_suffix: None,
         }
     }
 }

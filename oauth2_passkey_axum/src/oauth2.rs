@@ -50,36 +50,32 @@ fn provider_view(info: ProviderInfo) -> ProviderView {
 /// `--o2p-custom{N}-hover` variables for every enabled generic OIDC slot.
 ///
 /// Returns `None` if no slot is enabled (so the template can skip emitting an
-/// empty `<style>` tag). Only `ProviderInfo` entries carrying
-/// `Some(button_color)` contribute — named providers are styled by the base
-/// CSS and theme files.
-///
-/// The variable suffix is extracted from the second class in `button_class`
-/// (e.g. `"btn-oauth2 btn-custom1"` → `"custom1"`). This matches the
-/// `.btn-custom{N}` rules declared in `o2p-base.css`.
+/// empty `<style>` tag). Named providers have `css_var_suffix == None` and
+/// are skipped — they are styled by the base CSS and theme files.
 pub fn custom_css_vars_block() -> Option<String> {
-    let mut entries = Vec::new();
-    for info in enabled_providers() {
-        let (Some(color), Some(hover)) = (info.button_color, info.button_hover_color) else {
-            continue;
-        };
-        let Some(suffix) = info
-            .button_class
-            .split_whitespace()
-            .nth(1)
-            .and_then(|c| c.strip_prefix("btn-"))
-        else {
-            continue;
-        };
-        entries.push(format!(
-            "    --o2p-{suffix}: {color};\n    --o2p-{suffix}-hover: {hover};"
-        ));
-    }
+    let entries: Vec<_> = enabled_providers()
+        .iter()
+        .filter_map(|info| {
+            let suffix = info.css_var_suffix?;
+            let color = info.button_color?;
+            let hover = info.button_hover_color?;
+            Some((suffix, color, hover))
+        })
+        .collect();
+    css_vars_block_from(&entries)
+}
+
+fn css_vars_block_from(entries: &[(&'static str, &'static str, &'static str)]) -> Option<String> {
     if entries.is_empty() {
-        None
-    } else {
-        Some(format!(":root {{\n{}\n}}", entries.join("\n")))
+        return None;
     }
+    let body: Vec<_> = entries
+        .iter()
+        .map(|(suffix, color, hover)| {
+            format!("    --o2p-{suffix}: {color};\n    --o2p-{suffix}-hover: {hover};")
+        })
+        .collect();
+    Some(format!(":root {{\n{}\n}}", body.join("\n")))
 }
 
 use super::config::{O2P_CUSTOM_CSS_URL, O2P_FEDCM, O2P_PASSKEY_PROMOTION};
