@@ -87,6 +87,12 @@ pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
         }
     }
 
+    // Preset-contract validation (pre-LazyLock): reject invalid PRESET
+    // values and enforce DISPLAY_NAME/NAME when no preset is declared.
+    // Runs before `validate_custom_slots` so operators get the cleaner
+    // preset-shape error before any custom-slot LazyLock panics.
+    provider::validate_custom_slot_preset_shape().map_err(errors::OAuth2Error::Validation)?;
+
     // Value-level validation for generic OIDC slots (provider_name shape and
     // collision checks). Env-presence is already covered by the loop above.
     provider::validate_custom_slots().map_err(errors::OAuth2Error::Validation)?;

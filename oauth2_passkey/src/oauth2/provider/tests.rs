@@ -74,33 +74,22 @@ fn test_provider_kind_from_provider_name_known() {
 }
 
 #[test]
-fn test_provider_kind_from_provider_name_keycloak() {
-    assert_eq!(
-        ProviderKind::from_provider_name("keycloak"),
-        Some(ProviderKind::Keycloak)
-    );
-}
-
-#[test]
 fn test_provider_kind_from_provider_name_unknown() {
     assert_eq!(ProviderKind::from_provider_name("github"), None);
     assert_eq!(ProviderKind::from_provider_name(""), None);
     assert_eq!(ProviderKind::from_provider_name("Google"), None); // case-sensitive
+    // Former named providers are no longer registered by default — they
+    // resolve only when a Custom slot adopts that segment (via PRESET or
+    // explicit `NAME=...`), which this test does not configure.
+    assert_eq!(ProviderKind::from_provider_name("auth0"), None);
+    assert_eq!(ProviderKind::from_provider_name("keycloak"), None);
+    assert_eq!(ProviderKind::from_provider_name("entra"), None);
 }
 
 #[test]
 fn test_provider_kind_as_str() {
     assert_eq!(ProviderKind::Google.as_str(), "google");
-}
-
-// --- from_provider_name: entra ---
-
-#[test]
-fn test_provider_kind_from_provider_name_entra() {
-    assert_eq!(
-        ProviderKind::from_provider_name("entra"),
-        Some(ProviderKind::Entra)
-    );
+    assert_eq!(ProviderKind::Custom(CustomSlot::Slot1).as_str(), "custom1");
 }
 
 // --- optional_env_contract ---
@@ -111,36 +100,36 @@ fn test_optional_env_contract_google() {
 }
 
 #[test]
-fn test_optional_env_contract_auth0() {
-    let (trigger, required) = ProviderKind::Auth0.optional_env_contract().unwrap();
-    assert_eq!(trigger, "OAUTH2_AUTH0_CLIENT_ID");
-    assert_eq!(
-        required,
-        ["OAUTH2_AUTH0_CLIENT_SECRET", "OAUTH2_AUTH0_ISSUER_URL"]
-    );
-}
-
-#[test]
-fn test_optional_env_contract_keycloak() {
-    let (trigger, required) = ProviderKind::Keycloak.optional_env_contract().unwrap();
-    assert_eq!(trigger, "OAUTH2_KEYCLOAK_CLIENT_ID");
-    assert_eq!(
-        required,
-        [
-            "OAUTH2_KEYCLOAK_CLIENT_SECRET",
-            "OAUTH2_KEYCLOAK_ISSUER_URL"
-        ]
-    );
-}
-
-#[test]
-fn test_optional_env_contract_entra() {
-    let (trigger, required) = ProviderKind::Entra.optional_env_contract().unwrap();
-    assert_eq!(trigger, "OAUTH2_ENTRA_CLIENT_ID");
-    assert_eq!(
-        required,
-        ["OAUTH2_ENTRA_CLIENT_SECRET", "OAUTH2_ENTRA_ISSUER_URL"]
-    );
+fn test_optional_env_contract_custom_slot_no_longer_requires_display_name_or_name() {
+    // Post-1636: DISPLAY_NAME / NAME are preset-overridable, so they are
+    // NOT in the unconditional `required` list. `validate_custom_slot_preset_shape`
+    // handles the preset-aware requirement check separately.
+    for slot in CustomSlot::ALL {
+        let (_trigger, required) = ProviderKind::Custom(*slot)
+            .optional_env_contract()
+            .expect("custom slots declare a contract");
+        let prefix = slot.env_prefix();
+        assert!(
+            !required.contains(&format!("{prefix}_DISPLAY_NAME").as_str()),
+            "{prefix}_DISPLAY_NAME should not be unconditionally required"
+        );
+        assert!(
+            !required.contains(&format!("{prefix}_NAME").as_str()),
+            "{prefix}_NAME should not be unconditionally required"
+        );
+        assert!(
+            required
+                .iter()
+                .any(|r| *r == format!("{prefix}_CLIENT_SECRET")),
+            "{prefix}_CLIENT_SECRET should still be required"
+        );
+        assert!(
+            required
+                .iter()
+                .any(|r| *r == format!("{prefix}_ISSUER_URL")),
+            "{prefix}_ISSUER_URL should still be required"
+        );
+    }
 }
 
 // --- provider_for ---
@@ -240,8 +229,9 @@ fn custom_slot_button_classes() {
 }
 
 #[test]
-fn provider_kind_all_includes_named_and_custom() {
-    assert_eq!(ProviderKind::ALL.len(), 12);
+fn provider_kind_all_includes_google_and_custom_slots() {
+    // Post-1636: only Google remains named; 8 Custom slots follow.
+    assert_eq!(ProviderKind::ALL.len(), 9);
     assert!(ProviderKind::ALL.contains(&ProviderKind::Google));
     assert!(ProviderKind::ALL.contains(&ProviderKind::Custom(CustomSlot::Slot1)));
     assert!(ProviderKind::ALL.contains(&ProviderKind::Custom(CustomSlot::Slot8)));
@@ -253,26 +243,11 @@ fn custom_slot_optional_env_contract_slot1() {
         .optional_env_contract()
         .unwrap();
     assert_eq!(trigger, "OAUTH2_CUSTOM1_CLIENT_ID");
+    // DISPLAY_NAME / NAME are preset-overridable, so not unconditional.
     assert_eq!(
         required,
-        [
-            "OAUTH2_CUSTOM1_CLIENT_SECRET",
-            "OAUTH2_CUSTOM1_ISSUER_URL",
-            "OAUTH2_CUSTOM1_DISPLAY_NAME",
-            "OAUTH2_CUSTOM1_NAME",
-        ]
+        ["OAUTH2_CUSTOM1_CLIENT_SECRET", "OAUTH2_CUSTOM1_ISSUER_URL"]
     );
-}
-
-#[test]
-fn custom_slot_optional_env_contract_slot4() {
-    let (trigger, required) = ProviderKind::Custom(CustomSlot::Slot4)
-        .optional_env_contract()
-        .unwrap();
-    assert_eq!(trigger, "OAUTH2_CUSTOM4_CLIENT_ID");
-    assert_eq!(required.len(), 4);
-    assert!(required.contains(&"OAUTH2_CUSTOM4_DISPLAY_NAME"));
-    assert!(required.contains(&"OAUTH2_CUSTOM4_NAME"));
 }
 
 #[test]
@@ -327,11 +302,18 @@ fn is_valid_css_color_rejects_invalid() {
 }
 
 #[test]
-fn reserved_provider_names_cover_named_providers_and_literal_routes() {
-    for segment in ["google", "auth0", "keycloak", "entra"] {
+fn reserved_provider_names_cover_google_and_literal_routes() {
+    // "google" stays reserved (the only named variant). "auth0", "keycloak",
+    // "entra" are NOT reserved — they are the default segments supplied by
+    // presets and operators may use them directly through a Custom slot.
+    assert!(
+        RESERVED_PROVIDER_NAMES.contains(&"google"),
+        "named provider 'google' must be reserved"
+    );
+    for segment in ["auth0", "keycloak", "entra"] {
         assert!(
-            RESERVED_PROVIDER_NAMES.contains(&segment),
-            "named provider '{segment}' must be reserved"
+            !RESERVED_PROVIDER_NAMES.contains(&segment),
+            "preset-default '{segment}' should no longer be reserved"
         );
     }
     for segment in [
@@ -609,13 +591,11 @@ fn named_provider_strict_display_claims_valid_values_accepted() {
             .expect("valid values should pass validation");
         return;
     }
+    // Only Google remains named post-1636; non-Google providers flow through
+    // Custom slots (validated by `validate_custom_slots`).
     let output = run_child_with_env_set(
         "oauth2::provider::tests::named_provider_strict_display_claims_valid_values_accepted",
-        &[
-            ("OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS", "true"),
-            ("OAUTH2_AUTH0_STRICT_DISPLAY_CLAIMS", "false"),
-            // KEYCLOAK/ENTRA unset — must also be accepted (default).
-        ],
+        &[("OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS", "true")],
     );
     assert!(
         output.status.success(),
@@ -745,6 +725,204 @@ fn custom_slot_strict_display_claims_invalid_panics() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("OAUTH2_CUSTOM1_STRICT_DISPLAY_CLAIMS"));
     assert!(stderr.contains("'true' or 'false'"));
+}
+
+// --- Preset (OAUTH2_CUSTOM{N}_PRESET) ---
+
+#[test]
+fn custom_slot_preset_auth0_applies_defaults() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg = provider_for(ProviderKind::Custom(CustomSlot::Slot1))
+            .expect("slot1 should be enabled with PRESET=auth0 + credentials");
+        assert_eq!(cfg.provider_name.as_str(), "auth0");
+        assert_eq!(cfg.display_name, "Auth0");
+        assert_eq!(cfg.icon_slug, "auth0");
+        assert_eq!(cfg.button_color, Some("#eb5424"));
+        assert_eq!(cfg.button_hover_color, Some("#c94419"));
+        assert!(cfg.additional_allowed_origins.is_empty());
+        validate_custom_slots().expect("preset config should validate");
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_preset_auth0_applies_defaults",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://dev-xxx.auth0.com"),
+            ("OAUTH2_CUSTOM1_PRESET", "auth0"),
+            // DISPLAY_NAME and NAME omitted — preset supplies defaults.
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_preset_entra_threads_additional_allowed_origins() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg = provider_for(ProviderKind::Custom(CustomSlot::Slot1))
+            .expect("slot1 should be enabled with PRESET=entra");
+        assert_eq!(cfg.provider_name.as_str(), "entra");
+        assert_eq!(
+            cfg.additional_allowed_origins,
+            vec!["https://login.live.com".to_string()]
+        );
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_preset_entra_threads_additional_allowed_origins",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            (
+                "OAUTH2_CUSTOM1_ISSUER_URL",
+                "https://login.microsoftonline.com/t/v2.0",
+            ),
+            ("OAUTH2_CUSTOM1_PRESET", "entra"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_preset_env_var_overrides_wins() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg = provider_for(ProviderKind::Custom(CustomSlot::Slot1))
+            .expect("slot1 should be enabled with overridden preset");
+        // Explicit NAME / DISPLAY_NAME / ICON_SLUG / BUTTON_COLOR win over preset.
+        assert_eq!(cfg.provider_name.as_str(), "company-sso");
+        assert_eq!(cfg.display_name, "Company SSO");
+        assert_eq!(cfg.icon_slug, "openid");
+        assert_eq!(cfg.button_color, Some("#ff0000"));
+        // Not overridden — preset value kept.
+        assert_eq!(cfg.button_hover_color, Some("#c94419"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_preset_env_var_overrides_wins",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://dev-xxx.auth0.com"),
+            ("OAUTH2_CUSTOM1_PRESET", "auth0"),
+            ("OAUTH2_CUSTOM1_NAME", "company-sso"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "Company SSO"),
+            ("OAUTH2_CUSTOM1_ICON_SLUG", "openid"),
+            ("OAUTH2_CUSTOM1_BUTTON_COLOR", "#ff0000"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_preset_invalid_value_rejected_at_startup() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let err = validate_custom_slot_preset_shape()
+            .expect_err("unknown preset key must be rejected pre-LazyLock");
+        assert!(err.contains("OAUTH2_CUSTOM1_PRESET"));
+        assert!(err.contains("unknown PRESET 'okta'"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_preset_invalid_value_rejected_at_startup",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_PRESET", "okta"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_no_preset_requires_display_name_and_name() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let err = validate_custom_slot_preset_shape()
+            .expect_err("no preset + missing NAME must be rejected");
+        assert!(err.contains("OAUTH2_CUSTOM1_NAME"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_no_preset_requires_display_name_and_name",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            // PRESET unset, NAME/DISPLAY_NAME missing — must fail shape check.
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_icon_slug_override_applied() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg =
+            provider_for(ProviderKind::Custom(CustomSlot::Slot1)).expect("slot1 should be enabled");
+        assert_eq!(cfg.icon_slug, "keycloak");
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_icon_slug_override_applied",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
+            ("OAUTH2_CUSTOM1_ICON_SLUG", "keycloak"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_icon_slug_invalid_shape_rejected() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot1));
+        let err =
+            validate_custom_slots().expect_err("icon_slug with invalid char must be rejected");
+        assert!(err.contains("OAUTH2_CUSTOM1_ICON_SLUG"));
+        assert!(err.contains("[a-z0-9_-]+"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_icon_slug_invalid_shape_rejected",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
+            ("OAUTH2_CUSTOM1_ICON_SLUG", "My/Icon"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]

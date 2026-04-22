@@ -76,33 +76,87 @@ impl AsRef<str> for ProviderName {
 
 /// Identifies a supported OAuth2/OIDC provider.
 ///
-/// Adding a new **named** provider requires these lock-step edits, all in
-/// this file:
-/// 1. A new variant in `ProviderKind`
-/// 2. Include it in `ProviderKind::ALL`
-/// 3. A new arm in `as_str`
-/// 4. A new arm in `from_provider_name`
-/// 5. A corresponding static (`LazyLock<ProviderConfig>` or
-///    `LazyLock<Option<ProviderConfig>>`) and a new arm in `provider_for`
-/// 6. If the provider is optional, return its env-var contract from
-///    `optional_env_contract` so startup validation catches the
-///    "trigger set but dependent missing" case
+/// `Google` is the only **named** variant — it has library-side features
+/// (FedCM, `access_type=online`, `hd` claim handling) that cannot be
+/// expressed as a generic OIDC preset. All other providers are routed
+/// through `Custom(CustomSlot)` and configured via `OAUTH2_CUSTOM{N}_*`
+/// env vars, optionally pre-populated by a [`ProviderPreset`] selected
+/// via `OAUTH2_CUSTOM{N}_PRESET`.
 ///
 /// Reserved names that must never become path-segment values (they collide
 /// with literal routes under `/oauth2/*`):
-/// "authorized", "accounts", "fedcm", "popup_close", "oauth2.js", "select".
-/// Named variants already cover "google", "auth0", "keycloak", "entra".
-///
-/// For **generic OIDC slots** (`Custom(CustomSlot)`) no code change is
-/// needed per provider — operators enable a slot via env vars. See
-/// `CUSTOM{N}_PROVIDER` statics.
+/// "authorized", "accounts", "fedcm", "popup_close", "oauth2.js", "select",
+/// plus the named-provider segment "google". Operators using a preset
+/// (`PRESET=auth0` etc.) take the preset's default name ("auth0") which is
+/// allowed because no library route shadows it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum ProviderKind {
     Google,
-    Auth0,
-    Keycloak,
-    Entra,
     Custom(CustomSlot),
+}
+
+/// Vendor-specific defaults that pre-populate a Custom OIDC slot when the
+/// operator sets `OAUTH2_CUSTOM{N}_PRESET=<key>`. Each preset provides the
+/// defaults for display name, URL-facing provider name, icon, brand colors,
+/// and any library-side quirks (additional allowed origins) that would
+/// otherwise require a bespoke named-provider code path.
+///
+/// Operators can override individual fields via the usual `OAUTH2_CUSTOM{N}_*`
+/// env vars; the env var wins. `additional_allowed_origins` has no env-var
+/// override surface — it is a library-level invariant tied to the IdP's
+/// login UI (e.g. Entra personal routes credentials through login.live.com
+/// while its OIDC endpoints live on login.microsoftonline.com).
+pub(crate) struct ProviderPreset {
+    pub(crate) display_name: &'static str,
+    pub(crate) provider_name: ProviderName,
+    pub(crate) icon_slug: &'static str,
+    pub(crate) button_color: &'static str,
+    pub(crate) button_hover_color: &'static str,
+    pub(crate) additional_allowed_origins: &'static [&'static str],
+}
+
+pub(crate) const AUTH0_PRESET: ProviderPreset = ProviderPreset {
+    display_name: "Auth0",
+    provider_name: ProviderName::from_static("auth0"),
+    icon_slug: "auth0",
+    button_color: "#eb5424",
+    button_hover_color: "#c94419",
+    additional_allowed_origins: &[],
+};
+
+pub(crate) const KEYCLOAK_PRESET: ProviderPreset = ProviderPreset {
+    display_name: "Keycloak",
+    provider_name: ProviderName::from_static("keycloak"),
+    icon_slug: "keycloak",
+    button_color: "#4d4d4d",
+    button_hover_color: "#333333",
+    additional_allowed_origins: &[],
+};
+
+pub(crate) const ENTRA_PRESET: ProviderPreset = ProviderPreset {
+    display_name: "Microsoft",
+    provider_name: ProviderName::from_static("entra"),
+    icon_slug: "entra",
+    button_color: "#0078D4",
+    button_hover_color: "#005A9E",
+    // Microsoft routes personal MS account (B2C / consumers tenant) login
+    // through `login.live.com`; its Referer on the form_post callback is
+    // that host rather than `login.microsoftonline.com`.
+    additional_allowed_origins: &["https://login.live.com"],
+};
+
+/// Resolve a preset key (from `OAUTH2_CUSTOM{N}_PRESET`) to its
+/// [`ProviderPreset`]. Returns `Err` with an operator-facing message on
+/// unknown keys so `init()` can fail fast.
+fn resolve_preset(key: &str) -> Result<&'static ProviderPreset, String> {
+    match key {
+        "auth0" => Ok(&AUTH0_PRESET),
+        "keycloak" => Ok(&KEYCLOAK_PRESET),
+        "entra" => Ok(&ENTRA_PRESET),
+        other => Err(format!(
+            "unknown PRESET '{other}' (expected one of: auth0, keycloak, entra)"
+        )),
+    }
 }
 
 /// Identifies one of the eight generic OIDC provider slots.
@@ -184,12 +238,9 @@ impl CustomSlot {
 
 impl ProviderKind {
     /// All supported provider kinds in stable display order.
-    /// Named providers first, then the eight generic OIDC slots.
+    /// Google first, then the eight generic OIDC slots.
     pub(crate) const ALL: &'static [Self] = &[
         Self::Google,
-        Self::Auth0,
-        Self::Keycloak,
-        Self::Entra,
         Self::Custom(CustomSlot::Slot1),
         Self::Custom(CustomSlot::Slot2),
         Self::Custom(CustomSlot::Slot3),
@@ -208,95 +259,45 @@ impl ProviderKind {
     ///
     /// Used by `init` to fail fast at startup instead of panicking mid-request
     /// via the `LazyLock.expect()` inside the matching static.
+    ///
+    /// `DISPLAY_NAME` / `NAME` are intentionally NOT in the required list:
+    /// when `OAUTH2_CUSTOM{N}_PRESET` is set, the preset supplies those
+    /// defaults. `validate_custom_slot_preset_shape` handles the
+    /// preset-aware requirement check.
     pub(crate) fn optional_env_contract(&self) -> Option<(&'static str, &'static [&'static str])> {
         match self {
             Self::Google => None,
-            Self::Auth0 => Some((
-                "OAUTH2_AUTH0_CLIENT_ID",
-                &["OAUTH2_AUTH0_CLIENT_SECRET", "OAUTH2_AUTH0_ISSUER_URL"],
-            )),
-            Self::Keycloak => Some((
-                "OAUTH2_KEYCLOAK_CLIENT_ID",
-                &[
-                    "OAUTH2_KEYCLOAK_CLIENT_SECRET",
-                    "OAUTH2_KEYCLOAK_ISSUER_URL",
-                ],
-            )),
-            Self::Entra => Some((
-                "OAUTH2_ENTRA_CLIENT_ID",
-                &["OAUTH2_ENTRA_CLIENT_SECRET", "OAUTH2_ENTRA_ISSUER_URL"],
-            )),
             Self::Custom(CustomSlot::Slot1) => Some((
                 "OAUTH2_CUSTOM1_CLIENT_ID",
-                &[
-                    "OAUTH2_CUSTOM1_CLIENT_SECRET",
-                    "OAUTH2_CUSTOM1_ISSUER_URL",
-                    "OAUTH2_CUSTOM1_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM1_NAME",
-                ],
+                &["OAUTH2_CUSTOM1_CLIENT_SECRET", "OAUTH2_CUSTOM1_ISSUER_URL"],
             )),
             Self::Custom(CustomSlot::Slot2) => Some((
                 "OAUTH2_CUSTOM2_CLIENT_ID",
-                &[
-                    "OAUTH2_CUSTOM2_CLIENT_SECRET",
-                    "OAUTH2_CUSTOM2_ISSUER_URL",
-                    "OAUTH2_CUSTOM2_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM2_NAME",
-                ],
+                &["OAUTH2_CUSTOM2_CLIENT_SECRET", "OAUTH2_CUSTOM2_ISSUER_URL"],
             )),
             Self::Custom(CustomSlot::Slot3) => Some((
                 "OAUTH2_CUSTOM3_CLIENT_ID",
-                &[
-                    "OAUTH2_CUSTOM3_CLIENT_SECRET",
-                    "OAUTH2_CUSTOM3_ISSUER_URL",
-                    "OAUTH2_CUSTOM3_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM3_NAME",
-                ],
+                &["OAUTH2_CUSTOM3_CLIENT_SECRET", "OAUTH2_CUSTOM3_ISSUER_URL"],
             )),
             Self::Custom(CustomSlot::Slot4) => Some((
                 "OAUTH2_CUSTOM4_CLIENT_ID",
-                &[
-                    "OAUTH2_CUSTOM4_CLIENT_SECRET",
-                    "OAUTH2_CUSTOM4_ISSUER_URL",
-                    "OAUTH2_CUSTOM4_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM4_NAME",
-                ],
+                &["OAUTH2_CUSTOM4_CLIENT_SECRET", "OAUTH2_CUSTOM4_ISSUER_URL"],
             )),
             Self::Custom(CustomSlot::Slot5) => Some((
                 "OAUTH2_CUSTOM5_CLIENT_ID",
-                &[
-                    "OAUTH2_CUSTOM5_CLIENT_SECRET",
-                    "OAUTH2_CUSTOM5_ISSUER_URL",
-                    "OAUTH2_CUSTOM5_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM5_NAME",
-                ],
+                &["OAUTH2_CUSTOM5_CLIENT_SECRET", "OAUTH2_CUSTOM5_ISSUER_URL"],
             )),
             Self::Custom(CustomSlot::Slot6) => Some((
                 "OAUTH2_CUSTOM6_CLIENT_ID",
-                &[
-                    "OAUTH2_CUSTOM6_CLIENT_SECRET",
-                    "OAUTH2_CUSTOM6_ISSUER_URL",
-                    "OAUTH2_CUSTOM6_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM6_NAME",
-                ],
+                &["OAUTH2_CUSTOM6_CLIENT_SECRET", "OAUTH2_CUSTOM6_ISSUER_URL"],
             )),
             Self::Custom(CustomSlot::Slot7) => Some((
                 "OAUTH2_CUSTOM7_CLIENT_ID",
-                &[
-                    "OAUTH2_CUSTOM7_CLIENT_SECRET",
-                    "OAUTH2_CUSTOM7_ISSUER_URL",
-                    "OAUTH2_CUSTOM7_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM7_NAME",
-                ],
+                &["OAUTH2_CUSTOM7_CLIENT_SECRET", "OAUTH2_CUSTOM7_ISSUER_URL"],
             )),
             Self::Custom(CustomSlot::Slot8) => Some((
                 "OAUTH2_CUSTOM8_CLIENT_ID",
-                &[
-                    "OAUTH2_CUSTOM8_CLIENT_SECRET",
-                    "OAUTH2_CUSTOM8_ISSUER_URL",
-                    "OAUTH2_CUSTOM8_DISPLAY_NAME",
-                    "OAUTH2_CUSTOM8_NAME",
-                ],
+                &["OAUTH2_CUSTOM8_CLIENT_SECRET", "OAUTH2_CUSTOM8_ISSUER_URL"],
             )),
         }
     }
@@ -308,9 +309,6 @@ impl ProviderKind {
     pub(crate) const fn as_str(&self) -> &'static str {
         match self {
             Self::Google => "google",
-            Self::Auth0 => "auth0",
-            Self::Keycloak => "keycloak",
-            Self::Entra => "entra",
             Self::Custom(slot) => slot.label(),
         }
     }
@@ -318,17 +316,13 @@ impl ProviderKind {
     /// Parse a URL path segment (e.g. `"google"`, or a custom slot's
     /// configured segment) into a `ProviderKind`.
     ///
-    /// For named providers the match is a compile-time literal. For custom
-    /// slots the segment is read from `ProviderConfig::provider_name` of
-    /// each enabled slot.
+    /// Google is the compile-time literal; custom-slot segments are read
+    /// from `ProviderConfig::provider_name` of each enabled slot.
     ///
     /// Returns `None` if the segment does not match any configured provider.
     pub(crate) fn from_provider_name(s: &str) -> Option<Self> {
         match s {
             "google" => Some(Self::Google),
-            "auth0" => Some(Self::Auth0),
-            "keycloak" => Some(Self::Keycloak),
-            "entra" => Some(Self::Entra),
             _ => CustomSlot::ALL
                 .iter()
                 .copied()
@@ -561,145 +555,6 @@ pub(crate) static GOOGLE_PROVIDER: LazyLock<ProviderConfig> = LazyLock::new(|| {
     }
 });
 
-/// Auth0 provider — optional, enabled by setting `OAUTH2_AUTH0_CLIENT_ID`.
-/// Panics at first access if `CLIENT_ID` is set but `CLIENT_SECRET` or
-/// `ISSUER_URL` are missing (mis-configured, not intentionally absent).
-pub(crate) static AUTH0_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::new(|| {
-    let client_id = env::var("OAUTH2_AUTH0_CLIENT_ID").ok()?;
-    let client_secret = env::var("OAUTH2_AUTH0_CLIENT_SECRET")
-        .expect("OAUTH2_AUTH0_CLIENT_ID set but OAUTH2_AUTH0_CLIENT_SECRET missing");
-    let issuer_url = env::var("OAUTH2_AUTH0_ISSUER_URL")
-        .expect("OAUTH2_AUTH0_CLIENT_ID set but OAUTH2_AUTH0_ISSUER_URL missing");
-    let origin = env::var("ORIGIN").expect("Missing ORIGIN!");
-    let redirect_uri = format!(
-        "{}{}/oauth2/auth0/authorized",
-        origin,
-        O2P_ROUTE_PREFIX.as_str()
-    );
-    let response_mode =
-        env::var("OAUTH2_AUTH0_RESPONSE_MODE").unwrap_or_else(|_| "form_post".to_string());
-    let scope =
-        env::var("OAUTH2_AUTH0_SCOPE").unwrap_or_else(|_| "openid+email+profile".to_string());
-    // Note: `access_type=online` is Google-specific and omitted here.
-    let query_string = format!(
-        "&response_type=code&scope={}&response_mode={}&prompt=consent",
-        scope, response_mode
-    );
-    let strict_display_claims = read_strict_display_claims("OAUTH2_AUTH0_STRICT_DISPLAY_CLAIMS");
-    Some(ProviderConfig {
-        kind: ProviderKind::Auth0,
-        client_id,
-        client_secret,
-        issuer_url,
-        redirect_uri,
-        response_mode,
-        query_string,
-        discovery: OnceLock::new(),
-        additional_allowed_origins: Vec::new(),
-        provider_name: ProviderName::from_static("auth0"),
-        display_name: "Auth0",
-        button_class: "btn-oauth2 btn-auth0",
-        icon_slug: "auth0",
-        button_color: None,
-        button_hover_color: None,
-        css_var_suffix: None,
-        strict_display_claims,
-    })
-});
-
-/// Keycloak provider — optional, enabled by setting `OAUTH2_KEYCLOAK_CLIENT_ID`.
-/// Issuer URL format: `http(s)://{host}/realms/{realm-name}` (no trailing slash).
-pub(crate) static KEYCLOAK_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::new(|| {
-    let client_id = env::var("OAUTH2_KEYCLOAK_CLIENT_ID").ok()?;
-    let client_secret = env::var("OAUTH2_KEYCLOAK_CLIENT_SECRET")
-        .expect("OAUTH2_KEYCLOAK_CLIENT_ID set but OAUTH2_KEYCLOAK_CLIENT_SECRET missing");
-    let issuer_url = env::var("OAUTH2_KEYCLOAK_ISSUER_URL")
-        .expect("OAUTH2_KEYCLOAK_CLIENT_ID set but OAUTH2_KEYCLOAK_ISSUER_URL missing");
-    let origin = env::var("ORIGIN").expect("Missing ORIGIN!");
-    let redirect_uri = format!(
-        "{}{}/oauth2/keycloak/authorized",
-        origin,
-        O2P_ROUTE_PREFIX.as_str()
-    );
-    let response_mode =
-        env::var("OAUTH2_KEYCLOAK_RESPONSE_MODE").unwrap_or_else(|_| "form_post".to_string());
-    let scope =
-        env::var("OAUTH2_KEYCLOAK_SCOPE").unwrap_or_else(|_| "openid+email+profile".to_string());
-    let query_string = format!(
-        "&response_type=code&scope={}&response_mode={}&prompt=consent",
-        scope, response_mode
-    );
-    let strict_display_claims = read_strict_display_claims("OAUTH2_KEYCLOAK_STRICT_DISPLAY_CLAIMS");
-    Some(ProviderConfig {
-        kind: ProviderKind::Keycloak,
-        client_id,
-        client_secret,
-        issuer_url,
-        redirect_uri,
-        response_mode,
-        query_string,
-        discovery: OnceLock::new(),
-        additional_allowed_origins: Vec::new(),
-        provider_name: ProviderName::from_static("keycloak"),
-        display_name: "Keycloak",
-        button_class: "btn-oauth2 btn-keycloak",
-        icon_slug: "keycloak",
-        button_color: None,
-        button_hover_color: None,
-        css_var_suffix: None,
-        strict_display_claims,
-    })
-});
-
-/// Microsoft Entra ID provider — optional, enabled by setting `OAUTH2_ENTRA_CLIENT_ID`.
-/// Issuer URL format: `https://login.microsoftonline.com/{tenant_id}/v2.0` (single-tenant only).
-/// Multi-tenant endpoints (`common`, `organizations`) are not supported because the discovery
-/// document returns a `{tenantid}` placeholder that fails issuer validation.
-pub(crate) static ENTRA_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::new(|| {
-    let client_id = env::var("OAUTH2_ENTRA_CLIENT_ID").ok()?;
-    let client_secret = env::var("OAUTH2_ENTRA_CLIENT_SECRET")
-        .expect("OAUTH2_ENTRA_CLIENT_ID set but OAUTH2_ENTRA_CLIENT_SECRET missing");
-    let issuer_url = env::var("OAUTH2_ENTRA_ISSUER_URL")
-        .expect("OAUTH2_ENTRA_CLIENT_ID set but OAUTH2_ENTRA_ISSUER_URL missing");
-    let origin = env::var("ORIGIN").expect("Missing ORIGIN!");
-    let redirect_uri = format!(
-        "{}{}/oauth2/entra/authorized",
-        origin,
-        O2P_ROUTE_PREFIX.as_str()
-    );
-    let response_mode =
-        env::var("OAUTH2_ENTRA_RESPONSE_MODE").unwrap_or_else(|_| "form_post".to_string());
-    let scope =
-        env::var("OAUTH2_ENTRA_SCOPE").unwrap_or_else(|_| "openid+email+profile".to_string());
-    let query_string = format!(
-        "&response_type=code&scope={}&response_mode={}&prompt=consent",
-        scope, response_mode
-    );
-    let strict_display_claims = read_strict_display_claims("OAUTH2_ENTRA_STRICT_DISPLAY_CLAIMS");
-    Some(ProviderConfig {
-        kind: ProviderKind::Entra,
-        client_id,
-        client_secret,
-        issuer_url,
-        redirect_uri,
-        response_mode,
-        query_string,
-        discovery: OnceLock::new(),
-        // Microsoft routes personal MS account (B2C / consumers tenant) login
-        // through `login.live.com`; its Referer on the form_post callback is
-        // that host rather than `login.microsoftonline.com`.
-        additional_allowed_origins: vec!["https://login.live.com".to_string()],
-        provider_name: ProviderName::from_static("entra"),
-        display_name: "Microsoft",
-        button_class: "btn-oauth2 btn-entra",
-        icon_slug: "entra",
-        button_color: None,
-        button_hover_color: None,
-        css_var_suffix: None,
-        strict_display_claims,
-    })
-});
-
 /// Default button background color for a custom slot when
 /// `OAUTH2_CUSTOM{N}_BUTTON_COLOR` is not set. Neutral gray.
 const CUSTOM_DEFAULT_BUTTON_COLOR: &str = "#6b7280";
@@ -736,23 +591,16 @@ fn read_strict_display_claims(env_var: &str) -> bool {
     parse_strict_display_claims(env_var).unwrap_or_else(|msg| panic!("{msg}"))
 }
 
-/// Validate `OAUTH2_*_STRICT_DISPLAY_CLAIMS` for every named provider at
-/// startup without forcing their `LazyLock`s to initialize.
+/// Validate `OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS` at startup without
+/// forcing `GOOGLE_PROVIDER`'s `LazyLock` to initialize.
 ///
 /// Custom slots go through `LazyLock` init in `validate_custom_slots`, so
-/// their STRICT_DISPLAY_CLAIMS gets checked there. Named providers
-/// (Google/Auth0/Keycloak/Entra) are intentionally lazy so tests can
-/// override other env vars after `init()`; without this function a bad
-/// value would survive startup and crash the first login request instead.
+/// their STRICT_DISPLAY_CLAIMS gets checked there. `GOOGLE_PROVIDER` is
+/// intentionally lazy so tests can override other env vars after
+/// `init()`; without this function a bad value would survive startup and
+/// crash the first login request instead.
 pub(crate) fn validate_named_provider_strict_display_claims() -> Result<(), String> {
-    for var in [
-        "OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS",
-        "OAUTH2_AUTH0_STRICT_DISPLAY_CLAIMS",
-        "OAUTH2_KEYCLOAK_STRICT_DISPLAY_CLAIMS",
-        "OAUTH2_ENTRA_STRICT_DISPLAY_CLAIMS",
-    ] {
-        parse_strict_display_claims(var)?;
-    }
+    parse_strict_display_claims("OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS")?;
     Ok(())
 }
 
@@ -761,8 +609,14 @@ pub(crate) fn validate_named_provider_strict_display_claims() -> Result<(), Stri
 /// Returns `None` if the slot's `CLIENT_ID` trigger env var is not set
 /// (meaning the slot is disabled). Panics at first access if `CLIENT_ID`
 /// is set but any required dependent var is missing — `init()` calls
-/// `optional_env_contract` validation first, so this panic is a defense
-/// against direct static access before `init()` ran.
+/// `optional_env_contract` validation + `validate_custom_slot_preset_shape`
+/// first, so this panic is a defense against direct static access before
+/// `init()` ran.
+///
+/// When `OAUTH2_CUSTOM{N}_PRESET` is set (and known), the preset supplies
+/// defaults for display_name / provider_name / icon_slug / button colors /
+/// additional_allowed_origins. Each preset field is overridable via the
+/// usual `OAUTH2_CUSTOM{N}_*` env var — env wins.
 fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
     let prefix = slot.env_prefix();
     let client_id = env::var(format!("{prefix}_CLIENT_ID")).ok()?;
@@ -770,27 +624,68 @@ fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
         .unwrap_or_else(|_| panic!("{prefix}_CLIENT_ID set but {prefix}_CLIENT_SECRET missing"));
     let issuer_url = env::var(format!("{prefix}_ISSUER_URL"))
         .unwrap_or_else(|_| panic!("{prefix}_CLIENT_ID set but {prefix}_ISSUER_URL missing"));
-    let display_name_raw = env::var(format!("{prefix}_DISPLAY_NAME"))
-        .unwrap_or_else(|_| panic!("{prefix}_CLIENT_ID set but {prefix}_DISPLAY_NAME missing"));
-    let provider_name_raw = env::var(format!("{prefix}_NAME"))
-        .unwrap_or_else(|_| panic!("{prefix}_CLIENT_ID set but {prefix}_NAME missing"));
+
+    // Resolve optional preset. Invalid value → panic; matches the
+    // strict-parse style used for `OAUTH2_RESPONSE_MODE`.
+    let preset: Option<&'static ProviderPreset> =
+        match env::var(format!("{prefix}_PRESET")).ok().as_deref() {
+            None => None,
+            Some(key) => {
+                Some(resolve_preset(key).unwrap_or_else(|msg| panic!("{prefix}_PRESET: {msg}")))
+            }
+        };
+
+    let display_name: &'static str = env::var(format!("{prefix}_DISPLAY_NAME"))
+        .ok()
+        .map(leak_static)
+        .or(preset.map(|p| p.display_name))
+        .unwrap_or_else(|| {
+            panic!("{prefix}_CLIENT_ID set but {prefix}_DISPLAY_NAME missing (no PRESET to supply a default)")
+        });
+    let provider_name: ProviderName = env::var(format!("{prefix}_NAME"))
+        .ok()
+        .map(ProviderName::from_env_leaked)
+        .or(preset.map(|p| p.provider_name))
+        .unwrap_or_else(|| {
+            panic!(
+                "{prefix}_CLIENT_ID set but {prefix}_NAME missing (no PRESET to supply a default)"
+            )
+        });
+
     let origin = env::var("ORIGIN").expect("Missing ORIGIN!");
 
     let response_mode =
         env::var(format!("{prefix}_RESPONSE_MODE")).unwrap_or_else(|_| "form_post".to_string());
     let scope =
         env::var(format!("{prefix}_SCOPE")).unwrap_or_else(|_| "openid+email+profile".to_string());
-    let button_color_raw = env::var(format!("{prefix}_BUTTON_COLOR"))
-        .unwrap_or_else(|_| CUSTOM_DEFAULT_BUTTON_COLOR.to_string());
-    let button_hover_color_raw = env::var(format!("{prefix}_BUTTON_HOVER_COLOR"))
-        .unwrap_or_else(|_| CUSTOM_DEFAULT_BUTTON_HOVER_COLOR.to_string());
+
+    let button_color: &'static str = env::var(format!("{prefix}_BUTTON_COLOR"))
+        .ok()
+        .map(leak_static)
+        .or(preset.map(|p| p.button_color))
+        .unwrap_or(CUSTOM_DEFAULT_BUTTON_COLOR);
+    let button_hover_color: &'static str = env::var(format!("{prefix}_BUTTON_HOVER_COLOR"))
+        .ok()
+        .map(leak_static)
+        .or(preset.map(|p| p.button_hover_color))
+        .unwrap_or(CUSTOM_DEFAULT_BUTTON_HOVER_COLOR);
+    let icon_slug: &'static str = env::var(format!("{prefix}_ICON_SLUG"))
+        .ok()
+        .map(leak_static)
+        .or(preset.map(|p| p.icon_slug))
+        .unwrap_or("openid");
+
+    let additional_allowed_origins: Vec<String> = preset
+        .map(|p| {
+            p.additional_allowed_origins
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+
     let strict_display_claims =
         read_strict_display_claims(&format!("{prefix}_STRICT_DISPLAY_CLAIMS"));
-
-    let provider_name = ProviderName::from_env_leaked(provider_name_raw);
-    let display_name = leak_static(display_name_raw);
-    let button_color: &'static str = leak_static(button_color_raw);
-    let button_hover_color: &'static str = leak_static(button_hover_color_raw);
 
     let redirect_uri = format!(
         "{}{}/oauth2/{}/authorized",
@@ -812,11 +707,11 @@ fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
         response_mode,
         query_string,
         discovery: OnceLock::new(),
-        additional_allowed_origins: Vec::new(),
+        additional_allowed_origins,
         provider_name,
         display_name,
         button_class: slot.button_class(),
-        icon_slug: "openid",
+        icon_slug,
         button_color: Some(button_color),
         button_hover_color: Some(button_hover_color),
         css_var_suffix: Some(slot.label()),
@@ -856,13 +751,13 @@ pub(crate) static CUSTOM7_PROVIDER: LazyLock<Option<ProviderConfig>> =
 pub(crate) static CUSTOM8_PROVIDER: LazyLock<Option<ProviderConfig>> =
     LazyLock::new(|| build_custom_provider(CustomSlot::Slot8));
 
-/// Named-provider path segments and literal routes under `/oauth2/*` that a
-/// custom-slot `NAME` must not collide with.
+/// Path segments under `/oauth2/*` that a custom-slot `NAME` must not
+/// collide with: the `Google` named-provider segment plus the literal
+/// routes mounted by the axum crate. `"auth0"`, `"keycloak"`, `"entra"`
+/// are NOT reserved — they are the natural default names selected by
+/// `OAUTH2_CUSTOM{N}_PRESET` and operators may use them directly.
 pub(crate) const RESERVED_PROVIDER_NAMES: &[&str] = &[
     "google",
-    "auth0",
-    "keycloak",
-    "entra",
     "authorized",
     "accounts",
     "fedcm",
@@ -958,8 +853,58 @@ pub(crate) fn validate_custom_slots() -> Result<(), String> {
                 color
             ));
         }
+        if !is_valid_icon_slug(cfg.icon_slug) {
+            return Err(format!(
+                "{}_ICON_SLUG='{}' is invalid: must match [a-z0-9_-]+",
+                slot.env_prefix(),
+                cfg.icon_slug
+            ));
+        }
     }
     Ok(())
+}
+
+/// Pre-`LazyLock` validation for the preset contract on every enabled
+/// custom slot: reject invalid `OAUTH2_CUSTOM{N}_PRESET` values and, when
+/// no preset is declared, require `DISPLAY_NAME` + `NAME` explicitly.
+///
+/// Kept separate from `validate_custom_slots` so operators get the
+/// preset-shape error at startup without triggering `build_custom_provider`
+/// (which panics via `unwrap_or_else` if a required field is missing).
+pub(crate) fn validate_custom_slot_preset_shape() -> Result<(), String> {
+    for &slot in CustomSlot::ALL {
+        let prefix = slot.env_prefix();
+        if env::var(format!("{prefix}_CLIENT_ID")).is_err() {
+            continue;
+        }
+        let preset_key = env::var(format!("{prefix}_PRESET")).ok();
+        let has_preset = match preset_key.as_deref() {
+            None => false,
+            Some(key) => {
+                resolve_preset(key).map_err(|msg| format!("{prefix}_PRESET: {msg}"))?;
+                true
+            }
+        };
+        if !has_preset {
+            if env::var(format!("{prefix}_DISPLAY_NAME")).is_err() {
+                return Err(format!(
+                    "{prefix}_CLIENT_ID is set without {prefix}_PRESET; {prefix}_DISPLAY_NAME is required"
+                ));
+            }
+            if env::var(format!("{prefix}_NAME")).is_err() {
+                return Err(format!(
+                    "{prefix}_CLIENT_ID is set without {prefix}_PRESET; {prefix}_NAME is required"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Reuse the provider-name shape check for `ICON_SLUG` — same
+/// `[a-z0-9_-]+` grammar, used inside a URL path (`/icons/{slug}.svg`).
+fn is_valid_icon_slug(s: &str) -> bool {
+    is_valid_custom_provider_name(s)
 }
 
 /// Resolve a `ProviderKind` to its `&'static ProviderConfig`.
@@ -969,9 +914,6 @@ pub(crate) fn validate_custom_slots() -> Result<(), String> {
 pub(crate) fn provider_for(kind: ProviderKind) -> Option<&'static ProviderConfig> {
     match kind {
         ProviderKind::Google => Some(&GOOGLE_PROVIDER),
-        ProviderKind::Auth0 => AUTH0_PROVIDER.as_ref(),
-        ProviderKind::Keycloak => KEYCLOAK_PROVIDER.as_ref(),
-        ProviderKind::Entra => ENTRA_PROVIDER.as_ref(),
         ProviderKind::Custom(slot) => match slot {
             CustomSlot::Slot1 => CUSTOM1_PROVIDER.as_ref(),
             CustomSlot::Slot2 => CUSTOM2_PROVIDER.as_ref(),

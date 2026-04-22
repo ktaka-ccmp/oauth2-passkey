@@ -1,6 +1,9 @@
 # Keycloak Provider Setup
 
-This guide walks through configuring Keycloak as an OAuth2/OIDC provider for oauth2-passkey.
+Keycloak runs through a Custom OIDC slot with `OAUTH2_CUSTOM{N}_PRESET=keycloak`
+— the preset supplies the display name, URL segment (`keycloak`), icon, and
+brand colors. Setting the preset is equivalent to configuring a bespoke
+"Keycloak" provider; no code change is required.
 
 ## Prerequisites
 
@@ -55,7 +58,9 @@ On the client's **Settings** tab, under **Access settings**:
 
 - **Valid redirect URIs**: `http://localhost:3001/o2p/oauth2/keycloak/authorized`
 
-Replace `http://localhost:3001` with your actual `ORIGIN`.
+Replace `http://localhost:3001` with your actual `ORIGIN`. The URL segment is
+`keycloak` because that is the preset's default `provider_name`; override it
+via `OAUTH2_CUSTOM{N}_NAME=...` if you need a different segment.
 
 Click **Save**.
 
@@ -74,23 +79,28 @@ Go to the **Credentials** tab and copy the **Client secret**.
 
 ## Step 5: Configure Environment Variables
 
-Add the following to your `.env` file:
+Add the following to your `.env` file. This example uses slot 1; any of
+slots 1..8 works (each slot is independent).
 
 ```bash
-OAUTH2_KEYCLOAK_CLIENT_ID='oauth2-passkey-demo'
-OAUTH2_KEYCLOAK_CLIENT_SECRET='your-client-secret'
+OAUTH2_CUSTOM1_PRESET=keycloak
+OAUTH2_CUSTOM1_CLIENT_ID='oauth2-passkey-demo'
+OAUTH2_CUSTOM1_CLIENT_SECRET='your-client-secret'
 # Issuer URL: http(s)://{host}/realms/{realm-name}  (no trailing slash)
-OAUTH2_KEYCLOAK_ISSUER_URL='http://localhost:8180/realms/myrealm'
+OAUTH2_CUSTOM1_ISSUER_URL='http://localhost:8180/realms/myrealm'
 ```
+
+The preset (`PRESET=keycloak`) fills in defaults for `DISPLAY_NAME`, `NAME`
+(which becomes the `keycloak` URL segment), `ICON_SLUG`, and button colors.
 
 Optional overrides (defaults shown):
 
 ```bash
 # Default: 'form_post'
-#OAUTH2_KEYCLOAK_RESPONSE_MODE='form_post'
+#OAUTH2_CUSTOM1_RESPONSE_MODE='form_post'
 
 # Default: 'openid+email+profile'
-#OAUTH2_KEYCLOAK_SCOPE='openid+email+profile'
+#OAUTH2_CUSTOM1_SCOPE='openid+email+profile'
 ```
 
 ## Step 6: Verify
@@ -119,5 +129,6 @@ Expected output:
 
 - The `provider_user_id` format is `keycloak_{sub}` where `sub` is the Keycloak user UUID.
 - The issuer URL must include the realm name and must not have a trailing slash: `http://localhost:8180/realms/myrealm`.
-- `OAUTH2_KEYCLOAK_RESPONSE_MODE=form_post` (the default) works on both HTTP localhost and HTTPS production.
+- `OAUTH2_CUSTOM{N}_RESPONSE_MODE=form_post` (the default) works on both HTTP localhost and HTTPS production.
 - To stop Keycloak while preserving data: `docker compose stop`. To remove the container but keep data: `docker compose down`. To remove everything including data: `docker compose down -v`.
+- See [Generic OIDC Provider Setup](./generic-oidc.md) for the full Custom slot reference, including how presets and env-var overrides compose.
