@@ -1098,6 +1098,41 @@ fn prompt_custom_select_account_applied() {
 }
 
 #[test]
+fn prompt_custom_login_applied() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg =
+            provider_for(ProviderKind::Custom(CustomSlot::Slot1)).expect("slot1 should be enabled");
+        assert!(
+            cfg.query_string.contains("&prompt=login"),
+            "must contain &prompt=login; got: {}",
+            cfg.query_string
+        );
+        assert!(
+            !cfg.query_string.contains("&prompt=consent"),
+            "must not contain &prompt=consent; got: {}",
+            cfg.query_string
+        );
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::prompt_custom_login_applied",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
+            ("OAUTH2_CUSTOM1_PROMPT", "login"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn prompt_empty_omits_parameter_custom() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
         let cfg =

@@ -638,21 +638,18 @@ pub(crate) fn validate_named_provider_strict_display_claims() -> Result<(), Stri
 }
 
 /// Parse an `OAUTH2_*_PROMPT` env var.
-/// - Unset → `Ok(Some("consent"))` (preserves current behavior)
-/// - `""` → `Ok(None)` (operator explicitly omits `&prompt=` from the URL)
-/// - `"none" | "login" | "consent" | "select_account"` → `Ok(Some(value))`
-/// - Any other value → `Err(message)` for startup-time rejection
+/// - Unset -> `Ok(Some("consent"))` (preserves current behavior)
+/// - `""` -> `Ok(None)` (operator explicitly omits `&prompt=` from the URL)
+/// - `"none" | "login" | "consent" | "select_account"` -> `Ok(Some(value))`
+/// - Any other value -> `Err(message)` for startup-time rejection
 fn parse_prompt(env_var: &str) -> Result<Option<&'static str>, String> {
     match env::var(env_var).ok().as_deref() {
         None => Ok(Some("consent")),
         Some("") => Ok(None),
-        Some(v @ ("none" | "login" | "consent" | "select_account")) => Ok(Some(match v {
-            "consent" => "consent",
-            "none" => "none",
-            "login" => "login",
-            "select_account" => "select_account",
-            _ => unreachable!(),
-        })),
+        Some("none") => Ok(Some("none")),
+        Some("login") => Ok(Some("login")),
+        Some("consent") => Ok(Some("consent")),
+        Some("select_account") => Ok(Some("select_account")),
         Some(other) => Err(format!(
             "Invalid {env_var} '{other}'. \
              Must be one of: none, login, consent, select_account \
