@@ -102,6 +102,7 @@ OAUTH2_CUSTOM{N}_PRESET=                        # unset | auth0 | keycloak | ent
 OAUTH2_CUSTOM{N}_ICON_SLUG='openid'             # SVG basename at /o2p/icons/{slug}.svg
 OAUTH2_CUSTOM{N}_RESPONSE_MODE='form_post'      # form_post or query
 OAUTH2_CUSTOM{N}_SCOPE='openid+email+profile'
+OAUTH2_CUSTOM{N}_PROMPT='consent'               # none | login | consent | select_account | "" (omit)
 OAUTH2_CUSTOM{N}_BUTTON_COLOR='#6b7280'         # neutral gray
 OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#4b5563'
 OAUTH2_CUSTOM{N}_STRICT_DISPLAY_CLAIMS=true     # see "Claim mismatch" troubleshooting
@@ -604,10 +605,8 @@ After a first successful login, subsequent OAuth2 sign-ins complete
 without the IdP showing a password or account-picker screen. The IdP
 silently reuses the existing session.
 
-This is expected OIDC behavior: oauth2-passkey sends `prompt=consent`
-on every authorization request (hardcoded in `oauth2/provider.rs` for
-every provider, named and Custom), and per OIDC Core 1.0 that only
-asks the IdP to redisplay the *consent* screen — it does not force
+This is expected OIDC behavior: per OIDC Core 1.0, `prompt=consent`
+only asks the IdP to redisplay the *consent* screen — it does not force
 re-authentication or account selection. IdPs are therefore free to
 reuse an existing authenticated session.
 
@@ -618,11 +617,27 @@ The difference between IdPs is how visibly they honor this:
   when a session exists
 - Zitadel v2's V1 login often inserts an account-picker step
 
+**Fix**: set `OAUTH2_CUSTOM{N}_PROMPT` (or `OAUTH2_GOOGLE_PROMPT` for
+Google) to change the OIDC `prompt` parameter:
+
+```bash
+# Force the account-picker on every sign-in:
+OAUTH2_CUSTOM1_PROMPT=select_account
+
+# Force re-authentication on every sign-in:
+OAUTH2_CUSTOM1_PROMPT=login
+
+# Omit the prompt parameter entirely (let the IdP decide):
+OAUTH2_CUSTOM1_PROMPT=
+```
+
+Valid values: `none`, `login`, `consent`, `select_account`, or empty
+string (omits the parameter). Default is `consent`. An invalid value
+causes startup failure with a descriptive error.
+
 If the IdP's admin console shares the browser with the demo, the
 console login creates a session the OAuth2 flow will reuse on the next
-demo sign-in.
-
-Practical workarounds for end-to-end testing:
+demo sign-in. Other testing workarounds:
 
 - Use a **private browsing window** for the demo and close it between
   runs
@@ -631,11 +646,6 @@ Practical workarounds for end-to-end testing:
   drop the IdP-side session
 - Avoid signing into the IdP admin console in the same browser profile
   you test the demo with
-
-A permanent configuration knob for the `prompt` value
-(`OAUTH2_CUSTOM{N}_PROMPT=login|select_account|consent|none`) would
-give operators control over this but is not yet implemented; track as
-a separate issue if the behavior is problematic for your deployment.
 
 ### Claim mismatch between id_token and /userinfo
 

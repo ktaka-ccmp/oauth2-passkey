@@ -1010,6 +1010,164 @@ fn custom_slot_preset_invalid_value_rejected_at_startup() {
     );
 }
 
+// --- OAUTH2_*_PROMPT env-var tests ---
+
+#[test]
+fn prompt_default_applied_to_google_query_string() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert!(
+            GOOGLE_PROVIDER.query_string.contains("&prompt=consent"),
+            "default must produce &prompt=consent; got: {}",
+            GOOGLE_PROVIDER.query_string
+        );
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::prompt_default_applied_to_google_query_string",
+        &[],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn prompt_default_applied_to_custom_query_string() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg =
+            provider_for(ProviderKind::Custom(CustomSlot::Slot1)).expect("slot1 should be enabled");
+        assert!(
+            cfg.query_string.contains("&prompt=consent"),
+            "default must produce &prompt=consent; got: {}",
+            cfg.query_string
+        );
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::prompt_default_applied_to_custom_query_string",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn prompt_custom_select_account_applied() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg =
+            provider_for(ProviderKind::Custom(CustomSlot::Slot1)).expect("slot1 should be enabled");
+        assert!(
+            cfg.query_string.contains("&prompt=select_account"),
+            "must contain &prompt=select_account; got: {}",
+            cfg.query_string
+        );
+        assert!(
+            !cfg.query_string.contains("&prompt=consent"),
+            "must not contain &prompt=consent; got: {}",
+            cfg.query_string
+        );
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::prompt_custom_select_account_applied",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
+            ("OAUTH2_CUSTOM1_PROMPT", "select_account"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn prompt_empty_omits_parameter_custom() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg =
+            provider_for(ProviderKind::Custom(CustomSlot::Slot1)).expect("slot1 should be enabled");
+        assert!(
+            !cfg.query_string.contains("prompt="),
+            "empty PROMPT must omit the parameter entirely; got: {}",
+            cfg.query_string
+        );
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::prompt_empty_omits_parameter_custom",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
+            ("OAUTH2_CUSTOM1_PROMPT", ""),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn prompt_empty_omits_parameter_google() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert!(
+            !GOOGLE_PROVIDER.query_string.contains("prompt="),
+            "empty OAUTH2_GOOGLE_PROMPT must omit the parameter; got: {}",
+            GOOGLE_PROVIDER.query_string
+        );
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::prompt_empty_omits_parameter_google",
+        &[("OAUTH2_GOOGLE_PROMPT", "")],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn prompt_invalid_value_rejected_at_startup() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let err = validate_named_provider_prompt()
+            .expect_err("invalid prompt value must be rejected at startup");
+        assert!(err.contains("OAUTH2_GOOGLE_PROMPT"));
+        assert!(err.contains("foobar"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::prompt_invalid_value_rejected_at_startup",
+        &[("OAUTH2_GOOGLE_PROMPT", "foobar")],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 #[test]
 fn custom_slot_no_preset_requires_display_name_and_name() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {

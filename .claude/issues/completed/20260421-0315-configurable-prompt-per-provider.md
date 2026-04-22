@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-21-03-15
 
-## Closed:
+## Closed: 2026-04-23-07-00
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -124,21 +124,21 @@ Alternatives considered (rejected):
 
 ## Implementation Tasks
 
-- [ ] Add `prompt: &'static str` field to `ProviderConfig`
-- [ ] Populate named-provider statics with `prompt: "consent"` literals
-- [ ] Populate Custom-slot LazyLocks from `OAUTH2_CUSTOM{N}_PROMPT` env
-      with `"consent"` default, `Box::leak` for `&'static str`
-- [ ] Replace 5 hardcoded `&prompt=consent` occurrences with
-      `&prompt={prompt}` (skip the `&prompt=` segment entirely when
-      `prompt` is empty)
-- [ ] Extend `validate_custom_slots` to reject values outside the OIDC
-      Core 1.0 allowed set
-- [ ] Unit tests: default preserved, non-default applied, empty value
-      omits parameter, invalid value rejected at init
-- [ ] `dot.env.example`: document env var + allowed values
-- [ ] `docs/src/guides/generic-oidc.md`: add to optional-vars section,
-      cross-link from the troubleshooting entry
-- [ ] `idp/README.md`: cross-link from the Zitadel troubleshooting entry
+- [x] Add `parse_prompt` helper function (returns `Ok(None)` for empty,
+      `Ok(Some(&'static str))` for valid values, `Err` for invalid)
+- [x] Populate Google `GOOGLE_PROVIDER` LazyLock with prompt segment from
+      `OAUTH2_GOOGLE_PROMPT` (default `consent`)
+- [x] Populate Custom-slot `build_custom_provider` with prompt segment from
+      `OAUTH2_CUSTOM{N}_PROMPT` (default `consent`, panics on invalid)
+- [x] Add `validate_named_provider_prompt()` pub(crate) fn for startup check
+- [x] Wire `validate_named_provider_prompt()` into `oauth2/mod.rs` init()
+- [x] Unit tests: default applied to Google, default applied to Custom,
+      `select_account` applied, empty omits (Custom), empty omits (Google),
+      invalid value rejected at startup
+- [x] `dot.env.example`: document env var + allowed values (Google + Custom1)
+- [x] `docs/src/guides/generic-oidc.md`: add to optional-vars section,
+      cross-link from the troubleshooting entry with working example
+- [x] `idp/README.md`: cross-link from the Zitadel troubleshooting entry
 
 ## Decision Log
 
@@ -158,4 +158,37 @@ Alternatives considered (rejected):
   var and demo-side passthrough were considered and rejected for
   flexibility / API-surface reasons (see Approach / Alternatives).
 
+### 2026-04-23: Scope narrowed to `prompt` only
+
+- Context: User asked whether other OIDC params should be made configurable.
+- Decision: `prompt` only; no `hd`, `access_type`, or generic extra-params.
+- Reason: YAGNI. The issue was written before PR #319 collapsed named
+  non-Google providers into Custom slots, so the applicable env vars are
+  `OAUTH2_GOOGLE_PROMPT` and `OAUTH2_CUSTOM{N}_PROMPT` (N=1..8).
+
+### 2026-04-23: Approach refined — no ProviderConfig field needed
+
+- Context: Implementation. The issue described adding `prompt: &'static str`
+  to `ProviderConfig`, but since `prompt` is already baked into `query_string`
+  at LazyLock init, no separate field is needed. The `parse_prompt` helper
+  follows the same pattern as `parse_strict_display_claims` and
+  `validate_named_provider_strict_display_claims`. Custom slots inherit
+  startup-time validation via the existing `validate_custom_slots` LazyLock-
+  forcing pattern; only Google needs a dedicated `validate_named_provider_prompt`.
+
 ## Resolution
+
+Implemented in PR `feature/oauth2-prompt-env` on branch `feature/oauth2-prompt-env`.
+
+Key changes:
+- `parse_prompt(env_var) -> Result<Option<&'static str>, String>`: validates
+  the four OIDC Core 1.0 values plus empty string (omit parameter) and returns
+  descriptive error for unknown values.
+- `GOOGLE_PROVIDER` LazyLock: reads `OAUTH2_GOOGLE_PROMPT`, defaults to
+  `consent`, panics on invalid (caught at startup by `validate_named_provider_prompt`).
+- `build_custom_provider`: reads `OAUTH2_CUSTOM{N}_PROMPT`, same logic,
+  caught at startup by `validate_custom_slots` forcing all enabled slot LazyLocks.
+- 6 new subprocess tests covering both providers, both absent/empty/custom
+  values, and invalid-value startup rejection.
+- Docs: `dot.env.example`, `docs/src/guides/generic-oidc.md`,
+  `idp/README.md` all updated.
