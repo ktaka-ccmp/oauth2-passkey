@@ -5,8 +5,19 @@ oauth2-passkey ships with eight "Custom" OIDC slots (`Custom1` through
 provider via environment variables alone — no code change required.
 
 Use these slots for providers without dedicated built-in support, such as
-Okta, AWS Cognito, Zitadel, Ory Hydra, Dex, Authelia, and similar
-self-hosted or hosted OIDC stacks.
+Okta, AWS Cognito, Zitadel, Ory Hydra, Authentik, Dex, Authelia, and
+similar self-hosted or hosted OIDC stacks. A Custom slot can also be
+used to register a *second* instance of a named provider (e.g. a
+second Keycloak realm) — see **Using a Custom slot for a named
+provider** at the bottom of this page.
+
+> **ORIGIN in the examples below.** The `demo-*` apps in this
+> repository listen on port `3001`. Every redirect URI in this guide
+> uses `http://localhost:3001` as the concrete ORIGIN to match that
+> default. If your deployment uses a different origin, substitute
+> accordingly — the library reads `ORIGIN` from the environment at
+> startup and the redirect URI follows the shape
+> `{ORIGIN}/o2p/oauth2/{PATH_SEGMENT}/authorized`.
 
 ## When to Use Custom Slots vs Named Providers
 
@@ -14,7 +25,8 @@ self-hosted or hosted OIDC stacks.
 |----------|-----|
 | Google | Built-in (always on when `OAUTH2_GOOGLE_CLIENT_ID` is set) |
 | Auth0, Keycloak, Microsoft Entra ID | Dedicated guide — enable via `OAUTH2_{NAME}_*` env vars |
-| Okta, AWS Cognito, Zitadel, Ory Hydra, Dex, Authelia, any other OIDC IdP | A Custom slot |
+| Okta, AWS Cognito, Zitadel, Ory Hydra, Authentik, Dex, Authelia, any other OIDC IdP | A Custom slot |
+| A *second* instance of a named provider (e.g. extra Keycloak realm) | A Custom slot with a distinct `PATH_SEGMENT` |
 
 The custom slots go through the exact same OIDC code path as the named
 providers. The only constraint is that the IdP must implement standard OIDC
@@ -63,18 +75,30 @@ OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#4b5563'
 Button colors are injected as CSS variables in the login template and drive
 the `.btn-custom{N}` background color declared in the base stylesheet.
 
-## Verified IdPs
+## Verification Status and Caveats
 
-The following IdPs have been validated end-to-end against a custom slot:
+The table below summarizes the IdPs that have been exercised
+end-to-end against `demo-live` / `demo-both`, plus the quirks worth
+knowing before you connect them. Named providers are included for
+completeness — they have their own dedicated guides, but the OIDC
+code path is shared with Custom slots.
 
-| IdP | Issuer URL pattern |
-|-----|--------------------|
-| Zitadel | `https://{instance}.zitadel.cloud` (cloud) or `https://{host}` (self-host) |
-| Ory Hydra | `https://{host}` (the public URL of Hydra's public endpoints) |
-| Okta | `https://{tenant}.okta.com/oauth2/default` (Custom Authorization Server, default) |
+| IdP | Slot type | Verified | Key caveats |
+|-----|-----------|----------|-------------|
+| Google | Named (`OAUTH2_GOOGLE_*`) | ✅ | None. Standard OIDC compliant. |
+| Auth0 | Named (`OAUTH2_AUTH0_*`) | ✅ | `sub` contains `\|` (`auth0\|{id}`) — accepted by the library's `ProviderUserId` type. Cross-origin `form_post` sends `Origin: null`; the library falls back to `Referer` automatically. |
+| Keycloak | Named (`OAUTH2_KEYCLOAK_*`) | ✅ | Behind a reverse proxy, set `hostname` / `frontendUrl` so the advertised issuer matches the public URL — strict issuer validation fails otherwise. Can also be run via a Custom slot (see *Using a Custom slot for a named provider*). |
+| Microsoft Entra ID | Named (`OAUTH2_ENTRA_*`) | ✅ | Single-tenant issuer only (`https://login.microsoftonline.com/{tenant}/v2.0`); multi-tenant `common` / `organizations` endpoints are not supported. Personal MS accounts route credential entry through `login.live.com` — handled via `additional_allowed_origins` in the provider config. `email` often absent from the ID token for personal accounts; `preferred_username` is the fallback. |
+| Zitadel v2 (`v2.71.x`, embedded V1 login) | Custom | ✅ | Standard OIDC; `form_post` works natively. `email` absent from id_token; `/userinfo` carries it. |
+| Zitadel v4 (`zitadel-login` Next.js service) | Custom | ✅ | **Requires `RESPONSE_MODE=query`** — v4's login service has no `form_post` branch and silently downgrades to `query`. `email` absent from id_token, same as v2. See [Zitadel (Self-Hosted)](#zitadel-self-hosted). |
+| Ory Hydra | Custom | ✅ | Client must be registered with `--token-endpoint-auth-method client_secret_post` (library sends credentials in the form body, not HTTP Basic). No bundled user store — needs a separate login/consent app. Reference consent app emits only `sub` by default; use `CONFORMITY_FAKE_CLAIMS=1` for demo setups. See [Ory Hydra (Self-Hosted)](#ory-hydra-self-hosted). |
+| Authentik | Custom | ✅ | Trailing slash on `ISSUER_URL` must match what Authentik's discovery document reports (`http://localhost:9000/application/o/{slug}/`). Otherwise clean OIDC defaults — no response-mode downgrade, no auth-method mismatch. See [Authentik (Self-Hosted)](#authentik-self-hosted). |
+| Okta (Developer Edition) | Custom | ✅ | Two-layer policy model — both the app's Authentication Policy **and** the Custom Authorization Server's Access Policy must allow the grant. Users must be **assigned** to the app explicitly (super-admin appears to bypass in admin UI but fails at token grant). See [Okta (Cloud, Developer Edition)](#okta-cloud-developer-edition). |
+| AWS Cognito | Custom | ❌ Not tested | Expected to work per OIDC spec; user-pool issuer shape is `https://cognito-idp.{region}.amazonaws.com/{user-pool-id}`. |
+| Dex, Authelia, Salesforce, GitLab, Ping, etc. | Custom | ❌ Not tested | OIDC-compliant; expected to work. File an issue if you try one and need adjustments. |
 
-Any OIDC-compliant IdP should work. The sections below walk through the two
-verified self-host options.
+Any OIDC-compliant IdP should work. The sections below walk through
+each verified self-host / cloud setup in detail.
 
 ---
 
@@ -96,7 +120,7 @@ Open `http://localhost:8080/ui/console` and complete the first-run wizard.
 1. Log into the Zitadel console
 2. Open the **Default** project (or create one) → **New** → **Application**
 3. Choose **Web** and **Code** grant type
-4. Set **Redirect URI**: `{ORIGIN}/o2p/oauth2/zitadel/authorized`
+4. Set **Redirect URI**: `http://localhost:3001/o2p/oauth2/zitadel/authorized`
 5. Finish the wizard and copy the **Client ID** and **Client Secret**
 
 ### Step 3: Configure oauth2-passkey
@@ -146,7 +170,7 @@ docker compose exec hydra hydra create client \
   --grant-type authorization_code,refresh_token \
   --response-type code,id_token \
   --scope 'openid email profile' \
-  --redirect-uri '{ORIGIN}/o2p/oauth2/hydra/authorized' \
+  --redirect-uri 'http://localhost:3001/o2p/oauth2/hydra/authorized' \
   --token-endpoint-auth-method client_secret_post
 ```
 
@@ -157,8 +181,8 @@ Two Hydra-specific requirements:
   `client_secret_basic` (HTTP Basic), which will fail with `401 Unauthorized`
   at token exchange.
 - **`--redirect-uri` must exactly match** what the library sends —
-  `{ORIGIN}/o2p/oauth2/{PATH_SEGMENT}/authorized` — or Hydra rejects the
-  authorization request with `invalid_request`.
+  `http://localhost:3001/o2p/oauth2/{PATH_SEGMENT}/authorized` — or
+  Hydra rejects the authorization request with `invalid_request`.
 
 Copy the returned `client_id` and `client_secret` (Hydra only shows the
 secret once).
@@ -211,6 +235,95 @@ For real multi-user setups, fork the reference consent app and populate
 
 ---
 
+## Authentik (Self-Hosted)
+
+Authentik is a full-featured self-hosted IdP (admin UI, flows,
+policies) similar in scope to Keycloak or Zitadel, but with sensible
+OIDC defaults — no response-mode downgrade, no token-endpoint-auth-
+method mismatch, no fake-claim workarounds. This makes it a clean
+reference point for the Custom slot code path.
+
+### Step 1: Bring Up Authentik
+
+A ready-to-go docker-compose is provided under `idp/authentik/`:
+
+```bash
+cd idp/authentik
+cp .env.example .env
+# Generate AUTHENTIK_SECRET_KEY and set AUTHENTIK_BOOTSTRAP_PASSWORD:
+openssl rand -base64 60 | tr -d '\n'
+$EDITOR .env
+
+docker compose up -d
+docker compose logs -f server
+```
+
+Wait until the server log shows `Starting main process`. First boot
+runs migrations and creates the default admin user.
+
+Services exposed on host:
+
+| Service           | Port  |
+|-------------------|-------|
+| HTTP (admin UI + OIDC endpoints) | `9000` |
+| HTTPS (self-signed)              | `9443` |
+| Postgres / Redis                 | not exposed |
+
+### Step 2: Create the OAuth2/OIDC Provider
+
+1. Open `http://localhost:9000/if/flow/initial-setup/` and log in as
+   `akadmin` (or the email from `AUTHENTIK_BOOTSTRAP_EMAIL`) with
+   the password from `.env`.
+2. Admin interface → **Applications → Providers → Create →
+   OAuth2/OpenID Provider**. Key fields:
+   - **Name**: `oauth2-passkey-demo`
+   - **Authorization flow**:
+     `default-provider-authorization-explicit-consent` (or
+     `-implicit-consent` to skip the consent screen while testing)
+   - **Client type**: `Confidential`
+   - **Client ID** / **Client Secret**: leave auto-generated; copy
+     them out for Step 3
+   - **Redirect URIs**:
+     `http://localhost:3001/o2p/oauth2/authentik/authorized`
+     (regex mode **off**; exact match)
+   - **Signing Key**: `authentik Self-signed Certificate`
+   - **Scopes**: keep defaults (`openid`, `email`, `profile`)
+3. Save.
+4. **Applications → Applications → Create**:
+   - **Name**: `oauth2-passkey-demo`
+   - **Slug**: `oauth2-passkey-demo` (this forms the issuer URL)
+   - **Provider**: the provider you just created
+5. Save.
+
+The issuer URL is `http://localhost:9000/application/o/{slug}/`.
+Verify:
+
+```bash
+curl -s http://localhost:9000/application/o/oauth2-passkey-demo/.well-known/openid-configuration | jq .issuer
+# -> "http://localhost:9000/application/o/oauth2-passkey-demo/"
+```
+
+### Step 3: Configure oauth2-passkey
+
+```bash
+OAUTH2_CUSTOM{N}_CLIENT_ID='<from Authentik provider>'
+OAUTH2_CUSTOM{N}_CLIENT_SECRET='<from Authentik provider>'
+OAUTH2_CUSTOM{N}_ISSUER_URL='http://localhost:9000/application/o/oauth2-passkey-demo/'
+OAUTH2_CUSTOM{N}_DISPLAY_NAME='Authentik'
+OAUTH2_CUSTOM{N}_PATH_SEGMENT='authentik'
+OAUTH2_CUSTOM{N}_BUTTON_COLOR='#fd4b2d'
+OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#e03d1f'
+```
+
+The **trailing slash** on `ISSUER_URL` must match exactly what
+Authentik's discovery document reports under `"issuer"`, or strict
+ID-token validation will reject the response.
+
+Restart oauth2-passkey. A **Continue with Authentik** button appears
+on the login page.
+
+---
+
 ## Okta (Cloud, Developer Edition)
 
 Okta's Developer tenant is free and its OIDC defaults are standards-
@@ -228,7 +341,7 @@ layer. Walk through the steps in order.
    - **Application type**: `Web Application`
    - **Grant type**: `Authorization Code`
    - **Sign-in redirect URIs**: exactly
-     `{ORIGIN}/o2p/oauth2/{PATH_SEGMENT}/authorized`
+     `http://localhost:3001/o2p/oauth2/{PATH_SEGMENT}/authorized`
    - **Controlled access**: pick **Allow everyone in your organization**
      for fastest setup.
 
@@ -318,6 +431,57 @@ The rows matter in this order:
 Step 6. `Evaluation of sign-on policy` -> `DENY` maps to Step 5.
 No entry for your app at all = the request never reached Okta; check
 `redirect_uri` and `client_id` in the browser's Network tab.
+
+---
+
+## Using a Custom slot for a named provider
+
+The Custom slot code path is identical to the named-provider code
+path — the same `ProviderConfig`, the same OIDC discovery cache, the
+same token validation. Any named provider can therefore be
+configured via a Custom slot, which is useful when you need:
+
+- Two instances of the same provider type (e.g. two Keycloak realms
+  with different branding)
+- A named provider with a custom display name, button color, or
+  URL segment that the named slot does not expose
+- To experiment with a provider before deciding whether it deserves
+  a dedicated guide
+
+### Example: Keycloak as a Custom slot
+
+Suppose you already have Keycloak running at
+`http://localhost:8180/realms/o2p`. To expose it as `keycloak2`
+alongside (or instead of) the named Keycloak slot:
+
+```bash
+OAUTH2_CUSTOM{N}_CLIENT_ID='o2p'
+OAUTH2_CUSTOM{N}_CLIENT_SECRET='<client-secret-from-keycloak>'
+OAUTH2_CUSTOM{N}_ISSUER_URL='http://localhost:8180/realms/o2p'
+OAUTH2_CUSTOM{N}_DISPLAY_NAME='Keycloak2'
+OAUTH2_CUSTOM{N}_PATH_SEGMENT='keycloak2'
+OAUTH2_CUSTOM{N}_BUTTON_COLOR='#fd4b2d'
+OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#e03d1f'
+```
+
+Register a matching redirect URI in the Keycloak client config:
+
+```
+http://localhost:3001/o2p/oauth2/keycloak2/authorized
+```
+
+You now get a **Continue with Keycloak2** button that resolves
+through the same realm as the named Keycloak slot but via a
+different URL path, different DB `provider` column value
+(`keycloak2`), and different branding. The two are independent
+accounts in oauth2-passkey even when they share the backing realm.
+
+The same pattern works for Auth0 and Microsoft Entra ID — set
+`OAUTH2_CUSTOM{N}_CLIENT_ID` / `_SECRET` / `_ISSUER_URL` to the
+values from the IdP, pick a distinct `PATH_SEGMENT`, and you have a
+second instance. Google is slightly less interesting because its
+single OIDC tenant does not benefit from multiple client slots, but
+it works the same way if needed.
 
 ---
 
