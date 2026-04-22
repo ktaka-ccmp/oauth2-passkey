@@ -24,8 +24,8 @@ provider** at the bottom of this page.
 | Provider | Use |
 |----------|-----|
 | Google | Built-in (always on when `OAUTH2_GOOGLE_CLIENT_ID` is set) |
-| Auth0, Keycloak, Microsoft Entra ID | Custom slot with `OAUTH2_CUSTOM{N}_PRESET=auth0\|keycloak\|entra` — see each provider's dedicated guide for the IdP-side steps |
-| Okta, AWS Cognito, Zitadel, Ory Hydra, Authentik, Dex, Authelia, any other OIDC IdP | A Custom slot without a preset |
+| Auth0, Keycloak, Microsoft Entra ID, Zitadel, Okta, Authentik | Custom slot with `OAUTH2_CUSTOM{N}_PRESET=auth0\|keycloak\|entra\|zitadel\|okta\|authentik` — see each provider's dedicated guide for the IdP-side steps |
+| AWS Cognito, Ory Hydra, Dex, Authelia, any other OIDC IdP | A Custom slot without a preset |
 | A second instance of any of the above (e.g. extra Keycloak realm) | A Custom slot with a distinct `NAME` |
 
 The custom slots go through the exact same OIDC code path as Google. The
@@ -34,14 +34,16 @@ only constraint is that the IdP must implement standard OIDC Discovery at
 
 ## Presets for built-in vendors
 
-For Auth0, Keycloak, and Microsoft Entra ID, set
-`OAUTH2_CUSTOM{N}_PRESET` to one of:
+Set `OAUTH2_CUSTOM{N}_PRESET` to one of:
 
 | Preset | `NAME` default | `DISPLAY_NAME` default | `ICON_SLUG` | Brand color | Library-side quirks applied |
 |--------|----------------|------------------------|-------------|-------------|------------------------------|
-| `auth0` | `auth0` | `Auth0` | `auth0` | Auth0 orange | — |
-| `keycloak` | `keycloak` | `Keycloak` | `keycloak` | dark gray | — |
-| `entra` | `entra` | `Microsoft` | `entra` | Microsoft blue | `login.live.com` added to allowed origins (required for personal MS accounts) |
+| `auth0` | `auth0` | `Auth0` | `auth0` | Auth0 orange (#eb5424) | — |
+| `keycloak` | `keycloak` | `Keycloak` | `keycloak` | dark gray (#4d4d4d) | — |
+| `entra` | `entra` | `Microsoft` | `entra` | Microsoft blue (#0078D4) | `login.live.com` added to allowed origins (required for personal MS accounts) |
+| `zitadel` | `zitadel` | `Zitadel` | `zitadel` | near-black (#333333) | — |
+| `okta` | `okta` | `Okta` | `okta` | Okta blue (#007dc1) | — |
+| `authentik` | `authentik` | `Authentik` | `authentik` | red-orange (#fd4b2d) | — |
 
 A preset supplies defaults for `DISPLAY_NAME`, `NAME`, `ICON_SLUG`,
 `BUTTON_COLOR`, `BUTTON_HOVER_COLOR`, and any additional allowed origins.

@@ -145,6 +145,33 @@ pub(crate) const ENTRA_PRESET: ProviderPreset = ProviderPreset {
     additional_allowed_origins: &["https://login.live.com"],
 };
 
+pub(crate) const ZITADEL_PRESET: ProviderPreset = ProviderPreset {
+    display_name: "Zitadel",
+    provider_name: ProviderName::from_static("zitadel"),
+    icon_slug: "zitadel",
+    button_color: "#333333",
+    button_hover_color: "#1a1a1a",
+    additional_allowed_origins: &[],
+};
+
+pub(crate) const OKTA_PRESET: ProviderPreset = ProviderPreset {
+    display_name: "Okta",
+    provider_name: ProviderName::from_static("okta"),
+    icon_slug: "okta",
+    button_color: "#007dc1",
+    button_hover_color: "#005e93",
+    additional_allowed_origins: &[],
+};
+
+pub(crate) const AUTHENTIK_PRESET: ProviderPreset = ProviderPreset {
+    display_name: "Authentik",
+    provider_name: ProviderName::from_static("authentik"),
+    icon_slug: "authentik",
+    button_color: "#fd4b2d",
+    button_hover_color: "#e03d1f",
+    additional_allowed_origins: &[],
+};
+
 /// Resolve a preset key (from `OAUTH2_CUSTOM{N}_PRESET`) to its
 /// [`ProviderPreset`]. Returns `Err` with an operator-facing message on
 /// unknown keys so `init()` can fail fast.
@@ -153,8 +180,12 @@ fn resolve_preset(key: &str) -> Result<&'static ProviderPreset, String> {
         "auth0" => Ok(&AUTH0_PRESET),
         "keycloak" => Ok(&KEYCLOAK_PRESET),
         "entra" => Ok(&ENTRA_PRESET),
+        "zitadel" => Ok(&ZITADEL_PRESET),
+        "okta" => Ok(&OKTA_PRESET),
+        "authentik" => Ok(&AUTHENTIK_PRESET),
         other => Err(format!(
-            "unknown PRESET '{other}' (expected one of: auth0, keycloak, entra)"
+            "unknown PRESET '{other}' (expected one of: \
+             auth0, keycloak, entra, zitadel, okta, authentik)"
         )),
     }
 }
