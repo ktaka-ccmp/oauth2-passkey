@@ -532,6 +532,56 @@ fn custom_slot_invalid_button_hover_color_rejected() {
     );
 }
 
+// --- Named-provider STRICT_DISPLAY_CLAIMS startup validation ---
+//
+// Unlike Custom slots (where a bad value panics at LazyLock init via
+// `validate_custom_slots`), named providers are intentionally lazy, so
+// we need a pure env-value validator that runs at startup. These tests
+// exercise `validate_named_provider_strict_display_claims` directly
+// without touching the LazyLocks.
+
+#[test]
+fn named_provider_strict_display_claims_valid_values_accepted() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        validate_named_provider_strict_display_claims()
+            .expect("valid values should pass validation");
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::named_provider_strict_display_claims_valid_values_accepted",
+        &[
+            ("OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS", "true"),
+            ("OAUTH2_AUTH0_STRICT_DISPLAY_CLAIMS", "false"),
+            // KEYCLOAK/ENTRA unset — must also be accepted (default).
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn named_provider_strict_display_claims_invalid_value_rejected() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let err = validate_named_provider_strict_display_claims()
+            .expect_err("invalid value must be rejected at startup");
+        assert!(err.contains("OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS"));
+        assert!(err.contains("'true' or 'false'"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::named_provider_strict_display_claims_invalid_value_rejected",
+        &[("OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS", "yes")],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 // --- STRICT_DISPLAY_CLAIMS env-var tests ---
 
 #[test]

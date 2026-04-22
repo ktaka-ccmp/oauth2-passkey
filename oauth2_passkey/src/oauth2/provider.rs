@@ -648,15 +648,43 @@ fn leak_static(s: String) -> &'static str {
 }
 
 /// Parse an `OAUTH2_*_STRICT_DISPLAY_CLAIMS` env var. Unset or `"true"`
-/// returns `true`; `"false"` returns `false`; any other value panics at
-/// `LazyLock` init (matches the on-invalid strict-parse style of
-/// `OAUTH2_RESPONSE_MODE`).
-fn read_strict_display_claims(env_var: &str) -> bool {
+/// yields `Ok(true)`; `"false"` yields `Ok(false)`; any other value yields
+/// `Err(message)` so callers can choose between startup-time rejection
+/// (pure validator) and `LazyLock`-time panic.
+fn parse_strict_display_claims(env_var: &str) -> Result<bool, String> {
     match env::var(env_var).ok().as_deref() {
-        None | Some("true") => true,
-        Some("false") => false,
-        Some(other) => panic!("Invalid {env_var} '{other}'. Must be 'true' or 'false'."),
+        None | Some("true") => Ok(true),
+        Some("false") => Ok(false),
+        Some(other) => Err(format!(
+            "Invalid {env_var} '{other}'. Must be 'true' or 'false'."
+        )),
     }
+}
+
+/// `LazyLock`-time wrapper around `parse_strict_display_claims`. Matches the
+/// on-invalid strict-parse style of `OAUTH2_RESPONSE_MODE`.
+fn read_strict_display_claims(env_var: &str) -> bool {
+    parse_strict_display_claims(env_var).unwrap_or_else(|msg| panic!("{msg}"))
+}
+
+/// Validate `OAUTH2_*_STRICT_DISPLAY_CLAIMS` for every named provider at
+/// startup without forcing their `LazyLock`s to initialize.
+///
+/// Custom slots go through `LazyLock` init in `validate_custom_slots`, so
+/// their STRICT_DISPLAY_CLAIMS gets checked there. Named providers
+/// (Google/Auth0/Keycloak/Entra) are intentionally lazy so tests can
+/// override other env vars after `init()`; without this function a bad
+/// value would survive startup and crash the first login request instead.
+pub(crate) fn validate_named_provider_strict_display_claims() -> Result<(), String> {
+    for var in [
+        "OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS",
+        "OAUTH2_AUTH0_STRICT_DISPLAY_CLAIMS",
+        "OAUTH2_KEYCLOAK_STRICT_DISPLAY_CLAIMS",
+        "OAUTH2_ENTRA_STRICT_DISPLAY_CLAIMS",
+    ] {
+        parse_strict_display_claims(var)?;
+    }
+    Ok(())
 }
 
 /// Build a `ProviderConfig` for a custom OIDC slot from its env vars.
