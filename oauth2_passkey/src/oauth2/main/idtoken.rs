@@ -120,6 +120,12 @@ pub enum TokenVerificationError {
     InvalidTokenSignature,
     #[error("Invalid token audience, expected: {0}, actual: {1}")]
     InvalidTokenAudience(String, String),
+    #[error(
+        "ID token has multiple audiences but no `azp` claim (required by OIDC Core 1.0 §3.1.3.7)"
+    )]
+    MissingAuthorizedParty,
+    #[error("Authorized party mismatch: `azp` is '{0}', expected '{1}'")]
+    UnauthorizedParty(String, String),
     #[error("Invalid token issuer, expected: {0}, actual: {1}")]
     InvalidTokenIssuer(String, String),
     #[error("Token expired")]
@@ -305,6 +311,38 @@ fn decode_token(token: &str) -> Result<OidcIdInfo, TokenVerificationError> {
     Ok(idinfo)
 }
 
+/// Validate the `aud` and `azp` claims on a verified ID token.
+///
+/// Per OIDC Core 1.0 §3.1.3.7:
+/// - the Client's `client_id` MUST be present in `aud`;
+/// - when `aud` contains multiple audiences, the `azp` claim MUST be present
+///   and MUST name the authorized party (our `client_id`).
+///
+/// The second rule closes an attack surface opened by accepting array-form
+/// `aud`: without it, a token issued *for another client* that merely lists
+/// us in `aud` would be accepted here.
+fn validate_audience(idinfo: &OidcIdInfo, client_id: &str) -> Result<(), TokenVerificationError> {
+    if !idinfo.aud.iter().any(|a| a == client_id) {
+        return Err(TokenVerificationError::InvalidTokenAudience(
+            client_id.to_string(),
+            idinfo.aud.join(","),
+        ));
+    }
+    if idinfo.aud.len() > 1 {
+        match idinfo.azp.as_deref() {
+            Some(azp) if azp == client_id => {}
+            Some(azp) => {
+                return Err(TokenVerificationError::UnauthorizedParty(
+                    azp.to_string(),
+                    client_id.to_string(),
+                ));
+            }
+            None => return Err(TokenVerificationError::MissingAuthorizedParty),
+        }
+    }
+    Ok(())
+}
+
 fn verify_signature(
     token: &str,
     decoding_key: &DecodingKey,
@@ -353,13 +391,7 @@ pub(super) async fn verify_idtoken_with_algorithm(
         return Err(TokenVerificationError::InvalidTokenSignature);
     }
 
-    let audience = &ctx.client_id;
-    if !idinfo.aud.iter().any(|a| a == audience) {
-        return Err(TokenVerificationError::InvalidTokenAudience(
-            audience.clone(),
-            idinfo.aud.join(","),
-        ));
-    }
+    validate_audience(&idinfo, &ctx.client_id)?;
 
     let expected_issuer = ctx.expected_issuer().await?;
     if idinfo.iss != expected_issuer {
