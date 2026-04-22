@@ -6,13 +6,16 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (17)
+### Open (19)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
+| `20260422-1636` | medium-high | medium | [Unify non-Google providers under Custom slot with presets](open/20260422-1636-unify-non-google-providers-via-custom-slot-preset.md) |
 | `20260420-0402` | medium | small | [Admin unlink/delete fails in demo mode ("Invalid user ID")](open/20260420-0402-admin-unlink-demo-mode.md) |
+| `20260422-1552` | medium | small | [Detect claim mismatch between id_token and /userinfo](open/20260422-1552-detect-claim-mismatch-idinfo-userinfo.md) |
+| `20260421-0045` | low | trivial | [Make `expires_in` in OidcTokenResponse optional](open/20260421-0045-oidc-token-response-expires-in-optional.md) |
+| `20260421-0315` | low | small | [Configurable `prompt` parameter per OAuth2 provider](open/20260421-0315-configurable-prompt-per-provider.md) |
 | `20260226-2020` | high | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
-| `20260420-1511` | high | medium | [Add Generic OIDC Provider Slots](open/20260420-1511-add-generic-oidc-provider.md) |
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 | `20260226-1814` | high | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
@@ -26,12 +29,14 @@ This directory contains issue/task tracking files for the project.
 | `20260331-1517` | low | small | [PASSKEY_AUTHENTICATOR_ATTACHMENT=none sends non-standard string instead of omitting field](open/20260331-1517-passkey-authenticator-attachment-none-serialization.md) |
 | `20260420-1457` | low | large | [Add Sign in with Apple as OAuth2 Provider](open/20260420-1457-add-apple-provider.md) |
 | `20260420-1458` | low | large | [Add GitHub as OAuth2 Provider (non-OIDC)](open/20260420-1458-add-github-provider.md) |
-| `20260420-1521` | low | small | [Remove `OAUTH2_GOOGLE_USER` Dead Code and `oauth2_account_from_userinfo`](open/20260420-1521-remove-oauth2-google-user-dead-code.md) |
 
-### Completed (61)
+### Completed (64)
 
 | ID | Title |
 |----|-------|
+| `20260421-0105` | [Merge `idinfo` and `userinfo` when building OAuth2Account](completed/20260421-0105-merge-idinfo-and-userinfo-for-account-build.md) |
+| `20260420-1521` | [Remove `OAUTH2_GOOGLE_USER` Dead Code and `oauth2_account_from_userinfo`](completed/20260420-1521-remove-oauth2-google-user-dead-code.md) |
+| `20260420-1511` | [Add Generic OIDC Provider Slots](completed/20260420-1511-add-generic-oidc-provider.md) |
 | `20260420-1643` | [Show IDP Icon and Provider Name on OAuth2 Account Cards](completed/20260420-1643-oauth2-account-provider-icons.md) |
 | `20260420-0552` | [Add Microsoft Entra ID as OAuth2 Provider](completed/20260420-0552-add-entra-provider.md) |
 | `20260420-0307` | [Add Keycloak as OIDC Provider](completed/20260420-0307-add-keycloak-provider.md) |

@@ -1,7 +1,7 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
@@ -37,7 +37,10 @@ pub struct OidcIdInfo {
     pub sub: String,
     /// Google-specific; absent in many other OIDC providers (e.g. Auth0).
     pub azp: Option<String>,
-    pub aud: String,
+    /// OIDC Core 1.0 §2 allows `aud` to be either a single string or an array
+    /// of strings. Normalized to `Vec<String>` for uniform validation.
+    #[serde(deserialize_with = "deserialize_aud")]
+    pub aud: Vec<String>,
     /// Optional per OIDC Core 1.0; absent for some Microsoft personal accounts.
     pub email: Option<String>,
     /// Some providers omit this claim; treat absence as unverified.
@@ -62,6 +65,45 @@ pub struct OidcIdInfo {
     pub preferred_username: Option<String>,
 }
 
+fn deserialize_aud<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::{Error, SeqAccess, Visitor};
+    use std::fmt;
+
+    struct AudVisitor;
+
+    impl<'de> Visitor<'de> for AudVisitor {
+        type Value = Vec<String>;
+
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("a string or array of strings")
+        }
+
+        fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
+            Ok(vec![v.to_string()])
+        }
+
+        fn visit_string<E: Error>(self, v: String) -> Result<Self::Value, E> {
+            Ok(vec![v])
+        }
+
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+            let mut out: Vec<String> = Vec::new();
+            while let Some(s) = seq.next_element::<String>()? {
+                out.push(s);
+            }
+            if out.is_empty() {
+                return Err(Error::custom("aud array is empty"));
+            }
+            Ok(out)
+        }
+    }
+
+    deserializer.deserialize_any(AudVisitor)
+}
+
 #[derive(Error, Debug)]
 pub enum TokenVerificationError {
     #[error("HTTP request failed: {0}")]
@@ -78,6 +120,12 @@ pub enum TokenVerificationError {
     InvalidTokenSignature,
     #[error("Invalid token audience, expected: {0}, actual: {1}")]
     InvalidTokenAudience(String, String),
+    #[error(
+        "ID token has multiple audiences but no `azp` claim (required by OIDC Core 1.0 §3.1.3.7)"
+    )]
+    MissingAuthorizedParty,
+    #[error("Authorized party mismatch: `azp` is '{0}', expected '{1}'")]
+    UnauthorizedParty(String, String),
     #[error("Invalid token issuer, expected: {0}, actual: {1}")]
     InvalidTokenIssuer(String, String),
     #[error("Token expired")]
@@ -263,6 +311,38 @@ fn decode_token(token: &str) -> Result<OidcIdInfo, TokenVerificationError> {
     Ok(idinfo)
 }
 
+/// Validate the `aud` and `azp` claims on a verified ID token.
+///
+/// Per OIDC Core 1.0 §3.1.3.7:
+/// - the Client's `client_id` MUST be present in `aud`;
+/// - when `aud` contains multiple audiences, the `azp` claim MUST be present
+///   and MUST name the authorized party (our `client_id`).
+///
+/// The second rule closes an attack surface opened by accepting array-form
+/// `aud`: without it, a token issued *for another client* that merely lists
+/// us in `aud` would be accepted here.
+fn validate_audience(idinfo: &OidcIdInfo, client_id: &str) -> Result<(), TokenVerificationError> {
+    if !idinfo.aud.iter().any(|a| a == client_id) {
+        return Err(TokenVerificationError::InvalidTokenAudience(
+            client_id.to_string(),
+            idinfo.aud.join(","),
+        ));
+    }
+    if idinfo.aud.len() > 1 {
+        match idinfo.azp.as_deref() {
+            Some(azp) if azp == client_id => {}
+            Some(azp) => {
+                return Err(TokenVerificationError::UnauthorizedParty(
+                    azp.to_string(),
+                    client_id.to_string(),
+                ));
+            }
+            None => return Err(TokenVerificationError::MissingAuthorizedParty),
+        }
+    }
+    Ok(())
+}
+
 fn verify_signature(
     token: &str,
     decoding_key: &DecodingKey,
@@ -311,13 +391,7 @@ pub(super) async fn verify_idtoken_with_algorithm(
         return Err(TokenVerificationError::InvalidTokenSignature);
     }
 
-    let audience = &ctx.client_id;
-    if idinfo.aud != *audience {
-        return Err(TokenVerificationError::InvalidTokenAudience(
-            audience.clone(),
-            idinfo.aud.to_string(),
-        ));
-    }
+    validate_audience(&idinfo, &ctx.client_id)?;
 
     let expected_issuer = ctx.expected_issuer().await?;
     if idinfo.iss != expected_issuer {

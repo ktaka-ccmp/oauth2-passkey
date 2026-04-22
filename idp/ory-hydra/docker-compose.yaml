@@ -1,0 +1,66 @@
+services:
+  hydra-migrate:
+    image: oryd/hydra:v2.2.0
+    environment:
+      DSN: postgres://hydra:hydra@db:5432/hydra?sslmode=disable
+    command: migrate sql -e --yes
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+  hydra:
+    image: oryd/hydra:v2.2.0
+    command: serve all --dev
+    environment:
+      DSN: postgres://hydra:hydra@db:5432/hydra?sslmode=disable
+      URLS_SELF_ISSUER: http://localhost:4444
+      URLS_LOGIN: http://localhost:3100/login
+      URLS_CONSENT: http://localhost:3100/consent
+      URLS_LOGOUT: http://localhost:3100/logout
+      SECRETS_SYSTEM: youReallyNeedToChangeThisForProductionUse
+      OIDC_SUBJECT_IDENTIFIERS_SUPPORTED_TYPES: public,pairwise
+      OIDC_SUBJECT_IDENTIFIERS_PAIRWISE_SALT: youReallyNeedToChangeThisForProductionUse
+      STRATEGIES_ACCESS_TOKEN: jwt
+      LOG_LEVEL: debug
+    ports:
+      - "127.0.0.1:4444:4444"
+      - "127.0.0.1:4445:4445"
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  consent:
+    image: oryd/hydra-login-consent-node:v2.2.0
+    environment:
+      HYDRA_ADMIN_URL: http://hydra:4445
+      PORT: "3100"
+      # Emit fake `email` / `preferred_username` claims so the library's
+      # userinfo validation passes. The reference consent app leaves the
+      # session.id_token object empty; this flag is a built-in shortcut
+      # (see src/routes/stub/oidc-cert.ts). Demo use only.
+      CONFORMITY_FAKE_CLAIMS: "1"
+    ports:
+      - "127.0.0.1:3100:3100"
+    depends_on:
+      - hydra
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: hydra
+      POSTGRES_PASSWORD: hydra
+      POSTGRES_DB: hydra
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hydra"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - hydra-db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  hydra-db:

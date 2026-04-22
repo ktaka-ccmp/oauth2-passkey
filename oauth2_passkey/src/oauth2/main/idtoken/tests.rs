@@ -458,6 +458,47 @@ fn test_decode_token_valid_payload() {
     assert_eq!(id_info.email, Some("test@example.com".to_string()));
     assert_eq!(id_info.email_verified, Some(true));
     assert_eq!(id_info.name, Some("Test User".to_string()));
+    assert_eq!(id_info.aud, vec!["audience".to_string()]);
+}
+
+/// Test token decoding with array-valued `aud`
+///
+/// Per OIDC Core 1.0 §2, `aud` MAY be an array of strings. Providers like
+/// Zitadel and AWS Cognito emit this form even for single-audience tokens.
+/// The custom deserializer must accept both string and array shapes.
+#[test]
+fn test_decode_token_aud_as_array() {
+    let id_info_json = r#"{
+        "iss": "http://localhost:8080",
+        "sub": "987654321",
+        "aud": ["client_id_1", "client_id_2"],
+        "iat": 1640995200,
+        "exp": 1641001200
+    }"#;
+    let payload_b64 = URL_SAFE_NO_PAD.encode(id_info_json.as_bytes());
+    let token = format!("header.{payload_b64}.signature");
+
+    let id_info = decode_token(&token).expect("array-form aud must deserialize");
+    assert_eq!(
+        id_info.aud,
+        vec!["client_id_1".to_string(), "client_id_2".to_string()]
+    );
+}
+
+/// Test token decoding rejects an empty `aud` array.
+#[test]
+fn test_decode_token_aud_empty_array_rejected() {
+    let id_info_json = r#"{
+        "iss": "http://localhost:8080",
+        "sub": "1",
+        "aud": [],
+        "iat": 1640995200,
+        "exp": 1641001200
+    }"#;
+    let payload_b64 = URL_SAFE_NO_PAD.encode(id_info_json.as_bytes());
+    let token = format!("header.{payload_b64}.signature");
+
+    assert!(decode_token(&token).is_err(), "empty aud must fail");
 }
 
 /// Test signature verification with invalid token format
@@ -681,4 +722,79 @@ fn test_jwks_cache_invalid_json() {
         result.unwrap_err(),
         TokenVerificationError::JwksParsing(_)
     ));
+}
+
+/// Build a minimally-populated `OidcIdInfo` for testing `validate_audience`.
+fn idinfo_with_aud_and_azp(aud: Vec<&str>, azp: Option<&str>) -> OidcIdInfo {
+    OidcIdInfo {
+        iss: "https://idp.example.com".to_string(),
+        sub: "sub-1".to_string(),
+        azp: azp.map(str::to_string),
+        aud: aud.into_iter().map(str::to_string).collect(),
+        email: None,
+        email_verified: None,
+        name: None,
+        picture: None,
+        given_name: None,
+        family_name: None,
+        locale: None,
+        iat: 0,
+        exp: 0,
+        nbf: None,
+        jti: None,
+        nonce: None,
+        hd: None,
+        at_hash: None,
+        preferred_username: None,
+    }
+}
+
+#[test]
+fn validate_audience_accepts_single_audience_matching_client_id() {
+    let idinfo = idinfo_with_aud_and_azp(vec!["our-client"], None);
+    assert!(validate_audience(&idinfo, "our-client").is_ok());
+}
+
+#[test]
+fn validate_audience_rejects_when_client_id_not_in_aud() {
+    let idinfo = idinfo_with_aud_and_azp(vec!["someone-else"], None);
+    match validate_audience(&idinfo, "our-client") {
+        Err(TokenVerificationError::InvalidTokenAudience(expected, actual)) => {
+            assert_eq!(expected, "our-client");
+            assert_eq!(actual, "someone-else");
+        }
+        other => panic!("expected InvalidTokenAudience, got {other:?}"),
+    }
+}
+
+#[test]
+fn validate_audience_accepts_multi_aud_with_matching_azp() {
+    let idinfo = idinfo_with_aud_and_azp(vec!["our-client", "other-client"], Some("our-client"));
+    assert!(validate_audience(&idinfo, "our-client").is_ok());
+}
+
+#[test]
+fn validate_audience_rejects_multi_aud_with_mismatched_azp() {
+    // Attack shape: our client_id is in aud, but the token was issued for
+    // another client (azp names that other client). Must be rejected.
+    let idinfo = idinfo_with_aud_and_azp(
+        vec!["our-client", "attacker-client"],
+        Some("attacker-client"),
+    );
+    match validate_audience(&idinfo, "our-client") {
+        Err(TokenVerificationError::UnauthorizedParty(azp, expected)) => {
+            assert_eq!(azp, "attacker-client");
+            assert_eq!(expected, "our-client");
+        }
+        other => panic!("expected UnauthorizedParty, got {other:?}"),
+    }
+}
+
+#[test]
+fn validate_audience_rejects_multi_aud_without_azp() {
+    let idinfo = idinfo_with_aud_and_azp(vec!["our-client", "other-client"], None);
+    match validate_audience(&idinfo, "our-client") {
+        Err(TokenVerificationError::MissingAuthorizedParty) => {}
+        other => panic!("expected MissingAuthorizedParty, got {other:?}"),
+    }
 }

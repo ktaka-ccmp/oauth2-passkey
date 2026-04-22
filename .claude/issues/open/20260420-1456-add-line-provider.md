@@ -62,7 +62,7 @@ Lock-step edits following the Entra pattern exactly. No new architectural work.
 1. `Line` variant in `ProviderKind`
 2. Include in `ProviderKind::ALL`
 3. `as_str`: `Self::Line => "line"`
-4. `from_path_segment`: `"line" => Some(Self::Line)`
+4. `from_provider_name`: `"line" => Some(Self::Line)`
 5. `optional_env_contract`: trigger `OAUTH2_LINE_CLIENT_ID`, deps `OAUTH2_LINE_CLIENT_SECRET` + `OAUTH2_LINE_ISSUER_URL`
 6. `LINE_PROVIDER: LazyLock<Option<ProviderConfig>>` + `provider_for` arm
 
@@ -97,7 +97,7 @@ Lock-step edits following the Entra pattern exactly. No new architectural work.
 ## Implementation Tasks
 
 - [ ] Add `Line` variant + 6 lock-step edits in `provider.rs`
-- [ ] Add 2 tests in `provider/tests.rs` (from_path_segment + optional_env_contract)
+- [ ] Add 2 tests in `provider/tests.rs` (from_provider_name + optional_env_contract)
 - [ ] Add `"line"` arm in `provider_view`
 - [ ] Add CSS vars + `.btn-line` styles
 - [ ] Write `docs/src/guides/line.md`

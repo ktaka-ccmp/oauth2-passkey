@@ -18,7 +18,7 @@ pub(crate) mod provider;
 mod storage;
 mod types;
 
-pub use config::{enabled_providers, get_google_client_id, is_provider_enabled};
+pub use config::{enabled_providers, get_google_client_id, is_provider_enabled, provider_info};
 pub use main::{prepare_fedcm_nonce, prepare_oauth2_auth_request};
 pub use provider::ProviderInfo;
 pub use types::{
@@ -30,7 +30,7 @@ use crate::storage::CacheErrorConversion;
 pub(crate) use config::OAUTH2_CSRF_COOKIE_NAME;
 pub(crate) use errors::OAuth2Error;
 pub(crate) use types::{StateParams, StoredToken};
-pub(crate) use types::{oauth2_account_from_idinfo, oauth2_account_from_userinfo};
+pub(crate) use types::{oauth2_account_from_idinfo, oauth2_account_from_idinfo_and_userinfo};
 
 #[cfg(test)]
 pub(crate) use main::prepare_oauth2_auth_request_inner;
@@ -86,6 +86,10 @@ pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
             require_env_if_trigger_set(trigger, required)?;
         }
     }
+
+    // Value-level validation for generic OIDC slots (provider_name shape and
+    // collision checks). Env-presence is already covered by the loop above.
+    provider::validate_custom_slots().map_err(errors::OAuth2Error::Validation)?;
 
     let _ = *config::OAUTH2_CSRF_COOKIE_NAME;
     let _ = *config::OAUTH2_CSRF_COOKIE_MAX_AGE;

@@ -137,7 +137,7 @@ pub use oauth2_passkey::{
 };
 
 // Presentation layer: provider display info owned by the axum crate
-pub use oauth2::{ProviderView, enabled_provider_views};
+pub use oauth2::{ProviderView, custom_css_vars_block, enabled_provider_views};
 
 // Re-export types and functions for custom admin pages
 pub use oauth2_passkey::{

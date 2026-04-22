@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use oauth2_passkey::{
     AuthResponse, CoordinationError, FedCMCallbackRequest, O2P_ROUTE_PREFIX, OAuth2Account,
-    Provider, ProviderUserId, UserId, delete_oauth2_account_core, enabled_providers,
+    Provider, ProviderInfo, ProviderUserId, UserId, delete_oauth2_account_core, enabled_providers,
     fedcm_authorized_core, get_authorized_core, get_google_client_id, list_accounts_core,
     post_authorized_core, prepare_fedcm_nonce, prepare_oauth2_auth_request,
     verify_page_session_token,
@@ -24,8 +24,10 @@ use oauth2_passkey::{
 /// can use this type directly or derive their own from `enabled_providers()`.
 #[derive(Debug, Clone)]
 pub struct ProviderView {
-    /// URL path segment that identifies the provider (e.g. `"google"`, `"auth0"`).
-    pub name: &'static str,
+    /// Provider identifier used in URL routing, DB rows, OAuth2 state, and
+    /// templates (e.g. `"google"`, `"auth0"`, or an operator-configured
+    /// value for a Custom slot).
+    pub provider_name: &'static str,
     /// Human-readable label for login buttons (e.g. `"Google"`, `"Auth0"`).
     pub display_name: &'static str,
     /// CSS classes for the login button (e.g. `"btn-oauth2 btn-google"`).
@@ -35,68 +37,47 @@ pub struct ProviderView {
 /// Returns [`ProviderView`] for every currently enabled OAuth2 provider, in
 /// stable display order (Google first, then optional providers).
 pub fn enabled_provider_views() -> Vec<ProviderView> {
-    enabled_providers()
-        .into_iter()
-        .map(|info| provider_view(info.name))
-        .collect()
+    enabled_providers().into_iter().map(provider_view).collect()
 }
 
-fn provider_view(name: &'static str) -> ProviderView {
-    match name {
-        "google" => ProviderView {
-            name,
-            display_name: "Google",
-            button_class: "btn-oauth2 btn-google",
-        },
-        "auth0" => ProviderView {
-            name,
-            display_name: "Auth0",
-            button_class: "btn-oauth2 btn-auth0",
-        },
-        "keycloak" => ProviderView {
-            name,
-            display_name: "Keycloak",
-            button_class: "btn-oauth2 btn-keycloak",
-        },
-        "entra" => ProviderView {
-            name,
-            display_name: "Microsoft",
-            button_class: "btn-oauth2 btn-entra",
-        },
-        _ => ProviderView {
-            name,
-            display_name: name,
-            button_class: "btn-oauth2",
-        },
+fn provider_view(info: ProviderInfo) -> ProviderView {
+    ProviderView {
+        provider_name: info.provider_name,
+        display_name: info.display_name,
+        button_class: info.button_class,
     }
 }
 
-/// Human-readable label for a provider slug. Used on post-auth UI
-/// (e.g. linked-account cards) where the slug comes from the DB as a
-/// runtime `String`. Unknown slugs pass through unchanged so generic
-/// OIDC providers (see issue `20260420-1511`) render with their own
-/// slug as the label until that issue lands a richer display model.
-pub(crate) fn display_name_for(slug: &str) -> &str {
-    match slug {
-        "google" => "Google",
-        "auth0" => "Auth0",
-        "keycloak" => "Keycloak",
-        "entra" => "Microsoft",
-        other => other,
-    }
+/// Build the inline `:root { ... }` CSS block injecting `--o2p-custom{N}` /
+/// `--o2p-custom{N}-hover` variables for every enabled generic OIDC slot.
+///
+/// Returns `None` if no slot is enabled (so the template can skip emitting an
+/// empty `<style>` tag). Named providers have `css_var_suffix == None` and
+/// are skipped — they are styled by the base CSS and theme files.
+pub fn custom_css_vars_block() -> Option<String> {
+    let entries: Vec<_> = enabled_providers()
+        .iter()
+        .filter_map(|info| {
+            let suffix = info.css_var_suffix?;
+            let color = info.button_color?;
+            let hover = info.button_hover_color?;
+            Some((suffix, color, hover))
+        })
+        .collect();
+    css_vars_block_from(&entries)
 }
 
-/// Basename of the SVG served under `{O2P_ROUTE_PREFIX}/icons/` for a
-/// provider slug. Unknown slugs fall back to `"openid"` — a neutral
-/// OpenID Connect mark.
-pub(crate) fn icon_slug_for(slug: &str) -> &'static str {
-    match slug {
-        "google" => "google",
-        "auth0" => "auth0",
-        "keycloak" => "keycloak",
-        "entra" => "entra",
-        _ => "openid",
+fn css_vars_block_from(entries: &[(&'static str, &'static str, &'static str)]) -> Option<String> {
+    if entries.is_empty() {
+        return None;
     }
+    let body: Vec<_> = entries
+        .iter()
+        .map(|(suffix, color, hover)| {
+            format!("    --o2p-{suffix}: {color};\n    --o2p-{suffix}-hover: {hover};")
+        })
+        .collect();
+    Some(format!(":root {{\n{}\n}}", body.join("\n")))
 }
 
 use super::config::{O2P_CUSTOM_CSS_URL, O2P_FEDCM, O2P_PASSKEY_PROMOTION};
@@ -227,6 +208,7 @@ async fn oauth2_initiate(
 struct SelectProviderTemplate<'a> {
     o2p_route_prefix: &'a str,
     custom_css_url: Option<&'a str>,
+    custom_css_vars: Option<String>,
     providers: Vec<ProviderView>,
     mode: &'a str,
     context: &'a str,
@@ -261,14 +243,14 @@ async fn oauth2_select(
             Some(ctx) => format!(
                 "{}/oauth2/{}?mode={}&context={}",
                 O2P_ROUTE_PREFIX.as_str(),
-                p.name,
+                p.provider_name,
                 mode.as_deref().unwrap_or(""),
                 ctx
             ),
             None => format!(
                 "{}/oauth2/{}?mode={}",
                 O2P_ROUTE_PREFIX.as_str(),
-                p.name,
+                p.provider_name,
                 mode.as_deref().unwrap_or(""),
             ),
         };
@@ -278,6 +260,7 @@ async fn oauth2_select(
     let tmpl = SelectProviderTemplate {
         o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
         custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+        custom_css_vars: custom_css_vars_block(),
         providers,
         mode: mode.as_deref().unwrap_or(""),
         context: context.as_deref().unwrap_or(""),

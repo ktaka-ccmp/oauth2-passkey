@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-20-15-21
 
-## Closed:
+## Closed: 2026-04-22
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -115,12 +115,12 @@ Regression check: Google / Auth0 / Keycloak / Entra login still work.
 
 ## Implementation Tasks
 
-- [ ] Simplify the match to a single call in `coordination/oauth2.rs`
-- [ ] Delete `oauth2_account_from_userinfo` from `oauth2/types.rs`
-- [ ] Remove the corresponding tests from `oauth2/types/tests.rs`
-- [ ] Verify `cargo fmt --all` + `cargo clippy --all-targets --all-features` + `cargo test` clean
-- [ ] Regression: Google / Auth0 / Keycloak / Entra login still work
-- [ ] Commit
+- [x] Simplify the match to a single call in `coordination/oauth2.rs` (done in `db680fe`)
+- [x] Delete `oauth2_account_from_userinfo` from `oauth2/types.rs` (done in `3f74d37`)
+- [x] Remove the corresponding tests from `oauth2/types/tests.rs` (rewrote as merged-view tests in `3f74d37`)
+- [x] Verify `cargo fmt --all` + `cargo clippy --all-targets --all-features` + `cargo test` clean
+- [x] Regression: Google / Auth0 / Keycloak / Entra login still work
+- [x] Commit (`db680fe` + `3f74d37`)
 
 ## Decision Log
 
@@ -136,4 +136,47 @@ Regression check: Google / Auth0 / Keycloak / Entra login still work.
   attack. Cheap extra HTTPS call, real security value. Removing it is a
   separate decision that would require its own issue.
 
+### 2026-04-21: Partial resolution — dead match removed, but
+`oauth2_account_from_userinfo` stays alive
+
+- Context: Zitadel E2E verification under `20260420-1511` revealed that
+  some OIDC providers do not assert `email` in the id_token at all,
+  only via the UserInfo endpoint. Building the account from `idinfo`
+  alone fails for them.
+- Decision:
+  - **Done now (under `20260420-1511` PR)**: remove the
+    `OAUTH2_GOOGLE_USER` constant and the dead `match` in
+    `coordination/oauth2.rs`. The call site is now a single call to
+    `oauth2_account_from_userinfo`.
+  - **Reversed from the original plan**: do **NOT** delete
+    `oauth2_account_from_userinfo` from `types.rs`. It is now the live
+    path for the main OAuth2 callback.
+- Follow-up: `20260421-0105` supersedes this issue for the final
+  architecture — a merged `idinfo+userinfo` account builder that
+  prefers userinfo and falls back to idinfo. Close this issue once
+  that one lands, or mark it completed now that the dead `match` /
+  `OAUTH2_GOOGLE_USER` removal is done.
+
 ## Resolution
+
+Fully resolved across two PR #316 commits:
+
+- **`db680fe`** (feat: add 8 generic OIDC provider slots): removed
+  the `OAUTH2_GOOGLE_USER` constant and the dead three-arm `match`
+  in `coordination/oauth2.rs`. The call site became a single call
+  to `oauth2_account_from_userinfo` (at that point — subsequently
+  replaced; see below).
+- **`3f74d37`** (fix: merge idinfo+userinfo when building
+  OAuth2Account — issue `20260421-0105`): deleted
+  `oauth2_account_from_userinfo` entirely after the callback
+  switched to the new merged builder
+  `oauth2_account_from_idinfo_and_userinfo`. No remaining callers.
+
+Surviving related code:
+
+- `oauth2_account_from_idinfo` stays — still used by the FedCM
+  callback (`coordination/oauth2.rs` post-merged-builder line ~497)
+  because FedCM has no `/userinfo` endpoint to fetch from.
+- `fetch_userinfo` and `OidcUserInfo` stay per the earlier decision
+  log — they power the `idinfo.sub == userinfo.sub` consistency
+  check in `get_idinfo_userinfo`.

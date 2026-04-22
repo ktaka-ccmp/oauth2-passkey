@@ -45,6 +45,7 @@
 - [Auth0 Provider Setup](guides/auth0.md)
 - [Keycloak Provider Setup](guides/keycloak.md)
 - [Microsoft Entra ID Provider Setup](guides/entra.md)
+- [Generic OIDC Provider Setup](guides/generic-oidc.md)
 
 ---
 

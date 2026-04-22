@@ -9,6 +9,9 @@
     {% if let Some(css_url) = custom_css_url %}
     <link rel="stylesheet" href="{{css_url}}">
     {% endif %}
+    {% if let Some(css_vars) = custom_css_vars %}
+    <style>{{css_vars|safe}}</style>
+    {% endif %}
     <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
     <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
     <script>
@@ -26,7 +29,7 @@
             <div class="auth-buttons">
                 {% for p in providers %}
                 <button class="btn {{p.button_class}} btn-block"
-                        onclick="oauth2.openPopup('create_user_or_login', null, '{{p.name}}')">
+                        onclick="oauth2.openPopup('create_user_or_login', null, '{{p.provider_name}}')">
                     Register / Sign in with {{p.display_name}}
                 </button>
                 {% endfor %}

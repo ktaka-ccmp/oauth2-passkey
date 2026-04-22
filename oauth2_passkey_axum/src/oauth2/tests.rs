@@ -34,29 +34,29 @@ async fn test_serve_oauth2_js() {
 }
 
 #[test]
-fn display_name_for_known_slugs() {
-    assert_eq!(display_name_for("google"), "Google");
-    assert_eq!(display_name_for("auth0"), "Auth0");
-    assert_eq!(display_name_for("keycloak"), "Keycloak");
-    assert_eq!(display_name_for("entra"), "Microsoft");
+fn css_vars_block_from_returns_none_when_empty() {
+    assert_eq!(css_vars_block_from(&[]), None);
 }
 
 #[test]
-fn display_name_for_unknown_slug_passes_through() {
-    assert_eq!(display_name_for("okta"), "okta");
-    assert_eq!(display_name_for(""), "");
+fn css_vars_block_from_emits_root_block_for_single_slot() {
+    let block = css_vars_block_from(&[("custom1", "#abcdef", "#123456")])
+        .expect("non-empty input must produce a block");
+    assert_eq!(
+        block,
+        ":root {\n    --o2p-custom1: #abcdef;\n    --o2p-custom1-hover: #123456;\n}"
+    );
 }
 
 #[test]
-fn icon_slug_for_known_slugs() {
-    assert_eq!(icon_slug_for("google"), "google");
-    assert_eq!(icon_slug_for("auth0"), "auth0");
-    assert_eq!(icon_slug_for("keycloak"), "keycloak");
-    assert_eq!(icon_slug_for("entra"), "entra");
-}
-
-#[test]
-fn icon_slug_for_unknown_slug_falls_back_to_openid() {
-    assert_eq!(icon_slug_for("okta"), "openid");
-    assert_eq!(icon_slug_for(""), "openid");
+fn css_vars_block_from_emits_each_entry_for_multiple_slots() {
+    let block = css_vars_block_from(&[
+        ("custom1", "#111111", "#222222"),
+        ("custom4", "tomato", "firebrick"),
+    ])
+    .expect("non-empty input must produce a block");
+    assert_eq!(
+        block,
+        ":root {\n    --o2p-custom1: #111111;\n    --o2p-custom1-hover: #222222;\n    --o2p-custom4: tomato;\n    --o2p-custom4-hover: firebrick;\n}"
+    );
 }
