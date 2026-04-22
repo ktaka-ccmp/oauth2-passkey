@@ -3,7 +3,7 @@ use http::HeaderMap;
 use std::{env, sync::LazyLock};
 
 use crate::audit::{AuthMethod, AuthMethodDetails, LoginContext};
-use crate::oauth2::provider::{ProviderConfig, ProviderKind, provider_for};
+use crate::oauth2::provider::{ProviderConfig, ProviderKind, ProviderName, provider_for};
 use crate::oauth2::{
     AccountSearchField, AuthResponse, FedCMCallbackRequest, OAUTH2_CSRF_COOKIE_NAME, OAuth2Account,
     OAuth2Mode, OAuth2Store, Provider, ProviderUserId, StateParams, csrf_checks, decode_state,
@@ -160,17 +160,12 @@ async fn authorized_core(
 /// }
 /// ```
 pub async fn get_authorized_core(
-    provider: &str,
+    provider: ProviderName,
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    let kind = ProviderKind::from_provider_name(provider).ok_or_else(|| {
-        CoordinationError::InvalidState(format!("Unknown OAuth2 provider: {provider}"))
-    })?;
-    let ctx = provider_for(kind).ok_or_else(|| {
-        CoordinationError::InvalidState(format!("OAuth2 provider not enabled: {provider}"))
-    })?;
+    let ctx = resolve_ctx(provider)?;
     authorized_core(ctx, HttpMethod::Get, auth_response, cookies, headers).await
 }
 
@@ -209,18 +204,27 @@ pub async fn get_authorized_core(
 /// }
 /// ```
 pub async fn post_authorized_core(
-    provider: &str,
+    provider: ProviderName,
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    let kind = ProviderKind::from_provider_name(provider).ok_or_else(|| {
-        CoordinationError::InvalidState(format!("Unknown OAuth2 provider: {provider}"))
-    })?;
-    let ctx = provider_for(kind).ok_or_else(|| {
-        CoordinationError::InvalidState(format!("OAuth2 provider not enabled: {provider}"))
-    })?;
+    let ctx = resolve_ctx(provider)?;
     authorized_core(ctx, HttpMethod::Post, auth_response, cookies, headers).await
+}
+
+/// Resolve a [`ProviderName`] to its `&'static ProviderConfig`.
+///
+/// `ProviderName::from_registered` has already verified the provider is
+/// enabled at construction, so `provider_for` returning `None` here would
+/// indicate a racy config change (the provider became disabled between
+/// HTTP boundary parsing and this call). Treat that as an `InvalidState`.
+fn resolve_ctx(provider: ProviderName) -> Result<&'static ProviderConfig, CoordinationError> {
+    ProviderKind::from_provider_name(provider.as_str())
+        .and_then(provider_for)
+        .ok_or_else(|| {
+            CoordinationError::InvalidState(format!("OAuth2 provider not enabled: {provider}"))
+        })
 }
 
 #[tracing::instrument(skip(ctx, auth_response, login_context), fields(user_id, provider, state = %auth_response.state))]

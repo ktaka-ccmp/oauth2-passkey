@@ -45,6 +45,21 @@ impl ProviderName {
     pub const fn as_str(&self) -> &'static str {
         self.0
     }
+
+    /// Resolve a runtime string (URL path segment, DB-stored value) against
+    /// the currently-enabled provider registry. Returns `Some(ProviderName)`
+    /// only when the string matches an enabled provider's name, so the
+    /// `ProviderName` invariant is preserved — callers can treat the result
+    /// as "validated, registered identifier" without further checks.
+    ///
+    /// Returns `None` when the string is empty, does not match any enabled
+    /// provider, or matches a named provider whose optional env vars are not
+    /// configured.
+    pub fn from_registered(s: &str) -> Option<Self> {
+        ProviderKind::from_provider_name(s)
+            .and_then(provider_for)
+            .map(|cfg| cfg.provider_name)
+    }
 }
 
 impl std::fmt::Display for ProviderName {

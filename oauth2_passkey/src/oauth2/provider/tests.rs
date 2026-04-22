@@ -1,6 +1,68 @@
 use super::*;
 use crate::test_utils::run_child_without_env;
 
+// --- ProviderName ---
+
+#[test]
+fn test_provider_name_from_static_roundtrip() {
+    let pn = ProviderName::from_static("google");
+    assert_eq!(pn.as_str(), "google");
+    assert_eq!(format!("{pn}"), "google");
+    assert_eq!(AsRef::<str>::as_ref(&pn), "google");
+}
+
+#[test]
+fn test_provider_name_equality_by_static_str() {
+    // Same static &str contents → equal values, regardless of whether they
+    // were produced by `from_static` or the const construction path inside
+    // the module.
+    let a = ProviderName::from_static("google");
+    let b = ProviderName::from_static("google");
+    let c = ProviderName::from_static("auth0");
+    assert_eq!(a, b);
+    assert_ne!(a, c);
+}
+
+// `ProviderName::from_registered` forces `GOOGLE_PROVIDER` LazyLock init
+// inside `ProviderKind::from_provider_name`'s custom-slot branch, so this
+// test must run in a subprocess that supplies the minimum Google env vars.
+#[test]
+fn test_provider_name_from_registered_known() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let pn = ProviderName::from_registered("google").expect("google should resolve");
+        assert_eq!(pn.as_str(), "google");
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::test_provider_name_from_registered_known",
+        &[
+            ("OAUTH2_GOOGLE_CLIENT_ID", "id.apps.googleusercontent.com"),
+            ("OAUTH2_GOOGLE_CLIENT_SECRET", "secret"),
+            ("ORIGIN", "https://test.example.com"),
+        ],
+    );
+    assert!(output.status.success(), "{output:#?}");
+}
+
+#[test]
+fn test_provider_name_from_registered_unknown() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        assert!(ProviderName::from_registered("github").is_none());
+        assert!(ProviderName::from_registered("").is_none());
+        assert!(ProviderName::from_registered("Google").is_none()); // case-sensitive
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::test_provider_name_from_registered_unknown",
+        &[
+            ("OAUTH2_GOOGLE_CLIENT_ID", "id.apps.googleusercontent.com"),
+            ("OAUTH2_GOOGLE_CLIENT_SECRET", "secret"),
+            ("ORIGIN", "https://test.example.com"),
+        ],
+    );
+    assert!(output.status.success(), "{output:#?}");
+}
+
 // --- ProviderKind ---
 
 #[test]
