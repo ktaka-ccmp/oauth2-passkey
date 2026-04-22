@@ -16,9 +16,9 @@
 
 ## Created: 2026-04-22-15-52
 
-## Closed:
+## Closed: 2026-04-22-22-38
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -164,19 +164,20 @@ provider, not Hydra itself.
 
 ## Implementation Tasks
 
-- [ ] Add `OAuth2Error::ClaimMismatch { field, idinfo_value, userinfo_value, provider }`
-- [ ] Add `strict_display_claims: bool` to `ProviderConfig`, populate
+- [x] Add `OAuth2Error::ClaimMismatch { field, idinfo_value, userinfo_value, provider }`
+- [x] Add `strict_display_claims: bool` to `ProviderConfig`, populate
       from `OAUTH2_{PROVIDER}_STRICT_DISPLAY_CLAIMS` (default `true`)
-- [ ] Implement `validate_claim_match` in `types.rs`:
+- [x] Implement `validate_claim_match` in `types.rs`:
       Tier 1 fields always reject; Tier 2 fields reject or warn based on flag
-- [ ] Wire `validate_claim_match` into `oauth2_account_from_idinfo_and_userinfo`
-- [ ] Pass `ctx.strict_display_claims` from `coordination/oauth2.rs`
-- [ ] Unit tests — per field, match/mismatch/one-sided-None, both tiers
-- [ ] Update `dot.env.example` with the new env var block
-- [ ] `cargo fmt --all` / `cargo clippy --all-targets --all-features` / `cargo test`
+- [x] Wire `validate_claim_match` into `oauth2_account_from_idinfo_and_userinfo`
+- [x] Pass `ctx` (carrying `strict_display_claims`) from `coordination/oauth2.rs`
+      — signature unified to `&ProviderConfig` for both builders
+- [x] Unit tests — per field, match/mismatch/one-sided-None, both tiers
+- [x] Update `dot.env.example` with the new env var block
+- [x] `cargo fmt --all` / `cargo clippy --all-targets --all-features` / `cargo test`
 - [ ] E2E retest on Google / Auth0 / Keycloak / Entra / Zitadel /
       Okta / Authentik (all 7 default-config IdPs) — verify no
-      spurious reject in happy path
+      spurious reject in happy path *(deferred to post-merge per plan)*
 
 ## Decision Log
 
@@ -220,4 +221,30 @@ provider, not Hydra itself.
 
 ## Resolution
 
-(pending)
+Landed on branch `fix/oidc-validation-hardening` (PR #317). Key
+commits:
+
+- `e34d144` — `feat(oauth2): detect claim mismatch between id_token and
+  /userinfo` — adds `validate_claim_match`, `ClaimMismatch` error
+  variant, `strict_display_claims` field on `ProviderConfig`, and
+  unifies both account builders to take `&ProviderConfig`.
+- `0711946` — `fix(oauth2): validate named-provider
+  STRICT_DISPLAY_CLAIMS at startup` — fails fast on invalid values for
+  the 4 named providers (Custom slots were already covered via
+  LazyLock force-init).
+- `8b0969e` — `test(oauth2): address PR #317 review nits` — adds Tier 2
+  `family_name` / `given_name` coverage, renames misleading test, adds
+  Entra block to `dot.env.example`.
+
+Deviations from spec:
+- `locale` dropped from Tier 2 — not deserialized by `OidcUserInfo`,
+  so the check would be dead code. Noted in plan; can be re-added in
+  a follow-up if `locale` is added to the struct.
+
+Follow-up filed: `20260422-2055` tracks the `ProviderName` newtype
+refactor that would replace remaining stringly-typed provider
+identifiers.
+
+E2E retest across 7 IdPs is deferred to post-merge validation per the
+implementation plan. Unit tests + happy-path demo give sufficient
+confidence for the PR itself.
