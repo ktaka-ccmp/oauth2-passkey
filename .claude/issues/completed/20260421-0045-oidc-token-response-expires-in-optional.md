@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-21-00-45
 
-## Closed:
+## Closed: 2026-04-22-22-38
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -86,11 +86,11 @@ No call-site updates needed (field is currently unread).
 
 ## Implementation Tasks
 
-- [ ] Change type to `Option<u64>` in `types.rs`
-- [ ] Add a unit test: token response JSON without `expires_in`
+- [x] Change type to `Option<u64>` in `types.rs`
+- [x] Add a unit test: token response JSON without `expires_in`
   deserializes successfully (mirrors the existing `scope`-absent test
   pattern, if any; otherwise add a new one)
-- [ ] `cargo fmt --all` / `cargo clippy --all-targets --all-features` / `cargo test`
+- [x] `cargo fmt --all` / `cargo clippy --all-targets --all-features` / `cargo test`
 
 ## Decision Log
 
@@ -100,4 +100,9 @@ No call-site updates needed (field is currently unread).
 
 ## Resolution
 
-(pending)
+Landed on branch `fix/oidc-validation-hardening` (PR #317) as commit
+`8863098` — `fix(oauth2): make OidcTokenResponse.expires_in optional`.
+`expires_in` is now `Option<u64>`; regression test
+`test_oidc_token_response_missing_expires_in` in
+`oauth2_passkey/src/oauth2/main/oidc/tests.rs` deserializes a
+token-response JSON lacking `expires_in` cleanly.
