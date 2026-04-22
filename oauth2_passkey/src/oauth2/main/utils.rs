@@ -4,7 +4,7 @@ use http::header::HeaderMap;
 use std::str::FromStr;
 use url::Url;
 
-use crate::oauth2::{OAuth2Error, OAuth2Mode, StateParams, StoredToken, TokenType};
+use crate::oauth2::{OAuth2Error, OAuth2Mode, OAuth2State, StateParams, StoredToken, TokenType};
 
 use crate::session::{
     SessionId, User as SessionUser, delete_session_from_store_by_session_id, get_user_from_session,
@@ -15,18 +15,14 @@ use crate::storage::{
 
 use crate::utils::gen_random_string_with_entropy_validation;
 
-pub(super) fn encode_state(
-    state_params: StateParams,
-) -> Result<crate::oauth2::types::OAuth2State, OAuth2Error> {
+pub(super) fn encode_state(state_params: StateParams) -> Result<OAuth2State, OAuth2Error> {
     let state_json =
         serde_json::to_string(&state_params).map_err(|e| OAuth2Error::Serde(e.to_string()))?;
     let encoded = URL_SAFE_NO_PAD.encode(state_json);
-    crate::oauth2::types::OAuth2State::new(encoded)
+    OAuth2State::new(encoded)
 }
 
-pub(crate) fn decode_state(
-    state: &crate::oauth2::types::OAuth2State,
-) -> Result<StateParams, OAuth2Error> {
+pub(crate) fn decode_state(state: &OAuth2State) -> Result<StateParams, OAuth2Error> {
     // Since OAuth2State is validated during construction, we know these operations will succeed
     // This is safe because validation in OAuth2State::new() already verified:
     // 1. Valid base64url encoding

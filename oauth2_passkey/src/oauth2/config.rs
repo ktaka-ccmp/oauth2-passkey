@@ -1,5 +1,7 @@
 use std::sync::LazyLock;
 
+use crate::oauth2::provider::{GOOGLE_PROVIDER, ProviderInfo, ProviderKind, provider_for};
+
 // "__Host-" prefix forces host-only cookies (no Domain attribute, Secure flag required).
 
 /// CSRF cookie name used for the OAuth2 flow CSRF protection.
@@ -40,7 +42,7 @@ pub(super) static OAUTH2_CSRF_COOKIE_MAX_AGE: LazyLock<u64> =
 /// Delegates to `GOOGLE_PROVIDER.client_id` so the value is always
 /// consistent with the running provider configuration.
 pub fn get_google_client_id() -> &'static str {
-    &crate::oauth2::provider::GOOGLE_PROVIDER.client_id
+    &GOOGLE_PROVIDER.client_id
 }
 
 /// Returns true if the named OAuth2 provider is configured and enabled.
@@ -48,8 +50,8 @@ pub fn get_google_client_id() -> &'static str {
 /// `name` is the URL path segment identifying the provider (e.g. `"google"`,
 /// `"auth0"`). Unknown names return `false`.
 pub fn is_provider_enabled(name: &str) -> bool {
-    crate::oauth2::provider::ProviderKind::from_provider_name(name)
-        .and_then(crate::oauth2::provider::provider_for)
+    ProviderKind::from_provider_name(name)
+        .and_then(provider_for)
         .is_some()
 }
 
@@ -61,10 +63,10 @@ pub fn is_provider_enabled(name: &str) -> bool {
 /// Use this to map a runtime provider slug (e.g. from a DB row or URL
 /// segment) back to its display metadata without allocating a full
 /// [`enabled_providers`] vector.
-pub fn provider_info(name: &str) -> Option<crate::oauth2::provider::ProviderInfo> {
-    crate::oauth2::provider::ProviderKind::from_provider_name(name)
-        .and_then(crate::oauth2::provider::provider_for)
-        .map(|cfg| crate::oauth2::provider::ProviderInfo {
+pub fn provider_info(name: &str) -> Option<ProviderInfo> {
+    ProviderKind::from_provider_name(name)
+        .and_then(provider_for)
+        .map(|cfg| ProviderInfo {
             provider_name: cfg.provider_name,
             display_name: cfg.display_name,
             button_class: cfg.button_class,
@@ -78,20 +80,18 @@ pub fn provider_info(name: &str) -> Option<crate::oauth2::provider::ProviderInfo
 /// Returns UI info for every currently enabled OAuth2 provider, in stable
 /// display order (Google first, then Auth0/Keycloak/Entra, then configured
 /// generic OIDC slots Custom1..Custom8).
-pub fn enabled_providers() -> Vec<crate::oauth2::provider::ProviderInfo> {
-    crate::oauth2::provider::ProviderKind::ALL
+pub fn enabled_providers() -> Vec<ProviderInfo> {
+    ProviderKind::ALL
         .iter()
         .filter_map(|&kind| {
-            crate::oauth2::provider::provider_for(kind).map(|cfg| {
-                crate::oauth2::provider::ProviderInfo {
-                    provider_name: cfg.provider_name,
-                    display_name: cfg.display_name,
-                    button_class: cfg.button_class,
-                    icon_slug: cfg.icon_slug,
-                    button_color: cfg.button_color,
-                    button_hover_color: cfg.button_hover_color,
-                    css_var_suffix: cfg.css_var_suffix,
-                }
+            provider_for(kind).map(|cfg| ProviderInfo {
+                provider_name: cfg.provider_name,
+                display_name: cfg.display_name,
+                button_class: cfg.button_class,
+                icon_slug: cfg.icon_slug,
+                button_color: cfg.button_color,
+                button_hover_color: cfg.button_hover_color,
+                css_var_suffix: cfg.css_var_suffix,
             })
         })
         .collect()
