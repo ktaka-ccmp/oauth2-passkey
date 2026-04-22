@@ -853,7 +853,10 @@ pub(crate) fn validate_custom_slots() -> Result<(), String> {
                 color
             ));
         }
-        if !is_valid_icon_slug(cfg.icon_slug) {
+        // Icon slug shares the `[a-z0-9_-]+` grammar with provider_name —
+        // both are URL path segments served under `/icons/{slug}.svg` and
+        // `/oauth2/{name}` respectively.
+        if !is_valid_custom_provider_name(cfg.icon_slug) {
             return Err(format!(
                 "{}_ICON_SLUG='{}' is invalid: must match [a-z0-9_-]+",
                 slot.env_prefix(),
@@ -899,12 +902,6 @@ pub(crate) fn validate_custom_slot_preset_shape() -> Result<(), String> {
         }
     }
     Ok(())
-}
-
-/// Reuse the provider-name shape check for `ICON_SLUG` — same
-/// `[a-z0-9_-]+` grammar, used inside a URL path (`/icons/{slug}.svg`).
-fn is_valid_icon_slug(s: &str) -> bool {
-    is_valid_custom_provider_name(s)
 }
 
 /// Resolve a `ProviderKind` to its `&'static ProviderConfig`.

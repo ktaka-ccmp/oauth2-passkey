@@ -215,10 +215,12 @@ pub async fn post_authorized_core(
 
 /// Resolve a [`ProviderName`] to its `&'static ProviderConfig`.
 ///
-/// `ProviderName::from_registered` has already verified the provider is
-/// enabled at construction, so `provider_for` returning `None` here would
-/// indicate a racy config change (the provider became disabled between
-/// HTTP boundary parsing and this call). Treat that as an `InvalidState`.
+/// For any `ProviderName` constructed through
+/// `ProviderName::from_registered` (the axum-boundary path), this is
+/// effectively infallible — that constructor already performed the same
+/// `provider_for` lookup. The `None` arm is kept as defensive belt-and-
+/// suspenders in case a future code path mints a `ProviderName` by some
+/// other route; it surfaces as `InvalidState` rather than panicking.
 fn resolve_ctx(provider: ProviderName) -> Result<&'static ProviderConfig, CoordinationError> {
     ProviderKind::from_provider_name(provider.as_str())
         .and_then(provider_for)

@@ -761,6 +761,75 @@ fn custom_slot_preset_auth0_applies_defaults() {
 }
 
 #[test]
+fn custom_slot_preset_keycloak_applies_defaults() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg = provider_for(ProviderKind::Custom(CustomSlot::Slot1))
+            .expect("slot1 should be enabled with PRESET=keycloak + credentials");
+        assert_eq!(cfg.provider_name.as_str(), "keycloak");
+        assert_eq!(cfg.display_name, "Keycloak");
+        assert_eq!(cfg.icon_slug, "keycloak");
+        assert_eq!(cfg.button_color, Some("#4d4d4d"));
+        assert_eq!(cfg.button_hover_color, Some("#333333"));
+        assert!(cfg.additional_allowed_origins.is_empty());
+        validate_custom_slots().expect("preset config should validate");
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_preset_keycloak_applies_defaults",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            (
+                "OAUTH2_CUSTOM1_ISSUER_URL",
+                "http://localhost:8180/realms/myrealm",
+            ),
+            ("OAUTH2_CUSTOM1_PRESET", "keycloak"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+// Policy guard: `auth0`/`keycloak`/`entra` are removed from
+// RESERVED_PROVIDER_NAMES in commit 3. An operator can adopt
+// `OAUTH2_CUSTOM1_NAME=auth0` WITHOUT `PRESET=auth0` — e.g. for a bare
+// Custom slot that happens to be pointed at an Auth0 tenant but uses
+// explicit overrides. Validates the de-reservation is honored end-to-end.
+#[test]
+fn custom_slot_name_auth0_without_preset_initializes() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg = provider_for(ProviderKind::Custom(CustomSlot::Slot1))
+            .expect("slot1 should be enabled with NAME=auth0 + no preset");
+        assert_eq!(cfg.provider_name.as_str(), "auth0");
+        assert_eq!(cfg.display_name, "Bare Auth0 Slot");
+        // No preset → neutral-gray defaults, NOT the Auth0-branded colors.
+        assert_eq!(cfg.button_color, Some(CUSTOM_DEFAULT_BUTTON_COLOR));
+        assert_eq!(cfg.icon_slug, "openid");
+        validate_custom_slots().expect("NAME=auth0 without preset must validate");
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_name_auth0_without_preset_initializes",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://example.auth0.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "Bare Auth0 Slot"),
+            ("OAUTH2_CUSTOM1_NAME", "auth0"),
+            // No OAUTH2_CUSTOM1_PRESET — must still succeed.
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn custom_slot_preset_entra_threads_additional_allowed_origins() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
         let cfg = provider_for(ProviderKind::Custom(CustomSlot::Slot1))

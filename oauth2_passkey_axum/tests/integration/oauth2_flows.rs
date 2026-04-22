@@ -543,6 +543,45 @@ async fn test_oauth2_account_linking() -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
+/// Test that `/oauth2/{unknown}` initiate returns 404 Not Found.
+///
+/// Pins the status-code behavior of the axum-boundary ProviderName validation
+/// added for issue `20260422-2055`. Before commit 2, an unknown provider
+/// segment flowed through to the core and surfaced as a 500; now it is
+/// rejected as a client error at the handler boundary with the offending
+/// segment in the body.
+#[tokio::test]
+async fn test_oauth2_initiate_unknown_provider_returns_404()
+-> Result<(), Box<dyn std::error::Error>> {
+    let setup = TestSetup::new().await?;
+
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+
+    let response = client
+        .get(format!(
+            "{}/auth/oauth2/unknown-idp-xyz",
+            setup.server.base_url
+        ))
+        .send()
+        .await?;
+
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::NOT_FOUND,
+        "unknown provider segment should be rejected at the axum boundary"
+    );
+    let body = response.text().await?;
+    assert!(
+        body.contains("unknown-idp-xyz"),
+        "404 response should echo the offending segment, got: {body}"
+    );
+
+    setup.shutdown().await;
+    Ok(())
+}
+
 /// Test that the old `/oauth2/authorized` callback URL returns 410 Gone.
 ///
 /// When a client (or bookmarked redirect URI) hits the old single-provider
