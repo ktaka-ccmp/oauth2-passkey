@@ -331,9 +331,12 @@ fn test_idinfo_preferred_username_fallback() {
 // (see `types.rs::validate_claim_match`)
 // -----------------------------------------------------------------------
 
-/// Both Tier 1 email fields unset on both sides — no mismatch.
+/// Mirror of `test_claim_match_tier1_one_side_none_is_ok`: when idinfo omits
+/// the claim but userinfo provides it, that's the normal Option-B merge case
+/// for providers that emit the claim only in /userinfo (e.g. Zitadel email).
+/// Must not be flagged as a mismatch.
 #[test]
-fn test_claim_match_both_none_is_ok() {
+fn test_claim_match_idinfo_none_userinfo_some_is_ok() {
     let idinfo = empty_idinfo("sub-x");
     let userinfo = OidcUserInfo {
         sub: "sub-x".to_string(),
@@ -346,7 +349,6 @@ fn test_claim_match_both_none_is_ok() {
         hd: None,
         email_verified: None,
     };
-    // idinfo.email is None, userinfo.email is Some — one-sided None, not a mismatch.
     let account =
         oauth2_account_from_idinfo_and_userinfo(&idinfo, &userinfo, &ctx("google")).unwrap();
     assert_eq!(account.email, "same@example.com");
@@ -552,6 +554,116 @@ fn test_claim_match_tier2_picture_lax_is_accepted() {
         account.picture,
         Some("https://example.com/pic-a.jpg".to_string())
     );
+}
+
+/// Tier 2 `family_name` mismatch under strict=true is rejected.
+#[test]
+fn test_claim_match_tier2_family_name_strict_is_rejected() {
+    let idinfo = OidcIdInfo {
+        email: Some("same@example.com".to_string()),
+        family_name: Some("Smith".to_string()),
+        ..empty_idinfo("sub-fn")
+    };
+    let userinfo = OidcUserInfo {
+        sub: "sub-fn".to_string(),
+        email: Some("same@example.com".to_string()),
+        preferred_username: None,
+        name: None,
+        picture: None,
+        family_name: Some("Jones".to_string()),
+        given_name: None,
+        hd: None,
+        email_verified: None,
+    };
+    let err =
+        oauth2_account_from_idinfo_and_userinfo(&idinfo, &userinfo, &ctx("google")).unwrap_err();
+    assert!(matches!(
+        err,
+        OAuth2Error::ClaimMismatch {
+            field: "family_name",
+            ..
+        }
+    ));
+}
+
+/// Tier 2 `family_name` mismatch under strict=false is accepted; id_token wins.
+#[test]
+fn test_claim_match_tier2_family_name_lax_is_accepted_and_idinfo_wins() {
+    let idinfo = OidcIdInfo {
+        email: Some("same@example.com".to_string()),
+        family_name: Some("Smith".to_string()),
+        ..empty_idinfo("sub-fn2")
+    };
+    let userinfo = OidcUserInfo {
+        sub: "sub-fn2".to_string(),
+        email: Some("same@example.com".to_string()),
+        preferred_username: None,
+        name: None,
+        picture: None,
+        family_name: Some("Jones".to_string()),
+        given_name: None,
+        hd: None,
+        email_verified: None,
+    };
+    let account =
+        oauth2_account_from_idinfo_and_userinfo(&idinfo, &userinfo, &ctx_lax("google")).unwrap();
+    let metadata = account.metadata.as_object().unwrap();
+    assert_eq!(metadata["family_name"], json!("Smith"));
+}
+
+/// Tier 2 `given_name` mismatch under strict=true is rejected.
+#[test]
+fn test_claim_match_tier2_given_name_strict_is_rejected() {
+    let idinfo = OidcIdInfo {
+        email: Some("same@example.com".to_string()),
+        given_name: Some("Alice".to_string()),
+        ..empty_idinfo("sub-gn")
+    };
+    let userinfo = OidcUserInfo {
+        sub: "sub-gn".to_string(),
+        email: Some("same@example.com".to_string()),
+        preferred_username: None,
+        name: None,
+        picture: None,
+        family_name: None,
+        given_name: Some("Alicia".to_string()),
+        hd: None,
+        email_verified: None,
+    };
+    let err =
+        oauth2_account_from_idinfo_and_userinfo(&idinfo, &userinfo, &ctx("google")).unwrap_err();
+    assert!(matches!(
+        err,
+        OAuth2Error::ClaimMismatch {
+            field: "given_name",
+            ..
+        }
+    ));
+}
+
+/// Tier 2 `given_name` mismatch under strict=false is accepted; id_token wins.
+#[test]
+fn test_claim_match_tier2_given_name_lax_is_accepted_and_idinfo_wins() {
+    let idinfo = OidcIdInfo {
+        email: Some("same@example.com".to_string()),
+        given_name: Some("Alice".to_string()),
+        ..empty_idinfo("sub-gn2")
+    };
+    let userinfo = OidcUserInfo {
+        sub: "sub-gn2".to_string(),
+        email: Some("same@example.com".to_string()),
+        preferred_username: None,
+        name: None,
+        picture: None,
+        family_name: None,
+        given_name: Some("Alicia".to_string()),
+        hd: None,
+        email_verified: None,
+    };
+    let account =
+        oauth2_account_from_idinfo_and_userinfo(&idinfo, &userinfo, &ctx_lax("google")).unwrap();
+    let metadata = account.metadata.as_object().unwrap();
+    assert_eq!(metadata["given_name"], json!("Alice"));
 }
 
 /// All tiers equal on both sides — ok.
