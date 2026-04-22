@@ -86,7 +86,7 @@ export OAUTH2_GOOGLE_CLIENT_SECRET="your-client-secret"
 
 ### Step 2a: Create Auth0 credentials (optional)
 
-Auth0 provides an alternative OAuth2/OIDC provider. Skip this step if you only need Google login.
+Auth0 runs as Custom slot 1 with `PRESET=auth0`. Skip this step if you only need Google login.
 
 1. Log in to [Auth0 Dashboard](https://manage.auth0.com/)
 2. Applications > Create Application
@@ -98,16 +98,17 @@ Auth0 provides an alternative OAuth2/OIDC provider. Skip this step if you only n
 6. Save the **Domain**, **Client ID**, and **Client Secret**
 
 ```bash
-export OAUTH2_AUTH0_CLIENT_ID="your-auth0-client-id"
-export OAUTH2_AUTH0_CLIENT_SECRET="your-auth0-client-secret"
-export OAUTH2_AUTH0_ISSUER_URL="https://your-tenant.auth0.com"  # no trailing slash
+export OAUTH2_CUSTOM1_CLIENT_ID="your-auth0-client-id"
+export OAUTH2_CUSTOM1_CLIENT_SECRET="your-auth0-client-secret"
+export OAUTH2_CUSTOM1_ISSUER_URL="https://your-tenant.auth0.com"  # no trailing slash
+# PRESET=auth0 supplies DISPLAY_NAME / NAME / ICON_SLUG / colors; set in env.cloud-run.yaml.
 ```
 
-For local development, see `dot.env.example` for all Auth0 environment variables.
+For local development, see `dot.env.example` for the full Custom slot shape.
 
 ### Step 2b: Create Microsoft Entra ID credentials (optional)
 
-Entra ID is Microsoft's OAuth2/OIDC provider. Skip this step if you don't need Microsoft login.
+Entra runs as Custom slot 2 with `PRESET=entra`. Skip this step if you don't need Microsoft login.
 Full background (B2B vs B2C, consumers UUID, email claim handling) is in
 [docs/src/guides/entra.md](../docs/src/guides/entra.md); the condensed deploy-time
 steps are:
@@ -122,12 +123,13 @@ steps are:
 6. Save the **Application (client) ID**, **client secret Value**, and build the issuer URL:
 
 ```bash
-export OAUTH2_ENTRA_CLIENT_ID="your-application-client-id"
-export OAUTH2_ENTRA_CLIENT_SECRET="your-client-secret-value"
+export OAUTH2_CUSTOM2_CLIENT_ID="your-application-client-id"
+export OAUTH2_CUSTOM2_CLIENT_SECRET="your-client-secret-value"
 # Work/school (B2B): use your tenant ID
-export OAUTH2_ENTRA_ISSUER_URL="https://login.microsoftonline.com/<tenant-id>/v2.0"
+export OAUTH2_CUSTOM2_ISSUER_URL="https://login.microsoftonline.com/<tenant-id>/v2.0"
 # Personal MS accounts (B2C): use Microsoft's fixed consumer tenant UUID
-# export OAUTH2_ENTRA_ISSUER_URL="https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0"
+# export OAUTH2_CUSTOM2_ISSUER_URL="https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0"
+# PRESET=entra supplies DISPLAY_NAME / NAME / ICON_SLUG / colors / login.live.com origin.
 ```
 
 The `/v2.0` suffix is required — the v1 endpoint uses a different issuer format
@@ -142,26 +144,26 @@ echo -n "$OAUTH2_GOOGLE_CLIENT_ID" | gcloud secrets create OAUTH2_GOOGLE_CLIENT_
 echo -n "$OAUTH2_GOOGLE_CLIENT_SECRET" | gcloud secrets create OAUTH2_GOOGLE_CLIENT_SECRET --data-file=-
 openssl rand -base64 32 | gcloud secrets create AUTH_SERVER_SECRET --data-file=-
 
-# Auth0 secrets (first time only, if using Auth0)
-echo -n "$OAUTH2_AUTH0_CLIENT_ID" | gcloud secrets create OAUTH2_AUTH0_CLIENT_ID --data-file=-
-echo -n "$OAUTH2_AUTH0_CLIENT_SECRET" | gcloud secrets create OAUTH2_AUTH0_CLIENT_SECRET --data-file=-
+# Auth0 secrets (first time only, if using Auth0 via CUSTOM1 slot)
+echo -n "$OAUTH2_CUSTOM1_CLIENT_ID" | gcloud secrets create OAUTH2_CUSTOM1_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM1_CLIENT_SECRET" | gcloud secrets create OAUTH2_CUSTOM1_CLIENT_SECRET --data-file=-
 
-# Entra secrets (first time only, if using Entra)
-echo -n "$OAUTH2_ENTRA_CLIENT_ID" | gcloud secrets create OAUTH2_ENTRA_CLIENT_ID --data-file=-
-echo -n "$OAUTH2_ENTRA_CLIENT_SECRET" | gcloud secrets create OAUTH2_ENTRA_CLIENT_SECRET --data-file=-
+# Entra secrets (first time only, if using Entra via CUSTOM2 slot)
+echo -n "$OAUTH2_CUSTOM2_CLIENT_ID" | gcloud secrets create OAUTH2_CUSTOM2_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM2_CLIENT_SECRET" | gcloud secrets create OAUTH2_CUSTOM2_CLIENT_SECRET --data-file=-
 
 # Update secrets (add a new version to existing secrets)
 echo -n "$OAUTH2_GOOGLE_CLIENT_ID" | gcloud secrets versions add OAUTH2_GOOGLE_CLIENT_ID --data-file=-
 echo -n "$OAUTH2_GOOGLE_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_GOOGLE_CLIENT_SECRET --data-file=-
 openssl rand -base64 32 | gcloud secrets versions add AUTH_SERVER_SECRET --data-file=-
 
-# Auth0 secret rotation
-echo -n "$OAUTH2_AUTH0_CLIENT_ID" | gcloud secrets versions add OAUTH2_AUTH0_CLIENT_ID --data-file=-
-echo -n "$OAUTH2_AUTH0_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_AUTH0_CLIENT_SECRET --data-file=-
+# Auth0 secret rotation (CUSTOM1 slot)
+echo -n "$OAUTH2_CUSTOM1_CLIENT_ID" | gcloud secrets versions add OAUTH2_CUSTOM1_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM1_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_CUSTOM1_CLIENT_SECRET --data-file=-
 
-# Entra secret rotation (Azure client secrets expire; max 24 months)
-echo -n "$OAUTH2_ENTRA_CLIENT_ID" | gcloud secrets versions add OAUTH2_ENTRA_CLIENT_ID --data-file=-
-echo -n "$OAUTH2_ENTRA_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_ENTRA_CLIENT_SECRET --data-file=-
+# Entra secret rotation (CUSTOM2 slot; Azure client secrets expire; max 24 months)
+echo -n "$OAUTH2_CUSTOM2_CLIENT_ID" | gcloud secrets versions add OAUTH2_CUSTOM2_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM2_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_CUSTOM2_CLIENT_SECRET --data-file=-
 
 # Grant Cloud Run's default service account access to secrets
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
@@ -170,8 +172,8 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
   --role="roles/secretmanager.secretAccessor"
 ```
 
-`OAUTH2_AUTH0_ISSUER_URL` and `OAUTH2_ENTRA_ISSUER_URL` are not secrets — add them to
-`env.cloud-run.yaml` instead (see Step 5).
+`OAUTH2_CUSTOM1_ISSUER_URL` / `OAUTH2_CUSTOM2_ISSUER_URL` and the `_PRESET`
+keys are not secrets — add them to `env.cloud-run.yaml` instead (see Step 5).
 
 ### Step 4: Build and push Docker image
 
@@ -199,17 +201,19 @@ gcloud run deploy oauth2-passkey-demo \
   --allow-unauthenticated \
   --min-instances 1 \
   --env-vars-file demo-live/env.cloud-run.yaml \
-  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_AUTH0_CLIENT_ID=OAUTH2_AUTH0_CLIENT_ID:latest,OAUTH2_AUTH0_CLIENT_SECRET=OAUTH2_AUTH0_CLIENT_SECRET:latest,OAUTH2_ENTRA_CLIENT_ID=OAUTH2_ENTRA_CLIENT_ID:latest,OAUTH2_ENTRA_CLIENT_SECRET=OAUTH2_ENTRA_CLIENT_SECRET:latest"
+  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_CUSTOM1_CLIENT_ID=OAUTH2_CUSTOM1_CLIENT_ID:latest,OAUTH2_CUSTOM1_CLIENT_SECRET=OAUTH2_CUSTOM1_CLIENT_SECRET:latest,OAUTH2_CUSTOM2_CLIENT_ID=OAUTH2_CUSTOM2_CLIENT_ID:latest,OAUTH2_CUSTOM2_CLIENT_SECRET=OAUTH2_CUSTOM2_CLIENT_SECRET:latest"
 ```
 
 All environment variables including `ORIGIN` are managed in `env.cloud-run.yaml`.
-For Auth0, also add `OAUTH2_AUTH0_ISSUER_URL` (and optionally `OAUTH2_AUTH0_RESPONSE_MODE`,
-`OAUTH2_AUTH0_SCOPE`) to `env.cloud-run.yaml`. If Auth0 is not used, omit the
-`OAUTH2_AUTH0_*` entries from `--set-secrets`.
+For Auth0, `env.cloud-run.yaml` sets `OAUTH2_CUSTOM1_PRESET=auth0` and
+`OAUTH2_CUSTOM1_ISSUER_URL` (and optionally `_RESPONSE_MODE`, `_SCOPE`). If
+Auth0 is not used, omit the `OAUTH2_CUSTOM1_*` entries from `--set-secrets`
+and remove the corresponding keys from `env.cloud-run.yaml`.
 
-For Entra, also add `OAUTH2_ENTRA_ISSUER_URL` (and optionally
-`OAUTH2_ENTRA_RESPONSE_MODE`, `OAUTH2_ENTRA_SCOPE`) to `env.cloud-run.yaml`. If
-Entra is not used, omit the `OAUTH2_ENTRA_*` entries from `--set-secrets`.
+For Entra, `env.cloud-run.yaml` sets `OAUTH2_CUSTOM2_PRESET=entra` and
+`OAUTH2_CUSTOM2_ISSUER_URL` (and optionally `_RESPONSE_MODE`, `_SCOPE`). If
+Entra is not used, omit the `OAUTH2_CUSTOM2_*` entries from `--set-secrets`
+and remove the corresponding keys from `env.cloud-run.yaml`.
 
 ### Step 6: Configure custom domain
 
@@ -313,7 +317,7 @@ gcloud run deploy oauth2-passkey-demo \
   --allow-unauthenticated \
   --min-instances 1 \
   --env-vars-file demo-live/env.cloud-run.yaml \
-  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_AUTH0_CLIENT_ID=OAUTH2_AUTH0_CLIENT_ID:latest,OAUTH2_AUTH0_CLIENT_SECRET=OAUTH2_AUTH0_CLIENT_SECRET:latest,OAUTH2_ENTRA_CLIENT_ID=OAUTH2_ENTRA_CLIENT_ID:latest,OAUTH2_ENTRA_CLIENT_SECRET=OAUTH2_ENTRA_CLIENT_SECRET:latest"
+  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_CUSTOM1_CLIENT_ID=OAUTH2_CUSTOM1_CLIENT_ID:latest,OAUTH2_CUSTOM1_CLIENT_SECRET=OAUTH2_CUSTOM1_CLIENT_SECRET:latest,OAUTH2_CUSTOM2_CLIENT_ID=OAUTH2_CUSTOM2_CLIENT_ID:latest,OAUTH2_CUSTOM2_CLIENT_SECRET=OAUTH2_CUSTOM2_CLIENT_SECRET:latest"
 ```
 
 To update only environment variables (without rebuilding the image):

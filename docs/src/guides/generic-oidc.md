@@ -24,13 +24,45 @@ provider** at the bottom of this page.
 | Provider | Use |
 |----------|-----|
 | Google | Built-in (always on when `OAUTH2_GOOGLE_CLIENT_ID` is set) |
-| Auth0, Keycloak, Microsoft Entra ID | Dedicated guide — enable via `OAUTH2_{NAME}_*` env vars |
-| Okta, AWS Cognito, Zitadel, Ory Hydra, Authentik, Dex, Authelia, any other OIDC IdP | A Custom slot |
-| A *second* instance of a named provider (e.g. extra Keycloak realm) | A Custom slot with a distinct `NAME` |
+| Auth0, Keycloak, Microsoft Entra ID, Zitadel, Okta, Authentik | Custom slot with `OAUTH2_CUSTOM{N}_PRESET=auth0\|keycloak\|entra\|zitadel\|okta\|authentik` — see each provider's dedicated guide for the IdP-side steps |
+| AWS Cognito, Ory Hydra, Dex, Authelia, any other OIDC IdP | A Custom slot without a preset |
+| A second instance of any of the above (e.g. extra Keycloak realm) | A Custom slot with a distinct `NAME` |
 
-The custom slots go through the exact same OIDC code path as the named
-providers. The only constraint is that the IdP must implement standard OIDC
-Discovery at `{issuer}/.well-known/openid-configuration`.
+The custom slots go through the exact same OIDC code path as Google. The
+only constraint is that the IdP must implement standard OIDC Discovery at
+`{issuer}/.well-known/openid-configuration`.
+
+## Presets for built-in vendors
+
+Set `OAUTH2_CUSTOM{N}_PRESET` to one of:
+
+| Preset | `NAME` default | `DISPLAY_NAME` default | `ICON_SLUG` | Brand color | Library-side quirks applied |
+|--------|----------------|------------------------|-------------|-------------|------------------------------|
+| `auth0` | `auth0` | `Auth0` | `auth0` | Auth0 orange (#eb5424) | — |
+| `keycloak` | `keycloak` | `Keycloak` | `keycloak` | dark gray (#4d4d4d) | — |
+| `entra` | `entra` | `Microsoft` | `entra` | Microsoft blue (#0078D4) | `login.live.com` added to allowed origins (required for personal MS accounts) |
+| `zitadel` | `zitadel` | `Zitadel` | `zitadel` | near-black (#333333) | — |
+| `okta` | `okta` | `Okta` | `okta` | Okta blue (#007dc1) | — |
+| `authentik` | `authentik` | `Authentik` | `authentik` | red-orange (#fd4b2d) | — |
+
+A preset supplies defaults for `DISPLAY_NAME`, `NAME`, `ICON_SLUG`,
+`BUTTON_COLOR`, `BUTTON_HOVER_COLOR`, and any additional allowed origins.
+Any field can still be overridden by the matching `OAUTH2_CUSTOM{N}_*`
+env var — the env var wins.
+
+A preset-driven slot needs only four env vars:
+
+```bash
+OAUTH2_CUSTOM1_PRESET=auth0
+OAUTH2_CUSTOM1_CLIENT_ID='your-client-id'
+OAUTH2_CUSTOM1_CLIENT_SECRET='your-client-secret'
+OAUTH2_CUSTOM1_ISSUER_URL='https://your-tenant.auth0.com'
+```
+
+For Entra, the preset adds `https://login.live.com` to the allowed origin
+list so personal Microsoft accounts (which route credential entry through
+that host) do not fail origin validation on the `form_post` callback. There
+is no env var to override this list — it is a library-level invariant.
 
 ## Required Environment Variables
 
@@ -47,13 +79,13 @@ OAUTH2_CUSTOM{N}_NAME='my-sso'
 - `ISSUER_URL`: the base URL from which oauth2-passkey fetches
   `/.well-known/openid-configuration`. No trailing slash.
 - `DISPLAY_NAME`: the label shown on the login button ("Continue with
-  `{DISPLAY_NAME}`").
+  `{DISPLAY_NAME}`"). Optional when `PRESET` is set.
 - `NAME`: the URL segment used in routes
   (`/o2p/oauth2/{NAME}`) and stored in the database `provider`
-  column. Must match `[a-z0-9_-]+` and must not collide with the named
-  providers (`google`, `auth0`, `keycloak`, `entra`) or the reserved
-  literals `authorized`, `accounts`, `fedcm`, `popup_close`, `oauth2.js`,
-  `select`.
+  column. Must match `[a-z0-9_-]+` and must not collide with `google` or
+  the reserved literals `authorized`, `accounts`, `fedcm`, `popup_close`,
+  `oauth2.js`, `select`. Optional when `PRESET` is set — the preset
+  supplies `auth0`, `keycloak`, or `entra` as the default.
 
 The redirect URI you register at the IdP is:
 
@@ -66,6 +98,8 @@ The redirect URI you register at the IdP is:
 Defaults shown:
 
 ```bash
+OAUTH2_CUSTOM{N}_PRESET=                        # unset | auth0 | keycloak | entra
+OAUTH2_CUSTOM{N}_ICON_SLUG='openid'             # SVG basename at /o2p/icons/{slug}.svg
 OAUTH2_CUSTOM{N}_RESPONSE_MODE='form_post'      # form_post or query
 OAUTH2_CUSTOM{N}_SCOPE='openid+email+profile'
 OAUTH2_CUSTOM{N}_BUTTON_COLOR='#6b7280'         # neutral gray
@@ -73,8 +107,18 @@ OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#4b5563'
 OAUTH2_CUSTOM{N}_STRICT_DISPLAY_CLAIMS=true     # see "Claim mismatch" troubleshooting
 ```
 
+When `PRESET` is set, the preset supplies defaults for `ICON_SLUG`,
+`BUTTON_COLOR`, `BUTTON_HOVER_COLOR`, and (for `entra`) an additional
+allowed origin. Each field is still overridable by the corresponding env
+var. See [Presets for built-in vendors](#presets-for-built-in-vendors).
+
 Button colors are injected as CSS variables in the login template and drive
 the `.btn-custom{N}` background color declared in the base stylesheet.
+
+`ICON_SLUG` names an SVG basename served by the axum crate's built-in icon
+router. Built-in slugs: `auth0`, `keycloak`, `entra`, `google`, and `openid`
+(the neutral fallback). The slug must match `[a-z0-9_-]+`; slugs pointing
+at non-existent SVGs will 404 at icon fetch time.
 
 `STRICT_DISPLAY_CLAIMS` controls how the library reacts when display-tier
 claims (`name`, `picture`, `family_name`, `given_name`) differ between the

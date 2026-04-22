@@ -20,7 +20,7 @@ mod types;
 
 pub use config::{enabled_providers, get_google_client_id, is_provider_enabled, provider_info};
 pub use main::{prepare_fedcm_nonce, prepare_oauth2_auth_request};
-pub use provider::ProviderInfo;
+pub use provider::{ProviderInfo, ProviderName};
 pub use types::{
     AuthResponse, FedCMCallbackRequest, FedCMNonceResponse, OAuth2Account, OAuth2Mode, OAuth2State,
     Provider, ProviderUserId, TokenType,
@@ -86,6 +86,12 @@ pub(crate) async fn init() -> Result<(), errors::OAuth2Error> {
             require_env_if_trigger_set(trigger, required)?;
         }
     }
+
+    // Preset-contract validation (pre-LazyLock): reject invalid PRESET
+    // values and enforce DISPLAY_NAME/NAME when no preset is declared.
+    // Runs before `validate_custom_slots` so operators get the cleaner
+    // preset-shape error before any custom-slot LazyLock panics.
+    provider::validate_custom_slot_preset_shape().map_err(errors::OAuth2Error::Validation)?;
 
     // Value-level validation for generic OIDC slots (provider_name shape and
     // collision checks). Env-presence is already covered by the loop above.

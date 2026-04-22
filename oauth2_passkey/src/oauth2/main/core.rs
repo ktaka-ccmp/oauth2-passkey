@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256, Sha384, Sha512};
 
 use crate::oauth2::config::{OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME};
 use crate::oauth2::errors::OAuth2Error;
-use crate::oauth2::provider::{ProviderConfig, ProviderKind, provider_for};
+use crate::oauth2::provider::{ProviderConfig, ProviderKind, ProviderName, provider_for};
 use crate::oauth2::types::{AuthResponse, OidcUserInfo, StateParams, StoredToken, TokenType};
 use crate::session::get_session_id_from_headers;
 use crate::utils::base64url_encode;
@@ -38,22 +38,23 @@ use crate::storage::{
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::prepare_oauth2_auth_request;
+/// use oauth2_passkey::{prepare_oauth2_auth_request, ProviderName};
 /// use http::HeaderMap;
 ///
 /// async fn start_oauth_flow(request_headers: HeaderMap) -> Result<(String, HeaderMap), Box<dyn std::error::Error>> {
-///     let (auth_url, response_headers) = prepare_oauth2_auth_request("google", request_headers, Some("login")).await?;
+///     let provider = ProviderName::from_registered("google")
+///         .ok_or("google provider is not enabled")?;
+///     let (auth_url, response_headers) = prepare_oauth2_auth_request(provider, request_headers, Some("login")).await?;
 ///     Ok((auth_url, response_headers))
 /// }
 /// ```
 pub async fn prepare_oauth2_auth_request(
-    provider: &str,
+    provider: ProviderName,
     headers: HeaderMap,
     mode: Option<&str>,
 ) -> Result<(String, HeaderMap), OAuth2Error> {
-    let kind = ProviderKind::from_provider_name(provider)
-        .ok_or_else(|| OAuth2Error::Validation(format!("Unknown provider: {provider}")))?;
-    let ctx = provider_for(kind)
+    let ctx = ProviderKind::from_provider_name(provider.as_str())
+        .and_then(provider_for)
         .ok_or_else(|| OAuth2Error::Validation(format!("Provider not enabled: {provider}")))?;
     prepare_oauth2_auth_request_inner(ctx, headers, mode).await
 }

@@ -638,9 +638,10 @@ Two tiers are enforced:
 - **Tier 2 — display/metadata** (`name`, `picture`, `family_name`,
   `given_name`): strict by default; can be relaxed per provider via
   `OAUTH2_<PROVIDER>_STRICT_DISPLAY_CLAIMS=false` (which downgrades to
-  a `tracing::warn!` and uses the id_token value). Works for both
-  named providers (`OAUTH2_GOOGLE_*`, `OAUTH2_AUTH0_*`, etc.) and
-  generic slots (`OAUTH2_CUSTOM{N}_*`).
+  a `tracing::warn!` and uses the id_token value). Works for the
+  `OAUTH2_GOOGLE_*` named provider and every generic slot
+  (`OAUTH2_CUSTOM{N}_*`) — including preset-driven slots
+  (`PRESET=auth0|keycloak|entra`).
 
 During E2E validation against the self-hosted IdPs in this directory
 (Zitadel / Hydra / Authentik / Okta) the check does **not** fire on

@@ -15,12 +15,8 @@
     --o2p-oauth2-hover: #4f46e5;
     --o2p-google: var(--o2p-oauth2);
     --o2p-google-hover: var(--o2p-oauth2-hover);
-    --o2p-auth0: #eb5424;
-    --o2p-auth0-hover: #c94419;
-    --o2p-keycloak: #4d4d4d;
-    --o2p-keycloak-hover: #333333;
-    --o2p-entra: #0078D4;
-    --o2p-entra-hover: #005A9E;
+    /* Auth0 / Keycloak / Entra moved to Custom slot presets; their colors
+       are injected per-enabled-slot via `--o2p-custom{N}` variables. */
     --o2p-passkey: #818cf8;
     --o2p-passkey-hover: #6366f1;
     --o2p-danger: #dc2626;
@@ -164,33 +160,6 @@ a:hover {
 
 .btn-google:hover {
     background-color: var(--o2p-google-hover);
-}
-
-.btn-auth0 {
-    background-color: var(--o2p-auth0);
-    padding: 12px 16px;
-}
-
-.btn-auth0:hover {
-    background-color: var(--o2p-auth0-hover);
-}
-
-.btn-keycloak {
-    background-color: var(--o2p-keycloak);
-    padding: 12px 16px;
-}
-
-.btn-keycloak:hover {
-    background-color: var(--o2p-keycloak-hover);
-}
-
-.btn-entra {
-    background-color: var(--o2p-entra);
-    padding: 12px 16px;
-}
-
-.btn-entra:hover {
-    background-color: var(--o2p-entra-hover);
 }
 
 /* Generic OIDC slots. Colors come from --o2p-customN / --o2p-customN-hover,

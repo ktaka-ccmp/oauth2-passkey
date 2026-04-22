@@ -3,7 +3,7 @@ use http::HeaderMap;
 use std::{env, sync::LazyLock};
 
 use crate::audit::{AuthMethod, AuthMethodDetails, LoginContext};
-use crate::oauth2::provider::{ProviderConfig, ProviderKind, provider_for};
+use crate::oauth2::provider::{ProviderConfig, ProviderKind, ProviderName, provider_for};
 use crate::oauth2::{
     AccountSearchField, AuthResponse, FedCMCallbackRequest, OAUTH2_CSRF_COOKIE_NAME, OAuth2Account,
     OAuth2Mode, OAuth2Store, Provider, ProviderUserId, StateParams, csrf_checks, decode_state,
@@ -160,17 +160,12 @@ async fn authorized_core(
 /// }
 /// ```
 pub async fn get_authorized_core(
-    provider: &str,
+    provider: ProviderName,
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    let kind = ProviderKind::from_provider_name(provider).ok_or_else(|| {
-        CoordinationError::InvalidState(format!("Unknown OAuth2 provider: {provider}"))
-    })?;
-    let ctx = provider_for(kind).ok_or_else(|| {
-        CoordinationError::InvalidState(format!("OAuth2 provider not enabled: {provider}"))
-    })?;
+    let ctx = resolve_ctx(provider)?;
     authorized_core(ctx, HttpMethod::Get, auth_response, cookies, headers).await
 }
 
@@ -209,18 +204,29 @@ pub async fn get_authorized_core(
 /// }
 /// ```
 pub async fn post_authorized_core(
-    provider: &str,
+    provider: ProviderName,
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    let kind = ProviderKind::from_provider_name(provider).ok_or_else(|| {
-        CoordinationError::InvalidState(format!("Unknown OAuth2 provider: {provider}"))
-    })?;
-    let ctx = provider_for(kind).ok_or_else(|| {
-        CoordinationError::InvalidState(format!("OAuth2 provider not enabled: {provider}"))
-    })?;
+    let ctx = resolve_ctx(provider)?;
     authorized_core(ctx, HttpMethod::Post, auth_response, cookies, headers).await
+}
+
+/// Resolve a [`ProviderName`] to its `&'static ProviderConfig`.
+///
+/// For any `ProviderName` constructed through
+/// `ProviderName::from_registered` (the axum-boundary path), this is
+/// effectively infallible — that constructor already performed the same
+/// `provider_for` lookup. The `None` arm is kept as defensive belt-and-
+/// suspenders in case a future code path mints a `ProviderName` by some
+/// other route; it surfaces as `InvalidState` rather than panicking.
+fn resolve_ctx(provider: ProviderName) -> Result<&'static ProviderConfig, CoordinationError> {
+    ProviderKind::from_provider_name(provider.as_str())
+        .and_then(provider_for)
+        .ok_or_else(|| {
+            CoordinationError::InvalidState(format!("OAuth2 provider not enabled: {provider}"))
+        })
 }
 
 #[tracing::instrument(skip(ctx, auth_response, login_context), fields(user_id, provider, state = %auth_response.state))]
@@ -230,7 +236,7 @@ async fn process_oauth2_authorization(
     login_context: LoginContext,
 ) -> Result<(HeaderMap, String), CoordinationError> {
     let provider_name = ctx.provider_name;
-    tracing::Span::current().record("provider", provider_name);
+    tracing::Span::current().record("provider", provider_name.as_str());
     tracing::info!("Processing OAuth2 authorization core logic");
 
     // Decode the state from the auth response first so we can cross-check the provider
@@ -242,7 +248,7 @@ async fn process_oauth2_authorization(
     // The `provider` field in `StateParams` is a cross-check to detect URL/state
     // mismatches (e.g. an attacker submitting a Google state to an Auth0 callback).
     // Reject on mismatch so the flow never reaches the token exchange.
-    if state_in_response.provider != provider_name {
+    if state_in_response.provider.as_str() != provider_name.as_str() {
         tracing::error!(
             security_event = "provider_mismatch",
             state_provider = %state_in_response.provider,

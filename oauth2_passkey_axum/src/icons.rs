@@ -3,10 +3,11 @@
 //! Serves branded SVG icons for OAuth2 providers at
 //! `{O2P_ROUTE_PREFIX}/icons/<name>.svg`. Provider marks (Google,
 //! Microsoft, Auth0, Keycloak) are sourced from svgl
-//! (<https://svgl.app/>); the neutral OpenID fallback is from Simple
-//! Icons (<https://simpleicons.org/>, CC0). Brand trademarks remain with
-//! the respective owners; usage here is nominative (identifying a
-//! linked account).
+//! (<https://svgl.app/>); the neutral OpenID fallback and the Okta /
+//! Authentik marks are from Simple Icons (<https://simpleicons.org/>,
+//! CC0). The Zitadel mark is from the upstream Zitadel repository
+//! (Apache-2.0). Brand trademarks remain with the respective owners;
+//! usage here is nominative (identifying a linked account).
 
 use axum::{
     Router,
@@ -24,6 +25,9 @@ pub(crate) fn router() -> Router<()> {
         .route("/auth0.svg", get(serve_auth0))
         .route("/keycloak.svg", get(serve_keycloak))
         .route("/entra.svg", get(serve_entra))
+        .route("/zitadel.svg", get(serve_zitadel))
+        .route("/okta.svg", get(serve_okta))
+        .route("/authentik.svg", get(serve_authentik))
         .route("/openid.svg", get(serve_openid))
 }
 
@@ -50,6 +54,18 @@ async fn serve_keycloak() -> Response {
 
 async fn serve_entra() -> Response {
     svg_response(include_str!("../static/icons/entra.svg"))
+}
+
+async fn serve_zitadel() -> Response {
+    svg_response(include_str!("../static/icons/zitadel.svg"))
+}
+
+async fn serve_okta() -> Response {
+    svg_response(include_str!("../static/icons/okta.svg"))
+}
+
+async fn serve_authentik() -> Response {
+    svg_response(include_str!("../static/icons/authentik.svg"))
 }
 
 async fn serve_openid() -> Response {

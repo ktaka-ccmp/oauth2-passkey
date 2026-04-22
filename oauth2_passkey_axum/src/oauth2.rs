@@ -11,9 +11,9 @@ use std::collections::HashMap;
 
 use oauth2_passkey::{
     AuthResponse, CoordinationError, FedCMCallbackRequest, O2P_ROUTE_PREFIX, OAuth2Account,
-    Provider, ProviderInfo, ProviderUserId, UserId, delete_oauth2_account_core, enabled_providers,
-    fedcm_authorized_core, get_authorized_core, get_google_client_id, list_accounts_core,
-    post_authorized_core, prepare_fedcm_nonce, prepare_oauth2_auth_request,
+    Provider, ProviderInfo, ProviderName, ProviderUserId, UserId, delete_oauth2_account_core,
+    enabled_providers, fedcm_authorized_core, get_authorized_core, get_google_client_id,
+    list_accounts_core, post_authorized_core, prepare_fedcm_nonce, prepare_oauth2_auth_request,
     verify_page_session_token,
 };
 
@@ -27,7 +27,7 @@ pub struct ProviderView {
     /// Provider identifier used in URL routing, DB rows, OAuth2 state, and
     /// templates (e.g. `"google"`, `"auth0"`, or an operator-configured
     /// value for a Custom slot).
-    pub provider_name: &'static str,
+    pub provider_name: ProviderName,
     /// Human-readable label for login buttons (e.g. `"Google"`, `"Auth0"`).
     pub display_name: &'static str,
     /// CSS classes for the login button (e.g. `"btn-oauth2 btn-google"`).
@@ -196,7 +196,13 @@ async fn oauth2_initiate(
         }
     }
 
-    let (auth_url, headers) = prepare_oauth2_auth_request(&provider, headers, mode.as_deref())
+    let provider_name = ProviderName::from_registered(&provider).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Unknown provider: {provider}"),
+        )
+    })?;
+    let (auth_url, headers) = prepare_oauth2_auth_request(provider_name, headers, mode.as_deref())
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -278,7 +284,10 @@ async fn get_authorized(
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> (HeaderMap, Redirect) {
-    match get_authorized_core(&provider, &query, &cookies, &headers).await {
+    let Some(provider_name) = ProviderName::from_registered(&provider) else {
+        return unknown_provider_redirect(&provider);
+    };
+    match get_authorized_core(provider_name, &query, &cookies, &headers).await {
         Ok((response_headers, message)) => {
             let redirect_url = build_success_redirect_url(&message);
             (response_headers, Redirect::to(&redirect_url))
@@ -289,6 +298,18 @@ async fn get_authorized(
             (HeaderMap::new(), Redirect::to(&redirect_url))
         }
     }
+}
+
+/// Build the Redirect response used when the URL path names a provider that
+/// is not among the currently-enabled providers. Mirrors the error-redirect
+/// path taken by `get_authorized_core` / `post_authorized_core` for
+/// `InvalidState` — operators get a consistent error UX whether the reject
+/// happens at HTTP boundary or inside the core.
+fn unknown_provider_redirect(provider: &str) -> (HeaderMap, Redirect) {
+    let err = CoordinationError::InvalidState(format!("Unknown OAuth2 provider: {provider}"));
+    tracing::warn!(error = %err, provider = %provider, "OAuth2 authorization failed (unknown provider)");
+    let redirect_url = build_error_redirect_url(&err);
+    (HeaderMap::new(), Redirect::to(&redirect_url))
 }
 
 /// Handler for OAuth2 callbacks using form_post response mode.
@@ -306,7 +327,10 @@ async fn post_authorized(
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     Form(form): Form<AuthResponse>,
 ) -> (HeaderMap, Redirect) {
-    match post_authorized_core(&provider, &form, &cookies, &headers).await {
+    let Some(provider_name) = ProviderName::from_registered(&provider) else {
+        return unknown_provider_redirect(&provider);
+    };
+    match post_authorized_core(provider_name, &form, &cookies, &headers).await {
         Ok((response_headers, message)) => {
             let redirect_url = build_success_redirect_url(&message);
             (response_headers, Redirect::to(&redirect_url))

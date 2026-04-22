@@ -1,7 +1,14 @@
 # Microsoft Entra ID Provider Setup
 
-This guide walks through configuring Microsoft Entra ID (formerly Azure Active Directory)
-as an OAuth2/OIDC provider for oauth2-passkey.
+Microsoft Entra ID (formerly Azure AD) runs through a Custom OIDC slot with
+`OAUTH2_CUSTOM{N}_PRESET=entra`. The preset supplies the display name
+("Microsoft"), URL segment (`entra`), icon, brand colors, and — crucially —
+the additional allowed origin `login.live.com` needed for personal
+Microsoft accounts (which route credential entry through that host). Setting
+the preset is equivalent to configuring a bespoke "Entra" provider; no code
+change is required.
+
+The examples below use slot 1. Any of slots 1..8 works.
 
 ## Which Setup to Choose
 
@@ -42,7 +49,7 @@ Use this path to let anyone with a personal Microsoft account
 4. Click **Register**
 
 After registration, note your **Application (client) ID** — this is
-`OAUTH2_ENTRA_CLIENT_ID`.
+`OAUTH2_CUSTOM1_CLIENT_ID`.
 
 ### Step 2: Set the Redirect URI
 
@@ -59,19 +66,24 @@ After registration, note your **Application (client) ID** — this is
 3. Click **Add**
 4. **Copy the secret value immediately** — it will not be shown again
 
-This value is `OAUTH2_ENTRA_CLIENT_SECRET`.
+This value is `OAUTH2_CUSTOM1_CLIENT_SECRET`.
 
 ### Step 4: Configure Environment Variables
 
 Add the following to your `.env` file:
 
 ```bash
-OAUTH2_ENTRA_CLIENT_ID='your-application-client-id'
-OAUTH2_ENTRA_CLIENT_SECRET='your-client-secret-value'
+OAUTH2_CUSTOM1_PRESET=entra
+OAUTH2_CUSTOM1_CLIENT_ID='your-application-client-id'
+OAUTH2_CUSTOM1_CLIENT_SECRET='your-client-secret-value'
 # Microsoft's fixed tenant ID for personal (consumer) accounts.
 # This UUID is NOT your tenant — it's a well-known constant.
-OAUTH2_ENTRA_ISSUER_URL='https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0'
+OAUTH2_CUSTOM1_ISSUER_URL='https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0'
 ```
+
+The preset (`PRESET=entra`) fills in defaults for `DISPLAY_NAME`, `NAME`
+(which becomes the `entra` URL segment), `ICON_SLUG`, button colors, and the
+`login.live.com` additional allowed origin.
 
 > **Why this specific UUID?** The `consumers` endpoint alias
 > (`https://login.microsoftonline.com/consumers/v2.0`) returns a discovery
@@ -84,10 +96,10 @@ Optional overrides (defaults shown):
 
 ```bash
 # Default: 'form_post'
-#OAUTH2_ENTRA_RESPONSE_MODE='form_post'
+#OAUTH2_CUSTOM1_RESPONSE_MODE='form_post'
 
 # Default: 'openid+email+profile'
-#OAUTH2_ENTRA_SCOPE='openid+email+profile'
+#OAUTH2_CUSTOM1_SCOPE='openid+email+profile'
 ```
 
 ### Step 5: Verify
@@ -149,8 +161,8 @@ Entra ID tenant.
 4. Click **Register**
 
 After registration, note your:
-- **Application (client) ID** — this is `OAUTH2_ENTRA_CLIENT_ID`
-- **Directory (tenant) ID** — used to build `OAUTH2_ENTRA_ISSUER_URL`
+- **Application (client) ID** — this is `OAUTH2_CUSTOM1_CLIENT_ID`
+- **Directory (tenant) ID** — used to build `OAUTH2_CUSTOM1_ISSUER_URL`
 
 ### Step 2: Set the Redirect URI
 
@@ -167,7 +179,7 @@ After registration, note your:
 3. Click **Add**
 4. **Copy the secret value immediately** — it will not be shown again
 
-This value is `OAUTH2_ENTRA_CLIENT_SECRET`.
+This value is `OAUTH2_CUSTOM1_CLIENT_SECRET`.
 
 ### Step 4: Enable the Email Claim
 
@@ -187,22 +199,23 @@ library falls back to the `preferred_username` claim (typically the UPN).
 Add the following to your `.env` file:
 
 ```bash
-OAUTH2_ENTRA_CLIENT_ID='your-application-client-id'
-OAUTH2_ENTRA_CLIENT_SECRET='your-client-secret-value'
+OAUTH2_CUSTOM1_PRESET=entra
+OAUTH2_CUSTOM1_CLIENT_ID='your-application-client-id'
+OAUTH2_CUSTOM1_CLIENT_SECRET='your-client-secret-value'
 # IMPORTANT: Must end with /v2.0 — the v1 endpoint (without /v2.0) uses a
 # different issuer format (sts.windows.net) that will cause issuer
 # validation to fail.
-OAUTH2_ENTRA_ISSUER_URL='https://login.microsoftonline.com/your-tenant-id/v2.0'
+OAUTH2_CUSTOM1_ISSUER_URL='https://login.microsoftonline.com/your-tenant-id/v2.0'
 ```
 
 Optional overrides (defaults shown):
 
 ```bash
 # Default: 'form_post'
-#OAUTH2_ENTRA_RESPONSE_MODE='form_post'
+#OAUTH2_CUSTOM1_RESPONSE_MODE='form_post'
 
 # Default: 'openid+email+profile'
-#OAUTH2_ENTRA_SCOPE='openid+email+profile'
+#OAUTH2_CUSTOM1_SCOPE='openid+email+profile'
 ```
 
 ### Step 6: Verify
@@ -232,7 +245,7 @@ Expected output:
 
 ## Notes
 
-- **Single-tenant only** (per app registration): The `OAUTH2_ENTRA_ISSUER_URL`
+- **Single-tenant only** (per app registration): The `OAUTH2_CUSTOM1_ISSUER_URL`
   must resolve to a specific tenant — either your organization's tenant
   (work/school) or Microsoft's fixed consumer tenant UUID (personal). Using
   `common` or `organizations` aliases will fail issuer validation because
@@ -253,5 +266,5 @@ Expected output:
   unique within the issuing tenant.
 
 - **Client secret expiry**: Azure client secrets expire (max 24 months).
-  Rotate the secret before expiry and update `OAUTH2_ENTRA_CLIENT_SECRET`
+  Rotate the secret before expiry and update `OAUTH2_CUSTOM1_CLIENT_SECRET`
   in your environment.
