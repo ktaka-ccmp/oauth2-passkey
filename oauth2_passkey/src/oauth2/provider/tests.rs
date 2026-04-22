@@ -478,6 +478,61 @@ fn custom_slot_duplicate_path_segment_rejected() {
 }
 
 #[test]
+fn custom_slot_invalid_button_color_rejected() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot1));
+        let err = validate_custom_slots().expect_err("bad button color must be rejected");
+        assert!(err.contains("OAUTH2_CUSTOM1_BUTTON_COLOR"));
+        assert!(err.contains("invalid"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_invalid_button_color_rejected",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "x"),
+            // CSS-break-out attempt — must not reach the inline <style> block.
+            ("OAUTH2_CUSTOM1_BUTTON_COLOR", "red; } body { display:none;"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_invalid_button_hover_color_rejected() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot1));
+        let err = validate_custom_slots().expect_err("bad hover color must be rejected");
+        assert!(err.contains("OAUTH2_CUSTOM1_BUTTON_HOVER_COLOR"));
+        assert!(err.contains("invalid"));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_invalid_button_hover_color_rejected",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_PATH_SEGMENT", "x"),
+            ("OAUTH2_CUSTOM1_BUTTON_HOVER_COLOR", "rgb(0,0,0)"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn custom_slot_custom_button_colors_applied() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
         let cfg =
