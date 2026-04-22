@@ -9,7 +9,7 @@ use crate::oauth2::{
     OAuth2Mode, OAuth2Store, Provider, ProviderUserId, StateParams, csrf_checks, decode_state,
     delete_session_and_misc_token_from_store, get_idinfo_userinfo, get_mode_from_stored_session,
     get_uid_from_stored_session_by_state_param, oauth2_account_from_idinfo,
-    oauth2_account_from_userinfo, validate_fedcm_token, validate_origin,
+    oauth2_account_from_idinfo_and_userinfo, validate_fedcm_token, validate_origin,
 };
 
 use crate::userdb::{User as DbUser, UserStore};
@@ -255,19 +255,15 @@ async fn process_oauth2_authorization(
         )));
     }
 
-    let (_idinfo, userinfo) = get_idinfo_userinfo(ctx, auth_response).await?;
+    let (idinfo, userinfo) = get_idinfo_userinfo(ctx, auth_response).await?;
 
-    // UserInfo is the canonical OIDC source for profile claims (email, name,
-    // picture, ...). Some providers (Zitadel, some Keycloak configurations)
-    // do not assert these claims in the ID token even when the `email` /
-    // `profile` scopes are granted, so building the account from `idinfo`
-    // alone fails for them. `get_idinfo_userinfo` already verifies the
-    // `idinfo.sub == userinfo.sub` invariant, so the ID token's role as the
-    // identity binding is preserved.
-    //
-    // TODO(20260421-0105): prefer a merged idinfo+userinfo view so that a
-    // field absent in userinfo can fall back to idinfo (and vice versa).
-    let oauth2_account = oauth2_account_from_userinfo(&userinfo, provider_name)?;
+    // Merge both sources so providers that split profile claims either way
+    // (id_token only — Google/Entra/Okta, or userinfo only — Zitadel/some
+    // Keycloak configs) succeed. `get_idinfo_userinfo` has already verified
+    // `idinfo.sub == userinfo.sub`, so the ID token remains the identity
+    // binding.
+    let oauth2_account =
+        oauth2_account_from_idinfo_and_userinfo(&idinfo, &userinfo, provider_name)?;
 
     // Extract user_id from the stored session if available
     let state_user = get_uid_from_stored_session_by_state_param(&state_in_response).await?;

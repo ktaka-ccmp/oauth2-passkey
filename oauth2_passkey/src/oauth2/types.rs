@@ -121,40 +121,70 @@ pub(crate) fn oauth2_account_from_idinfo(
     })
 }
 
-/// Build an `OAuth2Account` from a userinfo endpoint response.
+/// Build an `OAuth2Account` from both the verified ID token and the userinfo
+/// endpoint response, preferring the ID token per field and falling back to
+/// /userinfo when the ID token omits it.
 ///
-/// Free function rather than `impl From<OidcUserInfo>` because `From` takes only one
-/// argument and cannot accept the `provider_name` parameter.
+/// Rationale: OIDC providers split profile claims inconsistently. Some assert
+/// `email` / `name` in the ID token only (Google, Entra, Okta); others only in
+/// /userinfo (Zitadel, some Keycloak configs). Neither source alone is
+/// universally sufficient, so the main callback needs a merged view.
 ///
-/// See `oauth2_account_from_idinfo` for the `provider_name` semantics.
-pub(crate) fn oauth2_account_from_userinfo(
+/// The ID token wins when both sources populate a field. It is cryptographically
+/// signed by the IdP and its audience/issuer/nonce have already been verified,
+/// so it is the stronger trust root for identity-critical claims (email, sub).
+/// /userinfo is retrieved over TLS using an access token and is not itself
+/// signed, so it is used only to fill gaps left by the ID token.
+///
+/// The `sub` equality invariant (`idinfo.sub == userinfo.sub`) is assumed to
+/// have been verified upstream by `get_idinfo_userinfo`; this function uses
+/// `idinfo.sub` when building `provider_user_id`.
+pub(crate) fn oauth2_account_from_idinfo_and_userinfo(
+    idinfo: &OidcIdInfo,
     userinfo: &OidcUserInfo,
     provider_name: &str,
 ) -> Result<OAuth2Account, OAuth2Error> {
-    let email = userinfo
+    let email = idinfo
         .email
         .clone()
+        .or_else(|| userinfo.email.clone())
+        .or_else(|| idinfo.preferred_username.clone())
         .or_else(|| userinfo.preferred_username.clone())
         .ok_or_else(|| {
             OAuth2Error::Validation(format!(
-                "OIDC userinfo from '{provider_name}' is missing both `email` and `preferred_username` claims"
+                "OIDC response from '{provider_name}' is missing `email` / `preferred_username` in both id_token and userinfo"
             ))
         })?;
-    let name = userinfo.name.clone().unwrap_or_else(|| email.clone());
+    let name = idinfo
+        .name
+        .clone()
+        .or_else(|| userinfo.name.clone())
+        .unwrap_or_else(|| email.clone());
+    let picture = idinfo.picture.clone().or_else(|| userinfo.picture.clone());
+    let family_name = idinfo
+        .family_name
+        .clone()
+        .or_else(|| userinfo.family_name.clone());
+    let given_name = idinfo
+        .given_name
+        .clone()
+        .or_else(|| userinfo.given_name.clone());
+    let hd = idinfo.hd.clone().or_else(|| userinfo.hd.clone());
+    let email_verified = idinfo.email_verified.or(userinfo.email_verified);
     Ok(OAuth2Account {
         sequence_number: None,
         id: String::new(),
         user_id: String::new(),
         name,
         email,
-        picture: userinfo.picture.clone(),
+        picture,
         provider: provider_name.to_string(),
-        provider_user_id: format!("{}_{}", provider_name, userinfo.sub),
+        provider_user_id: format!("{}_{}", provider_name, idinfo.sub),
         metadata: json!({
-            "family_name": userinfo.family_name,
-            "given_name": userinfo.given_name,
-            "hd": userinfo.hd,
-            "email_verified": userinfo.email_verified,
+            "family_name": family_name,
+            "given_name": given_name,
+            "hd": hd,
+            "email_verified": email_verified,
         }),
         created_at: Utc::now(),
         updated_at: Utc::now(),
