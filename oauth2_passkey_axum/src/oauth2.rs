@@ -11,9 +11,9 @@ use std::collections::HashMap;
 
 use oauth2_passkey::{
     AuthResponse, CoordinationError, FedCMCallbackRequest, O2P_ROUTE_PREFIX, OAuth2Account,
-    Provider, ProviderInfo, ProviderUserId, UserId, delete_oauth2_account_core, enabled_providers,
-    fedcm_authorized_core, get_authorized_core, get_google_client_id, list_accounts_core,
-    post_authorized_core, prepare_fedcm_nonce, prepare_oauth2_auth_request,
+    Provider, ProviderInfo, ProviderName, ProviderUserId, UserId, delete_oauth2_account_core,
+    enabled_providers, fedcm_authorized_core, get_authorized_core, get_google_client_id,
+    list_accounts_core, post_authorized_core, prepare_fedcm_nonce, prepare_oauth2_auth_request,
     verify_page_session_token,
 };
 
@@ -27,7 +27,7 @@ pub struct ProviderView {
     /// Provider identifier used in URL routing, DB rows, OAuth2 state, and
     /// templates (e.g. `"google"`, `"auth0"`, or an operator-configured
     /// value for a Custom slot).
-    pub provider_name: &'static str,
+    pub provider_name: ProviderName,
     /// Human-readable label for login buttons (e.g. `"Google"`, `"Auth0"`).
     pub display_name: &'static str,
     /// CSS classes for the login button (e.g. `"btn-oauth2 btn-google"`).

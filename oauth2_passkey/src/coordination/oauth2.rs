@@ -230,7 +230,7 @@ async fn process_oauth2_authorization(
     login_context: LoginContext,
 ) -> Result<(HeaderMap, String), CoordinationError> {
     let provider_name = ctx.provider_name;
-    tracing::Span::current().record("provider", provider_name);
+    tracing::Span::current().record("provider", provider_name.as_str());
     tracing::info!("Processing OAuth2 authorization core logic");
 
     // Decode the state from the auth response first so we can cross-check the provider
@@ -242,7 +242,7 @@ async fn process_oauth2_authorization(
     // The `provider` field in `StateParams` is a cross-check to detect URL/state
     // mismatches (e.g. an attacker submitting a Google state to an Auth0 callback).
     // Reject on mismatch so the flow never reaches the token exchange.
-    if state_in_response.provider != provider_name {
+    if state_in_response.provider.as_str() != provider_name.as_str() {
         tracing::error!(
             security_event = "provider_mismatch",
             state_provider = %state_in_response.provider,

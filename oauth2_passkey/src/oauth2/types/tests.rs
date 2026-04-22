@@ -1,5 +1,5 @@
 use super::*;
-use crate::oauth2::provider::ProviderConfig;
+use crate::oauth2::provider::{ProviderConfig, ProviderName};
 use chrono::{Duration, Utc};
 use serde_json::json;
 
@@ -9,7 +9,7 @@ use serde_json::json;
 /// `provider_user_id`) match the test scenario's provider.
 fn ctx(provider_name: &'static str) -> ProviderConfig {
     let mut cfg = ProviderConfig::for_test("https://idp.example.com/auth", "form_post");
-    cfg.provider_name = provider_name;
+    cfg.provider_name = ProviderName::from_static(provider_name);
     cfg.strict_display_claims = true;
     cfg
 }

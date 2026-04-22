@@ -332,7 +332,7 @@ fn custom_slot_valid_config_initializes() {
             .expect("slot1 should be enabled with full env");
         assert_eq!(cfg.client_id, "id");
         assert_eq!(cfg.display_name, "My SSO");
-        assert_eq!(cfg.provider_name, "my-sso");
+        assert_eq!(cfg.provider_name.as_str(), "my-sso");
         assert_eq!(cfg.icon_slug, "openid");
         assert_eq!(cfg.button_class, "btn-oauth2 btn-custom1");
         // Defaults applied
@@ -751,7 +751,7 @@ impl ProviderConfig {
             query_string,
             discovery,
             additional_allowed_origins: Vec::new(),
-            provider_name: "google",
+            provider_name: ProviderName::from_static("google"),
             display_name: "Google",
             button_class: "btn-oauth2 btn-google",
             icon_slug: "google",
@@ -792,7 +792,7 @@ impl ProviderConfig {
             query_string,
             discovery,
             additional_allowed_origins: Vec::new(),
-            provider_name: "google",
+            provider_name: ProviderName::from_static("google"),
             display_name: "Google",
             button_class: "btn-oauth2 btn-google",
             icon_slug: "google",

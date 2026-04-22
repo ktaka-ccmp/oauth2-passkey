@@ -6,6 +6,59 @@ use std::{
 use crate::config::O2P_ROUTE_PREFIX;
 use crate::oauth2::discovery::{OidcDiscoveryDocument, OidcDiscoveryError, fetch_oidc_discovery};
 
+/// URL-facing identifier of a **registered** OAuth2/OIDC provider.
+///
+/// Wraps a `&'static str` that is either a compile-time literal (named
+/// providers, preset defaults) or a `Box::leak`-ed value produced from an
+/// operator-supplied env var at `LazyLock` init (custom slots). The value
+/// has been validated for shape via `is_valid_custom_provider_name` (see
+/// `validate_custom_slots`) before any `ProviderName` constructed from env
+/// input reaches callers.
+///
+/// The newtype is not a parser — it does not re-validate its input at
+/// construction. It exists so function signatures can carry
+/// "provider-identifier" as a distinct type from other `&str` parameters
+/// (display name, client secret, etc.), letting the compiler catch
+/// accidental argument swaps. Construction paths stay `pub(crate)` so the
+/// invariant holds at the crate boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ProviderName(&'static str);
+
+impl ProviderName {
+    /// Wrap a compile-time literal. Caller is responsible for shape
+    /// (only used at authored LazyLock / preset initializers).
+    pub(crate) const fn from_static(s: &'static str) -> Self {
+        Self(s)
+    }
+
+    /// Leak an operator-supplied `String` (from `OAUTH2_CUSTOM{N}_NAME`)
+    /// to `'static`. The leak is bounded by the number of custom slots —
+    /// eight at most, each initialized at most once per process by
+    /// `LazyLock`. Shape validation runs in `validate_custom_slots`
+    /// against the resulting `ProviderConfig`, so the `Err` path there
+    /// is the single source of "invalid provider name" diagnostics.
+    pub(crate) fn from_env_leaked(raw: String) -> Self {
+        Self(leak_static(raw))
+    }
+
+    /// Borrow the underlying `&'static str`.
+    pub const fn as_str(&self) -> &'static str {
+        self.0
+    }
+}
+
+impl std::fmt::Display for ProviderName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+impl AsRef<str> for ProviderName {
+    fn as_ref(&self) -> &str {
+        self.0
+    }
+}
+
 /// Identifies a supported OAuth2/OIDC provider.
 ///
 /// Adding a new **named** provider requires these lock-step edits, all in
@@ -265,7 +318,8 @@ impl ProviderKind {
                 .iter()
                 .copied()
                 .find(|&slot| {
-                    provider_for(Self::Custom(slot)).is_some_and(|cfg| cfg.provider_name == s)
+                    provider_for(Self::Custom(slot))
+                        .is_some_and(|cfg| cfg.provider_name.as_str() == s)
                 })
                 .map(Self::Custom),
         }
@@ -289,7 +343,7 @@ pub struct ProviderInfo {
     /// DB rows (`oauth2_accounts.provider`), OAuth2 state (`StateParams.provider`),
     /// and templates. E.g. `"google"`, `"auth0"`, or an operator-configured
     /// value like `"my-sso"` for a custom slot.
-    pub provider_name: &'static str,
+    pub provider_name: ProviderName,
     /// Human-readable label for login buttons (e.g. `"Google"`, `"Microsoft"`).
     pub display_name: &'static str,
     /// CSS classes for the login button (e.g. `"btn-oauth2 btn-google"`).
@@ -362,7 +416,7 @@ pub(crate) struct ProviderConfig {
     /// For named providers this equals `kind.as_str()`. For `Custom(slot)`
     /// it is the operator-supplied `OAUTH2_CUSTOM{N}_NAME`,
     /// `Box::leak`ed to `'static` at `LazyLock` init.
-    pub(crate) provider_name: &'static str,
+    pub(crate) provider_name: ProviderName,
     /// Human-readable label for login buttons (e.g. `"Google"`, `"My SSO"`).
     pub(crate) display_name: &'static str,
     /// CSS classes for the login button (e.g. `"btn-oauth2 btn-google"`).
@@ -481,7 +535,7 @@ pub(crate) static GOOGLE_PROVIDER: LazyLock<ProviderConfig> = LazyLock::new(|| {
         query_string,
         discovery: OnceLock::new(),
         additional_allowed_origins: Vec::new(),
-        provider_name: "google",
+        provider_name: ProviderName::from_static("google"),
         display_name: "Google",
         button_class: "btn-oauth2 btn-google",
         icon_slug: "google",
@@ -527,7 +581,7 @@ pub(crate) static AUTH0_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         query_string,
         discovery: OnceLock::new(),
         additional_allowed_origins: Vec::new(),
-        provider_name: "auth0",
+        provider_name: ProviderName::from_static("auth0"),
         display_name: "Auth0",
         button_class: "btn-oauth2 btn-auth0",
         icon_slug: "auth0",
@@ -571,7 +625,7 @@ pub(crate) static KEYCLOAK_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock
         query_string,
         discovery: OnceLock::new(),
         additional_allowed_origins: Vec::new(),
-        provider_name: "keycloak",
+        provider_name: ProviderName::from_static("keycloak"),
         display_name: "Keycloak",
         button_class: "btn-oauth2 btn-keycloak",
         icon_slug: "keycloak",
@@ -620,7 +674,7 @@ pub(crate) static ENTRA_PROVIDER: LazyLock<Option<ProviderConfig>> = LazyLock::n
         // through `login.live.com`; its Referer on the form_post callback is
         // that host rather than `login.microsoftonline.com`.
         additional_allowed_origins: vec!["https://login.live.com".to_string()],
-        provider_name: "entra",
+        provider_name: ProviderName::from_static("entra"),
         display_name: "Microsoft",
         button_class: "btn-oauth2 btn-entra",
         icon_slug: "entra",
@@ -718,7 +772,7 @@ fn build_custom_provider(slot: CustomSlot) -> Option<ProviderConfig> {
     let strict_display_claims =
         read_strict_display_claims(&format!("{prefix}_STRICT_DISPLAY_CLAIMS"));
 
-    let provider_name = leak_static(provider_name_raw);
+    let provider_name = ProviderName::from_env_leaked(provider_name_raw);
     let display_name = leak_static(display_name_raw);
     let button_color: &'static str = leak_static(button_color_raw);
     let button_hover_color: &'static str = leak_static(button_hover_color_raw);
@@ -840,21 +894,21 @@ fn is_valid_css_color(s: &str) -> bool {
 /// Returns an `Err` with a descriptive message on the first violation so
 /// `init()` can fail fast before any request is served.
 pub(crate) fn validate_custom_slots() -> Result<(), String> {
-    let mut enabled_segments: Vec<(CustomSlot, &'static str)> = Vec::new();
+    let mut enabled_segments: Vec<(CustomSlot, ProviderName)> = Vec::new();
     for &slot in CustomSlot::ALL {
         let Some(cfg) = provider_for(ProviderKind::Custom(slot)) else {
             continue;
         };
         let seg = cfg.provider_name;
 
-        if !is_valid_custom_provider_name(seg) {
+        if !is_valid_custom_provider_name(seg.as_str()) {
             return Err(format!(
                 "{}_NAME='{}' is invalid: must match [a-z0-9_-]+",
                 slot.env_prefix(),
                 seg
             ));
         }
-        if RESERVED_PROVIDER_NAMES.contains(&seg) {
+        if RESERVED_PROVIDER_NAMES.contains(&seg.as_str()) {
             return Err(format!(
                 "{}_NAME='{}' collides with a reserved name",
                 slot.env_prefix(),

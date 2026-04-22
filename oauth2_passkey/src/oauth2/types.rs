@@ -5,7 +5,7 @@ use sqlx::FromRow;
 
 use super::errors::OAuth2Error;
 use super::main::OidcIdInfo;
-use super::provider::ProviderConfig;
+use super::provider::{ProviderConfig, ProviderName};
 
 use crate::session::UserId;
 use crate::storage::CacheData;
@@ -280,7 +280,7 @@ fn check_strict(
     field: &'static str,
     idinfo_value: Option<&str>,
     userinfo_value: Option<&str>,
-    provider: &str,
+    provider: ProviderName,
 ) -> Result<(), OAuth2Error> {
     match (idinfo_value, userinfo_value) {
         (Some(a), Some(b)) if a != b => Err(OAuth2Error::ClaimMismatch {
@@ -297,7 +297,7 @@ fn check_strict_bool(
     field: &'static str,
     idinfo_value: Option<bool>,
     userinfo_value: Option<bool>,
-    provider: &str,
+    provider: ProviderName,
 ) -> Result<(), OAuth2Error> {
     match (idinfo_value, userinfo_value) {
         (Some(a), Some(b)) if a != b => Err(OAuth2Error::ClaimMismatch {
@@ -314,7 +314,7 @@ fn check_display(
     field: &'static str,
     idinfo_value: Option<&str>,
     userinfo_value: Option<&str>,
-    provider: &str,
+    provider: ProviderName,
     strict: bool,
 ) -> Result<(), OAuth2Error> {
     match (idinfo_value, userinfo_value) {
@@ -332,7 +332,7 @@ fn check_display(
                     field = field,
                     idinfo_value = a,
                     userinfo_value = b,
-                    provider = provider,
+                    provider = %provider,
                     "claim mismatch between id_token and /userinfo; using id_token value (set OAUTH2_<provider>_STRICT_DISPLAY_CLAIMS=true to reject)"
                 );
                 Ok(())
