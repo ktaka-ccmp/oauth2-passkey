@@ -1169,6 +1169,42 @@ fn prompt_invalid_value_rejected_at_startup() {
 }
 
 #[test]
+fn custom_slot_invalid_prompt_rejected_as_validation_error() {
+    // Regression guard for the P2 review finding: invalid OAUTH2_CUSTOM{N}_PROMPT
+    // must surface as a clean Err from validate_custom_slot_preset_shape(), not as
+    // a panic inside the LazyLock init path that validate_custom_slots() forces.
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let err = validate_custom_slot_preset_shape()
+            .expect_err("invalid PROMPT must be rejected pre-LazyLock");
+        assert!(
+            err.contains("OAUTH2_CUSTOM1_PROMPT"),
+            "error must name the offending var; got: {err}"
+        );
+        assert!(
+            err.contains("badprompt"),
+            "error must include the bad value; got: {err}"
+        );
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_invalid_prompt_rejected_as_validation_error",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
+            ("OAUTH2_CUSTOM1_PROMPT", "badprompt"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn custom_slot_no_preset_requires_display_name_and_name() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
         let err = validate_custom_slot_preset_shape()

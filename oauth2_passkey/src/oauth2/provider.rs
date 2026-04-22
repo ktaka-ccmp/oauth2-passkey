@@ -966,6 +966,7 @@ pub(crate) fn validate_custom_slot_preset_shape() -> Result<(), String> {
                 ));
             }
         }
+        parse_prompt(&format!("{prefix}_PROMPT"))?;
     }
     Ok(())
 }
