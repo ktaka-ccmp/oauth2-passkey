@@ -146,7 +146,7 @@ async fn authorized_core(
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::{get_authorized_core, AuthResponse};
+/// use oauth2_passkey::{get_authorized_core, AuthResponse, ProviderName};
 /// use headers::Cookie;
 /// use http::HeaderMap;
 ///
@@ -155,7 +155,8 @@ async fn authorized_core(
 ///     cookies: &Cookie,
 ///     headers: &HeaderMap
 /// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {
-///     let (response_headers, body) = get_authorized_core("google", auth_response, cookies, headers).await?;
+///     let provider = ProviderName::from_registered("google").unwrap();
+///     let (response_headers, body) = get_authorized_core(provider, auth_response, cookies, headers).await?;
 ///     Ok((response_headers, body))
 /// }
 /// ```
@@ -190,7 +191,7 @@ pub async fn get_authorized_core(
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::{post_authorized_core, AuthResponse};
+/// use oauth2_passkey::{post_authorized_core, AuthResponse, ProviderName};
 /// use headers::Cookie;
 /// use http::HeaderMap;
 ///
@@ -199,7 +200,8 @@ pub async fn get_authorized_core(
 ///     cookies: &Cookie,
 ///     headers: &HeaderMap
 /// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {
-///     let (response_headers, body) = post_authorized_core("google", auth_response, cookies, headers).await?;
+///     let provider = ProviderName::from_registered("google").unwrap();
+///     let (response_headers, body) = post_authorized_core(provider, auth_response, cookies, headers).await?;
 ///     Ok((response_headers, body))
 /// }
 /// ```
