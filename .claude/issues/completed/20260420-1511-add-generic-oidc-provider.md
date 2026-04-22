@@ -180,39 +180,39 @@ Approach A is simpler and keeps the CSS file static.
 ## Implementation Tasks
 
 ### Core implementation
-- [ ] Add `CustomSlot` enum + `Custom(CustomSlot)` variant to `ProviderKind`
-- [ ] Add 4 `LazyLock<Option<ProviderConfig>>` statics (CUSTOM1..CUSTOM4)
-- [ ] Extend `ProviderConfig` with `display_name` / `button_class` / `button_color` / `button_hover_color`
-- [ ] Extend `optional_env_contract` to validate custom slot env shape
-- [ ] Path segment collision detection at LazyLock init
-- [ ] `from_path_segment` resolves custom slot path segments dynamically
-- [ ] `provider_for` arm for `Custom(slot)`
+- [x] Add `CustomSlot` enum + `Custom(CustomSlot)` variant to `ProviderKind`
+- [x] Add 4 `LazyLock<Option<ProviderConfig>>` statics (CUSTOM1..CUSTOM4) — **scope expanded to 8 slots (CUSTOM1..CUSTOM8)** during implementation to enable parallel E2E testing of multiple IdPs
+- [x] Extend `ProviderConfig` with `display_name` / `button_class` / `button_color` / `button_hover_color` (plus `icon_slug`, `path_segment`, `css_var_suffix` folded in from issue 20260420-1643)
+- [x] Extend `optional_env_contract` to validate custom slot env shape
+- [x] Path segment collision detection at LazyLock init (`validate_custom_slots` + `RESERVED_PATH_SEGMENTS`)
+- [x] `from_path_segment` resolves custom slot path segments dynamically
+- [x] `provider_for` arm for `Custom(slot)`
 
 ### UI
-- [ ] `provider_view` reads `display_name` / `button_class` from config
-- [ ] Inline CSS generation for custom slot button colors in login template
-- [ ] Verify UI button renders correctly for a custom slot
+- [x] `provider_view` reads `display_name` / `button_class` from config (`display_name_for` / `icon_slug_for` helpers deleted)
+- [x] Inline CSS generation for custom slot button colors in login template (`custom_css_vars_block` + `.btn-custom1..8` rules in `o2p-base.css`)
+- [x] Verify UI button renders correctly for a custom slot (E2E-verified against all 4 tested IdPs)
 
 ### Tests
-- [ ] Test: custom slot env validation (trigger + deps)
-- [ ] Test: path segment collision detection
-- [ ] Test: invalid path segment characters rejected
-- [ ] Test: slot falls back to defaults when optional env absent
-- [ ] Regression: all named providers still work
+- [x] Test: custom slot env validation (trigger + deps)
+- [x] Test: path segment collision detection (reserved + named-provider + cross-slot duplicate)
+- [x] Test: invalid path segment characters rejected
+- [x] Test: slot falls back to defaults when optional env absent (`custom_slot_custom_button_colors_applied`, etc.)
+- [x] Regression: all named providers still work
 
 ### Docs
-- [ ] Update `dot.env.example` with `OAUTH2_CUSTOM1_*` block
-- [ ] Write `docs/src/guides/generic-oidc.md`:
-  - List of tested OIDC providers (Okta, AWS Cognito, Zitadel, Ory Hydra, Dex, Authelia, Salesforce, GitLab)
+- [x] Update `dot.env.example` with `OAUTH2_CUSTOM1_*` block
+- [x] Write `docs/src/guides/generic-oidc.md`:
+  - List of tested OIDC providers (Zitadel, Ory Hydra, Authentik, Okta — full step-by-step sections)
   - Per-provider setup hints (issuer URL, scope quirks)
-  - Troubleshooting (most issuer-mismatch / JWKS issues already surfaced)
-- [ ] Add entry to `docs/src/SUMMARY.md`
+  - Troubleshooting (issuer-mismatch / JWKS / `CONFORMITY_FAKE_CLAIMS` for Hydra)
+- [x] Add entry to `docs/src/SUMMARY.md`
 
 ### Verification (pick 2-3 providers to end-to-end test)
-- [ ] Okta Developer Account login succeeds (free dev tenant)
-- [ ] Zitadel or Ory Hydra self-host login succeeds (Docker)
-- [ ] AWS Cognito login succeeds (free tier)
-- [ ] Verify named providers (Google/Auth0/Keycloak/Entra) untouched
+- [x] Okta Developer Account login succeeds (free dev tenant)
+- [x] Zitadel or Ory Hydra self-host login succeeds (Docker) — **both verified** plus Authentik (4 OSS/commercial IdPs total)
+- [ ] AWS Cognito login succeeds (free tier) — **intentionally skipped**. Verification scope already exceeded the "pick 2-3" guidance with Zitadel / Hydra / Authentik / Okta. AWS Cognito remains uncovered; if a user hits an issue, add coverage in a follow-up.
+- [x] Verify named providers (Google/Auth0/Keycloak/Entra) untouched
 
 ## Decision Log
 
