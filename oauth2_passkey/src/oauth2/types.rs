@@ -5,6 +5,7 @@ use sqlx::FromRow;
 
 use super::errors::OAuth2Error;
 use super::main::OidcIdInfo;
+use super::provider::ProviderConfig;
 
 use crate::session::UserId;
 use crate::storage::CacheData;
@@ -82,15 +83,16 @@ pub(crate) struct OidcUserInfo {
 /// Build an `OAuth2Account` from an ID token payload.
 ///
 /// Free function rather than `impl From<OidcIdInfo>` because `From` takes only one
-/// argument and cannot accept the `provider_name` parameter.
+/// argument and cannot accept the provider context parameter.
 ///
-/// `provider_name` is taken from the URL path (primary dispatch signal) and
+/// `ctx.provider_name` is taken from the URL path (primary dispatch signal) and
 /// cross-checked against `StateParams.provider`.  It is **not** hardcoded,
 /// so DB rows reflect the actual provider that issued the token.
 pub(crate) fn oauth2_account_from_idinfo(
     idinfo: &OidcIdInfo,
-    provider_name: &str,
+    ctx: &ProviderConfig,
 ) -> Result<OAuth2Account, OAuth2Error> {
+    let provider_name = ctx.provider_name;
     let email = idinfo
         .email
         .clone()
@@ -142,8 +144,11 @@ pub(crate) fn oauth2_account_from_idinfo(
 pub(crate) fn oauth2_account_from_idinfo_and_userinfo(
     idinfo: &OidcIdInfo,
     userinfo: &OidcUserInfo,
-    provider_name: &str,
+    ctx: &ProviderConfig,
 ) -> Result<OAuth2Account, OAuth2Error> {
+    validate_claim_match(idinfo, userinfo, ctx)?;
+
+    let provider_name = ctx.provider_name;
     let email = idinfo
         .email
         .clone()
@@ -189,6 +194,152 @@ pub(crate) fn oauth2_account_from_idinfo_and_userinfo(
         created_at: Utc::now(),
         updated_at: Utc::now(),
     })
+}
+
+/// Detect divergence between the verified ID token and the /userinfo response.
+///
+/// Both sources are fetched within milliseconds of each other in a single OAuth2
+/// flow and reflect the same user snapshot; any field-level divergence is
+/// therefore anomalous, not legitimate drift.
+///
+/// Classification:
+///
+/// * **Identity-tier** (`email`, `email_verified`, `preferred_username`, `hd`) —
+///   always rejected on mismatch. These drive authn/authz decisions and silent
+///   divergence is a security concern. Not configurable.
+/// * **Display-tier** (`name`, `picture`, `family_name`, `given_name`) —
+///   rejected when `ctx.strict_display_claims` is `true` (default); otherwise a
+///   warning is emitted and the id_token value is used (Option B merge priority
+///   preserved).
+///
+/// The check fires only when **both sides are `Some`** and the values differ.
+/// One-sided `None` is a normal merge case and is silently allowed.
+fn validate_claim_match(
+    idinfo: &OidcIdInfo,
+    userinfo: &OidcUserInfo,
+    ctx: &ProviderConfig,
+) -> Result<(), OAuth2Error> {
+    let provider = ctx.provider_name;
+
+    // Tier 1 — identity/authorization-critical, always strict.
+    check_strict(
+        "email",
+        idinfo.email.as_deref(),
+        userinfo.email.as_deref(),
+        provider,
+    )?;
+    check_strict_bool(
+        "email_verified",
+        idinfo.email_verified,
+        userinfo.email_verified,
+        provider,
+    )?;
+    check_strict(
+        "preferred_username",
+        idinfo.preferred_username.as_deref(),
+        userinfo.preferred_username.as_deref(),
+        provider,
+    )?;
+    check_strict("hd", idinfo.hd.as_deref(), userinfo.hd.as_deref(), provider)?;
+
+    // Tier 2 — display/metadata, flag-controlled.
+    let strict = ctx.strict_display_claims;
+    check_display(
+        "name",
+        idinfo.name.as_deref(),
+        userinfo.name.as_deref(),
+        provider,
+        strict,
+    )?;
+    check_display(
+        "picture",
+        idinfo.picture.as_deref(),
+        userinfo.picture.as_deref(),
+        provider,
+        strict,
+    )?;
+    check_display(
+        "family_name",
+        idinfo.family_name.as_deref(),
+        userinfo.family_name.as_deref(),
+        provider,
+        strict,
+    )?;
+    check_display(
+        "given_name",
+        idinfo.given_name.as_deref(),
+        userinfo.given_name.as_deref(),
+        provider,
+        strict,
+    )?;
+
+    Ok(())
+}
+
+fn check_strict(
+    field: &'static str,
+    idinfo_value: Option<&str>,
+    userinfo_value: Option<&str>,
+    provider: &str,
+) -> Result<(), OAuth2Error> {
+    match (idinfo_value, userinfo_value) {
+        (Some(a), Some(b)) if a != b => Err(OAuth2Error::ClaimMismatch {
+            field,
+            idinfo_value: a.to_string(),
+            userinfo_value: b.to_string(),
+            provider: provider.to_string(),
+        }),
+        _ => Ok(()),
+    }
+}
+
+fn check_strict_bool(
+    field: &'static str,
+    idinfo_value: Option<bool>,
+    userinfo_value: Option<bool>,
+    provider: &str,
+) -> Result<(), OAuth2Error> {
+    match (idinfo_value, userinfo_value) {
+        (Some(a), Some(b)) if a != b => Err(OAuth2Error::ClaimMismatch {
+            field,
+            idinfo_value: a.to_string(),
+            userinfo_value: b.to_string(),
+            provider: provider.to_string(),
+        }),
+        _ => Ok(()),
+    }
+}
+
+fn check_display(
+    field: &'static str,
+    idinfo_value: Option<&str>,
+    userinfo_value: Option<&str>,
+    provider: &str,
+    strict: bool,
+) -> Result<(), OAuth2Error> {
+    match (idinfo_value, userinfo_value) {
+        (Some(a), Some(b)) if a != b => {
+            if strict {
+                Err(OAuth2Error::ClaimMismatch {
+                    field,
+                    idinfo_value: a.to_string(),
+                    userinfo_value: b.to_string(),
+                    provider: provider.to_string(),
+                })
+            } else {
+                tracing::warn!(
+                    security_event = "oauth2_claim_mismatch",
+                    field = field,
+                    idinfo_value = a,
+                    userinfo_value = b,
+                    provider = provider,
+                    "claim mismatch between id_token and /userinfo; using id_token value (set OAUTH2_<provider>_STRICT_DISPLAY_CLAIMS=true to reject)"
+                );
+                Ok(())
+            }
+        }
+        _ => Ok(()),
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

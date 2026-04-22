@@ -617,6 +617,38 @@ A permanent fix would require making `prompt` configurable per slot
 is out of scope for the generic-OIDC slot work and should be tracked
 as a separate issue if needed.
 
+### Claim mismatch between id_token and /userinfo
+
+Sign-in fails with:
+
+```
+OAuth2 claim mismatch for provider '<name>': `<field>` differs between
+id_token ('<idinfo value>') and userinfo ('<userinfo value>')
+```
+
+The library cross-checks claims that both the verified ID token and
+the `/userinfo` response populate — the two are fetched within
+milliseconds in the same flow, so field-level divergence is anomalous.
+
+Two tiers are enforced:
+
+- **Tier 1 — identity-critical** (`email`, `email_verified`,
+  `preferred_username`, `hd`): always strict. These drive authn/authz
+  decisions. Not configurable.
+- **Tier 2 — display/metadata** (`name`, `picture`, `family_name`,
+  `given_name`): strict by default; can be relaxed per provider via
+  `OAUTH2_<PROVIDER>_STRICT_DISPLAY_CLAIMS=false` (which downgrades to
+  a `tracing::warn!` and uses the id_token value). Works for both
+  named providers (`OAUTH2_GOOGLE_*`, `OAUTH2_AUTH0_*`, etc.) and
+  generic slots (`OAUTH2_CUSTOM{N}_*`).
+
+During E2E validation against the self-hosted IdPs in this directory
+(Zitadel / Hydra / Authentik / Okta) the check does **not** fire on
+default configurations — it surfaces operator-introduced divergences
+(custom Token Mappers or Scope Mappings that rewrite a claim on only
+one side). Resolve at the IdP layer when possible; use the env var
+only if the divergence is intentional and limited to Tier 2.
+
 ### JWKS stale after switching Zitadel v2 <-> v4
 
 The two Zitadel stacks bind to the same port (`:8080`) and advertise

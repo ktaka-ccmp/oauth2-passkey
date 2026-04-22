@@ -66,14 +66,25 @@ The redirect URI you register at the IdP is:
 Defaults shown:
 
 ```bash
-OAUTH2_CUSTOM{N}_RESPONSE_MODE='form_post'     # form_post or query
+OAUTH2_CUSTOM{N}_RESPONSE_MODE='form_post'      # form_post or query
 OAUTH2_CUSTOM{N}_SCOPE='openid+email+profile'
-OAUTH2_CUSTOM{N}_BUTTON_COLOR='#6b7280'        # neutral gray
+OAUTH2_CUSTOM{N}_BUTTON_COLOR='#6b7280'         # neutral gray
 OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#4b5563'
+OAUTH2_CUSTOM{N}_STRICT_DISPLAY_CLAIMS=true     # see "Claim mismatch" troubleshooting
 ```
 
 Button colors are injected as CSS variables in the login template and drive
 the `.btn-custom{N}` background color declared in the base stylesheet.
+
+`STRICT_DISPLAY_CLAIMS` controls how the library reacts when display-tier
+claims (`name`, `picture`, `family_name`, `given_name`) differ between the
+verified ID token and the `/userinfo` response: `true` (default) rejects
+the flow; `false` emits a `tracing::warn!` log and uses the id_token
+value. Identity-tier claims (`email`, `email_verified`,
+`preferred_username`, `hd`) are always rejected on mismatch — this flag
+does **not** affect them. See the
+[Claim mismatch between id_token and /userinfo](#claim-mismatch-between-id_token-and-userinfo)
+troubleshooting entry for when this fires in practice.
 
 ## Verification Status and Caveats
 
@@ -581,3 +592,52 @@ A permanent configuration knob for the `prompt` value
 (`OAUTH2_CUSTOM{N}_PROMPT=login|select_account|consent|none`) would
 give operators control over this but is not yet implemented; track as
 a separate issue if the behavior is problematic for your deployment.
+
+### Claim mismatch between id_token and /userinfo
+
+Sign-in fails with an error whose message starts with
+
+```
+OAuth2 claim mismatch for provider '<name>': `<field>` differs between
+id_token ('<idinfo value>') and userinfo ('<userinfo value>')
+```
+
+The library cross-checks claims that both the verified ID token and
+the `/userinfo` response populate. Because both are fetched within
+milliseconds of each other in a single OAuth2 flow and reflect the
+same user snapshot, any field-level divergence is anomalous rather
+than legitimate drift.
+
+Two tiers are enforced:
+
+- **Tier 1 — identity-critical** (`email`, `email_verified`,
+  `preferred_username`, `hd`): always rejected on mismatch. These drive
+  authn/authz decisions, so silent divergence is a security concern.
+  Not configurable.
+- **Tier 2 — display/metadata** (`name`, `picture`, `family_name`,
+  `given_name`): rejected by default; can be downgraded to a warning
+  per provider by setting
+  `OAUTH2_<PROVIDER>_STRICT_DISPLAY_CLAIMS=false`
+  (`OAUTH2_GOOGLE_STRICT_DISPLAY_CLAIMS`, `OAUTH2_CUSTOM1_STRICT_DISPLAY_CLAIMS`, etc.).
+
+A mismatch fires only when **both sides populate the field with
+different values**. A one-sided `None` (e.g. Zitadel asserts `email`
+only in `/userinfo` and omits it from the ID token) is the normal merge
+case and is silently allowed.
+
+Typical triggers in practice:
+
+- A Keycloak realm with a custom **Token Mapper** that rewrites a
+  display claim only in the ID token (or only in `/userinfo`)
+- An Authentik custom **Scope Mapping** that transforms one side
+- Operator-level claim transformations at any OIDC IdP
+
+Remediation:
+
+- **Preferred**: reconcile the IdP mappings so both sources emit the
+  same value. This is a configuration bug at the IdP layer.
+- If the divergence is intentional and limited to Tier 2, set
+  `OAUTH2_<PROVIDER>_STRICT_DISPLAY_CLAIMS=false` and watch the
+  `tracing::warn!` logs for the
+  `security_event = "oauth2_claim_mismatch"` structured field.
+- Tier 1 divergence never has an escape hatch — resolve at the IdP.

@@ -532,6 +532,109 @@ fn custom_slot_invalid_button_hover_color_rejected() {
     );
 }
 
+// --- STRICT_DISPLAY_CLAIMS env-var tests ---
+
+#[test]
+fn custom_slot_strict_display_claims_default_true() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg =
+            provider_for(ProviderKind::Custom(CustomSlot::Slot1)).expect("slot1 should be enabled");
+        assert!(cfg.strict_display_claims, "default must be true");
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_strict_display_claims_default_true",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_strict_display_claims_explicit_true() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg =
+            provider_for(ProviderKind::Custom(CustomSlot::Slot1)).expect("slot1 should be enabled");
+        assert!(cfg.strict_display_claims);
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_strict_display_claims_explicit_true",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
+            ("OAUTH2_CUSTOM1_STRICT_DISPLAY_CLAIMS", "true"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_strict_display_claims_explicit_false() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg =
+            provider_for(ProviderKind::Custom(CustomSlot::Slot1)).expect("slot1 should be enabled");
+        assert!(!cfg.strict_display_claims, "explicit false must propagate");
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_strict_display_claims_explicit_false",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
+            ("OAUTH2_CUSTOM1_STRICT_DISPLAY_CLAIMS", "false"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_strict_display_claims_invalid_panics() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        // LazyLock init must panic on an invalid value.
+        let _ = provider_for(ProviderKind::Custom(CustomSlot::Slot1));
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_strict_display_claims_invalid_panics",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://idp.example.com"),
+            ("OAUTH2_CUSTOM1_DISPLAY_NAME", "X"),
+            ("OAUTH2_CUSTOM1_NAME", "x"),
+            ("OAUTH2_CUSTOM1_STRICT_DISPLAY_CLAIMS", "yes"),
+        ],
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("OAUTH2_CUSTOM1_STRICT_DISPLAY_CLAIMS"));
+    assert!(stderr.contains("'true' or 'false'"));
+}
+
 #[test]
 fn custom_slot_custom_button_colors_applied() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
@@ -605,6 +708,7 @@ impl ProviderConfig {
             button_color: None,
             button_hover_color: None,
             css_var_suffix: None,
+            strict_display_claims: true,
         }
     }
 
@@ -645,6 +749,7 @@ impl ProviderConfig {
             button_color: None,
             button_hover_color: None,
             css_var_suffix: None,
+            strict_display_claims: true,
         }
     }
 }
