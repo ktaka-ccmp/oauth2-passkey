@@ -6,10 +6,11 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (18)
+### Open (19)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
+| `20260422-1636` | medium-high | medium | [Unify non-Google providers under Custom slot with presets](open/20260422-1636-unify-non-google-providers-via-custom-slot-preset.md) |
 | `20260420-0402` | medium | small | [Admin unlink/delete fails in demo mode ("Invalid user ID")](open/20260420-0402-admin-unlink-demo-mode.md) |
 | `20260422-1552` | medium | small | [Detect claim mismatch between id_token and /userinfo](open/20260422-1552-detect-claim-mismatch-idinfo-userinfo.md) |
 | `20260421-0045` | low | trivial | [Make `expires_in` in OidcTokenResponse optional](open/20260421-0045-oidc-token-response-expires-in-optional.md) |
