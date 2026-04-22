@@ -110,13 +110,16 @@ merge function if it has no other callers by then.
 
 ## Implementation Tasks
 
-- [ ] Write `oauth2_account_from_idinfo_and_userinfo` in `types.rs`
-- [ ] Swap the main callback site in `coordination/oauth2.rs`
-- [ ] Decide whether to keep or inline `oauth2_account_from_userinfo`
-      (pure cleanup decision — likely keep for symmetry)
-- [ ] Add 3 unit tests above
-- [ ] `cargo fmt --all` / `cargo clippy --all-targets --all-features` / `cargo test`
-- [ ] Regression: Google / Auth0 / Keycloak / Entra / Zitadel login
+- [x] Write `oauth2_account_from_idinfo_and_userinfo` in `types.rs`
+- [x] Swap the main callback site in `coordination/oauth2.rs`
+- [x] Decide whether to keep or inline `oauth2_account_from_userinfo`
+      (decided: delete — no remaining callers after the switch)
+- [x] Add 3 unit tests above (added 7: idinfo-primary, userinfo
+      fallback, idinfo wins per-field, preferred_username fallback,
+      email-only-in-idinfo, missing-everywhere error,
+      name-falls-back-to-email)
+- [x] `cargo fmt --all` / `cargo clippy --all-targets --all-features` / `cargo test`
+- [x] Regression: Google / Auth0 / Keycloak / Entra / Zitadel login (plus Okta / Authentik, already E2E-verified in PR #316)
 
 ## Decision Log
 

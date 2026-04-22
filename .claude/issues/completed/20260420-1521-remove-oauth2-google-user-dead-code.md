@@ -115,12 +115,12 @@ Regression check: Google / Auth0 / Keycloak / Entra login still work.
 
 ## Implementation Tasks
 
-- [ ] Simplify the match to a single call in `coordination/oauth2.rs`
-- [ ] Delete `oauth2_account_from_userinfo` from `oauth2/types.rs`
-- [ ] Remove the corresponding tests from `oauth2/types/tests.rs`
-- [ ] Verify `cargo fmt --all` + `cargo clippy --all-targets --all-features` + `cargo test` clean
-- [ ] Regression: Google / Auth0 / Keycloak / Entra login still work
-- [ ] Commit
+- [x] Simplify the match to a single call in `coordination/oauth2.rs` (done in `db680fe`)
+- [x] Delete `oauth2_account_from_userinfo` from `oauth2/types.rs` (done in `3f74d37`)
+- [x] Remove the corresponding tests from `oauth2/types/tests.rs` (rewrote as merged-view tests in `3f74d37`)
+- [x] Verify `cargo fmt --all` + `cargo clippy --all-targets --all-features` + `cargo test` clean
+- [x] Regression: Google / Auth0 / Keycloak / Entra login still work
+- [x] Commit (`db680fe` + `3f74d37`)
 
 ## Decision Log
 
