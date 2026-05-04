@@ -805,7 +805,12 @@ fn validate_audience_rejects_multi_aud_without_azp() {
 
 use crate::oauth2::provider::ProviderConfig;
 
-fn create_hs256_jwt_without_kid(secret: &[u8], client_id: &str, issuer: &str) -> String {
+fn create_hmac_jwt_without_kid(
+    secret: &[u8],
+    client_id: &str,
+    issuer: &str,
+    alg: Algorithm,
+) -> String {
     use jsonwebtoken::{EncodingKey, Header, encode};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -822,8 +827,12 @@ fn create_hs256_jwt_without_kid(secret: &[u8], client_id: &str, issuer: &str) ->
         "email": "test@example.com",
         "name": "Test User",
     });
-    let header = Header::new(Algorithm::HS256);
+    let header = Header::new(alg);
     encode(&header, &claims, &EncodingKey::from_secret(secret)).expect("Failed to encode JWT")
+}
+
+fn create_hs256_jwt_without_kid(secret: &[u8], client_id: &str, issuer: &str) -> String {
+    create_hmac_jwt_without_kid(secret, client_id, issuer, Algorithm::HS256)
 }
 
 #[tokio::test]
@@ -895,4 +904,23 @@ async fn verify_idtoken_hs256_no_kid_empty_secret_rejected() {
         matches!(result, Err(TokenVerificationError::MissingKeyComponent(ref k)) if k.contains("client_secret")),
         "Empty client_secret should be rejected: {result:?}"
     );
+}
+
+#[tokio::test]
+async fn verify_idtoken_hs384_no_kid_correct_secret() {
+    let ctx = ProviderConfig::for_test("https://test.example.com/auth", "query");
+    let token = create_hmac_jwt_without_kid(
+        ctx.client_secret.as_bytes(),
+        &ctx.client_id,
+        &ctx.issuer_url,
+        Algorithm::HS384,
+    );
+    let result = verify_idtoken_with_algorithm(&ctx, token).await;
+    assert!(
+        result.is_ok(),
+        "HS384 with correct client_secret should succeed: {result:?}"
+    );
+    let (idinfo, alg) = result.unwrap();
+    assert_eq!(alg, Algorithm::HS384);
+    assert_eq!(idinfo.email, Some("test@example.com".to_string()));
 }
