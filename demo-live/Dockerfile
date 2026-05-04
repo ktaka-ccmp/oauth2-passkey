@@ -2,7 +2,7 @@
 # Usage: docker build -t oauth2-passkey-demo-live -f demo-live/Dockerfile .
 
 # Stage 1: Install cargo-chef
-FROM rust:latest-alpine AS chef
+FROM rust:alpine AS chef
 RUN apk add --no-cache musl-dev cmake make perl
 RUN cargo install cargo-chef
 WORKDIR /app
