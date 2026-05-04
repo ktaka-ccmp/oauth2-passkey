@@ -369,22 +369,35 @@ pub(super) async fn verify_idtoken_with_algorithm(
 ) -> Result<(OidcIdInfo, Algorithm), TokenVerificationError> {
     let header = jsonwebtoken::decode_header(&token)?;
 
-    let kid = header
-        .kid
-        .ok_or(TokenVerificationError::MissingKeyComponent(
-            "kid".to_string(),
-        ))?;
     let alg = header.alg;
     let idinfo: OidcIdInfo = decode_token(&token)?;
 
     tracing::debug!("Algorithm from JWT header: {:?}", alg);
     tracing::debug!("Decoded id_token payload: {:#?}", idinfo);
 
-    let jwks_url = ctx.jwks_url().await?;
-    let jwks = fetch_jwks(&jwks_url).await?;
-    let jwk = find_jwk(&jwks, &kid).ok_or(TokenVerificationError::NoMatchingKey)?;
-
-    let decoding_key = convert_jwk_to_decoding_key(jwk)?;
+    let decoding_key = match header.kid {
+        Some(kid) => {
+            let jwks_url = ctx.jwks_url().await?;
+            let jwks = fetch_jwks(&jwks_url).await?;
+            let jwk = find_jwk(&jwks, &kid).ok_or(TokenVerificationError::NoMatchingKey)?;
+            convert_jwk_to_decoding_key(jwk)?
+        }
+        None => match alg {
+            Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
+                if ctx.client_secret.is_empty() {
+                    return Err(TokenVerificationError::MissingKeyComponent(
+                        "client_secret (empty)".to_string(),
+                    ));
+                }
+                DecodingKey::from_secret(ctx.client_secret.as_bytes())
+            }
+            _ => {
+                return Err(TokenVerificationError::MissingKeyComponent(
+                    "kid".to_string(),
+                ));
+            }
+        },
+    };
 
     let signature_valid = verify_signature(&token, &decoding_key, alg)?;
     if !signature_valid {

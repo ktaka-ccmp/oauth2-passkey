@@ -28,6 +28,7 @@ pub(crate) fn router() -> Router<()> {
         .route("/zitadel.svg", get(serve_zitadel))
         .route("/okta.svg", get(serve_okta))
         .route("/authentik.svg", get(serve_authentik))
+        .route("/line.svg", get(serve_line))
         .route("/openid.svg", get(serve_openid))
 }
 
@@ -66,6 +67,10 @@ async fn serve_okta() -> Response {
 
 async fn serve_authentik() -> Response {
     svg_response(include_str!("../static/icons/authentik.svg"))
+}
+
+async fn serve_line() -> Response {
+    svg_response(include_str!("../static/icons/line.svg"))
 }
 
 async fn serve_openid() -> Response {

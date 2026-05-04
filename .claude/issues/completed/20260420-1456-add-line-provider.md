@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-20-14-56
 
-## Closed:
+## Closed: 2026-05-05
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -37,7 +37,7 @@ existing custom slot mechanism with zero code changes.
 - **OIDC compliant** (v2.1 and later)
 - **Discovery URL**: `https://access.line.me/.well-known/openid-configuration`
 - **Issuer**: `https://access.line.me`
-- **Signing algorithm**: ES256 (already supported)
+- **Signing algorithm**: HS256 for web login, ES256 for native/LIFF (per LINE docs)
 - **Scopes**: `openid`, `profile`, `email`
 
 ### Caveats
@@ -59,7 +59,9 @@ existing custom slot mechanism with zero code changes.
 
 ## Approach
 
-No code changes required. Deliverables:
+Originally expected no code changes, but LINE web login uses HS256
+(HMAC with channel secret) without a `kid` header, which required
+adding HS256 client_secret verification support. Deliverables:
 
 1. **E2E verification**: Confirm LINE Login works via a CUSTOM slot
 2. **Documentation**: Add LINE setup guide to `docs/src/guides/generic-oidc.md`
@@ -88,19 +90,25 @@ OAUTH2_CUSTOM<N>_SCOPE="openid+profile+email"
 
 ## Related Files
 
-- `docs/src/guides/generic-oidc.md` — append LINE section
-- `docs/src/SUMMARY.md` — already has generic-oidc entry (no change needed)
-- `dot.env.example` — optionally add LINE example block
+- `oauth2_passkey/src/oauth2/main/idtoken.rs` — HS256 client_secret verification support
+- `oauth2_passkey/src/oauth2/main/idtoken/tests.rs` — 4 new tests for HS256 no-kid branch
+- `demo-live/templates/login.j2` — email usage notice for LINE permission application
+- `demo-live/Dockerfile` — Rust version bump (rust:alpine)
+- `docs/src/guides/generic-oidc.md` — LINE Login setup guide
+- `dot.env.example` — LINE example block
 
 ## Implementation Tasks
 
-- [ ] Apply for LINE email permission in Developer Console
-- [ ] Wait for email permission approval
-- [ ] Configure LINE as CUSTOM slot in demo environment
-- [ ] E2E: LINE login succeeds (email present after approval)
-- [ ] E2E: Verify named providers still work (regression check)
-- [ ] Append LINE section to `docs/src/guides/generic-oidc.md`
-- [ ] Optionally add LINE example to `dot.env.example`
+- [x] Apply for LINE email permission in Developer Console
+- [x] Wait for email permission approval
+- [x] Configure LINE as CUSTOM slot in demo environment
+- [x] Fix: HS256 no-kid ID token verification (LINE web login uses HS256 with channel secret)
+- [x] Add empty client_secret guard for HS256 path
+- [x] Add 4 unit tests for HS256 no-kid branch
+- [x] E2E: LINE login succeeds (email present after approval)
+- [x] E2E: Verify named providers still work (regression check)
+- [x] Append LINE section to `docs/src/guides/generic-oidc.md`
+- [x] Optionally add LINE example to `dot.env.example`
 
 ## Decision Log
 
@@ -126,4 +134,49 @@ OAUTH2_CUSTOM<N>_SCOPE="openid+profile+email"
   concern (email permission) is a deployment/config issue, not a code issue.
   Document the setup process and verify E2E.
 
+### 2026-05-05: HS256 web login support required
+
+- Context: LINE's OIDC discovery advertises ES256, but LINE Login v2.1
+  docs specify that web login uses HS256 (channel secret as HMAC key)
+  while native/LIFF uses ES256 (JWKS). The HS256 token has no `kid`
+  header, causing "Missing key component: kid" error.
+- Decision: Add HS256 client_secret verification path in
+  `verify_idtoken_with_algorithm`: kid present -> JWKS; kid absent +
+  HMAC -> client_secret; kid absent + non-HMAC -> error.
+- Reason: OIDC Core 1.0 Section 10.1 defines HS256 with client_secret
+  as a valid verification method. The change is generic (benefits any
+  provider using HS256 without kid), not LINE-specific.
+
+### 2026-05-05: LINE login E2E verified
+
+- Context: After HS256 support and email permission approval, LINE
+  login was tested on localhost demo environment.
+- Decision: E2E verification passed. LINE login works as a CUSTOM
+  OIDC slot with email claim present.
+- Reason: Confirms the generic OIDC slot mechanism handles LINE
+  correctly with the HS256 fix.
+
 ## Resolution
+
+LINE Login v2.1 verified as a Custom OIDC slot on `feature/line-provider-verification`.
+
+### What was implemented
+
+- **HS256 client_secret verification** in `verify_idtoken_with_algorithm`:
+  LINE web login sends HS256-signed ID tokens without `kid`. New logic:
+  kid present -> JWKS; kid absent + HMAC -> client_secret; kid absent +
+  non-HMAC -> error. Empty client_secret is rejected as a safety guard.
+- **4 unit tests** covering the new HS256 no-kid branch (success, wrong
+  secret, RS256 regression, empty secret).
+- **Email usage notice** on demo login page for LINE's email permission
+  application screenshot requirement.
+- **Dockerfile fix** (`rust:1.88-alpine` -> `rust:alpine`) for
+  cargo-chef MSRV compatibility.
+- **Documentation**: LINE Login section in `docs/src/guides/generic-oidc.md`
+  with step-by-step setup, and LINE example in `dot.env.example`.
+
+### E2E verification
+
+- LINE Login with email permission approved: login succeeds, email
+  present in ID token.
+- Named providers (Google, Auth0, Okta): regression check passed.
