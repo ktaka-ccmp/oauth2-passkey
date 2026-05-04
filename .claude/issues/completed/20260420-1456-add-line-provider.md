@@ -94,8 +94,8 @@ OAUTH2_CUSTOM<N>_SCOPE="openid+profile+email"
 - `oauth2_passkey/src/oauth2/main/idtoken/tests.rs` — 4 new tests for HS256 no-kid branch
 - `demo-live/templates/login.j2` — email usage notice for LINE permission application
 - `demo-live/Dockerfile` — Rust version bump (rust:alpine)
-- `docs/src/guides/generic-oidc.md` — append LINE section (pending)
-- `dot.env.example` — optionally add LINE example block (pending)
+- `docs/src/guides/generic-oidc.md` — LINE Login setup guide
+- `dot.env.example` — LINE example block
 
 ## Implementation Tasks
 
