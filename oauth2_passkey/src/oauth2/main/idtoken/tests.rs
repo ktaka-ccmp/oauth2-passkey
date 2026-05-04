@@ -798,3 +798,101 @@ fn validate_audience_rejects_multi_aud_without_azp() {
         other => panic!("expected MissingAuthorizedParty, got {other:?}"),
     }
 }
+
+// =============================================================================
+// verify_idtoken_with_algorithm: kid-absent HS256 branch
+// =============================================================================
+
+use crate::oauth2::provider::ProviderConfig;
+
+fn create_hs256_jwt_without_kid(secret: &[u8], client_id: &str, issuer: &str) -> String {
+    use jsonwebtoken::{EncodingKey, Header, encode};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let claims = serde_json::json!({
+        "iss": issuer,
+        "sub": "U96a1377920729556fba3747bb71e001d",
+        "aud": client_id,
+        "exp": now + 3600,
+        "iat": now,
+        "email": "test@example.com",
+        "name": "Test User",
+    });
+    let header = Header::new(Algorithm::HS256);
+    encode(&header, &claims, &EncodingKey::from_secret(secret)).expect("Failed to encode JWT")
+}
+
+#[tokio::test]
+async fn verify_idtoken_hs256_no_kid_correct_secret() {
+    let ctx = ProviderConfig::for_test("https://test.example.com/auth", "query");
+    let token = create_hs256_jwt_without_kid(
+        ctx.client_secret.as_bytes(),
+        &ctx.client_id,
+        &ctx.issuer_url,
+    );
+    let result = verify_idtoken_with_algorithm(&ctx, token).await;
+    assert!(
+        result.is_ok(),
+        "HS256 with correct client_secret should succeed: {result:?}"
+    );
+    let (idinfo, alg) = result.unwrap();
+    assert_eq!(alg, Algorithm::HS256);
+    assert_eq!(idinfo.email, Some("test@example.com".to_string()));
+}
+
+#[tokio::test]
+async fn verify_idtoken_hs256_no_kid_wrong_secret() {
+    let ctx = ProviderConfig::for_test("https://test.example.com/auth", "query");
+    let token = create_hs256_jwt_without_kid(b"wrong_secret", &ctx.client_id, &ctx.issuer_url);
+    let result = verify_idtoken_with_algorithm(&ctx, token).await;
+    assert!(
+        matches!(result, Err(TokenVerificationError::InvalidTokenSignature)),
+        "HS256 with wrong secret should fail: {result:?}"
+    );
+}
+
+#[tokio::test]
+async fn verify_idtoken_rs256_no_kid_returns_missing_kid_error() {
+    use jsonwebtoken::{EncodingKey, Header, encode};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let ctx = ProviderConfig::for_test("https://test.example.com/auth", "query");
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let claims = serde_json::json!({
+        "iss": &ctx.issuer_url,
+        "sub": "test-sub",
+        "aud": &ctx.client_id,
+        "exp": now + 3600,
+        "iat": now,
+    });
+    // RS256 without kid — requires an RSA key pair
+    let rsa_key = EncodingKey::from_rsa_pem(include_bytes!("tests/test_rsa_key.pem"))
+        .expect("Failed to load test RSA key");
+    let header = Header::new(Algorithm::RS256);
+    let token = encode(&header, &claims, &rsa_key).expect("Failed to encode RS256 JWT");
+
+    let result = verify_idtoken_with_algorithm(&ctx, token).await;
+    assert!(
+        matches!(result, Err(TokenVerificationError::MissingKeyComponent(ref k)) if k == "kid"),
+        "RS256 without kid should return MissingKeyComponent: {result:?}"
+    );
+}
+
+#[tokio::test]
+async fn verify_idtoken_hs256_no_kid_empty_secret_rejected() {
+    let mut ctx = ProviderConfig::for_test("https://test.example.com/auth", "query");
+    ctx.client_secret = String::new();
+    let token = create_hs256_jwt_without_kid(b"any_secret", &ctx.client_id, &ctx.issuer_url);
+    let result = verify_idtoken_with_algorithm(&ctx, token).await;
+    assert!(
+        matches!(result, Err(TokenVerificationError::MissingKeyComponent(ref k)) if k.contains("client_secret")),
+        "Empty client_secret should be rejected: {result:?}"
+    );
+}

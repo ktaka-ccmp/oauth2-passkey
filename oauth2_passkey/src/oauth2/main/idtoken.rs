@@ -384,6 +384,11 @@ pub(super) async fn verify_idtoken_with_algorithm(
         }
         None => match alg {
             Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
+                if ctx.client_secret.is_empty() {
+                    return Err(TokenVerificationError::MissingKeyComponent(
+                        "client_secret (empty)".to_string(),
+                    ));
+                }
                 DecodingKey::from_secret(ctx.client_secret.as_bytes())
             }
             _ => {
