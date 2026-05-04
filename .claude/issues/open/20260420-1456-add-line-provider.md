@@ -1,4 +1,4 @@
-# Issue: Add LINE Login as OAuth2 Provider
+# Issue: Verify LINE Login as Custom OIDC Provider + Documentation
 
 ## Table of Contents
 
@@ -20,29 +20,33 @@
 
 ## Priority: medium
 
-## Difficulty: medium
+## Difficulty: low
 
 ## Description
 
-Add LINE Login v2.1 as a fifth optional OIDC provider alongside Google,
-Auth0, Keycloak, and Entra. LINE is OIDC-compliant and fits the established
-lock-step pattern with no architectural changes required.
+Verify that LINE Login v2.1 works as a Custom OIDC provider slot
+(implemented in issue `20260420-1511`) and produce setup documentation.
 
-### Key LINE Login characteristics
+Originally this issue planned LINE as a dedicated `ProviderKind::Line`
+variant, but the generic OIDC provider slots (CUSTOM1..CUSTOM8) make a
+dedicated variant unnecessary. LINE is OIDC-compliant and fits the
+existing custom slot mechanism with zero code changes.
+
+### LINE Login characteristics
 
 - **OIDC compliant** (v2.1 and later)
 - **Discovery URL**: `https://access.line.me/.well-known/openid-configuration`
 - **Issuer**: `https://access.line.me`
-- **Signing algorithm**: ES256 (already supported by `convert_jwk_to_decoding_key`)
+- **Signing algorithm**: ES256 (already supported)
 - **Scopes**: `openid`, `profile`, `email`
 
 ### Caveats
 
 1. **`email` claim requires LINE approval**
-   - LINE Developer Console → "Email address permission" application required
-   - Before approval, `email` claim is not returned in tokens
-   - `preferred_username` is also typically absent → current fallback returns a
-     clean `OAuth2Error::Validation` at the conversion step
+   - LINE Developer Console -> "Email address permission" application required
+   - Manual review process, typically approved within 1-2 business days
+   - Before approval, `email` claim is not returned -> login fails with
+     `OAuth2Error::Validation` (expected behavior, clean error)
 
 2. **`name` is the LINE display name** — may contain emoji or spaces
 
@@ -51,65 +55,75 @@ lock-step pattern with no architectural changes required.
 ## Related Issues
 
 - `20260226-2020` Expand OAuth2 Provider Support (relationship: part of)
-- `20260420-0552` Add Entra Provider (relationship: same lock-step pattern, completed)
+- `20260420-1511` Add Generic OIDC Provider Slots (relationship: LINE uses this, completed)
 
 ## Approach
 
-Lock-step edits following the Entra pattern exactly. No new architectural work.
+No code changes required. Deliverables:
 
-### Implementation (6 lock-step edits in `provider.rs`)
+1. **E2E verification**: Confirm LINE Login works via a CUSTOM slot
+2. **Documentation**: Add LINE setup guide to `docs/src/guides/generic-oidc.md`
+   (LINE section appended to existing provider guides)
 
-1. `Line` variant in `ProviderKind`
-2. Include in `ProviderKind::ALL`
-3. `as_str`: `Self::Line => "line"`
-4. `from_provider_name`: `"line" => Some(Self::Line)`
-5. `optional_env_contract`: trigger `OAUTH2_LINE_CLIENT_ID`, deps `OAUTH2_LINE_CLIENT_SECRET` + `OAUTH2_LINE_ISSUER_URL`
-6. `LINE_PROVIDER: LazyLock<Option<ProviderConfig>>` + `provider_for` arm
+### Environment variables for LINE
 
-### Env vars
+```bash
+OAUTH2_CUSTOM<N>_CLIENT_ID="<LINE Channel ID>"
+OAUTH2_CUSTOM<N>_CLIENT_SECRET="<LINE Channel Secret>"
+OAUTH2_CUSTOM<N>_ISSUER_URL="https://access.line.me"
+OAUTH2_CUSTOM<N>_DISPLAY_NAME="LINE"
+OAUTH2_CUSTOM<N>_NAME="line"
+OAUTH2_CUSTOM<N>_BUTTON_COLOR="#06C755"
+OAUTH2_CUSTOM<N>_BUTTON_HOVER_COLOR="#05A647"
+OAUTH2_CUSTOM<N>_SCOPE="openid+profile+email"
+```
 
-- `OAUTH2_LINE_CLIENT_ID` (trigger)
-- `OAUTH2_LINE_CLIENT_SECRET`
-- `OAUTH2_LINE_ISSUER_URL` = `https://access.line.me`
-- `OAUTH2_LINE_RESPONSE_MODE` (optional, default `form_post`)
-- `OAUTH2_LINE_SCOPE` (optional, default `openid+email+profile`)
+### LINE Developer Console setup outline
 
-### UI
-
-- `provider_view` arm: `display_name: "LINE"`, `button_class: "btn-oauth2 btn-line"`
-- CSS: `--o2p-line: #06C755`, `--o2p-line-hover: #05A647`
-
-### Docs
-
-- `docs/src/guides/line.md` following Entra structure
-- Clear explanation of email approval requirement
-- Link to LINE Developers Console setup steps
+1. Create a LINE Login channel (channel type: LINE Login, app type: Web app)
+2. Set callback URL to `https://<ORIGIN>/oauth2/line/authorized`
+3. Apply for email address permission (requires screenshot of consent UI)
+4. Wait for approval (~1-2 business days)
+5. Copy Channel ID and Channel Secret to env vars
 
 ## Related Files
 
-- `oauth2_passkey/src/oauth2/provider.rs` — 6 lock-step edits
-- `oauth2_passkey/src/oauth2/provider/tests.rs` — 2 new tests
-- `oauth2_passkey_axum/src/oauth2.rs` — provider_view arm
-- `oauth2_passkey_axum/static/o2p-base.css` — CSS vars + button styles
-- `docs/src/guides/line.md` — new setup guide
-- `docs/src/SUMMARY.md` — add entry
+- `docs/src/guides/generic-oidc.md` — append LINE section
+- `docs/src/SUMMARY.md` — already has generic-oidc entry (no change needed)
+- `dot.env.example` — optionally add LINE example block
 
 ## Implementation Tasks
 
-- [ ] Add `Line` variant + 6 lock-step edits in `provider.rs`
-- [ ] Add 2 tests in `provider/tests.rs` (from_provider_name + optional_env_contract)
-- [ ] Add `"line"` arm in `provider_view`
-- [ ] Add CSS vars + `.btn-line` styles
-- [ ] Write `docs/src/guides/line.md`
-- [ ] Add entry to `docs/src/SUMMARY.md`
-- [ ] Verify `cargo fmt --all` + `cargo clippy --all-targets --all-features` + `cargo test` clean
-- [ ] End-to-end: LINE login succeeds with approved app (email present)
-- [ ] Verify behavior with unapproved app (email absent) — clean error expected
-- [ ] Regression: Google / Auth0 / Keycloak / Entra login still work
-- [ ] Commit
+- [ ] Apply for LINE email permission in Developer Console
+- [ ] Wait for email permission approval
+- [ ] Configure LINE as CUSTOM slot in demo environment
+- [ ] E2E: LINE login succeeds (email present after approval)
+- [ ] E2E: Verify named providers still work (regression check)
+- [ ] Append LINE section to `docs/src/guides/generic-oidc.md`
+- [ ] Optionally add LINE example to `dot.env.example`
 
 ## Decision Log
 
 <!-- APPEND-ONLY: Do not edit or delete existing entries. Add new entries at the bottom. -->
+
+### 2026-04-20: LINE as dedicated variant
+
+- Context: Originally planned as `ProviderKind::Line` with 6 lock-step
+  edits following the Entra pattern.
+- Decision: Planned as a named variant.
+- Reason: Issue was created before generic OIDC slots existed.
+
+### 2026-05-04: Pivot to Custom OIDC slot verification
+
+- Context: Generic OIDC provider slots (issue `20260420-1511`) landed with
+  E2E verification against Zitadel, Ory Hydra, Authentik, and Okta. LINE
+  is OIDC-compliant (v2.1, ES256, standard discovery) and fits the custom
+  slot mechanism without code changes.
+- Decision: Repurpose this issue as verification + documentation only.
+  No `ProviderKind::Line` variant needed.
+- Reason: Adding a dedicated variant for LINE would be unnecessary code
+  when the generic slot handles it identically. The only LINE-specific
+  concern (email permission) is a deployment/config issue, not a code issue.
+  Document the setup process and verify E2E.
 
 ## Resolution
