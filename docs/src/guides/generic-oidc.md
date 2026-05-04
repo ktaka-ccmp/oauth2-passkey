@@ -150,6 +150,7 @@ code path is shared with Custom slots.
 | Ory Hydra | Custom | ✅ | Client must be registered with `--token-endpoint-auth-method client_secret_post` (library sends credentials in the form body, not HTTP Basic). No bundled user store — needs a separate login/consent app. Reference consent app emits only `sub` by default; use `CONFORMITY_FAKE_CLAIMS=1` for demo setups. See [Ory Hydra (Self-Hosted)](#ory-hydra-self-hosted). |
 | Authentik | Custom | ✅ | Trailing slash on `ISSUER_URL` must match what Authentik's discovery document reports (`http://localhost:9000/application/o/{slug}/`). Otherwise clean OIDC defaults — no response-mode downgrade, no auth-method mismatch. See [Authentik (Self-Hosted)](#authentik-self-hosted). |
 | Okta (Developer Edition) | Custom | ✅ | Two-layer policy model — both the app's Authentication Policy **and** the Custom Authorization Server's Access Policy must allow the grant. Users must be **assigned** to the app explicitly (super-admin appears to bypass in admin UI but fails at token grant). See [Okta (Cloud, Developer Edition)](#okta-cloud-developer-edition). |
+| LINE Login | Custom | ✅ | Web login uses **HS256** (channel secret as HMAC key, no `kid` header) — supported since v0.5.1. `email` scope requires explicit approval in the LINE Developer Console; without it, login fails with a clean validation error. Discovery advertises ES256 but web login always returns HS256. See [LINE Login (Cloud)](#line-login-cloud). |
 | AWS Cognito | Custom | ❌ Not tested | Expected to work per OIDC spec; user-pool issuer shape is `https://cognito-idp.{region}.amazonaws.com/{user-pool-id}`. |
 | Dex, Authelia, Salesforce, GitLab, Ping, etc. | Custom | ❌ Not tested | OIDC-compliant; expected to work. File an issue if you try one and need adjustments. |
 
@@ -487,6 +488,72 @@ The rows matter in this order:
 Step 6. `Evaluation of sign-on policy` -> `DENY` maps to Step 5.
 No entry for your app at all = the request never reached Okta; check
 `redirect_uri` and `client_id` in the browser's Network tab.
+
+---
+
+## LINE Login (Cloud)
+
+LINE Login v2.1 is OIDC-compliant and works as a Custom slot. Two
+things are unusual compared to other providers:
+
+1. **HS256 signing** — LINE web login signs ID tokens with HS256 using
+   the channel secret, not ES256/RS256 with JWKS. The JWT has no `kid`
+   header. This is supported automatically (the library detects the
+   algorithm and falls back to `client_secret` verification).
+2. **Email requires approval** — the `email` claim is only returned
+   after you apply for and receive "Email address permission" in the
+   LINE Developer Console. Without it, login fails with a validation
+   error because neither `email` nor `preferred_username` is present.
+
+### Step 1: Create a LINE Login channel
+
+1. Go to [LINE Developers Console](https://developers.line.biz/console/).
+2. Create a **Provider** (or select an existing one).
+3. Create a new channel: **LINE Login** type, **Web app** application type.
+4. Under **LINE Login settings**, add the callback URL:
+   `https://<ORIGIN>/o2p/oauth2/{NAME}/authorized`
+   (e.g. `https://passkey-demo.ccmp.jp/o2p/oauth2/line/authorized`)
+
+### Step 2: Apply for email address permission
+
+1. In the channel's **Basic settings** tab, scroll to
+   **OpenID Connect** -> **Email address permission**.
+2. Click **Apply**, agree to the LINE User Data Policy.
+3. Upload a screenshot of your app that shows how the email address
+   will be used (e.g. the login page with a note like "Your email
+   address from the identity provider is used solely for account
+   identification").
+4. Submit. Approval typically takes 1-2 business days. There is no
+   explicit notification — the feature silently activates.
+
+### Step 3: Configure oauth2-passkey
+
+```bash
+OAUTH2_CUSTOM{N}_CLIENT_ID='<Channel ID>'
+OAUTH2_CUSTOM{N}_CLIENT_SECRET='<Channel Secret>'
+OAUTH2_CUSTOM{N}_ISSUER_URL='https://access.line.me'
+OAUTH2_CUSTOM{N}_DISPLAY_NAME='LINE'
+OAUTH2_CUSTOM{N}_NAME='line'
+OAUTH2_CUSTOM{N}_BUTTON_COLOR='#06C755'
+OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#05A647'
+OAUTH2_CUSTOM{N}_SCOPE='openid+profile+email'
+```
+
+The channel is in **Developing** status by default. Only users with
+**Admin** or **Tester** roles on the channel can log in. Switch to
+**Published** when ready for production.
+
+### Debugging
+
+- **"Missing both `email` and `preferred_username`"** — email
+  permission has not been approved yet. Check the channel's Basic
+  settings for the current status.
+- **"Missing key component: kid"** — you are running a library version
+  older than v0.5.1 that does not support HS256 without `kid`. Upgrade.
+- **Scope shows `profile openid` but not `email`** — this is normal
+  LINE behavior. Even when email permission is granted, LINE does not
+  list `email` in the token response's `scope` field. The email is
+  present in the ID token claims regardless.
 
 ---
 
