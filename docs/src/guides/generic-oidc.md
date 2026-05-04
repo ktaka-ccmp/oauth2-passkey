@@ -150,7 +150,7 @@ code path is shared with Custom slots.
 | Ory Hydra | Custom | ✅ | Client must be registered with `--token-endpoint-auth-method client_secret_post` (library sends credentials in the form body, not HTTP Basic). No bundled user store — needs a separate login/consent app. Reference consent app emits only `sub` by default; use `CONFORMITY_FAKE_CLAIMS=1` for demo setups. See [Ory Hydra (Self-Hosted)](#ory-hydra-self-hosted). |
 | Authentik | Custom | ✅ | Trailing slash on `ISSUER_URL` must match what Authentik's discovery document reports (`http://localhost:9000/application/o/{slug}/`). Otherwise clean OIDC defaults — no response-mode downgrade, no auth-method mismatch. See [Authentik (Self-Hosted)](#authentik-self-hosted). |
 | Okta (Developer Edition) | Custom | ✅ | Two-layer policy model — both the app's Authentication Policy **and** the Custom Authorization Server's Access Policy must allow the grant. Users must be **assigned** to the app explicitly (super-admin appears to bypass in admin UI but fails at token grant). See [Okta (Cloud, Developer Edition)](#okta-cloud-developer-edition). |
-| LINE Login | Custom | ✅ | Web login uses **HS256** (channel secret as HMAC key, no `kid` header) — supported since v0.5.1. `email` scope requires explicit approval in the LINE Developer Console; without it, login fails with a clean validation error. Discovery advertises ES256 but web login always returns HS256. See [LINE Login (Cloud)](#line-login-cloud). |
+| LINE Login | Custom (`PRESET=line`) | ✅ | Web login uses **HS256** (channel secret as HMAC key, no `kid` header) — supported since v0.5.1. `email` scope requires explicit approval in the LINE Developer Console; without it, login fails with a clean validation error. Discovery advertises ES256 but web login always returns HS256. See [LINE Login (Cloud)](#line-login-cloud). |
 | AWS Cognito | Custom | ❌ Not tested | Expected to work per OIDC spec; user-pool issuer shape is `https://cognito-idp.{region}.amazonaws.com/{user-pool-id}`. |
 | Dex, Authelia, Salesforce, GitLab, Ping, etc. | Custom | ❌ Not tested | OIDC-compliant; expected to work. File an issue if you try one and need adjustments. |
 
@@ -529,15 +529,16 @@ things are unusual compared to other providers:
 ### Step 3: Configure oauth2-passkey
 
 ```bash
+OAUTH2_CUSTOM{N}_PRESET='line'
 OAUTH2_CUSTOM{N}_CLIENT_ID='<Channel ID>'
 OAUTH2_CUSTOM{N}_CLIENT_SECRET='<Channel Secret>'
 OAUTH2_CUSTOM{N}_ISSUER_URL='https://access.line.me'
-OAUTH2_CUSTOM{N}_DISPLAY_NAME='LINE'
-OAUTH2_CUSTOM{N}_NAME='line'
-OAUTH2_CUSTOM{N}_BUTTON_COLOR='#06C755'
-OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#05A647'
 OAUTH2_CUSTOM{N}_SCOPE='openid+profile+email'
 ```
+
+The `line` preset supplies the display name, URL segment, icon, and
+button colors automatically. You can override any preset value by
+setting the corresponding env var explicitly.
 
 The channel is in **Developing** status by default. Only users with
 **Admin** or **Tester** roles on the channel can log in. Switch to
