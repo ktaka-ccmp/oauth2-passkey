@@ -181,6 +181,15 @@ pub(crate) const LINE_PRESET: ProviderPreset = ProviderPreset {
     additional_allowed_origins: &[],
 };
 
+pub(crate) const APPLE_PRESET: ProviderPreset = ProviderPreset {
+    display_name: "Apple",
+    provider_name: ProviderName::from_static("apple"),
+    icon_slug: "apple",
+    button_color: "#000000",
+    button_hover_color: "#333333",
+    additional_allowed_origins: &[],
+};
+
 /// Resolve a preset key (from `OAUTH2_CUSTOM{N}_PRESET`) to its
 /// [`ProviderPreset`]. Returns `Err` with an operator-facing message on
 /// unknown keys so `init()` can fail fast.
@@ -193,9 +202,10 @@ fn resolve_preset(key: &str) -> Result<&'static ProviderPreset, String> {
         "okta" => Ok(&OKTA_PRESET),
         "authentik" => Ok(&AUTHENTIK_PRESET),
         "line" => Ok(&LINE_PRESET),
+        "apple" => Ok(&APPLE_PRESET),
         other => Err(format!(
             "unknown PRESET '{other}' (expected one of: \
-             auth0, keycloak, entra, zitadel, okta, authentik, line)"
+             auth0, keycloak, entra, zitadel, okta, authentik, line, apple)"
         )),
     }
 }

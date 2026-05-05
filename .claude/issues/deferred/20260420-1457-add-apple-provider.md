@@ -227,4 +227,24 @@ Standard 6 edits in `provider.rs` (same pattern as Entra) plus:
   (Apple Developer subscription) is disproportionate to current demand.
   The information is documented here for when it becomes relevant.
 
+### 2026-05-05: Apple preset added (resolves earlier title-vs-body contradiction)
+
+- Context: The previous Decision Log entry's title says "preset + docs
+  only, no core code changes" but the body says "If demand justifies
+  the cost, add preset". The actual implementation deferred everything
+  — preset was not added — leaving the docs talking about Apple as a
+  Custom slot without preset. User flagged the inconsistency.
+- Decision: Add `APPLE_PRESET` (matching the LINE pattern) in this
+  pass. Includes provider.rs preset constant + resolve_preset arm,
+  oauth2_passkey_axum/static/icons/apple.svg (CC0 from Simple Icons),
+  /apple.svg route in icons.rs, and dot.env.example block. Also a
+  dedicated docs/src/guides/apple.md page. **E2E verification still
+  deferred** — issue stays in `deferred/` until an Apple Developer
+  Program subscription is available.
+- Reason: Honors the original "preset + docs only" agreement.
+  Operators with an Apple Developer account can now use the same
+  one-line `PRESET=apple` ergonomics as LINE/Auth0/etc., and the
+  unverified status is documented in the verification table and the
+  Apple guide's Notes section.
+
 ## Resolution
