@@ -153,6 +153,8 @@ code path is shared with Custom slots.
 | LINE Login | Custom (`PRESET=line`) | ✅ | Web login uses **HS256** (channel secret as HMAC key, no `kid` header) — supported since v0.5.1. `email` scope requires explicit approval in the LINE Developer Console; without it, login fails with a clean validation error. Discovery advertises ES256 but web login always returns HS256. See [LINE Login (Cloud)](#line-login-cloud). |
 | AWS Cognito | Custom | ❌ Not tested | Expected to work per OIDC spec; user-pool issuer shape is `https://cognito-idp.{region}.amazonaws.com/{user-pool-id}`. |
 | Dex, Authelia, Salesforce, GitLab, Ping, etc. | Custom | ❌ Not tested | OIDC-compliant; expected to work. File an issue if you try one and need adjustments. |
+| Apple (Sign in with Apple) | Custom | ❌ Not tested | OIDC-compliant, expected to work. Requires a **pre-generated client_secret JWT** (ES256-signed, max 6-month validity) instead of a static secret — generate externally and pass as `CLIENT_SECRET`. `name` claim is only returned on first authorization. See [Apple (Cloud)](#apple-cloud). |
+| GitHub | — | ❌ Not supported | GitHub does not implement OIDC for end-user login. Its `/login/oauth/.well-known/openid-configuration` endpoint is for Actions workflow federation only (no authorization_endpoint, no user-identity claims). GitHub OAuth2 requires a proprietary REST flow that this library does not support. |
 
 Any OIDC-compliant IdP should work. The sections below walk through
 each verified self-host / cloud setup in detail.
@@ -555,6 +557,75 @@ The channel is in **Developing** status by default. Only users with
   LINE behavior. Even when email permission is granted, LINE does not
   list `email` in the token response's `scope` field. The email is
   present in the ID token claims regardless.
+
+---
+
+## Apple (Cloud)
+
+Sign in with Apple is OIDC-compliant but uses a **dynamic client_secret**
+— a short-lived JWT signed with an ES256 private key (P8 file) from
+Apple Developer. This library treats `CLIENT_SECRET` as a static string,
+so you must pre-generate the JWT externally and pass it as an env var.
+
+### Prerequisites
+
+- Apple Developer Program membership ($99/year)
+- A "Sign in with Apple" Service ID configured in the Apple Developer portal
+- A private key (P8 file) downloaded from Keys section
+
+### Generating the client_secret JWT
+
+The JWT is valid for up to 6 months. Generate it with any JWT library:
+
+```python
+import jwt, time
+
+token = jwt.encode(
+    {
+        "iss": "<Team ID>",
+        "sub": "<Service ID (client_id)>",
+        "aud": "https://appleid.apple.com",
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 86400 * 180,  # 6 months
+    },
+    open("AuthKey_<Key ID>.p8").read(),
+    algorithm="ES256",
+    headers={"kid": "<Key ID>"},
+)
+print(token)
+```
+
+Regenerate before expiry (cron job or CI pipeline).
+
+### Environment configuration
+
+```bash
+OAUTH2_CUSTOM{N}_CLIENT_ID='<Service ID>'
+OAUTH2_CUSTOM{N}_CLIENT_SECRET='<pre-generated JWT>'
+OAUTH2_CUSTOM{N}_ISSUER_URL='https://appleid.apple.com'
+OAUTH2_CUSTOM{N}_DISPLAY_NAME='Apple'
+OAUTH2_CUSTOM{N}_NAME='apple'
+OAUTH2_CUSTOM{N}_BUTTON_COLOR='#000000'
+OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#333333'
+OAUTH2_CUSTOM{N}_SCOPE='openid+email+name'
+```
+
+### Caveats
+
+- **`name` only on first authorization** — Apple returns the user's
+  name only the first time they authorize the app. If the user is
+  deleted from the application but does not revoke access in Apple ID
+  settings, re-registration will succeed (email is always in the ID
+  token) but name will be empty. Workaround: user revokes the app in
+  Settings > Apple ID > Sign in with Apple first.
+- **Private email relay** — users who choose "Hide My Email" get a
+  `@privaterelay.appleid.com` address. This works as-is for account
+  identification. Sending emails to relay addresses requires
+  registering outbound domains with SPF/DKIM in Apple Developer
+  Console, but oauth2-passkey itself does not send emails so this is
+  only relevant to the consuming application.
+- **Status: unverified** — this configuration has not been E2E tested.
+  If you verify it, please report back.
 
 ---
 
