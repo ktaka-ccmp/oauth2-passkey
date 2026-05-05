@@ -176,22 +176,34 @@ Open `http://localhost:8080/ui/console` and complete the first-run wizard.
 
 ### Step 2: Register an Application
 
-1. Log into the Zitadel console
-2. Open the **Default** project (or create one) → **New** → **Application**
-3. Choose **Web** and **Code** grant type
-4. Set **Redirect URI**: `http://localhost:3001/o2p/oauth2/zitadel/authorized`
-5. Finish the wizard and copy the **Client ID** and **Client Secret**
+1. Log into the Zitadel console (default IAM owner credentials are
+   `zitadel-admin@zitadel.localhost` / `Password1!` — Zitadel prompts a
+   password reset on first login).
+2. Open the **Default** project (or create one) → **New** → **Application**.
+3. Choose **Web**.
+4. **Authentication Method**: pick **`CODE`** — this is what issues a
+   client secret. Do **not** pick `PKCE`: PKCE makes Zitadel treat the
+   app as a public client with no secret, which oauth2-passkey does not
+   use. If you picked `PKCE` by accident, open the app, switch
+   **Authentication Method** to `CODE`, save, then regenerate a secret
+   from the **Client Secret** section.
+5. Set **Redirect URI**: `http://localhost:3001/o2p/oauth2/zitadel/authorized`.
+6. Finish the wizard and copy the **Client ID** and **Client Secret**.
+   The secret is shown **once only** — if you miss it, regenerate it
+   from the app's detail page → **Client Secret** section.
 
 ### Step 3: Configure oauth2-passkey
 
 ```bash
+OAUTH2_CUSTOM1_PRESET='zitadel'
 OAUTH2_CUSTOM1_CLIENT_ID='<client-id-from-zitadel>'
 OAUTH2_CUSTOM1_CLIENT_SECRET='<client-secret-from-zitadel>'
 OAUTH2_CUSTOM1_ISSUER_URL='http://localhost:8080'
-OAUTH2_CUSTOM1_DISPLAY_NAME='Zitadel'
-OAUTH2_CUSTOM1_NAME='zitadel'
 OAUTH2_CUSTOM1_RESPONSE_MODE='query'
 ```
+
+The `zitadel` preset supplies `DISPLAY_NAME`, `NAME`, icon, and button
+colors automatically; set them explicitly only if overriding.
 
 > **Zitadel v4** (separate `zitadel-login` Next.js service) requires
 > `OAUTH2_CUSTOM1_RESPONSE_MODE=query`. Zitadel v2 (embedded V1 login,
@@ -254,7 +266,12 @@ OAUTH2_CUSTOM2_CLIENT_SECRET='<client-secret-from-hydra>'
 OAUTH2_CUSTOM2_ISSUER_URL='http://localhost:4444'
 OAUTH2_CUSTOM2_DISPLAY_NAME='Ory Hydra'
 OAUTH2_CUSTOM2_NAME='hydra'
+OAUTH2_CUSTOM2_RESPONSE_MODE='query'
 ```
+
+`OAUTH2_CUSTOM2_RESPONSE_MODE=query` is required: Hydra supports `query`
+and `fragment` only, not `form_post`. The library's default `form_post`
+fails with `invalid_request: response_mode form_post not supported`.
 
 ### Step 4: Login / Consent App
 
@@ -365,14 +382,14 @@ curl -s http://localhost:9000/application/o/oauth2-passkey-demo/.well-known/open
 ### Step 3: Configure oauth2-passkey
 
 ```bash
+OAUTH2_CUSTOM{N}_PRESET='authentik'
 OAUTH2_CUSTOM{N}_CLIENT_ID='<from Authentik provider>'
 OAUTH2_CUSTOM{N}_CLIENT_SECRET='<from Authentik provider>'
 OAUTH2_CUSTOM{N}_ISSUER_URL='http://localhost:9000/application/o/oauth2-passkey-demo/'
-OAUTH2_CUSTOM{N}_DISPLAY_NAME='Authentik'
-OAUTH2_CUSTOM{N}_NAME='authentik'
-OAUTH2_CUSTOM{N}_BUTTON_COLOR='#fd4b2d'
-OAUTH2_CUSTOM{N}_BUTTON_HOVER_COLOR='#e03d1f'
 ```
+
+The `authentik` preset supplies `DISPLAY_NAME`, `NAME`, icon, and
+button colors automatically; set them explicitly only if overriding.
 
 The **trailing slash** on `ISSUER_URL` must match exactly what
 Authentik's discovery document reports under `"issuer"`, or strict
@@ -417,12 +434,14 @@ Use the exact string it returns for `OAUTH2_CUSTOM{N}_ISSUER_URL`.
 ### Step 3: Configure oauth2-passkey
 
 ```bash
+OAUTH2_CUSTOM{N}_PRESET='okta'
 OAUTH2_CUSTOM{N}_CLIENT_ID='<Client ID from Okta>'
 OAUTH2_CUSTOM{N}_CLIENT_SECRET='<Client Secret from Okta>'
 OAUTH2_CUSTOM{N}_ISSUER_URL='https://<tenant>.okta.com/oauth2/default'
-OAUTH2_CUSTOM{N}_DISPLAY_NAME='Okta'
-OAUTH2_CUSTOM{N}_NAME='okta'
 ```
+
+The `okta` preset supplies `DISPLAY_NAME`, `NAME`, icon, and button
+colors automatically; set them explicitly only if overriding.
 
 ### Step 4: Assign users
 
@@ -680,6 +699,43 @@ it works the same way if needed.
 
 ---
 
+## End-to-End Verification
+
+Once a Custom slot is configured:
+
+1. Start a demo app:
+   ```bash
+   cd demo-both
+   cargo run
+   ```
+2. Open `http://localhost:3001/` in a browser.
+3. Click **Continue with {DISPLAY_NAME}**.
+4. Authenticate at the IdP (use the admin account you created during
+   registration; for Hydra with `CONFORMITY_FAKE_CLAIMS=1`, any
+   credentials are accepted).
+5. Grant consent when prompted.
+6. You should be redirected back to the demo landing page as an
+   authenticated user.
+7. Verify the account row was written:
+   ```bash
+   sqlite3 demo-both/data/auth.db \
+       "SELECT provider, provider_user_id, email FROM oauth2_accounts;"
+   ```
+   You should see a row with `provider` matching `OAUTH2_CUSTOM{N}_NAME`.
+
+### Regression checks
+
+After verifying a Custom slot, sign out and confirm:
+
+- Google (and any other named providers configured) still work.
+- The **Choose a provider** screen at `/o2p/oauth2/select` renders every
+  enabled provider button, with the colors from each slot's
+  `BUTTON_COLOR` (or the preset's defaults).
+- The admin user-detail page renders the correct display name and icon
+  for the new provider.
+
+---
+
 ## Troubleshooting
 
 ### Issuer mismatch error
@@ -731,12 +787,49 @@ above).
 Zitadel v2.71.x (embedded V1 login) does not hit this path — it calls
 `AuthResponseFormPost` directly and emits the HTML form correctly.
 
+**Ory Hydra** exhibits the same constraint with a more explicit error
+message: it returns `invalid_request: response_mode form_post not
+supported` because Hydra only supports `query` and `fragment`. Same
+fix: set `OAUTH2_CUSTOM{N}_RESPONSE_MODE=query`.
+
 ### JWKS fetch failures
 
 oauth2-passkey fetches the IdP's JSON Web Key Set from the `jwks_uri`
 advertised by the discovery document. For self-hosted IdPs on HTTP, make
 sure the URL is reachable from the oauth2-passkey process. For IdPs
 behind corporate firewalls, confirm egress is allowed.
+
+### JWKS stale after switching IdP versions on the same host
+
+If you test against multiple versions of the same IdP on the same host
+(e.g. Zitadel v2 and v4 both bound to `:8080`), they advertise the same
+`jwks_uri`. oauth2-passkey caches JWKS in the configured cache backend
+(Redis by default) for 10 minutes keyed by URL, so after switching
+stacks the app still returns the previous instance's keys and ID-token
+verification fails with:
+
+```
+Authentication failed: OAuth2 error: Id token error: No matching key
+found in JWKS
+```
+
+Flush just the stale entry:
+
+```bash
+docker exec <redis-container> redis-cli \
+    DEL 'cache:jwks:http://localhost:8080/oauth/v2/keys'
+```
+
+(or `FLUSHDB` if you don't mind wiping the entire cache). In-memory
+caches clear on demo-app restart and do not need manual intervention.
+
+### Login loops after consent (self-hosted IdPs)
+
+Repeatedly redirected back to the IdP login screen after granting
+consent — usually a stale session cookie for the IdP from an earlier
+run. Clear cookies for the IdP host (e.g. `localhost:8080` for Zitadel)
+and try again. If the loop persists, `docker compose down -v` on the
+IdP stack to wipe state fully and re-register the application.
 
 ### IdP signs the user in without prompting
 
