@@ -43,8 +43,14 @@
 - [Passkey Implementation](integration/passkey.md)
 - [Development Tunneling](guides/tunneling.md)
 - [Auth0 Provider Setup](guides/auth0.md)
+- [Authentik Provider Setup](guides/authentik.md)
 - [Keycloak Provider Setup](guides/keycloak.md)
+- [LINE Login Provider Setup](guides/line.md)
 - [Microsoft Entra ID Provider Setup](guides/entra.md)
+- [Okta Provider Setup](guides/okta.md)
+- [Ory Hydra Provider Setup](guides/ory-hydra.md)
+- [Sign in with Apple Provider Setup](guides/apple.md)
+- [Zitadel Provider Setup](guides/zitadel.md)
 - [Generic OIDC Provider Setup](guides/generic-oidc.md)
 
 ---
