@@ -102,6 +102,31 @@ Update `docs/src/SUMMARY.md` to include new guide pages.
 - Reason: Less duplication, fewer files to keep in sync, and the
   walkthroughs were already in their natural home.
 
+### 2026-05-05: Follow-up — restructure provider docs to per-IdP files (Option A)
+
+- Context: After consolidating idp/README.md walkthroughs into
+  generic-oidc.md, a deeper audit revealed that the doc was still framed
+  as "Custom Slots vs Named Providers" — but the codebase removed the
+  Auth0/Keycloak/Entra named providers in commit `4b9d3ad`
+  (issue `20260422-1636`). Only Google remains as a named provider.
+  Meanwhile auth0.md / keycloak.md / entra.md were already current
+  per-provider walkthrough files using `PRESET=…`. The asymmetry was
+  inherited rather than designed.
+- Decision: Adopt Option A — every provider gets its own walkthrough
+  file. Created `zitadel.md`, `ory-hydra.md`, `authentik.md`,
+  `okta.md`, `line.md`, `apple.md` (matching the auth0.md template).
+  Slimmed `generic-oidc.md` from 929 lines to ~470: it is now the
+  catalog/reference (concepts, preset table, env-var docs,
+  verification status, multi-instance pattern, E2E checks,
+  troubleshooting) with no per-provider walkthroughs. Updated
+  SUMMARY.md to list all 9 provider guides + the catalog. Apple
+  preset (`APPLE_PRESET`) added to provider.rs to honor an earlier
+  agreement that had been missed.
+- Reason: Restores symmetry. Discoverable per-provider pages, single
+  catalog page, no inherited "named vs Custom" framing. The first
+  consolidation (idp/README.md → generic-oidc.md) plus this follow-up
+  arrive at a coherent end state.
+
 ### 2026-05-05: Step 1 verification finding
 
 - Context: Before trimming, compared every section of `idp/README.md`

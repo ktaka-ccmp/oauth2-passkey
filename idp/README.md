@@ -69,7 +69,7 @@ docker compose down -v
 > and works standalone — which is what this stack needs. Use the v4
 > stack below if you want to test the multi-service setup.
 
-Setup walkthrough: [Zitadel (Self-Hosted)](../docs/src/guides/generic-oidc.md#zitadel-self-hosted).
+Setup walkthrough: [Zitadel Provider Setup](../docs/src/guides/zitadel.md).
 
 ---
 
@@ -88,7 +88,7 @@ v4 splits Zitadel and the login UI into separate services. It silently
 downgrades `response_mode=form_post` to `query`, so set
 `OAUTH2_CUSTOM{N}_RESPONSE_MODE=query` in your `.env`.
 
-Setup walkthrough: [Zitadel (Self-Hosted)](../docs/src/guides/generic-oidc.md#zitadel-self-hosted)
+Setup walkthrough: [Zitadel Provider Setup](../docs/src/guides/zitadel.md)
 (same registration flow as v2; the response-mode caveat is in
 [Troubleshooting](../docs/src/guides/generic-oidc.md#zitadel-returns-invalid-response-mode-get-is-not-allowed-for-form_post)).
 
@@ -114,7 +114,7 @@ The bundled consent container runs with `CONFORMITY_FAKE_CLAIMS=1` so
 sign-in works out of the box for testing. Hydra also requires
 `OAUTH2_CUSTOM{N}_RESPONSE_MODE=query`.
 
-Setup walkthrough: [Ory Hydra (Self-Hosted)](../docs/src/guides/generic-oidc.md#ory-hydra-self-hosted).
+Setup walkthrough: [Ory Hydra Provider Setup](../docs/src/guides/ory-hydra.md).
 
 ---
 
@@ -142,7 +142,7 @@ docker compose down -v       # wipes Postgres + Redis volumes
 The `openssl rand` step **must** happen before `docker compose up` —
 Authentik refuses to start without `AUTHENTIK_SECRET_KEY` set in `.env`.
 
-Setup walkthrough: [Authentik (Self-Hosted)](../docs/src/guides/generic-oidc.md#authentik-self-hosted).
+Setup walkthrough: [Authentik Provider Setup](../docs/src/guides/authentik.md).
 
 ---
 
