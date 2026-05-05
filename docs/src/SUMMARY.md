@@ -25,7 +25,22 @@
 
 ---
 
-# Part 3: Customization
+# Part 3: Identity Providers
+
+- [Generic OIDC Provider Setup](guides/generic-oidc.md)
+  - [Auth0](guides/auth0.md)
+  - [Authentik](guides/authentik.md)
+  - [Keycloak](guides/keycloak.md)
+  - [LINE Login](guides/line.md)
+  - [Microsoft Entra ID](guides/entra.md)
+  - [Okta](guides/okta.md)
+  - [Ory Hydra](guides/ory-hydra.md)
+  - [Sign in with Apple](guides/apple.md)
+  - [Zitadel](guides/zitadel.md)
+
+---
+
+# Part 4: Customization
 
 - [Built-in Themes](integration/themes.md)
 - [Customizing CSS](integration/customizing-css.md)
@@ -36,26 +51,16 @@
 
 ---
 
-# Part 4: Internals
+# Part 5: Internals
 
 - [OAuth2 Implementation](integration/oauth2.md)
 - [FedCM (Experimental)](integration/fedcm.md)
 - [Passkey Implementation](integration/passkey.md)
 - [Development Tunneling](guides/tunneling.md)
-- [Auth0 Provider Setup](guides/auth0.md)
-- [Authentik Provider Setup](guides/authentik.md)
-- [Keycloak Provider Setup](guides/keycloak.md)
-- [LINE Login Provider Setup](guides/line.md)
-- [Microsoft Entra ID Provider Setup](guides/entra.md)
-- [Okta Provider Setup](guides/okta.md)
-- [Ory Hydra Provider Setup](guides/ory-hydra.md)
-- [Sign in with Apple Provider Setup](guides/apple.md)
-- [Zitadel Provider Setup](guides/zitadel.md)
-- [Generic OIDC Provider Setup](guides/generic-oidc.md)
 
 ---
 
-# Part 5: Security
+# Part 6: Security
 
 - [Security Model](security/model.md)
 - [CSRF Protection](security/csrf.md)
@@ -68,7 +73,7 @@
 
 ---
 
-# Part 6: Reference
+# Part 7: Reference
 
 - [Core Library API](api/core.md)
 - [Axum Integration API](api/axum.md)
@@ -83,7 +88,7 @@
 
 ---
 
-# Part 7: Maintainer Guide
+# Part 8: Maintainer Guide
 
 - [Development](maintainer/development.md)
 - [CI/CD](maintainer/ci-cd.md)
