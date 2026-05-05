@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-20-14-58
 
-## Closed:
+## Closed: 2026-05-05
 
-## Status: open
+## Status: wontfix
 
 ## Priority: low
 
@@ -189,4 +189,12 @@ Standard provider registration (minus OIDC-specific env vars):
 
 <!-- APPEND-ONLY: Do not edit or delete existing entries. Add new entries at the bottom. -->
 
+### 2026-05-05: Wontfix — scope limited to OIDC-compliant providers
+
+- Context: GitHub does not implement OIDC for end-user login (no discovery for login, no ID token, proprietary REST API for identity). Supporting it requires a non-OIDC flow abstraction (`ProviderFlow` enum or trait), a dedicated GitHub module, and email-fetching logic — significant complexity for one provider.
+- Decision: Close as wontfix. The library's scope is OIDC-compliant providers only.
+- Reason: The complexity of adding a non-OIDC flow abstraction is not justified by one provider. GitHub's OIDC endpoint (`/login/oauth/.well-known/openid-configuration`) is for Actions workflow federation, not user login — it has no authorization_endpoint, no token_endpoint, and no user-identity claims. Keeping the library OIDC-only results in simpler, more maintainable code.
+
 ## Resolution
+
+Closed as wontfix. GitHub does not implement OIDC for end-user login and supporting it would require a non-trivial architectural change (non-OIDC flow abstraction) that adds complexity disproportionate to the benefit. The library's scope is limited to OIDC-compliant providers, which covers the vast majority of enterprise and consumer identity providers.

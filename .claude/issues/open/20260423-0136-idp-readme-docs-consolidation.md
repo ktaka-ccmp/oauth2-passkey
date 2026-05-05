@@ -70,6 +70,7 @@ Update `docs/src/SUMMARY.md` to include new guide pages.
 - [ ] Add cross-links from `idp/README.md` to the new guide pages
 - [ ] Update `docs/src/SUMMARY.md` to include new guide pages
 - [ ] Verify no broken links / anchors
+- [ ] Audit `docs/src/guides/generic-oidc.md` for outdated OIDC configuration descriptions (preset system, Named vs Custom slot distinction, env var examples) — the guide predates the `PRESET=` mechanism and may still describe manual `DISPLAY_NAME`/`NAME`/`BUTTON_COLOR` setup as the only option
 
 ## Decision Log
 
@@ -80,5 +81,11 @@ Update `docs/src/SUMMARY.md` to include new guide pages.
 - Context: `idp/README.md` grown to 674 lines; user proposed splitting operational quick-reference from detailed walkthrough
 - Decision: Trim `idp/README.md` to Docker Compose commands + credential reset only; move detailed per-IdP setup into `docs/src/guides/`
 - Reason: `docs/src/guides/` is already the home for per-provider guides (auth0, keycloak, generic-oidc); keeping operational detail there avoids duplicating context
+
+### 2026-05-05: Add OIDC config documentation audit task
+
+- Context: The `PRESET=` mechanism (auth0, keycloak, entra, zitadel, okta, authentik, line) now supplies display_name, name, icon_slug, and button colors automatically. `generic-oidc.md` and other guides may still describe manual env var setup as the primary path, and the Named vs Custom slot distinction has evolved since the guides were written.
+- Decision: Add a task to audit OIDC configuration documentation for accuracy when this issue is worked on.
+- Reason: Avoids users following outdated setup instructions that require unnecessary env vars.
 
 ## Resolution
