@@ -6,11 +6,10 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (12)
+### Open (11)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260505-1416` | low | small | [Support Entra ID multi-tenant endpoints (common/organizations)](open/20260505-1416-entra-multi-tenant.md) |
 | `20260420-0402` | medium | small | [Admin unlink/delete fails in demo mode ("Invalid user ID")](open/20260420-0402-admin-unlink-demo-mode.md) |
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
@@ -110,10 +109,11 @@ This directory contains issue/task tracking files for the project.
 | `20260212-0235` | [Standalone Demo Repository](wontfix/20260212-0235-standalone-demo-repository.md) |
 | `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
-### Deferred (11)
+### Deferred (12)
 
 | ID | Title |
 |----|-------|
+| `20260505-1416` | [Support Entra ID multi-tenant endpoints (common/organizations)](deferred/20260505-1416-entra-multi-tenant.md) |
 | `20260420-1457` | [Add Sign in with Apple as OAuth2 Provider](deferred/20260420-1457-add-apple-provider.md) |
 | `20260323-1505` | [DPoP (Demonstration of Proof-of-Possession) Support](deferred/20260323-1505-dpop-sender-constrained-tokens.md) |
 | `20260320-1410` | [FedCM Cancel Fallback Popup Gets Blocked by Browser](deferred/20260320-1410-fedcm-fallback-popup-blocked.md) |
