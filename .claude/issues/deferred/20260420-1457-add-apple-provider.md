@@ -16,11 +16,11 @@
 
 ## Closed:
 
-## Status: open
+## Status: deferred
 
 ## Priority: low
 
-## Difficulty: large
+## Difficulty: small
 
 ## Description
 
@@ -63,10 +63,22 @@ The secret expires (max 6 months) and must be regenerated periodically.
    - oauth2-passkey already persists email/name in DB on first login, so
      subsequent logins reading from DB should work — but the initial
      authorization response shape must be handled correctly
+   - **Edge case: user deleted from oauth2-passkey but not revoked on Apple side.**
+     Apple still considers the app authorized, so `name` is not returned on
+     re-registration. `email` is available in the ID token every time (with
+     `email` scope), so account creation succeeds — but `name` will be empty.
+     Workaround: user revokes the app in Apple ID settings first, which resets
+     the authorization. Document this limitation clearly.
    
 2. **Private email relay**
    - User can choose "hide my email" → Apple returns `@privaterelay.appleid.com` proxy
    - Valid email for storage purposes; no special handling needed
+   - **Sending to relay addresses** requires registering outbound email
+     domains in Apple Developer Console + SPF/DKIM DNS records. However,
+     oauth2-passkey is passwordless (no password reset emails), so this
+     is **not needed** unless the consuming application sends emails to
+     users. Document this distinction: storing the relay address as an
+     identifier requires zero email infrastructure.
    
 3. **HTTPS redirect required in production**
    - localhost redirect not allowed in production app configuration
@@ -180,5 +192,59 @@ Standard 6 edits in `provider.rs` (same pattern as Entra) plus:
 ## Decision Log
 
 <!-- APPEND-ONLY: Do not edit or delete existing entries. Add new entries at the bottom. -->
+
+### 2026-05-05: Pre-generated client_secret as simpler alternative
+
+- Context: The `ClientSecret` enum approach (Phase A) requires async
+  `resolve()` at every token exchange, affects all providers, and adds
+  caching logic. However, Apple's client_secret JWT can be valid for up
+  to 6 months.
+- Decision: Document a simpler alternative — pre-generate the JWT
+  externally and pass it as a static `CLIENT_SECRET` env var. This
+  allows Apple to work as a Custom OIDC slot with zero library changes.
+  The `ClientSecret` enum approach remains an option if fully automated
+  rotation inside the library is desired later.
+- Reason: Eliminates the largest implementation cost (flow abstraction
+  + async resolve + cache). Operator regenerates the secret every
+  ~6 months via a script or CI pipeline. For Cloud Run / k8s deployments,
+  this can be automated at deploy time. Tradeoff: operational burden on
+  the operator, but minimal and automatable.
+
+### 2026-05-05: Defer — preset + docs only, no core code changes
+
+- Context: Apple is OIDC-compliant, `response_mode=form_post` is already
+  supported, and pre-generated client_secret eliminates the need for
+  `ClientSecret` enum. The only work needed is an `APPLE_PRESET` constant,
+  icon SVG, and documentation (same pattern as LINE preset). However,
+  verification requires Apple Developer Program ($99/year) which is not
+  currently available.
+- Decision: Defer the issue. Current status: Apple should work as a
+  Custom OIDC slot with a pre-generated client_secret JWT (unverified).
+  If demand justifies the cost, add preset + docs + verify E2E. Fully
+  automated secret rotation inside the library is a separate future
+  concern, only warranted if operator burden becomes a real problem.
+- Reason: No code changes needed for basic support. Verification cost
+  (Apple Developer subscription) is disproportionate to current demand.
+  The information is documented here for when it becomes relevant.
+
+### 2026-05-05: Apple preset added (resolves earlier title-vs-body contradiction)
+
+- Context: The previous Decision Log entry's title says "preset + docs
+  only, no core code changes" but the body says "If demand justifies
+  the cost, add preset". The actual implementation deferred everything
+  — preset was not added — leaving the docs talking about Apple as a
+  Custom slot without preset. User flagged the inconsistency.
+- Decision: Add `APPLE_PRESET` (matching the LINE pattern) in this
+  pass. Includes provider.rs preset constant + resolve_preset arm,
+  oauth2_passkey_axum/static/icons/apple.svg (CC0 from Simple Icons),
+  /apple.svg route in icons.rs, and dot.env.example block. Also a
+  dedicated docs/src/guides/apple.md page. **E2E verification still
+  deferred** — issue stays in `deferred/` until an Apple Developer
+  Program subscription is available.
+- Reason: Honors the original "preset + docs only" agreement.
+  Operators with an Apple Developer account can now use the same
+  one-line `PRESET=apple` ergonomics as LINE/Auth0/etc., and the
+  unverified status is documented in the verification table and the
+  Apple guide's Notes section.
 
 ## Resolution

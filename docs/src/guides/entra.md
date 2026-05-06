@@ -245,17 +245,25 @@ Expected output:
 
 ## Notes
 
-- **Single-tenant only** (per app registration): The `OAUTH2_CUSTOM1_ISSUER_URL`
-  must resolve to a specific tenant — either your organization's tenant
-  (work/school) or Microsoft's fixed consumer tenant UUID (personal). Using
-  `common` or `organizations` aliases will fail issuer validation because
-  their discovery documents contain a `{tenantid}` placeholder.
+- **One slot = one tenant**: Each Custom slot must point at a specific
+  tenant via `OAUTH2_CUSTOM{N}_ISSUER_URL` — either your organization's
+  tenant (work/school) or Microsoft's fixed consumer tenant UUID
+  (personal). To accept users from multiple tenants, configure multiple
+  Custom slots (each with `PRESET=entra` and a distinct `NAME` override).
+  See [Multiple instances of the same provider](./generic-oidc.md#multiple-instances-of-the-same-provider).
 
-- **Mixed (work + personal) not supported**: Supporting both account types
-  with one app registration requires multi-tenant issuer validation, which
-  is not implemented. The workaround is to register two separate
-  applications (one personal, one work/school) — however, oauth2-passkey
-  currently supports only one Entra provider instance per deployment.
+- **Multi-tenant aliases (`common`, `organizations`, `consumers`) not
+  supported**: A single app registration that accepts users from any
+  Azure AD tenant requires relaxing oauth2-passkey's strict issuer
+  validation — the discovery document at these endpoints advertises an
+  issuer of `https://login.microsoftonline.com/{tenantid}/v2.0` (a
+  literal placeholder). Workaround: use one slot per known tenant.
+
+- **Mixed personal + work accounts**: Use two slots — one with the
+  fixed consumer UUID issuer
+  (`9188040d-6c67-4c5b-b112-36a304b66dad`) and one with your
+  work/school tenant UUID. Each renders as its own "Continue with
+  Microsoft" button.
 
 - **Consent screen on every login**: A consent screen appears on every login
   because `prompt=consent` is included in the authorization request. This

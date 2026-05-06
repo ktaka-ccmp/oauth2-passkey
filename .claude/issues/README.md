@@ -6,13 +6,11 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (15)
+### Open (11)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260423-0136` | low | medium | [Consolidate idp/README.md into docs/](open/20260423-0136-idp-readme-docs-consolidation.md) |
 | `20260420-0402` | medium | small | [Admin unlink/delete fails in demo mode ("Invalid user ID")](open/20260420-0402-admin-unlink-demo-mode.md) |
-| `20260226-2020` | high | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 | `20260226-1814` | high | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
@@ -23,13 +21,13 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
 | `20260331-1517` | low | small | [PASSKEY_AUTHENTICATOR_ATTACHMENT=none sends non-standard string instead of omitting field](open/20260331-1517-passkey-authenticator-attachment-none-serialization.md) |
-| `20260420-1457` | low | large | [Add Sign in with Apple as OAuth2 Provider](open/20260420-1457-add-apple-provider.md) |
-| `20260420-1458` | low | large | [Add GitHub as OAuth2 Provider (non-OIDC)](open/20260420-1458-add-github-provider.md) |
 
-### Completed (70)
+### Completed (72)
 
 | ID | Title |
 |----|-------|
+| `20260423-0136` | [Consolidate idp/README.md into docs/](completed/20260423-0136-idp-readme-docs-consolidation.md) |
+| `20260226-2020` | [Expand OAuth2 Provider Support](completed/20260226-2020-expand-oauth2-providers.md) |
 | `20260420-1456` | [Verify LINE Login as Custom OIDC Provider + Documentation](completed/20260420-1456-add-line-provider.md) |
 | `20260421-0315` | [Configurable `prompt` parameter per OAuth2 provider](completed/20260421-0315-configurable-prompt-per-provider.md) |
 | `20260422-2055` | [Introduce `ProviderName` newtype for stringly-typed provider identifiers](completed/20260422-2055-providername-newtype-typesafety.md) |
@@ -101,19 +99,22 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-09` | [Cross-Origin Same-Site Demo (Pattern 2)](completed/2026-01-30-cross-origin-same-site-demo.md) |
 | `2026-01-31-02` | [Remove HTTPS Support from Demo Apps](completed/2026-01-31-demo-remove-https.md) |
 
-### Wontfix (4)
+### Wontfix (5)
 
 | ID | Title |
 |----|-------|
+| `20260420-1458` | [Add GitHub as OAuth2 Provider (non-OIDC)](wontfix/20260420-1458-add-github-provider.md) |
 | `20260226-2023` | [Authentication Method Tracking in Session](wontfix/20260226-2023-auth-method-tracking-in-session.md) |
 | `20260226-2026` | [UI Improvements](wontfix/20260226-2026-ui-improvements.md) |
 | `20260212-0235` | [Standalone Demo Repository](wontfix/20260212-0235-standalone-demo-repository.md) |
 | `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
-### Deferred (10)
+### Deferred (12)
 
 | ID | Title |
 |----|-------|
+| `20260505-1416` | [Support Entra ID multi-tenant endpoints (common/organizations)](deferred/20260505-1416-entra-multi-tenant.md) |
+| `20260420-1457` | [Add Sign in with Apple as OAuth2 Provider](deferred/20260420-1457-add-apple-provider.md) |
 | `20260323-1505` | [DPoP (Demonstration of Proof-of-Possession) Support](deferred/20260323-1505-dpop-sender-constrained-tokens.md) |
 | `20260320-1410` | [FedCM Cancel Fallback Popup Gets Blocked by Browser](deferred/20260320-1410-fedcm-fallback-popup-blocked.md) |
 | `20260316-1630` | [FedCM Promise Hangs Indefinitely in Stale Tab](deferred/20260316-1630-fedcm-promise-hang-stale-tab.md) |

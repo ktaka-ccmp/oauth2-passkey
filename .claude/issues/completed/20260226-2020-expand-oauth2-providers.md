@@ -14,9 +14,9 @@
 
 ## Created: 2026-02-26
 
-## Closed:
+## Closed: 2026-05-05
 
-## Status: open (Step 1 + 2 complete; Auth0/Keycloak/Entra shipped; LINE/Apple/GitHub tracked as sub-issues)
+## Status: completed
 
 ## Priority: high
 
@@ -36,10 +36,10 @@ range of deployments.
 | Auth0 | OIDC | shipped (v0.5.1) | Step 2 below |
 | Keycloak | OIDC | shipped | `20260420-0307` (completed) |
 | Microsoft Entra ID | OIDC | shipped | `20260420-0552` (completed) |
-| LINE | OIDC | planned | `20260420-1456` |
-| Apple | OIDC + dynamic JWT secret | planned | `20260420-1457` |
-| GitHub | plain OAuth2 (non-OIDC) | planned | `20260420-1458` |
-| Generic OIDC slots (Okta, Zitadel, AWS Cognito, Ory Hydra, Dex, Authelia, ...) | OIDC | planned | `20260420-1511` |
+| LINE | OIDC (HS256) | shipped (v0.5.1) | `20260420-1456` (completed) |
+| Generic OIDC slots (Okta, Zitadel, AWS Cognito, Ory Hydra, Dex, Authentik, ...) | OIDC | shipped (v0.5.1) | `20260420-1511` (completed) |
+| Apple | OIDC + pre-generated JWT secret | deferred | `20260420-1457` (deferred — works as Custom slot with externally-generated client_secret JWT; unverified) |
+| GitHub | plain OAuth2 (non-OIDC) | wontfix | `20260420-1458` (wontfix — not OIDC, out of scope) |
 
 ### Design Considerations
 
@@ -60,12 +60,12 @@ range of deployments.
 Completed sub-issues:
 - `20260420-0307` Add Keycloak as OIDC Provider (completed)
 - `20260420-0552` Add Microsoft Entra ID as OAuth2 Provider (completed)
+- `20260420-1456` Verify LINE Login as Custom OIDC Provider + Documentation (completed)
+- `20260420-1511` Add Generic OIDC Provider Slots (completed)
 
-Open sub-issues:
-- `20260420-1456` Add LINE Login as OAuth2 Provider
-- `20260420-1457` Add Sign in with Apple as OAuth2 Provider
-- `20260420-1458` Add GitHub as OAuth2 Provider (non-OIDC)
-- `20260420-1511` Add Generic OIDC Provider Slots
+Closed/deferred sub-issues:
+- `20260420-1457` Add Sign in with Apple as OAuth2 Provider (deferred — works as Custom slot with pre-generated client_secret; needs verification)
+- `20260420-1458` Add GitHub as OAuth2 Provider (wontfix — not OIDC, library scope limited to OIDC providers)
 
 ## Approach
 
@@ -268,7 +268,7 @@ Tests and verification:
 - [x] Configure `demo-live/env.cloud-run.yaml` with `OAUTH2_AUTH0_*` settings (ISSUER_URL / RESPONSE_MODE / SCOPE), plus GSM secrets for CLIENT_ID / CLIENT_SECRET and `--set-secrets` wiring in `.github/workflows/deploy-demo.yml`
 - [x] Run demo, log in via Auth0 button, verify DB row has `provider="auth0"` and correct `sub`
 - [x] Verify Google login still works concurrently
-- [ ] Capture screenshots for LT
+- [x] Capture screenshots for LT
 - [x] If any code change is needed here, mark Step 1 as incomplete and address (no code changes required)
 
 
@@ -280,34 +280,32 @@ Tests and verification:
     `email`/`name` relaxed to `Option<String>` with `preferred_username`
     fallback; `Jwk.alg` relaxed to `Option<String>` with kty-derived default.
 
-### Phase 2: LINE (OIDC — same pattern as Entra)
+### Phase 2: LINE (completed)
 
-Tracked as sub-issue `20260420-1456`. Straightforward lock-step edits; no
-architectural changes required. ES256 is already supported; main caveat is
-LINE's email-permission approval requirement.
+Tracked as sub-issue `20260420-1456`. LINE works as a Custom OIDC slot with
+`PRESET=line`. Required adding HS256 client_secret verification (LINE web
+login uses HS256 without `kid` header). No dedicated `ProviderKind` variant
+needed.
 
-### Phase 3: GitHub (non-OIDC) — was "Phase 2" in earlier revisions
+### Phase 3: GitHub (wontfix)
 
-Tracked as sub-issue `20260420-1458`. Requires introducing a non-OIDC flow
-path (enum `ProviderFlow` or a trait abstraction) because GitHub does not
-issue id_tokens and has no discovery endpoint for end-user login.
+Tracked as sub-issue `20260420-1458`. GitHub does not implement OIDC for
+end-user login. The library's scope is limited to OIDC-compliant providers;
+a non-OIDC flow abstraction is not justified for one provider.
 
-### Phase 4: Apple Sign-In — was "Phase 3" in earlier revisions
+### Phase 4: Apple Sign-In (deferred)
 
-Tracked as sub-issue `20260420-1457`. Requires introducing a dynamic-secret
-strategy (`ClientSecret::AppleJwt` with ES256 JWT generation from a P8
-private key, with caching).
+Tracked as sub-issue `20260420-1457`. Apple is OIDC-compliant and should
+work as a Custom OIDC slot with a pre-generated client_secret JWT (valid
+up to 6 months, generated externally). No `ClientSecret` enum needed.
+Deferred because verification requires Apple Developer Program ($99/year).
 
-### Phase 5: FedCM multi-provider (optional)
+### Phase 5: Multi-tenant Entra
 
-- [ ] Per-instance FedCM configURL
-- [ ] Frontend FedCM `providers: [...]` array support
-
-### Phase 6 (potential, not currently tracked): Multi-tenant Entra
-
-Support `common` / `organizations` Entra endpoints for work+personal mixed
-apps. Requires pattern-matching issuer URLs against a `{tenantid}` placeholder.
-See the Entra sub-issue's Decision Log for context.
+Tracked as sub-issue `20260505-1416`. Relaxes issuer validation in 2
+locations (~15 lines each) to accept the `{tenantid}` placeholder that
+Entra multi-tenant discovery documents return. Verification is free
+(Azure free tier). Difficulty: small.
 
 ## Decision Log
 
@@ -766,3 +764,17 @@ Key decisions:
 - Remaining: Google Cloud Console redirect URI update (user-side, external), post-deploy end-to-end verification.
 
 ## Resolution
+
+All planned provider expansion work is complete or tracked independently:
+
+- **Shipped**: Google (baseline), Auth0, Keycloak, Entra (single-tenant),
+  LINE, Generic OIDC slots (Okta, Zitadel, Ory Hydra, Authentik verified)
+- **Wontfix**: GitHub (not OIDC, out of library scope)
+- **Deferred**: Apple (works as Custom slot with pre-generated JWT; needs
+  verification with Apple Developer account)
+- **Separate issue**: Entra multi-tenant (`20260505-1416`)
+
+The library now supports any OIDC-compliant provider via Custom slots
+with optional presets. The provider preset system (auth0, keycloak,
+entra, zitadel, okta, authentik, line) provides one-line configuration
+for common providers.

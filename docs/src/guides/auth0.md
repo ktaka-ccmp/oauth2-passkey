@@ -99,7 +99,6 @@ Expected output:
 
 ## Notes
 
-- The `provider_user_id` format is `auth0_{sub}` where `sub` is the Auth0 user identifier (e.g. `auth0|6abc123...` for database connections, `google-oauth2|123...` for social connections).
-- Auth0 social connection logins (e.g. "Continue with Google" inside the Auth0 dialog) are stored as `provider="auth0"`, not `provider="google"`, because the token is issued by Auth0.
+- The `provider_user_id` format is `auth0_{sub}` where `sub` is the Auth0 user identifier returned in the ID token (e.g. `auth0|6abc123...`). The `|` is part of Auth0's own sub format and is preserved verbatim — `auth0_auth0|6abc...` in the example above is correct, not a typo.
 - `OAUTH2_CUSTOM{N}_RESPONSE_MODE=form_post` (the default) works on both HTTP localhost and HTTPS production.
 - See [Generic OIDC Provider Setup](./generic-oidc.md) for the full Custom slot reference, including how presets and env-var overrides compose.
