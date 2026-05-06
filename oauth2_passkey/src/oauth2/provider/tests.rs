@@ -886,6 +886,64 @@ fn custom_slot_preset_authentik_applies_defaults() {
     );
 }
 
+#[test]
+fn custom_slot_preset_line_applies_defaults() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg = provider_for(ProviderKind::Custom(CustomSlot::Slot1))
+            .expect("slot1 should be enabled with PRESET=line");
+        assert_eq!(cfg.provider_name.as_str(), "line");
+        assert_eq!(cfg.display_name, "LINE");
+        assert_eq!(cfg.icon_slug, "line");
+        assert_eq!(cfg.button_color, Some("#06C755"));
+        assert_eq!(cfg.button_hover_color, Some("#05A647"));
+        assert!(cfg.additional_allowed_origins.is_empty());
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_preset_line_applies_defaults",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://access.line.me"),
+            ("OAUTH2_CUSTOM1_PRESET", "line"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn custom_slot_preset_apple_applies_defaults() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let cfg = provider_for(ProviderKind::Custom(CustomSlot::Slot1))
+            .expect("slot1 should be enabled with PRESET=apple");
+        assert_eq!(cfg.provider_name.as_str(), "apple");
+        assert_eq!(cfg.display_name, "Apple");
+        assert_eq!(cfg.icon_slug, "apple");
+        assert_eq!(cfg.button_color, Some("#000000"));
+        assert_eq!(cfg.button_hover_color, Some("#333333"));
+        assert!(cfg.additional_allowed_origins.is_empty());
+        return;
+    }
+    let output = run_child_with_env_set(
+        "oauth2::provider::tests::custom_slot_preset_apple_applies_defaults",
+        &[
+            ("OAUTH2_CUSTOM1_CLIENT_ID", "id"),
+            ("OAUTH2_CUSTOM1_CLIENT_SECRET", "sec"),
+            ("OAUTH2_CUSTOM1_ISSUER_URL", "https://appleid.apple.com"),
+            ("OAUTH2_CUSTOM1_PRESET", "apple"),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 // Policy guard: `auth0`/`keycloak`/`entra` are removed from
 // RESERVED_PROVIDER_NAMES in commit 3. An operator can adopt
 // `OAUTH2_CUSTOM1_NAME=auth0` WITHOUT `PRESET=auth0` — e.g. for a bare
