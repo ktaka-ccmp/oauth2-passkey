@@ -201,10 +201,9 @@ The two slots produce independent **Continue with Keycloak** and
 **Continue with Keycloak (Realm 2)** buttons, with separate DB rows
 under `provider='keycloak'` vs `provider='keycloak2'`.
 
-The same pattern works for any provider — Auth0 (multiple tenants),
-Entra (multiple Azure AD tenants if/when multi-tenant support lands),
-Zitadel, Okta, etc. Pick a distinct `NAME` for each slot; the
-`PRESET=` is optional and reusable across slots.
+The same pattern works for any provider — Auth0, Entra, Zitadel,
+Okta, etc. Pick a distinct `NAME` for each slot; the `PRESET=` is
+optional and reusable across slots.
 
 ### Custom slot for an OIDC IdP without a preset
 

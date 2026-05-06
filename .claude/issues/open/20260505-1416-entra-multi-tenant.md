@@ -200,4 +200,55 @@ case automatically from the discovery document's `{tenantid}` placeholder.
   SaaS applications. The implementation cost is low enough that it's
   worth tracking as a concrete task rather than a vague future note.
 
+### 2026-05-07: Scope re-evaluation — library work alone is not useful
+
+After deeper discussion, the boundary of what this issue actually
+delivers became clearer. Recording it here so future-me does not
+re-derive it.
+
+**Library-side changes (this issue's scope, all small)**:
+- Relax issuer validation when discovery doc declares `{tenantid}`
+  placeholder (~15 lines × 2 files)
+- Add `tid: Option<String>` field to `OidcIdInfo`
+- Plumb `tid` into `OAuth2Account.metadata` (mirror existing `hd`
+  pattern) so the application layer can read it
+
+**Application-side requirements that the library cannot provide**:
+- Tenant onboarding flow (manual `tid` entry from Entra admin
+  panel — `tid` is publicly retrievable via `Microsoft Entra ID →
+  Overview` or `https://login.microsoftonline.com/<domain>/.well-known/openid-configuration`,
+  and is immutable for the tenant's lifetime, so it is safe to
+  store as a natural key)
+- Domain-ownership verification (e.g. email-based) to prevent a
+  random employee from "claiming" their own org's tenant slot
+- First-sign-in `tid` match against the registered tenant record
+- tenant ↔ user routing logic for tenant-scoped data
+
+**Why the library alone is not useful**:
+- Without app-side onboarding, the library would accept any token
+  from any Entra tenant (signature + audience valid), with no way
+  for the app to know which tenants are legitimate customers.
+  This is *not* a security model — it is "trust whoever shows up".
+- The naive "first user wins" pattern (the app records the first
+  authenticated user's `tid` as their org's `tid`) is unsafe
+  without supplementary domain verification (a random non-admin
+  employee could squat on their own employer's tenant slot
+  before the real admin signs up). Real SaaS uses Microsoft's
+  admin consent gate + email/DNS domain verification + manual
+  support escalation as overlapping defenses.
+- For pure self-service open-SaaS-style use cases (Slack-shaped),
+  the operator already needs onboarding/billing/workspace
+  primitives that oauth2-passkey does not provide. Such operators
+  are likely to choose a managed identity stack (WorkOS, Clerk,
+  Auth0 enterprise) over hand-rolling on top of this library.
+- For closed B2B with a known tenant list (a few partners),
+  pattern (A) — N Custom slots, one per specific tenant — already
+  works today and is operationally simpler.
+
+**Decision**: Keep open at low priority. Do not implement
+speculatively. If real demand arrives, the implementer must own
+both halves (library + app onboarding), so the issue should not be
+labeled "small" in difficulty for the full feature — only the
+library-side change is small.
+
 ## Resolution
