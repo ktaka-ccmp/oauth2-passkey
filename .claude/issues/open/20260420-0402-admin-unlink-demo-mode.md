@@ -34,83 +34,150 @@ Reproduced on demo-both with `O2P_DEMO_MODE=true`, viewing a target
 user whose id differs from the admin's (the masking path
 `Masker::for_detail` activates only in that case).
 
-### Root cause
+### Mechanism
 
-The admin user-detail template renders `account.user_id` /
-`credential.user_id` through `masker.id()`, producing strings like
-`"f47a***"` (first four chars + `***`). The page's JS helpers
-`unlinkOAuth2Account` / `deletePasskeyCredential` read those masked
-values out of the DOM and POST them back as `user_id` in the request
-body.
+`Masker::for_detail` (`admin/masking.rs:44-48`) is active when
+`*O2P_DEMO_MODE && viewer_id != target_id`. When active, the
+`TemplateAccount`/`TemplateCredential` `.masked()` impls
+(`admin/optional.rs:155-156`, `:185-187`) replace these resource
+identifiers with first-four-chars + `"***"`:
 
-The matching admin handlers in `admin/default.rs` then call
-`UserId::new(payload.user_id)`, which rejects `*`, and the request
-fails.
+- `credential.credential_id`, `credential.user_id`,
+  `credential.user_handle`
+- `account.id`, `account.user_id`, `account.provider_user_id`
 
-The architectural root cause is that these admin handlers call the
-**user-level** coordination functions (`delete_oauth2_account_core`,
-`delete_passkey_credential_core`), which need `user_id` purely to
-enforce ownership ("this resource belongs to the caller"). Admin
-flows don't need that check — the crate already exposes admin-level
-APIs (`delete_oauth2_account_admin`, `delete_passkey_credential_admin`
-in `coordination/admin.rs`) that take only the resource ID and
-validate the admin session directly.
+Both action paths feed those masked values back into write handlers:
+
+- **Unlink OAuth2** (`templates/admin_user_page.j2:138`) embeds
+  `provider_user_id` + `user_id` into the onclick handler, JS posts
+  `DELETE /admin/delete_oauth2_account/{provider}/{provider_user_id}`
+  with `user_id` in the body.
+- **Delete passkey** (`templates/admin_user_page.j2:97`) embeds
+  `credential_id` + `user_id`, JS posts
+  `DELETE /admin/delete_passkey_credential/{credential_id}` with
+  `user_id` in the body.
+
+The handlers call `UserId::new` / `ProviderUserId::new` /
+`CredentialId::new`, all of which reject `*` (the masking marker
+character is not in any of their allowed character sets). The
+user-visible failure surfaces from whichever validator runs first —
+currently `UserId::new`, hence the "Invalid user ID" message.
+
+The other admin write actions on the same page (`DeleteAccount`
+button at L21, `toggleAdminStatus` at L37, `forceLogout` at L49)
+bind to `user.id`, which is **not** masked
+(`Masker::mask_user` only touches `account` and `label`,
+`masking.rs:81-90`). Those work correctly.
+
+### Why this is a design conflict, not a parsing bug
+
+Earlier diagnoses (see Decision Log entries dated 2026-04-20) framed
+this narrowly as a `user_id` parsing problem solvable by switching
+the handlers to admin-level coordination functions. End-to-end
+tracing of that proposed fix revealed it would only change the error
+message from `"Invalid user ID"` to `"Invalid provider user ID"` /
+`"Invalid credential ID"` because the same `*`-rejecting validators
+sit on the URL-path side as well.
+
+The deeper issue: demo mode masking exists to hide other users'
+identifiers from the demo viewer, but those identifiers are
+required verbatim to perform write actions. You cannot honor both
+"viewer cannot see X" and "viewer can act on X" on the same page
+unless X round-trips outside the masking boundary (a cleartext side
+channel) — which would defeat the masking.
 
 ## Related Issues
 
 - `20260220-2357` Full Masking for Email and Name in Demo Mode
   (relationship: introduced the masker used here; masking itself is
-  correct — this issue is about the API call layer)
+  correct — this issue is about the action-button layer)
 
 ## Approach
 
-Switch the two admin handlers to use the admin-level coordination
-functions, eliminating the need to parse `user_id` out of the (masked)
-request body.
+Accept the design conflict and resolve it on the UX side: when the
+detail-page masker is active, disable the destructive actions that
+operate on per-resource items.
 
-High-level changes:
+1. **Surface the masker activity to the template**. Expose a
+   `Masker::is_active() -> bool` accessor (currently the `active`
+   field is private), and pass `actions_disabled: bool` into
+   `AdminUserPageTemplate`, set from `masker.is_active()` at the
+   single construction site (`admin/optional.rs:313`).
 
-1. `oauth2_passkey_axum/src/admin/default.rs`
-   - `delete_oauth2_account` → call `delete_oauth2_account_admin(session_id, provider_user_id)`
-   - `delete_passkey_credential` → call `delete_passkey_credential_admin(session_id, credential_id)`
-   - Drop `PageUserContext` body parsing; drop now-unused `Provider` /
-     `UserId` usages within these two handlers.
-2. `oauth2_passkey_axum/static/admin_user.js`
-   - Drop the trailing `accountUserId` / `credentialUserId` args and
-     request bodies.
-3. `oauth2_passkey_axum/templates/admin_user_page.j2`
-   - Drop the third arg from both `onclick=` handlers.
+2. **Disable the affected buttons**. In
+   `templates/admin_user_page.j2`, gate L97 (delete passkey) and
+   L138 (unlink oauth2) on `actions_disabled`:
 
-Not a security regression: the handler still runs
-`auth_user.has_admin_privileges()` up-front, and the admin-level
-coordination fn re-checks admin status against a fresh DB row via
-`validate_admin_session`. The pre-patch `user_id` ownership check
-was redundant for admin flows and actively harmful in demo mode.
+   ```jinja2
+   <button onclick="..."
+           class="delete-button"
+           {% if actions_disabled %}disabled
+           title="Disabled in demo mode for other users' data"
+           {% endif %}>...</button>
+   ```
 
-Detailed plan file:
-`~/.claude/plans/refactored-enchanting-pebble.md`
+   Disable rather than hide so the demo still demonstrates these
+   capabilities exist; the tooltip explains why they are inert.
+
+3. **Remove the `user_id` round-trip entirely**. Drop the third arg
+   from `unlinkOAuth2Account` / `deletePasskeyCredential` in
+   `admin_user.js`, drop `user_id` from the request body, and drop
+   `PageUserContext` in `admin/default.rs`. Switch the two handlers
+   to `delete_oauth2_account_admin` / `delete_passkey_credential_admin`
+   so only the URL-path resource ID remains. This piece is carried
+   over from the original (2026-04-20) proposal — its merit was
+   always pattern alignment with the other admin handlers, not
+   bug-fixing.
+
+4. **Document defense-in-depth**. The `*Id::new` validators reject
+   masked-format strings with HTTP 400, which is the correct
+   response if a future caller bypasses the disabled UI. Note this
+   intent in code comments rather than treat it as an accidental
+   side-effect.
+
+Not a security regression: each handler still runs
+`auth_user.has_admin_privileges()` up-front, and
+`delete_oauth2_account_admin` / `delete_passkey_credential_admin`
+re-check admin status against a fresh DB row via
+`validate_admin_session`. The user-level ownership check that
+exists today (`delete_oauth2_account_core` taking `user_id`) is
+redundant for admin flows.
 
 ## Related Files
 
-- `oauth2_passkey_axum/src/admin/default.rs`
-- `oauth2_passkey_axum/static/admin_user.js`
-- `oauth2_passkey_axum/templates/admin_user_page.j2`
-- `oauth2_passkey/src/coordination/admin.rs` (read-only — admin fns live here)
-- `oauth2_passkey_axum/src/admin/masking.rs` (read-only — masker behavior is correct)
-- `oauth2_passkey_axum/src/admin/optional.rs` (read-only — where masking is applied to template data)
+- `oauth2_passkey_axum/src/admin/masking.rs` (add `is_active`)
+- `oauth2_passkey_axum/src/admin/optional.rs` (template struct +
+  masker construction at L313)
+- `oauth2_passkey_axum/templates/admin_user_page.j2` (gate L97 +
+  L138)
+- `oauth2_passkey_axum/static/admin_user.js` (drop third arg from
+  L38 / L68)
+- `oauth2_passkey_axum/src/admin/default.rs` (drop `PageUserContext`,
+  switch to admin coord fns)
+- `oauth2_passkey/src/coordination/admin.rs` (read-only — admin
+  coord fns live here)
 
 ## Implementation Tasks
 
-- [ ] Update `delete_oauth2_account` handler to use `delete_oauth2_account_admin`
-- [ ] Update `delete_passkey_credential` handler to use `delete_passkey_credential_admin`
-- [ ] Remove `PageUserContext` struct if no remaining users in the file
-- [ ] Update imports in `admin/default.rs` (drop `Provider`, core fns; add admin fns)
-- [ ] Update `unlinkOAuth2Account` and `deletePasskeyCredential` in `admin_user.js`
-- [ ] Update both `onclick` handlers in `admin_user_page.j2`
-- [ ] Update `src/admin/` tests if they cover these handlers' signatures
-- [ ] `cargo fmt --all && cargo clippy --all-targets --all-features && cargo test`
-- [ ] Manual verification in demo-both with `O2P_DEMO_MODE=true`
-- [ ] Manual regression check with `O2P_DEMO_MODE` unset
+- [ ] Add `Masker::is_active(&self) -> bool` accessor
+- [ ] Add `actions_disabled: bool` to `AdminUserPageTemplate`,
+      populate from `masker.is_active()`
+- [ ] Gate the two button onclick handlers in `admin_user_page.j2`
+      on `actions_disabled`
+- [ ] Drop the third arg from `unlinkOAuth2Account` /
+      `deletePasskeyCredential` in `admin_user.js`
+- [ ] Drop `PageUserContext` and `user_id` body parsing in
+      `admin/default.rs`; switch to `delete_oauth2_account_admin` /
+      `delete_passkey_credential_admin`
+- [ ] Add a brief code comment documenting the `*Id::new` rejection
+      as defense-in-depth against bypass
+- [ ] `cargo fmt --all && cargo clippy --all-targets --all-features
+      && cargo test`
+- [ ] Manual verification with `O2P_DEMO_MODE=true`: button
+      disabled with tooltip when admin views another user, working
+      when admin views self
+- [ ] Manual regression check with `O2P_DEMO_MODE` unset: button
+      enabled and operation succeeds
 
 ## Decision Log
 
@@ -141,6 +208,30 @@ Detailed plan file:
   bind it to `_provider` in the handler.
 - Reason: URL stability for operator bookmarks; no functional
   difference.
+
+### 2026-05-07: Original Approach was incomplete — supersede
+
+The 2026-04-20 entries treated this as a `user_id`-parsing bug
+solved by switching to admin-level coord fns. End-to-end tracing
+revealed the same masking is also applied to `provider_user_id`
+(`admin/optional.rs:187`) and `credential_id`
+(`admin/optional.rs:155`), which flow through URL path parameters
+into `ProviderUserId::new` / `CredentialId::new` — both of which
+also reject `*`. The original fix would only have shifted the
+visible error from "Invalid user ID" to "Invalid provider user
+ID" / "Invalid credential ID" without fixing the underlying issue.
+
+The deeper conflict: demo masking and admin write actions cannot
+both be supported on the same per-resource items (you would need
+an out-of-band cleartext side channel that defeats the masking).
+Resolved by gating the two affected actions in the UI when
+masking is active, and treating the existing validator rejections
+as documented defense-in-depth rather than an accident.
+
+The handler refactor to admin-level coord fns is retained from the
+original plan because the user-level ownership check is still
+unnecessary noise for admin flows, but it is no longer the
+load-bearing piece of the fix.
 
 ## Resolution
 
