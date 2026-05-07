@@ -14,9 +14,9 @@
 
 ## Created: 2026-03-31-15-17
 
-## Closed: 2026-05-07
+## Closed:
 
-## Status: completed
+## Status: open
 
 ## Priority: low
 
