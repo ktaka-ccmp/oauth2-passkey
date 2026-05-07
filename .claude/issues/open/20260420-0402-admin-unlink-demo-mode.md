@@ -119,29 +119,17 @@ operate on per-resource items.
    Disable rather than hide so the demo still demonstrates these
    capabilities exist; the tooltip explains why they are inert.
 
-3. **Remove the `user_id` round-trip entirely**. Drop the third arg
-   from `unlinkOAuth2Account` / `deletePasskeyCredential` in
-   `admin_user.js`, drop `user_id` from the request body, and drop
-   `PageUserContext` in `admin/default.rs`. Switch the two handlers
-   to `delete_oauth2_account_admin` / `delete_passkey_credential_admin`
-   so only the URL-path resource ID remains. This piece is carried
-   over from the original (2026-04-20) proposal — its merit was
-   always pattern alignment with the other admin handlers, not
-   bug-fixing.
+**Defense-in-depth**: The `*Id::new` validators reject masked-format
+strings with HTTP 400, which is the correct response if a future
+caller bypasses the disabled UI. This is intended behavior, not
+an accidental side-effect.
 
-4. **Document defense-in-depth**. The `*Id::new` validators reject
-   masked-format strings with HTTP 400, which is the correct
-   response if a future caller bypasses the disabled UI. Note this
-   intent in code comments rather than treat it as an accidental
-   side-effect.
-
-Not a security regression: each handler still runs
-`auth_user.has_admin_privileges()` up-front, and
-`delete_oauth2_account_admin` / `delete_passkey_credential_admin`
-re-check admin status against a fresh DB row via
-`validate_admin_session`. The user-level ownership check that
-exists today (`delete_oauth2_account_core` taking `user_id`) is
-redundant for admin flows.
+**Out of scope**: switching the handlers to admin-level coordination
+functions (`delete_oauth2_account_admin` /
+`delete_passkey_credential_admin`) and removing the `user_id`
+request-body round-trip. See the 2026-05-07 Decision Log entry for
+the trade-off; the round-trip retains a small fail-safe value
+against template-DB skew so it stays for now.
 
 ## Related Files
 
@@ -150,12 +138,10 @@ redundant for admin flows.
   masker construction at L313)
 - `oauth2_passkey_axum/templates/admin_user_page.j2` (gate L97 +
   L138)
-- `oauth2_passkey_axum/static/admin_user.js` (drop third arg from
-  L38 / L68)
-- `oauth2_passkey_axum/src/admin/default.rs` (drop `PageUserContext`,
-  switch to admin coord fns)
-- `oauth2_passkey/src/coordination/admin.rs` (read-only — admin
-  coord fns live here)
+- `oauth2_passkey_axum/static/admin_user.js` (read-only —
+  intentionally untouched, see 2026-05-07 scope decision)
+- `oauth2_passkey_axum/src/admin/default.rs` (read-only —
+  intentionally untouched, see 2026-05-07 scope decision)
 
 ## Implementation Tasks
 
@@ -164,13 +150,6 @@ redundant for admin flows.
       populate from `masker.is_active()`
 - [ ] Gate the two button onclick handlers in `admin_user_page.j2`
       on `actions_disabled`
-- [ ] Drop the third arg from `unlinkOAuth2Account` /
-      `deletePasskeyCredential` in `admin_user.js`
-- [ ] Drop `PageUserContext` and `user_id` body parsing in
-      `admin/default.rs`; switch to `delete_oauth2_account_admin` /
-      `delete_passkey_credential_admin`
-- [ ] Add a brief code comment documenting the `*Id::new` rejection
-      as defense-in-depth against bypass
 - [ ] `cargo fmt --all && cargo clippy --all-targets --all-features
       && cargo test`
 - [ ] Manual verification with `O2P_DEMO_MODE=true`: button
@@ -228,10 +207,33 @@ Resolved by gating the two affected actions in the UI when
 masking is active, and treating the existing validator rejections
 as documented defense-in-depth rather than an accident.
 
-The handler refactor to admin-level coord fns is retained from the
-original plan because the user-level ownership check is still
-unnecessary noise for admin flows, but it is no longer the
-load-bearing piece of the fix.
+### 2026-05-07: Scope reduced to UI gating only — defer the user_id round-trip removal
+
+Initial draft of the rewritten Approach kept the
+"switch handlers to admin-level coord fns + drop the `user_id`
+body" cleanup as carried-over scope from the 2026-04-20 plan. On
+review this turned out to be inherited momentum rather than
+necessary work for the bug fix. The UI gating in step 1-3 is
+self-sufficient.
+
+Cross-checking what the round-trip actually does in non-demo
+mode: it lets `delete_oauth2_account_core` /
+`delete_passkey_credential_core` perform an
+`account.user_id == posted_user_id` check before deleting. In
+the normal click path this is self-referential (both values come
+from the same template render), but it does fail-safe when the
+two values disagree — e.g. if a future template change wires
+`user_id` and the resource ID from different rows, or if the
+template was rendered with stale data while ownership shifted
+on the server. Marginal but non-zero defensive value.
+
+Decision: keep the round-trip and the user-level core fn calls
+for now. The cleanup remains a defensible change but no longer
+load-bearing; tracked here for whoever revisits this area later.
+Trade-off when the time comes:
+- adopt the cleanup → pattern alignment + fresh-DB admin check
+  via `validate_admin_session`
+- keep current → the small fail-safe described above
 
 ## Resolution
 
