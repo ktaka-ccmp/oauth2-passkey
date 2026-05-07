@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `OAuth2Account.email` / `.name` remain non-optional; the conversion layer
     uses `preferred_username` or errors with `OAuth2Error::Validation` if no
     email claim is available.
+- **Breaking**: `PASSKEY_AUTHENTICATOR_ATTACHMENT=none` is no longer accepted —
+  the previous mapping emitted the non-spec JSON value `"None"`, which only
+  worked because of browser leniency. To allow either platform or
+  cross-platform authenticators (the previous `=none` behavior), **leave the
+  variable unset**. The default also changed: when the variable is unset, the
+  `authenticatorAttachment` field is now omitted from the WebAuthn
+  registration JSON (= "either is acceptable"). Operators who relied on the
+  previous default of `=platform` to force platform-bound authenticators must
+  now set `PASSKEY_AUTHENTICATOR_ATTACHMENT=platform` explicitly.
 
 ## [0.5.0] - 2026-03-23
 
