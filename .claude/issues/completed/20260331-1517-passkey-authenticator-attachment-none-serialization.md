@@ -14,9 +14,9 @@
 
 ## Created: 2026-03-31-15-17
 
-## Closed:
+## Closed: 2026-05-07
 
-## Status: open
+## Status: completed
 
 ## Priority: low
 
@@ -159,25 +159,25 @@ Scope is limited to `authenticator_attachment`.
 
 ## Implementation Tasks
 
-- [ ] Change `AuthenticatorSelection.authenticator_attachment` to
+- [x] Change `AuthenticatorSelection.authenticator_attachment` to
       `Option<String>` with
       `#[serde(skip_serializing_if = "Option::is_none")]`
-- [ ] Change `PASSKEY_AUTHENTICATOR_ATTACHMENT` static type to
+- [x] Change `PASSKEY_AUTHENTICATOR_ATTACHMENT` static type to
       `LazyLock<Option<String>>`; remove the `"none"` arm; default
       `Err(_)` to `None`; update panic message
-- [ ] Update `register.rs:193` from `.to_string()` to `.clone()`
-- [ ] Update / replace affected tests in `passkey/config/tests.rs`
+- [x] Update `register.rs:193` from `.to_string()` to `.clone()`
+- [x] Update / replace affected tests in `passkey/config/tests.rs`
       (panic-on-`=none`, default unset → `None`, `=platform` /
       `=cross-platform` → `Some(...)`)
-- [ ] Update `dot.env.example` to remove the
+- [x] Update `dot.env.example` to remove the
       `PASSKEY_AUTHENTICATOR_ATTACHMENT=none` example and document
       the new "unset = either" semantics
-- [ ] Add `CHANGELOG.md` entry noting the breaking change
+- [x] Add `CHANGELOG.md` entry noting the breaking change
       (`=none` rejected; default shifts from `=platform` to
       unrestricted)
-- [ ] `cargo fmt --all && cargo clippy --all-targets --all-features
+- [x] `cargo fmt --all && cargo clippy --all-targets --all-features
       && cargo test`
-- [ ] Manual verification: env unset → JSON has no
+- [x] Manual verification: env unset → JSON has no
       `authenticatorAttachment` field; `=platform` / `=cross-platform`
       → field present with that value; `=none` → app panics at
       startup with new error message
@@ -256,4 +256,23 @@ Option A trade-offs accepted:
 
 ## Resolution
 
-<!-- To be filled in when resolved -->
+Implemented Option A on branch `fix-passkey-attachment-none-omit`.
+
+- `b310ff4` `fix(passkey)!: reject PASSKEY_AUTHENTICATOR_ATTACHMENT=none, default to omit`
+  — `AuthenticatorSelection.authenticator_attachment` is now
+  `Option<String>` with `#[serde(skip_serializing_if = "Option::is_none")]`;
+  `PASSKEY_AUTHENTICATOR_ATTACHMENT` static is `LazyLock<Option<String>>`
+  with the `"none"` arm removed and `Err(_)` returning `None`;
+  `register.rs:193` uses `.clone()`; tests updated and a
+  panic-on-`=none` test added; `dot.env.example` comment refreshed.
+- `90d7983` `docs(changelog): note breaking change to PASSKEY_AUTHENTICATOR_ATTACHMENT`
+  — appended Breaking bullet under `[0.5.1-dev]` / `### Changed`.
+
+Verification:
+- `cargo fmt --all`, `cargo clippy --all-targets --all-features`,
+  `cargo test --lib` all green (693 + 71 lib tests pass).
+- Targeted `passkey::config::tests::test_passkey_authenticator_attachment*`
+  (4 tests) all pass: rejects-invalid, accepts-valid, rejects-none
+  (new), defaults-to-none (renamed from `_to_platform`).
+- Manual verification noted in the manual-verification checkbox
+  above.
