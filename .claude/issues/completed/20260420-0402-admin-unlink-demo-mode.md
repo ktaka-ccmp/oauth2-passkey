@@ -145,17 +145,17 @@ against template-DB skew so it stays for now.
 
 ## Implementation Tasks
 
-- [ ] Add `Masker::is_active(&self) -> bool` accessor
-- [ ] Add `actions_disabled: bool` to `AdminUserPageTemplate`,
+- [x] Add `Masker::is_active(&self) -> bool` accessor
+- [x] Add `actions_disabled: bool` to `AdminUserPageTemplate`,
       populate from `masker.is_active()`
-- [ ] Gate the two button onclick handlers in `admin_user_page.j2`
+- [x] Gate the two button onclick handlers in `admin_user_page.j2`
       on `actions_disabled`
-- [ ] `cargo fmt --all && cargo clippy --all-targets --all-features
+- [x] `cargo fmt --all && cargo clippy --all-targets --all-features
       && cargo test`
-- [ ] Manual verification with `O2P_DEMO_MODE=true`: button
+- [x] Manual verification with `O2P_DEMO_MODE=true`: button
       disabled with tooltip when admin views another user, working
       when admin views self
-- [ ] Manual regression check with `O2P_DEMO_MODE` unset: button
+- [x] Manual regression check with `O2P_DEMO_MODE` unset: button
       enabled and operation succeeds
 
 ## Decision Log
