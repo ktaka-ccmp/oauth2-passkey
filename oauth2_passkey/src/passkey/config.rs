@@ -47,16 +47,21 @@ pub(super) static PASSKEY_ATTESTATION: LazyLock<String> = LazyLock::new(|| {
     }
 });
 
-pub(super) static PASSKEY_AUTHENTICATOR_ATTACHMENT: LazyLock<String> =
+/// `None` means the field is omitted from the WebAuthn registration JSON,
+/// which lets the browser accept either platform or cross-platform
+/// authenticators. To restrict to a single attachment type, set the env
+/// var to `platform` or `cross-platform` explicitly. Any other value
+/// panics at startup.
+pub(super) static PASSKEY_AUTHENTICATOR_ATTACHMENT: LazyLock<Option<String>> =
     LazyLock::new(|| match env::var("PASSKEY_AUTHENTICATOR_ATTACHMENT") {
-        Err(_) => "platform".to_string(),
+        Err(_) => None,
         Ok(v) => match v.to_lowercase().as_str() {
-            "platform" => "platform".to_string(),
-            "cross-platform" => "cross-platform".to_string(),
-            "none" => "None".to_string(),
+            "platform" => Some("platform".to_string()),
+            "cross-platform" => Some("cross-platform".to_string()),
             _ => panic!(
                 "PASSKEY_AUTHENTICATOR_ATTACHMENT='{v}' is invalid. \
-                 Valid values: platform, cross-platform, none"
+                 Valid values: platform, cross-platform. \
+                 To allow either attachment, leave the variable unset."
             ),
         },
     });

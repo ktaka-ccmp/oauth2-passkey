@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (10)
+### Open (9)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -19,12 +19,12 @@ This directory contains issue/task tracking files for the project.
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
-| `20260331-1517` | low | small | [PASSKEY_AUTHENTICATOR_ATTACHMENT=none sends non-standard string instead of omitting field](open/20260331-1517-passkey-authenticator-attachment-none-serialization.md) |
 
-### Completed (73)
+### Completed (74)
 
 | ID | Title |
 |----|-------|
+| `20260331-1517` | [PASSKEY_AUTHENTICATOR_ATTACHMENT=none sends non-standard string instead of omitting field](completed/20260331-1517-passkey-authenticator-attachment-none-serialization.md) |
 | `20260420-0402` | [Admin unlink/delete fails in demo mode ("Invalid user ID")](completed/20260420-0402-admin-unlink-demo-mode.md) |
 | `20260423-0136` | [Consolidate idp/README.md into docs/](completed/20260423-0136-idp-readme-docs-consolidation.md) |
 | `20260226-2020` | [Expand OAuth2 Provider Support](completed/20260226-2020-expand-oauth2-providers.md) |
@@ -175,81 +175,97 @@ Legacy issues retain their `YYYY-MM-DD-NN` IDs.
 ```markdown
 # Issue: <Title>
 
-## Table of Contents
+## Metadata
 
-- [Description](#description)
-- [Related Issues](#related-issues)
-- [Approach](#approach)
-- [Related Files](#related-files)
-- [Implementation Tasks](#implementation-tasks)
-- [Decision Log](#decision-log)
-- [Resolution](#resolution)
+- ID: YYYYMMDD-HHMM
+- Created: YYYY-MM-DD-HH-MM
+- Closed:
+- Status: open | completed | wontfix | deferred
+- Priority: high | medium | low
+- Difficulty: small | medium | large
+- Related Issues:
+  - `YYYYMMDD-HHMM` <Title> (relationship)
 
-## ID: YYYYMMDD-HHMM
+## Problem
 
-## Created: YYYY-MM-DD-HH-MM
+<Symptom, mechanism, or feature gap as understood at issue creation.
+This is the historical record of what prompted the issue. **Do not
+edit, append, or correct after the issue is created** — even for
+typos or factual errors. Corrections, refinements, and new
+understanding go in the Timeline as new entries that respond to
+the original Problem statement.>
 
-## Closed:
+## Timeline
 
-## Status: open | completed | wontfix | deferred
+<!--
+APPEND-ONLY, time-ordered (oldest first). Each entry is a snapshot
+of thinking, decisions, corrections, or research outcomes at a
+point in time. Old plans, superseded approaches, decision rationale,
+and Problem corrections all live here as entries. Never edit or
+delete existing entries; always add new ones at the bottom.
+-->
 
-## Priority: high | medium | low
+### YYYY-MM-DDTHH:MM — <Short headline>
 
-## Difficulty: small | medium | large
+<Body: discussion, decision rationale, corrections to earlier
+sections, snapshot of an old Latest Plan that was just replaced, etc.>
 
-## Description
+### YYYY-MM-DDTHH:MM — <Next entry>
 
-<What needs to be done and why>
+<...>
 
-## Related Issues
+## Latest Plan
 
-- `YYYYMMDD-HHMM` <Title> (relationship: e.g., depends on, related to, supersedes)
+<!--
+Mutable. Always reflects the *current* intended implementation.
+When the plan changes substantively, copy the previous body into
+the Timeline as a new entry (`### YYYY-MM-DDTHH:MM — Plan revision: <summary>`)
+*before* overwriting this section, so no plan history is lost.
+-->
 
-## Approach
+<Concrete steps to implement, files to touch, etc. Includes the
+Implementation Tasks checklist below.>
 
-<Current plan for implementation>
-
-## Related Files
+### Files
 
 - `path/to/file.rs`
 
-## Implementation Tasks
+### Implementation Tasks
 
 - [ ] <Task 1>
 - [ ] <Task 2>
 
-## Decision Log
+### Verification
 
-<!-- APPEND-ONLY: Do not edit or delete existing entries. Add new entries at the bottom. -->
-
-### YYYY-MM-DD: <Short summary of decision>
-
-- Context: <What prompted this decision>
-- Decision: <What was decided>
-- Reason: <Why this was chosen over alternatives>
+<How to test end-to-end.>
 
 ## Resolution
 
-<What was done to resolve this issue>
+<!--
+Written once when status transitions to `completed`. Captures the
+final commit hashes, summary of what was done, and verification
+results. After this is filled in, the issue is sealed.
+-->
 ```
 
 ## Section Update Rules
 
 | Section | Update Rule |
 |---------|------------|
-| Created | Written once at creation |
-| Closed | Written once when issue is resolved or closed |
-| Description | Freely updatable |
-| Related Issues | Freely updatable |
-| Approach | Freely updatable (always reflects current plan) |
-| Related Files | Freely updatable |
-| Implementation Tasks | Freely updatable |
-| **Decision Log** | **Append-only -- never edit or delete existing entries** |
-| Resolution | Written once when issue is resolved |
+| Metadata | Freely updatable. `Created` is written once at issue creation; `Closed` is written once when status moves to `completed`. |
+| **Problem** | **Fully immutable after issue creation.** No edits, no appends, no typo fixes. Corrections go in Timeline as new entries. |
+| **Timeline** | **Append-only, time-ordered (oldest first).** Never edit or delete existing entries. New entries go at the bottom with a `### YYYY-MM-DDTHH:MM — <headline>` subsection header. |
+| **Latest Plan** | Freely overwritable, but every substantive revision must first copy the previous body into the Timeline as a new entry (`### YYYY-MM-DDTHH:MM — Plan revision: <summary>`). The Implementation Tasks checklist inside Latest Plan is freely tickable as work progresses. |
+| Resolution | Written once when status moves to `completed`. After that, treat as sealed. |
 
-The **Decision Log** preserves the history of design decisions, approach changes, and
-rejected alternatives. When updating other sections (especially Approach), always add
-a corresponding Decision Log entry explaining what changed and why.
+The mental model mirrors GitHub Issues:
+
+- **Problem** is the issue body (frozen at creation).
+- **Timeline** is the comment thread (chronological, append-only).
+- **Latest Plan** is a pinned summary at the bottom of the issue
+  describing the current intended fix; revisions move into Timeline
+  before the pinned summary is rewritten.
+- **Resolution** is the closing comment that seals the work.
 
 ## Status Values
 

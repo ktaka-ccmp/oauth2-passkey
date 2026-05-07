@@ -721,3 +721,40 @@ mod authenticator_data_tests {
         }
     }
 }
+
+// AuthenticatorSelection serialization
+mod authenticator_selection_tests {
+    use super::*;
+
+    /// `authenticator_attachment: None` must result in the
+    /// `authenticatorAttachment` field being **absent** from the
+    /// serialized JSON. This is the spec-correct way to indicate
+    /// "either attachment is acceptable" per WebAuthn — the field
+    /// must be omitted, not set to a non-spec sentinel string.
+    #[test]
+    fn authenticator_attachment_none_omits_from_json() {
+        let sel = AuthenticatorSelection {
+            authenticator_attachment: None,
+            resident_key: "required".to_string(),
+            require_resident_key: true,
+            user_verification: "required".to_string(),
+        };
+        let v = serde_json::to_value(&sel).unwrap();
+        assert!(v.get("authenticatorAttachment").is_none());
+    }
+
+    /// `authenticator_attachment: Some(...)` must result in the
+    /// `authenticatorAttachment` field being **present** with the
+    /// inner string value (no `Some(...)` wrapping leakage).
+    #[test]
+    fn authenticator_attachment_some_serializes_inner_string() {
+        let sel = AuthenticatorSelection {
+            authenticator_attachment: Some("platform".to_string()),
+            resident_key: "required".to_string(),
+            require_resident_key: true,
+            user_verification: "required".to_string(),
+        };
+        let v = serde_json::to_value(&sel).unwrap();
+        assert_eq!(v.get("authenticatorAttachment"), Some(&json!("platform")));
+    }
+}
