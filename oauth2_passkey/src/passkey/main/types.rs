@@ -37,7 +37,11 @@ pub(super) struct AllowCredential {
 #[derive(Serialize, Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AuthenticatorSelection {
-    pub(super) authenticator_attachment: String,
+    /// `None` omits the field from JSON, which per WebAuthn spec lets the
+    /// browser accept either `platform` or `cross-platform` authenticators.
+    /// `Some("platform")` / `Some("cross-platform")` restrict to that type.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) authenticator_attachment: Option<String>,
     pub(super) resident_key: String,
     pub(super) user_verification: String,
     pub(super) require_resident_key: bool,
