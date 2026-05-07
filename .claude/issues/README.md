@@ -175,93 +175,97 @@ Legacy issues retain their `YYYY-MM-DD-NN` IDs.
 ```markdown
 # Issue: <Title>
 
-## Table of Contents
+## Metadata
 
-- [Description](#description)
-- [Related Issues](#related-issues)
-- [Approach](#approach)
-- [Related Files](#related-files)
-- [Implementation Tasks](#implementation-tasks)
-- [Decision Log](#decision-log)
-- [Resolution](#resolution)
+- ID: YYYYMMDD-HHMM
+- Created: YYYY-MM-DD-HH-MM
+- Closed:
+- Status: open | completed | wontfix | deferred
+- Priority: high | medium | low
+- Difficulty: small | medium | large
+- Related Issues:
+  - `YYYYMMDD-HHMM` <Title> (relationship)
 
-## ID: YYYYMMDD-HHMM
+## Problem
 
-## Created: YYYY-MM-DD-HH-MM
+<Symptom, mechanism, or feature gap as understood at issue creation.
+This is the historical record of what prompted the issue. **Do not
+edit, append, or correct after the issue is created** — even for
+typos or factual errors. Corrections, refinements, and new
+understanding go in the Timeline as new entries that respond to
+the original Problem statement.>
 
-## Closed:
-
-## Status: open | completed | wontfix | deferred
-
-## Priority: high | medium | low
-
-## Difficulty: small | medium | large
-
-## Description
-
-<What needs to be done and why>
-
-## Related Issues
-
-- `YYYYMMDD-HHMM` <Title> (relationship: e.g., depends on, related to, supersedes)
-
-## Approach
-
-### YYYY-MM-DD — current
-
-<Current plan for implementation>
+## Timeline
 
 <!--
-When this Approach is superseded by a new one, do NOT delete this
-subsection. Insert the new Approach above as `### YYYY-MM-DD — current`
-and rename this heading to `### YYYY-MM-DD — superseded (see Decision Log YYYY-MM-DD)`.
-The body text below stays verbatim so the file preserves the full
-evolution of plans.
+APPEND-ONLY, time-ordered (oldest first). Each entry is a snapshot
+of thinking, decisions, corrections, or research outcomes at a
+point in time. Old plans, superseded approaches, decision rationale,
+and Problem corrections all live here as entries. Never edit or
+delete existing entries; always add new ones at the bottom.
 -->
 
-## Related Files
+### YYYY-MM-DDTHH:MM — <Short headline>
+
+<Body: discussion, decision rationale, corrections to earlier
+sections, snapshot of an old Latest Plan that was just replaced, etc.>
+
+### YYYY-MM-DDTHH:MM — <Next entry>
+
+<...>
+
+## Latest Plan
+
+<!--
+Mutable. Always reflects the *current* intended implementation.
+When the plan changes substantively, copy the previous body into
+the Timeline as a new entry (`### YYYY-MM-DDTHH:MM — Plan revision: <summary>`)
+*before* overwriting this section, so no plan history is lost.
+-->
+
+<Concrete steps to implement, files to touch, etc. Includes the
+Implementation Tasks checklist below.>
+
+### Files
 
 - `path/to/file.rs`
 
-## Implementation Tasks
+### Implementation Tasks
 
 - [ ] <Task 1>
 - [ ] <Task 2>
 
-## Decision Log
+### Verification
 
-<!-- APPEND-ONLY: Do not edit or delete existing entries. Add new entries at the bottom. -->
-
-### YYYY-MM-DD: <Short summary of decision>
-
-- Context: <What prompted this decision>
-- Decision: <What was decided>
-- Reason: <Why this was chosen over alternatives>
+<How to test end-to-end.>
 
 ## Resolution
 
-<What was done to resolve this issue>
+<!--
+Written once when status transitions to `completed`. Captures the
+final commit hashes, summary of what was done, and verification
+results. After this is filled in, the issue is sealed.
+-->
 ```
 
 ## Section Update Rules
 
 | Section | Update Rule |
 |---------|------------|
-| Created | Written once at creation |
-| Closed | Written once when issue is resolved or closed |
-| Description | Freely updatable |
-| Related Issues | Freely updatable |
-| **Approach** | **Versioned subsections, append-only.** Latest at top marked `### YYYY-MM-DD — current`. When superseded, do not delete or rewrite the old subsection — insert the new one above and rename the old heading to `### YYYY-MM-DD — superseded (see Decision Log YYYY-MM-DD)`. Old body text stays verbatim. |
-| Related Files | Freely updatable |
-| Implementation Tasks | Freely updatable |
-| **Decision Log** | **Append-only -- never edit or delete existing entries** |
-| Resolution | Written once when issue is resolved |
+| Metadata | Freely updatable. `Created` is written once at issue creation; `Closed` is written once when status moves to `completed`. |
+| **Problem** | **Fully immutable after issue creation.** No edits, no appends, no typo fixes. Corrections go in Timeline as new entries. |
+| **Timeline** | **Append-only, time-ordered (oldest first).** Never edit or delete existing entries. New entries go at the bottom with a `### YYYY-MM-DDTHH:MM — <headline>` subsection header. |
+| **Latest Plan** | Freely overwritable, but every substantive revision must first copy the previous body into the Timeline as a new entry (`### YYYY-MM-DDTHH:MM — Plan revision: <summary>`). The Implementation Tasks checklist inside Latest Plan is freely tickable as work progresses. |
+| Resolution | Written once when status moves to `completed`. After that, treat as sealed. |
 
-The **Decision Log** captures the rationale ("why we changed direction").
-The versioned **Approach** subsections preserve the plans themselves
-("what we considered before"). When updating Approach, always also add a
-Decision Log entry explaining what changed and why; the new Decision Log
-entry's date should match the new Approach subsection's date.
+The mental model mirrors GitHub Issues:
+
+- **Problem** is the issue body (frozen at creation).
+- **Timeline** is the comment thread (chronological, append-only).
+- **Latest Plan** is a pinned summary at the bottom of the issue
+  describing the current intended fix; revisions move into Timeline
+  before the pinned summary is rewritten.
+- **Resolution** is the closing comment that seals the work.
 
 ## Status Values
 
