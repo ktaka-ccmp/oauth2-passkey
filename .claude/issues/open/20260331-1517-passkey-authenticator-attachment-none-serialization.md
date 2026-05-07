@@ -56,7 +56,57 @@ invalid enum string in a dictionary field should produce a
 
 ## Approach
 
-### 2026-05-07 — current
+### 2026-05-07T16:04 — current
+
+Reject `PASSKEY_AUTHENTICATOR_ATTACHMENT=none` at config validation,
+and change the default (env unset) from `"platform"` to "no
+restriction" (= field omitted from JSON). Operators who want to
+restrict set `=platform` or `=cross-platform` explicitly. This is
+**Option A** in the 2026-05-07 followup decision; **Option B**
+(accept `=none` and translate internally) is recorded as superseded
+just below.
+
+Concrete edits:
+
+1. **`oauth2_passkey/src/passkey/main/types.rs:39-44`** — change
+   `AuthenticatorSelection.authenticator_attachment` from `String` to
+   `Option<String>`, and add
+   `#[serde(skip_serializing_if = "Option::is_none")]`.
+
+2. **`oauth2_passkey/src/passkey/config.rs:50-62`** — change the
+   static type from `LazyLock<String>` to `LazyLock<Option<String>>`.
+   - `Err(_)` (env unset) → `None` (default = no restriction).
+   - `Ok("platform")` → `Some("platform".to_string())`.
+   - `Ok("cross-platform")` → `Some("cross-platform".to_string())`.
+   - **Remove** the `"none"` arm. Update the panic message to list
+     valid values as `platform, cross-platform` only and to mention
+     "to allow either, leave the variable unset".
+
+3. **`oauth2_passkey/src/passkey/main/register.rs:193`** — change
+   `PASSKEY_AUTHENTICATOR_ATTACHMENT.to_string()` to
+   `PASSKEY_AUTHENTICATOR_ATTACHMENT.clone()`.
+
+4. **`oauth2_passkey/src/passkey/config/tests.rs`** — update existing
+   `=platform` / `=cross-platform` assertions for the new
+   `Option<String>` type. **Replace** the `=none` test case with a
+   panic-on-`=none` assertion. Add a default-unset test confirming
+   the static is `None` when the env var is not set.
+
+5. **`dot.env.example`** — replace any
+   `PASSKEY_AUTHENTICATOR_ATTACHMENT=none` line with a comment
+   explaining the variable is optional and defaults to "either".
+
+6. **`CHANGELOG.md`** — add an unreleased entry noting (a)
+   `=none` is no longer accepted (unset for the same effective
+   behavior) and (b) the default changed from `=platform` to
+   unrestricted.
+
+Other passkey enum env vars (`PASSKEY_ATTESTATION`,
+`PASSKEY_RESIDENT_KEY`, `PASSKEY_USER_VERIFICATION`) do not have the
+same problem — none of them emit a non-spec string for any input.
+Scope is limited to `authenticator_attachment`.
+
+### 2026-05-07T15:44 — superseded (see Decision Log 2026-05-07T16:04)
 
 The original 2026-03-31 plan names the right three ideas
 (`Option<String>` field, `skip_serializing_if`, return `None` from
@@ -92,7 +142,7 @@ The other passkey enum env vars (`PASSKEY_ATTESTATION`,
 same problem — none of them emit a non-spec string for any input.
 Scope is limited to `authenticator_attachment`.
 
-### 2026-03-31 — superseded (see Decision Log 2026-05-07)
+### 2026-03-31 — superseded (see Decision Log 2026-05-07T15:44)
 
 1. Change `authenticator_attachment` in `AuthenticatorSelection` to
    `Option<String>`
@@ -113,21 +163,30 @@ Scope is limited to `authenticator_attachment`.
       `Option<String>` with
       `#[serde(skip_serializing_if = "Option::is_none")]`
 - [ ] Change `PASSKEY_AUTHENTICATOR_ATTACHMENT` static type to
-      `LazyLock<Option<String>>`; wrap arms accordingly
+      `LazyLock<Option<String>>`; remove the `"none"` arm; default
+      `Err(_)` to `None`; update panic message
 - [ ] Update `register.rs:193` from `.to_string()` to `.clone()`
-- [ ] Update affected assertions in `passkey/config/tests.rs`
+- [ ] Update / replace affected tests in `passkey/config/tests.rs`
+      (panic-on-`=none`, default unset → `None`, `=platform` /
+      `=cross-platform` → `Some(...)`)
+- [ ] Update `dot.env.example` to remove the
+      `PASSKEY_AUTHENTICATOR_ATTACHMENT=none` example and document
+      the new "unset = either" semantics
+- [ ] Add `CHANGELOG.md` entry noting the breaking change
+      (`=none` rejected; default shifts from `=platform` to
+      unrestricted)
 - [ ] `cargo fmt --all && cargo clippy --all-targets --all-features
       && cargo test`
-- [ ] Manual verification: `PASSKEY_AUTHENTICATOR_ATTACHMENT=none`
-      → JSON has no `authenticatorAttachment` field
-- [ ] Manual regression: default and `=platform` /
-      `=cross-platform` → JSON contains the literal value
+- [ ] Manual verification: env unset → JSON has no
+      `authenticatorAttachment` field; `=platform` / `=cross-platform`
+      → field present with that value; `=none` → app panics at
+      startup with new error message
 
 ## Decision Log
 
 <!-- APPEND-ONLY: Do not edit or delete existing entries. Add new entries at the bottom. -->
 
-### 2026-05-07: Approach refined for compile-correctness; spec claim softened
+### 2026-05-07T15:44: Approach refined for compile-correctness; spec claim softened
 
 End-to-end review of the original 2026-03-31 plan found two issues:
 
@@ -151,6 +210,49 @@ Cross-checked the other passkey enum env vars
 (`PASSKEY_ATTESTATION`, `PASSKEY_RESIDENT_KEY`,
 `PASSKEY_USER_VERIFICATION`) for the same pattern — none have it.
 Scope stays limited to `authenticator_attachment`.
+
+### 2026-05-07T16:04: Chose Option A (reject `=none`) over Option B (translate internally)
+
+The 15:44 Approach kept accepting `PASSKEY_AUTHENTICATOR_ATTACHMENT=none`
+at the env layer and translating it to `Option::None` internally so
+that serde would omit the field. On reflection this is roundabout —
+the env value (`"none"`) and the JSON value (omitted) live in
+different value systems, with the config layer doing a silent shift.
+
+Two designs considered in the 16:04 review:
+
+- **Option A (chosen)**: reject `=none` at config validation. Make
+  the env unset case (`Err(_)`) the way to express "no restriction"
+  by returning `None`. Default shifts from `=platform` to
+  unrestricted. To force platform-only, operators must set
+  `=platform` explicitly.
+- **Option B (15:44 Approach above)**: keep accepting `=none`,
+  translate to `None` internally, omit field. Default unchanged at
+  `=platform`.
+
+Option A reasons:
+
+- **Single value system**: env value matches what gets sent (or
+  matches "field absent" via "unset"). No translation layer to
+  remember.
+- **Spec alignment**: "no restriction" in WebAuthn is "field absent",
+  so the env being unset (= absent) maps to the JSON being absent.
+- **Permissive default**: most passkey-supporting apps want either
+  attachment, so unrestricted is a friendlier default than
+  platform-only for new users.
+- **Smaller code**: the match has only the two valid arms plus the
+  panic; no special `"none"` arm.
+
+Option A trade-offs accepted:
+
+- **Breaking change for `=none` users**: they must unset the variable
+  to get the same effective behavior. Pre-1.0 (project at v0.5.x),
+  CHANGELOG covers it.
+- **Default shift from `=platform` to unrestricted**: pre-existing
+  operators relying on the default now get either attachment by
+  default. This direction is permissive (security-wise it removes
+  a forced restriction) — appropriate for most apps; operators with
+  specific requirements can re-add `=platform` explicitly.
 
 ## Resolution
 
