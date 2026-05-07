@@ -47,6 +47,12 @@ impl Masker {
         }
     }
 
+    /// Whether masking is currently active. Used by callers that need to gate
+    /// behavior (e.g. disabling destructive UI actions on masked resource IDs).
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+
     // -- Collection-level masking --
 
     /// Mask a list of users for admin views.

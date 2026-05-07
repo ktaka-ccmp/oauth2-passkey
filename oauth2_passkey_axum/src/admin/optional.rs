@@ -214,6 +214,11 @@ struct AdminUserPageTemplate {
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
     pub custom_css_url: Option<String>,
+    /// True when the masker is active (demo mode + admin viewing another
+    /// user). Per-resource destructive buttons are disabled in this state
+    /// because the resource IDs they would post are masked and would be
+    /// rejected by `*Id::new` validators (defense-in-depth).
+    pub actions_disabled: bool,
 }
 
 impl AdminUserPageTemplate {
@@ -224,6 +229,7 @@ impl AdminUserPageTemplate {
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
         custom_css_url: Option<String>,
+        actions_disabled: bool,
     ) -> Self {
         Self {
             user: TemplateUser {
@@ -240,6 +246,7 @@ impl AdminUserPageTemplate {
             oauth2_accounts,
             o2p_route_prefix,
             custom_css_url,
+            actions_disabled,
         }
     }
 }
@@ -380,6 +387,7 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
         })
         .collect();
 
+    let actions_disabled = masker.is_active();
     let user = masker.mask_user(user);
 
     let csrf_token = auth_user.csrf_token.clone();
@@ -392,6 +400,7 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
         oauth2_accounts,
         O2P_ROUTE_PREFIX.to_string(),
         O2P_CUSTOM_CSS_URL.clone(),
+        actions_disabled,
     );
 
     // Render the template
