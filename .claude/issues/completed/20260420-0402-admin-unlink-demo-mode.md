@@ -14,9 +14,9 @@
 
 ## Created: 2026-04-20-04-02
 
-## Closed:
+## Closed: 2026-05-07
 
-## Status: open
+## Status: completed
 
 ## Priority: medium
 
@@ -237,4 +237,29 @@ Trade-off when the time comes:
 
 ## Resolution
 
-<!-- To be filled in when resolved -->
+Fixed in commit `1b5afdf` on branch
+`fix-admin-demo-mode-actions-disabled`.
+
+- Added `Masker::is_active(&self) -> bool` accessor
+  (`oauth2_passkey_axum/src/admin/masking.rs`).
+- Added `actions_disabled: bool` to `AdminUserPageTemplate`,
+  populated from `masker.is_active()` at the single masker
+  construction site (`oauth2_passkey_axum/src/admin/optional.rs`).
+- Gated the Unlink (oauth2 account) and Delete (passkey
+  credential) buttons in `templates/admin_user_page.j2` to render
+  with `disabled` and a tooltip when `actions_disabled` is true.
+
+The `*Id::new` validators that already reject `*` remain as the
+defense-in-depth backstop if the disabled UI is ever bypassed.
+
+Manual verification:
+- `O2P_DEMO_MODE=true`, admin views another user → Unlink and
+  Delete buttons rendered disabled with tooltip.
+- `O2P_DEMO_MODE=true`, admin views own page → buttons enabled,
+  operations succeed.
+- `O2P_DEMO_MODE` unset → buttons enabled, operations succeed.
+
+Out of scope for this fix (deferred indefinitely): switching the
+two handlers to `delete_oauth2_account_admin` /
+`delete_passkey_credential_admin` and removing the `user_id`
+request-body round-trip. See the 2026-05-07 Decision Log entries.
