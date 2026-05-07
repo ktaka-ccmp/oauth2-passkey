@@ -207,7 +207,17 @@ Legacy issues retain their `YYYY-MM-DD-NN` IDs.
 
 ## Approach
 
+### YYYY-MM-DD — current
+
 <Current plan for implementation>
+
+<!--
+When this Approach is superseded by a new one, do NOT delete this
+subsection. Insert the new Approach above as `### YYYY-MM-DD — current`
+and rename this heading to `### YYYY-MM-DD — superseded (see Decision Log YYYY-MM-DD)`.
+The body text below stays verbatim so the file preserves the full
+evolution of plans.
+-->
 
 ## Related Files
 
@@ -241,15 +251,17 @@ Legacy issues retain their `YYYY-MM-DD-NN` IDs.
 | Closed | Written once when issue is resolved or closed |
 | Description | Freely updatable |
 | Related Issues | Freely updatable |
-| Approach | Freely updatable (always reflects current plan) |
+| **Approach** | **Versioned subsections, append-only.** Latest at top marked `### YYYY-MM-DD — current`. When superseded, do not delete or rewrite the old subsection — insert the new one above and rename the old heading to `### YYYY-MM-DD — superseded (see Decision Log YYYY-MM-DD)`. Old body text stays verbatim. |
 | Related Files | Freely updatable |
 | Implementation Tasks | Freely updatable |
 | **Decision Log** | **Append-only -- never edit or delete existing entries** |
 | Resolution | Written once when issue is resolved |
 
-The **Decision Log** preserves the history of design decisions, approach changes, and
-rejected alternatives. When updating other sections (especially Approach), always add
-a corresponding Decision Log entry explaining what changed and why.
+The **Decision Log** captures the rationale ("why we changed direction").
+The versioned **Approach** subsections preserve the plans themselves
+("what we considered before"). When updating Approach, always also add a
+Decision Log entry explaining what changed and why; the new Decision Log
+entry's date should match the new Approach subsection's date.
 
 ## Status Values
 
