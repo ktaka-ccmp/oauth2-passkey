@@ -5,6 +5,16 @@ All notable changes to oauth2-passkey will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-05-11
+
+### Changed
+
+- README files now describe the v0.6.0 multi-provider support
+  (Google + 8 preset providers + 8 generic OIDC slots) instead of
+  "Google OAuth2" only. Also fixes the OAuth2 redirect URI example
+  to use the new `/o2p/oauth2/{provider}/authorized` form (the
+  pre-v0.6.0 `/o2p/oauth2/authorized` form now returns 410 Gone).
+
 ## [0.6.0] - 2026-05-11
 
 ### Added
@@ -411,6 +421,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full WebAuthn specification compliance
 - Comprehensive security documentation and best practices guide
 
+[0.6.1]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.3.0...v0.4.0
