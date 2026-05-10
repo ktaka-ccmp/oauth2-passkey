@@ -639,7 +639,7 @@ checksum = "a4ae5f15dda3c708c0ade84bfee31ccab44a3da4f88015ed22f63732abe300c8"
 
 [[package]]
 name = "demo-both"
-version = "0.6.0-dev"
+version = "0.6.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -655,7 +655,7 @@ dependencies = [
 
 [[package]]
 name = "demo-cross-origin"
-version = "0.6.0-dev"
+version = "0.6.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -671,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "demo-custom-login"
-version = "0.6.0-dev"
+version = "0.6.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -684,7 +684,7 @@ dependencies = [
 
 [[package]]
 name = "demo-live"
-version = "0.6.0-dev"
+version = "0.6.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -698,7 +698,7 @@ dependencies = [
 
 [[package]]
 name = "demo-oauth2"
-version = "0.6.0-dev"
+version = "0.6.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -712,7 +712,7 @@ dependencies = [
 
 [[package]]
 name = "demo-passkey"
-version = "0.6.0-dev"
+version = "0.6.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -727,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "demo-profile"
-version = "0.6.0-dev"
+version = "0.6.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -745,7 +745,7 @@ dependencies = [
 
 [[package]]
 name = "demo-todo"
-version = "0.6.0-dev"
+version = "0.6.1-dev"
 dependencies = [
  "askama",
  "axum",
@@ -1903,7 +1903,7 @@ dependencies = [
 
 [[package]]
 name = "oauth2-passkey"
-version = "0.6.0-dev"
+version = "0.6.1-dev"
 dependencies = [
  "async-trait",
  "axum",
@@ -1939,7 +1939,7 @@ dependencies = [
 
 [[package]]
 name = "oauth2-passkey-axum"
-version = "0.6.0-dev"
+version = "0.6.1-dev"
 dependencies = [
  "askama",
  "axum",

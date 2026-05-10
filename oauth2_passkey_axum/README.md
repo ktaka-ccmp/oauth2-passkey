@@ -9,7 +9,7 @@
 
 Axum web framework integration for the [`oauth2-passkey`](https://crates.io/crates/oauth2-passkey) authentication library.
 
-This crate provides ready-to-use Axum handlers, middleware, and UI components for OAuth2 and passkey authentication in your Axum web applications.
+This crate provides ready-to-use Axum handlers, middleware, and UI components for OAuth2/OIDC and Passkey authentication in your Axum web applications. Supports Google plus 8 preset providers (Auth0, Keycloak, Microsoft Entra ID, Zitadel, Okta, Authentik, LINE, Apple) and 8 generic OIDC slots for any standards-compliant IdP.
 
 ## Documentation
 
@@ -160,8 +160,8 @@ You can change this prefix by setting the `O2P_ROUTE_PREFIX` environment variabl
 ### Core Authentication
 
 **OAuth2:**
-- `GET /o2p/oauth2/google` - Start Google OAuth2 login
-- `GET|POST /o2p/oauth2/authorized` - OAuth2 callback handler
+- `GET /o2p/oauth2/{provider}` - Start OAuth2/OIDC login for a configured provider (`google`, `custom1`..`custom8`)
+- `GET|POST /o2p/oauth2/{provider}/authorized` - Provider-specific OAuth2 callback handler
 
 **Passkey:**
 - `POST /o2p/passkey/register/start` - Begin passkey registration
