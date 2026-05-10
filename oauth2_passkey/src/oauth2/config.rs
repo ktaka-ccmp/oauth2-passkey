@@ -78,8 +78,8 @@ pub fn provider_info(name: &str) -> Option<ProviderInfo> {
 }
 
 /// Returns UI info for every currently enabled OAuth2 provider, in stable
-/// display order (Google first, then Auth0/Keycloak/Entra, then configured
-/// generic OIDC slots Custom1..Custom8).
+/// display order (Google first, then enabled generic OIDC slots
+/// Custom1..Custom8 in order).
 pub fn enabled_providers() -> Vec<ProviderInfo> {
     ProviderKind::ALL
         .iter()

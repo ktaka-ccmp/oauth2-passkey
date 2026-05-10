@@ -70,18 +70,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   previous default of `=platform` to force platform-bound authenticators must
   now set `PASSKEY_AUTHENTICATOR_ATTACHMENT=platform` explicitly.
 - OAuth2 callback now **merges** claims from both the ID token and
-  `/userinfo` (preferring `/userinfo` as the canonical profile source,
-  falling back to the ID token) instead of using one or the other.
-  Eliminates failure modes where a provider populates a field in only
-  one of the two responses
+  `/userinfo` (preferring the ID token as the cryptographically
+  signed source, falling back to `/userinfo` to fill missing fields)
+  instead of using one or the other. Eliminates failure modes where
+  a provider populates a field in only one of the two responses
 
 ### Security
 
 - Identity-critical claim mismatches between the ID token and
-  `/userinfo` (`sub`, `email`, `email_verified`) are now strictly
-  rejected with `OAuth2Error::Validation`. Display-claim mismatches
-  (`name`, `picture`) follow the per-provider `STRICT_DISPLAY_CLAIMS`
-  setting (warn by default, reject when strict)
+  `/userinfo` (`email`, `email_verified`, `preferred_username`, `hd`)
+  are now strictly rejected with `OAuth2Error::Validation`. The `sub`
+  equality invariant is enforced upstream in `get_idinfo_userinfo` as
+  `OAuth2Error::IdMismatch`. Display-claim mismatches (`name`,
+  `picture`, `family_name`, `given_name`) follow the per-provider
+  `STRICT_DISPLAY_CLAIMS` setting (warn by default, reject when strict)
 - ID tokens with multiple audiences are validated against the `azp`
   (authorized party) claim per OIDC Core 1.0 §3.1.3.7 — previously
   multi-audience tokens passed validation with only the `aud` check
