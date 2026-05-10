@@ -121,6 +121,10 @@ pub(crate) async fn validate_origin(
     auth_url: &str,
     additional_allowed_origins: &[String],
 ) -> Result<(), OAuth2Error> {
+    // `expected_origin` is for error messages and logging only. It preserves
+    // operator-facing input (no `:443` / `:80` injection) so messages look
+    // like the configured value. Origin matching itself uses the structural
+    // comparison in `allowed_triples` below.
     let parsed_url = Url::parse(auth_url).expect("Invalid URL");
     let scheme = parsed_url.scheme();
     let host = parsed_url.host_str().unwrap_or_default();

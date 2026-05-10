@@ -341,6 +341,46 @@ async fn test_validate_origin_invalid_url_rejected() {
     assert!(result.is_err(), "unparseable candidate must be rejected");
 }
 
+/// An unparseable entry in `additional_allowed_origins` must be silently
+/// dropped (fail-closed): it neither matches anything nor short-circuits
+/// the check, and a sibling valid entry still works.
+#[tokio::test]
+async fn test_validate_origin_unparseable_additional_origin_dropped() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Origin", HeaderValue::from_static("https://login.live.com"));
+
+    let result = validate_origin(
+        &headers,
+        "https://example.com/oauth2/callback",
+        &[
+            "not-a-valid-url".to_string(),
+            "https://login.live.com".to_string(),
+        ],
+    )
+    .await;
+    assert!(
+        result.is_ok(),
+        "valid sibling allowed origin must still match when an unparseable entry is present"
+    );
+
+    // And the unparseable entry on its own does not authorize anything.
+    let mut headers2 = HeaderMap::new();
+    headers2.insert(
+        "Origin",
+        HeaderValue::from_static("https://attacker.example"),
+    );
+    let result2 = validate_origin(
+        &headers2,
+        "https://example.com/oauth2/callback",
+        &["not-a-valid-url".to_string()],
+    )
+    .await;
+    assert!(
+        result2.is_err(),
+        "unparseable additional_allowed_origins entry must not authorize anything"
+    );
+}
+
 /// Tests for validate_origin with mismatched origin
 ///
 /// This test verifies that `validate_origin` correctly validates an origin
