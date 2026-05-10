@@ -22,7 +22,7 @@ bundled-tls = ["oauth2-passkey/bundled-tls"]
 
 [dependencies]
 # Changed from workspace dependency to published crate version
-oauth2-passkey = "0.6.1"
+oauth2-passkey = { path = "../oauth2_passkey" }
 #oauth2-passkey = { version = "0.1.x" }
 
 askama = { workspace = true }
