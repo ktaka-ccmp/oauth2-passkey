@@ -136,6 +136,29 @@ The `/v2.0` suffix is required — the v1 endpoint uses a different issuer forma
 (`sts.windows.net`) that will fail issuer validation. The `common` and
 `organizations` aliases are also not supported.
 
+### Step 2c: Create LINE Login credentials (optional)
+
+LINE runs as Custom slot 3 with `PRESET=line`. Skip this step if you don't need LINE login.
+Full background is in [docs/src/guides/line.md](../docs/src/guides/line.md); the condensed
+deploy-time steps are:
+
+1. Open the [LINE Developers Console](https://developers.line.biz/console/), create or
+   open a Provider, then create a **LINE Login** channel
+2. Channel settings: enable **OpenID Connect**, set callback URLs:
+   - `http://localhost:3001/o2p/oauth2/line/authorized` (local development)
+   - `https://passkey-demo.ccmp.jp/o2p/oauth2/line/authorized` (production)
+3. OpenID Connect > scopes: `openid`, `profile`, and (if needed) `email`
+4. Email claim requires a separate manual application under **Email address permission**
+   (1-2 business days). Without approval, login fails with `OAuth2Error::Validation`
+5. Copy **Channel ID** (CLIENT_ID) and **Channel secret** (CLIENT_SECRET)
+
+```bash
+export OAUTH2_CUSTOM3_CLIENT_ID="your-line-channel-id"
+export OAUTH2_CUSTOM3_CLIENT_SECRET="your-line-channel-secret"
+# PRESET=line supplies DISPLAY_NAME / NAME / ICON_SLUG / brand color.
+# Issuer URL is fixed to https://access.line.me/ in env.cloud-run.yaml.
+```
+
 ### Step 3: Store secrets in Secret Manager
 
 ```bash
@@ -152,6 +175,10 @@ echo -n "$OAUTH2_CUSTOM1_CLIENT_SECRET" | gcloud secrets create OAUTH2_CUSTOM1_C
 echo -n "$OAUTH2_CUSTOM2_CLIENT_ID" | gcloud secrets create OAUTH2_CUSTOM2_CLIENT_ID --data-file=-
 echo -n "$OAUTH2_CUSTOM2_CLIENT_SECRET" | gcloud secrets create OAUTH2_CUSTOM2_CLIENT_SECRET --data-file=-
 
+# LINE secrets (first time only, if using LINE via CUSTOM3 slot)
+echo -n "$OAUTH2_CUSTOM3_CLIENT_ID" | gcloud secrets create OAUTH2_CUSTOM3_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM3_CLIENT_SECRET" | gcloud secrets create OAUTH2_CUSTOM3_CLIENT_SECRET --data-file=-
+
 # Update secrets (add a new version to existing secrets)
 echo -n "$OAUTH2_GOOGLE_CLIENT_ID" | gcloud secrets versions add OAUTH2_GOOGLE_CLIENT_ID --data-file=-
 echo -n "$OAUTH2_GOOGLE_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_GOOGLE_CLIENT_SECRET --data-file=-
@@ -164,6 +191,10 @@ echo -n "$OAUTH2_CUSTOM1_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_CUS
 # Entra secret rotation (CUSTOM2 slot; Azure client secrets expire; max 24 months)
 echo -n "$OAUTH2_CUSTOM2_CLIENT_ID" | gcloud secrets versions add OAUTH2_CUSTOM2_CLIENT_ID --data-file=-
 echo -n "$OAUTH2_CUSTOM2_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_CUSTOM2_CLIENT_SECRET --data-file=-
+
+# LINE secret rotation (CUSTOM3 slot)
+echo -n "$OAUTH2_CUSTOM3_CLIENT_ID" | gcloud secrets versions add OAUTH2_CUSTOM3_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM3_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_CUSTOM3_CLIENT_SECRET --data-file=-
 
 # Grant Cloud Run's default service account access to secrets
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
