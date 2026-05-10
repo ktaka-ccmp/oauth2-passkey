@@ -21,7 +21,7 @@ This library provides the essential authentication logic and coordination functi
 
 ## Features
 
-- **OAuth2 Support**: Google OAuth2/OIDC authentication with extensible provider system
+- **OAuth2 / OIDC Support**: Google plus 8 preset providers (Auth0, Keycloak, Microsoft Entra ID, Zitadel, Okta, Authentik, LINE, Apple) and a generic slot system for any standards-compliant OIDC IdP
 - **WebAuthn/Passkey**: FIDO2-compliant passwordless authentication
 - **Secure Session Management**: Redis and in-memory session storage with secure cookies
 - **Flexible Storage**: SQLite and PostgreSQL database support
