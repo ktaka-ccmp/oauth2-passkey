@@ -7,12 +7,15 @@
 - [Proposed Fix](#proposed-fix)
 - [Related Files](#related-files)
 - [Timeline](#timeline)
+- [Resolution](#resolution)
 
 ## ID: 20260511-0543
 
 ## Created: 2026-05-11-05-43
 
-## Status: open
+## Closed: 2026-05-11-06-13
+
+## Status: completed
 
 ## Priority: medium
 
@@ -125,3 +128,46 @@ straightforward to test.
   v0.6.0 release prep is doc-accuracy fixes only; this is a code change
   that warrants its own PR with negative tests.
 - Reference: review-295.txt § "Findings worth fixing" item 1
+
+### 2026-05-11: Decision reversed -- fix in same release window
+
+- Re-evaluated: the attack surface widened in v0.6.0 with
+  `additional_allowed_origins` (Entra B2C `login.live.com`). Shipping
+  a security-focused release with a known origin-validation gap in the
+  same code paths the release expands is inconsistent.
+- `url` crate is already a direct workspace dependency (via reqwest
+  transitively, and used elsewhere in oauth2_passkey), so Option A
+  (structural URL parse + compare) has no dependency cost.
+- Decision: implement Option A in `fix/validate-origin-subdomain-confusion`
+  branched off dev (which already has the v0.6.0 release-prep merge).
+- Trade-off vs Option B (byte-after-prefix): Option A additionally
+  fixes case-insensitive host comparison and default-port normalization
+  (RFC 3986 compliance), at the cost of ~5 more lines.
+
+## Resolution
+
+Implemented via Option A on `fix/validate-origin-subdomain-confusion`:
+
+- Added private `origin_triple(&str) -> Option<(String, String, Option<u16>)>`
+  helper in `oauth2_passkey/src/oauth2/main/utils.rs` that parses a URL
+  string, lowercases scheme and host (RFC 3986 case-insensitivity), and
+  resolves the port via `Url::port_or_known_default()` (so `:443` for
+  https collapses to the implicit form).
+- `validate_origin` now pre-parses `auth_url` and every
+  `additional_allowed_origins` entry into triples, then matches the
+  incoming Origin / Referer candidate by structural equality. Subdomain-
+  confusion candidates such as `https://accounts.google.com.attacker.example`
+  no longer satisfy the check.
+- Seven negative / positive tests added in `utils/tests.rs`:
+  - subdomain confusion via Origin rejected
+  - subdomain confusion via Referer rejected
+  - subdomain confusion against `additional_allowed_origins` rejected
+  - case-insensitive host accepted (`https://EXAMPLE.com` vs
+    `https://example.com`)
+  - explicit default port `:443` accepted
+  - non-default port mismatch rejected
+  - unparseable Referer rejected
+- All 14 `validate_origin` tests pass (7 existing + 7 new). Workspace
+  test suite: 841 / 0.
+- CHANGELOG.md v0.6.0 § Security extended with an entry describing this
+  fix (release has not been tagged yet at the time of merge).

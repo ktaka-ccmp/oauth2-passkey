@@ -233,6 +233,154 @@ async fn test_validate_origin_null_without_referer() {
     }
 }
 
+/// Subdomain-confusion attacker host must not match expected origin.
+///
+/// `https://example.com.attacker.example/...` previously satisfied
+/// `starts_with("https://example.com")` because the next character was a
+/// valid host-segment byte. Structural origin comparison rejects it.
+#[tokio::test]
+async fn test_validate_origin_rejects_subdomain_confusion() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Origin",
+        HeaderValue::from_static("https://example.com.attacker.example"),
+    );
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(
+        result.is_err(),
+        "subdomain-confusion Origin must be rejected"
+    );
+}
+
+/// Same defense, exercised via the Referer fallback path.
+#[tokio::test]
+async fn test_validate_origin_rejects_subdomain_confusion_via_referer() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Referer",
+        HeaderValue::from_static("https://example.com.attacker.example/path"),
+    );
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(
+        result.is_err(),
+        "subdomain-confusion Referer must be rejected"
+    );
+}
+
+/// `additional_allowed_origins` entries must also resist subdomain confusion.
+/// Mirrors the Entra preset path where `https://login.live.com` is registered
+/// as an extra allowed origin.
+#[tokio::test]
+async fn test_validate_origin_rejects_subdomain_confusion_in_additional() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Origin",
+        HeaderValue::from_static("https://login.live.com.attacker.example"),
+    );
+
+    let result = validate_origin(
+        &headers,
+        "https://example.com/oauth2/callback",
+        &["https://login.live.com".to_string()],
+    )
+    .await;
+    assert!(
+        result.is_err(),
+        "subdomain confusion against additional_allowed_origins must be rejected"
+    );
+}
+
+/// RFC 3986: scheme and host are case-insensitive. Different casing must match.
+#[tokio::test]
+async fn test_validate_origin_case_insensitive_host() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Origin", HeaderValue::from_static("https://EXAMPLE.com"));
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(result.is_ok(), "case-insensitive host must match");
+}
+
+/// Explicit default port must match the implicit form (https:443).
+#[tokio::test]
+async fn test_validate_origin_default_port_normalization() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Origin",
+        HeaderValue::from_static("https://example.com:443"),
+    );
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(
+        result.is_ok(),
+        "explicit default port :443 must match implicit form"
+    );
+}
+
+/// Non-default port mismatch must be rejected.
+#[tokio::test]
+async fn test_validate_origin_different_port_rejected() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Origin",
+        HeaderValue::from_static("https://example.com:8443"),
+    );
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(result.is_err(), "different port must not match");
+}
+
+/// Malformed Referer must be rejected, not treated as a wildcard match.
+#[tokio::test]
+async fn test_validate_origin_invalid_url_rejected() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Referer", HeaderValue::from_static("not-a-url"));
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(result.is_err(), "unparseable candidate must be rejected");
+}
+
+/// An unparseable entry in `additional_allowed_origins` must be silently
+/// dropped (fail-closed): it neither matches anything nor short-circuits
+/// the check, and a sibling valid entry still works.
+#[tokio::test]
+async fn test_validate_origin_unparseable_additional_origin_dropped() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Origin", HeaderValue::from_static("https://login.live.com"));
+
+    let result = validate_origin(
+        &headers,
+        "https://example.com/oauth2/callback",
+        &[
+            "not-a-valid-url".to_string(),
+            "https://login.live.com".to_string(),
+        ],
+    )
+    .await;
+    assert!(
+        result.is_ok(),
+        "valid sibling allowed origin must still match when an unparseable entry is present"
+    );
+
+    // And the unparseable entry on its own does not authorize anything.
+    let mut headers2 = HeaderMap::new();
+    headers2.insert(
+        "Origin",
+        HeaderValue::from_static("https://attacker.example"),
+    );
+    let result2 = validate_origin(
+        &headers2,
+        "https://example.com/oauth2/callback",
+        &["not-a-valid-url".to_string()],
+    )
+    .await;
+    assert!(
+        result2.is_err(),
+        "unparseable additional_allowed_origins entry must not authorize anything"
+    );
+}
+
 /// Tests for validate_origin with mismatched origin
 ///
 /// This test verifies that `validate_origin` correctly validates an origin

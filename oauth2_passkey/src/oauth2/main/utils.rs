@@ -103,11 +103,28 @@ pub(super) async fn verify_and_consume_nonce(
     Ok(())
 }
 
+/// Parse a URL string into a `(scheme, host, port)` triple for origin
+/// comparison. Scheme and host are lowercased per RFC 3986; port is the
+/// explicit port or the scheme's default (443 for https, 80 for http).
+/// Returns `None` if the input does not parse as a URL or has no host.
+fn origin_triple(s: &str) -> Option<(String, String, Option<u16>)> {
+    let u = Url::parse(s).ok()?;
+    Some((
+        u.scheme().to_ascii_lowercase(),
+        u.host_str()?.to_ascii_lowercase(),
+        u.port_or_known_default(),
+    ))
+}
+
 pub(crate) async fn validate_origin(
     headers: &HeaderMap,
     auth_url: &str,
     additional_allowed_origins: &[String],
 ) -> Result<(), OAuth2Error> {
+    // `expected_origin` is for error messages and logging only. It preserves
+    // operator-facing input (no `:443` / `:80` injection) so messages look
+    // like the configured value. Origin matching itself uses the structural
+    // comparison in `allowed_triples` below.
     let parsed_url = Url::parse(auth_url).expect("Invalid URL");
     let scheme = parsed_url.scheme();
     let host = parsed_url.host_str().unwrap_or_default();
@@ -115,6 +132,16 @@ pub(crate) async fn validate_origin(
         .port()
         .map_or("".to_string(), |p| format!(":{p}"));
     let expected_origin = format!("{scheme}://{host}{port}");
+
+    // Pre-parse the expected origin and each additional allowed origin into
+    // (scheme, host, port) triples for structural comparison. This rejects
+    // subdomain-confusion candidates like
+    // "https://accounts.google.com.attacker.com" against
+    // "https://accounts.google.com" that a raw `starts_with` would accept.
+    let allowed_triples: Vec<_> = std::iter::once(auth_url)
+        .chain(additional_allowed_origins.iter().map(String::as_str))
+        .filter_map(origin_triple)
+        .collect();
 
     // Browsers send `Origin: null` for cross-origin form_post redirects (e.g. Auth0).
     // Treat the literal string "null" the same as absent and fall back to Referer.
@@ -127,10 +154,7 @@ pub(crate) async fn validate_origin(
     };
 
     let matches = |candidate: &str| {
-        candidate.starts_with(&expected_origin)
-            || additional_allowed_origins
-                .iter()
-                .any(|allowed| candidate.starts_with(allowed))
+        origin_triple(candidate).is_some_and(|cand| allowed_triples.contains(&cand))
     };
 
     match origin {
