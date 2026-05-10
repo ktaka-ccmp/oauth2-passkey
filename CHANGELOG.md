@@ -96,6 +96,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - RUSTSEC-2026-0098: name constraints for URI names incorrectly accepted
   - RUSTSEC-2026-0099: name constraints accepted for wildcard certs
   - RUSTSEC-2026-0104: reachable panic in CRL parsing
+- `validate_origin` now compares the incoming Origin / Referer
+  structurally (scheme + host + port via `url::Url`) instead of using
+  a raw `starts_with` prefix match. Closes a subdomain-confusion gap
+  where e.g. `https://accounts.google.com.attacker.example` satisfied
+  the prefix check against `https://accounts.google.com`. The same
+  defense applies to `additional_allowed_origins` (e.g. `login.live.com`
+  for the Entra personal-accounts flow). Case-insensitive host and
+  default-port (`:443` / `:80`) normalization are now also honored
 
 ### Fixed
 

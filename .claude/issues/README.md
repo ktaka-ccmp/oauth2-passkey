@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (10)
+### Open (9)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -17,14 +17,14 @@ This directory contains issue/task tracking files for the project.
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
-| `20260511-0543` | medium | low | [validate_origin starts_with subdomain confusion via Referer](open/20260511-0543-validate-origin-subdomain-confusion.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
 
-### Completed (74)
+### Completed (75)
 
 | ID | Title |
 |----|-------|
+| `20260511-0543` | [validate_origin starts_with subdomain confusion via Referer](completed/20260511-0543-validate-origin-subdomain-confusion.md) |
 | `20260331-1517` | [PASSKEY_AUTHENTICATOR_ATTACHMENT=none sends non-standard string instead of omitting field](completed/20260331-1517-passkey-authenticator-attachment-none-serialization.md) |
 | `20260420-0402` | [Admin unlink/delete fails in demo mode ("Invalid user ID")](completed/20260420-0402-admin-unlink-demo-mode.md) |
 | `20260423-0136` | [Consolidate idp/README.md into docs/](completed/20260423-0136-idp-readme-docs-consolidation.md) |
