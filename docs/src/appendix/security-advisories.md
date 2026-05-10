@@ -22,16 +22,24 @@ The Marvin Attack is a potential key recovery attack through timing side-channel
 - Removed `pkcs1` crate dependency used for PEM conversion
 
 **Remaining Exposure:**
-- Transitive dependency through `sqlx-mysql` → `rsa` crate (via SQLx macros)
-- **Impact:** None - we only use SQLite and PostgreSQL features, never MySQL
+- Transitive dependency through `sqlx-mysql` → `rsa` crate
+- Pulled in two ways:
+  1. SQLx's macro system (`sqlx-macros-core`) includes all database drivers at compile time
+  2. The `mysql` feature added in v0.5.0 enables the runtime driver
+- **Impact:** None - the Marvin Attack targets RSA *decryption* timing
+  to recover a private key, but `sqlx-mysql` only performs RSA *public-key
+  encryption* of the password during the MySQL `caching_sha2_password`
+  authentication handshake. The client never holds an RSA private key, so
+  no decryption oracle exists in this code path
 - **Risk:** Minimal - vulnerability not in our execution path
-- **CI Status:** Advisory ignored (RUSTSEC-2023-0071) due to unused dependency path
+- **CI Status:** Advisory ignored (RUSTSEC-2023-0071)
 
 **Technical Details:**
-- SQLx's macro system (`sqlx-macros-core`) includes all database drivers at compile time
-- This is a known SQLx architectural limitation
-- MySQL driver dependencies are never loaded or executed in our applications
-- All actual database operations use only SQLite or PostgreSQL drivers
+- Even with MySQL backend selected (`GENERIC_DATA_STORE_TYPE=mysql`), the
+  client only encrypts outbound credentials with the server's public key
+- Marvin Attack mitigation is the responsibility of the MySQL server
+  (which holds the private key), not the Rust client
+- SQLite and PostgreSQL backends do not pull `sqlx-mysql` at runtime at all
 
 #### Migration Details
 
@@ -71,5 +79,5 @@ Ok(DecodingKey::from_rsa_components(n, e)?)
 
 ---
 
-*Last Updated: June 22, 2025*
+*Last Updated: 2026-05-11 (revised for v0.5.0 MySQL support)*
 *Review Frequency: Quarterly or upon new RSA crate releases*
