@@ -54,7 +54,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-oauth2-passkey-axum = "0.5"
+oauth2-passkey-axum = "0.6"
 ```
 
 ### Prepare .env
@@ -149,7 +149,7 @@ Disable features you don't need:
 ```toml
 [dependencies]
 # Custom login page, keep built-in account management and admin UI
-oauth2-passkey-axum = { version = "0.5", default-features = false, features = ["user-ui", "admin-ui"] }
+oauth2-passkey-axum = { version = "0.6", default-features = false, features = ["user-ui", "admin-ui"] }
 ```
 
 ## Available Routes
