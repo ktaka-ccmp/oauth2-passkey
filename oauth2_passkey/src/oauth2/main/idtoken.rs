@@ -1,11 +1,11 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
-use crate::oauth2::config::get_jwks_url;
+use crate::oauth2::provider::ProviderConfig;
 use crate::storage::{
     CacheData, CacheErrorConversion, CacheKey, CachePrefix, StorageError, get_data, remove_data,
     store_cache_keyed,
@@ -20,7 +20,8 @@ struct Jwks {
 struct Jwk {
     kty: String,
     kid: String,
-    alg: String,
+    /// Optional: some providers (e.g. Entra) omit `alg`; fall back to kty-derived default.
+    alg: Option<String>,
     n: Option<String>,
     e: Option<String>,
     x: Option<String>,
@@ -31,17 +32,26 @@ struct Jwk {
 
 #[allow(unused)]
 #[derive(Debug, Deserialize, Clone)]
-pub struct IdInfo {
+pub struct OidcIdInfo {
     pub iss: String,
     pub sub: String,
-    pub azp: String,
-    pub aud: String,
-    pub email: String,
-    pub email_verified: bool,
-    pub name: String,
+    /// Google-specific; absent in many other OIDC providers (e.g. Auth0).
+    pub azp: Option<String>,
+    /// OIDC Core 1.0 §2 allows `aud` to be either a single string or an array
+    /// of strings. Normalized to `Vec<String>` for uniform validation.
+    #[serde(deserialize_with = "deserialize_aud")]
+    pub aud: Vec<String>,
+    /// Optional per OIDC Core 1.0; absent for some Microsoft personal accounts.
+    pub email: Option<String>,
+    /// Some providers omit this claim; treat absence as unverified.
+    pub email_verified: Option<bool>,
+    /// Optional per OIDC Core 1.0; absent when profile scope not granted.
+    pub name: Option<String>,
     pub picture: Option<String>,
-    pub given_name: String,
-    pub family_name: String,
+    /// Absent in many non-Google OIDC providers.
+    pub given_name: Option<String>,
+    /// Absent in many non-Google OIDC providers.
+    pub family_name: Option<String>,
     pub locale: Option<String>,
     pub iat: i64,
     pub exp: i64,
@@ -50,6 +60,48 @@ pub struct IdInfo {
     pub nonce: Option<String>,
     pub hd: Option<String>,
     pub at_hash: Option<String>,
+    /// Fallback for `email` when the provider omits the standard claim
+    /// (e.g. Microsoft personal accounts).
+    pub preferred_username: Option<String>,
+}
+
+fn deserialize_aud<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::{Error, SeqAccess, Visitor};
+    use std::fmt;
+
+    struct AudVisitor;
+
+    impl<'de> Visitor<'de> for AudVisitor {
+        type Value = Vec<String>;
+
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("a string or array of strings")
+        }
+
+        fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
+            Ok(vec![v.to_string()])
+        }
+
+        fn visit_string<E: Error>(self, v: String) -> Result<Self::Value, E> {
+            Ok(vec![v])
+        }
+
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+            let mut out: Vec<String> = Vec::new();
+            while let Some(s) = seq.next_element::<String>()? {
+                out.push(s);
+            }
+            if out.is_empty() {
+                return Err(Error::custom("aud array is empty"));
+            }
+            Ok(out)
+        }
+    }
+
+    deserializer.deserialize_any(AudVisitor)
 }
 
 #[derive(Error, Debug)]
@@ -68,6 +120,12 @@ pub enum TokenVerificationError {
     InvalidTokenSignature,
     #[error("Invalid token audience, expected: {0}, actual: {1}")]
     InvalidTokenAudience(String, String),
+    #[error(
+        "ID token has multiple audiences but no `azp` claim (required by OIDC Core 1.0 §3.1.3.7)"
+    )]
+    MissingAuthorizedParty,
+    #[error("Authorized party mismatch: `azp` is '{0}', expected '{1}'")]
+    UnauthorizedParty(String, String),
     #[error("Invalid token issuer, expected: {0}, actual: {1}")]
     InvalidTokenIssuer(String, String),
     #[error("Token expired")]
@@ -197,7 +255,15 @@ fn decode_base64_url_safe(input: &str) -> Result<Vec<u8>, TokenVerificationError
 }
 
 fn convert_jwk_to_decoding_key(jwk: &Jwk) -> Result<DecodingKey, TokenVerificationError> {
-    match jwk.alg.as_str() {
+    // When `alg` is absent, infer from `kty` (Entra and some other providers omit `alg`).
+    let alg_default = match jwk.kty.as_str() {
+        "RSA" => "RS256",
+        "EC" => "ES256",
+        "oct" => "HS256",
+        _ => "",
+    };
+    let alg = jwk.alg.as_deref().unwrap_or(alg_default);
+    match alg {
         "RS256" | "RS384" | "RS512" => {
             let n = jwk
                 .n
@@ -234,15 +300,47 @@ fn convert_jwk_to_decoding_key(jwk: &Jwk) -> Result<DecodingKey, TokenVerificati
     }
 }
 
-fn decode_token(token: &str) -> Result<IdInfo, TokenVerificationError> {
+fn decode_token(token: &str) -> Result<OidcIdInfo, TokenVerificationError> {
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() != 3 {
         return Err(TokenVerificationError::InvalidTokenFormat);
     }
     let payload = parts[1];
     let decoded_payload = decode_base64_url_safe(payload)?;
-    let idinfo: IdInfo = serde_json::from_slice(&decoded_payload)?;
+    let idinfo: OidcIdInfo = serde_json::from_slice(&decoded_payload)?;
     Ok(idinfo)
+}
+
+/// Validate the `aud` and `azp` claims on a verified ID token.
+///
+/// Per OIDC Core 1.0 §3.1.3.7:
+/// - the Client's `client_id` MUST be present in `aud`;
+/// - when `aud` contains multiple audiences, the `azp` claim MUST be present
+///   and MUST name the authorized party (our `client_id`).
+///
+/// The second rule closes an attack surface opened by accepting array-form
+/// `aud`: without it, a token issued *for another client* that merely lists
+/// us in `aud` would be accepted here.
+fn validate_audience(idinfo: &OidcIdInfo, client_id: &str) -> Result<(), TokenVerificationError> {
+    if !idinfo.aud.iter().any(|a| a == client_id) {
+        return Err(TokenVerificationError::InvalidTokenAudience(
+            client_id.to_string(),
+            idinfo.aud.join(","),
+        ));
+    }
+    if idinfo.aud.len() > 1 {
+        match idinfo.azp.as_deref() {
+            Some(azp) if azp == client_id => {}
+            Some(azp) => {
+                return Err(TokenVerificationError::UnauthorizedParty(
+                    azp.to_string(),
+                    client_id.to_string(),
+                ));
+            }
+            None => return Err(TokenVerificationError::MissingAuthorizedParty),
+        }
+    }
+    Ok(())
 }
 
 fn verify_signature(
@@ -265,50 +363,50 @@ fn verify_signature(
     }
 }
 
-pub(super) async fn _verify_idtoken(
-    token: String,
-    audience: String,
-) -> Result<IdInfo, TokenVerificationError> {
-    let (idinfo, _algorithm) = verify_idtoken_with_algorithm(token, audience).await?;
-    Ok(idinfo)
-}
-
 pub(super) async fn verify_idtoken_with_algorithm(
+    ctx: &ProviderConfig,
     token: String,
-    audience: String,
-) -> Result<(IdInfo, Algorithm), TokenVerificationError> {
+) -> Result<(OidcIdInfo, Algorithm), TokenVerificationError> {
     let header = jsonwebtoken::decode_header(&token)?;
 
-    let kid = header
-        .kid
-        .ok_or(TokenVerificationError::MissingKeyComponent(
-            "kid".to_string(),
-        ))?;
     let alg = header.alg;
-    let idinfo: IdInfo = decode_token(&token)?;
+    let idinfo: OidcIdInfo = decode_token(&token)?;
 
     tracing::debug!("Algorithm from JWT header: {:?}", alg);
     tracing::debug!("Decoded id_token payload: {:#?}", idinfo);
 
-    let jwks_url = get_jwks_url().await?;
-    let jwks = fetch_jwks(&jwks_url).await?;
-    let jwk = find_jwk(&jwks, &kid).ok_or(TokenVerificationError::NoMatchingKey)?;
-
-    let decoding_key = convert_jwk_to_decoding_key(jwk)?;
+    let decoding_key = match header.kid {
+        Some(kid) => {
+            let jwks_url = ctx.jwks_url().await?;
+            let jwks = fetch_jwks(&jwks_url).await?;
+            let jwk = find_jwk(&jwks, &kid).ok_or(TokenVerificationError::NoMatchingKey)?;
+            convert_jwk_to_decoding_key(jwk)?
+        }
+        None => match alg {
+            Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
+                if ctx.client_secret.is_empty() {
+                    return Err(TokenVerificationError::MissingKeyComponent(
+                        "client_secret (empty)".to_string(),
+                    ));
+                }
+                DecodingKey::from_secret(ctx.client_secret.as_bytes())
+            }
+            _ => {
+                return Err(TokenVerificationError::MissingKeyComponent(
+                    "kid".to_string(),
+                ));
+            }
+        },
+    };
 
     let signature_valid = verify_signature(&token, &decoding_key, alg)?;
     if !signature_valid {
         return Err(TokenVerificationError::InvalidTokenSignature);
     }
 
-    if idinfo.aud != audience {
-        return Err(TokenVerificationError::InvalidTokenAudience(
-            audience,
-            idinfo.aud.to_string(),
-        ));
-    }
+    validate_audience(&idinfo, &ctx.client_id)?;
 
-    let expected_issuer = crate::oauth2::config::get_expected_issuer().await?;
+    let expected_issuer = ctx.expected_issuer().await?;
     if idinfo.iss != expected_issuer {
         return Err(TokenVerificationError::InvalidTokenIssuer(
             idinfo.iss.to_string(),

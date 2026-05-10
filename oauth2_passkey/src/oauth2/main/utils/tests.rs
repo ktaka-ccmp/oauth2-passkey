@@ -44,6 +44,7 @@ fn test_encode_decode_state() {
         pkce_id: "pkce789".to_string(),
         misc_id: Some("misc123".to_string()),
         mode_id: Some("mode456".to_string()),
+        provider: "google".to_string(),
     };
 
     // Encode the state
@@ -63,6 +64,7 @@ fn test_encode_decode_state() {
     assert_eq!(decoded.pkce_id, "pkce789");
     assert_eq!(decoded.misc_id, Some("misc123".to_string()));
     assert_eq!(decoded.mode_id, Some("mode456".to_string()));
+    assert_eq!(decoded.provider, "google");
 }
 
 /// Test state parameter encoding and decoding with minimal fields
@@ -81,6 +83,7 @@ fn test_encode_decode_state_minimal() {
         pkce_id: "pkce789".to_string(),
         misc_id: None,
         mode_id: None,
+        provider: "google".to_string(),
     };
 
     // Encode the state
@@ -163,7 +166,7 @@ async fn test_validate_origin_success() {
     headers.insert("Origin", HeaderValue::from_static("https://example.com"));
 
     // Validate against matching URL
-    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
 
     // Should succeed
     assert!(result.is_ok());
@@ -186,10 +189,196 @@ async fn test_validate_origin_with_referer() {
     );
 
     // Validate against matching URL
-    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
 
     // Should succeed
     assert!(result.is_ok());
+}
+
+/// Test origin validation when Origin header is the literal string "null"
+///
+/// Browsers send `Origin: null` for cross-origin form_post redirects.
+/// The function should fall back to the Referer header in this case.
+#[tokio::test]
+async fn test_validate_origin_null_with_referer() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Origin", HeaderValue::from_static("null"));
+    headers.insert(
+        "Referer",
+        HeaderValue::from_static("https://example.com/login"),
+    );
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(
+        result.is_ok(),
+        "Origin: null should fall back to matching Referer"
+    );
+}
+
+/// Test origin validation when Origin is "null" and no Referer is present
+///
+/// When Origin is "null" and there is no Referer to fall back to, validation
+/// must still reject the request.
+#[tokio::test]
+async fn test_validate_origin_null_without_referer() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Origin", HeaderValue::from_static("null"));
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(result.is_err());
+    match result {
+        Err(OAuth2Error::InvalidOrigin(_)) => {}
+        Ok(_) => unreachable!("Expected InvalidOrigin error but got Ok"),
+        Err(err) => unreachable!("Expected InvalidOrigin error, got {:?}", err),
+    }
+}
+
+/// Subdomain-confusion attacker host must not match expected origin.
+///
+/// `https://example.com.attacker.example/...` previously satisfied
+/// `starts_with("https://example.com")` because the next character was a
+/// valid host-segment byte. Structural origin comparison rejects it.
+#[tokio::test]
+async fn test_validate_origin_rejects_subdomain_confusion() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Origin",
+        HeaderValue::from_static("https://example.com.attacker.example"),
+    );
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(
+        result.is_err(),
+        "subdomain-confusion Origin must be rejected"
+    );
+}
+
+/// Same defense, exercised via the Referer fallback path.
+#[tokio::test]
+async fn test_validate_origin_rejects_subdomain_confusion_via_referer() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Referer",
+        HeaderValue::from_static("https://example.com.attacker.example/path"),
+    );
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(
+        result.is_err(),
+        "subdomain-confusion Referer must be rejected"
+    );
+}
+
+/// `additional_allowed_origins` entries must also resist subdomain confusion.
+/// Mirrors the Entra preset path where `https://login.live.com` is registered
+/// as an extra allowed origin.
+#[tokio::test]
+async fn test_validate_origin_rejects_subdomain_confusion_in_additional() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Origin",
+        HeaderValue::from_static("https://login.live.com.attacker.example"),
+    );
+
+    let result = validate_origin(
+        &headers,
+        "https://example.com/oauth2/callback",
+        &["https://login.live.com".to_string()],
+    )
+    .await;
+    assert!(
+        result.is_err(),
+        "subdomain confusion against additional_allowed_origins must be rejected"
+    );
+}
+
+/// RFC 3986: scheme and host are case-insensitive. Different casing must match.
+#[tokio::test]
+async fn test_validate_origin_case_insensitive_host() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Origin", HeaderValue::from_static("https://EXAMPLE.com"));
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(result.is_ok(), "case-insensitive host must match");
+}
+
+/// Explicit default port must match the implicit form (https:443).
+#[tokio::test]
+async fn test_validate_origin_default_port_normalization() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Origin",
+        HeaderValue::from_static("https://example.com:443"),
+    );
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(
+        result.is_ok(),
+        "explicit default port :443 must match implicit form"
+    );
+}
+
+/// Non-default port mismatch must be rejected.
+#[tokio::test]
+async fn test_validate_origin_different_port_rejected() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Origin",
+        HeaderValue::from_static("https://example.com:8443"),
+    );
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(result.is_err(), "different port must not match");
+}
+
+/// Malformed Referer must be rejected, not treated as a wildcard match.
+#[tokio::test]
+async fn test_validate_origin_invalid_url_rejected() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Referer", HeaderValue::from_static("not-a-url"));
+
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
+    assert!(result.is_err(), "unparseable candidate must be rejected");
+}
+
+/// An unparseable entry in `additional_allowed_origins` must be silently
+/// dropped (fail-closed): it neither matches anything nor short-circuits
+/// the check, and a sibling valid entry still works.
+#[tokio::test]
+async fn test_validate_origin_unparseable_additional_origin_dropped() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Origin", HeaderValue::from_static("https://login.live.com"));
+
+    let result = validate_origin(
+        &headers,
+        "https://example.com/oauth2/callback",
+        &[
+            "not-a-valid-url".to_string(),
+            "https://login.live.com".to_string(),
+        ],
+    )
+    .await;
+    assert!(
+        result.is_ok(),
+        "valid sibling allowed origin must still match when an unparseable entry is present"
+    );
+
+    // And the unparseable entry on its own does not authorize anything.
+    let mut headers2 = HeaderMap::new();
+    headers2.insert(
+        "Origin",
+        HeaderValue::from_static("https://attacker.example"),
+    );
+    let result2 = validate_origin(
+        &headers2,
+        "https://example.com/oauth2/callback",
+        &["not-a-valid-url".to_string()],
+    )
+    .await;
+    assert!(
+        result2.is_err(),
+        "unparseable additional_allowed_origins entry must not authorize anything"
+    );
 }
 
 /// Tests for validate_origin with mismatched origin
@@ -208,7 +397,7 @@ async fn test_validate_origin_mismatch() {
     headers.insert("Origin", HeaderValue::from_static("https://attacker.com"));
 
     // Validate against different URL
-    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
 
     // Should fail
     assert!(result.is_err());
@@ -238,7 +427,7 @@ async fn test_validate_origin_missing() {
     let headers = HeaderMap::new();
 
     // Validate against URL
-    let result = validate_origin(&headers, "https://example.com/oauth2/callback").await;
+    let result = validate_origin(&headers, "https://example.com/oauth2/callback", &[]).await;
 
     // Should fail
     assert!(result.is_err());
@@ -251,6 +440,36 @@ async fn test_validate_origin_missing() {
             unreachable!("Expected InvalidOrigin error, got {:?}", err);
         }
     }
+}
+
+/// Test origin validation accepts an origin listed in `additional_allowed_origins`
+///
+/// Providers like Microsoft Entra B2C route credential entry through a different
+/// host than the OIDC endpoints (e.g. `login.live.com` vs `login.microsoftonline.com`),
+/// so the Referer on the `form_post` callback is that alternate host. The provider
+/// config declares it via `additional_allowed_origins`, and `validate_origin` must
+/// accept it even though it doesn't match the authorization endpoint's origin.
+#[tokio::test]
+async fn test_validate_origin_additional_allowed() {
+    let mut headers = HeaderMap::new();
+    headers.insert("Origin", HeaderValue::from_static("null"));
+    headers.insert(
+        "Referer",
+        HeaderValue::from_static("https://login.live.com/oauth20_authorize.srf"),
+    );
+
+    let allowed = vec!["https://login.live.com".to_string()];
+    let result = validate_origin(
+        &headers,
+        "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        &allowed,
+    )
+    .await;
+
+    assert!(
+        result.is_ok(),
+        "Referer on an additional_allowed_origins host should be accepted"
+    );
 }
 
 /// Test token storage and retrieval roundtrip in cache
@@ -537,6 +756,7 @@ async fn test_get_uid_from_stored_session_no_misc_id() {
         pkce_id: "pkce789".to_string(),
         misc_id: None,
         mode_id: None,
+        provider: "google".to_string(),
     };
 
     // Call the function
@@ -566,6 +786,7 @@ async fn test_get_uid_from_stored_session_token_not_found() {
         pkce_id: "pkce789".to_string(),
         misc_id: Some("nonexistent_misc_id".to_string()),
         mode_id: None,
+        provider: "google".to_string(),
     };
 
     // Call the function
@@ -595,6 +816,7 @@ async fn test_delete_session_and_misc_token_no_misc_id() {
         pkce_id: "pkce789".to_string(),
         misc_id: None,
         mode_id: None,
+        provider: "google".to_string(),
     };
 
     // Call the function
@@ -623,6 +845,7 @@ async fn test_delete_session_and_misc_token_token_not_found() {
         pkce_id: "pkce789".to_string(),
         misc_id: Some("nonexistent_misc_id".to_string()),
         mode_id: None,
+        provider: "google".to_string(),
     };
 
     // Call the function

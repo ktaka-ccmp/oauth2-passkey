@@ -1,9 +1,76 @@
 use super::*;
-use crate::oauth2::{FedCMCallbackRequest, OAuth2Account, OAuth2Error, prepare_fedcm_nonce};
+use crate::oauth2::provider::ProviderConfig;
+use crate::oauth2::{
+    FedCMCallbackRequest, OAuth2Account, OAuth2Error, prepare_fedcm_nonce,
+    prepare_oauth2_auth_request_inner,
+};
 use crate::test_utils::init_test_environment;
 use crate::userdb::User;
 use chrono::Utc;
 use serial_test::serial;
+
+/// Test-accessible variant of `get_authorized_core` that accepts a pre-built
+/// `ProviderConfig` directly, bypassing the global provider static.
+/// This allows tests to inject mock server URLs without touching `LazyLock`s.
+async fn get_authorized_core_with_ctx(
+    ctx: &ProviderConfig,
+    auth_response: &AuthResponse,
+    cookies: &headers::Cookie,
+    headers: &HeaderMap,
+) -> Result<(HeaderMap, String), CoordinationError> {
+    authorized_core(ctx, HttpMethod::Get, auth_response, cookies, headers).await
+}
+
+/// Test-accessible variant of `post_authorized_core` that accepts a pre-built
+/// `ProviderConfig` directly, bypassing the global provider static.
+async fn post_authorized_core_with_ctx(
+    ctx: &ProviderConfig,
+    auth_response: &AuthResponse,
+    cookies: &headers::Cookie,
+    headers: &HeaderMap,
+) -> Result<(HeaderMap, String), CoordinationError> {
+    authorized_core(ctx, HttpMethod::Post, auth_response, cookies, headers).await
+}
+
+/// Test-accessible variant of `fedcm_authorized_core` that accepts a pre-built
+/// `ProviderConfig` directly, bypassing the global provider static.
+async fn fedcm_authorized_core_with_ctx(
+    ctx: &ProviderConfig,
+    request: &FedCMCallbackRequest,
+    headers: &HeaderMap,
+) -> Result<(HeaderMap, String), CoordinationError> {
+    let idinfo = validate_fedcm_token(ctx, &request.credential, &request.nonce_id).await?;
+    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx)?;
+
+    let mode = match &request.mode {
+        Some(mode_str) => {
+            let parsed: OAuth2Mode = mode_str.parse().map_err(|_| {
+                CoordinationError::InvalidState(format!("Invalid FedCM mode: {mode_str}"))
+            })?;
+            Some(parsed)
+        }
+        None => None,
+    };
+
+    if matches!(mode, Some(OAuth2Mode::AddToUser)) {
+        return Err(CoordinationError::InvalidState(
+            "FedCM does not support add_to_user mode".to_string(),
+        ));
+    }
+
+    let login_context = LoginContext::from_headers(headers);
+    let result = process_authenticated_oauth2_user(
+        oauth2_account,
+        mode,
+        AuthMethod::FedCM,
+        login_context,
+        None,
+        None,
+        None,
+    )
+    .await?;
+    Ok(result)
+}
 
 // Additional imports for mock OAuth2 server tests
 use axum::routing::{get, post};
@@ -275,7 +342,7 @@ impl Default for MockServerState {
         Self {
             auth_codes: Arc::new(StdMutex::new(HashMap::new())),
             user_email: Arc::new(StdMutex::new("first-user@example.com".to_string())),
-            // Note: From<IdInfo> adds "google_" prefix to sub, so sub should NOT include it.
+            // Note: oauth2_account_from_idinfo adds "google_" prefix to sub, so sub should NOT include it.
             // "first-user-test-google-id" -> provider_user_id = "google_first-user-test-google-id"
             user_sub: Arc::new(StdMutex::new("first-user-test-google-id".to_string())),
             user_name: Arc::new(StdMutex::new("First User".to_string())),
@@ -555,8 +622,9 @@ async fn drive_oauth2_flow(
         }
     }
 
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
     let (auth_url, response_headers) =
-        crate::oauth2::prepare_oauth2_auth_request(request_headers, Some(mode)).await?;
+        prepare_oauth2_auth_request_inner(&ctx, request_headers, Some(mode)).await?;
 
     // 2. Extract CSRF cookie value from Set-Cookie header
     let set_cookie = response_headers
@@ -644,7 +712,10 @@ async fn test_post_authorized_core_wrong_response_mode() -> Result<(), Box<dyn s
     cookie_hmap.insert(http::header::COOKIE, "dummy=value".parse().unwrap());
     let cookie: headers::Cookie = cookie_hmap.typed_get().expect("Should parse Cookie header");
 
-    let result = post_authorized_core(&auth_response, &cookie, &http::HeaderMap::new()).await;
+    // for_mock_server uses response_mode="query", so POST should be rejected
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result =
+        post_authorized_core_with_ctx(&ctx, &auth_response, &cookie, &http::HeaderMap::new()).await;
 
     assert!(
         matches!(result, Err(CoordinationError::InvalidResponseMode(_))),
@@ -668,7 +739,8 @@ async fn test_get_authorized_core_login_existing_user() -> Result<(), Box<dyn st
     mock.reset_to_first_user();
 
     let (auth_response, cookie, headers) = drive_oauth2_flow("login", None).await?;
-    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = get_authorized_core_with_ctx(&ctx, &auth_response, &cookie, &headers).await;
 
     assert!(
         result.is_ok(),
@@ -702,7 +774,7 @@ async fn test_get_authorized_core_login_nonexistent_account()
     set_mock_env_vars();
 
     // Configure mock with a user that has no existing account in the database.
-    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Note: sub should NOT include "google_" prefix (oauth2_account_from_idinfo adds it).
     // Guard resets to first user on drop (panic-safe).
     let _guard = mock.configure_user_guarded(
         "nonexistent@example.com",
@@ -711,7 +783,8 @@ async fn test_get_authorized_core_login_nonexistent_account()
     );
 
     let (auth_response, cookie, headers) = drive_oauth2_flow("login", None).await?;
-    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = get_authorized_core_with_ctx(&ctx, &auth_response, &cookie, &headers).await;
 
     assert!(
         matches!(result, Err(CoordinationError::Conflict(_))),
@@ -733,7 +806,7 @@ async fn test_get_authorized_core_create_new_user() -> Result<(), Box<dyn std::e
     set_mock_env_vars();
 
     // Configure mock with a new user identity.
-    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Note: sub should NOT include "google_" prefix (oauth2_account_from_idinfo adds it).
     // Guard resets to first user on drop (panic-safe).
     let timestamp = chrono::Utc::now().timestamp_millis();
     let new_email = format!("new-user-{timestamp}@example.com");
@@ -742,7 +815,8 @@ async fn test_get_authorized_core_create_new_user() -> Result<(), Box<dyn std::e
     let _guard = mock.configure_user_guarded(&new_email, &new_sub, &new_name);
 
     let (auth_response, cookie, headers) = drive_oauth2_flow("create_user", None).await?;
-    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = get_authorized_core_with_ctx(&ctx, &auth_response, &cookie, &headers).await;
 
     assert!(
         result.is_ok(),
@@ -760,7 +834,7 @@ async fn test_get_authorized_core_create_new_user() -> Result<(), Box<dyn std::e
     );
 
     // Verify the OAuth2 account was created in the database
-    // From<IdInfo> adds "google_" prefix to sub -> provider_user_id
+    // oauth2_account_from_idinfo adds "google_" prefix to sub -> provider_user_id
     let expected_provider_user_id = format!("google_{new_sub}");
     let provider = crate::oauth2::Provider::new("google".to_string()).unwrap();
     let provider_user_id = crate::oauth2::ProviderUserId::new(expected_provider_user_id).unwrap();
@@ -788,7 +862,7 @@ async fn test_get_authorized_core_create_user_or_login() -> Result<(), Box<dyn s
     set_mock_env_vars();
 
     // Part 1: Create user (new OAuth2 identity).
-    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Note: sub should NOT include "google_" prefix (oauth2_account_from_idinfo adds it).
     // Guard resets to first user on drop (panic-safe).
     let timestamp = chrono::Utc::now().timestamp_millis();
     let new_email = format!("dual-mode-{timestamp}@example.com");
@@ -797,7 +871,8 @@ async fn test_get_authorized_core_create_user_or_login() -> Result<(), Box<dyn s
     let _guard = mock.configure_user_guarded(&new_email, &new_sub, &new_name);
 
     let (auth_response, cookie, headers) = drive_oauth2_flow("create_user_or_login", None).await?;
-    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = get_authorized_core_with_ctx(&ctx, &auth_response, &cookie, &headers).await;
     assert!(
         result.is_ok(),
         "create_user_or_login with new identity should succeed: {result:?}"
@@ -810,7 +885,8 @@ async fn test_get_authorized_core_create_user_or_login() -> Result<(), Box<dyn s
 
     // Part 2: Login (same OAuth2 identity, now exists)
     let (auth_response, cookie, headers) = drive_oauth2_flow("create_user_or_login", None).await?;
-    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = get_authorized_core_with_ctx(&ctx, &auth_response, &cookie, &headers).await;
     assert!(
         result.is_ok(),
         "create_user_or_login with existing identity should succeed: {result:?}"
@@ -854,7 +930,7 @@ async fn test_get_authorized_core_add_to_user() -> Result<(), Box<dyn std::error
     session_request_headers.insert(http::header::COOKIE, session_cookie_pair.parse()?);
 
     // Configure mock with a NEW OAuth2 identity to link.
-    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Note: sub should NOT include "google_" prefix (oauth2_account_from_idinfo adds it).
     // Guard resets to first user on drop (panic-safe).
     let timestamp = chrono::Utc::now().timestamp_millis();
     let link_email = format!("linked-{timestamp}@example.com");
@@ -867,7 +943,8 @@ async fn test_get_authorized_core_add_to_user() -> Result<(), Box<dyn std::error
         drive_oauth2_flow("add_to_user", Some(&session_request_headers)).await?;
 
     // Step 3: Call get_authorized_core
-    let result = get_authorized_core(&auth_response, &cookie, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = get_authorized_core_with_ctx(&ctx, &auth_response, &cookie, &headers).await;
     assert!(result.is_ok(), "add_to_user should succeed: {result:?}");
     let (_response_headers, message) = result.unwrap();
     assert!(
@@ -876,7 +953,7 @@ async fn test_get_authorized_core_add_to_user() -> Result<(), Box<dyn std::error
     );
 
     // Verify the new OAuth2 account is linked to the first user
-    // From<IdInfo> adds "google_" prefix to sub -> provider_user_id
+    // oauth2_account_from_idinfo adds "google_" prefix to sub -> provider_user_id
     let expected_provider_user_id = format!("google_{link_sub}");
     let provider = crate::oauth2::Provider::new("google".to_string()).unwrap();
     let provider_user_id = crate::oauth2::ProviderUserId::new(expected_provider_user_id).unwrap();
@@ -928,8 +1005,9 @@ async fn drive_fedcm_flow(
     let mut headers = http::HeaderMap::new();
     headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
 
-    // 6. Call fedcm_authorized_core
-    let result = fedcm_authorized_core(&request, &headers).await?;
+    // 6. Call fedcm_authorized_core_with_ctx using mock server config
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = fedcm_authorized_core_with_ctx(&ctx, &request, &headers).await?;
     Ok(result)
 }
 
@@ -971,7 +1049,7 @@ async fn test_fedcm_login_nonexistent_account() -> Result<(), Box<dyn std::error
     set_mock_env_vars();
 
     // Configure mock with a user that has no existing account in the database.
-    // Note: sub should NOT include "google_" prefix (From<IdInfo> adds it).
+    // Note: sub should NOT include "google_" prefix (oauth2_account_from_idinfo adds it).
     let _guard = mock.configure_user_guarded(
         "fedcm-nonexistent@example.com",
         "fedcm-nonexistent-id",
@@ -994,7 +1072,8 @@ async fn test_fedcm_login_nonexistent_account() -> Result<(), Box<dyn std::error
     let mut headers = http::HeaderMap::new();
     headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
 
-    let result = fedcm_authorized_core(&request, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = fedcm_authorized_core_with_ctx(&ctx, &request, &headers).await;
     assert!(
         matches!(result, Err(CoordinationError::Conflict(_))),
         "FedCM login with nonexistent account should return Conflict error, got: {result:?}"
@@ -1107,7 +1186,8 @@ async fn test_fedcm_reject_add_to_user() -> Result<(), Box<dyn std::error::Error
     let mut headers = http::HeaderMap::new();
     headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
 
-    let result = fedcm_authorized_core(&request, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = fedcm_authorized_core_with_ctx(&ctx, &request, &headers).await;
     assert!(
         matches!(result, Err(CoordinationError::InvalidState(_))),
         "FedCM should reject add_to_user mode, got: {result:?}"
@@ -1146,7 +1226,8 @@ async fn test_fedcm_create_existing_user_conflict() -> Result<(), Box<dyn std::e
     let mut headers = http::HeaderMap::new();
     headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
 
-    let result = fedcm_authorized_core(&request, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = fedcm_authorized_core_with_ctx(&ctx, &request, &headers).await;
     assert!(
         matches!(result, Err(CoordinationError::Conflict(_))),
         "FedCM create_user with existing account should return Conflict, got: {result:?}"
@@ -1184,7 +1265,8 @@ async fn test_fedcm_nonce_replay() -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = http::HeaderMap::new();
     headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
 
-    let first_result = fedcm_authorized_core(&request, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let first_result = fedcm_authorized_core_with_ctx(&ctx, &request, &headers).await;
     assert!(
         first_result.is_ok(),
         "First FedCM call should succeed: {first_result:?}"
@@ -1196,7 +1278,7 @@ async fn test_fedcm_nonce_replay() -> Result<(), Box<dyn std::error::Error>> {
         nonce_id: nonce_response.nonce_id,
         mode: Some("login".to_string()),
     };
-    let replay_result = fedcm_authorized_core(&replay_request, &headers).await;
+    let replay_result = fedcm_authorized_core_with_ctx(&ctx, &replay_request, &headers).await;
     assert!(
         matches!(
             replay_result,
@@ -1238,7 +1320,8 @@ async fn test_fedcm_nonce_mismatch() -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = http::HeaderMap::new();
     headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
 
-    let result = fedcm_authorized_core(&request, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = fedcm_authorized_core_with_ctx(&ctx, &request, &headers).await;
     assert!(
         matches!(
             result,
@@ -1279,7 +1362,8 @@ async fn test_fedcm_mode_none() -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = http::HeaderMap::new();
     headers.insert(http::header::USER_AGENT, "TestBrowser/1.0".parse().unwrap());
 
-    let result = fedcm_authorized_core(&request, &headers).await;
+    let ctx = ProviderConfig::for_mock_server(MOCK_BASE_URL);
+    let result = fedcm_authorized_core_with_ctx(&ctx, &request, &headers).await;
     assert!(
         matches!(result, Err(CoordinationError::InvalidState(_))),
         "FedCM with mode=None should return InvalidState, got: {result:?}"

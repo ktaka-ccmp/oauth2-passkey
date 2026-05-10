@@ -1,4 +1,5 @@
 use super::*;
+use crate::oauth2::provider::ProviderConfig;
 use crate::test_utils::init_test_environment;
 use std::collections::HashMap;
 
@@ -21,30 +22,20 @@ async fn test_oauth2_request_preparation_with_session() {
         http::HeaderValue::from_static("session_id=test_session_123"),
     );
 
-    // Use the internal function with a test auth URL to avoid external dependencies
     let test_auth_url = "https://test.example.com/oauth/authorize";
-    let current_response_mode = OAUTH2_RESPONSE_MODE.as_str();
-    let result = prepare_oauth2_auth_request_with_params(
-        headers,
-        Some("signup"),
-        test_auth_url,
-        current_response_mode,
-    )
-    .await;
+    let ctx = ProviderConfig::for_test(test_auth_url, "query");
+    let result = prepare_oauth2_auth_request_inner(&ctx, headers, Some("signup")).await;
 
     assert!(result.is_ok());
     let (auth_url, response_headers) = result.unwrap();
 
-    // Test the actual behavior, not implementation details
     let parsed_url = url::Url::parse(&auth_url).expect("Should generate valid URL");
 
-    // Test that auth URL starts with our test URL
     assert!(
         auth_url.starts_with(test_auth_url),
         "Should use provided auth URL"
     );
 
-    // Test OAuth2 parameters are present
     let params: HashMap<String, String> = parsed_url.query_pairs().into_owned().collect();
     assert!(params.contains_key("client_id"), "Should include client_id");
     assert!(
@@ -74,7 +65,6 @@ async fn test_oauth2_request_preparation_with_session() {
         "Should use authorization code flow"
     );
 
-    // Verify CSRF cookie is set in response headers
     let set_cookie_headers: Vec<_> = response_headers
         .get_all(SET_COOKIE)
         .iter()
@@ -87,21 +77,14 @@ async fn test_oauth2_request_preparation_with_session() {
         .find(|cookie| cookie.contains(&*OAUTH2_CSRF_COOKIE_NAME))
         .expect("CSRF cookie should be set");
 
-    // Debug: print the actual cookie to see its format
     println!("Actual cookie: {csrf_cookie}");
 
     assert!(csrf_cookie.contains("HttpOnly"));
 
-    // Verify SameSite attribute matches the response mode
-    // form_post mode should use SameSite=None, query mode should use SameSite=Lax
-    let expected_samesite = match OAUTH2_RESPONSE_MODE.to_lowercase().as_str() {
-        "form_post" => "SameSite=None",
-        "query" => "SameSite=Lax",
-        _ => "SameSite=Lax", // Default fallback
-    };
+    // "query" mode → SameSite=Lax
     assert!(
-        csrf_cookie.contains(expected_samesite),
-        "Expected {expected_samesite} in cookie: {csrf_cookie}"
+        csrf_cookie.contains("SameSite=Lax"),
+        "Expected SameSite=Lax in cookie: {csrf_cookie}"
     );
 }
 
@@ -120,30 +103,20 @@ async fn test_oauth2_request_preparation_without_session() {
         http::HeaderValue::from_static("test-user-agent"),
     );
 
-    // Use the internal function with a test auth URL to avoid external dependencies
     let test_auth_url = "https://test.example.com/oauth/authorize";
-    let current_response_mode = OAUTH2_RESPONSE_MODE.as_str();
-    let result = prepare_oauth2_auth_request_with_params(
-        headers,
-        None,
-        test_auth_url,
-        current_response_mode,
-    )
-    .await;
+    let ctx = ProviderConfig::for_test(test_auth_url, "query");
+    let result = prepare_oauth2_auth_request_inner(&ctx, headers, None).await;
 
     assert!(result.is_ok());
     let (auth_url, response_headers) = result.unwrap();
 
-    // Test the actual behavior, not implementation details
     let parsed_url = url::Url::parse(&auth_url).expect("Should generate valid URL");
 
-    // Test that auth URL starts with our test URL
     assert!(
         auth_url.starts_with(test_auth_url),
         "Should use provided auth URL"
     );
 
-    // Test OAuth2 parameters are present even without session
     let params: HashMap<String, String> = parsed_url.query_pairs().into_owned().collect();
     assert!(params.contains_key("client_id"), "Should include client_id");
     assert!(
@@ -173,7 +146,6 @@ async fn test_oauth2_request_preparation_without_session() {
         "Should use authorization code flow"
     );
 
-    // Test that CSRF cookie is set even without session
     assert!(
         response_headers.contains_key("set-cookie"),
         "Should set CSRF cookie"
@@ -193,6 +165,7 @@ async fn test_state_encoding_decoding_roundtrip() {
         pkce_id: "test_pkce_id".to_string(),
         misc_id: Some("test_misc_id".to_string()),
         mode_id: Some("signup".to_string()),
+        provider: "google".to_string(),
     };
 
     let encoded = encode_state(original_state.clone()).unwrap();
@@ -203,6 +176,7 @@ async fn test_state_encoding_decoding_roundtrip() {
     assert_eq!(original_state.pkce_id, decoded.pkce_id);
     assert_eq!(original_state.misc_id, decoded.misc_id);
     assert_eq!(original_state.mode_id, decoded.mode_id);
+    assert_eq!(original_state.provider, decoded.provider);
 }
 
 /// Test OAuth2State validation with invalid base64 input
@@ -235,7 +209,6 @@ async fn test_state_validation_invalid_base64() {
 ///
 #[tokio::test]
 async fn test_state_validation_invalid_json() {
-    // Create invalid JSON by encoding invalid data
     let invalid_json = base64url_encode(b"not valid json".to_vec()).unwrap();
     let result = crate::OAuth2State::new(invalid_json);
 
@@ -266,15 +239,14 @@ async fn test_oauth2_csrf_cookie_samesite_form_post_mode() {
     );
 
     let test_auth_url = "https://test.example.com/oauth/authorize";
-    let result =
-        prepare_oauth2_auth_request_with_params(headers, None, test_auth_url, "form_post").await;
+    let ctx = ProviderConfig::for_test(test_auth_url, "form_post");
+    let result = prepare_oauth2_auth_request_inner(&ctx, headers, None).await;
 
     assert!(result.is_ok());
     let (_, response_headers) = result.unwrap();
 
     let csrf_cookie = extract_csrf_cookie(&response_headers);
 
-    // Verify security attributes
     assert!(
         csrf_cookie.contains("HttpOnly"),
         "Cookie should be HttpOnly"
@@ -282,7 +254,6 @@ async fn test_oauth2_csrf_cookie_samesite_form_post_mode() {
     assert!(csrf_cookie.contains("Secure"), "Cookie should be Secure");
     assert!(csrf_cookie.contains("Path=/"), "Cookie should have Path=/");
 
-    // Verify SameSite=None for form_post mode
     assert!(
         csrf_cookie.contains("SameSite=None"),
         "form_post mode should use SameSite=None for cross-origin POST requests. Cookie: {csrf_cookie}"
@@ -304,15 +275,14 @@ async fn test_oauth2_csrf_cookie_samesite_query_mode() {
     );
 
     let test_auth_url = "https://test.example.com/oauth/authorize";
-    let result =
-        prepare_oauth2_auth_request_with_params(headers, None, test_auth_url, "query").await;
+    let ctx = ProviderConfig::for_test(test_auth_url, "query");
+    let result = prepare_oauth2_auth_request_inner(&ctx, headers, None).await;
 
     assert!(result.is_ok());
     let (_, response_headers) = result.unwrap();
 
     let csrf_cookie = extract_csrf_cookie(&response_headers);
 
-    // Verify security attributes
     assert!(
         csrf_cookie.contains("HttpOnly"),
         "Cookie should be HttpOnly"
@@ -320,7 +290,6 @@ async fn test_oauth2_csrf_cookie_samesite_query_mode() {
     assert!(csrf_cookie.contains("Secure"), "Cookie should be Secure");
     assert!(csrf_cookie.contains("Path=/"), "Cookie should have Path=/");
 
-    // Verify SameSite=Lax for query mode
     assert!(
         csrf_cookie.contains("SameSite=Lax"),
         "query mode should use SameSite=Lax for redirect-based flows. Cookie: {csrf_cookie}"
@@ -342,15 +311,14 @@ async fn test_oauth2_csrf_cookie_samesite_unknown_mode() {
     );
 
     let test_auth_url = "https://test.example.com/oauth/authorize";
-    let result =
-        prepare_oauth2_auth_request_with_params(headers, None, test_auth_url, "unknown_mode").await;
+    let ctx = ProviderConfig::for_test(test_auth_url, "unknown_mode");
+    let result = prepare_oauth2_auth_request_inner(&ctx, headers, None).await;
 
     assert!(result.is_ok());
     let (_, response_headers) = result.unwrap();
 
     let csrf_cookie = extract_csrf_cookie(&response_headers);
 
-    // Verify security attributes
     assert!(
         csrf_cookie.contains("HttpOnly"),
         "Cookie should be HttpOnly"
@@ -358,7 +326,6 @@ async fn test_oauth2_csrf_cookie_samesite_unknown_mode() {
     assert!(csrf_cookie.contains("Secure"), "Cookie should be Secure");
     assert!(csrf_cookie.contains("Path=/"), "Cookie should have Path=/");
 
-    // Verify SameSite=Lax as default for unknown modes
     assert!(
         csrf_cookie.contains("SameSite=Lax"),
         "Unknown response mode should default to SameSite=Lax. Cookie: {csrf_cookie}"
@@ -368,7 +335,7 @@ async fn test_oauth2_csrf_cookie_samesite_unknown_mode() {
 /// Test CSRF cookie SameSite attribute configuration based on current config
 ///
 /// This integration test verifies that CSRF cookies are configured with appropriate SameSite
-/// attributes based on the actual OAuth2 response mode configuration.
+/// attributes based on the OAuth2 response mode set to "query" (matching .env_test).
 ///
 #[tokio::test]
 async fn test_oauth2_csrf_cookie_samesite_based_on_response_mode() {
@@ -380,23 +347,16 @@ async fn test_oauth2_csrf_cookie_samesite_based_on_response_mode() {
         http::HeaderValue::from_static("test-user-agent"),
     );
 
-    // Use the internal function with a test auth URL to avoid external dependencies
     let test_auth_url = "https://test.example.com/oauth/authorize";
-    let current_response_mode = OAUTH2_RESPONSE_MODE.as_str();
-    let result = prepare_oauth2_auth_request_with_params(
-        headers,
-        None,
-        test_auth_url,
-        current_response_mode,
-    )
-    .await;
+    // .env_test sets OAUTH2_RESPONSE_MODE=query
+    let ctx = ProviderConfig::for_test(test_auth_url, "query");
+    let result = prepare_oauth2_auth_request_inner(&ctx, headers, None).await;
 
     assert!(result.is_ok());
     let (_, response_headers) = result.unwrap();
 
     let csrf_cookie = extract_csrf_cookie(&response_headers);
 
-    // Verify the cookie has required security attributes
     assert!(
         csrf_cookie.contains("HttpOnly"),
         "Cookie should be HttpOnly"
@@ -404,28 +364,11 @@ async fn test_oauth2_csrf_cookie_samesite_based_on_response_mode() {
     assert!(csrf_cookie.contains("Secure"), "Cookie should be Secure");
     assert!(csrf_cookie.contains("Path=/"), "Cookie should have Path=/");
 
-    // Verify SameSite attribute matches the configured response mode
-    let current_mode = OAUTH2_RESPONSE_MODE.to_lowercase();
-    match current_mode.as_str() {
-        "form_post" => {
-            assert!(
-                csrf_cookie.contains("SameSite=None"),
-                "form_post mode should use SameSite=None for cross-origin POST requests. Cookie: {csrf_cookie}"
-            );
-        }
-        "query" => {
-            assert!(
-                csrf_cookie.contains("SameSite=Lax"),
-                "query mode should use SameSite=Lax for redirect-based flows. Cookie: {csrf_cookie}"
-            );
-        }
-        _ => {
-            assert!(
-                csrf_cookie.contains("SameSite=Lax"),
-                "Unknown response mode should default to SameSite=Lax. Cookie: {csrf_cookie}"
-            );
-        }
-    }
+    // "query" mode → SameSite=Lax
+    assert!(
+        csrf_cookie.contains("SameSite=Lax"),
+        "query mode should use SameSite=Lax for redirect-based flows. Cookie: {csrf_cookie}"
+    );
 }
 
 /// Helper function to extract CSRF cookie from response headers

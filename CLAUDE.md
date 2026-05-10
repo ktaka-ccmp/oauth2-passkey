@@ -133,6 +133,10 @@ Environment variables (see `dot.env.example`):
 ### Coding Style Preferences
 - **Prefer `match` over `if let`**: Use `match` expressions instead of `if let` / `if let ... else` unless clippy suggests otherwise. `match` is more readable and makes all branches explicit.
 
+### Branch Policy
+- **master and dev branches**: Direct commits are prohibited. All changes must go through pull requests merged on GitHub.
+- **Feature/fix branches**: Create topic branches from dev, open PR to dev, then merge dev -> master via PR.
+
 ### Development Workflow
 7. **Minimal Changes**: Code modifications should be minimal and targeted to fulfill specific needs
 8. **Change Approval**: Discuss and get explicit approval before making changes beyond the immediate request

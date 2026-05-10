@@ -20,6 +20,17 @@ pub enum OAuth2Error {
     #[error("Id mismatch")]
     IdMismatch,
 
+    #[error(
+        "OAuth2 claim mismatch for provider '{provider}': `{field}` differs \
+         between id_token ('{idinfo_value}') and userinfo ('{userinfo_value}')"
+    )]
+    ClaimMismatch {
+        field: &'static str,
+        idinfo_value: String,
+        userinfo_value: String,
+        provider: String,
+    },
+
     #[error("Serde error: {0}")]
     Serde(String),
 

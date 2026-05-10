@@ -144,6 +144,26 @@ pub mod oauth2_attacks {
         URL_SAFE_NO_PAD.encode(pkce_bypass_state.to_string().as_bytes())
     }
 
+    /// Tamper the `provider` field in a real base64url-encoded state parameter.
+    ///
+    /// Decodes the state, replaces `state.provider` with `fake_provider`, then
+    /// re-encodes.  All other IDs (csrf_id, nonce_id, pkce_id) remain intact so
+    /// CSRF validation can still pass — the only difference is the provider name.
+    /// This is the exact attack that the provider cross-check is designed to block.
+    pub fn tamper_state_provider(real_state: &str, fake_provider: &str) -> String {
+        // Decode base64url
+        let decoded = URL_SAFE_NO_PAD
+            .decode(real_state)
+            .expect("real_state must be valid base64url");
+        // Parse JSON
+        let mut state: serde_json::Value =
+            serde_json::from_slice(&decoded).expect("decoded state must be valid JSON");
+        // Replace provider field
+        state["provider"] = serde_json::Value::String(fake_provider.to_string());
+        // Re-encode
+        URL_SAFE_NO_PAD.encode(state.to_string().as_bytes())
+    }
+
     /// Create state with malicious redirect URI for redirect validation bypass testing
     pub fn create_state_with_malicious_redirect(redirect_uri: &str) -> String {
         let malicious_redirect_state = json!({

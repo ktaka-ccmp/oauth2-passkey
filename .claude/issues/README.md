@@ -6,25 +6,41 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (10)
+### Open (9)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
-| `20260226-2019` | high | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
+| `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
+| `20260226-1814` | high | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
+| `20260226-2019` | medium | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
-| `20260226-2020` | medium | large | [Expand OAuth2 Provider Support](open/20260226-2020-expand-oauth2-providers.md) |
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
-| `20260226-1814` | low | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
-| `20260226-2025` | low | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
 
-### Completed (58)
+### Completed (75)
 
 | ID | Title |
 |----|-------|
+| `20260511-0543` | [validate_origin starts_with subdomain confusion via Referer](completed/20260511-0543-validate-origin-subdomain-confusion.md) |
+| `20260331-1517` | [PASSKEY_AUTHENTICATOR_ATTACHMENT=none sends non-standard string instead of omitting field](completed/20260331-1517-passkey-authenticator-attachment-none-serialization.md) |
+| `20260420-0402` | [Admin unlink/delete fails in demo mode ("Invalid user ID")](completed/20260420-0402-admin-unlink-demo-mode.md) |
+| `20260423-0136` | [Consolidate idp/README.md into docs/](completed/20260423-0136-idp-readme-docs-consolidation.md) |
+| `20260226-2020` | [Expand OAuth2 Provider Support](completed/20260226-2020-expand-oauth2-providers.md) |
+| `20260420-1456` | [Verify LINE Login as Custom OIDC Provider + Documentation](completed/20260420-1456-add-line-provider.md) |
+| `20260421-0315` | [Configurable `prompt` parameter per OAuth2 provider](completed/20260421-0315-configurable-prompt-per-provider.md) |
+| `20260422-2055` | [Introduce `ProviderName` newtype for stringly-typed provider identifiers](completed/20260422-2055-providername-newtype-typesafety.md) |
+| `20260422-1636` | [Unify non-Google providers under Custom slot with presets](completed/20260422-1636-unify-non-google-providers-via-custom-slot-preset.md) |
+| `20260422-1552` | [Detect claim mismatch between id_token and /userinfo](completed/20260422-1552-detect-claim-mismatch-idinfo-userinfo.md) |
+| `20260421-0045` | [Make `expires_in` in OidcTokenResponse optional](completed/20260421-0045-oidc-token-response-expires-in-optional.md) |
+| `20260421-0105` | [Merge `idinfo` and `userinfo` when building OAuth2Account](completed/20260421-0105-merge-idinfo-and-userinfo-for-account-build.md) |
+| `20260420-1521` | [Remove `OAUTH2_GOOGLE_USER` Dead Code and `oauth2_account_from_userinfo`](completed/20260420-1521-remove-oauth2-google-user-dead-code.md) |
+| `20260420-1511` | [Add Generic OIDC Provider Slots](completed/20260420-1511-add-generic-oidc-provider.md) |
+| `20260420-1643` | [Show IDP Icon and Provider Name on OAuth2 Account Cards](completed/20260420-1643-oauth2-account-provider-icons.md) |
+| `20260420-0552` | [Add Microsoft Entra ID as OAuth2 Provider](completed/20260420-0552-add-entra-provider.md) |
+| `20260420-0307` | [Add Keycloak as OIDC Provider](completed/20260420-0307-add-keycloak-provider.md) |
 | `20260322-0927` | [User Deletion Lacks Atomicity Across Multiple Stores](completed/20260322-0927-user-deletion-atomicity.md) |
 | `20260321-1346` | [Review delete_old_entries Dead Code and Retention Policy](completed/20260321-1346-review-delete-old-entries-dead-code.md) |
 | `20260322-0907` | [upsert_oauth2_account SELECT after COMMIT race condition](completed/20260322-0907-upsert-oauth2-account-post-tx-select-race.md) |
@@ -84,19 +100,23 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-09` | [Cross-Origin Same-Site Demo (Pattern 2)](completed/2026-01-30-cross-origin-same-site-demo.md) |
 | `2026-01-31-02` | [Remove HTTPS Support from Demo Apps](completed/2026-01-31-demo-remove-https.md) |
 
-### Wontfix (4)
+### Wontfix (5)
 
 | ID | Title |
 |----|-------|
+| `20260420-1458` | [Add GitHub as OAuth2 Provider (non-OIDC)](wontfix/20260420-1458-add-github-provider.md) |
 | `20260226-2023` | [Authentication Method Tracking in Session](wontfix/20260226-2023-auth-method-tracking-in-session.md) |
 | `20260226-2026` | [UI Improvements](wontfix/20260226-2026-ui-improvements.md) |
 | `20260212-0235` | [Standalone Demo Repository](wontfix/20260212-0235-standalone-demo-repository.md) |
 | `20260213-1500` | [Remove seq=1 from has_admin_privileges()](wontfix/20260213-remove-seq1-from-has-admin-privileges.md) |
 
-### Deferred (9)
+### Deferred (12)
 
 | ID | Title |
 |----|-------|
+| `20260505-1416` | [Support Entra ID multi-tenant endpoints (common/organizations)](deferred/20260505-1416-entra-multi-tenant.md) |
+| `20260420-1457` | [Add Sign in with Apple as OAuth2 Provider](deferred/20260420-1457-add-apple-provider.md) |
+| `20260323-1505` | [DPoP (Demonstration of Proof-of-Possession) Support](deferred/20260323-1505-dpop-sender-constrained-tokens.md) |
 | `20260320-1410` | [FedCM Cancel Fallback Popup Gets Blocked by Browser](deferred/20260320-1410-fedcm-fallback-popup-blocked.md) |
 | `20260316-1630` | [FedCM Promise Hangs Indefinitely in Stale Tab](deferred/20260316-1630-fedcm-promise-hang-stale-tab.md) |
 | `20260315-0349` | [Eliminate ring Dependency for Full RustCrypto Migration](deferred/20260315-0349-eliminate-ring-dependency.md) |
@@ -156,81 +176,97 @@ Legacy issues retain their `YYYY-MM-DD-NN` IDs.
 ```markdown
 # Issue: <Title>
 
-## Table of Contents
+## Metadata
 
-- [Description](#description)
-- [Related Issues](#related-issues)
-- [Approach](#approach)
-- [Related Files](#related-files)
-- [Implementation Tasks](#implementation-tasks)
-- [Decision Log](#decision-log)
-- [Resolution](#resolution)
+- ID: YYYYMMDD-HHMM
+- Created: YYYY-MM-DD-HH-MM
+- Closed:
+- Status: open | completed | wontfix | deferred
+- Priority: high | medium | low
+- Difficulty: small | medium | large
+- Related Issues:
+  - `YYYYMMDD-HHMM` <Title> (relationship)
 
-## ID: YYYYMMDD-HHMM
+## Problem
 
-## Created: YYYY-MM-DD-HH-MM
+<Symptom, mechanism, or feature gap as understood at issue creation.
+This is the historical record of what prompted the issue. **Do not
+edit, append, or correct after the issue is created** — even for
+typos or factual errors. Corrections, refinements, and new
+understanding go in the Timeline as new entries that respond to
+the original Problem statement.>
 
-## Closed:
+## Timeline
 
-## Status: open | completed | wontfix | deferred
+<!--
+APPEND-ONLY, time-ordered (oldest first). Each entry is a snapshot
+of thinking, decisions, corrections, or research outcomes at a
+point in time. Old plans, superseded approaches, decision rationale,
+and Problem corrections all live here as entries. Never edit or
+delete existing entries; always add new ones at the bottom.
+-->
 
-## Priority: high | medium | low
+### YYYY-MM-DDTHH:MM — <Short headline>
 
-## Difficulty: small | medium | large
+<Body: discussion, decision rationale, corrections to earlier
+sections, snapshot of an old Latest Plan that was just replaced, etc.>
 
-## Description
+### YYYY-MM-DDTHH:MM — <Next entry>
 
-<What needs to be done and why>
+<...>
 
-## Related Issues
+## Latest Plan
 
-- `YYYYMMDD-HHMM` <Title> (relationship: e.g., depends on, related to, supersedes)
+<!--
+Mutable. Always reflects the *current* intended implementation.
+When the plan changes substantively, copy the previous body into
+the Timeline as a new entry (`### YYYY-MM-DDTHH:MM — Plan revision: <summary>`)
+*before* overwriting this section, so no plan history is lost.
+-->
 
-## Approach
+<Concrete steps to implement, files to touch, etc. Includes the
+Implementation Tasks checklist below.>
 
-<Current plan for implementation>
-
-## Related Files
+### Files
 
 - `path/to/file.rs`
 
-## Implementation Tasks
+### Implementation Tasks
 
 - [ ] <Task 1>
 - [ ] <Task 2>
 
-## Decision Log
+### Verification
 
-<!-- APPEND-ONLY: Do not edit or delete existing entries. Add new entries at the bottom. -->
-
-### YYYY-MM-DD: <Short summary of decision>
-
-- Context: <What prompted this decision>
-- Decision: <What was decided>
-- Reason: <Why this was chosen over alternatives>
+<How to test end-to-end.>
 
 ## Resolution
 
-<What was done to resolve this issue>
+<!--
+Written once when status transitions to `completed`. Captures the
+final commit hashes, summary of what was done, and verification
+results. After this is filled in, the issue is sealed.
+-->
 ```
 
 ## Section Update Rules
 
 | Section | Update Rule |
 |---------|------------|
-| Created | Written once at creation |
-| Closed | Written once when issue is resolved or closed |
-| Description | Freely updatable |
-| Related Issues | Freely updatable |
-| Approach | Freely updatable (always reflects current plan) |
-| Related Files | Freely updatable |
-| Implementation Tasks | Freely updatable |
-| **Decision Log** | **Append-only -- never edit or delete existing entries** |
-| Resolution | Written once when issue is resolved |
+| Metadata | Freely updatable. `Created` is written once at issue creation; `Closed` is written once when status moves to `completed`. |
+| **Problem** | **Fully immutable after issue creation.** No edits, no appends, no typo fixes. Corrections go in Timeline as new entries. |
+| **Timeline** | **Append-only, time-ordered (oldest first).** Never edit or delete existing entries. New entries go at the bottom with a `### YYYY-MM-DDTHH:MM — <headline>` subsection header. |
+| **Latest Plan** | Freely overwritable, but every substantive revision must first copy the previous body into the Timeline as a new entry (`### YYYY-MM-DDTHH:MM — Plan revision: <summary>`). The Implementation Tasks checklist inside Latest Plan is freely tickable as work progresses. |
+| Resolution | Written once when status moves to `completed`. After that, treat as sealed. |
 
-The **Decision Log** preserves the history of design decisions, approach changes, and
-rejected alternatives. When updating other sections (especially Approach), always add
-a corresponding Decision Log entry explaining what changed and why.
+The mental model mirrors GitHub Issues:
+
+- **Problem** is the issue body (frozen at creation).
+- **Timeline** is the comment thread (chronological, append-only).
+- **Latest Plan** is a pinned summary at the bottom of the issue
+  describing the current intended fix; revisions move into Timeline
+  before the pinned summary is rewritten.
+- **Resolution** is the closing comment that seals the work.
 
 ## Status Values
 

@@ -3,7 +3,7 @@ use axum::{
     Json, Router,
     extract::{Form, Path, Query},
     http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
-    response::{Html, Redirect, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::{delete, get, post},
 };
 use axum_extra::{TypedHeader, headers};
@@ -11,26 +11,96 @@ use std::collections::HashMap;
 
 use oauth2_passkey::{
     AuthResponse, CoordinationError, FedCMCallbackRequest, O2P_ROUTE_PREFIX, OAuth2Account,
-    Provider, ProviderUserId, UserId, delete_oauth2_account_core, fedcm_authorized_core,
-    get_authorized_core, get_google_client_id, list_accounts_core, post_authorized_core,
-    prepare_fedcm_nonce, prepare_oauth2_auth_request, verify_page_session_token,
+    Provider, ProviderInfo, ProviderName, ProviderUserId, UserId, delete_oauth2_account_core,
+    enabled_providers, fedcm_authorized_core, get_authorized_core, get_google_client_id,
+    list_accounts_core, post_authorized_core, prepare_fedcm_nonce, prepare_oauth2_auth_request,
+    verify_page_session_token,
 };
 
-use super::config::{O2P_FEDCM, O2P_PASSKEY_PROMOTION};
+/// Human-readable presentation data for an OAuth2 provider.
+///
+/// Owned by this crate so that CSS class names and display labels stay out of
+/// the framework-agnostic core. Downstream crates writing custom login pages
+/// can use this type directly or derive their own from `enabled_providers()`.
+#[derive(Debug, Clone)]
+pub struct ProviderView {
+    /// Provider identifier used in URL routing, DB rows, OAuth2 state, and
+    /// templates (e.g. `"google"`, `"auth0"`, or an operator-configured
+    /// value for a Custom slot).
+    pub provider_name: ProviderName,
+    /// Human-readable label for login buttons (e.g. `"Google"`, `"Auth0"`).
+    pub display_name: &'static str,
+    /// CSS classes for the login button (e.g. `"btn-oauth2 btn-google"`).
+    pub button_class: &'static str,
+}
+
+/// Returns [`ProviderView`] for every currently enabled OAuth2 provider, in
+/// stable display order (Google first, then optional providers).
+pub fn enabled_provider_views() -> Vec<ProviderView> {
+    enabled_providers().into_iter().map(provider_view).collect()
+}
+
+fn provider_view(info: ProviderInfo) -> ProviderView {
+    ProviderView {
+        provider_name: info.provider_name,
+        display_name: info.display_name,
+        button_class: info.button_class,
+    }
+}
+
+/// Build the inline `:root { ... }` CSS block injecting `--o2p-custom{N}` /
+/// `--o2p-custom{N}-hover` variables for every enabled generic OIDC slot.
+///
+/// Returns `None` if no slot is enabled (so the template can skip emitting an
+/// empty `<style>` tag). Named providers have `css_var_suffix == None` and
+/// are skipped — they are styled by the base CSS and theme files.
+pub fn custom_css_vars_block() -> Option<String> {
+    let entries: Vec<_> = enabled_providers()
+        .iter()
+        .filter_map(|info| {
+            let suffix = info.css_var_suffix?;
+            let color = info.button_color?;
+            let hover = info.button_hover_color?;
+            Some((suffix, color, hover))
+        })
+        .collect();
+    css_vars_block_from(&entries)
+}
+
+fn css_vars_block_from(entries: &[(&'static str, &'static str, &'static str)]) -> Option<String> {
+    if entries.is_empty() {
+        return None;
+    }
+    let body: Vec<_> = entries
+        .iter()
+        .map(|(suffix, color, hover)| {
+            format!("    --o2p-{suffix}: {color};\n    --o2p-{suffix}-hover: {hover};")
+        })
+        .collect();
+    Some(format!(":root {{\n{}\n}}", body.join("\n")))
+}
+
+use super::config::{O2P_CUSTOM_CSS_URL, O2P_FEDCM, O2P_PASSKEY_PROMOTION};
 use super::error::IntoResponseError;
 use super::session::AuthUser;
 
 pub(super) fn router() -> Router {
     let router = Router::new()
         .route("/oauth2.js", get(serve_oauth2_js))
-        .route("/google", get(google_auth))
-        .route("/authorized", get(get_authorized).post(post_authorized))
+        .route("/{provider}", get(oauth2_initiate))
+        .route(
+            "/{provider}/authorized",
+            get(get_authorized).post(post_authorized),
+        )
+        // Keep the old route returning 410 Gone so bookmarked links get a clear signal.
+        .route("/authorized", get(gone).post(gone))
         .route("/popup_close", get(popup_close))
         .route("/accounts", get(list_oauth2_accounts))
         .route(
             "/accounts/{provider}/{provider_user_id}",
             delete(delete_oauth2_account),
-        );
+        )
+        .route("/select", get(oauth2_select));
 
     if O2P_FEDCM.is_enabled() {
         router
@@ -39,6 +109,18 @@ pub(super) fn router() -> Router {
     } else {
         router
     }
+}
+
+/// Returns 410 Gone for the old `/oauth2/authorized` route.
+/// Clients that followed the old redirect should update their redirect_uri.
+async fn gone() -> (StatusCode, Json<serde_json::Value>) {
+    (
+        StatusCode::GONE,
+        Json(serde_json::json!({
+            "error": "callback URL moved",
+            "new_url_pattern": "/oauth2/{provider}/authorized"
+        })),
+    )
 }
 
 #[derive(Template)]
@@ -88,7 +170,8 @@ async fn serve_oauth2_js() -> Result<Response, (StatusCode, String)> {
         .into_response_error()
 }
 
-async fn google_auth(
+async fn oauth2_initiate(
+    Path(provider): Path<String>,
     auth_user: Option<AuthUser>,
     headers: HeaderMap,
     Query(params): Query<HashMap<String, String>>,
@@ -113,19 +196,98 @@ async fn google_auth(
         }
     }
 
-    let (auth_url, headers) = prepare_oauth2_auth_request(headers, mode.as_deref())
+    let provider_name = ProviderName::from_registered(&provider).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Unknown provider: {provider}"),
+        )
+    })?;
+    let (auth_url, headers) = prepare_oauth2_auth_request(provider_name, headers, mode.as_deref())
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok((headers, Redirect::to(&auth_url)))
 }
 
+#[derive(Template)]
+#[template(path = "select_provider.j2")]
+struct SelectProviderTemplate<'a> {
+    o2p_route_prefix: &'a str,
+    custom_css_url: Option<&'a str>,
+    custom_css_vars: Option<String>,
+    providers: Vec<ProviderView>,
+    mode: &'a str,
+    context: &'a str,
+}
+
+async fn oauth2_select(
+    auth_user: Option<AuthUser>,
+    headers: HeaderMap,
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Response, (StatusCode, String)> {
+    let mode = params.get("mode").cloned();
+    let context = params.get("context").cloned();
+
+    if mode.as_deref() == Some("add_to_user") {
+        if context.is_none() {
+            return Err((StatusCode::BAD_REQUEST, "Missing Context".to_string()));
+        }
+        if auth_user.is_none() {
+            return Err((StatusCode::BAD_REQUEST, "Missing Session".to_string()));
+        }
+        if let Some(context_value) = &context {
+            verify_page_session_token(&headers, Some(context_value))
+                .await
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        }
+    }
+
+    let providers = enabled_provider_views();
+    if providers.len() == 1 {
+        let p = &providers[0];
+        let url = match context.as_deref() {
+            Some(ctx) => format!(
+                "{}/oauth2/{}?mode={}&context={}",
+                O2P_ROUTE_PREFIX.as_str(),
+                p.provider_name,
+                mode.as_deref().unwrap_or(""),
+                ctx
+            ),
+            None => format!(
+                "{}/oauth2/{}?mode={}",
+                O2P_ROUTE_PREFIX.as_str(),
+                p.provider_name,
+                mode.as_deref().unwrap_or(""),
+            ),
+        };
+        return Ok(Redirect::to(&url).into_response());
+    }
+
+    let tmpl = SelectProviderTemplate {
+        o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
+        custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+        custom_css_vars: custom_css_vars_block(),
+        providers,
+        mode: mode.as_deref().unwrap_or(""),
+        context: context.as_deref().unwrap_or(""),
+    };
+    Ok(Html(
+        tmpl.render()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+    )
+    .into_response())
+}
+
 async fn get_authorized(
+    Path(provider): Path<String>,
     Query(query): Query<AuthResponse>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     headers: HeaderMap,
 ) -> (HeaderMap, Redirect) {
-    match get_authorized_core(&query, &cookies, &headers).await {
+    let Some(provider_name) = ProviderName::from_registered(&provider) else {
+        return unknown_provider_redirect(&provider);
+    };
+    match get_authorized_core(provider_name, &query, &cookies, &headers).await {
         Ok((response_headers, message)) => {
             let redirect_url = build_success_redirect_url(&message);
             (response_headers, Redirect::to(&redirect_url))
@@ -138,6 +300,18 @@ async fn get_authorized(
     }
 }
 
+/// Build the Redirect response used when the URL path names a provider that
+/// is not among the currently-enabled providers. Mirrors the error-redirect
+/// path taken by `get_authorized_core` / `post_authorized_core` for
+/// `InvalidState` — operators get a consistent error UX whether the reject
+/// happens at HTTP boundary or inside the core.
+fn unknown_provider_redirect(provider: &str) -> (HeaderMap, Redirect) {
+    let err = CoordinationError::InvalidState(format!("Unknown OAuth2 provider: {provider}"));
+    tracing::warn!(error = %err, provider = %provider, "OAuth2 authorization failed (unknown provider)");
+    let redirect_url = build_error_redirect_url(&err);
+    (HeaderMap::new(), Redirect::to(&redirect_url))
+}
+
 /// Handler for OAuth2 callbacks using form_post response mode.
 ///
 /// Note: Unlike the GET handler, this POST handler doesn't receive session cookies because:
@@ -148,11 +322,15 @@ async fn get_authorized(
 /// 4. Therefore, we can only access headers (which may contain some cookies) but not the
 ///    typed Cookie header that would be available in a standard browser navigation
 async fn post_authorized(
+    Path(provider): Path<String>,
     headers: HeaderMap,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     Form(form): Form<AuthResponse>,
 ) -> (HeaderMap, Redirect) {
-    match post_authorized_core(&form, &cookies, &headers).await {
+    let Some(provider_name) = ProviderName::from_registered(&provider) else {
+        return unknown_provider_redirect(&provider);
+    };
+    match post_authorized_core(provider_name, &form, &cookies, &headers).await {
         Ok((response_headers, message)) => {
             let redirect_url = build_success_redirect_url(&message);
             (response_headers, Redirect::to(&redirect_url))

@@ -1,16 +1,16 @@
 use super::*;
-use crate::oauth2::types::{GoogleUserInfo, OidcTokenResponse};
+use crate::oauth2::types::{OidcTokenResponse, OidcUserInfo};
 use serde_json::json;
 
-/// Test successful deserialization of Google user info JSON
+/// Test successful deserialization of OIDC user info JSON
 ///
-/// This test verifies that `GoogleUserInfo` can be correctly deserialized from
+/// This test verifies that `OidcUserInfo` can be correctly deserialized from
 /// a JSON response containing all required fields. It creates a mock JSON response
 /// in memory and tests the serde deserialization.
 ///
 #[test]
-fn test_google_user_info_deserialization() {
-    // Test successful deserialization of Google user info
+fn test_oidc_userinfo_deserialization() {
+    // Test successful deserialization of OIDC user info
     let json_data = json!({
         "sub": "123456789",
         "email": "test@example.com",
@@ -24,15 +24,15 @@ fn test_google_user_info_deserialization() {
 
     let json_str = serde_json::to_string(&json_data)
         .expect("JSON serialization should not fail for valid data");
-    let user_info: Result<GoogleUserInfo, _> = serde_json::from_str(&json_str);
+    let user_info: Result<OidcUserInfo, _> = serde_json::from_str(&json_str);
 
     assert!(
         user_info.is_ok(),
         "Should successfully deserialize valid Google user info"
     );
     let user_info = user_info.expect("Already verified result is Ok");
-    assert_eq!(user_info.email, "test@example.com");
-    assert_eq!(user_info.name, "Test User");
+    assert_eq!(user_info.email, Some("test@example.com".to_string()));
+    assert_eq!(user_info.name, Some("Test User".to_string()));
 }
 
 /// Test successful deserialization of OIDC token response with id_token
@@ -98,13 +98,46 @@ fn test_oidc_token_response_missing_id_token() {
     );
 }
 
-/// Test Google user info deserialization with missing required fields
+/// Test deserialization of OIDC token response without expires_in
 ///
-/// This test verifies that deserializing Google user info JSON fails appropriately
+/// Per RFC 6749 §5.1 `expires_in` is RECOMMENDED, not REQUIRED. This test
+/// verifies that `OidcTokenResponse` can be correctly deserialized from a
+/// JSON response that omits it (e.g. older Keycloak builds, some Ory Hydra
+/// configs).
+///
+#[test]
+fn test_oidc_token_response_missing_expires_in() {
+    let json_data = json!({
+        "access_token": "ya29.access_token_value",
+        "scope": "openid email profile",
+        "token_type": "Bearer",
+        "id_token": "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20ifQ.signature"
+        // Missing expires_in field
+    });
+
+    let json_str = serde_json::to_string(&json_data)
+        .expect("JSON serialization should not fail for valid data");
+    let token_response: Result<OidcTokenResponse, _> = serde_json::from_str(&json_str);
+
+    assert!(
+        token_response.is_ok(),
+        "Should successfully deserialize token response without expires_in"
+    );
+    let token_response = token_response.expect("Already verified result is Ok");
+    assert_eq!(token_response.access_token, "ya29.access_token_value");
+    assert!(
+        token_response.id_token.is_some(),
+        "id_token should still be present"
+    );
+}
+
+/// Test OIDC user info deserialization with missing required fields
+///
+/// This test verifies that deserializing OIDC user info JSON fails appropriately
 /// when required fields are missing from the response.
 ///
 #[test]
-fn test_google_user_info_deserialization_missing_required_fields() {
+fn test_oidc_userinfo_deserialization_missing_required_fields() {
     // Test deserialization failure when required fields are missing
     let json_data = json!({
         "id": "123456789",
@@ -114,7 +147,7 @@ fn test_google_user_info_deserialization_missing_required_fields() {
     });
 
     let json_str = serde_json::to_string(&json_data).expect("JSON serialization should not fail");
-    let user_info: Result<GoogleUserInfo, _> = serde_json::from_str(&json_str);
+    let user_info: Result<OidcUserInfo, _> = serde_json::from_str(&json_str);
 
     assert!(
         user_info.is_err(),
@@ -122,17 +155,17 @@ fn test_google_user_info_deserialization_missing_required_fields() {
     );
 }
 
-/// Test Google user info deserialization with malformed JSON
+/// Test OIDC user info deserialization with malformed JSON
 ///
-/// This test verifies that attempting to deserialize malformed JSON to GoogleUserInfo
+/// This test verifies that attempting to deserialize malformed JSON to OidcUserInfo
 /// returns a JsonError as expected.
 ///
 #[test]
-fn test_google_user_info_deserialization_invalid_json() {
+fn test_oidc_userinfo_deserialization_invalid_json() {
     // Test deserialization failure with malformed JSON
     let invalid_json = r#"{"id": "123", "email":}"#; // Malformed JSON
 
-    let user_info: Result<GoogleUserInfo, _> = serde_json::from_str(invalid_json);
+    let user_info: Result<OidcUserInfo, _> = serde_json::from_str(invalid_json);
 
     assert!(
         user_info.is_err(),

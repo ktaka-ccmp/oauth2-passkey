@@ -3,12 +3,13 @@ use http::HeaderMap;
 use std::{env, sync::LazyLock};
 
 use crate::audit::{AuthMethod, AuthMethodDetails, LoginContext};
+use crate::oauth2::provider::{ProviderConfig, ProviderKind, ProviderName, provider_for};
 use crate::oauth2::{
-    AccountSearchField, AuthResponse, FedCMCallbackRequest, OAUTH2_CSRF_COOKIE_NAME,
-    OAUTH2_RESPONSE_MODE, OAuth2Account, OAuth2Mode, OAuth2Store, Provider, ProviderUserId,
-    StateParams, csrf_checks, decode_state, delete_session_and_misc_token_from_store, get_auth_url,
-    get_idinfo_userinfo, get_mode_from_stored_session, get_uid_from_stored_session_by_state_param,
-    validate_fedcm_token, validate_origin,
+    AccountSearchField, AuthResponse, FedCMCallbackRequest, OAUTH2_CSRF_COOKIE_NAME, OAuth2Account,
+    OAuth2Mode, OAuth2Store, Provider, ProviderUserId, StateParams, csrf_checks, decode_state,
+    delete_session_and_misc_token_from_store, get_idinfo_userinfo, get_mode_from_stored_session,
+    get_uid_from_stored_session_by_state_param, oauth2_account_from_idinfo,
+    oauth2_account_from_idinfo_and_userinfo, validate_fedcm_token, validate_origin,
 };
 
 use crate::userdb::{User as DbUser, UserStore};
@@ -45,20 +46,23 @@ enum HttpMethod {
 ///
 /// # Arguments
 ///
+/// * `ctx` - The resolved provider configuration
 /// * `method` - The HTTP method used for the callback (GET or POST)
 /// * `auth_response` - The OAuth2 authentication response from the provider
 /// * `cookies` - Cookie headers from the client request
 /// * `headers` - All headers from the client request
-#[tracing::instrument(skip(auth_response, cookies, headers), fields(user_id, provider = "google", state = %auth_response.state))]
+#[tracing::instrument(skip(ctx, auth_response, cookies, headers), fields(user_id, provider, state = %auth_response.state))]
 async fn authorized_core(
+    ctx: &ProviderConfig,
     method: HttpMethod,
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
+    tracing::Span::current().record("provider", ctx.kind.as_str());
     tracing::info!(?method, "Processing OAuth2 authorization callback");
     // Verify this is the correct response mode for the HTTP method
-    match (method, OAUTH2_RESPONSE_MODE.to_lowercase().as_str()) {
+    match (method, ctx.response_mode.to_lowercase().as_str()) {
         (HttpMethod::Get, "form_post") => {
             return Err(CoordinationError::InvalidResponseMode(
                 "GET is not allowed for form_post response mode".to_string(),
@@ -72,10 +76,27 @@ async fn authorized_core(
         _ => {} // Valid combination, continue processing
     }
 
-    let auth_url = get_auth_url()
+    let auth_url = ctx
+        .auth_url()
         .await
         .map_err(|e| CoordinationError::InvalidState(format!("Failed to get auth url: {e}")))?;
-    validate_origin(headers, &auth_url).await?;
+    // Origin validation is skipped only for plain-HTTP localhost callbacks.
+    // This is a protocol-level concession, not provider-specific: browsers
+    // handle `Origin` inconsistently on cross-site `form_post` redirects to
+    // insecure origins during local development, and there is no HTTPS to
+    // anchor to. Production callbacks always use HTTPS, so this branch is
+    // never taken outside dev/test setups. If a future provider uses a
+    // different dev-only scheme, narrow further at that point.
+    if ctx.redirect_uri.starts_with("http://localhost")
+        || ctx.redirect_uri.starts_with("http://127.0.0.1")
+    {
+        tracing::warn!(
+            redirect_uri = %ctx.redirect_uri,
+            "Skipping origin check for HTTP localhost callback"
+        );
+    } else {
+        validate_origin(headers, &auth_url, &ctx.additional_allowed_origins).await?;
+    }
 
     if auth_response.state.is_empty() {
         return Err(CoordinationError::InvalidState(
@@ -100,7 +121,7 @@ async fn authorized_core(
             .await;
             Err(e.into())
         }
-        Ok(()) => process_oauth2_authorization(auth_response, login_context).await,
+        Ok(()) => process_oauth2_authorization(ctx, auth_response, login_context).await,
     }
 }
 
@@ -112,6 +133,7 @@ async fn authorized_core(
 ///
 /// # Arguments
 ///
+/// * `provider` - The OAuth2 provider identifier from the URL path (e.g. "google")
 /// * `auth_response` - The OAuth2 authentication response from the provider
 /// * `cookies` - Cookie headers from the client request
 /// * `headers` - All headers from the client request
@@ -124,7 +146,7 @@ async fn authorized_core(
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::{get_authorized_core, AuthResponse};
+/// use oauth2_passkey::{get_authorized_core, AuthResponse, ProviderName};
 /// use headers::Cookie;
 /// use http::HeaderMap;
 ///
@@ -133,16 +155,19 @@ async fn authorized_core(
 ///     cookies: &Cookie,
 ///     headers: &HeaderMap
 /// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {
-///     let (response_headers, body) = get_authorized_core(auth_response, cookies, headers).await?;
+///     let provider = ProviderName::from_registered("google").unwrap();
+///     let (response_headers, body) = get_authorized_core(provider, auth_response, cookies, headers).await?;
 ///     Ok((response_headers, body))
 /// }
 /// ```
 pub async fn get_authorized_core(
+    provider: ProviderName,
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    authorized_core(HttpMethod::Get, auth_response, cookies, headers).await
+    let ctx = resolve_ctx(provider)?;
+    authorized_core(ctx, HttpMethod::Get, auth_response, cookies, headers).await
 }
 
 /// Processes an OAuth2 POST authorization request.
@@ -153,6 +178,7 @@ pub async fn get_authorized_core(
 ///
 /// # Arguments
 ///
+/// * `provider` - The OAuth2 provider identifier from the URL path (e.g. "google")
 /// * `auth_response` - The OAuth2 authentication response from the provider
 /// * `cookies` - Cookie headers from the client request
 /// * `headers` - All headers from the client request
@@ -165,7 +191,7 @@ pub async fn get_authorized_core(
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::{post_authorized_core, AuthResponse};
+/// use oauth2_passkey::{post_authorized_core, AuthResponse, ProviderName};
 /// use headers::Cookie;
 /// use http::HeaderMap;
 ///
@@ -174,43 +200,77 @@ pub async fn get_authorized_core(
 ///     cookies: &Cookie,
 ///     headers: &HeaderMap
 /// ) -> Result<(HeaderMap, String), Box<dyn std::error::Error>> {
-///     let (response_headers, body) = post_authorized_core(auth_response, cookies, headers).await?;
+///     let provider = ProviderName::from_registered("google").unwrap();
+///     let (response_headers, body) = post_authorized_core(provider, auth_response, cookies, headers).await?;
 ///     Ok((response_headers, body))
 /// }
 /// ```
 pub async fn post_authorized_core(
+    provider: ProviderName,
     auth_response: &AuthResponse,
     cookies: &headers::Cookie,
     headers: &HeaderMap,
 ) -> Result<(HeaderMap, String), CoordinationError> {
-    authorized_core(HttpMethod::Post, auth_response, cookies, headers).await
+    let ctx = resolve_ctx(provider)?;
+    authorized_core(ctx, HttpMethod::Post, auth_response, cookies, headers).await
 }
 
-#[tracing::instrument(skip(auth_response, login_context), fields(user_id, provider = "google", state = %auth_response.state))]
+/// Resolve a [`ProviderName`] to its `&'static ProviderConfig`.
+///
+/// For any `ProviderName` constructed through
+/// `ProviderName::from_registered` (the axum-boundary path), this is
+/// effectively infallible — that constructor already performed the same
+/// `provider_for` lookup. The `None` arm is kept as defensive belt-and-
+/// suspenders in case a future code path mints a `ProviderName` by some
+/// other route; it surfaces as `InvalidState` rather than panicking.
+fn resolve_ctx(provider: ProviderName) -> Result<&'static ProviderConfig, CoordinationError> {
+    ProviderKind::from_provider_name(provider.as_str())
+        .and_then(provider_for)
+        .ok_or_else(|| {
+            CoordinationError::InvalidState(format!("OAuth2 provider not enabled: {provider}"))
+        })
+}
+
+#[tracing::instrument(skip(ctx, auth_response, login_context), fields(user_id, provider, state = %auth_response.state))]
 async fn process_oauth2_authorization(
+    ctx: &ProviderConfig,
     auth_response: &AuthResponse,
     login_context: LoginContext,
 ) -> Result<(HeaderMap, String), CoordinationError> {
+    let provider_name = ctx.provider_name;
+    tracing::Span::current().record("provider", provider_name.as_str());
     tracing::info!("Processing OAuth2 authorization core logic");
 
-    // Upsert oauth2_account and user
-    // 1. Decode the state from the auth response
-    // 2. Extract user_id from the stored session if available
-
-    let (idinfo, userinfo) = get_idinfo_userinfo(auth_response).await?;
-
-    // Convert GoogleUserInfo to DbUser and store it
-    static OAUTH2_GOOGLE_USER: &str = "idinfo";
-
-    let oauth2_account = match OAUTH2_GOOGLE_USER {
-        "idinfo" => OAuth2Account::from(idinfo),
-        "userinfo" => OAuth2Account::from(userinfo),
-        _ => OAuth2Account::from(idinfo), // Default case
-    };
-
-    // Decode the state from the auth response
+    // Decode the state from the auth response first so we can cross-check the provider
+    // before doing any expensive token exchange.
     let oauth2_state = crate::OAuth2State::new(auth_response.state.clone())?;
     let state_in_response = decode_state(&oauth2_state)?;
+
+    // Defense-in-depth: the URL path provider is the authoritative dispatch signal.
+    // The `provider` field in `StateParams` is a cross-check to detect URL/state
+    // mismatches (e.g. an attacker submitting a Google state to an Auth0 callback).
+    // Reject on mismatch so the flow never reaches the token exchange.
+    if state_in_response.provider.as_str() != provider_name.as_str() {
+        tracing::error!(
+            security_event = "provider_mismatch",
+            state_provider = %state_in_response.provider,
+            url_path_provider = %provider_name,
+            "Provider mismatch: state.provider does not match URL path provider"
+        );
+        return Err(CoordinationError::InvalidState(format!(
+            "Provider mismatch: state contains '{}' but URL path is '{}'",
+            state_in_response.provider, provider_name
+        )));
+    }
+
+    let (idinfo, userinfo) = get_idinfo_userinfo(ctx, auth_response).await?;
+
+    // Merge both sources so providers that split profile claims either way
+    // (id_token only — Google/Entra/Okta, or userinfo only — Zitadel/some
+    // Keycloak configs) succeed. `get_idinfo_userinfo` has already verified
+    // `idinfo.sub == userinfo.sub`, so the ID token remains the identity
+    // binding.
+    let oauth2_account = oauth2_account_from_idinfo_and_userinfo(&idinfo, &userinfo, ctx)?;
 
     // Extract user_id from the stored session if available
     let state_user = get_uid_from_stored_session_by_state_param(&state_in_response).await?;
@@ -433,11 +493,16 @@ pub async fn fedcm_authorized_core(
 ) -> Result<(HeaderMap, String), CoordinationError> {
     tracing::info!("Processing FedCM authorization callback");
 
+    // FedCM is currently Google-only.
+    let ctx = provider_for(ProviderKind::Google).ok_or_else(|| {
+        CoordinationError::InvalidState("Google provider not available".to_string())
+    })?;
+
     // 1. Validate ID token and verify nonce (single-use)
-    let idinfo = validate_fedcm_token(&request.credential, &request.nonce_id).await?;
+    let idinfo = validate_fedcm_token(ctx, &request.credential, &request.nonce_id).await?;
 
     // 2. Build OAuth2Account from the verified ID token
-    let oauth2_account = OAuth2Account::from(idinfo);
+    let oauth2_account = oauth2_account_from_idinfo(&idinfo, ctx)?;
 
     // 3. Parse mode directly from request (no cache round-trip needed for FedCM)
     let mode = match &request.mode {

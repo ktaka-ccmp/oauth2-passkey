@@ -106,7 +106,7 @@ impl OAuth2SecurityTestSetup {
         let result = match response_mode.as_str() {
             "query" => {
                 // Query mode: use GET request with query parameters
-                let url = format!("/auth/oauth2/authorized?code={code}&state={state}");
+                let url = format!("/auth/oauth2/google/authorized?code={code}&state={state}");
                 match headers {
                     Some(headers) => self.browser.get_with_headers(&url, headers).await?,
                     None => self.browser.get(&url).await?,
@@ -119,7 +119,7 @@ impl OAuth2SecurityTestSetup {
                     Some(headers) => {
                         self.browser
                             .post_form_with_headers_old(
-                                "/auth/oauth2/authorized",
+                                "/auth/oauth2/google/authorized",
                                 &form_data,
                                 headers,
                             )
@@ -127,7 +127,7 @@ impl OAuth2SecurityTestSetup {
                     }
                     None => {
                         self.browser
-                            .post_form("/auth/oauth2/authorized", &form_data)
+                            .post_form("/auth/oauth2/google/authorized", &form_data)
                             .await?
                     }
                 }
@@ -385,7 +385,8 @@ async fn test_consolidated_oauth2_authorization_code_security()
         let valid_code = "valid_auth_code_123";
 
         // For form_post mode, using GET should be rejected
-        let get_url = format!("/auth/oauth2/authorized?code={valid_code}&state={real_state}");
+        let get_url =
+            format!("/auth/oauth2/google/authorized?code={valid_code}&state={real_state}");
         let valid_origin_headers = vec![
             ("Origin", "http://127.0.0.1:9876"),
             ("Referer", "http://127.0.0.1:9876/auth"),
@@ -718,5 +719,67 @@ async fn test_consolidated_oauth2_advanced_attack_prevention()
     }
 
     println!("🎯 === CONSOLIDATED OAUTH2 ADVANCED ATTACK PREVENTION TEST COMPLETED ===");
+    Ok(())
+}
+
+/// **TEST**: Callback handler rejects URL/state provider mismatch as a security event
+///
+/// Verifies that submitting a state whose `provider` field does not match the URL
+/// path provider is rejected before any token exchange occurs.
+///
+/// Attack scenario:
+/// 1. Attacker starts a Google OAuth2 flow (obtains a real state with provider="google")
+/// 2. Attacker replaces `state.provider` with "auth0" but keeps the csrf_id intact
+/// 3. Attacker submits the tampered state to the Google callback URL
+/// 4. The server must detect the mismatch and reject the request as a security event
+///    — it must NOT proceed to the token exchange
+#[tokio::test]
+async fn test_oauth2_provider_mismatch_rejected_as_security_event()
+-> Result<(), Box<dyn std::error::Error>> {
+    println!("🔒 === OAUTH2 PROVIDER MISMATCH SECURITY TEST ===");
+
+    let setup = OAuth2SecurityTestSetup::new().await?;
+
+    // Step 1: start a real Google OAuth2 flow to obtain a valid state + CSRF cookie
+    let real_state = setup.establish_csrf_session_and_extract_state().await?;
+    println!(
+        "🔧 Real state extracted (first 20 chars): {}",
+        &real_state[..real_state.len().min(20)]
+    );
+
+    // Step 2: tamper the state — replace provider="google" with provider="auth0"
+    // All other IDs (csrf_id, nonce_id, pkce_id) remain intact so CSRF validation
+    // would pass if the provider check did not exist.
+    let tampered_state = tamper_state_provider(&real_state, "auth0");
+    println!(
+        "🔧 Tampered state (first 20 chars): {}",
+        &tampered_state[..tampered_state.len().min(20)]
+    );
+
+    let valid_code = "valid_auth_code_123";
+    let valid_origin_headers = vec![
+        ("Origin", "http://127.0.0.1:9876"),
+        ("Referer", "http://127.0.0.1:9876/auth"),
+    ];
+
+    // Step 3: submit the tampered state to the Google callback URL
+    // The CSRF cookie from the real flow is present in the browser jar.
+    let response = setup
+        .oauth2_callback_request(valid_code, &tampered_state, Some(&valid_origin_headers))
+        .await?;
+
+    let result = create_security_result_from_response(response).await?;
+
+    // Step 4: verify the request is rejected as a security event
+    assert_security_failure(
+        &result,
+        &ExpectedSecurityError::RedirectWithError,
+        "provider mismatch security test",
+    );
+    assert_no_session_established(&setup.browser).await;
+
+    setup.shutdown().await?;
+    println!("✅ PASSED: Provider mismatch properly rejected as security event");
+    println!("🎯 === OAUTH2 PROVIDER MISMATCH SECURITY TEST COMPLETED ===");
     Ok(())
 }

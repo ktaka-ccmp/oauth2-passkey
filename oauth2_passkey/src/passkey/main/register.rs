@@ -190,7 +190,7 @@ async fn create_registration_options(
     .await?;
 
     let authenticator_selection = AuthenticatorSelection {
-        authenticator_attachment: PASSKEY_AUTHENTICATOR_ATTACHMENT.to_string(),
+        authenticator_attachment: PASSKEY_AUTHENTICATOR_ATTACHMENT.clone(),
         resident_key: PASSKEY_RESIDENT_KEY.to_string(),
         require_resident_key: *PASSKEY_REQUIRE_RESIDENT_KEY,
         user_verification: PASSKEY_USER_VERIFICATION.to_string(),

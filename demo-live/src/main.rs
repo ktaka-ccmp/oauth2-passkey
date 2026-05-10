@@ -8,8 +8,8 @@ use axum::{
 use dotenvy::dotenv;
 
 use oauth2_passkey_axum::{
-    AuthUser, O2P_CUSTOM_CSS_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router,
-    spawn_login_history_cleanup,
+    AuthUser, O2P_CUSTOM_CSS_URL, O2P_ROUTE_PREFIX, ProviderView, custom_css_vars_block,
+    enabled_provider_views, oauth2_passkey_full_router, spawn_login_history_cleanup,
 };
 
 mod server;
@@ -22,6 +22,8 @@ use server::{init_tracing, spawn_http_server};
 struct LoginTemplate<'a> {
     o2p_route_prefix: &'a str,
     custom_css_url: Option<&'a str>,
+    custom_css_vars: Option<String>,
+    providers: Vec<ProviderView>,
 }
 
 async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)> {
@@ -31,6 +33,8 @@ async fn login(user: Option<AuthUser>) -> Result<Response, (StatusCode, String)>
             let template = LoginTemplate {
                 o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
                 custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
+                custom_css_vars: custom_css_vars_block(),
+                providers: enabled_provider_views(),
             };
             Ok(Html(
                 template

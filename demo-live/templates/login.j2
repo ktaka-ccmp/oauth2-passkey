@@ -9,6 +9,9 @@
     {% if let Some(css_url) = custom_css_url %}
     <link rel="stylesheet" href="{{css_url}}">
     {% endif %}
+    {% if let Some(css_vars) = custom_css_vars %}
+    <style>{{css_vars|safe}}</style>
+    {% endif %}
     <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
     <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
     <script>
@@ -32,14 +35,6 @@
         }
         .auth-buttons {
             gap: 16px !important;
-        }
-        .btn-google {
-            background-color: var(--o2p-oauth2, #6366f1);
-            color: white;
-            padding: 12px 16px;
-        }
-        .btn-google:hover {
-            background-color: var(--o2p-oauth2-hover, #4f46e5);
         }
         .btn-passkey-alt {
             background-color: var(--o2p-passkey, #818cf8);
@@ -107,12 +102,13 @@
 
         <div class="auth-section">
             <div class="auth-buttons">
+                {% for p in providers %}
                 <div>
-                    <button class="btn btn-google btn-block" onclick="oauth2.openPopup('create_user_or_login')">
-                        Register / Sign in with Google
+                    <button class="btn {{p.button_class}} btn-block" onclick="oauth2.openPopup('create_user_or_login', null, '{{p.provider_name}}')">
+                        Register / Sign in with {{p.display_name}}
                     </button>
-                    <span class="btn-hint">New here? Start here</span>
                 </div>
+                {% endfor %}
                 <div>
                     <button class="btn btn-passkey-alt btn-block" onclick="startAuthentication(false)">
                         Sign in with Passkey
@@ -125,6 +121,7 @@
         <div class="demo-notice">
             <h2>About this demo</h2>
             <ul>
+                <li>Your email address from the identity provider is used solely for account identification</li>
                 <li>All users are granted admin access to explore full functionality</li>
                 <li>Other users' information is masked for privacy</li>
                 <li>Data is stored in memory and reset on app restart</li>

@@ -163,7 +163,7 @@ impl MockBrowser {
         code: &str,
         state: &str,
     ) -> Result<Response, Box<dyn std::error::Error>> {
-        let path = format!("/auth/oauth2/authorized?code={code}&state={state}");
+        let path = format!("/auth/oauth2/google/authorized?code={code}&state={state}");
         let response = self.get(&path).await?;
         Ok(response)
     }

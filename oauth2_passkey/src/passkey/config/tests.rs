@@ -118,7 +118,10 @@ fn test_passkey_authenticator_attachment_rejects_invalid() {
 #[test]
 fn test_passkey_authenticator_attachment_accepts_valid() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_AUTHENTICATOR_ATTACHMENT, "cross-platform");
+        assert_eq!(
+            *PASSKEY_AUTHENTICATOR_ATTACHMENT,
+            Some("cross-platform".to_string())
+        );
         return;
     }
     let output = run_child(
@@ -127,6 +130,23 @@ fn test_passkey_authenticator_attachment_accepts_valid() {
         "cross-platform",
     );
     assert!(output.status.success());
+}
+
+#[test]
+fn test_passkey_authenticator_attachment_rejects_none() {
+    if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
+        let _ = &*PASSKEY_AUTHENTICATOR_ATTACHMENT;
+        return;
+    }
+    let output = run_child(
+        "passkey::config::tests::test_passkey_authenticator_attachment_rejects_none",
+        "PASSKEY_AUTHENTICATOR_ATTACHMENT",
+        "none",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("PASSKEY_AUTHENTICATOR_ATTACHMENT"));
+    assert!(stderr.contains("leave the variable unset"));
 }
 
 // --- PASSKEY_RESIDENT_KEY ---
@@ -182,7 +202,7 @@ fn test_passkey_require_resident_key_rejects_invalid() {
 #[test]
 fn test_passkey_require_resident_key_accepts_valid() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_REQUIRE_RESIDENT_KEY, false);
+        assert!(!(*PASSKEY_REQUIRE_RESIDENT_KEY));
         return;
     }
     let output = run_child(
@@ -246,7 +266,7 @@ fn test_passkey_user_handle_unique_rejects_invalid() {
 #[test]
 fn test_passkey_user_handle_unique_accepts_valid() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL, true);
+        assert!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL);
         return;
     }
     let output = run_child(
@@ -260,7 +280,7 @@ fn test_passkey_user_handle_unique_accepts_valid() {
 #[test]
 fn test_passkey_user_handle_unique_accepts_uppercase() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL, true);
+        assert!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL);
         return;
     }
     let output = run_child(
@@ -313,13 +333,13 @@ fn test_passkey_attestation_defaults_to_direct() {
 }
 
 #[test]
-fn test_passkey_authenticator_attachment_defaults_to_platform() {
+fn test_passkey_authenticator_attachment_defaults_to_none() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_AUTHENTICATOR_ATTACHMENT, "platform");
+        assert_eq!(*PASSKEY_AUTHENTICATOR_ATTACHMENT, None);
         return;
     }
     let output = run_child_without_env(
-        "passkey::config::tests::test_passkey_authenticator_attachment_defaults_to_platform",
+        "passkey::config::tests::test_passkey_authenticator_attachment_defaults_to_none",
         "PASSKEY_AUTHENTICATOR_ATTACHMENT",
     );
     assert!(output.status.success());
@@ -341,7 +361,7 @@ fn test_passkey_resident_key_defaults_to_required() {
 #[test]
 fn test_passkey_require_resident_key_defaults_to_true() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_REQUIRE_RESIDENT_KEY, true);
+        assert!(*PASSKEY_REQUIRE_RESIDENT_KEY);
         return;
     }
     let output = run_child_without_env(
@@ -367,7 +387,7 @@ fn test_passkey_user_verification_defaults_to_discouraged() {
 #[test]
 fn test_passkey_user_handle_unique_defaults_to_false() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL, false);
+        assert!(!(*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL));
         return;
     }
     let output = run_child_without_env(

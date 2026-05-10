@@ -94,7 +94,9 @@
                     <div class="item-detail  created-row">
                         <span><strong>Last Used:</strong> {{ credential.last_used_at }}</span>
                         <div>
-                            <button onclick="deletePasskeyCredential('{{ credential.credential_id }}', '{{ credential.user_id }}')" class="delete-button">Delete</button>
+                            <button onclick="deletePasskeyCredential('{{ credential.credential_id }}', '{{ credential.user_id }}')"
+                                    class="delete-button"
+                                    {% if actions_disabled %}disabled title="Disabled in demo mode for other users' data"{% endif %}>Delete</button>
                         </div>
                     </div>
                 </div>
@@ -112,11 +114,16 @@
         {% else %}
             {% for account in oauth2_accounts %}
                 <div class="item oauth2">
+                    <img class="provider-icon"
+                         src="{{ o2p_route_prefix }}/icons/{{ account.provider_icon_slug }}.svg"
+                         alt="{{ account.provider_display_name }}"
+                         title="{{ account.provider_display_name }}">
                     {% if account.picture != "" %}
                     <div class="account-picture">
-                        <img src="{{ account.picture }}" alt="Profile Picture" style="max-width: 100px; max-height: 100px; border-radius: 50%;">
+                        <img src="{{ account.picture }}" alt="Profile Picture" style="max-width: 80px; max-height: 80px; border-radius: 50%;">
                     </div>
                     {% endif %}
+                    <div class="item-detail"><strong>Provider:</strong> {{ account.provider_display_name }}</div>
                     <div class="item-detail"><strong>User ID:</strong> {{ account.user_id }}</div>
                     {% if account.email != "" %}
                         <div class="item-detail"><strong>Email:</strong> {{ account.email }}</div>
@@ -130,7 +137,9 @@
                     <div class="item-detail"><strong>Created:</strong> {{ account.created_at }}</div>
                     <div class="item-detail created-row">
                         <span><strong>Updated:</strong> {{ account.updated_at }}</span>
-                        <button onclick="unlinkOAuth2Account('{{ account.provider }}', '{{ account.provider_user_id }}', '{{ account.user_id }}')" class="delete-button">Unlink</button>
+                        <button onclick="unlinkOAuth2Account('{{ account.provider }}', '{{ account.provider_user_id }}', '{{ account.user_id }}')"
+                                class="delete-button"
+                                {% if actions_disabled %}disabled title="Disabled in demo mode for other users' data"{% endif %}>Unlink</button>
                     </div>
                 </div>
             {% endfor %}

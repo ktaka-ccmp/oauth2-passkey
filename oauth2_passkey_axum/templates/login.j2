@@ -9,6 +9,9 @@
     {% if let Some(css_url) = custom_css_url %}
     <link rel="stylesheet" href="{{css_url}}">
     {% endif %}
+    {% if let Some(css_vars) = custom_css_vars %}
+    <style>{{css_vars|safe}}</style>
+    {% endif %}
     <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
     <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>
     <script>
@@ -23,38 +26,30 @@
         <p class="subtitle">{{message}}</p>
 
         <div class="auth-section">
-            <span class="section-label">Sign In</span>
             <div class="auth-buttons">
-                <button class="btn btn-oauth2 btn-block" onclick="oauth2.openPopup('login')">
-                    Sign in with Google
+                {% for p in providers %}
+                <button class="btn {{p.button_class}} btn-block"
+                        onclick="oauth2.openPopup('create_user_or_login', null, '{{p.provider_name}}')">
+                    Register / Sign in with {{p.display_name}}
                 </button>
-                <button class="btn btn-passkey btn-block" onclick="startAuthentication(false)">
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="auth-section">
+            <div class="auth-buttons">
+                <button class="btn btn-passkey btn-block"
+                        onclick="showRegistrationModal('create_user')">
+                    Register with Passkey
+                </button>
+            </div>
+        </div>
+
+        <div class="auth-section">
+            <div class="auth-buttons">
+                <button class="btn btn-passkey btn-block"
+                        onclick="startAuthentication(false)">
                     Sign in with Passkey
-                </button>
-            </div>
-        </div>
-
-        <div class="divider"><span>or</span></div>
-
-        <div class="auth-section">
-            <span class="section-label">Create Account</span>
-            <div class="auth-buttons">
-                <button class="btn btn-oauth2 btn-block" onclick="oauth2.openPopup('create_user')">
-                    Create with Google
-                </button>
-                <button class="btn btn-passkey btn-block" onclick="showRegistrationModal('create_user')">
-                    Create with Passkey
-                </button>
-            </div>
-        </div>
-
-        <div class="divider"><span>or</span></div>
-
-        <div class="auth-section">
-            <span class="section-label">Auto (Create or Sign In)</span>
-            <div class="auth-buttons">
-                <button class="btn btn-oauth2 btn-block" onclick="oauth2.openPopup('create_user_or_login')">
-                    Google Account
                 </button>
             </div>
         </div>

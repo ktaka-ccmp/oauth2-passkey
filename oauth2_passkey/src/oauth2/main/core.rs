@@ -5,17 +5,15 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::Algorithm;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 
-use crate::oauth2::config::{
-    OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME, OAUTH2_GOOGLE_CLIENT_ID,
-    OAUTH2_QUERY_STRING, OAUTH2_REDIRECT_URI, OAUTH2_RESPONSE_MODE, get_auth_url,
-};
+use crate::oauth2::config::{OAUTH2_CSRF_COOKIE_MAX_AGE, OAUTH2_CSRF_COOKIE_NAME};
 use crate::oauth2::errors::OAuth2Error;
-use crate::oauth2::types::{AuthResponse, GoogleUserInfo, StateParams, StoredToken, TokenType};
+use crate::oauth2::provider::{ProviderConfig, ProviderKind, ProviderName, provider_for};
+use crate::oauth2::types::{AuthResponse, OidcUserInfo, StateParams, StoredToken, TokenType};
 use crate::session::get_session_id_from_headers;
 use crate::utils::base64url_encode;
 
-use super::google::{exchange_code_for_token, fetch_user_data_from_google};
-use super::idtoken::{IdInfo as GoogleIdInfo, verify_idtoken_with_algorithm};
+use super::idtoken::{OidcIdInfo, verify_idtoken_with_algorithm};
+use super::oidc::{exchange_code_for_token, fetch_userinfo};
 use super::utils::{decode_state, encode_state, generate_store_token, verify_and_consume_nonce};
 use crate::storage::{
     CacheErrorConversion, CacheKey, CachePrefix, get_data, remove_data, store_cache_auto,
@@ -23,53 +21,57 @@ use crate::storage::{
 
 /// Prepares an OAuth2 authentication request URL and necessary headers.
 ///
-/// This function generates a secure OAuth2 authorization URL for redirecting users
-/// to the identity provider (e.g., Google). It also sets up CSRF protection by
-/// generating and storing a state parameter.
+/// Resolves the provider configuration from `provider` (URL path segment),
+/// then builds the authorization URL and sets the CSRF cookie.
 ///
 /// # Arguments
 ///
-/// * `headers` - HTTP headers from the client request, used to extract user agent and other info
-/// * `mode` - Optional authentication mode (e.g., "login", "create_user", etc.)
+/// * `provider` - Provider identifier from the URL path (e.g. "google")
+/// * `headers` - HTTP headers from the client request
+/// * `mode` - Optional authentication mode (e.g. "login", "create_user")
 ///
 /// # Returns
 ///
 /// * `Ok((String, HeaderMap))` - The authorization URL and response headers
-/// * `Err(OAuth2Error)` - If an error occurs during preparation
+/// * `Err(OAuth2Error)` - If the provider is unknown or an error occurs
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use oauth2_passkey::prepare_oauth2_auth_request;
+/// use oauth2_passkey::{prepare_oauth2_auth_request, ProviderName};
 /// use http::HeaderMap;
 ///
 /// async fn start_oauth_flow(request_headers: HeaderMap) -> Result<(String, HeaderMap), Box<dyn std::error::Error>> {
-///     let (auth_url, response_headers) = prepare_oauth2_auth_request(request_headers, Some("login")).await?;
+///     let provider = ProviderName::from_registered("google")
+///         .ok_or("google provider is not enabled")?;
+///     let (auth_url, response_headers) = prepare_oauth2_auth_request(provider, request_headers, Some("login")).await?;
 ///     Ok((auth_url, response_headers))
 /// }
 /// ```
 pub async fn prepare_oauth2_auth_request(
+    provider: ProviderName,
     headers: HeaderMap,
     mode: Option<&str>,
 ) -> Result<(String, HeaderMap), OAuth2Error> {
-    // Resolve configuration values
-    let auth_base_url = get_auth_url().await?;
-    let response_mode = OAUTH2_RESPONSE_MODE.as_str();
-
-    // Delegate to the internal function that builds the request
-    prepare_oauth2_auth_request_with_params(headers, mode, &auth_base_url, response_mode).await
+    let ctx = ProviderKind::from_provider_name(provider.as_str())
+        .and_then(provider_for)
+        .ok_or_else(|| OAuth2Error::Validation(format!("Provider not enabled: {provider}")))?;
+    prepare_oauth2_auth_request_inner(ctx, headers, mode).await
 }
 
-/// Internal function that builds OAuth2 authorization request with provided parameters
+/// Internal function that builds the OAuth2 authorization request.
 ///
-/// This separation allows for comprehensive testing by injecting both auth URL and response mode,
-/// enabling unit tests to validate cookie security attributes for all response modes.
-async fn prepare_oauth2_auth_request_with_params(
+/// Separated from the public entry point so tests can inject a `ProviderConfig`
+/// constructed directly (without touching `LazyLock` globals or env vars).
+pub(crate) async fn prepare_oauth2_auth_request_inner(
+    ctx: &ProviderConfig,
     headers: HeaderMap,
     mode: Option<&str>,
-    auth_base_url: &str,
-    response_mode: &str,
 ) -> Result<(String, HeaderMap), OAuth2Error> {
+    let auth_base_url = ctx.auth_url().await?;
+    let response_mode = ctx.response_mode.as_str();
+    let provider_name = ctx.provider_name;
+
     let expires_at = Utc::now() + Duration::seconds((*OAUTH2_CSRF_COOKIE_MAX_AGE) as i64);
     let ttl = *OAUTH2_CSRF_COOKIE_MAX_AGE;
     let user_agent = headers
@@ -133,6 +135,7 @@ async fn prepare_oauth2_auth_request_with_params(
         pkce_id,
         misc_id,
         mode_id,
+        provider: provider_name.to_string(),
     };
 
     let encoded_state = encode_state(state_params)?;
@@ -141,9 +144,9 @@ async fn prepare_oauth2_auth_request_with_params(
         "{}?{}&client_id={}&redirect_uri={}&state={}&nonce={}\
         &code_challenge={}&code_challenge_method={}",
         auth_base_url,
-        OAUTH2_QUERY_STRING.as_str(),
-        OAUTH2_GOOGLE_CLIENT_ID.as_str(),
-        OAUTH2_REDIRECT_URI.as_str(),
+        ctx.query_string.as_str(),
+        ctx.client_id.as_str(),
+        ctx.redirect_uri.as_str(),
         encoded_state,
         nonce_token,
         pkce_challenge,
@@ -154,13 +157,13 @@ async fn prepare_oauth2_auth_request_with_params(
 
     let mut response_headers = HeaderMap::new();
 
-    // Set SameSite attribute based on response mode
-    // form_post requires SameSite=None because it's a cross-site POST
-    // query (redirect) can use SameSite=Lax for better security
+    // Set SameSite attribute based on response mode.
+    // form_post requires SameSite=None because it's a cross-site POST.
+    // query (redirect) can use SameSite=Lax for better security.
     let samesite = match response_mode.to_lowercase().as_str() {
         "form_post" => "None",
         "query" => "Lax",
-        _ => "Lax", // Default to Lax for unknown response modes
+        _ => "Lax",
     };
 
     let cookie = format!(
@@ -181,26 +184,26 @@ async fn prepare_oauth2_auth_request_with_params(
 }
 
 pub(crate) async fn get_idinfo_userinfo(
+    ctx: &ProviderConfig,
     auth_response: &AuthResponse,
-) -> Result<(GoogleIdInfo, GoogleUserInfo), OAuth2Error> {
+) -> Result<(OidcIdInfo, OidcUserInfo), OAuth2Error> {
     let pkce_verifier = get_pkce_verifier(auth_response).await?;
     let (access_token, id_token) =
-        exchange_code_for_token(auth_response.code.clone(), pkce_verifier).await?;
+        exchange_code_for_token(ctx, auth_response.code.clone(), pkce_verifier).await?;
 
-    let (idinfo, algorithm) =
-        verify_idtoken_with_algorithm(id_token, OAUTH2_GOOGLE_CLIENT_ID.to_string())
-            .await
-            .map_err(|e| OAuth2Error::IdToken(e.to_string()))?;
+    let (idinfo, algorithm) = verify_idtoken_with_algorithm(ctx, id_token)
+        .await
+        .map_err(|e| OAuth2Error::IdToken(e.to_string()))?;
 
     verify_at_hash(&idinfo, &access_token, algorithm)?;
 
     verify_nonce(auth_response, idinfo.clone()).await?;
 
-    let userinfo = fetch_user_data_from_google(access_token).await?;
+    let userinfo = fetch_userinfo(ctx, access_token).await?;
 
     if idinfo.sub != userinfo.sub {
         tracing::error!(
-            "Id mismatch in IdInfo and Userinfo: \nIdInfo: {:#?}\nUserInfo: {:#?}",
+            "Id mismatch in OidcIdInfo and Userinfo: \nOidcIdInfo: {:#?}\nUserInfo: {:#?}",
             idinfo,
             userinfo
         );
@@ -227,16 +230,21 @@ async fn get_pkce_verifier(auth_response: &AuthResponse) -> Result<String, OAuth
     Ok(pkce_session.token)
 }
 
-async fn verify_nonce(
-    auth_response: &AuthResponse,
-    idinfo: GoogleIdInfo,
-) -> Result<(), OAuth2Error> {
+async fn verify_nonce(auth_response: &AuthResponse, idinfo: OidcIdInfo) -> Result<(), OAuth2Error> {
     let oauth2_state = crate::OAuth2State::new(auth_response.state.clone())?;
     let state_in_response = decode_state(&oauth2_state)?;
 
     verify_and_consume_nonce(&state_in_response.nonce_id, idinfo.nonce.as_deref()).await
 }
 
+/// CSRF checks for the OAuth2 callback.
+///
+/// The cookie name `OAUTH2_CSRF_COOKIE_NAME` is intentionally a single global
+/// (not per-provider).  This implements the "latest OAuth2 flow wins" policy:
+/// starting a new flow overwrites the cookie, causing any abandoned in-flight
+/// flow's callback to fail here.  See the policy comment in `config.rs` and
+/// the Decision Log entry "2026-04-16: Preserve the 'latest flow wins' CSRF
+/// cookie policy" in issue `20260226-2020` for the full rationale.
 pub(crate) async fn csrf_checks(
     cookies: Cookie,
     query: &AuthResponse,
@@ -344,7 +352,7 @@ fn calculate_at_hash(access_token: &str, algorithm: Algorithm) -> Result<String,
 /// * `Ok(())` - If verification succeeds or at_hash is not present
 /// * `Err(OAuth2Error)` - If verification fails or calculation error occurs
 fn verify_at_hash(
-    idinfo: &GoogleIdInfo,
+    idinfo: &OidcIdInfo,
     access_token: &str,
     algorithm: Algorithm,
 ) -> Result<(), OAuth2Error> {

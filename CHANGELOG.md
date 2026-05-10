@@ -5,6 +5,113 @@ All notable changes to oauth2-passkey will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-05-11
+
+### Added
+
+- **Generic OIDC provider slots** — eight `OAUTH2_CUSTOM{N}_*` slots
+  (`CUSTOM1`..`CUSTOM8`) for arbitrary OIDC IdPs alongside Google.
+  Endpoints (authorization, token, JWKS, userinfo) are auto-discovered
+  from `/.well-known/openid-configuration`. Per-slot env vars:
+  `CLIENT_ID`, `CLIENT_SECRET`, `ISSUER_URL`, `NAME`, `DISPLAY_NAME`,
+  `SCOPE`, `RESPONSE_MODE`, `PROMPT`, `ICON_SLUG`, `BUTTON_COLOR`,
+  `BUTTON_HOVER_COLOR`, `STRICT_DISPLAY_CLAIMS`, `PRESET` (#316, #319)
+- **Provider presets** — `OAUTH2_CUSTOM{N}_PRESET=<name>` pre-fills
+  display name, icon, button colors, and any IdP-specific quirks
+  (e.g. additional allowed origins for Entra personal accounts).
+  Built-in presets: `auth0`, `keycloak`, `entra`, `zitadel`, `okta`,
+  `authentik`, `line`, `apple`. Any preset field can be individually
+  overridden by setting the corresponding `OAUTH2_CUSTOM{N}_*` env var
+- HS256 / HS384 ID token signature support (HMAC keyed on
+  `client_secret`) for providers that do not sign with RSA/ECDSA
+  (e.g. LINE Login web flow)
+- `OAUTH2_*_PROMPT` env var to configure the OIDC `prompt` parameter
+  per provider (default remains `consent`). Invalid values are
+  rejected at startup
+- `OAUTH2_*_STRICT_DISPLAY_CLAIMS` per-provider toggle: hard-reject
+  (vs. warn on) `name` / `picture` divergence between the ID token
+  and `/userinfo`
+- Multi-provider login UI: provider selection popup appears when more
+  than one OIDC provider is configured, with per-provider branded
+  login button (icon + brand color)
+- IDP icon and provider name shown on OAuth2 account cards on both
+  the user account page and the admin user detail page (#313, #314)
+- Public API: `ProviderName` newtype, `ProviderInfo` struct, and
+  introspection helpers `enabled_providers()`, `is_provider_enabled()`,
+  `provider_info()` for runtime discovery of configured providers
+- Local IdP bring-up scripts and E2E setup notes under `idp/`
+  (Keycloak, Authentik, Zitadel, Hydra) and dedicated provider
+  setup guides under `docs/src/guides/` (Auth0, Keycloak, Entra,
+  LINE, Apple, generic-oidc)
+
+### Changed
+
+- **Breaking**: `OidcIdInfo.email` and `OidcIdInfo.name` are now `Option<String>`
+  (previously `String`) to comply with OIDC Core 1.0, which classifies them as
+  standard — not required — claims. Required for Microsoft Entra and other
+  providers that may omit these claims.
+  - Added `OidcIdInfo.preferred_username: Option<String>` as a documented
+    fallback for `email` (used by Microsoft personal accounts).
+  - `OAuth2Account.email` / `.name` remain non-optional; the conversion layer
+    uses `preferred_username` or errors with `OAuth2Error::Validation` if no
+    email claim is available.
+- **Breaking**: `OidcTokenResponse.expires_in` is now `Option<u64>`
+  (previously `u64`) and `OidcTokenResponse.scope` is now `Option<String>`
+  (previously `String`), per RFC 6749 §5.1 which classifies both fields
+  as RECOMMENDED rather than REQUIRED. Required for providers like
+  older Keycloak builds, Ory Hydra, and Zitadel that may omit them
+- **Breaking**: `PASSKEY_AUTHENTICATOR_ATTACHMENT=none` is no longer accepted —
+  the previous mapping emitted the non-spec JSON value `"None"`, which only
+  worked because of browser leniency. To allow either platform or
+  cross-platform authenticators (the previous `=none` behavior), **leave the
+  variable unset**. The default also changed: when the variable is unset, the
+  `authenticatorAttachment` field is now omitted from the WebAuthn
+  registration JSON (= "either is acceptable"). Operators who relied on the
+  previous default of `=platform` to force platform-bound authenticators must
+  now set `PASSKEY_AUTHENTICATOR_ATTACHMENT=platform` explicitly.
+- OAuth2 callback now **merges** claims from both the ID token and
+  `/userinfo` (preferring the ID token as the cryptographically
+  signed source, falling back to `/userinfo` to fill missing fields)
+  instead of using one or the other. Eliminates failure modes where
+  a provider populates a field in only one of the two responses
+
+### Security
+
+- Identity-critical claim mismatches between the ID token and
+  `/userinfo` (`email`, `email_verified`, `preferred_username`, `hd`)
+  are now strictly rejected with `OAuth2Error::Validation`. The `sub`
+  equality invariant is enforced upstream in `get_idinfo_userinfo` as
+  `OAuth2Error::IdMismatch`. Display-claim mismatches (`name`,
+  `picture`, `family_name`, `given_name`) follow the per-provider
+  `STRICT_DISPLAY_CLAIMS` setting (warn by default, reject when strict)
+- ID tokens with multiple audiences are validated against the `azp`
+  (authorized party) claim per OIDC Core 1.0 §3.1.3.7 — previously
+  multi-audience tokens passed validation with only the `aud` check
+- Optional-provider env var contracts (`{TRIGGER}` set ⇒ `{required}`
+  set) are validated at startup; missing companions cause an
+  immediate panic instead of failing on the first OAuth2 login
+- Named-provider `STRICT_DISPLAY_CLAIMS` and `PROMPT` env values are
+  validated at startup, eliminating delayed panics on first request
+- Update rustls-webpki 0.103.10 -> 0.103.13 (#303), resolving:
+  - RUSTSEC-2026-0098: name constraints for URI names incorrectly accepted
+  - RUSTSEC-2026-0099: name constraints accepted for wildcard certs
+  - RUSTSEC-2026-0104: reachable panic in CRL parsing
+- `validate_origin` now compares the incoming Origin / Referer
+  structurally (scheme + host + port via `url::Url`) instead of using
+  a raw `starts_with` prefix match. Closes a subdomain-confusion gap
+  where e.g. `https://accounts.google.com.attacker.example` satisfied
+  the prefix check against `https://accounts.google.com`. The same
+  defense applies to `additional_allowed_origins` (e.g. `login.live.com`
+  for the Entra personal-accounts flow). Case-insensitive host and
+  default-port (`:443` / `:80`) normalization are now also honored
+
+### Fixed
+
+- Admin actions (Unlink OAuth2 account / Delete passkey credential)
+  failed with "Invalid user ID" when an admin viewed another user's
+  detail page in `O2P_DEMO_MODE`. Destructive admin buttons are now
+  hidden when resource identifiers are masked (#328)
+
 ## [0.5.0] - 2026-03-23
 
 ### Added
@@ -304,6 +411,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full WebAuthn specification compliance
 - Comprehensive security documentation and best practices guide
 
+[0.6.0]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ktaka-ccmp/oauth2-passkey/compare/v0.2.0...v0.3.0

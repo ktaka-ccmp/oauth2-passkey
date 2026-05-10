@@ -4,7 +4,7 @@ use http::header::HeaderMap;
 use std::str::FromStr;
 use url::Url;
 
-use crate::oauth2::{OAuth2Error, OAuth2Mode, StateParams, StoredToken, TokenType};
+use crate::oauth2::{OAuth2Error, OAuth2Mode, OAuth2State, StateParams, StoredToken, TokenType};
 
 use crate::session::{
     SessionId, User as SessionUser, delete_session_from_store_by_session_id, get_user_from_session,
@@ -15,18 +15,14 @@ use crate::storage::{
 
 use crate::utils::gen_random_string_with_entropy_validation;
 
-pub(super) fn encode_state(
-    state_params: StateParams,
-) -> Result<crate::oauth2::types::OAuth2State, OAuth2Error> {
+pub(super) fn encode_state(state_params: StateParams) -> Result<OAuth2State, OAuth2Error> {
     let state_json =
         serde_json::to_string(&state_params).map_err(|e| OAuth2Error::Serde(e.to_string()))?;
     let encoded = URL_SAFE_NO_PAD.encode(state_json);
-    crate::oauth2::types::OAuth2State::new(encoded)
+    OAuth2State::new(encoded)
 }
 
-pub(crate) fn decode_state(
-    state: &crate::oauth2::types::OAuth2State,
-) -> Result<StateParams, OAuth2Error> {
+pub(crate) fn decode_state(state: &OAuth2State) -> Result<StateParams, OAuth2Error> {
     // Since OAuth2State is validated during construction, we know these operations will succeed
     // This is safe because validation in OAuth2State::new() already verified:
     // 1. Valid base64url encoding
@@ -107,10 +103,28 @@ pub(super) async fn verify_and_consume_nonce(
     Ok(())
 }
 
+/// Parse a URL string into a `(scheme, host, port)` triple for origin
+/// comparison. Scheme and host are lowercased per RFC 3986; port is the
+/// explicit port or the scheme's default (443 for https, 80 for http).
+/// Returns `None` if the input does not parse as a URL or has no host.
+fn origin_triple(s: &str) -> Option<(String, String, Option<u16>)> {
+    let u = Url::parse(s).ok()?;
+    Some((
+        u.scheme().to_ascii_lowercase(),
+        u.host_str()?.to_ascii_lowercase(),
+        u.port_or_known_default(),
+    ))
+}
+
 pub(crate) async fn validate_origin(
     headers: &HeaderMap,
     auth_url: &str,
+    additional_allowed_origins: &[String],
 ) -> Result<(), OAuth2Error> {
+    // `expected_origin` is for error messages and logging only. It preserves
+    // operator-facing input (no `:443` / `:80` injection) so messages look
+    // like the configured value. Origin matching itself uses the structural
+    // comparison in `allowed_triples` below.
     let parsed_url = Url::parse(auth_url).expect("Invalid URL");
     let scheme = parsed_url.scheme();
     let host = parsed_url.host_str().unwrap_or_default();
@@ -119,18 +133,41 @@ pub(crate) async fn validate_origin(
         .map_or("".to_string(), |p| format!(":{p}"));
     let expected_origin = format!("{scheme}://{host}{port}");
 
-    let origin = headers
-        .get("Origin")
-        .or_else(|| headers.get("Referer"))
-        .and_then(|h| h.to_str().ok());
+    // Pre-parse the expected origin and each additional allowed origin into
+    // (scheme, host, port) triples for structural comparison. This rejects
+    // subdomain-confusion candidates like
+    // "https://accounts.google.com.attacker.com" against
+    // "https://accounts.google.com" that a raw `starts_with` would accept.
+    let allowed_triples: Vec<_> = std::iter::once(auth_url)
+        .chain(additional_allowed_origins.iter().map(String::as_str))
+        .filter_map(origin_triple)
+        .collect();
+
+    // Browsers send `Origin: null` for cross-origin form_post redirects (e.g. Auth0).
+    // Treat the literal string "null" the same as absent and fall back to Referer.
+    let origin = {
+        let raw = headers.get("Origin").and_then(|h| h.to_str().ok());
+        match raw {
+            Some("null") | None => headers.get("Referer").and_then(|h| h.to_str().ok()),
+            some => some,
+        }
+    };
+
+    let matches = |candidate: &str| {
+        origin_triple(candidate).is_some_and(|cand| allowed_triples.contains(&cand))
+    };
 
     match origin {
-        Some(origin) if origin.starts_with(&expected_origin) => Ok(()),
+        Some(origin) if matches(origin) => Ok(()),
         _ => {
             tracing::error!("Expected Origin: {:#?}", expected_origin);
+            tracing::error!(
+                "Additional allowed origins: {:#?}",
+                additional_allowed_origins
+            );
             tracing::error!("Actual Origin: {:#?}", origin);
             Err(OAuth2Error::InvalidOrigin(format!(
-                "Expected Origin: {expected_origin:#?}, Actual Origin: {origin:#?}"
+                "Expected Origin: {expected_origin:#?} (or one of {additional_allowed_origins:?}), Actual Origin: {origin:#?}"
             )))
         }
     }

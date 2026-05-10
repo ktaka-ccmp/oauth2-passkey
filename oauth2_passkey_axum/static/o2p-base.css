@@ -13,6 +13,10 @@
     --o2p-primary-hover: #4338ca;
     --o2p-oauth2: #6366f1;
     --o2p-oauth2-hover: #4f46e5;
+    --o2p-google: var(--o2p-oauth2);
+    --o2p-google-hover: var(--o2p-oauth2-hover);
+    /* Auth0 / Keycloak / Entra moved to Custom slot presets; their colors
+       are injected per-enabled-slot via `--o2p-custom{N}` variables. */
     --o2p-passkey: #818cf8;
     --o2p-passkey-hover: #6366f1;
     --o2p-danger: #dc2626;
@@ -147,6 +151,90 @@ a:hover {
 
 .btn-oauth2:hover {
     background-color: var(--o2p-oauth2-hover);
+}
+
+.btn-google {
+    background-color: var(--o2p-google);
+    padding: 12px 16px;
+}
+
+.btn-google:hover {
+    background-color: var(--o2p-google-hover);
+}
+
+/* Generic OIDC slots. Colors come from --o2p-customN / --o2p-customN-hover,
+   injected as a :root { ... } block by the login / select_provider templates
+   when the corresponding slot is enabled (see ProviderInfo.button_color). */
+.btn-custom1 {
+    background-color: var(--o2p-custom1);
+    padding: 12px 16px;
+}
+
+.btn-custom1:hover {
+    background-color: var(--o2p-custom1-hover);
+}
+
+.btn-custom2 {
+    background-color: var(--o2p-custom2);
+    padding: 12px 16px;
+}
+
+.btn-custom2:hover {
+    background-color: var(--o2p-custom2-hover);
+}
+
+.btn-custom3 {
+    background-color: var(--o2p-custom3);
+    padding: 12px 16px;
+}
+
+.btn-custom3:hover {
+    background-color: var(--o2p-custom3-hover);
+}
+
+.btn-custom4 {
+    background-color: var(--o2p-custom4);
+    padding: 12px 16px;
+}
+
+.btn-custom4:hover {
+    background-color: var(--o2p-custom4-hover);
+}
+
+.btn-custom5 {
+    background-color: var(--o2p-custom5);
+    padding: 12px 16px;
+}
+
+.btn-custom5:hover {
+    background-color: var(--o2p-custom5-hover);
+}
+
+.btn-custom6 {
+    background-color: var(--o2p-custom6);
+    padding: 12px 16px;
+}
+
+.btn-custom6:hover {
+    background-color: var(--o2p-custom6-hover);
+}
+
+.btn-custom7 {
+    background-color: var(--o2p-custom7);
+    padding: 12px 16px;
+}
+
+.btn-custom7:hover {
+    background-color: var(--o2p-custom7-hover);
+}
+
+.btn-custom8 {
+    background-color: var(--o2p-custom8);
+    padding: 12px 16px;
+}
+
+.btn-custom8:hover {
+    background-color: var(--o2p-custom8-hover);
 }
 
 .btn-passkey {
@@ -373,6 +461,7 @@ a:hover {
 
 .item.oauth2 {
     border-left-color: var(--o2p-secondary);
+    position: relative;
 }
 
 .item-detail {
@@ -653,6 +742,20 @@ nav a:hover {
     max-height: 80px;
     border-radius: 50%;
     border: 2px solid var(--o2p-border-light);
+}
+
+/* -----------------------------------------------------------------------------
+   Provider Icon
+   -----------------------------------------------------------------------------
+   Small branded mark displayed in the top-right corner of an OAuth2 account
+   card (`.item.oauth2`). See the crate README for attribution. */
+.provider-icon {
+    position: absolute;
+    top: var(--o2p-space-sm);
+    right: var(--o2p-space-sm);
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
 }
 
 /* -----------------------------------------------------------------------------

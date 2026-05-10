@@ -70,7 +70,7 @@ fn test_demo_mode_rejects_invalid() {
 #[test]
 fn test_demo_mode_accepts_true() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*O2P_DEMO_MODE, true);
+        assert!(*O2P_DEMO_MODE);
         return;
     }
     let output = run_child(
@@ -84,7 +84,7 @@ fn test_demo_mode_accepts_true() {
 #[test]
 fn test_demo_mode_accepts_false() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*O2P_DEMO_MODE, false);
+        assert!(!(*O2P_DEMO_MODE));
         return;
     }
     let output = run_child(
@@ -131,7 +131,7 @@ fn test_signal_api_mode_accepts_valid() {
 #[test]
 fn test_demo_mode_defaults_to_false() {
     if std::env::var("__TEST_ENV_VAR_CHILD").is_ok() {
-        assert_eq!(*O2P_DEMO_MODE, false);
+        assert!(!(*O2P_DEMO_MODE));
         return;
     }
     let output = run_child_without_env(

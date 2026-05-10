@@ -59,6 +59,7 @@ mod config;
 #[cfg(feature = "cors")]
 mod cors;
 mod error;
+mod icons;
 mod login_history;
 mod middleware;
 mod oauth2;
@@ -131,8 +132,12 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
 
 // Re-export types and functions for custom summary pages
 pub use oauth2_passkey::{
-    OAuth2Account, PasskeyCredential, UserId, list_accounts_core, list_credentials_core,
+    OAuth2Account, PasskeyCredential, ProviderInfo, UserId, enabled_providers, is_provider_enabled,
+    list_accounts_core, list_credentials_core,
 };
+
+// Presentation layer: provider display info owned by the axum crate
+pub use oauth2::{ProviderView, custom_css_vars_block, enabled_provider_views};
 
 // Re-export types and functions for custom admin pages
 pub use oauth2_passkey::{

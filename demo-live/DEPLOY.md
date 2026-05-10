@@ -75,13 +75,88 @@ gcloud services enable secretmanager.googleapis.com
 3. Application type: "Web application"
 4. Name: e.g. "oauth2-passkey-demo"
 5. Authorized redirect URIs:
-   - `http://localhost:3001/o2p/oauth2/authorized` (local development)
-   - `https://passkey-demo.ccmp.jp/o2p/oauth2/authorized` (production)
+   - `http://localhost:3001/o2p/oauth2/google/authorized` (local development)
+   - `https://passkey-demo.ccmp.jp/o2p/oauth2/google/authorized` (production)
 6. Save the **Client ID** and **Client Secret**
 
 ```bash
 export OAUTH2_GOOGLE_CLIENT_ID="your-client-id"
 export OAUTH2_GOOGLE_CLIENT_SECRET="your-client-secret"
+```
+
+### Step 2a: Create Auth0 credentials (optional)
+
+Auth0 runs as Custom slot 1 with `PRESET=auth0`. Skip this step if you only need Google login.
+
+1. Log in to [Auth0 Dashboard](https://manage.auth0.com/)
+2. Applications > Create Application
+3. Application type: "Regular Web Application"
+4. Allowed Callback URLs:
+   - `http://localhost:3001/o2p/oauth2/auth0/authorized` (local development)
+   - `https://passkey-demo.ccmp.jp/o2p/oauth2/auth0/authorized` (production)
+5. Allowed Logout URLs: `https://passkey-demo.ccmp.jp/`
+6. Save the **Domain**, **Client ID**, and **Client Secret**
+
+```bash
+export OAUTH2_CUSTOM1_CLIENT_ID="your-auth0-client-id"
+export OAUTH2_CUSTOM1_CLIENT_SECRET="your-auth0-client-secret"
+export OAUTH2_CUSTOM1_ISSUER_URL="https://your-tenant.auth0.com"  # no trailing slash
+# PRESET=auth0 supplies DISPLAY_NAME / NAME / ICON_SLUG / colors; set in env.cloud-run.yaml.
+```
+
+For local development, see `dot.env.example` for the full Custom slot shape.
+
+### Step 2b: Create Microsoft Entra ID credentials (optional)
+
+Entra runs as Custom slot 2 with `PRESET=entra`. Skip this step if you don't need Microsoft login.
+Full background (B2B vs B2C, consumers UUID, email claim handling) is in
+[docs/src/guides/entra.md](../docs/src/guides/entra.md); the condensed deploy-time
+steps are:
+
+1. Open the [Azure Portal](https://portal.azure.com/) > Microsoft Entra ID > App registrations > New registration
+2. Supported account types: choose "Single tenant" (B2B) or "Personal Microsoft accounts only" (B2C)
+3. Authentication > Add a platform > Web > Redirect URIs:
+   - `http://localhost:3001/o2p/oauth2/entra/authorized` (local development)
+   - `https://passkey-demo.ccmp.jp/o2p/oauth2/entra/authorized` (production)
+4. Certificates & secrets > New client secret — copy the **Value** immediately (not shown again)
+5. (B2B only) Token configuration > Add optional claim > Token type: ID > check **email**
+6. Save the **Application (client) ID**, **client secret Value**, and build the issuer URL:
+
+```bash
+export OAUTH2_CUSTOM2_CLIENT_ID="your-application-client-id"
+export OAUTH2_CUSTOM2_CLIENT_SECRET="your-client-secret-value"
+# Work/school (B2B): use your tenant ID
+export OAUTH2_CUSTOM2_ISSUER_URL="https://login.microsoftonline.com/<tenant-id>/v2.0"
+# Personal MS accounts (B2C): use Microsoft's fixed consumer tenant UUID
+# export OAUTH2_CUSTOM2_ISSUER_URL="https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0"
+# PRESET=entra supplies DISPLAY_NAME / NAME / ICON_SLUG / colors / login.live.com origin.
+```
+
+The `/v2.0` suffix is required — the v1 endpoint uses a different issuer format
+(`sts.windows.net`) that will fail issuer validation. The `common` and
+`organizations` aliases are also not supported.
+
+### Step 2c: Create LINE Login credentials (optional)
+
+LINE runs as Custom slot 3 with `PRESET=line`. Skip this step if you don't need LINE login.
+Full background is in [docs/src/guides/line.md](../docs/src/guides/line.md); the condensed
+deploy-time steps are:
+
+1. Open the [LINE Developers Console](https://developers.line.biz/console/), create or
+   open a Provider, then create a **LINE Login** channel
+2. Channel settings: enable **OpenID Connect**, set callback URLs:
+   - `http://localhost:3001/o2p/oauth2/line/authorized` (local development)
+   - `https://passkey-demo.ccmp.jp/o2p/oauth2/line/authorized` (production)
+3. OpenID Connect > scopes: `openid`, `profile`, and (if needed) `email`
+4. Email claim requires a separate manual application under **Email address permission**
+   (1-2 business days). Without approval, login fails with `OAuth2Error::Validation`
+5. Copy **Channel ID** (CLIENT_ID) and **Channel secret** (CLIENT_SECRET)
+
+```bash
+export OAUTH2_CUSTOM3_CLIENT_ID="your-line-channel-id"
+export OAUTH2_CUSTOM3_CLIENT_SECRET="your-line-channel-secret"
+# PRESET=line supplies DISPLAY_NAME / NAME / ICON_SLUG / brand color.
+# Issuer URL is fixed to https://access.line.me/ in env.cloud-run.yaml.
 ```
 
 ### Step 3: Store secrets in Secret Manager
@@ -92,10 +167,34 @@ echo -n "$OAUTH2_GOOGLE_CLIENT_ID" | gcloud secrets create OAUTH2_GOOGLE_CLIENT_
 echo -n "$OAUTH2_GOOGLE_CLIENT_SECRET" | gcloud secrets create OAUTH2_GOOGLE_CLIENT_SECRET --data-file=-
 openssl rand -base64 32 | gcloud secrets create AUTH_SERVER_SECRET --data-file=-
 
+# Auth0 secrets (first time only, if using Auth0 via CUSTOM1 slot)
+echo -n "$OAUTH2_CUSTOM1_CLIENT_ID" | gcloud secrets create OAUTH2_CUSTOM1_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM1_CLIENT_SECRET" | gcloud secrets create OAUTH2_CUSTOM1_CLIENT_SECRET --data-file=-
+
+# Entra secrets (first time only, if using Entra via CUSTOM2 slot)
+echo -n "$OAUTH2_CUSTOM2_CLIENT_ID" | gcloud secrets create OAUTH2_CUSTOM2_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM2_CLIENT_SECRET" | gcloud secrets create OAUTH2_CUSTOM2_CLIENT_SECRET --data-file=-
+
+# LINE secrets (first time only, if using LINE via CUSTOM3 slot)
+echo -n "$OAUTH2_CUSTOM3_CLIENT_ID" | gcloud secrets create OAUTH2_CUSTOM3_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM3_CLIENT_SECRET" | gcloud secrets create OAUTH2_CUSTOM3_CLIENT_SECRET --data-file=-
+
 # Update secrets (add a new version to existing secrets)
 echo -n "$OAUTH2_GOOGLE_CLIENT_ID" | gcloud secrets versions add OAUTH2_GOOGLE_CLIENT_ID --data-file=-
 echo -n "$OAUTH2_GOOGLE_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_GOOGLE_CLIENT_SECRET --data-file=-
 openssl rand -base64 32 | gcloud secrets versions add AUTH_SERVER_SECRET --data-file=-
+
+# Auth0 secret rotation (CUSTOM1 slot)
+echo -n "$OAUTH2_CUSTOM1_CLIENT_ID" | gcloud secrets versions add OAUTH2_CUSTOM1_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM1_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_CUSTOM1_CLIENT_SECRET --data-file=-
+
+# Entra secret rotation (CUSTOM2 slot; Azure client secrets expire; max 24 months)
+echo -n "$OAUTH2_CUSTOM2_CLIENT_ID" | gcloud secrets versions add OAUTH2_CUSTOM2_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM2_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_CUSTOM2_CLIENT_SECRET --data-file=-
+
+# LINE secret rotation (CUSTOM3 slot)
+echo -n "$OAUTH2_CUSTOM3_CLIENT_ID" | gcloud secrets versions add OAUTH2_CUSTOM3_CLIENT_ID --data-file=-
+echo -n "$OAUTH2_CUSTOM3_CLIENT_SECRET" | gcloud secrets versions add OAUTH2_CUSTOM3_CLIENT_SECRET --data-file=-
 
 # Grant Cloud Run's default service account access to secrets
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
@@ -103,6 +202,9 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
 ```
+
+`OAUTH2_CUSTOM1_ISSUER_URL` / `OAUTH2_CUSTOM2_ISSUER_URL` and the `_PRESET`
+keys are not secrets — add them to `env.cloud-run.yaml` instead (see Step 5).
 
 ### Step 4: Build and push Docker image
 
@@ -130,10 +232,19 @@ gcloud run deploy oauth2-passkey-demo \
   --allow-unauthenticated \
   --min-instances 1 \
   --env-vars-file demo-live/env.cloud-run.yaml \
-  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest"
+  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_CUSTOM1_CLIENT_ID=OAUTH2_CUSTOM1_CLIENT_ID:latest,OAUTH2_CUSTOM1_CLIENT_SECRET=OAUTH2_CUSTOM1_CLIENT_SECRET:latest,OAUTH2_CUSTOM2_CLIENT_ID=OAUTH2_CUSTOM2_CLIENT_ID:latest,OAUTH2_CUSTOM2_CLIENT_SECRET=OAUTH2_CUSTOM2_CLIENT_SECRET:latest"
 ```
 
 All environment variables including `ORIGIN` are managed in `env.cloud-run.yaml`.
+For Auth0, `env.cloud-run.yaml` sets `OAUTH2_CUSTOM1_PRESET=auth0` and
+`OAUTH2_CUSTOM1_ISSUER_URL` (and optionally `_RESPONSE_MODE`, `_SCOPE`). If
+Auth0 is not used, omit the `OAUTH2_CUSTOM1_*` entries from `--set-secrets`
+and remove the corresponding keys from `env.cloud-run.yaml`.
+
+For Entra, `env.cloud-run.yaml` sets `OAUTH2_CUSTOM2_PRESET=entra` and
+`OAUTH2_CUSTOM2_ISSUER_URL` (and optionally `_RESPONSE_MODE`, `_SCOPE`). If
+Entra is not used, omit the `OAUTH2_CUSTOM2_*` entries from `--set-secrets`
+and remove the corresponding keys from `env.cloud-run.yaml`.
 
 ### Step 6: Configure custom domain
 
@@ -237,7 +348,7 @@ gcloud run deploy oauth2-passkey-demo \
   --allow-unauthenticated \
   --min-instances 1 \
   --env-vars-file demo-live/env.cloud-run.yaml \
-  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest"
+  --set-secrets "OAUTH2_GOOGLE_CLIENT_ID=OAUTH2_GOOGLE_CLIENT_ID:latest,OAUTH2_GOOGLE_CLIENT_SECRET=OAUTH2_GOOGLE_CLIENT_SECRET:latest,AUTH_SERVER_SECRET=AUTH_SERVER_SECRET:latest,OAUTH2_CUSTOM1_CLIENT_ID=OAUTH2_CUSTOM1_CLIENT_ID:latest,OAUTH2_CUSTOM1_CLIENT_SECRET=OAUTH2_CUSTOM1_CLIENT_SECRET:latest,OAUTH2_CUSTOM2_CLIENT_ID=OAUTH2_CUSTOM2_CLIENT_ID:latest,OAUTH2_CUSTOM2_CLIENT_SECRET=OAUTH2_CUSTOM2_CLIENT_SECRET:latest"
 ```
 
 To update only environment variables (without rebuilding the image):
@@ -255,7 +366,7 @@ Note: `--env-vars-file` replaces all env vars. To update individual keys without
 - Authentication is free (no charges)
 - Test mode: max 100 test users (only added test users can log in)
 - Public access requires Google verification review (review is free)
-- Redirect URI: `https://passkey-demo.ccmp.jp/o2p/oauth2/authorized`
+- Redirect URI: `https://passkey-demo.ccmp.jp/o2p/oauth2/google/authorized`
 
 ## Related Files
 

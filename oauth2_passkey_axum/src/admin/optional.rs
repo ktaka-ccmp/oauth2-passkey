@@ -16,7 +16,7 @@ use std::{
 use oauth2_passkey::{
     AuthenticatorInfo, DbUser, O2P_ROUTE_PREFIX, SessionId, UserId, force_logout_user,
     get_all_active_sessions, get_all_users, get_authenticator_info_batch, get_user,
-    list_accounts_core, list_credentials_core,
+    list_accounts_core, list_credentials_core, provider_info,
 };
 
 use super::masking::Masker;
@@ -168,6 +168,8 @@ struct TemplateAccount {
     pub id: String,
     pub user_id: String,
     pub provider: String,
+    pub provider_display_name: String,
+    pub provider_icon_slug: &'static str,
     pub provider_user_id: String,
     pub name: String,
     pub email: String,
@@ -212,6 +214,11 @@ struct AdminUserPageTemplate {
     pub oauth2_accounts: Vec<TemplateAccount>,
     pub o2p_route_prefix: String,
     pub custom_css_url: Option<String>,
+    /// True when the masker is active (demo mode + admin viewing another
+    /// user). Per-resource destructive buttons are disabled in this state
+    /// because the resource IDs they would post are masked and would be
+    /// rejected by `*Id::new` validators (defense-in-depth).
+    pub actions_disabled: bool,
 }
 
 impl AdminUserPageTemplate {
@@ -222,6 +229,7 @@ impl AdminUserPageTemplate {
         oauth2_accounts: Vec<TemplateAccount>,
         o2p_route_prefix: String,
         custom_css_url: Option<String>,
+        actions_disabled: bool,
     ) -> Self {
         Self {
             user: TemplateUser {
@@ -238,6 +246,7 @@ impl AdminUserPageTemplate {
             oauth2_accounts,
             o2p_route_prefix,
             custom_css_url,
+            actions_disabled,
         }
     }
 }
@@ -354,10 +363,18 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
     let oauth2_accounts = oauth2_accounts
         .into_iter()
         .map(|account| {
+            let info = provider_info(&account.provider);
+            let provider_display_name = info
+                .as_ref()
+                .map(|p| p.display_name.to_string())
+                .unwrap_or_else(|| account.provider.clone());
+            let provider_icon_slug = info.map(|p| p.icon_slug).unwrap_or("openid");
             TemplateAccount {
                 id: account.id,
                 user_id: account.user_id,
                 provider: account.provider,
+                provider_display_name,
+                provider_icon_slug,
                 provider_user_id: account.provider_user_id,
                 name: account.name,
                 email: account.email,
@@ -370,6 +387,7 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
         })
         .collect();
 
+    let actions_disabled = masker.is_active();
     let user = masker.mask_user(user);
 
     let csrf_token = auth_user.csrf_token.clone();
@@ -382,6 +400,7 @@ async fn admin_user_page(auth_user: AuthUser, user_id: Path<String>) -> impl Int
         oauth2_accounts,
         O2P_ROUTE_PREFIX.to_string(),
         O2P_CUSTOM_CSS_URL.clone(),
+        actions_disabled,
     );
 
     // Render the template

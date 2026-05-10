@@ -4,7 +4,8 @@ use serde_json::{Value, json};
 use sqlx::FromRow;
 
 use super::errors::OAuth2Error;
-use super::main::IdInfo as GoogleIdInfo;
+use super::main::OidcIdInfo;
+use super::provider::{ProviderConfig, ProviderName};
 
 use crate::session::UserId;
 use crate::storage::CacheData;
@@ -59,63 +60,285 @@ impl Default for OAuth2Account {
     }
 }
 
-// The user data we'll get back from Google
+/// Userinfo endpoint response.
+///
+/// `email` and `name` are optional per OIDC Core 1.0 (they are standard claims,
+/// not required ones).  When `email` is absent the implementation falls back to
+/// `preferred_username` (e.g. Microsoft personal accounts return email only there).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct GoogleUserInfo {
+pub(crate) struct OidcUserInfo {
     pub(crate) sub: String,
-    pub(crate) family_name: String,
-    pub name: String,
+    pub(crate) family_name: Option<String>,
+    pub name: Option<String>,
     pub picture: Option<String>,
-    pub(crate) email: String,
-    pub(crate) given_name: String,
+    pub(crate) email: Option<String>,
+    pub(crate) given_name: Option<String>,
     pub(crate) hd: Option<String>,
-    pub(crate) email_verified: bool,
+    pub(crate) email_verified: Option<bool>,
+    /// Fallback for `email` when the provider omits the standard claim
+    /// (e.g. Microsoft personal accounts return email only in `preferred_username`).
+    pub(crate) preferred_username: Option<String>,
 }
 
-// Add these implementations
-impl From<GoogleUserInfo> for OAuth2Account {
-    fn from(google_user: GoogleUserInfo) -> Self {
-        Self {
-            sequence_number: None,  // Will be set by database
-            id: String::new(),      // Will be set during storage
-            user_id: String::new(), // Will be set during upsert process
-            name: google_user.name,
-            email: google_user.email,
-            picture: google_user.picture,
-            provider: "google".to_string(),
-            provider_user_id: format!("google_{}", google_user.sub),
-            metadata: json!({
-                "family_name": google_user.family_name,
-                "given_name": google_user.given_name,
-                "hd": google_user.hd,
-                "email_verified": google_user.email_verified,
-            }),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        }
+/// Build an `OAuth2Account` from an ID token payload.
+///
+/// Free function rather than `impl From<OidcIdInfo>` because `From` takes only one
+/// argument and cannot accept the provider context parameter.
+///
+/// `ctx.provider_name` is taken from the URL path (primary dispatch signal) and
+/// cross-checked against `StateParams.provider`.  It is **not** hardcoded,
+/// so DB rows reflect the actual provider that issued the token.
+pub(crate) fn oauth2_account_from_idinfo(
+    idinfo: &OidcIdInfo,
+    ctx: &ProviderConfig,
+) -> Result<OAuth2Account, OAuth2Error> {
+    let provider_name = ctx.provider_name;
+    let email = idinfo
+        .email
+        .clone()
+        .or_else(|| idinfo.preferred_username.clone())
+        .ok_or_else(|| {
+            OAuth2Error::Validation(format!(
+                "OIDC id_token from '{provider_name}' is missing both `email` and `preferred_username` claims"
+            ))
+        })?;
+    let name = idinfo.name.clone().unwrap_or_else(|| email.clone());
+    Ok(OAuth2Account {
+        sequence_number: None,
+        id: String::new(),
+        user_id: String::new(),
+        name,
+        email,
+        picture: idinfo.picture.clone(),
+        provider: provider_name.to_string(),
+        provider_user_id: format!("{}_{}", provider_name, idinfo.sub),
+        metadata: json!({
+            "family_name": idinfo.family_name,
+            "given_name": idinfo.given_name,
+            "hd": idinfo.hd,
+            "verified_email": idinfo.email_verified,
+        }),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    })
+}
+
+/// Build an `OAuth2Account` from both the verified ID token and the userinfo
+/// endpoint response, preferring the ID token per field and falling back to
+/// /userinfo when the ID token omits it.
+///
+/// Rationale: OIDC providers split profile claims inconsistently. Some assert
+/// `email` / `name` in the ID token only (Google, Entra, Okta); others only in
+/// /userinfo (Zitadel, some Keycloak configs). Neither source alone is
+/// universally sufficient, so the main callback needs a merged view.
+///
+/// The ID token wins when both sources populate a field. It is cryptographically
+/// signed by the IdP and its audience/issuer/nonce have already been verified,
+/// so it is the stronger trust root for identity-critical claims (email, sub).
+/// /userinfo is retrieved over TLS using an access token and is not itself
+/// signed, so it is used only to fill gaps left by the ID token.
+///
+/// The `sub` equality invariant (`idinfo.sub == userinfo.sub`) is assumed to
+/// have been verified upstream by `get_idinfo_userinfo`; this function uses
+/// `idinfo.sub` when building `provider_user_id`.
+pub(crate) fn oauth2_account_from_idinfo_and_userinfo(
+    idinfo: &OidcIdInfo,
+    userinfo: &OidcUserInfo,
+    ctx: &ProviderConfig,
+) -> Result<OAuth2Account, OAuth2Error> {
+    validate_claim_match(idinfo, userinfo, ctx)?;
+
+    let provider_name = ctx.provider_name;
+    let email = idinfo
+        .email
+        .clone()
+        .or_else(|| userinfo.email.clone())
+        .or_else(|| idinfo.preferred_username.clone())
+        .or_else(|| userinfo.preferred_username.clone())
+        .ok_or_else(|| {
+            OAuth2Error::Validation(format!(
+                "OIDC response from '{provider_name}' is missing `email` / `preferred_username` in both id_token and userinfo"
+            ))
+        })?;
+    let name = idinfo
+        .name
+        .clone()
+        .or_else(|| userinfo.name.clone())
+        .unwrap_or_else(|| email.clone());
+    let picture = idinfo.picture.clone().or_else(|| userinfo.picture.clone());
+    let family_name = idinfo
+        .family_name
+        .clone()
+        .or_else(|| userinfo.family_name.clone());
+    let given_name = idinfo
+        .given_name
+        .clone()
+        .or_else(|| userinfo.given_name.clone());
+    let hd = idinfo.hd.clone().or_else(|| userinfo.hd.clone());
+    let email_verified = idinfo.email_verified.or(userinfo.email_verified);
+    Ok(OAuth2Account {
+        sequence_number: None,
+        id: String::new(),
+        user_id: String::new(),
+        name,
+        email,
+        picture,
+        provider: provider_name.to_string(),
+        provider_user_id: format!("{}_{}", provider_name, idinfo.sub),
+        metadata: json!({
+            "family_name": family_name,
+            "given_name": given_name,
+            "hd": hd,
+            "email_verified": email_verified,
+        }),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    })
+}
+
+/// Detect divergence between the verified ID token and the /userinfo response.
+///
+/// Both sources are fetched within milliseconds of each other in a single OAuth2
+/// flow and reflect the same user snapshot; any field-level divergence is
+/// therefore anomalous, not legitimate drift.
+///
+/// Classification:
+///
+/// * **Identity-tier** (`email`, `email_verified`, `preferred_username`, `hd`) —
+///   always rejected on mismatch. These drive authn/authz decisions and silent
+///   divergence is a security concern. Not configurable.
+/// * **Display-tier** (`name`, `picture`, `family_name`, `given_name`) —
+///   rejected when `ctx.strict_display_claims` is `true` (default); otherwise a
+///   warning is emitted and the id_token value is used (Option B merge priority
+///   preserved).
+///
+/// The check fires only when **both sides are `Some`** and the values differ.
+/// One-sided `None` is a normal merge case and is silently allowed.
+fn validate_claim_match(
+    idinfo: &OidcIdInfo,
+    userinfo: &OidcUserInfo,
+    ctx: &ProviderConfig,
+) -> Result<(), OAuth2Error> {
+    let provider = ctx.provider_name;
+
+    // Tier 1 — identity/authorization-critical, always strict.
+    check_strict(
+        "email",
+        idinfo.email.as_deref(),
+        userinfo.email.as_deref(),
+        provider,
+    )?;
+    check_strict_bool(
+        "email_verified",
+        idinfo.email_verified,
+        userinfo.email_verified,
+        provider,
+    )?;
+    check_strict(
+        "preferred_username",
+        idinfo.preferred_username.as_deref(),
+        userinfo.preferred_username.as_deref(),
+        provider,
+    )?;
+    check_strict("hd", idinfo.hd.as_deref(), userinfo.hd.as_deref(), provider)?;
+
+    // Tier 2 — display/metadata, flag-controlled.
+    let strict = ctx.strict_display_claims;
+    check_display(
+        "name",
+        idinfo.name.as_deref(),
+        userinfo.name.as_deref(),
+        provider,
+        strict,
+    )?;
+    check_display(
+        "picture",
+        idinfo.picture.as_deref(),
+        userinfo.picture.as_deref(),
+        provider,
+        strict,
+    )?;
+    check_display(
+        "family_name",
+        idinfo.family_name.as_deref(),
+        userinfo.family_name.as_deref(),
+        provider,
+        strict,
+    )?;
+    check_display(
+        "given_name",
+        idinfo.given_name.as_deref(),
+        userinfo.given_name.as_deref(),
+        provider,
+        strict,
+    )?;
+
+    Ok(())
+}
+
+fn check_strict(
+    field: &'static str,
+    idinfo_value: Option<&str>,
+    userinfo_value: Option<&str>,
+    provider: ProviderName,
+) -> Result<(), OAuth2Error> {
+    match (idinfo_value, userinfo_value) {
+        (Some(a), Some(b)) if a != b => Err(OAuth2Error::ClaimMismatch {
+            field,
+            idinfo_value: a.to_string(),
+            userinfo_value: b.to_string(),
+            provider: provider.to_string(),
+        }),
+        _ => Ok(()),
     }
 }
 
-impl From<GoogleIdInfo> for OAuth2Account {
-    fn from(idinfo: GoogleIdInfo) -> Self {
-        Self {
-            sequence_number: None,  // Will be set by database
-            id: String::new(),      // Will be set during storage
-            user_id: String::new(), // Will be set during upsert process
-            name: idinfo.name,
-            email: idinfo.email,
-            picture: idinfo.picture,
-            provider: "google".to_string(),
-            provider_user_id: format!("google_{}", idinfo.sub),
-            metadata: json!({
-                "family_name": idinfo.family_name,
-                "given_name": idinfo.given_name,
-                "hd": idinfo.hd,
-                "verified_email": idinfo.email_verified,
-            }),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+fn check_strict_bool(
+    field: &'static str,
+    idinfo_value: Option<bool>,
+    userinfo_value: Option<bool>,
+    provider: ProviderName,
+) -> Result<(), OAuth2Error> {
+    match (idinfo_value, userinfo_value) {
+        (Some(a), Some(b)) if a != b => Err(OAuth2Error::ClaimMismatch {
+            field,
+            idinfo_value: a.to_string(),
+            userinfo_value: b.to_string(),
+            provider: provider.to_string(),
+        }),
+        _ => Ok(()),
+    }
+}
+
+fn check_display(
+    field: &'static str,
+    idinfo_value: Option<&str>,
+    userinfo_value: Option<&str>,
+    provider: ProviderName,
+    strict: bool,
+) -> Result<(), OAuth2Error> {
+    match (idinfo_value, userinfo_value) {
+        (Some(a), Some(b)) if a != b => {
+            if strict {
+                Err(OAuth2Error::ClaimMismatch {
+                    field,
+                    idinfo_value: a.to_string(),
+                    userinfo_value: b.to_string(),
+                    provider: provider.to_string(),
+                })
+            } else {
+                tracing::warn!(
+                    security_event = "oauth2_claim_mismatch",
+                    field = field,
+                    idinfo_value = a,
+                    userinfo_value = b,
+                    provider = %provider,
+                    "claim mismatch between id_token and /userinfo; using id_token value (set OAUTH2_<provider>_STRICT_DISPLAY_CLAIMS=true to reject)"
+                );
+                Ok(())
+            }
         }
+        _ => Ok(()),
     }
 }
 
@@ -126,6 +349,10 @@ pub(crate) struct StateParams {
     pub(crate) pkce_id: String,
     pub(crate) misc_id: Option<String>,
     pub(crate) mode_id: Option<String>,
+    /// Provider name embedded in state as a defense-in-depth cross-check.
+    /// The URL path (`/oauth2/{provider}/authorized`) is the primary dispatch
+    /// signal; this field is only used to detect URL/state mismatches.
+    pub(crate) provider: String,
 }
 
 #[derive(Serialize, Clone, Deserialize, Debug)]
@@ -155,9 +382,12 @@ pub struct AuthResponse {
 pub(super) struct OidcTokenResponse {
     pub(super) access_token: String,
     token_type: String,
-    expires_in: u64,
+    // Optional per RFC 6749 §5.1 (RECOMMENDED, not REQUIRED). Some
+    // providers (e.g. older Keycloak builds, some Ory Hydra configs)
+    // omit it entirely.
+    expires_in: Option<u64>,
     refresh_token: Option<String>,
-    scope: String,
+    scope: Option<String>,
     pub(super) id_token: Option<String>,
 }
 
@@ -430,8 +660,10 @@ impl ProviderUserId {
         }
 
         // Validate ID contains only safe characters
+        // '|' is included to support Auth0's sub format: "auth0|{id}"
         if !id.chars().all(|c| {
-            c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '+' | '=' | '(' | ')')
+            c.is_ascii_alphanumeric()
+                || matches!(c, '-' | '_' | '.' | '@' | '+' | '=' | '(' | ')' | '|')
         }) {
             return Err(OAuth2Error::Validation(
                 "Provider user ID contains invalid characters".to_string(),
