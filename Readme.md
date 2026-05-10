@@ -9,13 +9,13 @@
 [![Docs.rs](https://docs.rs/oauth2-passkey/badge.svg)](https://docs.rs/oauth2-passkey)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-**Password authentication is fundamentally flawed** - even strong, unique passwords are vulnerable to phishing, brute-force attacks, and server-side breaches. This library provides a better approach: users register with Google OAuth2, then add a Passkey for fast, phishing-resistant daily login. OAuth2 remains as a backup if the device is lost. After authentication, the library issues a secure session cookie to maintain login state.
+**Password authentication is fundamentally flawed** - even strong, unique passwords are vulnerable to phishing, brute-force attacks, and server-side breaches. This library provides a better approach: users register with an OAuth2/OIDC provider (Google, plus presets for Auth0, Keycloak, Microsoft Entra ID, Zitadel, Okta, Authentik, LINE, Apple, or any standards-compliant OIDC IdP via generic slots), then add a Passkey for fast, phishing-resistant daily login. OAuth2 remains as a backup if the device is lost. After authentication, the library issues a secure session cookie to maintain login state.
 
 ## 🎮 Live Demo
 
 > **[passkey-demo.ccmp.jp](https://passkey-demo.ccmp.jp)**
 
-No setup required. Google account needed for OAuth2. Data is ephemeral (resets on server restart, sessions expire in 10 min).
+No setup required. Sign in with Google, Auth0, Microsoft Entra ID, or LINE. Data is ephemeral (resets on server restart, sessions expire in 10 min).
 
 **Register with Google and add a Passkey:**
 
@@ -28,7 +28,7 @@ No setup required. Google account needed for OAuth2. Data is ephemeral (resets o
 ## ✨ What You Get
 
 - 🔑 **Passkey** - Phishing-resistant login with biometrics, inherently multi-factor (no 2FA needed)
-- 🌐 **Google OAuth2** - One-click registration and backup authentication
+- 🌐 **OAuth2 / OIDC** - One-click registration and backup authentication. Google plus 8 preset providers (Auth0, Keycloak, Microsoft Entra ID, Zitadel, Okta, Authentik, LINE, Apple) and 8 generic slots for any standards-compliant OIDC IdP
 - 🔗 **Account linking** - Users can add multiple login methods to one account
 - 📦 **Minimal setup** - Works with SQLite out of the box, scales to PostgreSQL + Redis
 
@@ -152,7 +152,7 @@ GENERIC_DATA_STORE_URL='sqlite:data/auth.db'
 GENERIC_CACHE_STORE_TYPE=memory
 ```
 
-**OAuth2 Setup:** Get credentials from [Google API Console](https://console.cloud.google.com/auth/clients) and add redirect URI: `https://your-domain.com/o2p/oauth2/authorized`
+**OAuth2 Setup:** Get Google credentials from the [Google API Console](https://console.cloud.google.com/auth/clients) and add redirect URI: `https://your-domain.com/o2p/oauth2/google/authorized`. For other providers (Auth0, Keycloak, Microsoft Entra ID, Zitadel, Okta, Authentik, LINE, Apple, or any OIDC IdP via generic slots) see the [Provider Guides](https://ktaka-ccmp.github.io/oauth2-passkey/).
 
 ## 📄 License
 
