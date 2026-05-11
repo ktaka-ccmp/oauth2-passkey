@@ -25,12 +25,15 @@ Historical test quality assessments from June 2025:
 
 ## Design Proposals
 
-Implemented design documents and proposals:
+### Implemented
 
 - [cache-expiration-system-simplification.md](design-proposals/cache-expiration-system-simplification.md)
 - [implementing-tracing.md](design-proposals/implementing-tracing.md)
 - [integration-testing-plan.md](design-proposals/integration-testing-plan.md)
-- [oauth2-account-linking-api-simplification.md](design-proposals/oauth2-account-linking-api-simplification.md)
 - [testing-oidc-discovery.md](design-proposals/testing-oidc-discovery.md)
 - [TestKeyPairGeneration.md](design-proposals/TestKeyPairGeneration.md)
 - [type-safe-validation.md](design-proposals/type-safe-validation.md)
+
+### Superseded / Not Implemented
+
+- [oauth2-account-linking-api-simplification.md](design-proposals/oauth2-account-linking-api-simplification.md) — see issues `20260226-2018` and `20260512-0335` for current status
