@@ -6,17 +6,21 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (9)
+### Open (13)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 | `20260226-1814` | high | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
+| `20260512-0335` | medium | medium | [POST-based OAuth2 account linking initiation (Alt 5B validation)](open/20260512-0335-post-based-oauth2-linking-validation.md) |
 | `20260226-2019` | medium | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
+| `20260512-0350` | low | small | [Use constant-time comparison in verify_page_session_token](open/20260512-0350-constant-time-page-session-token.md) |
+| `20260512-0351` | low | small | [Correct status labeling for archived design proposals](open/20260512-0351-archived-design-proposals-status-labeling.md) |
+| `20260512-0457` | low | small | [Standardize Rust code block markers in mdBook docs to `rust,ignore`](open/20260512-0457-standardize-rust-block-markers.md) |
+| `20260226-2018` | low | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
 
