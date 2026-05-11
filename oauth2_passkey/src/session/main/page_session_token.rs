@@ -8,6 +8,7 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use hmac::{Hmac, KeyInit, Mac};
 use http::HeaderMap;
 use sha2::Sha256;
+use subtle::ConstantTimeEq;
 
 use crate::{
     session::{config::AUTH_SERVER_SECRET, errors::SessionError, types::StoredSession},
@@ -104,7 +105,8 @@ pub async fn verify_page_session_token(
 
     match page_session_token {
         Some(context) => {
-            if context.as_str() != generate_page_session_token(&stored_session.csrf_token) {
+            let expected = generate_page_session_token(&stored_session.csrf_token);
+            if !bool::from(context.as_bytes().ct_eq(expected.as_bytes())) {
                 tracing::error!("Page session token does not match session user");
                 return Err(SessionError::PageSessionToken(
                     "Page session token does not match session user".to_string(),
