@@ -4,8 +4,8 @@
 
 - ID: 20260512-0350
 - Created: 2026-05-12-03-50
-- Closed:
-- Status: open
+- Closed: 2026-05-12-05-22
+- Status: completed
 - Priority: low
 - Difficulty: small
 - Related Issues:
@@ -77,10 +77,10 @@ if context_bytes.len() != expected_bytes.len()
 
 ### Implementation Tasks
 
-- [ ] Replace `!=` with `subtle::ConstantTimeEq` per implementation sketch
-- [ ] Verify existing `page_session_token` unit tests pass
-- [ ] Run `cargo fmt --all` and `cargo clippy --all-targets --all-features`
-- [ ] Run full workspace test suite
+- [x] Replace `!=` with `subtle::ConstantTimeEq` per implementation sketch
+- [x] Verify existing `page_session_token` unit tests pass
+- [x] Run `cargo fmt --all` and `cargo clippy --all-targets --all-features`
+- [x] Run full workspace test suite
 
 ### Verification
 
@@ -89,3 +89,33 @@ if context_bytes.len() != expected_bytes.len()
 - Existing tests `test_verify_page_session_token_success`, `_invalid_token`, `_missing_token`, `_missing_session` continue to pass
 
 ## Resolution
+
+Branch: `chore/constant-time-page-session-token`.
+
+`oauth2_passkey/src/session/main/page_session_token.rs:107`
+replaced with constant-time comparison. The final form is simpler
+than the implementation sketch in Latest Plan — `subtle::ConstantTimeEq`
+on `&[u8]` already short-circuits on length mismatch, so no
+explicit length check is needed:
+
+```rust
+let expected = generate_page_session_token(&stored_session.csrf_token);
+if !bool::from(context.as_bytes().ct_eq(expected.as_bytes())) {
+    tracing::error!("Page session token does not match session user");
+    return Err(SessionError::PageSessionToken(
+        "Page session token does not match session user".to_string(),
+    ));
+}
+```
+
+`subtle` was already a workspace dependency
+(`oauth2_passkey/Cargo.toml:37`); only the import line was added.
+
+Verification:
+
+- `cargo clippy --all-targets --all-features -p oauth2-passkey` clean
+- `cargo test --manifest-path oauth2_passkey/Cargo.toml` — all tests pass,
+  including the 7 `page_session_token` tests
+- `cargo test --manifest-path oauth2_passkey_axum/Cargo.toml --all-features`
+  — all tests pass
+- `cargo fmt --all` clean
