@@ -313,34 +313,38 @@ outcome, and conditional work that depends on the child issue
 
 ### Always (independent of Alt 5B outcome)
 
-**Restructure `docs/src/security/page-session.md` for a clearer
-conceptual map.** The current document presents two attack
-scenarios (Page-to-Request and Process Start-to-Completion
-desynchronization), then dives into ~100 lines of Phase 1 (page
-session token) details before introducing Phase 2 (OAuth2 flow
-continuity via `misc_session`). The unifying "Phase-Specific
-Protection" table sits at the very end of the document, so readers
-build a partial mental model on the way through.
+**Restructure `docs/src/security/oauth2-linking-protection.md`
+(renamed from `page-session.md`) for a clearer conceptual map and
+more accurate scope framing.** The previous document title and
+intro led with Phase 1's mechanism, making Phase 2 read as
+supplementary; the unifying phase-mapping table sat at the very
+end. Rename file and title, rewrite Overview, and reorder
+sections so readers see the two-phase model up front.
 
 Restructure target:
 
-1. Overview (unchanged)
-2. Session Boundary Attacks (unchanged)
-3. **Two-Phase Protection Overview** — promote the existing
-   Phase-Specific Protection table from the tail to right after
-   the attack scenarios; relabel the sections that follow with
-   `Phase 1:` / `Phase 2:` prefixes for navigability.
-4. Phase 1: Page Session Token Mechanism — consolidate the current
-   "Page Session Token Mechanism" + "Token Generation and
-   Verification" sections (no content rewrite).
-5. Phase 2: OAuth2 Flow Session Continuity — rename
-   "Integration with OAuth2 Flows".
+1. Rename file to `oauth2-linking-protection.md` and update H1 to
+   "OAuth2 Linking Session Protection".
+2. Overview — rewrite to introduce the two-phase model and
+   incorporate the phase-mapping table directly (no separate
+   "Two-Phase Protection Overview" section).
+3. Session Boundary Attacks (unchanged).
+4. **Phase 1: Page Session Token Mechanism** — consolidate the
+   former "Page Session Token Mechanism" + "Token Generation and
+   Verification" sections; add a brief intro paragraph explaining
+   the `window.open` navigation constraint that motivates the
+   mechanism.
+5. **Phase 2: OAuth2 Flow Session Continuity** — rename
+   "Integration with OAuth2 Flows"; add an intro paragraph framing
+   the IDP round-trip threat.
 6. Implementation Notes — short summary of remaining items from
-   "Key Security Characteristics".
-7. Testing Page Session Protection (unchanged).
+   the former "Key Security Characteristics".
+7. **Testing Session Protection** — rename and split into
+   "Phase 1: Page-to-Request Detection" + "Phase 2: OAuth2 Flow
+   Continuity" subsections.
 
-Content (prose paragraphs and code blocks) is preserved verbatim;
-this is a reordering + section-naming change.
+Code blocks are preserved verbatim; prose is lightly rewritten
+for smoother transitions where new section intros were added.
 
 ### If Alt 5B is go
 
@@ -375,7 +379,7 @@ Concrete scope:
 
 2. Document the custom-UI linking pattern in `docs/src/guides/` or
    `docs/src/integration/`. This complements the restructured
-   `page-session.md` from the Always section.
+   `oauth2-linking-protection.md` from the Always section.
 
 Archived design proposal status labeling is tracked separately
 under `20260512-0351`; not duplicated here.
@@ -389,7 +393,7 @@ see Timeline entry 2026-05-12T02:46 for the critique.
 
 Always:
 
-- `docs/src/security/page-session.md` — restructure
+- `docs/src/security/oauth2-linking-protection.md` — restructure (renamed from `page-session.md`)
 
 Conditional on no-go fallback:
 
@@ -399,8 +403,8 @@ Conditional on no-go fallback:
 
 ### Implementation Tasks
 
-- [ ] Always: restructure `docs/src/security/page-session.md`
-- [ ] Always: verify `mdbook build docs` is warning-clean
+- [x] Always: restructure `docs/src/security/oauth2-linking-protection.md` (renamed from `page-session.md`)
+- [x] Always: verify `mdbook build docs` is warning-clean
 - [ ] Await go/no-go decision from `20260512-0335`
 - [ ] If no-go: add `oauth2_link_url` helper with unit tests
 - [ ] If no-go: write custom-UI linking guide chapter
@@ -410,8 +414,8 @@ Conditional on no-go fallback:
 ### Verification
 
 - Always: `mdbook build docs` clean; manual readthrough of
-  restructured `page-session.md` reads top-to-bottom with the
-  conceptual map established before details.
+  restructured `oauth2-linking-protection.md` reads top-to-bottom
+  with the conceptual map established before details.
 - If go path: covered by `20260512-0335` Verification.
 - If no-go path: `cargo test --manifest-path oauth2_passkey_axum/Cargo.toml
   --all-features` plus manual walkthrough of the new custom-UI guide

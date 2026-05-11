@@ -123,7 +123,7 @@ the env var is always safe.
 - `oauth2_passkey_axum/src/config.rs` — new env var
 - `oauth2_passkey_axum/src/user/account.rs` — conditionally skip page_session_token when in POST mode
 - `demo-both/` — proof-of-concept test page
-- `docs/src/security/page-session.md` — describe both alternatives and decision
+- `docs/src/security/oauth2-linking-protection.md` — describe both alternatives and decision
 
 ### Implementation Tasks
 
