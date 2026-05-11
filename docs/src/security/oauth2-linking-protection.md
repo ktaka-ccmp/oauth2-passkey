@@ -37,6 +37,8 @@ A user loads a page while logged in as Account A. Later, they log in as Account 
 
 In multi-step processes (such as passkey or OAuth2 registration), a user might start the process with one account but complete it after switching sessions. This can result in credentials being registered to an unintended user or session.
 
+This document covers the OAuth2 linking case. Passkey registration uses a different mechanism for the equivalent protection — see [Passkey Registration Session Protection](passkey-registration-protection.md) for the passkey-specific implementation and a side-by-side comparison with the OAuth2 mechanism.
+
 ## Phase 1: Page Session Token Mechanism
 
 Phase 1 protects the window between rendering the user's account page and the click that initiates the OAuth2 flow. Standard CSRF protection alone is insufficient here: the click results in a `window.open(...)` navigation, which cannot carry custom headers, and the session cookie may have rotated between page load and click. The **Page Session Token** binds the page to the session that rendered it, so a session change is detected before the redirect to the IDP.

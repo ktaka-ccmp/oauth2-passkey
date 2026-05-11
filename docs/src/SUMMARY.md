@@ -67,6 +67,7 @@
 - [Session Security](security/session.md)
 - [Session Conflict Policy](security/session-conflict.md)
 - [OAuth2 Linking Session Protection](security/oauth2-linking-protection.md)
+- [Passkey Registration Session Protection](security/passkey-registration-protection.md)
 - [OAuth2 Security](security/oauth2-security.md)
 - [Authorization Patterns](security/authorization.md)
 - [Production Deployment](security/production.md)

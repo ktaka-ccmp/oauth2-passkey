@@ -305,6 +305,30 @@ Reasons for revision:
    independently. Removed from the no-go fallback list to avoid
    duplication.
 
+### 2026-05-12T04:54 — Side effect: passkey doc spawned
+
+During the docs restructure executed under the Always section, it
+became clear that the previous `page-session.md` mentioned passkey
+registration in its threat description but did not actually cover
+passkey's protection mechanism. Investigation confirmed that the
+library protects passkey registration with `X-CSRF-Token` header
+(Phase 1) and a `user_handle`-keyed `SessionInfo` cache entry with
+explicit user ID comparison at finish (Phase 2) — functionally
+equivalent to the OAuth2 protections, implemented differently
+because passkey registration is initiated by a `fetch` POST rather
+than a `window.open(...)` navigation.
+
+Rather than expanding the OAuth2 doc back out to cover both flows,
+a parallel `docs/src/security/passkey-registration-protection.md`
+was created (mirroring the OAuth2 doc's structure), a SUMMARY.md
+entry added, and a cross-reference inserted in
+`oauth2-linking-protection.md`'s Process Start-to-Completion
+subsection. This work was tangential to the parent issue's scope
+(OAuth2 linking simplification) but landed in the same branch.
+
+The Always-section scope of this parent issue is unchanged; this
+entry records the side-effect for traceability.
+
 ## Latest Plan
 
 Scope is split into work that proceeds regardless of Alt 5B's
