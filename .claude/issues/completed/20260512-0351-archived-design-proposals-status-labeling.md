@@ -4,8 +4,8 @@
 
 - ID: 20260512-0351
 - Created: 2026-05-12-03-51
-- Closed:
-- Status: open
+- Closed: 2026-05-12-05-13
+- Status: completed
 - Priority: low
 - Difficulty: small
 - Related Issues:
@@ -101,10 +101,10 @@ Prepend a status notice at the top of
 
 ### Implementation Tasks
 
-- [ ] Restructure `archived/README.md` Design Proposals into "Implemented" and "Superseded / Not Implemented"
-- [ ] Spot-check that each remaining "Implemented" entry has corresponding implementation in code; reclassify any that don't
-- [ ] Prepend Status notice to `oauth2-account-linking-api-simplification.md`
-- [ ] If the mdBook build is part of CI, verify it still passes
+- [x] Restructure `archived/README.md` Design Proposals into "Implemented" and "Superseded / Not Implemented"
+- [x] Spot-check that each remaining "Implemented" entry has corresponding implementation in code; reclassify any that don't
+- [x] Prepend Status notice to `oauth2-account-linking-api-simplification.md`
+- [x] If the mdBook build is part of CI, verify it still passes
 
 ### Verification
 
@@ -112,3 +112,34 @@ Prepend a status notice at the top of
 - Each listed proposal's status accurately reflects code reality
 
 ## Resolution
+
+Branch: `chore/archived-proposals-labeling`.
+
+Spot-check confirmed all 6 remaining proposals listed under
+"Implemented" are in fact implemented (evidence per Latest Plan):
+
+- `cache-expiration-system-simplification` — TTL/expiration logic in
+  `oauth2_passkey/src/storage/types.rs` and
+  `cache_store/{memory,redis}.rs`
+- `implementing-tracing` — `tracing::` used across core
+  (`utils.rs`, `session/config.rs`, `oauth2/main/oidc.rs`, etc.)
+- `integration-testing-plan` — `oauth2_passkey_axum/tests/integration/`
+  (`api_client_flows.rs`, `combined_flows.rs`, `oauth2_flows.rs`,
+  `passkey_flows.rs`)
+- `testing-oidc-discovery` — `oauth2_passkey/src/oauth2/discovery/tests.rs`
+- `TestKeyPairGeneration` — `oauth2_passkey/src/coordination/passkey/tests.rs`
+- `type-safe-validation` — newtypes (`UserId`, `ProviderName`, etc.)
+  exposed in `oauth2_passkey/src/lib.rs`
+
+Changes landed:
+
+1. `docs/src/archived/README.md` — Design Proposals section split
+   into "Implemented" (6 entries) and "Superseded / Not Implemented"
+   (1 entry, `oauth2-account-linking-api-simplification.md` with
+   inline pointer to issues `20260226-2018` and `20260512-0335`).
+2. `docs/src/archived/design-proposals/oauth2-account-linking-api-simplification.md`
+   — Status notice blockquote prepended right after the H1, citing
+   the parent issue Timeline entry and the architectural
+   reconsideration tracked under the child issue.
+
+`mdbook build docs` clean.

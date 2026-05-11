@@ -1,5 +1,13 @@
 # OAuth2 Account Linking API Simplification
 
+> **Status: Superseded.** The specific API recommendations in this
+> document (one-function `.await`, provider-specific traits, builder
+> pattern, middleware) were critiqued and rejected in issue
+> `20260226-2018` Timeline entry 2026-05-12T02:46. The architectural
+> question this proposal tried to address is being reconsidered
+> under issue `20260512-0335` (POST-based linking initiation, which
+> would eliminate the `page_session_token` concept entirely).
+
 ## Problem Statement
 
 The current OAuth2 account linking implementation creates a significant barrier to adoption due to its complexity. Users must understand and coordinate multiple concepts and API calls to accomplish what should be a simple operation.
