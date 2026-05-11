@@ -32,7 +32,18 @@ A user loads a page while logged in as Account A. Later, they log in as Account 
 
 In multi-step processes (such as passkey or OAuth2 registration), a user might start the process with one account but complete it after switching sessions. This can result in credentials being registered to an unintended user or session.
 
-## Page Session Token Mechanism
+## Two-Phase Protection Overview
+
+The two attack scenarios above are handled in separate phases of the OAuth2 linking flow, each with its own mechanism:
+
+| Phase | Mechanism | Purpose |
+|-------|-----------|---------|
+| Page load to request | Page session tokens | Detect session changes before OAuth2 redirect |
+| OAuth2 flow duration | Session context preservation | Maintain user identity through redirects |
+
+Phase 1 is detailed in the next section; Phase 2 is covered later under "Phase 2: OAuth2 Flow Session Continuity".
+
+## Phase 1: Page Session Token Mechanism
 
 The library implements **Page Session Tokens** to solve the page-to-request desynchronization problem, particularly for OAuth2 account linking where standard CSRF protection is insufficient due to redirects to third-party providers.
 
@@ -63,8 +74,6 @@ And used in the OAuth2 account addition button:
     Add New OAuth2 Account
 </button>
 ```
-
-## Token Generation and Verification
 
 ### Token Generation
 
@@ -167,7 +176,7 @@ pub async fn verify_page_session_token(
 3. When the page session token is verified, it will not match what is expected for the current session
 4. The OAuth2 flow is rejected before it even starts, preventing incorrect account linkage
 
-## Integration with OAuth2 Flows
+## Phase 2: OAuth2 Flow Session Continuity
 
 ### Session Context Preservation
 
@@ -235,16 +244,7 @@ This approach ensures that:
 - Session changes during the OAuth2 process do not affect the final account linking
 - Continuous user context is maintained from flow initiation to completion
 
-## Key Security Characteristics
-
-### Phase-Specific Protection
-
-Each mechanism addresses a specific phase where session desynchronization can occur:
-
-| Phase | Mechanism | Purpose |
-|-------|-----------|---------|
-| Page load to request | Page session tokens | Detect session changes before OAuth2 redirect |
-| OAuth2 flow duration | Session context preservation | Maintain user identity through redirects |
+## Implementation Notes
 
 ### Early Detection
 
