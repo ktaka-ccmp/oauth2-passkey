@@ -8,6 +8,8 @@ members = [
     "demo-passkey",
     "demo-profile",
     "demo-todo",
+    "mock-oidc",
+    "mock-oidc-core",
     "oauth2_passkey_axum",
     "oauth2_passkey",
 ]
