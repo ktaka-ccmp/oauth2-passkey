@@ -59,7 +59,7 @@ SESSION_AUTH_MODE='cookie'
 
 Add new configuration:
 
-```rust
+```rust,ignore
 /// Session authentication mode determining how sessions are identified
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SessionAuthMode {
@@ -91,7 +91,7 @@ pub static SESSION_AUTH_MODE: LazyLock<SessionAuthMode> = LazyLock::new(|| {
 
 Modify `get_session_id_from_headers()` to support Bearer token extraction:
 
-```rust
+```rust,ignore
 pub(crate) fn get_session_id_from_headers(
     headers: &HeaderMap,
 ) -> Result<Option<&str>, SessionError> {
@@ -136,7 +136,7 @@ fn get_session_id_from_cookie(headers: &HeaderMap) -> Result<Option<&str>, Sessi
 
 Add new function for Bearer mode responses:
 
-```rust
+```rust,ignore
 /// Response type for session creation
 pub enum SessionCreationResponse {
     /// Cookie-based: returns HeaderMap with Set-Cookie
@@ -177,7 +177,7 @@ pub(super) async fn create_new_session_with_uid(
 
 Update authentication completion handlers to return appropriate response format:
 
-```rust
+```rust,ignore
 // In OAuth2 callback handler
 match session_response {
     SessionCreationResponse::Cookie(headers) => {
@@ -196,7 +196,7 @@ match session_response {
 
 Update `AuthUser` extractor to support Bearer authentication:
 
-```rust
+```rust,ignore
 impl<B> FromRequestParts<B> for AuthUser
 where
     B: Send + Sync,

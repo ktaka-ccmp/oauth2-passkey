@@ -77,7 +77,7 @@ SESSION_COOKIE_DOMAIN='.example.com'  # Note the leading dot
 
 ### CORS Configuration (Axum)
 
-```rust
+```rust,ignore
 use tower_http::cors::{CorsLayer, Any};
 use http::{Method, header::{CONTENT_TYPE, AUTHORIZATION}};
 

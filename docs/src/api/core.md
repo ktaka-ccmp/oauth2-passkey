@@ -42,7 +42,7 @@ User account management module for storing, retrieving, updating, and deleting u
 
 ## Initialization
 
-```rust
+```rust,ignore
 use oauth2_passkey::init;
 
 #[tokio::main]

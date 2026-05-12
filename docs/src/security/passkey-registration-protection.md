@@ -76,7 +76,7 @@ Phase 2 protects the window between the server returning a registration challeng
 
 At `register/start`, the server stores a `SessionInfo { user }` entry in the cache, keyed by the generated `user_handle`:
 
-```rust
+```rust,ignore
 // oauth2_passkey/src/passkey/main/register.rs (in start_registration)
 let session_info = SessionInfo { user: u.clone() };
 store_cache_keyed::<_, PasskeyError>(
@@ -97,7 +97,7 @@ The browser invokes `navigator.credentials.create()` with the challenge, the use
 
 At `register/finish`, the server retrieves the `SessionInfo` stored under that `user_handle` and explicitly compares the stored user ID to the current session's user ID:
 
-```rust
+```rust,ignore
 // oauth2_passkey/src/passkey/main/register.rs
 // (in verify_session_then_finish_registration)
 if session_user.id != session_info.user.id {

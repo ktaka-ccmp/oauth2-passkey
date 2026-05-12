@@ -251,7 +251,7 @@ These improvements would enhance the maintainability, security, and user experie
 - Fix: add O2P_ROUTE_PREFIX to "fetch('/summary/user-info', {"
 - Currently if a user is showing two pages, the one for index page for unauthenticated user and the one for summary page for authenticated user, then tries to create a new user with a new passkey in the first page, the passkey will be registered for the authenticated user in the second page.
   - Fixed by checking if the user isn't authenticated
-```rust
+```rust,ignore
 						match auth_user {
 								Some(_) => return Err(CoordinationError::UnexpectedlyAuthorized.log()),
 								None => {}

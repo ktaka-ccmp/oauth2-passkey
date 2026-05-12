@@ -95,7 +95,7 @@ The TPMS_CERTIFY_INFO structure contains:
 
 The name field in the TPMS_CERTIFY_INFO structure is a hash of the pubArea using the nameAlg algorithm. The verification process includes:
 
-```rust
+```rust,ignore
 // Extract the name algorithm from pubArea
 let _name_alg = u16::from_be_bytes([pub_area[2], pub_area[3]]);
 

@@ -81,7 +81,7 @@ From the authenticator's perspective, these appear as **three different users** 
 
 **Source**: `oauth2_passkey/src/passkey/main/register.rs` lines 64-71
 
-```rust
+```rust,ignore
 if *PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL {
     let new_handle = gen_random_string(32)?;
     tracing::debug!(
@@ -116,7 +116,7 @@ From the authenticator's perspective, these all belong to **the same user**.
 
 **Source**: `oauth2_passkey/src/passkey/main/register.rs` lines 73-110
 
-```rust
+```rust,ignore
 // Otherwise, follow the normal logic of reusing handles for logged-in users
 if let Some(user) = session_user {
     let existing_credentials =
@@ -139,7 +139,7 @@ When `false`, the library performs cleanup during registration to enforce the on
 
 **Source**: `oauth2_passkey/src/passkey/main/register.rs` lines 345-422
 
-```rust
+```rust,ignore
 if !*PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL {
     // Find credentials with matching user_handle
     let credentials_with_matching_handle =
@@ -486,7 +486,7 @@ After successful authentication, the server returns:
 
 **Source**: `oauth2_passkey/src/coordination/passkey.rs`
 
-```rust
+```rust,ignore
 pub struct AuthenticationResponse {
     pub name: String,
     pub user_handle: String,
@@ -518,7 +518,7 @@ After deleting a credential, the server returns:
 
 **Source**: `oauth2_passkey/src/coordination/passkey.rs`
 
-```rust
+```rust,ignore
 pub struct DeleteCredentialResponse {
     pub remaining_credential_ids: Vec<String>,
     pub user_handle: String,

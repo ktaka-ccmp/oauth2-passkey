@@ -15,7 +15,7 @@ The oauth2-passkey library requires consistent key pairs for testing to ensure:
 
 The key pair was generated using a small Rust program with the Ring cryptography library:
 
-```rust
+```rust,ignore
 // key_generator.rs - One-time key generation program
 use ring::{rand, signature};
 
@@ -53,7 +53,7 @@ This program was run once to generate the fixed key pair used throughout the tes
 
 The generated private key is stored in PKCS#8 DER format (131 bytes):
 
-```rust
+```rust,ignore
 const FIRST_USER_PRIVATE_KEY: &[u8] = &[
     // PKCS#8 PrivateKeyInfo structure (ASN.1 DER encoded)
     48, 129, 135,           // SEQUENCE, 135 bytes total
@@ -98,7 +98,7 @@ Public Key = Private Key × Generator Point (on P-256 curve)
 ## Implementation Details
 
 ### Private Key Usage (fixtures.rs)
-```rust
+```rust,ignore
 pub fn first_user_key_pair() -> Vec<u8> {
     // Fixed private key (PKCS#8 DER format) that corresponds to the public key used in test_utils.rs
     // This ensures signature verification works between credential storage and authentication
@@ -109,7 +109,7 @@ pub fn first_user_key_pair() -> Vec<u8> {
 ```
 
 ### Public Key Usage (test_utils.rs)
-```rust
+```rust,ignore
 fn generate_first_user_public_key() -> String {
     // Fixed public key that corresponds to FIRST_USER_PRIVATE_KEY in integration tests
     // Generated using the same key pair to ensure signature verification works

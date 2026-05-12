@@ -13,7 +13,7 @@ This document captures detailed insights and lessons learned from implementing a
 - Error: `tokio_test` crate wasn't available as a dependency
 
 **Solution:**
-```rust
+```rust,ignore
 // Changed from:
 #[test]
 fn test_extract_credential_public_key_success() {
@@ -72,7 +72,7 @@ async fn test_extract_credential_public_key_success() {
 - WebAuthn requires User Verification flag when user verification is performed
 
 **Solution:**
-```rust
+```rust,ignore
 // Changed from:
 auth_data.push(0x41); // user present + attested credential data
 
@@ -127,7 +127,7 @@ The fundamental issue was not just missing initialization, but **database connec
 Instead of repeating explicit store initialization in every test, we created a better approach:
 
 **New Pattern (`init_test_environment_with_db()`):**
-```rust
+```rust,ignore
 #[serial] // or #[tokio::test]
 #[tokio::test]
 async fn test_name() {
@@ -144,7 +144,7 @@ This function:
 3. Makes the intent clear and reduces code duplication
 
 **Legacy Pattern (still works but verbose):**
-```rust
+```rust,ignore
 #[serial]
 #[tokio::test]
 async fn test_name() {
@@ -172,7 +172,7 @@ We applied the working pattern to all failing tests:
 
 ### Store Initialization Pattern
 
-```rust
+```rust,ignore
 // Explicitly ensure tables exist for this test's connection
 // This is necessary for in-memory databases where each test may get a fresh instance
 UserStore::init()
@@ -209,7 +209,7 @@ The in-memory SQLite configuration, while excellent for test isolation and speed
 
 **Always include explicit store initialization** in tests that interact with the database:
 
-```rust
+```rust,ignore
 #[serial]
 #[tokio::test]
 async fn test_function() {
@@ -228,7 +228,7 @@ async fn test_function() {
 
 Use timestamp-based unique identifiers to prevent test interference:
 
-```rust
+```rust,ignore
 let timestamp = chrono::Utc::now().timestamp_millis();
 let user_id = format!("test-user-{}", timestamp);
 ```
@@ -237,7 +237,7 @@ let user_id = format!("test-user-{}", timestamp);
 
 Include cleanup logic where appropriate:
 
-```rust
+```rust,ignore
 // Clean up - delete test data
 UserStore::delete_user(&user_id).await.ok();
 ```
@@ -246,7 +246,7 @@ UserStore::delete_user(&user_id).await.ok();
 
 Use `#[serial]` for tests that share database state:
 
-```rust
+```rust,ignore
 #[serial]
 #[tokio::test]
 async fn test_function() {

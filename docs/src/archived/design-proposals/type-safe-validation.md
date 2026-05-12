@@ -26,7 +26,7 @@ The type-safe validation system was implemented to address critical security and
 #### `SessionId`
 Type-safe wrapper for session identifiers used in coordination layer functions.
 
-```rust
+```rust,ignore
 use oauth2_passkey::SessionId;
 
 // Create from string
@@ -39,7 +39,7 @@ let users = get_all_users(session_id).await?;
 #### `UserId`
 Type-safe wrapper for user identifiers to prevent mixing up with other ID types.
 
-```rust
+```rust,ignore
 use oauth2_passkey::UserId;
 
 let user_id = UserId::new("user_123".to_string());
@@ -49,7 +49,7 @@ let user = get_user(session_id, user_id).await?;
 #### `SessionCookie`
 Type-safe wrapper for HTTP session cookies with validation.
 
-```rust
+```rust,ignore
 use oauth2_passkey::SessionCookie;
 
 // Validates length (10-1024 chars) and safe characters
@@ -62,7 +62,7 @@ let user = get_user_from_session(&cookie).await?;
 #### `CredentialId`
 Type-safe wrapper for passkey credential identifiers.
 
-```rust
+```rust,ignore
 use oauth2_passkey::CredentialId;
 
 let cred_id = CredentialId::new("credential_abc".to_string());
@@ -72,7 +72,7 @@ let result = delete_credential(session_id, cred_id).await?;
 #### `UserHandle`
 Type-safe wrapper for WebAuthn user handles.
 
-```rust
+```rust,ignore
 use oauth2_passkey::UserHandle;
 
 let handle = UserHandle::new("user_handle_123".to_string());
@@ -81,7 +81,7 @@ let handle = UserHandle::new("user_handle_123".to_string());
 #### `UserName`
 Type-safe wrapper for usernames.
 
-```rust
+```rust,ignore
 use oauth2_passkey::UserName;
 
 let username = UserName::new("alice".to_string());
@@ -90,7 +90,7 @@ let username = UserName::new("alice".to_string());
 #### `ChallengeType`
 Type-safe wrapper for WebAuthn challenge types with validation.
 
-```rust
+```rust,ignore
 use oauth2_passkey::ChallengeType;
 
 // Validates against known challenge types
@@ -104,7 +104,7 @@ let auth_challenge = ChallengeType::authentication();
 #### `ChallengeId`
 Type-safe wrapper for challenge identifiers.
 
-```rust
+```rust,ignore
 use oauth2_passkey::ChallengeId;
 
 let challenge_id = ChallengeId::new("challenge_xyz".to_string())?;
@@ -115,7 +115,7 @@ let challenge_id = ChallengeId::new("challenge_xyz".to_string())?;
 #### `OAuth2State`
 Type-safe wrapper for OAuth2 state parameters with comprehensive validation.
 
-```rust
+```rust,ignore
 use oauth2_passkey::OAuth2State;
 
 // Validates base64url encoding, JSON structure, length limits
@@ -126,7 +126,7 @@ let decoded = decode_state(&state)?;
 #### `AccountId`
 Type-safe wrapper for OAuth2 account identifiers.
 
-```rust
+```rust,ignore
 use oauth2_passkey::AccountId;
 
 let account_id = AccountId::new("account_123".to_string());
@@ -135,7 +135,7 @@ let account_id = AccountId::new("account_123".to_string());
 #### `Provider`
 Type-safe wrapper for OAuth2 provider names.
 
-```rust
+```rust,ignore
 use oauth2_passkey::Provider;
 
 let provider = Provider::new("google".to_string());
@@ -144,7 +144,7 @@ let provider = Provider::new("google".to_string());
 #### `ProviderUserId`
 Type-safe wrapper for provider-specific user identifiers.
 
-```rust
+```rust,ignore
 use oauth2_passkey::ProviderUserId;
 
 let provider_user_id = ProviderUserId::new("google_123456".to_string());
@@ -153,7 +153,7 @@ let provider_user_id = ProviderUserId::new("google_123456".to_string());
 #### `DisplayName`
 Type-safe wrapper for user display names.
 
-```rust
+```rust,ignore
 use oauth2_passkey::DisplayName;
 
 let name = DisplayName::new("Alice Smith".to_string());
@@ -162,7 +162,7 @@ let name = DisplayName::new("Alice Smith".to_string());
 #### `Email`
 Type-safe wrapper for email addresses.
 
-```rust
+```rust,ignore
 use oauth2_passkey::Email;
 
 let email = Email::new("alice@example.com".to_string());
@@ -173,7 +173,7 @@ let email = Email::new("alice@example.com".to_string());
 #### `CachePrefix`
 Type-safe wrapper for cache namespace prefixes with validation.
 
-```rust
+```rust,ignore
 use oauth2_passkey::CachePrefix;
 
 // Validates length, safe characters, prevents Redis injection
@@ -187,7 +187,7 @@ let oauth2_prefix = CachePrefix::oauth2();
 #### `CacheKey`
 Type-safe wrapper for cache entry keys with validation.
 
-```rust
+```rust,ignore
 use oauth2_passkey::CacheKey;
 
 // Same validation as CachePrefix
@@ -199,7 +199,7 @@ let key = CacheKey::new("user_123_token".to_string())?;
 ### `CredentialSearchField`
 Type-safe search operations for passkey credentials.
 
-```rust
+```rust,ignore
 use oauth2_passkey::{CredentialSearchField, CredentialId, UserId, UserHandle, UserName};
 
 // Search by different field types - compile-time type safety
@@ -214,7 +214,7 @@ let credentials = PasskeyStore::get_credentials_by(by_user_id).await?;
 ### `AccountSearchField`
 Type-safe search operations for OAuth2 accounts.
 
-```rust
+```rust,ignore
 use oauth2_passkey::{AccountSearchField, AccountId, UserId, Provider, Email};
 
 let by_account_id = AccountSearchField::Id(account_id);
@@ -258,7 +258,7 @@ This approach provides maximum security with optimal performance for authenticat
 ### Coordination Layer Functions
 All coordination functions require typed parameters:
 
-```rust
+```rust,ignore
 // Admin functions
 get_all_users(session_id: SessionId) -> Result<Vec<User>, CoordinationError>
 get_user(session_id: SessionId, user_id: UserId) -> Result<Option<User>, CoordinationError>
@@ -269,7 +269,7 @@ get_user_credentials(session_id: SessionId, user_id: UserId) -> Result<Vec<Passk
 ```
 
 ### Session Management
-```rust
+```rust,ignore
 // Session validation
 get_user_from_session(session_cookie: &SessionCookie) -> Result<SessionUser, SessionError>
 
@@ -278,7 +278,7 @@ get_csrf_token_from_session(session_cookie: &str) -> Result<CsrfToken, SessionEr
 ```
 
 ### OAuth2 Operations
-```rust
+```rust,ignore
 // State parameter handling
 encode_state(params: StateParams) -> Result<OAuth2State, OAuth2Error>
 decode_state(state: &OAuth2State) -> Result<StateParams, OAuth2Error>
@@ -288,7 +288,7 @@ OAuth2Store::get_accounts_by(search_field: AccountSearchField) -> Result<Vec<OAu
 ```
 
 ### Cache Operations
-```rust
+```rust,ignore
 // Unified cache operations with type safety
 store_cache_auto(prefix: CachePrefix, data: T, ttl: u64) -> Result<String, E>
 store_cache_keyed(prefix: CachePrefix, key: CacheKey, data: T, ttl: u64) -> Result<(), E>
@@ -299,7 +299,7 @@ get_data(prefix: CachePrefix, key: CacheKey) -> Result<Option<T>, E>
 
 All typed constructors can fail with validation errors:
 
-```rust
+```rust,ignore
 // Handle validation errors
 match SessionCookie::new(cookie_value.to_string()) {
     Ok(cookie) => {
@@ -343,7 +343,7 @@ match OAuth2State::new(state_param.to_string()) {
 
 When updating code that uses raw strings:
 
-```rust
+```rust,ignore
 // Before (vulnerable to parameter confusion)
 let credentials = PasskeyStore::get_credentials_by(
     CredentialSearchField::UserId(user_id.to_string())

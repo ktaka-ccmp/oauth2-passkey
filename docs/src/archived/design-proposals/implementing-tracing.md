@@ -77,7 +77,7 @@ Add `#[tracing::instrument]` attributes to key functions:
 
 #### Coordination Layer Functions
 
-```rust
+```rust,ignore
 // oauth2_passkey/src/coordination/oauth2.rs
 #[tracing::instrument(skip(coordination), fields(user_id, provider = "google"))]
 pub async fn authorized_core(
@@ -112,7 +112,7 @@ pub async fn process_oauth2_authorization(
 
 #### Passkey Authentication Functions
 
-```rust
+```rust,ignore
 // oauth2_passkey/src/coordination/passkey.rs
 #[tracing::instrument(skip(coordination), fields(user_id))]
 pub async fn start_registration_flow(
@@ -156,7 +156,7 @@ pub async fn finish_authentication_flow(
 
 #### Session Management Functions
 
-```rust
+```rust,ignore
 // oauth2_passkey/src/session/main/session.rs
 #[tracing::instrument(skip(cache))]
 pub(super) async fn create_session(
@@ -188,7 +188,7 @@ pub(super) async fn prepare_logout_response(
 
 #### User Management Functions
 
-```rust
+```rust,ignore
 // oauth2_passkey/src/coordination/user.rs
 #[tracing::instrument(skip(coordination), fields(user_id = %user_id))]
 pub async fn update_user_account(
@@ -215,7 +215,7 @@ pub async fn delete_user_account(
 
 Update `oauth2_passkey_axum/src/lib.rs`:
 
-```rust
+```rust,ignore
 use tower_http::trace::{TraceLayer, DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse};
 use tower_http::LatencyUnit;
 use tracing::Level;
@@ -242,7 +242,7 @@ pub fn create_router_with_tracing() -> Router {
 
 Create enhanced error handling with `tracing-error`:
 
-```rust
+```rust,ignore
 // oauth2_passkey/src/error/coordination.rs
 use tracing_error::ErrorExt;
 
@@ -286,7 +286,7 @@ return Err(CoordinationError::InvalidState.log());
 
 Tracing automatically measures span duration, so manual timing is unnecessary:
 
-```rust
+```rust,ignore
 // oauth2_passkey/src/userdb/storage/store_type.rs
 impl UserStore {
     #[tracing::instrument(fields(user_id = %id))]
@@ -321,7 +321,7 @@ The span duration is automatically included in structured logs as `time.busy` an
 
 Update demo applications with comprehensive tracing:
 
-```rust
+```rust,ignore
 // demo-*/src/server.rs
 pub(crate) fn init_tracing(app_name: &str) {
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, fmt, EnvFilter};

@@ -75,7 +75,7 @@ Display name + icon in templates
 
 The AAGUID lookup is implemented in `oauth2_passkey/src/passkey/main/aaguid.rs`:
 
-```rust
+```rust,ignore
 // Embedded fallback data
 const AAGUID_JSON: &str = include_str!("../../../assets/aaguid.json");
 
@@ -88,7 +88,7 @@ pub async fn get_authenticator_info(aaguid: &str) -> Result<Option<Authenticator
 
 ### Data Structure
 
-```rust
+```rust,ignore
 pub struct AuthenticatorInfo {
     pub name: String,           // e.g., "Google Password Manager"
     pub icon_dark: Option<String>,  // Base64-encoded SVG for dark theme

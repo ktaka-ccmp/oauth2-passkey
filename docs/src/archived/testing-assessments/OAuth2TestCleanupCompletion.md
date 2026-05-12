@@ -52,7 +52,7 @@ The codebase implements sophisticated OAuth2 security with dynamic SameSite cook
 
 **Implementation Location**: `/oauth2_passkey/src/oauth2/main/core.rs`
 
-```rust
+```rust,ignore
 let samesite = match OAUTH2_RESPONSE_MODE.to_lowercase().as_str() {
     "form_post" => "None",    // Cross-origin POST requires None
     "query" => "Lax",         // Redirect can use safer Lax

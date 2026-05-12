@@ -22,7 +22,7 @@ The current OAuth2 account linking implementation creates a significant barrier 
 
 ## Current Implementation Example
 
-```rust
+```rust,ignore
 // Server-side: Multiple endpoints and complex logic
 async fn get_csrf_token(auth_user: AuthUser) -> Json<Value> {
     Json(json!({"csrf_token": auth_user.csrf_token}))
@@ -74,7 +74,7 @@ async function linkGoogleAccount() {
 
 ### 1. One-Function Approach ⭐ **(Recommended)**
 
-```rust
+```rust,ignore
 // Instead of complex multi-step process:
 let link_url = auth_user.create_oauth2_link_url("google").await?;
 // Returns secure URL with all complexity handled internally
@@ -87,7 +87,7 @@ let link_url = auth_user.create_oauth2_link_url("google").await?;
 
 ### 2. Builder Pattern with Sensible Defaults
 
-```rust
+```rust,ignore
 let link_url = OAuth2AccountLinker::new(&auth_user)
     .provider("google")
     .build_link_url().await?;
@@ -107,7 +107,7 @@ let link_url = OAuth2AccountLinker::new(&auth_user)
 
 ### 3. Session-Aware Middleware
 
-```rust
+```rust,ignore
 // Middleware automatically handles session/CSRF complexity
 async fn link_oauth2_handler(
     Extension(oauth2_linker): Extension<OAuth2Linker>,
@@ -125,7 +125,7 @@ async fn link_oauth2_handler(
 
 ### 4. Trait-Based Approach
 
-```rust
+```rust,ignore
 impl OAuth2Linkable for AuthUser {
     async fn link_google_account(&self) -> Result<String, Error>;
     async fn link_github_account(&self) -> Result<String, Error>;
@@ -140,7 +140,7 @@ impl OAuth2Linkable for AuthUser {
 
 ### 5. Embedded JavaScript Helper
 
-```rust
+```rust,ignore
 // Server provides JS snippet that handles everything
 async fn oauth2_linking_script(auth_user: AuthUser) -> JavaScript {
     generate_oauth2_linking_script(&auth_user).await
@@ -166,7 +166,7 @@ The most intuitive solution combines the one-function approach with trait-based 
 
 ### Server-Side Implementation
 
-```rust
+```rust,ignore
 // Simple, secure API
 async fn add_google_account(auth_user: AuthUser) -> impl IntoResponse {
     match auth_user.create_oauth2_link_url("google").await {
@@ -228,7 +228,7 @@ The complexity should be hidden from the user, not eliminated from the implement
 **Reduce implementation from 50+ lines to 5-10 lines while maintaining all security guarantees.**
 
 ### Before (Current)
-```rust
+```rust,ignore
 // ~50+ lines of complex coordination
 async fn link_oauth2_account() {
     // Multiple API calls, token management, URL construction, etc.
@@ -236,7 +236,7 @@ async fn link_oauth2_account() {
 ```
 
 ### After (Proposed)
-```rust
+```rust,ignore
 // ~5 lines of simple, secure code
 async fn link_oauth2_account(auth_user: AuthUser) -> impl IntoResponse {
     match auth_user.create_oauth2_link_url("google").await {
