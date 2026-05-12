@@ -26,7 +26,7 @@ The OAuth2 module contains a mix of excellent business logic tests and problemat
 #### 1. Meaningless Tests (Should be Removed)
 
 **A. Trivial Serialization Tests** (`oauth2/types.rs`)
-```rust
+```rust,ignore
 #[test]
 fn test_oauth2_mode_serde() {
     let mode = OAuth2Mode::AddToUser;
@@ -37,7 +37,7 @@ fn test_oauth2_mode_serde() {
 **Problem**: Tests serde derive functionality that's already tested by the serde library.
 
 **B. Error Display String Tests** (`oauth2/errors.rs`)
-```rust
+```rust,ignore
 #[test]
 fn test_error_display() {
     let err = OAuth2Error::Storage("storage error".to_string());
@@ -48,7 +48,7 @@ fn test_error_display() {
 **Problem**: Tests `Display` trait implementations that are simple string formatting.
 
 **C. Basic Type Conversion Tests** (`oauth2/types.rs`)
-```rust
+```rust,ignore
 #[test]
 fn test_oauth2_mode_as_str() {
     assert_eq!(OAuth2Mode::AddToUser.as_str(), "add_to_user");
@@ -60,7 +60,7 @@ fn test_oauth2_mode_as_str() {
 #### 2. Flaky Environment Variable Tests
 
 **Unsafe Environment Manipulation** (`oauth2/config.rs`)
-```rust
+```rust,ignore
 fn with_env_var<F>(key: &str, value: Option<&str>, test: F) {
     unsafe {
         match value {
@@ -81,7 +81,7 @@ fn with_env_var<F>(key: &str, value: Option<&str>, test: F) {
 #### 3. Overengineered Mock Infrastructure
 
 **Complex Mock Classes** (`oauth2/main/core.rs`)
-```rust
+```rust,ignore
 struct MockTokenStore {
     tokens: std::collections::HashMap<String, StoredToken>,
 }
@@ -99,7 +99,7 @@ struct TestContext { /* 8 configuration fields */ }
 ### ✅ Excellent Tests (Keep These Patterns)
 
 #### 1. Security-Critical Business Logic
-```rust
+```rust,ignore
 #[tokio::test]
 async fn test_csrf_checks_token_mismatch() {
     // Tests actual CSRF protection logic
@@ -109,7 +109,7 @@ async fn test_csrf_checks_token_mismatch() {
 ```
 
 #### 2. Integration Tests with Real Stores
-```rust
+```rust,ignore
 #[tokio::test]
 async fn test_upsert_oauth2_account_create() {
     init_test_environment().await;
@@ -120,7 +120,7 @@ async fn test_upsert_oauth2_account_create() {
 ```
 
 #### 3. WebAuthn/OAuth2 Protocol Tests
-```rust
+```rust,ignore
 #[tokio::test]
 async fn test_verify_nonce_success() {
     // Tests actual protocol implementation
@@ -161,7 +161,7 @@ right: "https://custom.oauth.com/auth"
 **Target**: Refactor ~30 tests
 
 **Replace**:
-```rust
+```rust,ignore
 // OLD: Complex mock infrastructure
 let mock_store = MockTokenStore::new();
 let mock_cookies = MockCookie::new();
@@ -169,7 +169,7 @@ let test_ctx = TestContext::default();
 ```
 
 **With**:
-```rust
+```rust,ignore
 // NEW: Real in-memory stores
 init_test_environment().await;
 let token = OAuth2Store::generate_and_store_token("csrf", 3600).await?;

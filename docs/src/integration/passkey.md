@@ -569,7 +569,7 @@ Conditional UI allows passkeys to appear in the browser's autofill dropdown. Thi
 
 The passkey routes are provided by the `oauth2_passkey_axum` crate:
 
-```rust
+```rust,ignore
 use axum::Router;
 use oauth2_passkey_axum::oauth2_passkey_full_router;
 
@@ -602,7 +602,7 @@ The passkey router provides these endpoints:
 
 The HTTP handlers delegate to coordination layer functions:
 
-```rust
+```rust,ignore
 // Start registration handler
 async fn handle_start_registration(
     auth_user: Option<AuthUser>,
@@ -635,7 +635,7 @@ WebAuthn supports related origins through a well-known endpoint. When using `oau
 
 For manual setup with `oauth2_passkey_router()`, mount it at the root:
 
-```rust
+```rust,ignore
 use oauth2_passkey_axum::{oauth2_passkey_router, passkey_well_known_router, O2P_ROUTE_PREFIX};
 
 let app = Router::new()
@@ -680,7 +680,7 @@ PASSKEY_USER_VERIFICATION=preferred
 
 Stored credential information:
 
-```rust
+```rust,ignore
 pub struct PasskeyCredential {
     /// Raw credential ID (base64url encoded)
     pub credential_id: String,
@@ -705,7 +705,7 @@ pub struct PasskeyCredential {
 
 The library uses type-safe wrappers for identifiers:
 
-```rust
+```rust,ignore
 // Credential ID with validation
 let credential_id = CredentialId::new("abc123...".to_string())?;
 
@@ -752,7 +752,7 @@ User handles are random identifiers that:
 
 A complete demo application is available in `demo-passkey/`:
 
-```rust
+```rust,ignore
 use oauth2_passkey_axum::{AuthUser, oauth2_passkey_full_router};
 
 #[tokio::main]

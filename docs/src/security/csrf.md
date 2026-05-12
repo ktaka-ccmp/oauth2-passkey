@@ -19,7 +19,7 @@ Choose the method that best fits your application:
 
 **Best for:** Traditional web apps, server-side rendering
 
-```rust
+```rust,ignore
 // Pass token to your template
 async fn page_handler(user: AuthUser) -> impl IntoResponse {
     HtmlTemplate::render("page.j2", json!({
@@ -114,7 +114,7 @@ When using `X-CSRF-Token` header:
 
 HTML forms cannot include custom headers, so the `X-CSRF-Token` header won't be present. **You must verify the form token manually:**
 
-```rust
+```rust,ignore
 // In your handler - check if manual verification is needed
 if !auth_user.csrf_via_header_verified {
     // Verify form token manually
@@ -131,7 +131,7 @@ if !auth_user.csrf_via_header_verified {
 
 Always use constant-time comparison (`ct_eq`) when manually verifying CSRF tokens to prevent timing attacks:
 
-```rust
+```rust,ignore
 use subtle::ConstantTimeEq;
 
 // ✅ Good - constant-time comparison

@@ -22,7 +22,7 @@ OAuth2 account linking allows users to connect multiple OAuth2/OpenID Connect ac
 
 First, you need to retrieve the CSRF token from the user's active session. The library provides an endpoint for this:
 
-```rust
+```rust,ignore
 // In your Axum handler
 async fn get_csrf_token(auth_user: AuthUser) -> Result<Json<Value>, (StatusCode, String)> {
     Ok(Json(json!({
@@ -35,7 +35,7 @@ async fn get_csrf_token(auth_user: AuthUser) -> Result<Json<Value>, (StatusCode,
 
 Use the CSRF token to generate a page session token that will be used for session boundary protection:
 
-```rust
+```rust,ignore
 use oauth2_passkey::generate_page_session_token;
 
 // Generate page session token from CSRF token
@@ -143,7 +143,7 @@ linker.linkAccount('google')
 
 If you're not using the `oauth2_passkey_axum` crate, you'll need to implement the OAuth2 linking handler:
 
-```rust
+```rust,ignore
 use oauth2_passkey::{
     prepare_oauth2_auth_request,
     verify_page_session_token,
@@ -195,7 +195,7 @@ Here's a complete example showing how to implement OAuth2 account linking in a u
 
 ### Server-Side (Rust + Axum)
 
-```rust
+```rust,ignore
 use askama::Template;
 use axum::{
     extract::Query,

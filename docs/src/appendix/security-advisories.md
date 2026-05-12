@@ -44,7 +44,7 @@ The Marvin Attack is a potential key recovery attack through timing side-channel
 #### Migration Details
 
 **Before (Vulnerable Pattern):**
-```rust
+```rust,ignore
 // Used rsa crate directly
 let rsa_public_key = RsaPublicKey::new(
     rsa::BigUint::from_bytes_be(&n),
@@ -55,7 +55,7 @@ Ok(DecodingKey::from_rsa_pem(pem.as_bytes())?)
 ```
 
 **After (Secure Pattern):**
-```rust
+```rust,ignore
 // Uses jsonwebtoken's built-in RSA support
 Ok(DecodingKey::from_rsa_components(n, e)?)
 ```

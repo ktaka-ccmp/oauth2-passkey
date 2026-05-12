@@ -122,7 +122,7 @@ We'll follow a bottom-up testing approach, starting with the most fundamental mo
 ## Test Structure
 
 ### Unit Tests
-```rust
+```rust,ignore
 #[cfg(test)]
 mod tests {
     use super::*;

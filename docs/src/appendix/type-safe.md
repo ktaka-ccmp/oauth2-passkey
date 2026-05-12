@@ -4,7 +4,7 @@
 
 In authentication code, many values are plain strings: user IDs, session IDs, credential IDs, email addresses, and so on. When functions accept raw `String` parameters, the compiler cannot tell them apart. This leads to a class of bugs where values are accidentally swapped:
 
-```rust
+```rust,ignore
 // Both parameters are String — the compiler accepts this without complaint
 fn delete_credential(session_id: String, credential_id: String) { /* ... */ }
 
@@ -16,7 +16,7 @@ This is especially dangerous in authentication systems where such a mix-up can c
 
 **Type-safe validation** solves this by wrapping each string in a dedicated type (the "newtype pattern" in Rust):
 
-```rust
+```rust,ignore
 // Each type is a thin wrapper around String
 pub struct SessionId(String);
 pub struct CredentialId(String);
@@ -53,7 +53,7 @@ By wrapping each identifier in its own type, these issues are caught at the poin
 
 All types follow the same newtype pattern. Here is the full implementation of `SessionId` as a representative example:
 
-```rust
+```rust,ignore
 pub struct SessionId(String);  // Private inner field -- cannot be constructed directly
 
 impl SessionId {
@@ -78,7 +78,7 @@ Every type below works the same way: `new()` validates and returns `Result`, `as
 
 ### Session & User Management
 
-```rust
+```rust,ignore
 // SessionId: session identifiers for coordination layer functions
 // Length: 10-256 | Chars: a-zA-Z0-9 - _ . ~ | Error: SessionError
 pub struct SessionId(String);
@@ -93,7 +93,7 @@ pub struct SessionCookie(String);
 ```
 
 Usage:
-```rust
+```rust,ignore
 let session_id = SessionId::new("session_abc123".to_string())?;
 let user_id = UserId::new("user_123".to_string())?;
 let user = get_user(session_id, user_id).await?;
@@ -104,7 +104,7 @@ let user = get_user_from_session(&cookie).await?;
 
 ### WebAuthn/Passkey Types
 
-```rust
+```rust,ignore
 // CredentialId: passkey credential identifiers (base64url-encoded)
 // Length: 10-1024 | Chars: a-zA-Z0-9 - _ . ~ = + / | Error: PasskeyError
 pub struct CredentialId(String);
@@ -129,7 +129,7 @@ pub struct ChallengeId(String);
 ```
 
 Usage:
-```rust
+```rust,ignore
 let cred_id = CredentialId::new("credential_abc123".to_string())?;
 delete_credential(session_id, cred_id).await?;
 
@@ -140,7 +140,7 @@ let challenge_type = ChallengeType::registration(); // convenience constructor, 
 
 ### OAuth2 Types
 
-```rust
+```rust,ignore
 // OAuth2State: OAuth2 state parameter carrying CSRF protection data
 // Length: 10-8192 | Error: OAuth2Error
 // Multi-layer validation: base64url decode -> UTF-8 check -> JSON parse as StateParams
@@ -169,7 +169,7 @@ pub struct Email(String);
 ```
 
 Usage:
-```rust
+```rust,ignore
 let state = OAuth2State::new(state_param.to_string())?; // validates base64url -> UTF-8 -> JSON
 let decoded = decode_state(&state)?;
 
@@ -179,7 +179,7 @@ let email = Email::new("alice@example.com".to_string())?;
 
 ### Cache & Storage Types
 
-```rust
+```rust,ignore
 // CachePrefix and CacheKey share identical validation logic.
 // Both are designed to prevent Redis command injection.
 //
@@ -198,7 +198,7 @@ pub struct CacheKey(String);
 ```
 
 Usage:
-```rust
+```rust,ignore
 // From string (with validation)
 let prefix = CachePrefix::new("custom_prefix".to_string())?;
 
@@ -211,14 +211,14 @@ let csrf_prefix = CachePrefix::csrf();
 
 Database queries often need to search by different fields. Without type safety, you might write:
 
-```rust
+```rust,ignore
 // Dangerous: which field does this string refer to? A user ID? An email? A credential ID?
 fn get_credentials(field_name: &str, value: &str) -> Vec<Credential> { /* ... */ }
 ```
 
 Search field enums combine the field selection and the typed value into a single type, so the compiler ensures you cannot pass an `Email` when searching by `CredentialId`:
 
-```rust
+```rust,ignore
 // Passkey credential searches
 pub enum CredentialSearchField {
     CredentialId(CredentialId),  // find by credential ID
@@ -239,7 +239,7 @@ pub enum AccountSearchField {
 ```
 
 Usage:
-```rust
+```rust,ignore
 // Each variant carries a validated typed value -- no raw strings anywhere
 let user_id = UserId::new("user_123".to_string())?;
 let credentials = PasskeyStore::get_credentials_by(
@@ -285,7 +285,7 @@ This approach provides maximum security with optimal performance for authenticat
 ### Coordination Layer Functions
 All coordination functions require typed parameters:
 
-```rust
+```rust,ignore
 // Admin functions
 get_all_users(session_id: SessionId) -> Result<Vec<User>, CoordinationError>
 get_user(session_id: SessionId, user_id: UserId) -> Result<Option<User>, CoordinationError>
@@ -296,7 +296,7 @@ get_user_credentials(session_id: SessionId, user_id: UserId) -> Result<Vec<Passk
 ```
 
 ### Session Management
-```rust
+```rust,ignore
 // Session validation
 get_user_from_session(session_cookie: &SessionCookie) -> Result<SessionUser, SessionError>
 
@@ -305,7 +305,7 @@ get_csrf_token_from_session(session_cookie: &str) -> Result<CsrfToken, SessionEr
 ```
 
 ### OAuth2 Operations
-```rust
+```rust,ignore
 // State parameter handling
 encode_state(params: StateParams) -> Result<OAuth2State, OAuth2Error>
 decode_state(state: &OAuth2State) -> Result<StateParams, OAuth2Error>
@@ -315,7 +315,7 @@ OAuth2Store::get_accounts_by(search_field: AccountSearchField) -> Result<Vec<OAu
 ```
 
 ### Cache Operations
-```rust
+```rust,ignore
 // Unified cache operations with type safety
 store_cache_auto(prefix: CachePrefix, data: T, ttl: u64) -> Result<String, E>
 store_cache_keyed(prefix: CachePrefix, key: CacheKey, data: T, ttl: u64) -> Result<(), E>
@@ -326,7 +326,7 @@ get_data(prefix: CachePrefix, key: CacheKey) -> Result<Option<T>, E>
 
 All typed constructors can fail with validation errors:
 
-```rust
+```rust,ignore
 // Handle validation errors
 match SessionCookie::new(cookie_value.to_string()) {
     Ok(cookie) => {
@@ -370,7 +370,7 @@ match OAuth2State::new(state_param.to_string()) {
 
 When migrating existing code from raw strings to typed wrappers, the change is straightforward. The key difference is that the typed version catches invalid input immediately and prevents parameter mix-ups at compile time:
 
-```rust
+```rust,ignore
 // Before: raw String — no validation, no type safety
 // A malicious or malformed user_id passes through silently.
 // Swapping user_id with another String parameter compiles without error.

@@ -13,7 +13,7 @@ This architectural duplication creates unnecessary complexity, potential race co
 
 ### Dual Expiration Logic
 
-```rust
+```rust,ignore
 // Session creation in oauth2_passkey/src/session/main/session.rs:47-61
 let expires_at = Utc::now() + Duration::seconds(*SESSION_COOKIE_MAX_AGE as i64);
 // ...
@@ -61,7 +61,7 @@ The current Redis Lua script (`oauth2_passkey/src/storage/cache_store/redis.rs:1
 ### Code Changes Required
 
 #### Before (Complex)
-```rust
+```rust,ignore
 async fn get_and_delete_if_expired(
     &mut self,
     prefix: CachePrefix,
@@ -73,7 +73,7 @@ async fn get_and_delete_if_expired(
 ```
 
 #### After (Simple)
-```rust
+```rust,ignore
 // Just use the existing get() method
 async fn get(
     &self,
@@ -87,7 +87,7 @@ async fn get(
 
 #### CacheData Structure Simplification
 
-```rust
+```rust,ignore
 // Before
 pub struct CacheData {
     pub value: String,
