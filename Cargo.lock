@@ -1808,14 +1808,22 @@ name = "mock-oidc"
 version = "0.6.2-dev"
 dependencies = [
  "axum",
+ "mock-oidc-core",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "mock-oidc-core"
+version = "0.6.2-dev"
+dependencies = [
+ "axum",
  "base64",
  "jsonwebtoken",
  "serde",
  "serde_json",
  "sha2 0.11.0",
- "tokio",
- "tracing",
- "tracing-subscriber",
  "uuid",
 ]
 
@@ -1967,6 +1975,7 @@ dependencies = [
  "dotenvy",
  "http",
  "jsonwebtoken",
+ "mock-oidc-core",
  "oauth2-passkey",
  "regex",
  "reqwest",

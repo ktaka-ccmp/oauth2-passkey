@@ -10,12 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 axum = { workspace = true }
-base64 = { workspace = true }
-jsonwebtoken = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-sha2 = { workspace = true }
+mock-oidc-core = { path = "../mock-oidc-core" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-uuid = { workspace = true }
