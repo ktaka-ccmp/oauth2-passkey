@@ -4,12 +4,12 @@
 
 - ID: 20260226-2018
 - Created: 2026-02-26-20-18
-- Closed:
-- Status: open
+- Closed: 2026-05-12-15-39
+- Status: wontfix
 - Priority: low
 - Difficulty: medium
 - Related Issues:
-  - `20260512-0335` POST-based OAuth2 account linking initiation (Alt 5B validation) (child — determines this issue's outcome)
+  - `20260512-0335` POST-based OAuth2 account linking initiation (Alt 5B validation) (child — closed as wontfix 2026-05-12, determined this issue's outcome)
 
 ## Problem
 
@@ -329,6 +329,73 @@ subsection. This work was tangential to the parent issue's scope
 The Always-section scope of this parent issue is unchanged; this
 entry records the side-effect for traceability.
 
+### 2026-05-12T15:39 — Decision: close as wontfix
+
+Closing the issue.
+
+Child `20260512-0335` (Alt 5B / POST-based linking validation)
+landed at commit `ca62953` end-to-end (env var
+`OAUTH2_LINKING_MODE`, `POST /oauth2/{provider}`,
+`POST /oauth2/select`, `select_provider.j2` branch,
+`oauth2.linkAccountPost` / `oauth2.startLinkingViaForm` JS API)
+and was then reverted at `f13d247` as wontfix. The negative
+result is preserved in dev's git history and the child issue's
+Timeline (T03:35 through T15:26). The conclusion was that POST
+mode delivers no meaningful value over GET — same security
+coverage, page_session_token still needed for the GET default,
+zero user-visible change at the built-in /user/account page,
+permanent two-path maintenance cost.
+
+That outcome also undermines this parent issue's framing. The
+parent originally claimed (per archived design proposal) that
+OAuth2 account linking required ~50+ lines of integration code
+and was "a key usability barrier for library adoption". The
+2026-05-12T02:46 re-evaluation entry already established that
+the 50+ figure came from an integration-test helper, not real
+application code: with the built-in `/user/account` page, a
+library user writes 0 lines; with a custom UI, ~3 lines. Alt
+5B was the strongest concrete remediation candidate this issue
+produced. Its failure isn't a setback for "simplify OAuth2
+linking" — it's evidence that there's no real complexity to
+simplify.
+
+The Latest Plan's "Always" section (docs restructure of
+`page-session.md` → `oauth2-linking-protection.md`) was
+already executed and merged via PR #341. The "If Alt 5B is
+no-go" fallback was a small free-function helper
+(`oauth2_link_url`) plus a custom-UI guide chapter; per the
+analysis above the helper saves ~1 line per custom-UI handler,
+which doesn't justify the public-API surface area, and the
+guide is something to write only if there's documented user
+demand. Neither will be acted on by this issue.
+
+What remains unaddressed in the broader "OAuth2 account
+linking" space — if any reader reaches this Timeline looking
+for follow-up work:
+
+- **No outstanding bugs.** Current GET-based flow is
+  production-tested via the demo apps and integration tests.
+- **No outstanding security issues.** GET-mode threat coverage
+  is documented in `docs/src/security/oauth2-linking-protection.md`
+  (the doc that this issue's "Always" section produced); Alt
+  5B was the alternative-architecture investigation and is now
+  closed out.
+- **No outstanding ergonomics issues.** The 3-line custom-UI
+  case is well within library conventions. If a future
+  contributor finds the friction worth removing they can open
+  a fresh issue with the concrete use case.
+
+Closing as `wontfix` rather than `completed` because nothing in
+the original Implementation Tasks list shipped on this issue
+specifically — Always-section docs work landed via the same
+branch but is attributed there; the conditional fallback is
+declined; Alt 5B (the actual exploration this issue spawned)
+went to its own issue and was closed wontfix.
+
+The Latest Plan below is left unchanged as a historical
+artifact of the design exploration. The authoritative outcome
+is in this Timeline entry and the Resolution section.
+
 ## Latest Plan
 
 Scope is split into work that proceeds regardless of Alt 5B's
@@ -446,3 +513,42 @@ Conditional on no-go fallback:
   against `demo-both`.
 
 ## Resolution
+
+Closed as `wontfix`. Full reasoning in Timeline entry
+2026-05-12T15:39.
+
+In short: the design exploration that this issue spawned
+concluded that OAuth2 account linking is not in fact complex
+enough to require simplification. Child issue `20260512-0335`
+prototyped the strongest concrete remediation candidate
+(POST-based linking, Alt 5B); it worked but added cost without
+net benefit and was reverted (commit `f13d247`, history
+preserved). The fallback "small helper + docs" path was also
+declined for the same reason — there's no observed friction
+that justifies expanding the public API.
+
+What did land from this issue's branch family:
+
+- Docs restructure: `page-session.md` was renamed to
+  `oauth2-linking-protection.md` with a two-phase conceptual
+  overview moved to the top (PR #341).
+- Sibling passkey doc: `passkey-registration-protection.md`
+  was authored as the parallel for passkey registration's
+  session-boundary protection (separate session, committed
+  via PR #341's branch).
+- Side findings extracted to their own issues:
+  - `20260512-0350` constant-time comparison fix (completed)
+  - `20260512-0351` archived-proposals status labeling
+    (completed)
+  - `20260512-0457` rust,ignore standardization across docs
+    (completed)
+- The archived design proposal itself
+  (`oauth2-account-linking-api-simplification.md`) was moved
+  to the "Superseded / Not Implemented" section of
+  `docs/src/archived/README.md` and got a Status notice
+  pointing at this issue and `20260512-0335`.
+
+Net effect on the codebase: pure improvements (docs hygiene,
+security policy compliance, design-proposal labeling
+correctness) plus a documented negative result. No
+user-facing API change.
