@@ -6,13 +6,12 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (10)
+### Open (9)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 | `20260226-1814` | high | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
-| `20260512-0335` | medium | medium | [POST-based OAuth2 account linking initiation (Alt 5B validation)](open/20260512-0335-post-based-oauth2-linking-validation.md) |
 | `20260226-2019` | medium | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
@@ -104,10 +103,11 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-09` | [Cross-Origin Same-Site Demo (Pattern 2)](completed/2026-01-30-cross-origin-same-site-demo.md) |
 | `2026-01-31-02` | [Remove HTTPS Support from Demo Apps](completed/2026-01-31-demo-remove-https.md) |
 
-### Wontfix (5)
+### Wontfix (6)
 
 | ID | Title |
 |----|-------|
+| `20260512-0335` | [POST-based OAuth2 account linking initiation (Alt 5B validation)](wontfix/20260512-0335-post-based-oauth2-linking-validation.md) |
 | `20260420-1458` | [Add GitHub as OAuth2 Provider (non-OIDC)](wontfix/20260420-1458-add-github-provider.md) |
 | `20260226-2023` | [Authentication Method Tracking in Session](wontfix/20260226-2023-auth-method-tracking-in-session.md) |
 | `20260226-2026` | [UI Improvements](wontfix/20260226-2026-ui-improvements.md) |

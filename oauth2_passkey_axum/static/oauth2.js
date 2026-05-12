@@ -173,100 +173,6 @@ const oauth2 = (function() {
         });
     }
 
-    // Bootstrap the popup-based OAuth2 account-linking flow via a form POST
-    // (Alt 5B with the `OAUTH2_LINKING_MODE=post` setting).
-    //
-    // The parent page declares a hidden <form> with method=POST, the matching
-    // target name, and the session csrf_token in a hidden input. This helper
-    // opens the popup synchronously inside the click handler (so popup
-    // blockers see a user gesture) and then submits the form to it.
-    //
-    // The server-side counterpart is `POST /oauth2/select`, which verifies
-    // the form-body csrf_token against the current session and renders the
-    // provider-select page. The session-boundary attack (page rendered as
-    // session A, clicked as session B) is detected here: the form carries
-    // the csrf_token captured at parent render time, and the server compares
-    // it against the cookie session at click time.
-    function startLinkingViaForm(formId, popupName) {
-        const name = popupName || 'PopupWindow';
-        const popup = window.open('about:blank', name,
-            'width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes');
-        if (!popup) {
-            console.log('Popup blocked');
-            return;
-        }
-        popupWindow = popup;
-
-        window.addEventListener('message', function(event) {
-            if (event.data === 'auth_complete') {
-                handlePopupClosed();
-            }
-        });
-
-        const form = document.getElementById(formId);
-        if (!form) {
-            console.error('startLinkingViaForm: form not found:', formId);
-            try { popup.close(); } catch (_) { /* COOP */ }
-            return;
-        }
-        form.submit();
-    }
-
-    // POST-based linking initiation (Alt 5B).
-    //
-    // Counterpart to openPopup(mode='add_to_user', ...) that does not
-    // require a page_session_token. Uses a CSRF-protected fetch POST
-    // to /oauth2/{provider}, then navigates a pre-opened popup to the
-    // returned OAuth2 authorization URL.
-    //
-    // The session-boundary attack (page rendered under session A,
-    // clicked under session B) is detected by the standard X-CSRF-Token
-    // header check on the POST: a JS-held token from session A's render
-    // won't match session B's CSRF, so the POST fails with 401.
-    async function linkAccountPost(provider, csrfToken) {
-        // 1. Open empty popup synchronously inside the click handler so
-        //    popup blockers see a user gesture. Must precede any await.
-        const popup = window.open('about:blank', 'PopupWindow',
-            'width=550,height=640,left=1000,top=200,resizable=yes,scrollbars=yes');
-        if (!popup) {
-            console.log('Popup blocked');
-            return;
-        }
-        popupWindow = popup;
-
-        // 2. Listen for the auth_complete message before navigating, so
-        //    we don't miss it if the IDP round-trip is fast.
-        window.addEventListener('message', function(event) {
-            if (event.data === 'auth_complete') {
-                handlePopupClosed();
-            }
-        });
-
-        try {
-            // 3. CSRF-protected POST. The existing AuthUser extractor on
-            //    the server verifies X-CSRF-Token against the session.
-            const response = await fetch(
-                `${O2P_ROUTE_PREFIX}/oauth2/${provider}`,
-                {
-                    method: 'POST',
-                    headers: { 'X-CSRF-Token': csrfToken },
-                    credentials: 'same-origin',
-                }
-            );
-            if (!response.ok) {
-                throw new Error(`POST /oauth2/${provider} failed: ${response.status}`);
-            }
-            const { auth_url } = await response.json();
-
-            // 4. Navigate the pre-opened popup to the OAuth2 IDP URL.
-            popup.location.href = auth_url;
-        } catch (e) {
-            try { popup.close(); } catch (_) { /* COOP */ }
-            console.error('linkAccountPost failed:', e);
-            throw e;
-        }
-    }
-
     function handlePopupClosed() {
         if (isReloading) return;  // Prevent multiple reloads
         isReloading = true;
@@ -298,7 +204,5 @@ const oauth2 = (function() {
     return {
         openPopup: openPopup,
         openSelectPopup: openSelectPopup,
-        linkAccountPost: linkAccountPost,
-        startLinkingViaForm: startLinkingViaForm,
     };
 })();

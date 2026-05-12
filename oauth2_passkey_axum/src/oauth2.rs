@@ -8,7 +8,6 @@ use axum::{
 };
 use axum_extra::{TypedHeader, headers};
 use std::collections::HashMap;
-use subtle::ConstantTimeEq;
 
 use oauth2_passkey::{
     AuthResponse, CoordinationError, FedCMCallbackRequest, O2P_ROUTE_PREFIX, OAuth2Account,
@@ -81,17 +80,14 @@ fn css_vars_block_from(entries: &[(&'static str, &'static str, &'static str)]) -
     Some(format!(":root {{\n{}\n}}", body.join("\n")))
 }
 
-use super::config::{O2P_CUSTOM_CSS_URL, O2P_FEDCM, O2P_PASSKEY_PROMOTION, OAUTH2_LINKING_MODE};
+use super::config::{O2P_CUSTOM_CSS_URL, O2P_FEDCM, O2P_PASSKEY_PROMOTION};
 use super::error::IntoResponseError;
 use super::session::AuthUser;
 
 pub(super) fn router() -> Router {
     let router = Router::new()
         .route("/oauth2.js", get(serve_oauth2_js))
-        .route(
-            "/{provider}",
-            get(oauth2_initiate).post(oauth2_initiate_post),
-        )
+        .route("/{provider}", get(oauth2_initiate))
         .route(
             "/{provider}/authorized",
             get(get_authorized).post(post_authorized),
@@ -104,7 +100,7 @@ pub(super) fn router() -> Router {
             "/accounts/{provider}/{provider_user_id}",
             delete(delete_oauth2_account),
         )
-        .route("/select", get(oauth2_select).post(oauth2_select_post));
+        .route("/select", get(oauth2_select));
 
     if O2P_FEDCM.is_enabled() {
         router
@@ -158,98 +154,20 @@ async fn popup_close(
 
 async fn serve_oauth2_js() -> Result<Response, (StatusCode, String)> {
     let static_js = include_str!("../static/oauth2.js");
-    let mut prelude = String::new();
-    if O2P_FEDCM.is_enabled() {
-        prelude.push_str(&format!(
-            "const FEDCM_ENABLED = true;\nconst OAUTH2_CLIENT_ID = '{}';\n",
-            get_google_client_id()
-        ));
-    }
-    prelude.push_str(&format!(
-        "const OAUTH2_LINKING_MODE = '{}';\n",
-        OAUTH2_LINKING_MODE.as_str()
-    ));
-    let js_content = format!("{prelude}{static_js}");
+    let js_content = if O2P_FEDCM.is_enabled() {
+        format!(
+            "const FEDCM_ENABLED = true;\nconst OAUTH2_CLIENT_ID = '{}';\n{}",
+            get_google_client_id(),
+            static_js
+        )
+    } else {
+        static_js.to_string()
+    };
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/javascript")
         .body(js_content.into())
         .into_response_error()
-}
-
-/// POST-based OAuth2 account linking initiation (Alt 5B).
-///
-/// Counterpart to `oauth2_initiate` (GET) on the same path. Where GET
-/// returns a 303 redirect to the IDP for navigation-based flows, this
-/// handler returns JSON `{ "auth_url": "..." }` for fetch + manual
-/// `window.location.href` patterns. Both methods share the same OAuth2
-/// CSRF cookie via `Set-Cookie` on the response.
-///
-/// POST mode replaces the URL-embedded `page_session_token` (HMAC) with
-/// header-based CSRF: the `AuthUser` extractor verifies `X-CSRF-Token`
-/// against the session CSRF token, giving equivalent Phase 1
-/// session-boundary protection.
-///
-/// **Supports `mode=add_to_user` only.** The other OAuth2 modes
-/// (`login`, `create_user`, `create_user_or_login`) start from an
-/// unauthenticated state and therefore have no session CSRF token to
-/// send via `X-CSRF-Token`; they continue to use `GET /oauth2/{provider}`.
-/// If the `mode` query parameter is present here, it must equal
-/// `add_to_user` — anything else is rejected with 400 rather than
-/// silently treated as `add_to_user`.
-async fn oauth2_initiate_post(
-    Path(provider): Path<String>,
-    auth_user: AuthUser,
-    Query(params): Query<HashMap<String, String>>,
-    headers: HeaderMap,
-) -> Result<(HeaderMap, Json<serde_json::Value>), (StatusCode, String)> {
-    // AuthUser extraction enforces session validity for any state-changing
-    // request. The session-boundary attack is detected by the X-CSRF-Token
-    // header: a JS-held CSRF token from a stale page won't match the
-    // current session's CSRF token. AuthUser's extractor also lets form-like
-    // POSTs through without the header (delegating CSRF check to the
-    // handler), so we explicitly require the header here — this endpoint is
-    // only designed for JSON-style fetch POSTs from the popup.
-    if !auth_user.csrf_via_header_verified {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "X-CSRF-Token header required for POST /oauth2/{provider}".to_string(),
-        ));
-    }
-
-    // Explicit scope: this endpoint is `add_to_user`-only. Reject any
-    // mismatched `mode` query parameter rather than silently coercing it,
-    // since other modes have no authenticated session to drive the CSRF
-    // check that gives POST mode its security benefit.
-    if let Some(mode) = params.get("mode")
-        && mode != "add_to_user"
-    {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            format!(
-                "POST /oauth2/{{provider}} supports mode=add_to_user only \
-                 (got mode={mode}). For login/register flows use \
-                 GET /oauth2/{{provider}}?mode=..."
-            ),
-        ));
-    }
-
-    let provider_name = ProviderName::from_registered(&provider).ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            format!("Unknown provider: {provider}"),
-        )
-    })?;
-
-    let (auth_url, response_headers) =
-        prepare_oauth2_auth_request(provider_name, headers, Some("add_to_user"))
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    Ok((
-        response_headers,
-        Json(serde_json::json!({ "auth_url": auth_url })),
-    ))
 }
 
 async fn oauth2_initiate(
@@ -300,17 +218,6 @@ struct SelectProviderTemplate<'a> {
     providers: Vec<ProviderView>,
     mode: &'a str,
     context: &'a str,
-    /// `true` when the page should render POST-based linking buttons —
-    /// `OAUTH2_LINKING_MODE=post` and the OAuth2 mode is `add_to_user`.
-    post_linking_active: bool,
-    /// Session CSRF token embedded as a JS const when `post_linking_active`
-    /// is true. Empty string otherwise.
-    csrf_token: String,
-    /// When set, the page auto-triggers the link flow on load for the named
-    /// provider. Only populated for single-provider POST-mode setups, since
-    /// the GET-mode single-provider case is served by a server-side 302
-    /// before this template is rendered.
-    single_provider_auto_trigger: Option<String>,
 }
 
 async fn oauth2_select(
@@ -363,85 +270,6 @@ async fn oauth2_select(
         providers,
         mode: mode.as_deref().unwrap_or(""),
         context: context.as_deref().unwrap_or(""),
-        post_linking_active: false,
-        csrf_token: String::new(),
-        single_provider_auto_trigger: None,
-    };
-    Ok(Html(
-        tmpl.render()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
-    )
-    .into_response())
-}
-
-/// Form payload submitted to `POST /oauth2/select` when the built-in
-/// `/user/account` page is operating in `OAUTH2_LINKING_MODE=post`.
-#[derive(serde::Deserialize)]
-struct OAuth2SelectForm {
-    mode: String,
-    csrf_token: String,
-}
-
-/// POST-based counterpart to `oauth2_select` (Alt 5B).
-///
-/// The parent page submits a `<form target="popup">` so the popup itself
-/// receives the rendered select page over POST. `csrf_token` travels in the
-/// form body (not URL or header) and is verified against the session via a
-/// constant-time comparison. This carries the parent-render-time session
-/// binding across the parent → popup boundary without needing the
-/// `page_session_token` HMAC; if the cookie session changed between page
-/// render and click, the form-body token won't match the current session
-/// and the popup never loads.
-///
-/// Only `mode=add_to_user` is supported via POST. Other modes (login,
-/// register) have no session-CSRF context to carry, so they continue to use
-/// `GET /oauth2/select`.
-async fn oauth2_select_post(
-    auth_user: AuthUser,
-    Form(form): Form<OAuth2SelectForm>,
-) -> Result<Response, (StatusCode, String)> {
-    if form.mode != "add_to_user" {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            format!(
-                "POST /oauth2/select only supports mode=add_to_user, got mode={}",
-                form.mode
-            ),
-        ));
-    }
-
-    // The form-body CSRF check is the popup boundary's session-drift detector:
-    // the token was captured at parent render time; if the cookie session has
-    // since rotated, AuthUser will expose a different csrf_token here and the
-    // comparison fails. AuthUser's extractor already allows form-like POSTs
-    // through without X-CSRF-Token (it expects the handler to verify form
-    // body manually), see `session.rs` lines 215-244.
-    if !bool::from(
-        form.csrf_token
-            .as_bytes()
-            .ct_eq(auth_user.csrf_token.as_bytes()),
-    ) {
-        tracing::warn!("POST /oauth2/select: form csrf_token does not match session");
-        return Err((StatusCode::FORBIDDEN, "CSRF token mismatch".to_string()));
-    }
-
-    let providers = enabled_provider_views();
-    let single_provider_auto_trigger = if providers.len() == 1 {
-        Some(providers[0].provider_name.to_string())
-    } else {
-        None
-    };
-
-    let tmpl = SelectProviderTemplate {
-        o2p_route_prefix: O2P_ROUTE_PREFIX.as_str(),
-        custom_css_url: O2P_CUSTOM_CSS_URL.as_deref(),
-        custom_css_vars: custom_css_vars_block(),
-        providers,
-        mode: "add_to_user",
-        context: "",
-        post_linking_active: true,
-        csrf_token: auth_user.csrf_token.clone(),
-        single_provider_auto_trigger,
     };
     Ok(Html(
         tmpl.render()

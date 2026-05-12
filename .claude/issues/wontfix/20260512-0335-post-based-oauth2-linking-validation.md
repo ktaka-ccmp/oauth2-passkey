@@ -4,8 +4,8 @@
 
 - ID: 20260512-0335
 - Created: 2026-05-12-03-35
-- Closed:
-- Status: open
+- Closed: 2026-05-12-15-26
+- Status: wontfix
 - Priority: medium
 - Difficulty: medium
 - Related Issues:
@@ -479,6 +479,106 @@ as-is. The new URL is the source of truth going forward.
 - `cargo clippy --workspace --all-targets --all-features` clean
 - `cargo test --workspace --all-features` all pass
 
+### 2026-05-12T15:26 — Decision: not merging POST mode (wontfix)
+
+After completing the Option E implementation and reviewing the
+result, the conclusion is that POST mode does not deliver
+meaningful value over the existing GET mode. The work landed as
+commit `ca62953` on branch `feat/oauth2-post-linking-prototype`,
+and this commit reverts the code while preserving the analysis
+and the original commit in git history.
+
+**Why reject:**
+
+1. **`page_session_token` is not actually eliminated.** The
+   original framing in parent issue `20260226-2018` Timeline
+   2026-05-12T03:21 was that POST mode "would eliminate the
+   `page_session_token` concept entirely". In practice Option E
+   keeps both `generate_page_session_token` and
+   `verify_page_session_token` in the codebase — they remain
+   load-bearing for GET mode, which is the default. POST mode
+   just provides an alternate path that uses form-body CSRF
+   instead.
+2. **Zero user-visible change for the built-in `/user/account`
+   page.** Whether `OAUTH2_LINKING_MODE=get` (default) or
+   `=post`, the page renders one "Add New OAuth2 Account"
+   button and the popup-select UX is identical. The benefit
+   of POST mode at the built-in-page level is purely internal
+   (different transport for the same flow).
+3. **No concrete user demand or pain point.** Nobody asked for
+   this. The parent issue surfaced the question of API
+   complexity, but the deeper analysis (parent Timeline
+   2026-05-12T02:46) established that current ergonomics for
+   custom UIs is ~3 lines, not the "~50+ lines" the archived
+   design proposal claimed. There is no real friction to
+   alleviate.
+4. **Security parity, not improvement.** Threat coverage
+   (Phase 1 popup-boundary drift, Phase 2 action-time drift,
+   Phase 3 IDP round-trip) is equivalent across the two modes.
+   POST does not strengthen security; it just relocates the
+   same checks to different transport channels.
+5. **Permanent maintenance cost for an opt-in alternative.**
+   Two parallel code paths (`oauth2_initiate` /
+   `oauth2_initiate_post`, anchor-tag / button branches in
+   `select_provider.j2`, `linkAccountPost` / `startLinkingViaForm`
+   in `oauth2.js`, conditional `linking_mode_is_post` in
+   `user_account.j2`) need to be kept in sync forever, plus
+   the env var configuration matrix expands.
+6. **Negative result from the parent's "simplify" goal.**
+   This issue's lineage(`20260226-2018` →
+   `20260512-0335`)started from "the OAuth2 linking API is
+   too complex". After thorough investigation the conclusion
+   is the existing API is fine. POST mode was the strongest
+   candidate for simplification, and it didn't deliver. This
+   is a useful negative result.
+
+**What stays in the codebase after this revert:**
+
+- `oauth2_passkey/src/session/main/page_session_token.rs`
+  (unchanged, still the canonical mechanism)
+- `oauth2_passkey_axum/src/oauth2.rs` (back to pre-Alt-5B state:
+  `oauth2_initiate` GET handler only, `oauth2_select` GET only,
+  no `oauth2_initiate_post`, no `oauth2_select_post`)
+- `oauth2_passkey_axum/static/oauth2.js` (no `linkAccountPost`,
+  no `startLinkingViaForm`, no `OAUTH2_LINKING_MODE` JS const)
+- `oauth2_passkey_axum/templates/user_account.j2` and
+  `select_provider.j2` (back to single-button GET flow)
+- `oauth2_passkey_axum/src/config.rs` (no `OAUTH2_LINKING_MODE`
+  env var)
+- `oauth2_passkey_axum/tests-security/cross_flow_security.rs`
+  (back to expecting `METHOD_NOT_ALLOWED (405)` for POST on
+  `/oauth2/{provider}`)
+
+**What stays preserved in git history:**
+
+- Commit `ca62953` on branch `feat/oauth2-post-linking-prototype`
+  (full Option E implementation, +840 / -24 lines)
+- This issue file with all Timeline entries from T03:35 to
+  T15:26 inclusive, recording the design exploration and the
+  decision to reject
+- The merge commit landing this revert PR (single PR captures
+  both the work and the rejection per option B of the merge /
+  revert discussion)
+
+**What this means for the parent issue (`20260226-2018`):**
+
+The parent issue's Latest Plan had two branches: "If Alt 5B is
+go" (close as superseded) and "If Alt 5B is no-go" (small
+ergonomics helper + custom-UI docs). With Alt 5B rejected, the
+parent falls to the no-go branch. The parent issue is left in
+its current state (not closed) and the no-go fallback can be
+acted on separately, or the parent itself can be revisited (in
+the light of the negative result, even the "small helper" might
+not be worth the effort — but that's a parent-issue decision,
+not this one).
+
+**Build status (post-revert):**
+
+- `cargo fmt --all` clean
+- `cargo clippy --workspace --all-targets --all-features` clean
+- `cargo test --workspace --all-features` all pass
+  (71 lib + 12 integration + 22 security tests, all green)
+
 ## Latest Plan
 
 ### Coexistence design
@@ -577,3 +677,17 @@ End-to-end manual test in `demo-both`:
    `auth_complete` message handling
 
 ## Resolution
+
+Closed as `wontfix`. POST-based OAuth2 account linking
+initiation was prototyped end-to-end (Option E: form-target
+POST `/oauth2/select` + POST `/oauth2/{provider}`, env var
+`OAUTH2_LINKING_MODE` for opt-in dispatch) and evaluated. The
+implementation works correctly and provides security parity
+with GET mode, but the practical value over the existing GET
+flow is insufficient to justify the permanent maintenance cost
+of two parallel transport paths.
+
+Negative result preserved as commit `ca62953` on branch
+`feat/oauth2-post-linking-prototype`. This issue's Timeline
+contains the full exploration history (entries T03:35 through
+T15:26).

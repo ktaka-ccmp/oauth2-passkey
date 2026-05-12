@@ -84,49 +84,6 @@ impl PasskeyPromotionMode {
     }
 }
 
-/// OAuth2 account linking transport mode for the built-in `/user/account` page
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LinkingMode {
-    /// GET-based initiation with URL-embedded `page_session_token` (default,
-    /// backward-compatible).
-    Get,
-    /// POST-based initiation using the standard `X-CSRF-Token` header. See
-    /// issue `20260512-0335` for the design rationale.
-    Post,
-}
-
-impl LinkingMode {
-    pub(crate) fn is_post(self) -> bool {
-        matches!(self, Self::Post)
-    }
-
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            Self::Get => "get",
-            Self::Post => "post",
-        }
-    }
-}
-
-/// Selects the OAuth2 linking transport used by the built-in
-/// `/user/account` page. Both server methods on `/oauth2/{provider}`
-/// (`GET` for navigation-based init, `POST` for fetch-based init with
-/// `X-CSRF-Token` header) are always available regardless of this
-/// value; the env var only controls which one the built-in page uses
-/// by default. Custom UIs are free to call either explicitly.
-///
-/// Values: `get` (default), `post`.
-pub(crate) static OAUTH2_LINKING_MODE: LazyLock<LinkingMode> =
-    LazyLock::new(|| match std::env::var("OAUTH2_LINKING_MODE") {
-        Err(_) => LinkingMode::Get,
-        Ok(val) => match val.to_lowercase().as_str() {
-            "get" => LinkingMode::Get,
-            "post" => LinkingMode::Post,
-            "" => LinkingMode::Get,
-            _ => panic!("OAUTH2_LINKING_MODE='{val}' is invalid. Valid values: get, post"),
-        },
-    });
-
 /// FedCM (Federated Credential Management) mode (experimental)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FedCMMode {
