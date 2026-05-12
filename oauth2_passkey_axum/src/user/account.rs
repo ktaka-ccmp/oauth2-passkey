@@ -17,7 +17,7 @@ use oauth2_passkey::{
     get_authenticator_info_batch, list_accounts_core, list_credentials_core, provider_info,
 };
 
-use crate::config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT};
+use crate::config::{O2P_CUSTOM_CSS_URL, O2P_DEFAULT_REDIRECT, OAUTH2_LINKING_MODE};
 use crate::session::AuthUser;
 
 pub(super) fn router() -> Router<()> {
@@ -82,6 +82,10 @@ struct UserAccountTemplate {
     pub o2p_default_redirect: String,
     pub page_session_token: String,
     pub custom_css_url: Option<String>,
+    /// `true` when `OAUTH2_LINKING_MODE=post`. Switches the OAuth2-link button
+    /// from the legacy `openSelectPopup` invocation to a `<form target>` POST
+    /// that carries the parent's session csrf_token into the popup.
+    pub linking_mode_is_post: bool,
 }
 
 impl UserAccountTemplate {
@@ -93,7 +97,16 @@ impl UserAccountTemplate {
         o2p_default_redirect: String,
         custom_css_url: Option<String>,
     ) -> Self {
-        let page_session_token = generate_page_session_token(&user.csrf_token);
+        let linking_mode_is_post = OAUTH2_LINKING_MODE.is_post();
+        // GET mode embeds the legacy `page_session_token` (HMAC of session
+        // CSRF) for `openSelectPopup`. POST mode carries the raw csrf_token
+        // in a hidden form body instead, so this HMAC is unused; emit an
+        // empty string to keep the template contract stable.
+        let page_session_token = if linking_mode_is_post {
+            String::new()
+        } else {
+            generate_page_session_token(&user.csrf_token)
+        };
 
         Self {
             user: TemplateAuthUser {
@@ -111,6 +124,7 @@ impl UserAccountTemplate {
             o2p_default_redirect,
             page_session_token,
             custom_css_url,
+            linking_mode_is_post,
         }
     }
 }

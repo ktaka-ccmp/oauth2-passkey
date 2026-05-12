@@ -45,10 +45,14 @@ async fn test_consolidated_cross_flow_authentication_attacks()
 
     let result = create_security_result_from_response(response).await?;
 
-    // Verify security rejection
+    // Verify security rejection. POST /oauth2/{provider} is now a registered
+    // route (Alt 5B linking, issue 20260512-0335). Without a session the
+    // AuthUser extractor rejects with 401 Unauthorized; previously the same
+    // request returned 405 because POST wasn't routed at all. Either way the
+    // attack is refused before any handler logic runs.
     assert_security_failure(
         &result,
-        &ExpectedSecurityError::Custom(reqwest::StatusCode::METHOD_NOT_ALLOWED, None),
+        &ExpectedSecurityError::Custom(reqwest::StatusCode::UNAUTHORIZED, None),
         "unauthenticated linking test",
     );
     assert_no_session_established(&setup.browser).await;
@@ -279,10 +283,12 @@ async fn test_consolidated_cross_flow_privilege_attacks() -> Result<(), Box<dyn 
 
     let result = create_security_result_from_response(response).await?;
 
-    // Verify security rejection
+    // Verify security rejection. Same reasoning as the unauthenticated
+    // linking test above: POST /oauth2/{provider} is now a registered route
+    // (Alt 5B), and AuthUser rejects unauthenticated requests with 401.
     assert_security_failure(
         &result,
-        &ExpectedSecurityError::Custom(reqwest::StatusCode::METHOD_NOT_ALLOWED, None),
+        &ExpectedSecurityError::Custom(reqwest::StatusCode::UNAUTHORIZED, None),
         "privilege escalation test",
     );
     assert_no_session_established(&setup.browser).await;

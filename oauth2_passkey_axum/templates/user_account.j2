@@ -132,7 +132,20 @@
     <div class="section">
         <div class="section-header">
             <h2 class="section-title">OAuth2 Accounts</h2>
+            {% if linking_mode_is_post %}
+            {# OAUTH2_LINKING_MODE=post: bootstrap the popup via a form POST so
+               the parent's session csrf_token rides in the body, not in a URL. #}
+            <form id="oauth2-link-form" method="POST"
+                  action="{{o2p_route_prefix}}/oauth2/select"
+                  target="PopupWindow" style="display:none">
+                <input type="hidden" name="mode" value="add_to_user">
+                <input type="hidden" name="csrf_token" value="{{user.csrf_token}}">
+            </form>
+            <button onclick="oauth2.startLinkingViaForm('oauth2-link-form')" class="action-button">Add New OAuth2 Account</button>
+            {% else %}
+            {# OAUTH2_LINKING_MODE=get (default): legacy GET flow with page_session_token. #}
             <button onclick="oauth2.openSelectPopup('add_to_user', PAGE_SESSION_TOKEN)" class="action-button">Add New OAuth2 Account</button>
+            {% endif %}
         </div>
         {% if oauth2_accounts.is_empty() %}
             <p>You don't have any linked OAuth2 accounts yet.</p>
