@@ -8,7 +8,7 @@ The `oauth2-passkey-axum` crate provides Axum web framework integration for the 
 
 ## Quick Start
 
-```rust
+```rust,ignore
 use axum::{Router, response::Html};
 use oauth2_passkey_axum::{oauth2_passkey_full_router, init};
 
@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 The unified router that provides all authentication endpoints. This is the recommended way to add authentication to your application.
 
-```rust
+```rust,ignore
 use oauth2_passkey_axum::oauth2_passkey_full_router;
 
 let app = Router::new()
@@ -65,7 +65,7 @@ See [Endpoint Reference](#endpoint-reference) for complete details.
 
 The auth-only router without the prefix nesting. Use this for custom setups where you need more control.
 
-```rust
+```rust,ignore
 use oauth2_passkey_axum::{oauth2_passkey_router, O2P_ROUTE_PREFIX};
 
 let app = Router::new()
@@ -85,7 +85,7 @@ let app = Router::new()
 
 Router for the WebAuthn well-known endpoint. Only needed if you use `oauth2_passkey_router()` directly with a multi-origin setup.
 
-```rust
+```rust,ignore
 use oauth2_passkey_axum::{oauth2_passkey_router, passkey_well_known_router, O2P_ROUTE_PREFIX};
 
 let app = Router::new()
@@ -108,7 +108,7 @@ Authentication middleware for protecting routes. All middleware functions:
 
 Returns HTTP 401 Unauthorized for unauthenticated requests.
 
-```rust
+```rust,ignore
 use axum::{Router, middleware::from_fn};
 use oauth2_passkey_axum::is_authenticated_401;
 
@@ -121,7 +121,7 @@ let app: Router = Router::new()
 
 Redirects unauthenticated GET requests to login page; returns 401 for other methods.
 
-```rust
+```rust,ignore
 use axum::{Router, middleware::from_fn};
 use oauth2_passkey_axum::is_authenticated_redirect;
 
@@ -134,7 +134,7 @@ let app: Router = Router::new()
 
 Like `is_authenticated_401`, but also extracts user data into an `Extension<AuthUser>`.
 
-```rust
+```rust,ignore
 use axum::{Router, middleware::from_fn, extract::Extension};
 use oauth2_passkey_axum::{is_authenticated_user_401, AuthUser};
 
@@ -151,7 +151,7 @@ let app: Router = Router::new()
 
 Like `is_authenticated_redirect`, but also extracts user data into an `Extension<AuthUser>`.
 
-```rust
+```rust,ignore
 use axum::{Router, middleware::from_fn, extract::Extension};
 use oauth2_passkey_axum::{is_authenticated_user_redirect, AuthUser};
 
@@ -170,7 +170,7 @@ let app: Router = Router::new()
 
 Axum extractor for authenticated user information. Automatically verifies session and CSRF tokens.
 
-```rust
+```rust,ignore
 use axum::routing::get;
 use oauth2_passkey_axum::AuthUser;
 
@@ -205,7 +205,7 @@ let app: Router = Router::new()
 
 `AuthUser` also implements `OptionalFromRequestParts`, allowing optional user extraction:
 
-```rust
+```rust,ignore
 async fn handler(user: Option<AuthUser>) -> String {
     match user {
         Some(u) => format!("Hello, {}!", u.label),
@@ -237,7 +237,7 @@ The following are re-exported from the core library for convenience:
 
 ## Example: Protected API Routes
 
-```rust
+```rust,ignore
 use axum::{Router, routing::{get, post}, middleware::from_fn, Json};
 use oauth2_passkey_axum::{
     oauth2_passkey_full_router, is_authenticated_user_401, AuthUser, init
@@ -283,7 +283,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Example: Protected Web Pages with Redirect
 
-```rust
+```rust,ignore
 use axum::{Router, routing::get, middleware::from_fn, response::Html};
 use oauth2_passkey_axum::{is_authenticated_user_redirect, AuthUser};
 

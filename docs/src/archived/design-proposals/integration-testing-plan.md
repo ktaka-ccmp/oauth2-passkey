@@ -207,7 +207,7 @@ test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 ```
 ## 9. Key Implementation Highlights
 ### 9.1 Production-Grade Axum Mock Server - ✅ OAUTH2/OIDC COMPLIANT
-```rust
+```rust,ignore
 // From tests/common/axum_mock_server.rs
 async fn oauth2_auth(
     Query(params): Query<HashMap<String, String>>,
@@ -248,7 +248,7 @@ async fn oauth2_token(Form(params): Form<HashMap<String, String>>) -> Result<Jso
 }
 ```
 ### 9.2 WebAuthn Mock Implementation - ✅ COMPREHENSIVE
-```rust
+```rust,ignore
 // From tests/common/fixtures.rs
 impl MockWebAuthnCredentials {
     pub fn registration_response(username: &str, _display_name: &str) -> Value {
@@ -268,7 +268,7 @@ impl MockWebAuthnCredentials {
 }
 ```
 ### 9.3 Enhanced Integration Testing - ✅ COMPREHENSIVE VALIDATION
-```rust
+```rust,ignore
 // From tests/integration/oauth2_flows.rs
 async fn test_oauth2_new_user_registration() -> Result<(), Box<dyn std::error::Error>> {
     // ✅ Extract auth code from response mode (form_post or query)

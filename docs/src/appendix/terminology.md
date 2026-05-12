@@ -105,7 +105,7 @@ This library uses type-safe wrappers to prevent identifier confusion at compile 
 
 ### 1. user_id vs user_handle
 
-```rust
+```rust,ignore
 // WRONG: These are different!
 let user_id = "db_user_123";      // Database primary key
 let user_handle = "webauthn_abc"; // WebAuthn identifier

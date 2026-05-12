@@ -29,7 +29,7 @@ This document provides a comprehensive analysis of test quality across the OAuth
 **Location**: ~~`/oauth2_passkey/src/userdb/errors.rs` - 5 tests~~ - **All removed**
 
 **Previous Examples** (now removed):
-```rust
+```rust,ignore
 #[test]
 fn test_user_error_display() {
     let error = UserError::NotFound;
@@ -49,7 +49,7 @@ fn test_user_error_display() {
 **Status**: All trait bound tests removed from userdb module
 
 **Previous Examples** (now removed from userdb):
-```rust
+```rust,ignore
 #[test]
 fn test_error_is_sync_and_send() {
     fn assert_send_sync<T: Send + Sync>() {}
@@ -78,7 +78,7 @@ fn test_error_is_sync_and_send() {
 - `src/passkey/main/aaguid.rs` - 4 serialization tests
 
 **Previous Examples** (now removed from userdb):
-```rust
+```rust,ignore
 #[test]
 fn test_user_serialization() {
     let user = User::new(...);
@@ -108,7 +108,7 @@ fn test_user_serialization() {
 - ~~`/oauth2_passkey/src/userdb/errors.rs`~~ - **All resolved** ✅
 
 **Previous Examples** (now fixed in userdb):
-```rust
+```rust,ignore
 // Before
 let user = UserStore::get_user("test-user").await.unwrap();
 
@@ -231,7 +231,7 @@ let user = UserStore::get_user("test-user")
 **Target**: 40+ instances across modules
 
 **Action Taken in UserDB**:
-```rust
+```rust,ignore
 // Changed from:
 let result = UserStore::get_user("test-user").await.unwrap();
 
@@ -264,7 +264,7 @@ let result = UserStore::get_user("test-user")
 
 **Examples to Keep**:
 
-```rust
+```rust,ignore
 // Keep - tests business logic
 #[test]
 fn test_webauthn_client_data_field_mapping() {
@@ -274,7 +274,7 @@ fn test_webauthn_client_data_field_mapping() {
 
 **Examples to Remove**:
 
-```rust
+```rust,ignore
 // Remove - tests serde derive
 #[test]
 fn test_user_serialization() {

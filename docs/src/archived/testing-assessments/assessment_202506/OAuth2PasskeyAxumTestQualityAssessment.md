@@ -84,7 +84,7 @@ Middleware tests:
 
 ### Error Conversion Testing
 
-```rust
+```rust,ignore
 #[test]
 fn test_coordination_error_unauthorized() {
     let result: Result<(), CoordinationError> = Err(CoordinationError::Unauthorized);
@@ -99,7 +99,7 @@ fn test_coordination_error_unauthorized() {
 
 ### Authorization Logic Testing
 
-```rust
+```rust,ignore
 #[tokio::test]
 async fn test_delete_user_account_handler_unauthorized() {
     let auth_user = AuthUser {
@@ -119,7 +119,7 @@ async fn test_delete_user_account_handler_unauthorized() {
 
 ### CSRF Protection Testing
 
-```rust
+```rust,ignore
 #[test]
 fn test_handle_auth_error_csrf_error_with_redirect() {
     let request = Request::builder().method(Method::GET).build();
@@ -160,7 +160,7 @@ fn test_handle_auth_error_csrf_error_with_redirect() {
 
 Consider adding more integration tests for complex handlers:
 
-```rust
+```rust,ignore
 #[tokio::test]
 async fn test_complete_passkey_registration_flow() {
     // Test start -> finish registration with real data flow
@@ -169,7 +169,7 @@ async fn test_complete_passkey_registration_flow() {
 
 ### Performance Testing
 
-```rust
+```rust,ignore
 #[bench]
 fn bench_authentication_middleware(b: &mut Bencher) {
     // Benchmark authentication performance
@@ -178,7 +178,7 @@ fn bench_authentication_middleware(b: &mut Bencher) {
 
 ### Extended Error Scenarios
 
-```rust
+```rust,ignore
 #[test]
 fn test_malformed_json_request_handling() {
     // Test invalid JSON, missing fields, etc.

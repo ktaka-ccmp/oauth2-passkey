@@ -6,11 +6,10 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (9)
+### Open (8)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
-| `20260226-2018` | high | medium | [Simplify OAuth2 Account Linking API](open/20260226-2018-simplify-oauth2-account-linking-api.md) |
 | `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 | `20260226-1814` | high | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
 | `20260226-2019` | medium | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
@@ -20,10 +19,13 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
 
-### Completed (75)
+### Completed (78)
 
 | ID | Title |
 |----|-------|
+| `20260512-0457` | [Standardize Rust code block markers in mdBook docs to `rust,ignore`](completed/20260512-0457-standardize-rust-block-markers.md) |
+| `20260512-0350` | [Use constant-time comparison in verify_page_session_token](completed/20260512-0350-constant-time-page-session-token.md) |
+| `20260512-0351` | [Correct status labeling for archived design proposals](completed/20260512-0351-archived-design-proposals-status-labeling.md) |
 | `20260511-0543` | [validate_origin starts_with subdomain confusion via Referer](completed/20260511-0543-validate-origin-subdomain-confusion.md) |
 | `20260331-1517` | [PASSKEY_AUTHENTICATOR_ATTACHMENT=none sends non-standard string instead of omitting field](completed/20260331-1517-passkey-authenticator-attachment-none-serialization.md) |
 | `20260420-0402` | [Admin unlink/delete fails in demo mode ("Invalid user ID")](completed/20260420-0402-admin-unlink-demo-mode.md) |
@@ -100,10 +102,12 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-30-09` | [Cross-Origin Same-Site Demo (Pattern 2)](completed/2026-01-30-cross-origin-same-site-demo.md) |
 | `2026-01-31-02` | [Remove HTTPS Support from Demo Apps](completed/2026-01-31-demo-remove-https.md) |
 
-### Wontfix (5)
+### Wontfix (7)
 
 | ID | Title |
 |----|-------|
+| `20260226-2018` | [Simplify OAuth2 Account Linking API](wontfix/20260226-2018-simplify-oauth2-account-linking-api.md) |
+| `20260512-0335` | [POST-based OAuth2 account linking initiation (Alt 5B validation)](wontfix/20260512-0335-post-based-oauth2-linking-validation.md) |
 | `20260420-1458` | [Add GitHub as OAuth2 Provider (non-OIDC)](wontfix/20260420-1458-add-github-provider.md) |
 | `20260226-2023` | [Authentication Method Tracking in Session](wontfix/20260226-2023-auth-method-tracking-in-session.md) |
 | `20260226-2026` | [UI Improvements](wontfix/20260226-2026-ui-improvements.md) |

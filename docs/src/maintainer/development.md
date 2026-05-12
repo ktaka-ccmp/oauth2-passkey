@@ -114,7 +114,7 @@ Unit tests are placed inline with the code they test, within a `tests` submodule
 
 ### Basic Test Structure
 
-```rust
+```rust,ignore
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,7 +138,7 @@ mod tests {
 
 For pure functions without side effects, tests are straightforward:
 
-```rust
+```rust,ignore
 #[test]
 fn test_base64url_encode_decode() {
     // Test with simple string
@@ -166,7 +166,7 @@ fn test_base64url_decode_invalid() {
 
 For tests requiring HTTP headers or other framework types:
 
-```rust
+```rust,ignore
 // Helper function to create test fixtures
 fn create_header_map_with_cookie(cookie_name: &str, cookie_value: &str) -> HeaderMap {
     let mut headers = HeaderMap::new();
@@ -198,7 +198,7 @@ fn test_get_session_id_from_headers() {
 
 For async functions requiring database access:
 
-```rust
+```rust,ignore
 use crate::test_utils::init_test_environment;
 
 #[tokio::test]
@@ -245,7 +245,7 @@ oauth2_passkey/tests/
 
 ### Integration Test Structure
 
-```rust
+```rust,ignore
 /// Integration tests for oauth2-passkey library
 ///
 /// These tests verify complete authentication flows in an isolated test environment
@@ -262,7 +262,7 @@ mod integration {
 
 ### Flow Testing Example
 
-```rust
+```rust,ignore
 use crate::common::{MockBrowser, TestSetup, TestUsers};
 
 #[tokio::test]
@@ -294,7 +294,7 @@ The `test_utils` module provides centralized test setup functionality for consis
 
 ### Initialization
 
-```rust
+```rust,ignore
 use crate::test_utils::init_test_environment;
 
 #[tokio::test]
@@ -320,7 +320,7 @@ async fn my_test() {
 
 ### Test Origin Helper
 
-```rust
+```rust,ignore
 use crate::test_utils::get_test_origin;
 
 #[test]
@@ -368,7 +368,7 @@ cargo test -- --ignored
 - Test error cases explicitly
 - Use pattern matching to verify error types
 
-```rust
+```rust,ignore
 #[test]
 fn test_invalid_input_returns_error() {
     let result = process_input("invalid");
@@ -390,7 +390,7 @@ fn test_invalid_input_returns_error() {
 - Mark slow tests with `#[ignore]`
 - Run slow tests separately in CI
 
-```rust
+```rust,ignore
 #[test]
 #[ignore]  // Run with: cargo test -- --ignored
 fn slow_integration_test() {

@@ -34,7 +34,7 @@ Use middleware that wraps function logic, but adds complexity with closures.
 
 ### Helper Functions (Recommended)
 
-```rust
+```rust,ignore
 // Helper functions for common authorization patterns
 pub async fn validate_admin_session(session_id: &str) -> Result<User, CoordinationError> {
     let session = validate_session(session_id).await?;
@@ -66,7 +66,7 @@ pub async fn validate_admin_or_owner_session(session_id: &str, resource_user_id:
 
 ### Middleware Pattern (Alternative)
 
-```rust
+```rust,ignore
 // Admin authorization middleware
 pub async fn with_admin_auth<F, R>(session_id: &str, operation: F) -> Result<R, CoordinationError>
 where F: FnOnce(&User) -> Result<R, CoordinationError>
@@ -104,7 +104,7 @@ where F: FnOnce(&User) -> Result<R, CoordinationError>
 
 ### Helper Functions (Simple One-Liners)
 
-```rust
+```rust,ignore
 // Admin-only function
 pub async fn update_user_admin_status(
     session_id: &str,
@@ -157,7 +157,7 @@ pub async fn delete_user_account(session_id: &str, user_id: &str) -> Result<Vec<
 
 ### Middleware Pattern (Alternative)
 
-```rust
+```rust,ignore
 // Admin-only function
 pub async fn delete_user_account_admin(session_id: &str, user_id: &str) -> Result<(), CoordinationError> {
     with_admin_auth(session_id, |_admin_user| {

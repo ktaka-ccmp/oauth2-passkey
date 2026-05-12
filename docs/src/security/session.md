@@ -144,7 +144,7 @@ The oauth2-passkey test suite uses `MockBrowser` (based on `reqwest`), not real 
 
 The library handles missing cookies gracefully:
 
-```rust
+```rust,ignore
 match get_session_cookie_from_headers(headers) {
     Ok(Some(session_id)) => { /* Cookie found - proceed */ },
     Ok(None) | Err(_) => { /* Normal for new users - continue auth flow */ }

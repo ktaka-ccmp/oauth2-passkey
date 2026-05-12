@@ -22,7 +22,7 @@ The passkey module is now fully tested and validated, ready for crate publicatio
 
 ### Solution
 
-```rust
+```rust,ignore
 // Changed from:
 #[test]
 fn test_extract_credential_public_key_success() {
@@ -60,7 +60,7 @@ For async tests in this codebase, use `#[tokio::test]` instead of blocking patte
 
 2. **RP ID Hash Fix:** Changed from SHA256("localhost") to SHA256("example.com"):
 
-```rust
+```rust,ignore
 // Old hash (SHA256("localhost")):
 auth_data.extend_from_slice(&[
     0x6d, 0xc4, 0xc2, 0x9d, 0x90, 0x1f, 0x36, 0xf4,
@@ -93,7 +93,7 @@ Always ensure test data consistency across:
 
 ### Solution
 
-```rust
+```rust,ignore
 // Changed from:
 auth_data.push(0x41); // user present + attested credential data
 
