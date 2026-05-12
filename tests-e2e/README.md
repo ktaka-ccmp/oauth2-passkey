@@ -55,7 +55,13 @@ ports are taken on your machine.
 |------|------------------|
 | `smoke.spec.ts` | Login page renders, mock-oidc discovery doc is reachable |
 | `passkey.spec.ts` | Register a passkey via virtual authenticator, log out, sign back in with the same authenticator |
-| `oauth2.spec.ts` | Click "Sign in with Google", popup drives the authorization-code flow against `mock-oidc`, parent reloads with a session cookie |
+| `oauth2.spec.ts` | OAuth2 popup against `mock-oidc`, dismiss the passkey promotion popup (`O2P_PASSKEY_PROMOTION=ask`), verify session |
+| `account-passkey-mgmt.spec.ts` | From the account page, add a second passkey (using a second virtual authenticator), delete the first one, verify counts |
+
+A GitHub Actions workflow at `.github/workflows/e2e.yml` runs the same suite
+on PR and push to `master`/`dev`. It is marked `continue-on-error` while the
+suite stabilises so failures show up in the Actions tab but do not gate
+merges.
 
 ## Architecture notes
 
@@ -87,9 +93,10 @@ await request.post(`${MOCK_OIDC_URL}/test/config`, {
 });
 ```
 
-This mirrors `oauth2_passkey_axum/tests/common/axum_mock_server.rs`. Both
-copies should eventually share a library crate; for now duplication keeps
-the existing integration-test infrastructure untouched.
+The shared logic lives in the `mock-oidc-core` library crate, which is also
+used by the in-process test fixture
+`oauth2_passkey_axum/tests/common/axum_mock_server.rs`. There is no
+duplication — both consumers build their router from the same source.
 
 ### Virtual authenticator setup
 
@@ -118,22 +125,27 @@ in registration options: `authenticator_attachment: platform`,
 3. **Network idle waits.** Many flows end with `location.reload()` in JS.
    Tests use `page.waitForLoadState('networkidle')` rather than racing a
    subsequent `page.goto`.
-4. **Passkey promotion is disabled.** `O2P_PASSKEY_PROMOTION=disabled` so
-   the OAuth2 test doesn't have to dismiss a second popup. Promotion has
-   its own (future) test.
-5. **Logout requires `?redirect=`.** `/o2p/user/logout` only redirects when
+4. **Logout requires `?redirect=`.** `/o2p/user/logout` only redirects when
    the `redirect` query is supplied; without it the response is just
    header-clearing with no body.
+5. **`.env` is skipped.** Playwright sets `DEMO_BOTH_SKIP_DOTENV=1` so
+   demo-both doesn't read the workspace-root `.env` (which may set values
+   like `PASSKEY_AUTHENTICATOR_ATTACHMENT=platform` that conflict with the
+   second virtual authenticator used in the account-management test).
+6. **One internal authenticator per context.** Chrome only allows a single
+   platform/`internal` virtual authenticator. Additional ones must use
+   `usb`/`nfc`/`ble` (cross-platform). See `account-passkey-mgmt.spec.ts`.
 
 ## Deferred to later phases
 
-- CI integration (GitHub Actions)
-- `data-testid` attributes on templates for selector stability
-- Account-management flows (add/delete passkey, change name)
-- Admin-panel flows
+- `data-testid` rollout across more templates for selector stability
+- Account-management flows beyond passkey CRUD (rename, OAuth2 link/unlink,
+  edit profile, delete account)
+- Admin-panel flows (user list, force logout)
 - Conditional UI / autofill
 - FedCM (`navigator.credentials.get({ identity: ... })`)
-- Passkey promotion popup flow (enable `O2P_PASSKEY_PROMOTION=ask` and drive
-  the promo popup)
+- Promotion popup *accept* path (currently only the dismiss path is tested)
 - Multi-user / re-link scenarios (currently the DB is fresh per server
   start, but state persists across tests in a single run)
+- Remove `continue-on-error: true` from `.github/workflows/e2e.yml` once
+  the suite is proven stable in CI

@@ -54,15 +54,18 @@ export default defineConfig({
       stderr: 'pipe',
       env: {
         DEMO_BOTH_PORT: String(DEMO_PORT),
+        // Block demo-both from reading the user's workspace-root `.env`,
+        // which may set values (e.g. PASSKEY_AUTHENTICATOR_ATTACHMENT) that
+        // break E2E assumptions.
+        DEMO_BOTH_SKIP_DOTENV: '1',
         ORIGIN: DEMO_BASE_URL,
         OAUTH2_GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
         OAUTH2_GOOGLE_CLIENT_SECRET: 'test-client-secret',
         OAUTH2_ISSUER_URL: MOCK_OIDC_URL,
         OAUTH2_GOOGLE_PROMPT: '',
-        // Disable the post-OAuth2 passkey promotion popup so the OAuth2 test
-        // doesn't have to dismiss a second window. Promotion has its own test
-        // in a later phase.
-        O2P_PASSKEY_PROMOTION: 'disabled',
+        // Enable passkey promotion so the post-OAuth2 popup flow is covered
+        // by the E2E suite.
+        O2P_PASSKEY_PROMOTION: 'ask',
         GENERIC_CACHE_STORE_TYPE: 'memory',
         GENERIC_CACHE_STORE_URL: 'memory://',
         GENERIC_DATA_STORE_TYPE: 'sqlite',

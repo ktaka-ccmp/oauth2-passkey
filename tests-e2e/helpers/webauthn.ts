@@ -13,8 +13,16 @@ export interface VirtualAuthenticator {
  * Defaults emulate a platform passkey with resident keys, automatic UV, and
  * automatic user-presence simulation.
  */
+export interface VirtualAuthenticatorOptions {
+  /** CDP transport. Defaults to `internal` (platform authenticator). Chrome
+   * only allows one `internal` authenticator per browser context; use
+   * `usb`/`nfc`/`ble` (cross-platform) for any additional ones. */
+  transport?: 'usb' | 'nfc' | 'ble' | 'internal' | 'hybrid';
+}
+
 export async function addVirtualAuthenticator(
   page: Page,
+  options: VirtualAuthenticatorOptions = {},
 ): Promise<VirtualAuthenticator> {
   const client = await page.context().newCDPSession(page);
   await client.send('WebAuthn.enable');
@@ -23,7 +31,7 @@ export async function addVirtualAuthenticator(
     {
       options: {
         protocol: 'ctap2',
-        transport: 'internal',
+        transport: options.transport ?? 'internal',
         hasResidentKey: true,
         hasUserVerification: true,
         isUserVerified: true,

@@ -63,7 +63,7 @@
     <div class="section">
         <div class="section-header">
             <h2 class="section-title">Passkey Credentials</h2>
-            <button onclick="showRegistrationModal('add_to_user')" class="action-button">Add New Passkey</button>
+            <button onclick="showRegistrationModal('add_to_user')" class="action-button" data-testid="add-passkey-btn">Add New Passkey</button>
         </div>
         {% if passkey_credentials.is_empty() %}
             <p>You don't have any passkey credentials yet.</p>

@@ -1,0 +1,98 @@
+name: E2E
+
+on:
+  push:
+    branches: [ master, dev ]
+    paths:
+      - 'oauth2_passkey/**'
+      - 'oauth2_passkey_axum/**'
+      - 'mock-oidc/**'
+      - 'mock-oidc-core/**'
+      - 'demo-both/**'
+      - 'tests-e2e/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    branches: [ master, dev ]
+    paths:
+      - 'oauth2_passkey/**'
+      - 'oauth2_passkey_axum/**'
+      - 'mock-oidc/**'
+      - 'mock-oidc-core/**'
+      - 'demo-both/**'
+      - 'tests-e2e/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/e2e.yml'
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  playwright:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    # Non-blocking while the suite stabilises. Failures show in the Actions
+    # tab but do not gate PR merges.
+    continue-on-error: true
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo deps
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' }}
+          cache-on-failure: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tests-e2e/package-lock.json
+
+      - name: Install npm deps
+        working-directory: tests-e2e
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('tests-e2e/package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        working-directory: tests-e2e
+        run: npx playwright install chromium --with-deps
+
+      - name: Pre-build Rust binaries
+        run: cargo build -p mock-oidc -p demo-both
+
+      - name: Run Playwright tests
+        working-directory: tests-e2e
+        run: npx playwright test --reporter=list
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: tests-e2e/playwright-report/
+          retention-days: 7
+
+      - name: Upload trace + video on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: tests-e2e/test-results/
+          retention-days: 7

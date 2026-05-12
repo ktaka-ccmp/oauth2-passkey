@@ -43,7 +43,11 @@ async fn index(_user: AuthUser) -> Result<Response, (StatusCode, String)> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing("demo-both");
 
-    dotenv().ok();
+    // Skip .env loading when invoked from automated tests so the user's
+    // workspace-root .env does not leak into the test environment.
+    if std::env::var("DEMO_BOTH_SKIP_DOTENV").is_err() {
+        dotenv().ok();
+    }
     oauth2_passkey_axum::init().await?;
 
     spawn_login_history_cleanup();
