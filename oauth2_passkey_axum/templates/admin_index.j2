@@ -35,30 +35,30 @@
             </thead>
             <tbody>
                 {% for user in users %}
-                <tr class="user-row" data-user-id="{{ user.id }}">
-                    <td class="id-cell" data-label="ID"><a href="{{o2p_route_prefix}}/admin/user/{{ user.id }}">{{ user.id }}</a></td>
-                    <td data-label="Account">{{ user.account }}</td>
+                <tr class="user-row" data-user-id="{{ user.id }}" data-testid="admin-user-row">
+                    <td class="id-cell" data-label="ID"><a href="{{o2p_route_prefix}}/admin/user/{{ user.id }}" data-testid="admin-user-link">{{ user.id }}</a></td>
+                    <td data-label="Account" data-testid="admin-user-account">{{ user.account }}</td>
                     <td data-label="Label">{{ user.label }}</td>
                     {% if user.sequence_number.is_some() && user.sequence_number.unwrap_or(0) == 1 %}
                         <td data-label="Admin">
                             <span>{{ user.is_admin }}</span>
                         </td>
-                        <td data-label="Active" class="session-status" id="session-status-{{ user.id }}">
+                        <td data-label="Active" class="session-status" id="session-status-{{ user.id }}" data-testid="admin-session-status">
                             <span class="status-loading">...</span>
                         </td>
                         <td class="actions-cell">
                         </td>
                     {% else %}
                         <td data-label="Admin">
-                            <button onclick="toggleAdminStatus('{{ user.id }}', {{ user.is_admin }})">
+                            <button onclick="toggleAdminStatus('{{ user.id }}', {{ user.is_admin }})" data-testid="admin-toggle-admin-btn">
                                 <span id="admin-status-{{ user.id }}">{{ user.is_admin }}</span>
                             </button>
                         </td>
-                        <td data-label="Active" class="session-status" id="session-status-{{ user.id }}">
+                        <td data-label="Active" class="session-status" id="session-status-{{ user.id }}" data-testid="admin-session-status">
                             <span class="status-loading">...</span>
                         </td>
                         <td class="actions-cell">
-                            <button onclick="DeleteAccount('{{ user.id }}')" class="action-button delete-button">Delete</button>
+                            <button onclick="DeleteAccount('{{ user.id }}')" class="action-button delete-button" data-testid="admin-delete-user-btn">Delete</button>
                         </td>
                     {% endif %}
                 </tr>

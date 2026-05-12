@@ -4,6 +4,7 @@ import {
   addPasskeyFromAccount,
   registerPasskeyFromLogin,
 } from '../helpers/auth-flows';
+import { resetDb } from '../helpers/db';
 
 test('account page: add a second passkey, then delete the first one', async ({
   page,
@@ -18,6 +19,7 @@ test('account page: add a second passkey, then delete the first one', async ({
     );
   }
 
+  await resetDb();
   await page.goto('/o2p/user/login');
   // First virtual authenticator: stands in for the user's primary device.
   const authenticator1 = await addVirtualAuthenticator(page);
@@ -59,7 +61,7 @@ test('account page: add a second passkey, then delete the first one', async ({
   );
   await page
     .locator(`.item.passkey[data-credential-id="${firstCredId}"]`)
-    .locator('.delete-button')
+    .getByTestId('passkey-delete-btn')
     .click();
   await deleteFinish;
   await page.waitForLoadState('networkidle');

@@ -45,8 +45,8 @@
             <div class="item-detail"><strong>Updated:</strong> {{ user.updated_at }}</div>
             <div class="item-detail">
                 <strong>Active Sessions:</strong>
-                <span id="session-count">...</span>
-                <button id="force-logout-btn" onclick="forceLogout('{{ user.id }}')" class="action-button delete-button" style="display: none; margin-left: 10px;">Force Logout</button>
+                <span id="session-count" data-testid="admin-user-session-count">...</span>
+                <button id="force-logout-btn" onclick="forceLogout('{{ user.id }}')" class="action-button delete-button" style="display: none; margin-left: 10px;" data-testid="admin-force-logout-btn">Force Logout</button>
             </div>
         </div>
     </div>

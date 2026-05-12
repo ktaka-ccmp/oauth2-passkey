@@ -15,19 +15,8 @@ export async function registerPasskeyFromLogin(
   username: string,
   displayName: string,
 ): Promise<void> {
-  await page.getByRole('button', { name: /Register with Passkey/i }).click();
-  const modal = page.locator('#registration-modal');
-  await expect(modal).toBeVisible();
-  await modal.locator('#reg-username').fill(username);
-  await modal.locator('#reg-displayname').fill(displayName);
-
-  const finish = page.waitForResponse(
-    (r) =>
-      r.url().endsWith('/o2p/passkey/register/finish') && r.status() === 200,
-  );
-  await modal.getByRole('button', { name: 'Register', exact: true }).click();
-  await finish;
-  await page.waitForLoadState('networkidle');
+  await page.getByTestId('login-passkey-register').click();
+  await fillAndSubmitRegistration(page, username, displayName);
 }
 
 /**
@@ -42,16 +31,24 @@ export async function addPasskeyFromAccount(
   displayName: string,
 ): Promise<void> {
   await page.getByTestId('add-passkey-btn').click();
-  const modal = page.locator('#registration-modal');
+  await fillAndSubmitRegistration(page, username, displayName);
+}
+
+async function fillAndSubmitRegistration(
+  page: Page,
+  username: string,
+  displayName: string,
+): Promise<void> {
+  const modal = page.getByTestId('passkey-reg-modal');
   await expect(modal).toBeVisible();
-  await modal.locator('#reg-username').fill(username);
-  await modal.locator('#reg-displayname').fill(displayName);
+  await modal.getByTestId('passkey-reg-username').fill(username);
+  await modal.getByTestId('passkey-reg-displayname').fill(displayName);
 
   const finish = page.waitForResponse(
     (r) =>
       r.url().endsWith('/o2p/passkey/register/finish') && r.status() === 200,
   );
-  await modal.getByRole('button', { name: 'Register', exact: true }).click();
+  await modal.getByTestId('passkey-reg-submit').click();
   await finish;
   await page.waitForLoadState('networkidle');
 }

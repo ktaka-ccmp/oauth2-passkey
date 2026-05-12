@@ -4,7 +4,10 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-oauth2-passkey-axum = { path = "../oauth2_passkey_axum" }
+# `test-reset` exposes a wipe-DB function used by the Playwright E2E suite.
+# Demo binaries don't ship as a release artifact, so it's safe to always
+# enable; the route that calls it is still gated by `DEMO_BOTH_TEST_RESET`.
+oauth2-passkey-axum = { path = "../oauth2_passkey_axum", features = ["test-reset"] }
 #oauth2-passkey-axum = "0.2"
 
 askama = { workspace = true }

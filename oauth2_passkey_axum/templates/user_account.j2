@@ -16,12 +16,12 @@
         <nav>
             <a href="/">Home</a>
             {% if user.is_admin %}
-            <a href="{{o2p_route_prefix}}/admin/index">Admin</a>
+            <a href="{{o2p_route_prefix}}/admin/index" data-testid="account-admin-link">Admin</a>
             {% endif %}
         </nav>
         <div class="header-buttons">
-            <button onclick="DeleteAccount()" class="action-button delete-button">Delete Account</button>
-            <button onclick="Logout()" class="action-button">Logout</button>
+            <button onclick="DeleteAccount()" class="action-button delete-button" data-testid="account-delete-btn">Delete Account</button>
+            <button onclick="Logout()" class="action-button" data-testid="account-logout-btn">Logout</button>
         </div>
     </div>
 
@@ -109,8 +109,8 @@
                     <div class="item-detail  created-row">
                         <span><strong>Last Used:</strong> {{ credential.last_used_at }}</span>
                         <div>
-                            <button onclick="openUpdateCredentialModal('{{ credential.credential_id }}', '{{ credential.user_name }}', '{{ credential.user_display_name }}', '{{ credential.user_handle }}')" class="edit-button">Edit</button>
-                            <button onclick="deletePasskeyCredential('{{ credential.credential_id }}', '{{ credential.user_handle }}')" class="delete-button">Delete</button>
+                            <button onclick="openUpdateCredentialModal('{{ credential.credential_id }}', '{{ credential.user_name }}', '{{ credential.user_display_name }}', '{{ credential.user_handle }}')" class="edit-button" data-testid="passkey-edit-btn">Edit</button>
+                            <button onclick="deletePasskeyCredential('{{ credential.credential_id }}', '{{ credential.user_handle }}')" class="delete-button" data-testid="passkey-delete-btn">Delete</button>
                         </div>
                     </div>
                     <!--

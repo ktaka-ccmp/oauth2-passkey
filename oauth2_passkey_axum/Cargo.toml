@@ -19,6 +19,9 @@ user-ui = []
 admin-ui = []
 cors = ["dep:tower-http"]
 bundled-tls = ["oauth2-passkey/bundled-tls"]
+# Re-exports `reset_storage_for_test` for E2E test harnesses (demo-both).
+# Must NOT be enabled in production builds.
+test-reset = ["oauth2-passkey/test-reset"]
 
 [dependencies]
 # Changed from workspace dependency to published crate version

@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { addVirtualAuthenticator } from '../helpers/webauthn';
+import { registerPasskeyFromLogin } from '../helpers/auth-flows';
+import { resetDb } from '../helpers/db';
 
 test('register passkey, log out, sign back in with passkey', async ({
   page,
@@ -11,29 +13,12 @@ test('register passkey, log out, sign back in with passkey', async ({
     page.on('pageerror', (err) => console.log('[pageerror]', err.message));
   }
 
+  await resetDb();
   await page.goto('/o2p/user/login');
   const authenticator = await addVirtualAuthenticator(page);
 
   // --- Register ---
-  await page
-    .getByRole('button', { name: /Register with Passkey/i })
-    .click();
-  const modal = page.locator('#registration-modal');
-  await expect(modal).toBeVisible();
-  await modal.locator('#reg-username').fill('e2e-user');
-  await modal.locator('#reg-displayname').fill('E2E User');
-
-  const registrationFinish = page.waitForResponse(
-    (resp) =>
-      resp.url().endsWith('/o2p/passkey/register/finish') &&
-      resp.status() === 200,
-  );
-  await modal.getByRole('button', { name: 'Register', exact: true }).click();
-  await registrationFinish;
-  // The frontend calls `location.reload()` after /register/finish succeeds.
-  // Wait for that reload to settle before our next navigation, otherwise
-  // page.goto races with the reload.
-  await page.waitForLoadState('networkidle');
+  await registerPasskeyFromLogin(page, 'e2e-user', 'E2E User');
 
   // Verify auth by visiting a protected route.
   await page.goto('/');
@@ -50,7 +35,7 @@ test('register passkey, log out, sign back in with passkey', async ({
     (resp) =>
       resp.url().endsWith('/o2p/passkey/auth/finish') && resp.status() === 200,
   );
-  await page.getByRole('button', { name: /Sign in with Passkey/i }).click();
+  await page.getByTestId('login-passkey-signin').click();
   await authFinish;
   await page.waitForLoadState('networkidle');
 

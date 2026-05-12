@@ -105,10 +105,15 @@ pub fn build_router(state: AppState) -> Router {
 /// Build helper routes used by external test runners (Playwright):
 /// - `GET /test/healthz` → readiness probe
 /// - `POST /test/config` → override the active `TestUser` (JSON body)
+/// - `POST /test/issue_token` → mint a JWT for the current user with a
+///   caller-supplied `nonce`, signed by the same key the JWKS endpoint
+///   advertises. Used by the FedCM E2E spec to drive
+///   `/oauth2/fedcm/callback` without a real Google IdP.
 pub fn test_routes(state: AppState) -> Router {
     Router::new()
         .route("/test/healthz", get(healthz))
         .route("/test/config", post(test_config))
+        .route("/test/issue_token", post(test_issue_token))
         .with_state(state)
 }
 
@@ -329,6 +334,54 @@ fn create_mock_id_token(state: &AppState, user: &TestUser, nonce: Option<&str>) 
     header.kid = Some("mock_key_id".to_string());
     let key = EncodingKey::from_secret("test_secret".as_ref());
     encode(&header, &claims, &key).expect("failed to encode mock ID token")
+}
+
+#[derive(Deserialize)]
+struct IssueTokenBody {
+    /// Nonce claim to embed in the minted JWT. Required because the FedCM
+    /// callback validates this against a server-cached value.
+    nonce: String,
+    /// Optional override for the `aud` claim. Defaults to the configured
+    /// client_id, which matches what `oauth2-passkey` expects.
+    aud: Option<String>,
+}
+
+async fn test_issue_token(
+    State(state): State<AppState>,
+    Json(body): Json<IssueTokenBody>,
+) -> Json<Value> {
+    let user = state.user.lock().unwrap().clone();
+    let aud_override = body.aud.clone();
+    let token = if let Some(aud) = aud_override {
+        // Mint with a non-default audience. We rebuild the claims inline
+        // because `create_mock_id_token` always uses `state.client_id`.
+        use jsonwebtoken::{EncodingKey, Header, encode};
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let claims = json!({
+            "iss": state.issuer,
+            "sub": user.sub,
+            "aud": aud,
+            "azp": aud,
+            "exp": now + 3600,
+            "iat": now,
+            "email": user.email,
+            "name": user.name,
+            "given_name": user.given_name,
+            "family_name": user.family_name,
+            "email_verified": true,
+            "nonce": body.nonce,
+        });
+        let mut header = Header::new(jsonwebtoken::Algorithm::HS256);
+        header.kid = Some("mock_key_id".to_string());
+        let key = EncodingKey::from_secret("test_secret".as_ref());
+        encode(&header, &claims, &key).expect("failed to encode mock ID token")
+    } else {
+        create_mock_id_token(&state, &user, Some(body.nonce.as_str()))
+    };
+    Json(json!({ "id_token": token }))
 }
 
 #[derive(Deserialize)]

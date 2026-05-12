@@ -58,6 +58,9 @@ export default defineConfig({
         // which may set values (e.g. PASSKEY_AUTHENTICATOR_ATTACHMENT) that
         // break E2E assumptions.
         DEMO_BOTH_SKIP_DOTENV: '1',
+        // Mount POST /test/reset so Playwright fixtures can wipe state
+        // between tests. The route is only added when this var is set.
+        DEMO_BOTH_TEST_RESET: '1',
         ORIGIN: DEMO_BASE_URL,
         OAUTH2_GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
         OAUTH2_GOOGLE_CLIENT_SECRET: 'test-client-secret',
@@ -66,6 +69,11 @@ export default defineConfig({
         // Enable passkey promotion so the post-OAuth2 popup flow is covered
         // by the E2E suite.
         O2P_PASSKEY_PROMOTION: 'ask',
+        // Enable FedCM so the /oauth2/fedcm/* routes are mounted. Existing
+        // OAuth2 tests still work because the JS falls back to the popup
+        // flow when the browser-side FedCM dialog can't reach a real
+        // identity provider config endpoint.
+        O2P_FEDCM: 'enabled',
         GENERIC_CACHE_STORE_TYPE: 'memory',
         GENERIC_CACHE_STORE_URL: 'memory://',
         GENERIC_DATA_STORE_TYPE: 'sqlite',

@@ -240,17 +240,18 @@ function createRegistrationModal() {
         modal = document.createElement('div');
         modal.id = 'registration-modal';
         modal.className = 'modal';
+        modal.setAttribute('data-testid', 'passkey-reg-modal');
         modal.style.cssText = 'display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);';
 
         modal.innerHTML = `
             <h3>Register New Passkey</h3>
             <div style="margin: 10px 0;">
-                <input type="text" id="reg-username" placeholder="Username" style="width: 100%; margin-bottom: 10px; padding: 5px;">
-                <input type="text" id="reg-displayname" placeholder="Display Name" style="width: 100%; padding: 5px;">
+                <input type="text" id="reg-username" data-testid="passkey-reg-username" placeholder="Username" style="width: 100%; margin-bottom: 10px; padding: 5px;">
+                <input type="text" id="reg-displayname" data-testid="passkey-reg-displayname" placeholder="Display Name" style="width: 100%; padding: 5px;">
             </div>
             <div style="text-align: right;">
-                <button onclick="closeRegistrationModal()">Cancel</button>
-                <button onclick="submitRegistration(document.getElementById('registration-modal').dataset.mode)">Register</button>
+                <button onclick="closeRegistrationModal()" data-testid="passkey-reg-cancel">Cancel</button>
+                <button onclick="submitRegistration(document.getElementById('registration-modal').dataset.mode)" data-testid="passkey-reg-submit">Register</button>
             </div>
         `;
 

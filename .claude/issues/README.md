@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (8)
+### Open (9)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -18,6 +18,7 @@ This directory contains issue/task tracking files for the project.
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
+| `20260513-0544` | low | small | [Passkey register/finish falls through to create_user when auth is lost mid-flow](open/20260513-0544-passkey-register-finish-mode-confusion.md) |
 
 ### Completed (78)
 

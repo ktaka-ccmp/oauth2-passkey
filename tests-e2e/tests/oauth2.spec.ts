@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { resetDb } from '../helpers/db';
 
 test('OAuth2 login via mock-oidc, dismiss promotion popup, verify session', async ({
   page,
@@ -10,15 +11,14 @@ test('OAuth2 login via mock-oidc, dismiss promotion popup, verify session', asyn
     page.on('pageerror', (e) => console.log('[parent:err]', e.message));
   }
 
+  await resetDb();
   await page.goto('/o2p/user/login');
 
   // The Google button opens a popup that drives the authorization-code flow
   // against mock-oidc. With O2P_PASSKEY_PROMOTION=ask, the same popup then
   // navigates to the promotion page, which we dismiss explicitly.
   const popupPromise = context.waitForEvent('page');
-  await page
-    .getByRole('button', { name: /Register \/ Sign in with Google/i })
-    .click();
+  await page.getByTestId('login-oauth2-google').click();
   const popup = await popupPromise;
 
   if (logBrowser) {
