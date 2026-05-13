@@ -1,6 +1,6 @@
 # Demo Todo
 
-A demonstration application showing how to manage user-specific data with a one-to-many relationship using a separate PostgreSQL table linked by `user_id`.
+A demonstration application showing how to manage user-specific data with a one-to-many relationship using a separate table linked by `user_id`.
 
 ## Features
 
@@ -33,12 +33,12 @@ The oauth2-passkey library and your application can use any combination of datab
 
 ### Same Database
 
-Both library and app share a single PostgreSQL database. This enables foreign key constraints and JOINs between `users` and `todos` tables.
+Both library and app share a single SQLite database. This enables foreign key constraints and JOINs between `users` and `todos` tables.
 
 ```env
-GENERIC_DATA_STORE_TYPE=postgresql
-GENERIC_DATA_STORE_URL='postgres://demo:demo@localhost:5432/demo'
-APP_DATABASE_URL='postgres://demo:demo@localhost:5432/demo'
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL='sqlite:demo.db?mode=rwc'
+APP_DATABASE_URL='sqlite:demo.db?mode=rwc'
 ```
 
 ### Separate Databases
@@ -47,9 +47,15 @@ Library and app use independent databases. Useful for isolation or when using di
 
 ```env
 GENERIC_DATA_STORE_TYPE=sqlite
-GENERIC_DATA_STORE_URL='sqlite:/tmp/auth.db'
-APP_DATABASE_URL='postgres://demo:demo@localhost:5432/demo'
+GENERIC_DATA_STORE_URL='sqlite:auth.db?mode=rwc'
+APP_DATABASE_URL='sqlite:demo-todo.db?mode=rwc'
 ```
+
+> **Postgres on the app side**: point `APP_DATABASE_URL` at a
+> `postgres://...` URL (start Postgres yourself) and switch
+> `SqlitePool` → `PgPool` (plus the SQLite-specific SQL) in
+> `src/db.rs`. See `demo-live` for a working HTTPS + Postgres
+> deployment.
 
 ## Setup
 
@@ -63,31 +69,24 @@ cp .env.example .env
 
 3. Choose your database configuration in `.env`
 
-4. Start PostgreSQL (the `todos` table will be created automatically):
-
-```bash
-# Use the project's docker-compose
-cd ../db/postgresql && docker compose up -d
-```
-
-5. Run the demo:
+4. Run the demo:
 
 ```bash
 cargo run
 ```
 
-6. Open http://localhost:3001 in your browser
+5. Open http://localhost:3001 in your browser
 
 ## Database Schema
 
 ```sql
 CREATE TABLE todos (
-    id SERIAL PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT NOT NULL,        -- Links to oauth2-passkey user
     title TEXT NOT NULL,
-    completed BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    completed INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_todos_user_id ON todos(user_id);

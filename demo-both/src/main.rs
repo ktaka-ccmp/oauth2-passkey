@@ -5,8 +5,6 @@ use axum::{
     routing::get,
 };
 
-use dotenvy::dotenv;
-
 use oauth2_passkey_axum::{
     AuthUser, O2P_CUSTOM_CSS_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router,
     spawn_login_history_cleanup,
@@ -43,7 +41,8 @@ async fn index(_user: AuthUser) -> Result<Response, (StatusCode, String)> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing("demo-both");
 
-    dotenv().ok();
+    #[cfg(not(feature = "e2e-test"))]
+    dotenvy::dotenv().ok();
     oauth2_passkey_axum::init().await?;
 
     spawn_login_history_cleanup();
@@ -53,6 +52,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(oauth2_passkey_full_router())
         .merge(protected::router());
 
-    spawn_http_server(3001, app).await?;
+    let port = std::env::var("DEMO_BOTH_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3001);
+    spawn_http_server(port, app).await?;
     Ok(())
 }

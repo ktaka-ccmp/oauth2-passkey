@@ -240,17 +240,18 @@ function createRegistrationModal() {
         modal = document.createElement('div');
         modal.id = 'registration-modal';
         modal.className = 'modal';
+        modal.setAttribute('data-testid', 'passkey-reg-modal');
         modal.style.cssText = 'display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);';
 
         modal.innerHTML = `
             <h3>Register New Passkey</h3>
             <div style="margin: 10px 0;">
-                <input type="text" id="reg-username" placeholder="Username" style="width: 100%; margin-bottom: 10px; padding: 5px;">
-                <input type="text" id="reg-displayname" placeholder="Display Name" style="width: 100%; padding: 5px;">
+                <input type="text" id="reg-username" data-testid="passkey-reg-username" placeholder="Username" style="width: 100%; margin-bottom: 10px; padding: 5px;">
+                <input type="text" id="reg-displayname" data-testid="passkey-reg-displayname" placeholder="Display Name" style="width: 100%; padding: 5px;">
             </div>
             <div style="text-align: right;">
-                <button onclick="closeRegistrationModal()">Cancel</button>
-                <button onclick="submitRegistration(document.getElementById('registration-modal').dataset.mode)">Register</button>
+                <button onclick="closeRegistrationModal()" data-testid="passkey-reg-cancel">Cancel</button>
+                <button onclick="submitRegistration(document.getElementById('registration-modal').dataset.mode)" data-testid="passkey-reg-submit">Register</button>
             </div>
         `;
 
@@ -327,13 +328,20 @@ async function startRegistration(mode, username = null, displayname = null) {
             mode: mode,
         };
 
-        let startResponse;
-        startResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/start', {
+        // Only attach X-CSRF-Token in modes the server actually checks
+        // (add_to_user requires an authenticated session and CSRF). For
+        // anonymous flows (create_user) the server's AuthUser extractor
+        // is None and the header value is ignored — referencing the
+        // page-supplied `csrfToken` global there would force every
+        // anonymous host page to declare it just to satisfy lexical
+        // resolution.
+        const startHeaders = { 'Content-Type': 'application/json' };
+        if (mode === 'add_to_user') {
+            startHeaders['X-CSRF-Token'] = csrfToken;
+        }
+        const startResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/start', {
             method: 'POST',
-            headers: {
-                'X-CSRF-Token': `${csrfToken}`,
-                'Content-Type': 'application/json',
-            },
+            headers: startHeaders,
             credentials: 'same-origin', // Important for cookie-based context token
             body: JSON.stringify(request)
         });
@@ -385,13 +393,15 @@ async function startRegistration(mode, username = null, displayname = null) {
 
         console.log('Registration response:', credentialResponse);
 
+        // Same mode-based gating as register/start above.
+        const finishHeaders = { 'Content-Type': 'application/json' };
+        if (mode === 'add_to_user') {
+            finishHeaders['X-CSRF-Token'] = csrfToken;
+        }
         // Use the single registration finish endpoint
         const finishResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/finish', {
             method: 'POST',
-            headers: {
-                'X-CSRF-Token': `${csrfToken}`,
-                'Content-Type': 'application/json',
-            },
+            headers: finishHeaders,
             // Include credentials to ensure cookies are sent with the request
             credentials: 'same-origin',
             body: JSON.stringify(credentialResponse)

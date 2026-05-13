@@ -19,6 +19,9 @@ user-ui = []
 admin-ui = []
 cors = ["dep:tower-http"]
 bundled-tls = ["oauth2-passkey/bundled-tls"]
+# E2E build flag. Re-exports `reset_storage_for_test` and mounts
+# `POST /o2p/test/reset`. Must NOT be enabled in production builds.
+e2e-test = ["oauth2-passkey/e2e-test"]
 
 [dependencies]
 # Changed from workspace dependency to published crate version
@@ -43,6 +46,7 @@ base64 = { workspace = true }
 ciborium = { workspace = true }
 dotenvy = { workspace = true }
 jsonwebtoken = { workspace = true }
+mock-oidc = { path = "../mock-oidc" }
 regex = { workspace = true }
 reqwest = { workspace = true }
 ring = { workspace = true }

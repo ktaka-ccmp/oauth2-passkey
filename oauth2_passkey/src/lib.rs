@@ -173,3 +173,54 @@ pub async fn init() -> Result<(), Box<dyn std::error::Error>> {
 pub use audit::LoginHistoryError;
 pub use audit::cleanup_old_login_history;
 pub use audit::spawn_login_history_cleanup;
+
+/// Wipe all persisted users, OAuth2 accounts, passkey credentials, and
+/// login history. Resets auto-increment sequences so the next inserted
+/// user becomes the first user again (matters for admin-bootstrap tests
+/// that rely on `sequence_number == 1`).
+///
+/// Intended for E2E test setup to give each test a clean DB.
+///
+/// Stale session and challenge cache entries are left in place — Playwright
+/// uses a fresh browser context per test, so leftover server-side cache
+/// entries are never referenced.
+///
+/// SQLite only. PostgreSQL/MySQL paths are out of scope here because the
+/// E2E suite runs against SQLite.
+///
+/// Gated behind the `e2e-test` Cargo feature; not present in production
+/// builds.
+#[cfg(feature = "e2e-test")]
+pub async fn reset_storage_for_test() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::session::UserId;
+    use crate::storage::GENERIC_DATA_STORE;
+    use crate::userdb::UserStore;
+
+    // Cascade-delete every user. ON DELETE CASCADE on oauth2_accounts and
+    // passkey_credentials cleans up dependent rows automatically.
+    let users = UserStore::get_all_users().await?;
+    for u in users {
+        let user_id = UserId::new(u.id)?;
+        UserStore::delete_user(user_id).await?;
+    }
+
+    let store = GENERIC_DATA_STORE.lock().await;
+    if let Some(pool) = store.as_sqlite() {
+        let prefix = &*crate::storage::DB_TABLE_PREFIX;
+        // login_history has no FK to users; clear it explicitly.
+        sqlx::query(&format!("DELETE FROM {prefix}login_history"))
+            .execute(pool)
+            .await?;
+        // Reset autoincrement counters so the next inserted user lands at
+        // sequence_number=1 (and thus is recognised as the first user/admin).
+        sqlx::query(&format!(
+            "DELETE FROM sqlite_sequence WHERE name IN \
+             ('{prefix}users', '{prefix}passkey_credentials', \
+              '{prefix}oauth2_accounts', '{prefix}login_history')"
+        ))
+        .execute(pool)
+        .await?;
+    }
+
+    Ok(())
+}

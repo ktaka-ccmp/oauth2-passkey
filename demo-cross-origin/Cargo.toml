@@ -3,6 +3,11 @@ name = "demo-cross-origin"
 version = { workspace = true }
 edition = { workspace = true }
 
+[features]
+# E2E build flag (Playwright only). Mounts `POST /o2p/test/reset` via
+# the library and skips loading `.env`. Never enable in production.
+e2e-test = ["oauth2-passkey-axum/e2e-test"]
+
 [dependencies]
 oauth2-passkey-axum = { path = "../oauth2_passkey_axum", features = ["cors"] }
 

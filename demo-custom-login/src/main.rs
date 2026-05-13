@@ -6,8 +6,6 @@ use axum::{
     response::{Html, IntoResponse, Redirect},
     routing::get,
 };
-use dotenvy::dotenv;
-
 use oauth2_passkey_axum::{
     AuthUser, O2P_ROUTE_PREFIX, OAuth2Account, PasskeyCredential, SessionId, UserId, get_all_users,
     get_user, list_accounts_core, list_credentials_core, oauth2_passkey_full_router,
@@ -353,7 +351,8 @@ async fn admin_user(user: AuthUser, Path(target_id): Path<String>) -> impl IntoR
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing("demo-custom-login");
 
-    dotenv().ok();
+    #[cfg(not(feature = "e2e-test"))]
+    dotenvy::dotenv().ok();
     oauth2_passkey_axum::init().await?;
 
     let app = Router::new()
@@ -365,6 +364,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/admin/user/{id}", get(admin_user)) // Custom admin user detail page
         .merge(oauth2_passkey_full_router());
 
-    spawn_http_server(3001, app).await?;
+    let port = std::env::var("DEMO_CUSTOM_LOGIN_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3001);
+    spawn_http_server(port, app).await?;
     Ok(())
 }

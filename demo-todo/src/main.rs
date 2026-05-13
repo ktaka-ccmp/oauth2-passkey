@@ -6,9 +6,8 @@ use axum::{
     response::{Html, IntoResponse, Response},
     routing::get,
 };
-use dotenvy::dotenv;
 use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_full_router};
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 mod db;
 mod handlers;
@@ -19,7 +18,7 @@ use server::{init_tracing, spawn_http_server};
 /// Application state - shared across all handlers
 #[derive(Clone)]
 pub struct AppState {
-    pub pool: PgPool,
+    pub pool: SqlitePool,
 }
 
 #[derive(Template)]
@@ -73,7 +72,8 @@ async fn index(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing("demo-todo");
 
-    dotenv().ok();
+    #[cfg(not(feature = "e2e-test"))]
+    dotenvy::dotenv().ok();
 
     // Initialize oauth2-passkey library
     oauth2_passkey_axum::init().await?;
@@ -91,6 +91,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Combine with oauth2-passkey routes
     let app = app_routes.merge(oauth2_passkey_full_router());
 
-    spawn_http_server(3001, app).await?;
+    let port = std::env::var("DEMO_TODO_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3001);
+    spawn_http_server(port, app).await?;
     Ok(())
 }

@@ -78,7 +78,7 @@ async fn toggle_todo(
     user: AuthUser,
     Extension(csrf_token): Extension<CsrfToken>,
     Extension(csrf_header_verified): Extension<CsrfHeaderVerified>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Form(form): Form<ActionForm>,
 ) -> Result<Response, (StatusCode, String)> {
     if !verify_csrf(&form.csrf_token, &csrf_token, csrf_header_verified.0) {
@@ -103,7 +103,7 @@ async fn delete_todo(
     user: AuthUser,
     Extension(csrf_token): Extension<CsrfToken>,
     Extension(csrf_header_verified): Extension<CsrfHeaderVerified>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Form(form): Form<ActionForm>,
 ) -> Result<Response, (StatusCode, String)> {
     if !verify_csrf(&form.csrf_token, &csrf_token, csrf_header_verified.0) {
