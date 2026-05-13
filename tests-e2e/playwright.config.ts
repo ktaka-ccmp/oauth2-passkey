@@ -35,7 +35,20 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          // Disable Chrome's FedCM so `navigator.credentials.get({ identity })`
+          // does not try to reach the real `accounts.google.com/gsi/fedcm.json`
+          // when --headed is used. The library's client JS catches the failure
+          // and falls back to the popup flow, which is what the specs assert.
+          // fedcm.spec.ts exercises FedCM at the HTTP API level only, so this
+          // flag does not affect it.
+          args: [
+            '--disable-features=FedCm,FedCmAuthz,FedCmMultipleIdentityProviders',
+          ],
+        },
+      },
     },
   ],
 
