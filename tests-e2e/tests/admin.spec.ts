@@ -122,3 +122,111 @@ test('admin: list users and force-logout a second user', async ({
   await adminCtx.close();
   await userCtx.close();
 });
+
+test('admin: toggle a second user\'s admin status, then delete them', async ({
+  browser,
+}) => {
+  await resetDb();
+
+  // --- 1) Admin via passkey (first user => sequence_number == 1 => is_admin)
+  const adminCtx = await browser.newContext();
+  const adminPage = await adminCtx.newPage();
+  await adminPage.goto('/o2p/user/login');
+  const adminAuth = await addVirtualAuthenticator(adminPage);
+  await registerPasskeyFromLogin(adminPage, 'e2e-admin', 'E2E Admin');
+
+  // --- 2) Second user via OAuth2 (distinct identity via mock-oidc /test/config)
+  await adminCtx.request.post(`${MOCK_OIDC_URL}/test/config`, {
+    data: {
+      email: 'second@example.com',
+      sub: 'google_second-user',
+      name: 'Second User',
+      given_name: 'Second',
+      family_name: 'User',
+    },
+  });
+
+  const userCtx = await browser.newContext();
+  const userPage = await userCtx.newPage();
+  await userPage.goto('/o2p/user/login');
+  const popupPromise = userCtx.waitForEvent('page');
+  await userPage.getByTestId('login-oauth2-google').click();
+  const popup = await popupPromise;
+  await popup.waitForURL(/\/o2p\/passkey\/promotion\/popup/, {
+    timeout: 15_000,
+  });
+  await popup.locator('#passkey-promo-dismiss').click();
+  await popup.waitForEvent('close', { timeout: 10_000 });
+  await userPage.waitForLoadState('networkidle');
+
+  // --- 3) Locate the second user's row on the admin index. Bootstrap admin
+  //         (sequence_number == 1) has no toggle/delete button; non-bootstrap
+  //         rows do, so the test naturally operates on the second user.
+  await adminPage.goto('/o2p/admin/index');
+  await expect(adminPage.getByTestId('admin-user-row')).toHaveCount(2);
+  const secondRow = adminPage
+    .locator('tr[data-user-id]')
+    .filter({ hasText: 'second@example.com' });
+  const secondUserId = await secondRow.getAttribute('data-user-id');
+  expect(secondUserId).toBeTruthy();
+
+  // Auto-accept confirm() + the success alert() the JS handlers raise.
+  adminPage.on('dialog', (d) => d.accept());
+
+  // --- 4) Toggle admin off->on. The UI shows is_admin as a string; assert
+  //         on the inline status span the JS updates.
+  const statusSpan = adminPage.locator(`#admin-status-${secondUserId}`);
+  await expect(statusSpan).toHaveText('false');
+
+  const toggleOnResp = adminPage.waitForResponse(
+    (r) =>
+      r.url().endsWith('/o2p/admin/update_admin_status') &&
+      r.request().method() === 'PUT' &&
+      r.status() === 200,
+  );
+  await secondRow.getByTestId('admin-toggle-admin-btn').click();
+  await toggleOnResp;
+  await expect(statusSpan).toHaveText('true');
+
+  // Toggle back off — verifies the button's onclick was rewired with the
+  // new status by the client-side handler.
+  const toggleOffResp = adminPage.waitForResponse(
+    (r) =>
+      r.url().endsWith('/o2p/admin/update_admin_status') &&
+      r.request().method() === 'PUT' &&
+      r.status() === 200,
+  );
+  await secondRow.getByTestId('admin-toggle-admin-btn').click();
+  await toggleOffResp;
+  await expect(statusSpan).toHaveText('false');
+
+  // --- 5) Delete the second user from the admin index. The handler
+  //         returns 204 No Content on success.
+  const deleteResp = adminPage.waitForResponse(
+    (r) =>
+      r.url().endsWith('/o2p/admin/delete_user') &&
+      r.request().method() === 'DELETE' &&
+      r.status() === 204,
+  );
+  await secondRow.getByTestId('admin-delete-user-btn').click();
+  await deleteResp;
+  // The JS calls window.location.reload(); wait for the row count to drop.
+  await expect(adminPage.getByTestId('admin-user-row')).toHaveCount(1, {
+    timeout: 5_000,
+  });
+
+  // --- 6) The deleted user's protected-route access must now redirect to
+  //         login (account + cascaded session are gone).
+  const protectedReq = await userCtx.request.get(`${DEMO_BASE_URL}/`, {
+    maxRedirects: 0,
+    failOnStatusCode: false,
+  });
+  expect([302, 303, 307]).toContain(protectedReq.status());
+  expect(protectedReq.headers()['location'] ?? '').toMatch(
+    /\/o2p\/user\/login/,
+  );
+
+  await adminAuth.remove();
+  await adminCtx.close();
+  await userCtx.close();
+});
