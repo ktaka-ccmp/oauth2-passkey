@@ -3,6 +3,10 @@ name = "mock-oidc"
 version = { workspace = true }
 edition = { workspace = true }
 publish = false
+description = "Mock OIDC provider (lib + standalone bin) for E2E and integration tests"
+
+[lib]
+path = "src/lib.rs"
 
 [[bin]]
 name = "mock-oidc"
@@ -10,7 +14,12 @@ path = "src/main.rs"
 
 [dependencies]
 axum = { workspace = true }
-mock-oidc-core = { path = "../mock-oidc-core" }
+base64 = { workspace = true }
+jsonwebtoken = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+uuid = { workspace = true }

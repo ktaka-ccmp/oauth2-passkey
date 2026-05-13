@@ -48,7 +48,6 @@ use axum::{
     response::{Html, IntoResponse, Response},
     routing::get,
 };
-use dotenvy::dotenv;
 use serde::Serialize;
 use std::sync::LazyLock;
 
@@ -182,7 +181,8 @@ async fn resource_health() -> impl IntoResponse {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing("demo_cross_origin");
 
-    dotenv().ok();
+    #[cfg(not(feature = "e2e-test"))]
+    dotenvy::dotenv().ok();
     oauth2_passkey_axum::init().await?;
 
     // Get ports from environment

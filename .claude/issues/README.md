@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (8)
+### Open (9)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -18,11 +18,14 @@ This directory contains issue/task tracking files for the project.
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
+| `20260513-0544` | low | small | [Passkey register/finish falls through to create_user when auth is lost mid-flow](open/20260513-0544-passkey-register-finish-mode-confusion.md) |
 
-### Completed (78)
+### Completed (80)
 
 | ID | Title |
 |----|-------|
+| `20260513-1550` | [passkey.js references csrfToken in create_user mode where the server does not check it](completed/20260513-1550-passkey-js-csrftoken-create-user.md) |
+| `20260513-1356` | [Reduce E2E pollution in demos (lib-side /test/reset + SQLite for demo-todo/profile)](completed/20260513-1356-reduce-e2e-pollution-in-demos.md) |
 | `20260512-0457` | [Standardize Rust code block markers in mdBook docs to `rust,ignore`](completed/20260512-0457-standardize-rust-block-markers.md) |
 | `20260512-0350` | [Use constant-time comparison in verify_page_session_token](completed/20260512-0350-constant-time-page-session-token.md) |
 | `20260512-0351` | [Correct status labeling for archived design proposals](completed/20260512-0351-archived-design-proposals-status-labeling.md) |

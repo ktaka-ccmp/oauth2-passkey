@@ -28,13 +28,32 @@ use oauth2_passkey::{O2P_ROUTE_PREFIX, get_related_origin_json};
 ///     .layer(TraceLayer::new_for_http());
 /// ```
 pub fn oauth2_passkey_router() -> Router {
-    Router::new()
+    let router = Router::new()
         .nest("/oauth2", super::oauth2::router())
         .nest("/passkey", super::passkey::router())
         .nest("/user", super::user::router())
         .nest("/admin", super::admin::router())
         .nest("/themes", super::themes::router())
-        .nest("/icons", super::icons::router())
+        .nest("/icons", super::icons::router());
+
+    #[cfg(feature = "e2e-test")]
+    let router = router.route("/test/reset", axum::routing::post(test_reset_handler));
+
+    router
+}
+
+/// E2E test-reset endpoint, mounted only when the `e2e-test` Cargo
+/// feature is enabled. Lets the Playwright suite wipe library state
+/// between tests via `POST {O2P_ROUTE_PREFIX}/test/reset` (default
+/// `POST /o2p/test/reset`).
+///
+/// Never enable this feature in production builds.
+#[cfg(feature = "e2e-test")]
+async fn test_reset_handler() -> Result<axum::http::StatusCode, (axum::http::StatusCode, String)> {
+    oauth2_passkey::reset_storage_for_test()
+        .await
+        .map(|_| axum::http::StatusCode::NO_CONTENT)
+        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// Creates a complete router with all authentication endpoints
