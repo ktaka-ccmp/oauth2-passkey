@@ -7,11 +7,6 @@
     <title>Login - Custom Demo</title>
     <script>
         const O2P_ROUTE_PREFIX = '{{o2p_route_prefix}}';
-        // passkey.js' submitRegistration references this for X-CSRF-Token
-        // on /passkey/register/start. In anonymous create_user mode the
-        // server does not enforce CSRF, but the JS still has to resolve
-        // the symbol — match the library's built-in login.j2.
-        const csrfToken = "_NOT_SET_";
     </script>
     <script src="{{o2p_route_prefix}}/oauth2/oauth2.js"></script>
     <script src="{{o2p_route_prefix}}/passkey/passkey.js"></script>

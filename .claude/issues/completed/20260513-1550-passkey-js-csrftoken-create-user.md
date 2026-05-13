@@ -4,8 +4,8 @@
 
 - ID: 20260513-1550
 - Created: 2026-05-13-15-50
-- Closed:
-- Status: open
+- Closed: 2026-05-13-16-27
+- Status: completed
 - Priority: medium
 - Difficulty: small
 - Related Issues:
@@ -190,4 +190,47 @@ node test rig in this repo).
 
 ## Resolution
 
-<!-- written when status moves to completed -->
+Implemented as planned, in a single commit landing on
+`feat/e2e-phase-2` immediately after the issue was filed.
+
+**Library change** — `oauth2_passkey_axum/static/passkey.js`'s
+`startRegistration` now builds the `headers` object incrementally and
+only attaches `X-CSRF-Token: ${csrfToken}` when `mode === 'add_to_user'`.
+Both fetch sites (register/start and register/finish) are gated this
+way. In `create_user` mode the `csrfToken` symbol is never resolved,
+so an anonymous host page that does not declare it no longer hits
+`ReferenceError`. Comment blocks at both fetch sites document the
+mode-based gating.
+
+**Cleanups enabled by the fix**:
+
+- `oauth2_passkey_axum/templates/login.j2` — removed the now-pointless
+  `const csrfToken = "_NOT_SET_";` declaration from the page-init
+  `<script>` block. The library's built-in anonymous login page no
+  longer carries that workaround.
+- `demo-custom-login/templates/login.j2` — removed the same line +
+  the four-line comment I had added in commit `6ae6531` to satisfy
+  the old contract. The demo's custom login page is now properly
+  symmetric with the library's built-in login.j2.
+
+**Out of scope for this fix** (intentionally):
+
+- `O2P_ROUTE_PREFIX` is also referenced as an undeclared global in
+  both `passkey.js` and `oauth2.js`. It is conceptually similar but
+  practically never omitted (it is obviously required for URL
+  construction and breaks loudly when missing) so does not warrant
+  the same hardening. Left untouched.
+- Documentation of the *remaining* `csrfToken` contract for
+  `add_to_user` flows (authed pages must declare it). The library's
+  authed templates already do this implicitly; an integrator writing
+  an authed page would discover the requirement from any of them.
+
+**Verification**:
+
+- `cargo build` clean.
+- Playwright suite: **38/38 specs pass in ~1.5 min**. In particular,
+  `passkey-registration-protection.spec.ts Phase 1` continues to
+  catch the stale-CSRF rejection (the test sends `mode=add_to_user`
+  directly via the HTTP client, so it exercises the path that still
+  attaches the header), confirming the gating is mode-correct.
+- Manual flow not re-executed; the spec covers the regression.

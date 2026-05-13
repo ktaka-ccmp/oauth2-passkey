@@ -328,13 +328,20 @@ async function startRegistration(mode, username = null, displayname = null) {
             mode: mode,
         };
 
-        let startResponse;
-        startResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/start', {
+        // Only attach X-CSRF-Token in modes the server actually checks
+        // (add_to_user requires an authenticated session and CSRF). For
+        // anonymous flows (create_user) the server's AuthUser extractor
+        // is None and the header value is ignored — referencing the
+        // page-supplied `csrfToken` global there would force every
+        // anonymous host page to declare it just to satisfy lexical
+        // resolution.
+        const startHeaders = { 'Content-Type': 'application/json' };
+        if (mode === 'add_to_user') {
+            startHeaders['X-CSRF-Token'] = csrfToken;
+        }
+        const startResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/start', {
             method: 'POST',
-            headers: {
-                'X-CSRF-Token': `${csrfToken}`,
-                'Content-Type': 'application/json',
-            },
+            headers: startHeaders,
             credentials: 'same-origin', // Important for cookie-based context token
             body: JSON.stringify(request)
         });
@@ -386,13 +393,15 @@ async function startRegistration(mode, username = null, displayname = null) {
 
         console.log('Registration response:', credentialResponse);
 
+        // Same mode-based gating as register/start above.
+        const finishHeaders = { 'Content-Type': 'application/json' };
+        if (mode === 'add_to_user') {
+            finishHeaders['X-CSRF-Token'] = csrfToken;
+        }
         // Use the single registration finish endpoint
         const finishResponse = await fetch(O2P_ROUTE_PREFIX + '/passkey/register/finish', {
             method: 'POST',
-            headers: {
-                'X-CSRF-Token': `${csrfToken}`,
-                'Content-Type': 'application/json',
-            },
+            headers: finishHeaders,
             // Include credentials to ensure cookies are sent with the request
             credentials: 'same-origin',
             body: JSON.stringify(credentialResponse)
