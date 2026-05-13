@@ -1,6 +1,8 @@
 # Demo Profile
 
-A demonstration application showing how to extend user data with application-specific attributes using a separate PostgreSQL table linked by `user_id`.
+A demonstration application showing how to extend user data with application-specific attributes using a separate table linked by `user_id`.
+
+Defaults to SQLite (`sqlite:demo-profile.db?mode=rwc`) so the demo runs with `cargo run` and no external setup. For a production-style topology see `demo-live` (HTTPS + Postgres).
 
 ## Features
 
@@ -30,27 +32,20 @@ The library manages authentication; your app manages extended attributes in a se
 
 ## Database Configuration
 
-The oauth2-passkey library and your application can use any combination of databases. Choose the setup that best fits your requirements.
-
-### Same Database
-
-Both library and app share a single PostgreSQL database. This enables foreign key constraints and JOINs between `users` and `user_profiles` tables.
+The library and the app each pick their own database via env vars. The
+demo defaults both to SQLite for zero-setup development.
 
 ```env
-GENERIC_DATA_STORE_TYPE=postgresql
-GENERIC_DATA_STORE_URL='postgres://demo:demo@localhost:5432/demo'
-APP_DATABASE_URL='postgres://demo:demo@localhost:5432/demo'
-```
-
-### Separate Databases
-
-Library and app use independent databases. Useful for isolation or when using different database systems.
-
-```env
+# Library auth tables (users, oauth2_accounts, passkey_credentials, ...)
 GENERIC_DATA_STORE_TYPE=sqlite
-GENERIC_DATA_STORE_URL='sqlite:/tmp/auth.db'
-APP_DATABASE_URL='postgres://demo:demo@localhost:5432/demo'
+GENERIC_DATA_STORE_URL='sqlite:auth.db?mode=rwc'
+
+# App tables (user_profiles)
+APP_DATABASE_URL='sqlite:demo-profile.db?mode=rwc'
 ```
+
+Swap either or both for Postgres in production — see `demo-live` for a
+working HTTPS+Postgres deployment.
 
 ## Setup
 
@@ -62,22 +57,13 @@ cp .env.example .env
 
 2. Configure your Google OAuth2 credentials in `.env`
 
-3. Choose your database configuration (Option A or B) in `.env`
-
-4. Start PostgreSQL (the `user_profiles` table will be created automatically):
-
-```bash
-# Use the project's docker-compose
-cd ../db/postgresql && docker compose up -d
-```
-
-5. Run the demo:
+3. Run the demo (SQLite files are created automatically):
 
 ```bash
 cargo run
 ```
 
-6. Open http://localhost:3001 in your browser
+4. Open http://localhost:3001 in your browser
 
 ## How Avatar Works
 
@@ -102,13 +88,13 @@ let google_avatar = accounts
 
 ```sql
 CREATE TABLE user_profiles (
-    user_id TEXT PRIMARY KEY,      -- Links to oauth2-passkey user
+    user_id TEXT PRIMARY KEY,        -- Links to oauth2-passkey user
     display_name TEXT,
     bio TEXT,
-    avatar_url TEXT,               -- Google picture or custom URL
-    theme TEXT DEFAULT 'light',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    avatar_url TEXT,                 -- Google picture or custom URL
+    theme TEXT NOT NULL DEFAULT 'light',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 

@@ -2,14 +2,14 @@ use axum::{
     Router,
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::get,
 };
 
 use dotenvy::dotenv;
 
 use oauth2_passkey_axum::{
     AuthUser, O2P_CUSTOM_CSS_URL, O2P_ROUTE_PREFIX, oauth2_passkey_full_router,
-    reset_storage_for_test, spawn_login_history_cleanup,
+    spawn_login_history_cleanup,
 };
 
 mod protected;
@@ -24,13 +24,6 @@ struct IndexTemplate<'a> {
     message: &'a str,
     prefix: &'a str,
     custom_css_url: Option<&'a str>,
-}
-
-async fn test_reset() -> Result<StatusCode, (StatusCode, String)> {
-    reset_storage_for_test()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    Ok(StatusCode::NO_CONTENT)
 }
 
 // AuthUser extractor redirects unauthenticated users to O2P_LOGIN_URL automatically
@@ -59,17 +52,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     spawn_login_history_cleanup();
 
-    let mut app = Router::new()
+    let app = Router::new()
         .route("/", get(index))
         .merge(oauth2_passkey_full_router())
         .merge(protected::router());
-
-    // E2E test harness: when DEMO_BOTH_TEST_RESET=1, expose POST /test/reset
-    // for Playwright fixtures to wipe persistent state between tests.
-    if std::env::var("DEMO_BOTH_TEST_RESET").is_ok() {
-        app = app.route("/test/reset", post(test_reset));
-        tracing::warn!("DEMO_BOTH_TEST_RESET enabled — mounting POST /test/reset");
-    }
 
     let port = std::env::var("DEMO_BOTH_PORT")
         .ok()

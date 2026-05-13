@@ -21,12 +21,3 @@ export const DEMO_CROSS_ORIGIN_API_URL = `http://localhost:${DEMO_CROSS_ORIGIN_A
 export const DEMO_TODO_BASE_URL = `http://localhost:${DEMO_TODO_PORT}`;
 export const DEMO_PROFILE_BASE_URL = `http://localhost:${DEMO_PROFILE_PORT}`;
 export const MOCK_OIDC_URL = `http://localhost:${MOCK_OIDC_PORT}`;
-
-/**
- * Postgres connection string for demo-todo / demo-profile. The
- * Playwright `globalSetup` spins up `e2e-pg` as a docker container
- * mapped to host port 54320; both demos point their `APP_DATABASE_URL`
- * here.
- */
-export const APP_DATABASE_URL =
-  process.env.APP_DATABASE_URL ?? 'postgres://demo:demo@localhost:54320/demo';

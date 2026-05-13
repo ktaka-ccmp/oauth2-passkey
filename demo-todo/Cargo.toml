@@ -3,8 +3,13 @@ name = "demo-todo"
 version = { workspace = true }
 edition = { workspace = true }
 
+[features]
+# Passthrough: enables the library's `POST /o2p/test/reset` route for
+# the Playwright E2E suite. Never enable in production.
+test-reset = ["oauth2-passkey-axum/test-reset"]
+
 [dependencies]
-oauth2-passkey-axum = { path = "../oauth2_passkey_axum", features = ["test-reset"] }
+oauth2-passkey-axum = { path = "../oauth2_passkey_axum" }
 
 askama = { workspace = true }
 axum = { workspace = true }

@@ -4,13 +4,11 @@ use axum::{
     extract::State,
     http::StatusCode,
     response::{Html, IntoResponse, Response},
-    routing::{get, post},
+    routing::get,
 };
 use dotenvy::dotenv;
-use oauth2_passkey_axum::{
-    AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_full_router, reset_storage_for_test,
-};
-use sqlx::PgPool;
+use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_full_router};
+use sqlx::SqlitePool;
 
 mod db;
 mod handlers;
@@ -21,7 +19,7 @@ use server::{init_tracing, spawn_http_server};
 /// Application state - shared across all handlers
 #[derive(Clone)]
 pub struct AppState {
-    pub pool: PgPool,
+    pub pool: SqlitePool,
 }
 
 #[derive(Template)]
@@ -69,19 +67,6 @@ async fn index(
     }
 }
 
-/// E2E test-reset endpoint (mounted only when DEMO_PROFILE_TEST_RESET=1):
-/// wipes library users + the app's `user_profiles` table.
-async fn test_reset(State(state): State<AppState>) -> Result<StatusCode, (StatusCode, String)> {
-    reset_storage_for_test()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    sqlx::query("DELETE FROM user_profiles")
-        .execute(&state.pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing("demo-profile");
@@ -98,16 +83,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState { pool };
 
     // Routes that use our AppState
-    let mut app_routes = Router::new()
+    let app_routes = Router::new()
         .route("/", get(index))
-        .merge(handlers::router());
-
-    if std::env::var("DEMO_PROFILE_TEST_RESET").is_ok() {
-        app_routes = app_routes.route("/test/reset", post(test_reset));
-        tracing::warn!("DEMO_PROFILE_TEST_RESET enabled — mounting POST /test/reset");
-    }
-
-    let app_routes = app_routes.with_state(state);
+        .merge(handlers::router())
+        .with_state(state);
 
     // Combine with oauth2-passkey routes
     let app = app_routes.merge(oauth2_passkey_full_router());

@@ -1,6 +1,8 @@
 # Demo Todo
 
-A demonstration application showing how to manage user-specific data with a one-to-many relationship using a separate PostgreSQL table linked by `user_id`.
+A demonstration application showing how to manage user-specific data with a one-to-many relationship using a separate table linked by `user_id`.
+
+Defaults to SQLite (`sqlite:demo-todo.db?mode=rwc`) so the demo runs with `cargo run` and no external setup. For a production-style topology see `demo-live` (HTTPS + Postgres).
 
 ## Features
 
@@ -29,27 +31,20 @@ The library manages authentication; your app manages user data in a separate tab
 
 ## Database Configuration
 
-The oauth2-passkey library and your application can use any combination of databases. Choose the setup that best fits your requirements.
-
-### Same Database
-
-Both library and app share a single PostgreSQL database. This enables foreign key constraints and JOINs between `users` and `todos` tables.
+The library and the app each pick their own database via env vars. The
+demo defaults both to SQLite for zero-setup development.
 
 ```env
-GENERIC_DATA_STORE_TYPE=postgresql
-GENERIC_DATA_STORE_URL='postgres://demo:demo@localhost:5432/demo'
-APP_DATABASE_URL='postgres://demo:demo@localhost:5432/demo'
-```
-
-### Separate Databases
-
-Library and app use independent databases. Useful for isolation or when using different database systems.
-
-```env
+# Library auth tables (users, oauth2_accounts, passkey_credentials, ...)
 GENERIC_DATA_STORE_TYPE=sqlite
-GENERIC_DATA_STORE_URL='sqlite:/tmp/auth.db'
-APP_DATABASE_URL='postgres://demo:demo@localhost:5432/demo'
+GENERIC_DATA_STORE_URL='sqlite:auth.db?mode=rwc'
+
+# App tables (todos)
+APP_DATABASE_URL='sqlite:demo-todo.db?mode=rwc'
 ```
+
+Swap either or both for Postgres in production — see `demo-live` for a
+working HTTPS+Postgres deployment.
 
 ## Setup
 
@@ -61,33 +56,24 @@ cp .env.example .env
 
 2. Configure your Google OAuth2 credentials in `.env`
 
-3. Choose your database configuration in `.env`
-
-4. Start PostgreSQL (the `todos` table will be created automatically):
-
-```bash
-# Use the project's docker-compose
-cd ../db/postgresql && docker compose up -d
-```
-
-5. Run the demo:
+3. Run the demo (SQLite files are created automatically):
 
 ```bash
 cargo run
 ```
 
-6. Open http://localhost:3001 in your browser
+4. Open http://localhost:3001 in your browser
 
 ## Database Schema
 
 ```sql
 CREATE TABLE todos (
-    id SERIAL PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT NOT NULL,        -- Links to oauth2-passkey user
     title TEXT NOT NULL,
-    completed BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    completed INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_todos_user_id ON todos(user_id);

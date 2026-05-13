@@ -1,7 +1,5 @@
-import { createRequire } from 'node:module';
 import { defineConfig, devices } from '@playwright/test';
 import {
-  APP_DATABASE_URL,
   DEMO_BASE_URL,
   DEMO_CROSS_ORIGIN_API_PORT,
   DEMO_CROSS_ORIGIN_API_URL,
@@ -18,8 +16,6 @@ import {
   MOCK_OIDC_URL,
 } from './helpers/endpoints';
 
-const require = createRequire(import.meta.url);
-
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false, // shared backend state — keep serial
@@ -28,13 +24,6 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   timeout: 30_000,
   expect: { timeout: 5_000 },
-  // demo-todo / demo-profile need a real Postgres; globalSetup starts
-  // an ephemeral container, globalTeardown stops it. `require.resolve`
-  // gives Playwright an absolute path so the loader picks it up
-  // regardless of cwd. The `.ts` extension is required — Node's
-  // `require.resolve` does not auto-append it.
-  globalSetup: require.resolve('./global-setup.ts'),
-  globalTeardown: require.resolve('./global-teardown.ts'),
 
   use: {
     baseURL: DEMO_BASE_URL,
@@ -67,7 +56,11 @@ export default defineConfig({
       },
     },
     {
-      command: `cargo run -p demo-todo`,
+      // `--features test-reset` flips the passthrough Cargo feature that
+      // mounts `POST /o2p/test/reset` inside the library, which the spec
+      // helper hits between tests. Without that flag the demo compiles
+      // as a clean release binary.
+      command: `cargo run -p demo-todo --features test-reset`,
       url: `${DEMO_TODO_BASE_URL}/`,
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
@@ -76,8 +69,7 @@ export default defineConfig({
       env: {
         DEMO_TODO_PORT: String(DEMO_TODO_PORT),
         DEMO_TODO_SKIP_DOTENV: '1',
-        DEMO_TODO_TEST_RESET: '1',
-        APP_DATABASE_URL,
+        APP_DATABASE_URL: 'sqlite::memory:',
         ORIGIN: DEMO_TODO_BASE_URL,
         OAUTH2_GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
         OAUTH2_GOOGLE_CLIENT_SECRET: 'test-client-secret',
@@ -93,7 +85,7 @@ export default defineConfig({
       },
     },
     {
-      command: `cargo run -p demo-profile`,
+      command: `cargo run -p demo-profile --features test-reset`,
       url: `${DEMO_PROFILE_BASE_URL}/`,
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
@@ -102,8 +94,7 @@ export default defineConfig({
       env: {
         DEMO_PROFILE_PORT: String(DEMO_PROFILE_PORT),
         DEMO_PROFILE_SKIP_DOTENV: '1',
-        DEMO_PROFILE_TEST_RESET: '1',
-        APP_DATABASE_URL,
+        APP_DATABASE_URL: 'sqlite::memory:',
         ORIGIN: DEMO_PROFILE_BASE_URL,
         OAUTH2_GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
         OAUTH2_GOOGLE_CLIENT_SECRET: 'test-client-secret',
@@ -122,7 +113,7 @@ export default defineConfig({
       // demo-cross-origin spawns BOTH auth (:13010) and api (:13011)
       // servers in a single process. Wait on the auth server's `/`
       // (renders even when anonymous) to know both are up.
-      command: `cargo run -p demo-cross-origin`,
+      command: `cargo run -p demo-cross-origin --features test-reset`,
       url: `${DEMO_CROSS_ORIGIN_AUTH_URL}/`,
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
@@ -132,7 +123,6 @@ export default defineConfig({
         AUTH_PORT: String(DEMO_CROSS_ORIGIN_AUTH_PORT),
         API_PORT: String(DEMO_CROSS_ORIGIN_API_PORT),
         DEMO_CROSS_ORIGIN_SKIP_DOTENV: '1',
-        DEMO_CROSS_ORIGIN_TEST_RESET: '1',
         ORIGIN: DEMO_CROSS_ORIGIN_AUTH_URL,
         API_ORIGIN: DEMO_CROSS_ORIGIN_API_URL,
         // Both servers run on `localhost` so the cookie is implicitly
@@ -155,7 +145,7 @@ export default defineConfig({
       },
     },
     {
-      command: `cargo run -p demo-custom-login`,
+      command: `cargo run -p demo-custom-login --features test-reset`,
       url: `${DEMO_CUSTOM_LOGIN_BASE_URL}/login`,
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
@@ -164,7 +154,6 @@ export default defineConfig({
       env: {
         DEMO_CUSTOM_LOGIN_PORT: String(DEMO_CUSTOM_LOGIN_PORT),
         DEMO_CUSTOM_LOGIN_SKIP_DOTENV: '1',
-        DEMO_CUSTOM_LOGIN_TEST_RESET: '1',
         ORIGIN: DEMO_CUSTOM_LOGIN_BASE_URL,
         // The whole point of this demo: redirect anon users to /login,
         // not the built-in /o2p/user/login.
@@ -183,7 +172,7 @@ export default defineConfig({
       },
     },
     {
-      command: `cargo run -p demo-both`,
+      command: `cargo run -p demo-both --features test-reset`,
       url: `${DEMO_BASE_URL}/o2p/user/login`,
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
@@ -195,9 +184,6 @@ export default defineConfig({
         // which may set values (e.g. PASSKEY_AUTHENTICATOR_ATTACHMENT) that
         // break E2E assumptions.
         DEMO_BOTH_SKIP_DOTENV: '1',
-        // Mount POST /test/reset so Playwright fixtures can wipe state
-        // between tests. The route is only added when this var is set.
-        DEMO_BOTH_TEST_RESET: '1',
         ORIGIN: DEMO_BASE_URL,
         OAUTH2_GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
         OAUTH2_GOOGLE_CLIENT_SECRET: 'test-client-secret',

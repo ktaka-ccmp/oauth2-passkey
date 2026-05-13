@@ -4,8 +4,8 @@
 
 - ID: 20260513-1356
 - Created: 2026-05-13-13-56
-- Closed:
-- Status: open
+- Closed: 2026-05-13-14-15
+- Status: completed
 - Priority: low
 - Difficulty: small
 - Related Issues:
@@ -186,4 +186,46 @@ type — see `demo-live` for an HTTPS+Postgres example."
 
 ## Resolution
 
-<!-- written when status moves to completed -->
+Both changes landed in the immediate follow-up commit on
+`feat/e2e-phase-2` after the Phase 3 commit (`6ae6531`).
+
+**Change A — library-side `/test/reset`**: implemented in
+`oauth2_passkey_axum/src/router.rs` behind the existing `test-reset`
+Cargo feature. Each demo's `Cargo.toml` now declares a passthrough
+feature of the same name and Playwright opts in via
+`cargo run -p <demo> --features test-reset`. All five demos
+(`demo-both`, `demo-custom-login`, `demo-cross-origin`, `demo-todo`,
+`demo-profile`) had their `test_reset` handler, conditional route
+mount, `DEMO_*_TEST_RESET` env-var gate, and supporting imports
+removed.
+
+**Change B — SQLite for demo-todo / demo-profile**:
+`sqlx::PgPool` → `sqlx::SqlitePool`; schema migrated to SQLite SQL
+(`SERIAL` → `INTEGER PRIMARY KEY AUTOINCREMENT`, `TIMESTAMPTZ` →
+`TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, `$1, $2` → `?, ?`); `id` typed
+as `i64`; `APP_DATABASE_URL` defaults to a local SQLite file.
+`tests-e2e/global-setup.ts` and `global-teardown.ts` deleted;
+`.github/workflows/e2e.yml` lost its `services: postgres` block.
+
+Demo `main.rs` sizes after the cleanup:
+
+| Demo                | Pre-Phase-3 | After Phase 3 | After cleanup |
+|---------------------|------------:|--------------:|--------------:|
+| `demo-both`         |          67 |            79 |            66 |
+| `demo-custom-login` |         370 |           390 |           376 |
+| `demo-cross-origin` |         260 |           275 |           262 |
+| `demo-todo`         |          96 |           121 |           102 |
+| `demo-profile`      |          95 |           119 |           100 |
+
+Residual increases (1-6 lines) are doc comments on the new SQLite
+default in `db.rs` and the unchanged-since-Phase-2
+`DEMO_*_SKIP_DOTENV` env var. No test-only Rust code remains in any
+demo `main.rs`.
+
+Verification:
+
+- `cargo fmt --all` clean, `cargo clippy --workspace --all-targets
+  --all-features` clean.
+- Playwright suite: **38 tests pass in ~1.7 min with no Postgres
+  running**.
+- `docker ps` shows no test container during or after the run.

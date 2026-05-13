@@ -148,41 +148,23 @@ in registration options: `authenticator_attachment: platform`,
 
 ## Per-test DB reset
 
-Each demo under test mounts `POST /test/reset` when launched with its
-corresponding `*_TEST_RESET=1` env var (Playwright config sets these for
-demo-both, demo-custom-login, demo-cross-origin, demo-todo, demo-profile).
-The route calls the `test-reset`-gated `reset_storage_for_test()` in
-`oauth2-passkey`, which cascade-deletes users, wipes `login_history`,
-and resets the SQLite autoincrement counters so the next inserted user
-lands at `sequence_number=1`. demo-todo / demo-profile also wipe their
-own app-table inside the same handler.
+`oauth2-passkey-axum` exposes `POST {O2P_ROUTE_PREFIX}/test/reset`
+(default `POST /o2p/test/reset`) when its `test-reset` Cargo feature is
+on. Each demo's `Cargo.toml` declares a passthrough feature of the
+same name; the Playwright `webServer` entries opt in via `cargo run -p
+<demo> --features test-reset`. **The demo source code carries zero
+test wiring** — without the feature flag, the route is not compiled.
 
 Each spec calls `resetDb(baseUrl)` from `helpers/db.ts` at the top,
-which hits that route on the target demo and also resets `mock-oidc`'s
-`TestUser` back to the default identity. This keeps tests
-order-independent.
+which hits the library route on the target demo and also resets
+`mock-oidc`'s `TestUser` back to the default identity. Library state
+(users, passkeys, oauth2 accounts, login history) is cascade-deleted
+and SQLite autoincrement counters are reset so the next registered
+user lands at `sequence_number=1` again.
 
-## Postgres dependency (demo-todo, demo-profile only)
-
-`demo-todo` and `demo-profile` hard-code `sqlx::PgPool` for their
-app-specific tables (`todos`, `user_profiles`). The Playwright suite
-expects Postgres to be reachable on `localhost:54320` before running.
-
-**Local:**
-
-```bash
-docker run -d --rm --name e2e-pg \
-  -p 54320:5432 \
-  -e POSTGRES_USER=demo -e POSTGRES_PASSWORD=demo -e POSTGRES_DB=demo \
-  postgres:16-alpine
-```
-
-`globalSetup` fast-fails with a remediation hint if the port isn't
-reachable, so a missing Postgres is loud rather than silent.
-
-**CI:** `.github/workflows/e2e.yml` declares Postgres via the workflow
-`services:` block, which the GitHub Actions runner brings up before the
-test step starts.
+App-side tables in `demo-todo` / `demo-profile` keep their rows; rows
+are keyed by random user_id UUIDs so they never leak into subsequent
+tests.
 
 ## Deferred to later phases
 

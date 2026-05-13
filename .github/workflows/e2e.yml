@@ -49,23 +49,6 @@ jobs:
     # tab but do not gate PR merges.
     continue-on-error: true
     timeout-minutes: 30
-    services:
-      # demo-todo / demo-profile hard-code sqlx::PgPool, so the
-      # corresponding specs need a real Postgres. The Playwright global
-      # setup detects CI=true and skips spawning its own container.
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: demo
-          POSTGRES_PASSWORD: demo
-          POSTGRES_DB: demo
-        ports:
-          - 54320:5432
-        options: >-
-          --health-cmd "pg_isready -U demo"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -101,13 +84,12 @@ jobs:
 
       - name: Pre-build Rust binaries
         run: |
-          cargo build \
-            -p mock-oidc \
-            -p demo-both \
-            -p demo-custom-login \
-            -p demo-cross-origin \
-            -p demo-todo \
-            -p demo-profile
+          cargo build -p mock-oidc
+          cargo build -p demo-both         --features test-reset
+          cargo build -p demo-custom-login --features test-reset
+          cargo build -p demo-cross-origin --features test-reset
+          cargo build -p demo-todo         --features test-reset
+          cargo build -p demo-profile      --features test-reset
 
       - name: Run Playwright tests
         working-directory: tests-e2e

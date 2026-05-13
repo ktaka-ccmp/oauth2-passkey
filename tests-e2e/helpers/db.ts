@@ -4,15 +4,18 @@ import { DEMO_BASE_URL, MOCK_OIDC_URL } from './endpoints';
 /**
  * Wipe persistent state between tests.
  *
- * Hits `POST {targetBaseUrl}/test/reset` on the named demo (each demo
- * mounts this when its `*_TEST_RESET=1` env var is set) to clear all
- * users/passkeys/oauth2 accounts, then resets mock-oidc's `TestUser`
- * back to its default identity so the next test starts from the same
- * baseline.
+ * Hits `POST {targetBaseUrl}/o2p/test/reset`. The route lives inside
+ * `oauth2-passkey-axum`, gated behind the `test-reset` Cargo feature —
+ * each demo's `Cargo.toml` declares a passthrough feature of the same
+ * name, which Playwright flips on at build time via `cargo run -p
+ * <demo> --features test-reset`. Demo source code itself carries no
+ * test wiring.
  *
- * Each demo process has its own library DB (in-memory SQLite is
- * per-process even with `cache=shared`), so the DB reset only needs to
- * hit the demo under test.
+ * Library state (users, passkeys, oauth2 accounts, login history) is
+ * cascade-deleted and SQLite sequence counters are reset so the next
+ * registered user lands at `sequence_number=1` again. App-side tables
+ * in demo-todo / demo-profile keep their rows; rows are keyed by
+ * random user_id UUIDs so they never leak into subsequent tests.
  *
  * @param targetBaseUrl base URL of the demo to reset; defaults to demo-both
  */
@@ -21,10 +24,10 @@ export async function resetDb(
 ): Promise<void> {
   const ctx = await request.newContext();
   try {
-    const reset = await ctx.post(`${targetBaseUrl}/test/reset`);
+    const reset = await ctx.post(`${targetBaseUrl}/o2p/test/reset`);
     if (!reset.ok()) {
       throw new Error(
-        `${targetBaseUrl} /test/reset failed: ${reset.status()} ${await reset.text()}`,
+        `${targetBaseUrl} /o2p/test/reset failed: ${reset.status()} ${await reset.text()}`,
       );
     }
     // Reset the mock-oidc identity so subsequent OAuth2 logins create a
