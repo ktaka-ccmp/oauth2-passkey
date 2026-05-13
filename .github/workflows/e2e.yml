@@ -85,11 +85,11 @@ jobs:
       - name: Pre-build Rust binaries
         run: |
           cargo build -p mock-oidc
-          cargo build -p demo-both         --features test-reset
-          cargo build -p demo-custom-login --features test-reset
-          cargo build -p demo-cross-origin --features test-reset
-          cargo build -p demo-todo         --features test-reset
-          cargo build -p demo-profile      --features test-reset
+          cargo build -p demo-both         --features e2e-test
+          cargo build -p demo-custom-login --features e2e-test
+          cargo build -p demo-cross-origin --features e2e-test
+          cargo build -p demo-todo         --features e2e-test
+          cargo build -p demo-profile      --features e2e-test
 
       - name: Run Playwright tests
         working-directory: tests-e2e

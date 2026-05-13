@@ -138,22 +138,21 @@ in registration options: `authenticator_attachment: platform`,
 4. **Logout requires `?redirect=`.** `/o2p/user/logout` only redirects when
    the `redirect` query is supplied; without it the response is just
    header-clearing with no body.
-5. **`.env` is skipped.** Playwright sets `DEMO_BOTH_SKIP_DOTENV=1` so
-   demo-both doesn't read the workspace-root `.env` (which may set values
-   like `PASSKEY_AUTHENTICATOR_ATTACHMENT=platform` that conflict with the
-   second virtual authenticator used in the account-management test).
-6. **One internal authenticator per context.** Chrome only allows a single
+5. **One internal authenticator per context.** Chrome only allows a single
    platform/`internal` virtual authenticator. Additional ones must use
    `usb`/`nfc`/`ble` (cross-platform). See `account-passkey-mgmt.spec.ts`.
 
 ## Per-test DB reset
 
 `oauth2-passkey-axum` exposes `POST {O2P_ROUTE_PREFIX}/test/reset`
-(default `POST /o2p/test/reset`) when its `test-reset` Cargo feature is
+(default `POST /o2p/test/reset`) when its `e2e-test` Cargo feature is
 on. Each demo's `Cargo.toml` declares a passthrough feature of the
 same name; the Playwright `webServer` entries opt in via `cargo run -p
-<demo> --features test-reset`. **The demo source code carries zero
-test wiring** — without the feature flag, the route is not compiled.
+<demo> --features e2e-test`. The same flag also gates `dotenv()` off
+at compile time so the workspace-root `.env` cannot leak into the
+test environment. **The demo source code carries zero runtime test
+wiring** — without the feature flag, neither the route nor the
+dotenv skip is compiled.
 
 Each spec calls `resetDb(baseUrl)` from `helpers/db.ts` at the top,
 which hits the library route on the target demo and also resets

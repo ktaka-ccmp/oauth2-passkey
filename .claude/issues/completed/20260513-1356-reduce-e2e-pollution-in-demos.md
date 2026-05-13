@@ -69,7 +69,7 @@ its pre-Phase-3 line count.
 ### Change A: move `/test/reset` into `oauth2-passkey-axum`
 
 Mount the route inside the library's router when the existing
-`test-reset` Cargo feature is enabled. Sketch:
+`e2e-test` Cargo feature is enabled. Sketch:
 
 ```rust,ignore
 // oauth2_passkey_axum/src/router.rs (or wherever oauth2_passkey_router lives)
@@ -80,7 +80,7 @@ pub fn oauth2_passkey_router() -> Router {
         // ... existing nests
         ;
 
-    #[cfg(feature = "test-reset")]
+    #[cfg(feature = "e2e-test")]
     let router = router.route(
         "/test/reset",
         axum::routing::post(|| async {
@@ -101,11 +101,11 @@ Each demo's `Cargo.toml` keeps the passthrough:
 [features]
 # Enables POST /o2p/test/reset via the library; only used by the
 # Playwright E2E suite. Never enable in production.
-test-reset = ["oauth2-passkey-axum/test-reset"]
+e2e-test = ["oauth2-passkey-axum/e2e-test"]
 ```
 
 Playwright config switches each demo's `cargo run` line to
-`cargo run -p <demo> --features test-reset`. The `helpers/db.ts`
+`cargo run -p <demo> --features e2e-test`. The `helpers/db.ts`
 target changes from `/test/reset` to `/o2p/test/reset`.
 
 ### Change B: switch demo-todo and demo-profile from Postgres to SQLite
@@ -147,7 +147,7 @@ type — see `demo-live` for an HTTPS+Postgres example."
   code, passthrough feature, switch to SqlitePool + SQLite SQL
 - `demo-profile/Cargo.toml` + `src/main.rs` + `src/db.rs` — same
 - `tests-e2e/playwright.config.ts` — `cargo run -p <demo> --features
-  test-reset`, drop `DEMO_*_TEST_RESET` env vars, drop globalSetup
+  e2e-test`, drop `DEMO_*_TEST_RESET` env vars, drop globalSetup
   block, drop APP_DATABASE_URL for todo/profile (point at sqlite
   in-memory instead)
 - `tests-e2e/helpers/db.ts` — path `/test/reset` → `/o2p/test/reset`
@@ -190,10 +190,10 @@ Both changes landed in the immediate follow-up commit on
 `feat/e2e-phase-2` after the Phase 3 commit (`6ae6531`).
 
 **Change A — library-side `/test/reset`**: implemented in
-`oauth2_passkey_axum/src/router.rs` behind the existing `test-reset`
+`oauth2_passkey_axum/src/router.rs` behind the existing `e2e-test`
 Cargo feature. Each demo's `Cargo.toml` now declares a passthrough
 feature of the same name and Playwright opts in via
-`cargo run -p <demo> --features test-reset`. All five demos
+`cargo run -p <demo> --features e2e-test`. All five demos
 (`demo-both`, `demo-custom-login`, `demo-cross-origin`, `demo-todo`,
 `demo-profile`) had their `test_reset` handler, conditional route
 mount, `DEMO_*_TEST_RESET` env-var gate, and supporting imports

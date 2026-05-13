@@ -156,7 +156,7 @@ pub use oauth2_passkey::LoginHistoryError;
 pub use oauth2_passkey::cleanup_old_login_history;
 pub use oauth2_passkey::spawn_login_history_cleanup;
 
-// E2E test harness only — re-export of the test-reset function. Gated by
-// the `test-reset` feature; not present in production builds.
-#[cfg(feature = "test-reset")]
+// E2E test harness only — re-export of `reset_storage_for_test`. Gated
+// by the `e2e-test` feature; not present in production builds.
+#[cfg(feature = "e2e-test")]
 pub use oauth2_passkey::reset_storage_for_test;

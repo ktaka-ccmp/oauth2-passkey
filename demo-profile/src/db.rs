@@ -28,14 +28,9 @@ impl Default for UserProfile {
     }
 }
 
-/// Initialize database connection pool and return it.
-///
-/// Defaults to an on-disk SQLite file so the demo runs with zero
-/// external setup. Override via `APP_DATABASE_URL` for tests
-/// (e.g. `sqlite::memory:`) or to switch to Postgres in production.
+/// Initialize database connection pool and return it
 pub async fn init_db() -> Result<SqlitePool, Box<dyn std::error::Error>> {
-    let database_url = std::env::var("APP_DATABASE_URL")
-        .unwrap_or_else(|_| "sqlite:demo-profile.db?mode=rwc".to_string());
+    let database_url = std::env::var("APP_DATABASE_URL").expect("APP_DATABASE_URL must be set");
 
     let pool = SqlitePoolOptions::new()
         .max_connections(5)

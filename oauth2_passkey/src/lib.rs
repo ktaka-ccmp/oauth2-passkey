@@ -188,9 +188,9 @@ pub use audit::spawn_login_history_cleanup;
 /// SQLite only. PostgreSQL/MySQL paths are out of scope here because the
 /// E2E suite runs against SQLite.
 ///
-/// Gated behind the `test-reset` Cargo feature; not present in production
+/// Gated behind the `e2e-test` Cargo feature; not present in production
 /// builds.
-#[cfg(feature = "test-reset")]
+#[cfg(feature = "e2e-test")]
 pub async fn reset_storage_for_test() -> Result<(), Box<dyn std::error::Error>> {
     use crate::session::UserId;
     use crate::storage::GENERIC_DATA_STORE;

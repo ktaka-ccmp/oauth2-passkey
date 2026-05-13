@@ -6,7 +6,6 @@ use axum::{
     response::{Html, IntoResponse, Response},
     routing::get,
 };
-use dotenvy::dotenv;
 use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_full_router};
 use sqlx::SqlitePool;
 
@@ -71,9 +70,8 @@ async fn index(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing("demo-profile");
 
-    if std::env::var("DEMO_PROFILE_SKIP_DOTENV").is_err() {
-        dotenv().ok();
-    }
+    #[cfg(not(feature = "e2e-test"))]
+    dotenvy::dotenv().ok();
 
     // Initialize oauth2-passkey library
     oauth2_passkey_axum::init().await?;

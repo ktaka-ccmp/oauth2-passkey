@@ -5,10 +5,10 @@ import { DEMO_BASE_URL, MOCK_OIDC_URL } from './endpoints';
  * Wipe persistent state between tests.
  *
  * Hits `POST {targetBaseUrl}/o2p/test/reset`. The route lives inside
- * `oauth2-passkey-axum`, gated behind the `test-reset` Cargo feature —
+ * `oauth2-passkey-axum`, gated behind the `e2e-test` Cargo feature —
  * each demo's `Cargo.toml` declares a passthrough feature of the same
  * name, which Playwright flips on at build time via `cargo run -p
- * <demo> --features test-reset`. Demo source code itself carries no
+ * <demo> --features e2e-test`. Demo source code itself carries no
  * test wiring.
  *
  * Library state (users, passkeys, oauth2 accounts, login history) is

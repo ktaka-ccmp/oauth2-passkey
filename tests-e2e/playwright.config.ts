@@ -56,11 +56,11 @@ export default defineConfig({
       },
     },
     {
-      // `--features test-reset` flips the passthrough Cargo feature that
-      // mounts `POST /o2p/test/reset` inside the library, which the spec
-      // helper hits between tests. Without that flag the demo compiles
-      // as a clean release binary.
-      command: `cargo run -p demo-todo --features test-reset`,
+      // `--features e2e-test` flips the passthrough Cargo feature that
+      // mounts `POST /o2p/test/reset` inside the library (used by the
+      // spec helper between tests) and skips `.env` loading. Without
+      // that flag the demo compiles as a clean release binary.
+      command: `cargo run -p demo-todo --features e2e-test`,
       url: `${DEMO_TODO_BASE_URL}/`,
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
@@ -68,7 +68,6 @@ export default defineConfig({
       stderr: 'pipe',
       env: {
         DEMO_TODO_PORT: String(DEMO_TODO_PORT),
-        DEMO_TODO_SKIP_DOTENV: '1',
         APP_DATABASE_URL: 'sqlite::memory:',
         ORIGIN: DEMO_TODO_BASE_URL,
         OAUTH2_GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
@@ -85,7 +84,7 @@ export default defineConfig({
       },
     },
     {
-      command: `cargo run -p demo-profile --features test-reset`,
+      command: `cargo run -p demo-profile --features e2e-test`,
       url: `${DEMO_PROFILE_BASE_URL}/`,
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
@@ -93,7 +92,6 @@ export default defineConfig({
       stderr: 'pipe',
       env: {
         DEMO_PROFILE_PORT: String(DEMO_PROFILE_PORT),
-        DEMO_PROFILE_SKIP_DOTENV: '1',
         APP_DATABASE_URL: 'sqlite::memory:',
         ORIGIN: DEMO_PROFILE_BASE_URL,
         OAUTH2_GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
@@ -113,7 +111,7 @@ export default defineConfig({
       // demo-cross-origin spawns BOTH auth (:13010) and api (:13011)
       // servers in a single process. Wait on the auth server's `/`
       // (renders even when anonymous) to know both are up.
-      command: `cargo run -p demo-cross-origin --features test-reset`,
+      command: `cargo run -p demo-cross-origin --features e2e-test`,
       url: `${DEMO_CROSS_ORIGIN_AUTH_URL}/`,
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
@@ -122,7 +120,6 @@ export default defineConfig({
       env: {
         AUTH_PORT: String(DEMO_CROSS_ORIGIN_AUTH_PORT),
         API_PORT: String(DEMO_CROSS_ORIGIN_API_PORT),
-        DEMO_CROSS_ORIGIN_SKIP_DOTENV: '1',
         ORIGIN: DEMO_CROSS_ORIGIN_AUTH_URL,
         API_ORIGIN: DEMO_CROSS_ORIGIN_API_URL,
         // Both servers run on `localhost` so the cookie is implicitly
@@ -145,7 +142,7 @@ export default defineConfig({
       },
     },
     {
-      command: `cargo run -p demo-custom-login --features test-reset`,
+      command: `cargo run -p demo-custom-login --features e2e-test`,
       url: `${DEMO_CUSTOM_LOGIN_BASE_URL}/login`,
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
@@ -153,7 +150,6 @@ export default defineConfig({
       stderr: 'pipe',
       env: {
         DEMO_CUSTOM_LOGIN_PORT: String(DEMO_CUSTOM_LOGIN_PORT),
-        DEMO_CUSTOM_LOGIN_SKIP_DOTENV: '1',
         ORIGIN: DEMO_CUSTOM_LOGIN_BASE_URL,
         // The whole point of this demo: redirect anon users to /login,
         // not the built-in /o2p/user/login.
@@ -172,7 +168,7 @@ export default defineConfig({
       },
     },
     {
-      command: `cargo run -p demo-both --features test-reset`,
+      command: `cargo run -p demo-both --features e2e-test`,
       url: `${DEMO_BASE_URL}/o2p/user/login`,
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
@@ -180,10 +176,6 @@ export default defineConfig({
       stderr: 'pipe',
       env: {
         DEMO_BOTH_PORT: String(DEMO_PORT),
-        // Block demo-both from reading the user's workspace-root `.env`,
-        // which may set values (e.g. PASSKEY_AUTHENTICATOR_ATTACHMENT) that
-        // break E2E assumptions.
-        DEMO_BOTH_SKIP_DOTENV: '1',
         ORIGIN: DEMO_BASE_URL,
         OAUTH2_GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
         OAUTH2_GOOGLE_CLIENT_SECRET: 'test-client-secret',

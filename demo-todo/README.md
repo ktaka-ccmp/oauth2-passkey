@@ -2,8 +2,6 @@
 
 A demonstration application showing how to manage user-specific data with a one-to-many relationship using a separate table linked by `user_id`.
 
-Defaults to SQLite (`sqlite:demo-todo.db?mode=rwc`) so the demo runs with `cargo run` and no external setup. For a production-style topology see `demo-live` (HTTPS + Postgres).
-
 ## Features
 
 - **CRUD Operations**: Create, read, toggle, and delete todo items
@@ -31,20 +29,33 @@ The library manages authentication; your app manages user data in a separate tab
 
 ## Database Configuration
 
-The library and the app each pick their own database via env vars. The
-demo defaults both to SQLite for zero-setup development.
+The oauth2-passkey library and your application can use any combination of databases. Choose the setup that best fits your requirements.
+
+### Same Database
+
+Both library and app share a single SQLite database. This enables foreign key constraints and JOINs between `users` and `todos` tables.
 
 ```env
-# Library auth tables (users, oauth2_accounts, passkey_credentials, ...)
+GENERIC_DATA_STORE_TYPE=sqlite
+GENERIC_DATA_STORE_URL='sqlite:demo.db?mode=rwc'
+APP_DATABASE_URL='sqlite:demo.db?mode=rwc'
+```
+
+### Separate Databases
+
+Library and app use independent databases. Useful for isolation or when using different database systems.
+
+```env
 GENERIC_DATA_STORE_TYPE=sqlite
 GENERIC_DATA_STORE_URL='sqlite:auth.db?mode=rwc'
-
-# App tables (todos)
 APP_DATABASE_URL='sqlite:demo-todo.db?mode=rwc'
 ```
 
-Swap either or both for Postgres in production — see `demo-live` for a
-working HTTPS+Postgres deployment.
+> **Postgres on the app side**: point `APP_DATABASE_URL` at a
+> `postgres://...` URL (start Postgres yourself) and switch
+> `SqlitePool` → `PgPool` (plus the SQLite-specific SQL) in
+> `src/db.rs`. See `demo-live` for a working HTTPS + Postgres
+> deployment.
 
 ## Setup
 
@@ -56,13 +67,15 @@ cp .env.example .env
 
 2. Configure your Google OAuth2 credentials in `.env`
 
-3. Run the demo (SQLite files are created automatically):
+3. Choose your database configuration in `.env`
+
+4. Run the demo:
 
 ```bash
 cargo run
 ```
 
-4. Open http://localhost:3001 in your browser
+5. Open http://localhost:3001 in your browser
 
 ## Database Schema
 
