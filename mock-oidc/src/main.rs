@@ -1,7 +1,7 @@
 //! Standalone mock OIDC provider used by the Playwright E2E suite.
 //!
-//! All real logic lives in the `mock-oidc-core` library crate; this binary
-//! parses env vars, builds an `AppState`, and serves the router.
+//! All real logic lives in this crate's library target; this binary parses
+//! env vars, builds an `AppState`, and serves the router.
 //!
 //! Environment variables:
 //! - `MOCK_OIDC_BIND` (default `127.0.0.1:9876`)
@@ -10,7 +10,7 @@
 //! - `MOCK_OIDC_USER_{EMAIL,SUB,NAME,GIVEN_NAME,FAMILY_NAME}` to override
 //!   the default `TestUser`
 
-use mock_oidc_core::{AppState, TestUser, build_router, test_routes};
+use mock_oidc::{AppState, TestUser, build_router, test_routes};
 use std::{env, time::Duration};
 
 #[tokio::main]

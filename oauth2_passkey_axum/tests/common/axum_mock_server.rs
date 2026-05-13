@@ -1,12 +1,12 @@
 //! In-process mock OAuth2 server for HTTP integration tests.
 //!
-//! Wraps the shared `mock-oidc-core` router in a background thread with a
-//! `LazyLock`, so a single mock instance is reused across all tests in a run.
-//! The shared core also powers the `mock-oidc` standalone binary used by
-//! the Playwright E2E suite, keeping a single source of truth for handler
-//! behaviour.
+//! Wraps the shared `mock-oidc` library router in a background thread with
+//! a `LazyLock`, so a single mock instance is reused across all tests in a
+//! run. The same library also backs the `mock-oidc` standalone binary used
+//! by the Playwright E2E suite, keeping a single source of truth for
+//! handler behaviour.
 
-use mock_oidc_core::{AppState, TestUser, build_router};
+use mock_oidc::{AppState, TestUser, build_router};
 use std::{
     sync::{
         Arc, LazyLock, Mutex,
