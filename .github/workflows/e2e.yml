@@ -9,6 +9,10 @@ on:
       - 'mock-oidc/**'
       - 'mock-oidc-core/**'
       - 'demo-both/**'
+      - 'demo-custom-login/**'
+      - 'demo-cross-origin/**'
+      - 'demo-todo/**'
+      - 'demo-profile/**'
       - 'tests-e2e/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -21,6 +25,10 @@ on:
       - 'mock-oidc/**'
       - 'mock-oidc-core/**'
       - 'demo-both/**'
+      - 'demo-custom-login/**'
+      - 'demo-cross-origin/**'
+      - 'demo-todo/**'
+      - 'demo-profile/**'
       - 'tests-e2e/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -41,6 +49,23 @@ jobs:
     # tab but do not gate PR merges.
     continue-on-error: true
     timeout-minutes: 30
+    services:
+      # demo-todo / demo-profile hard-code sqlx::PgPool, so the
+      # corresponding specs need a real Postgres. The Playwright global
+      # setup detects CI=true and skips spawning its own container.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: demo
+          POSTGRES_PASSWORD: demo
+          POSTGRES_DB: demo
+        ports:
+          - 54320:5432
+        options: >-
+          --health-cmd "pg_isready -U demo"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -75,7 +100,14 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Pre-build Rust binaries
-        run: cargo build -p mock-oidc -p demo-both
+        run: |
+          cargo build \
+            -p mock-oidc \
+            -p demo-both \
+            -p demo-custom-login \
+            -p demo-cross-origin \
+            -p demo-todo \
+            -p demo-profile
 
       - name: Run Playwright tests
         working-directory: tests-e2e

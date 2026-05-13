@@ -63,6 +63,10 @@ ports are taken on your machine.
 | `oauth2-linking-protection.spec.ts` | Phase 1: stale/missing/garbage `context=` on `add_to_user` is rejected (incl. session rotation invalidating the previously-rendered token), fresh token redirects to the IdP. Phase 2: simulate a session swap during the IdP round-trip and confirm the callback's `misc_session` lookup wins — the account links to the initiator, not the current-cookie user |
 | `passkey-registration-protection.spec.ts` | Phase 1: stale/missing/garbage `X-CSRF-Token` on `/passkey/register/start` is rejected (incl. session rotation). Phase 2: simulate a session swap between `register/start` and `register/finish` — the `verify_session_then_finish_registration` user_id check must reject with "User ID mismatch", and no credential is persisted to either user |
 | `demo-both-protected.spec.ts` | Regression coverage for `demo-both/src/protected.rs` (p1–p6 + nested/p3): anonymous-redirect, `Option<AuthUser>` branching, `X-CSRF-Token` response header, AJAX POST CSRF (403 without header), `Extension<AuthUser>` / `Extension<CsrfToken>` injection, form-CSRF four branches (valid / mismatch / missing / header-bypass) — guards the integrator-facing usage surface of the library's protection primitives |
+| `demo-custom-login.spec.ts` | `demo-custom-login`'s `O2P_LOGIN_URL=/login` redirect contract: anonymous protected routes redirect to the consumer's own page, authed users on `/login` redirect to `/`, custom `/`, `/protected`, `/account`, `/admin` all render user info |
+| `demo-cross-origin.spec.ts` | `demo-cross-origin` (Pattern 2): cross-origin cookie scope (auth server on :13010 → API server on :13011 both on `localhost`), `is_authenticated_user_401` middleware on the API server (401 anon / 200 with cookie), CORS preflight accepted from the auth origin and rejected from unknown origins |
+| `demo-todo.spec.ts` | `demo-todo` (1:N pattern, Postgres-backed): anonymous redirect, form-CSRF protected create/toggle/delete, missing-CSRF 403, user isolation on `user_id`-keyed rows |
+| `demo-profile.spec.ts` | `demo-profile` (1:1 pattern, Postgres-backed): anonymous redirect, lazy-create default profile on first GET, form-CSRF protected update, wrong-CSRF 403, user isolation |
 
 A GitHub Actions workflow at `.github/workflows/e2e.yml` runs the same suite
 on PR and push to `master`/`dev`. It is marked `continue-on-error` while the
@@ -144,16 +148,41 @@ in registration options: `authenticator_attachment: platform`,
 
 ## Per-test DB reset
 
-`demo-both` mounts `POST /test/reset` when launched with
-`DEMO_BOTH_TEST_RESET=1` (the Playwright config sets it). The route calls
-the `test-reset`-gated `reset_storage_for_test()` in `oauth2-passkey`,
-which cascade-deletes users, wipes `login_history`, and resets the SQLite
-autoincrement counters so the next inserted user lands at
-`sequence_number=1` (admin bootstrap depends on this).
+Each demo under test mounts `POST /test/reset` when launched with its
+corresponding `*_TEST_RESET=1` env var (Playwright config sets these for
+demo-both, demo-custom-login, demo-cross-origin, demo-todo, demo-profile).
+The route calls the `test-reset`-gated `reset_storage_for_test()` in
+`oauth2-passkey`, which cascade-deletes users, wipes `login_history`,
+and resets the SQLite autoincrement counters so the next inserted user
+lands at `sequence_number=1`. demo-todo / demo-profile also wipe their
+own app-table inside the same handler.
 
-Each spec calls `resetDb()` from `helpers/db.ts` at the top, which hits
-that route and also resets `mock-oidc`'s `TestUser` back to the default
-identity. This keeps tests order-independent.
+Each spec calls `resetDb(baseUrl)` from `helpers/db.ts` at the top,
+which hits that route on the target demo and also resets `mock-oidc`'s
+`TestUser` back to the default identity. This keeps tests
+order-independent.
+
+## Postgres dependency (demo-todo, demo-profile only)
+
+`demo-todo` and `demo-profile` hard-code `sqlx::PgPool` for their
+app-specific tables (`todos`, `user_profiles`). The Playwright suite
+expects Postgres to be reachable on `localhost:54320` before running.
+
+**Local:**
+
+```bash
+docker run -d --rm --name e2e-pg \
+  -p 54320:5432 \
+  -e POSTGRES_USER=demo -e POSTGRES_PASSWORD=demo -e POSTGRES_DB=demo \
+  postgres:16-alpine
+```
+
+`globalSetup` fast-fails with a remediation hint if the port isn't
+reachable, so a missing Postgres is loud rather than silent.
+
+**CI:** `.github/workflows/e2e.yml` declares Postgres via the workflow
+`services:` block, which the GitHub Actions runner brings up before the
+test step starts.
 
 ## Deferred to later phases
 

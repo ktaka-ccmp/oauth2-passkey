@@ -4,13 +4,14 @@ use axum::{
     extract::Path,
     http::StatusCode,
     response::{Html, IntoResponse, Redirect},
-    routing::get,
+    routing::{get, post},
 };
 use dotenvy::dotenv;
 
 use oauth2_passkey_axum::{
     AuthUser, O2P_ROUTE_PREFIX, OAuth2Account, PasskeyCredential, SessionId, UserId, get_all_users,
     get_user, list_accounts_core, list_credentials_core, oauth2_passkey_full_router,
+    reset_storage_for_test,
 };
 
 mod server;
@@ -349,14 +350,23 @@ async fn admin_user(user: AuthUser, Path(target_id): Path<String>) -> impl IntoR
 // Main
 // ============================================================================
 
+async fn test_reset() -> Result<StatusCode, (StatusCode, String)> {
+    reset_storage_for_test()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing("demo-custom-login");
 
-    dotenv().ok();
+    if std::env::var("DEMO_CUSTOM_LOGIN_SKIP_DOTENV").is_err() {
+        dotenv().ok();
+    }
     oauth2_passkey_axum::init().await?;
 
-    let app = Router::new()
+    let mut app = Router::new()
         .route("/", get(index))
         .route("/login", get(login)) // Custom login page
         .route("/protected", get(protected))
@@ -365,6 +375,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/admin/user/{id}", get(admin_user)) // Custom admin user detail page
         .merge(oauth2_passkey_full_router());
 
-    spawn_http_server(3001, app).await?;
+    if std::env::var("DEMO_CUSTOM_LOGIN_TEST_RESET").is_ok() {
+        app = app.route("/test/reset", post(test_reset));
+        tracing::warn!("DEMO_CUSTOM_LOGIN_TEST_RESET enabled — mounting POST /test/reset");
+    }
+
+    let port = std::env::var("DEMO_CUSTOM_LOGIN_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3001);
+    spawn_http_server(port, app).await?;
     Ok(())
 }

@@ -4,10 +4,12 @@ use axum::{
     extract::State,
     http::StatusCode,
     response::{Html, IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
 };
 use dotenvy::dotenv;
-use oauth2_passkey_axum::{AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_full_router};
+use oauth2_passkey_axum::{
+    AuthUser, O2P_ROUTE_PREFIX, oauth2_passkey_full_router, reset_storage_for_test,
+};
 use sqlx::PgPool;
 
 mod db;
@@ -67,11 +69,26 @@ async fn index(
     }
 }
 
+/// E2E test-reset endpoint (mounted only when DEMO_PROFILE_TEST_RESET=1):
+/// wipes library users + the app's `user_profiles` table.
+async fn test_reset(State(state): State<AppState>) -> Result<StatusCode, (StatusCode, String)> {
+    reset_storage_for_test()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    sqlx::query("DELETE FROM user_profiles")
+        .execute(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing("demo-profile");
 
-    dotenv().ok();
+    if std::env::var("DEMO_PROFILE_SKIP_DOTENV").is_err() {
+        dotenv().ok();
+    }
 
     // Initialize oauth2-passkey library
     oauth2_passkey_axum::init().await?;
@@ -81,14 +98,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState { pool };
 
     // Routes that use our AppState
-    let app_routes = Router::new()
+    let mut app_routes = Router::new()
         .route("/", get(index))
-        .merge(handlers::router())
-        .with_state(state);
+        .merge(handlers::router());
+
+    if std::env::var("DEMO_PROFILE_TEST_RESET").is_ok() {
+        app_routes = app_routes.route("/test/reset", post(test_reset));
+        tracing::warn!("DEMO_PROFILE_TEST_RESET enabled — mounting POST /test/reset");
+    }
+
+    let app_routes = app_routes.with_state(state);
 
     // Combine with oauth2-passkey routes
     let app = app_routes.merge(oauth2_passkey_full_router());
 
-    spawn_http_server(3001, app).await?;
+    let port = std::env::var("DEMO_PROFILE_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3001);
+    spawn_http_server(port, app).await?;
     Ok(())
 }

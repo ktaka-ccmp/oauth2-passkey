@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (9)
+### Open (10)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -19,6 +19,7 @@ This directory contains issue/task tracking files for the project.
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
 | `20260513-0544` | low | small | [Passkey register/finish falls through to create_user when auth is lost mid-flow](open/20260513-0544-passkey-register-finish-mode-confusion.md) |
+| `20260513-1356` | low | small | [Reduce E2E pollution in demos (lib-side /test/reset + SQLite for demo-todo/profile)](open/20260513-1356-reduce-e2e-pollution-in-demos.md) |
 
 ### Completed (78)
 

@@ -46,7 +46,7 @@ use axum::{
     http::StatusCode,
     middleware::from_fn,
     response::{Html, IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
 };
 use dotenvy::dotenv;
 use serde::Serialize;
@@ -54,7 +54,7 @@ use std::sync::LazyLock;
 
 use oauth2_passkey_axum::{
     AuthUser, O2P_CUSTOM_CSS_URL, O2P_ROUTE_PREFIX, cors_layer, is_authenticated_user_401,
-    oauth2_passkey_full_router,
+    oauth2_passkey_full_router, reset_storage_for_test,
 };
 
 mod server;
@@ -178,11 +178,20 @@ async fn resource_health() -> impl IntoResponse {
 // Main
 // =============================================================================
 
+async fn test_reset() -> Result<StatusCode, (StatusCode, String)> {
+    reset_storage_for_test()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing("demo_cross_origin");
 
-    dotenv().ok();
+    if std::env::var("DEMO_CROSS_ORIGIN_SKIP_DOTENV").is_err() {
+        dotenv().ok();
+    }
     oauth2_passkey_axum::init().await?;
 
     // Get ports from environment
@@ -201,9 +210,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // - Full oauth2_passkey authentication (OAuth2 + Passkey)
     // - No CORS needed (Same-Origin with frontend)
     // =========================================================================
-    let auth_route = Router::new()
+    let mut auth_route = Router::new()
         .route("/", get(index))
         .merge(oauth2_passkey_full_router());
+
+    if std::env::var("DEMO_CROSS_ORIGIN_TEST_RESET").is_ok() {
+        auth_route = auth_route.route("/test/reset", post(test_reset));
+        tracing::warn!("DEMO_CROSS_ORIGIN_TEST_RESET enabled — mounting POST /test/reset on auth");
+    }
 
     // =========================================================================
     // API Server (api.example.local:3001)

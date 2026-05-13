@@ -4,21 +4,27 @@ import { DEMO_BASE_URL, MOCK_OIDC_URL } from './endpoints';
 /**
  * Wipe persistent state between tests.
  *
- * Hits the `/test/reset` route on demo-both (mounted only when
- * `DEMO_BOTH_TEST_RESET=1`) to clear all users/passkeys/oauth2 accounts,
- * then resets mock-oidc's `TestUser` back to its default identity so the
- * next test starts from the same baseline.
+ * Hits `POST {targetBaseUrl}/test/reset` on the named demo (each demo
+ * mounts this when its `*_TEST_RESET=1` env var is set) to clear all
+ * users/passkeys/oauth2 accounts, then resets mock-oidc's `TestUser`
+ * back to its default identity so the next test starts from the same
+ * baseline.
  *
- * The Playwright config sets the env var unconditionally, so tests can
- * always call this in `test.beforeEach` / at the top of a test.
+ * Each demo process has its own library DB (in-memory SQLite is
+ * per-process even with `cache=shared`), so the DB reset only needs to
+ * hit the demo under test.
+ *
+ * @param targetBaseUrl base URL of the demo to reset; defaults to demo-both
  */
-export async function resetDb(): Promise<void> {
+export async function resetDb(
+  targetBaseUrl: string = DEMO_BASE_URL,
+): Promise<void> {
   const ctx = await request.newContext();
   try {
-    const reset = await ctx.post(`${DEMO_BASE_URL}/test/reset`);
+    const reset = await ctx.post(`${targetBaseUrl}/test/reset`);
     if (!reset.ok()) {
       throw new Error(
-        `demo-both /test/reset failed: ${reset.status()} ${await reset.text()}`,
+        `${targetBaseUrl} /test/reset failed: ${reset.status()} ${await reset.text()}`,
       );
     }
     // Reset the mock-oidc identity so subsequent OAuth2 logins create a
