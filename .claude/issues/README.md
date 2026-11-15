@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (8)
+### Open (10)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -18,6 +18,8 @@ This directory contains issue/task tracking files for the project.
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
+| `20261116-0111` | low | large | [Re-authentication (Step-up) Design Policy](open/20261116-0111-reauthentication-design.md) |
+| `20261116-0112` | low | small | [Passkey Login While Logged In Silently Switches Account](open/20261116-0112-passkey-login-silently-switches-account.md) |
 
 ### Completed (78)
 
