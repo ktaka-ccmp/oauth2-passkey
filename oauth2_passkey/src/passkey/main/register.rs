@@ -323,8 +323,12 @@ pub(crate) async fn validate_registration_challenge(
     let stored_options = get_and_validate_options(&challenge_type, &challenge_id).await?;
     let stored_user = stored_options.user.clone();
 
-    // Extract credential ID
-    let credential_id = reg_data.raw_id.clone();
+    // Parse and validate attestation object
+    let attestation_obj = parse_attestation_object(&reg_data.response.attestation_object)?;
+
+    // The credential ID is the one in the attested credential data (WebAuthn §7.1);
+    // the client-supplied id and rawId must match it.
+    let credential_id = extract_bound_credential_id(reg_data, &attestation_obj.auth_data)?;
 
     // Reject a credential ID that is already registered for any user (WebAuthn §7.1).
     // Checked here, before any side effects, so the create-user path does not leave
@@ -340,8 +344,6 @@ pub(crate) async fn validate_registration_challenge(
         ));
     }
 
-    // Parse and validate attestation object
-    let attestation_obj = parse_attestation_object(&reg_data.response.attestation_object)?;
     let aaguid = extract_aaguid(&attestation_obj)?;
     tracing::trace!("AAGUID: {}", aaguid);
 
@@ -558,7 +560,35 @@ fn extract_public_key_from_auth_data(auth_data: &[u8]) -> Result<String, Passkey
     Ok(encoded)
 }
 
+/// Returns the base64url-encoded credential ID from the attested credential data,
+/// after verifying that the client-supplied `id` and `rawId` both equal it.
+fn extract_bound_credential_id(
+    reg_data: &RegisterCredential,
+    auth_data: &[u8],
+) -> Result<String, PasskeyError> {
+    let (attested_cred_id, _) = split_attested_credential_data(auth_data)?;
+
+    let credential_id = base64url_encode(attested_cred_id.to_vec())
+        .map_err(|_| PasskeyError::Format("Failed to encode credential ID".to_string()))?;
+
+    if reg_data.raw_id != credential_id || reg_data.id != credential_id {
+        tracing::error!("Credential ID does not match the attested credential data");
+        return Err(PasskeyError::Verification(
+            "Credential ID mismatch".to_string(),
+        ));
+    }
+
+    Ok(credential_id)
+}
+
 fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], PasskeyError> {
+    let (_, rest) = split_attested_credential_data(auth_data)?;
+    Ok(rest)
+}
+
+/// Splits the attested credential data into the credential ID and the bytes that
+/// follow it (the credential public key).
+fn split_attested_credential_data(auth_data: &[u8]) -> Result<(&[u8], &[u8]), PasskeyError> {
     let mut pos = 37; // Skip RP ID hash (32) + flags (1) + counter (4)
 
     if auth_data.len() < pos + 18 {
@@ -588,9 +618,10 @@ fn parse_credential_data(auth_data: &[u8]) -> Result<&[u8], PasskeyError> {
         ));
     }
 
+    let cred_id = &auth_data[pos..pos + cred_id_len];
     pos += cred_id_len;
 
-    Ok(&auth_data[pos..])
+    Ok((cred_id, &auth_data[pos..]))
 }
 
 fn extract_key_coordinates(credential_data: &[u8]) -> Result<(Vec<u8>, Vec<u8>), PasskeyError> {

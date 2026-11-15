@@ -157,7 +157,7 @@ fn build_none_registration_response(
     let attestation_object = general_purpose::URL_SAFE_NO_PAD.encode(&cbor_bytes);
 
     serde_json::json!({
-        "id": credential_id,
+        "id": general_purpose::URL_SAFE_NO_PAD.encode(credential_id_bytes),
         "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(credential_id_bytes),
         "response": {
             "client_data_json": client_data_json,

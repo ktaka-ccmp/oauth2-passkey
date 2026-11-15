@@ -811,6 +811,8 @@ async fn test_verify_session_then_finish_registration_success() {
 
     // Create the test user only; the credential itself is created by the registration
     let credential_id = "test_cred_verify_session_success";
+    // rawId as a browser sends it: base64url of the credential ID bytes
+    let raw_id = crate::utils::base64url_encode(credential_id.as_bytes().to_vec()).unwrap();
     let user_creation_result = passkey_test_utils::insert_test_user(
         crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
         "test_user",
@@ -886,8 +888,8 @@ async fn test_verify_session_then_finish_registration_success() {
     let attestation_object_b64 = crate::utils::base64url_encode(cbor_bytes).unwrap();
 
     let reg_data = super::RegisterCredential {
-        raw_id: credential_id.to_string(),
-        id: credential_id.to_string(),
+        raw_id: raw_id.clone(),
+        id: raw_id.clone(),
         type_: "public-key".to_string(),
         user_handle: Some(user_handle.to_string()),
         response: AuthenticatorAttestationResponse {
@@ -918,7 +920,7 @@ async fn test_verify_session_then_finish_registration_success() {
 
     // Cleanup
     let cleanup_result = passkey_test_utils::cleanup_test_credential(
-        CredentialId::new(credential_id.to_string()).expect("Valid credential ID"),
+        CredentialId::new(raw_id.clone()).expect("Valid credential ID"),
     )
     .await;
     assert!(cleanup_result.is_ok(), "Failed to clean up test credential");
@@ -2213,4 +2215,194 @@ async fn test_finish_registration_rejects_already_registered_credential_id() {
         stored.public_key, owner_public_key,
         "Credential public key was overwritten"
     );
+}
+
+/// Test that registration rejects a rawId that differs from the attested credential ID
+///
+/// Regression test: the stored credential ID must be the one inside the attested
+/// credential data, so a client-supplied rawId that does not match it is rejected.
+#[tokio::test]
+async fn test_finish_registration_rejects_raw_id_mismatch() {
+    use crate::passkey::main::test_utils as passkey_test_utils;
+    use crate::passkey::types::{PublicKeyCredentialUserEntity, StoredOptions};
+    use crate::session::UserId;
+    use crate::storage::store_cache_keyed;
+    use crate::test_utils::init_test_environment;
+
+    init_test_environment().await;
+
+    let attested_cred_id_bytes = b"mismatch_attested_cred_id";
+    let raw_id = crate::utils::base64url_encode(b"mismatch_client_raw_id".to_vec()).unwrap();
+
+    let user_id = "raw_id_mismatch_user";
+    let user_handle = "raw_id_mismatch_handle";
+    passkey_test_utils::insert_test_user(
+        UserId::new(user_id.to_string()).unwrap(),
+        "mismatch",
+        "Mismatch",
+        false,
+    )
+    .await
+    .expect("Failed to insert test user");
+
+    let challenge = "raw_id_mismatch_challenge";
+    let stored_options = StoredOptions {
+        challenge: challenge.to_string(),
+        user: PublicKeyCredentialUserEntity {
+            user_handle: user_handle.to_string(),
+            name: "mismatch".to_string(),
+            display_name: "Mismatch".to_string(),
+        },
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        ttl: 3600,
+    };
+    store_cache_keyed::<_, PasskeyError>(
+        CachePrefix::reg_challenge(),
+        CacheKey::new(user_handle.to_string()).unwrap(),
+        stored_options,
+        3600,
+    )
+    .await
+    .expect("Failed to store registration challenge");
+
+    let client_data = super::WebAuthnClientData {
+        type_: "webauthn.create".to_string(),
+        challenge: challenge.to_string(),
+        origin: crate::passkey::config::ORIGIN.to_string(),
+    };
+    let client_data_json = serde_json::to_string(&client_data).unwrap();
+
+    let reg_data = super::RegisterCredential {
+        raw_id: raw_id.clone(),
+        id: raw_id.clone(),
+        type_: "public-key".to_string(),
+        user_handle: Some(user_handle.to_string()),
+        response: AuthenticatorAttestationResponse {
+            client_data_json: crate::utils::base64url_encode(client_data_json.into_bytes())
+                .unwrap(),
+            attestation_object: build_none_attestation_object(attested_cred_id_bytes),
+        },
+    };
+
+    let result =
+        super::finish_registration(UserId::new(user_id.to_string()).unwrap(), &reg_data).await;
+
+    let stored = PasskeyStore::get_credential(CredentialId::new(raw_id.clone()).unwrap())
+        .await
+        .expect("get_credential failed");
+
+    // Cleanup before asserting
+    let _ = passkey_test_utils::cleanup_test_credential(CredentialId::new(raw_id.clone()).unwrap())
+        .await;
+    let _ = passkey_test_utils::remove_from_cache(
+        CachePrefix::reg_challenge(),
+        CacheKey::new(user_handle.to_string()).unwrap(),
+    )
+    .await;
+
+    assert!(
+        result.is_err(),
+        "Registration with rawId not matching the attested credential ID must be rejected"
+    );
+    assert!(
+        stored.is_none(),
+        "No credential should be stored under the mismatched rawId"
+    );
+}
+
+/// Test that registration rejects an id that differs from rawId
+///
+/// Regression test: rawId matches the attested credential ID, but id does not.
+/// Browsers always send id == base64url(rawId), so a mismatch is rejected.
+#[tokio::test]
+async fn test_finish_registration_rejects_id_mismatch() {
+    use crate::passkey::main::test_utils as passkey_test_utils;
+    use crate::passkey::types::{PublicKeyCredentialUserEntity, StoredOptions};
+    use crate::session::UserId;
+    use crate::storage::store_cache_keyed;
+    use crate::test_utils::init_test_environment;
+
+    init_test_environment().await;
+
+    let cred_id_bytes = b"id_mismatch_attested_cred_id";
+    let raw_id = crate::utils::base64url_encode(cred_id_bytes.to_vec()).unwrap();
+    let id = crate::utils::base64url_encode(b"id_mismatch_other_id".to_vec()).unwrap();
+
+    let user_id = "id_mismatch_user";
+    let user_handle = "id_mismatch_handle";
+    passkey_test_utils::insert_test_user(
+        UserId::new(user_id.to_string()).unwrap(),
+        "idmismatch",
+        "Id Mismatch",
+        false,
+    )
+    .await
+    .expect("Failed to insert test user");
+
+    let challenge = "id_mismatch_challenge";
+    let stored_options = StoredOptions {
+        challenge: challenge.to_string(),
+        user: PublicKeyCredentialUserEntity {
+            user_handle: user_handle.to_string(),
+            name: "idmismatch".to_string(),
+            display_name: "Id Mismatch".to_string(),
+        },
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        ttl: 3600,
+    };
+    store_cache_keyed::<_, PasskeyError>(
+        CachePrefix::reg_challenge(),
+        CacheKey::new(user_handle.to_string()).unwrap(),
+        stored_options,
+        3600,
+    )
+    .await
+    .expect("Failed to store registration challenge");
+
+    let client_data = super::WebAuthnClientData {
+        type_: "webauthn.create".to_string(),
+        challenge: challenge.to_string(),
+        origin: crate::passkey::config::ORIGIN.to_string(),
+    };
+    let client_data_json = serde_json::to_string(&client_data).unwrap();
+
+    let reg_data = super::RegisterCredential {
+        raw_id: raw_id.clone(),
+        id,
+        type_: "public-key".to_string(),
+        user_handle: Some(user_handle.to_string()),
+        response: AuthenticatorAttestationResponse {
+            client_data_json: crate::utils::base64url_encode(client_data_json.into_bytes())
+                .unwrap(),
+            attestation_object: build_none_attestation_object(cred_id_bytes),
+        },
+    };
+
+    let result =
+        super::finish_registration(UserId::new(user_id.to_string()).unwrap(), &reg_data).await;
+
+    let stored = PasskeyStore::get_credential(CredentialId::new(raw_id.clone()).unwrap())
+        .await
+        .expect("get_credential failed");
+
+    // Cleanup before asserting
+    let _ = passkey_test_utils::cleanup_test_credential(CredentialId::new(raw_id.clone()).unwrap())
+        .await;
+    let _ = passkey_test_utils::remove_from_cache(
+        CachePrefix::reg_challenge(),
+        CacheKey::new(user_handle.to_string()).unwrap(),
+    )
+    .await;
+
+    assert!(
+        matches!(result, Err(PasskeyError::Verification(_))),
+        "Registration with id not matching rawId must be rejected: {result:?}"
+    );
+    assert!(stored.is_none(), "No credential should be stored");
 }
