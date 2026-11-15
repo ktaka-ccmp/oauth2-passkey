@@ -114,14 +114,11 @@ pub(super) async fn store_credential_postgres(
     let last_used_at = &credential.last_used_at;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query_as::<_, (i32,)>(sqlx::AssertSqlSafe(format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         INSERT INTO {passkey_table}
         (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, rp_id, created_at, updated_at, last_used_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        ON CONFLICT (credential_id) DO UPDATE
-        SET user_id = $2, public_key = $3, counter = $4, user_handle = $5, user_name = $6, user_display_name = $7, aaguid = $8, rp_id = $9, updated_at = CURRENT_TIMESTAMP, last_used_at = CURRENT_TIMESTAMP
-        RETURNING 1
         "#
     )))
     .bind(credential_id.as_str())
@@ -136,7 +133,7 @@ pub(super) async fn store_credential_postgres(
     .bind(created_at)
     .bind(updated_at)
     .bind(last_used_at)
-    .fetch_optional(pool)
+    .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 

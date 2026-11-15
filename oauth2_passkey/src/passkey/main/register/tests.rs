@@ -809,24 +809,16 @@ async fn test_verify_session_then_finish_registration_success() {
         store_cache_keyed::<_, PasskeyError>(cache_prefix, cache_key, stored_options, 3600).await;
     assert!(challenge_store_result.is_ok(), "Failed to store challenge");
 
-    // Create test credential for storage
+    // Create the test user only; the credential itself is created by the registration
     let credential_id = "test_cred_verify_session_success";
-    let credential_data = passkey_test_utils::TestCredentialData::new(
-        credential_id,
-        user_id,
-        user_handle,
+    let user_creation_result = passkey_test_utils::insert_test_user(
+        crate::session::UserId::new(user_id.to_string()).expect("Valid user ID"),
         "test_user",
         "Test User",
-        "test_public_key",
-        "test_aaguid",
-        0,
-    );
-    let user_creation_result =
-        passkey_test_utils::insert_test_user_and_credential(credential_data).await;
-    assert!(
-        user_creation_result.is_ok(),
-        "Failed to create test user and credential"
-    );
+        false,
+    )
+    .await;
+    assert!(user_creation_result.is_ok(), "Failed to create test user");
 
     // Create RegisterCredential with matching client data
     let client_data = super::WebAuthnClientData {
@@ -2046,4 +2038,179 @@ async fn test_start_registration_anonymous_has_empty_exclude_credentials() {
     let cache_prefix = CachePrefix::reg_challenge();
     let cache_key = CacheKey::new(options.user.user_handle).unwrap();
     let _ = crate::passkey::main::test_utils::remove_from_cache(cache_prefix, cache_key).await;
+}
+
+/// Build a base64url-encoded "none" attestation object whose attested credential data
+/// contains `cred_id_bytes` and a fixed mock ES256 public key.
+fn build_none_attestation_object(cred_id_bytes: &[u8]) -> String {
+    use ring::digest;
+
+    let mut auth_data = Vec::new();
+    let rp_id_hash = digest::digest(
+        &digest::SHA256,
+        crate::passkey::config::PASSKEY_RP_ID.as_bytes(),
+    );
+    auth_data.extend_from_slice(rp_id_hash.as_ref());
+    // Flags: UP (0x01) + UV (0x04) + AT (0x40)
+    auth_data.push(0x45);
+    // Counter
+    auth_data.extend_from_slice(&[0u8; 4]);
+    // AAGUID
+    auth_data.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+    // Credential ID length + credential ID
+    auth_data.extend_from_slice(&(cred_id_bytes.len() as u16).to_be_bytes());
+    auth_data.extend_from_slice(cred_id_bytes);
+    // Mock COSE ES256 public key
+    auth_data.extend_from_slice(&[
+        0xa5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 0x58, 0x20, 0x01, 0x02, 0x03, 0x04, 0x05,
+        0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
+        0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x22, 0x58, 0x20,
+        0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
+        0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e,
+        0x3f, 0x40,
+    ]);
+
+    let cbor_value = CborValue::Map(vec![
+        (
+            CborValue::Text("fmt".to_string()),
+            CborValue::Text("none".to_string()),
+        ),
+        (
+            CborValue::Text("attStmt".to_string()),
+            CborValue::Map(Vec::new()),
+        ),
+        (
+            CborValue::Text("authData".to_string()),
+            CborValue::Bytes(auth_data),
+        ),
+    ]);
+    let mut cbor_bytes = Vec::new();
+    ciborium::ser::into_writer(&cbor_value, &mut cbor_bytes).unwrap();
+    crate::utils::base64url_encode(cbor_bytes).unwrap()
+}
+
+/// Test that registration rejects a credential ID already registered to another user
+///
+/// Regression test: registering with an existing credential ID must not overwrite the
+/// stored credential (WebAuthn L3 §7.1: "Verify that the credentialId is not yet
+/// registered for any user"). The attestation is self-consistent (the attested
+/// credential ID equals rawId), so this exercises the duplicate check on its own.
+#[tokio::test]
+async fn test_finish_registration_rejects_already_registered_credential_id() {
+    use crate::passkey::main::test_utils as passkey_test_utils;
+    use crate::passkey::types::{PublicKeyCredentialUserEntity, StoredOptions};
+    use crate::session::UserId;
+    use crate::storage::store_cache_keyed;
+    use crate::test_utils::init_test_environment;
+
+    init_test_environment().await;
+
+    let cred_id_bytes = b"dup_cred_id_regression_test";
+    let credential_id = crate::utils::base64url_encode(cred_id_bytes.to_vec()).unwrap();
+
+    // Existing credential owned by the first user
+    let owner_user_id = "dup_cred_owner_user";
+    let owner_public_key = "owner_original_public_key";
+    passkey_test_utils::insert_test_user_and_credential(
+        passkey_test_utils::TestCredentialData::new(
+            &credential_id,
+            owner_user_id,
+            "dup_cred_owner_handle",
+            "owner",
+            "Owner",
+            owner_public_key,
+            "owner_aaguid",
+            0,
+        ),
+    )
+    .await
+    .expect("Failed to insert owner user and credential");
+
+    // Second user attempts to register the same credential ID
+    let other_user_id = "dup_cred_other_user";
+    let other_user_handle = "dup_cred_other_handle";
+    passkey_test_utils::insert_test_user(
+        UserId::new(other_user_id.to_string()).unwrap(),
+        "other",
+        "Other",
+        false,
+    )
+    .await
+    .expect("Failed to insert other user");
+
+    let challenge = "dup_cred_challenge_regression";
+    let stored_options = StoredOptions {
+        challenge: challenge.to_string(),
+        user: PublicKeyCredentialUserEntity {
+            user_handle: other_user_handle.to_string(),
+            name: "other".to_string(),
+            display_name: "Other".to_string(),
+        },
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        ttl: 3600,
+    };
+    store_cache_keyed::<_, PasskeyError>(
+        CachePrefix::reg_challenge(),
+        CacheKey::new(other_user_handle.to_string()).unwrap(),
+        stored_options,
+        3600,
+    )
+    .await
+    .expect("Failed to store registration challenge");
+
+    let client_data = super::WebAuthnClientData {
+        type_: "webauthn.create".to_string(),
+        challenge: challenge.to_string(),
+        origin: crate::passkey::config::ORIGIN.to_string(),
+    };
+    let client_data_json = serde_json::to_string(&client_data).unwrap();
+
+    let reg_data = super::RegisterCredential {
+        raw_id: credential_id.clone(),
+        id: credential_id.clone(),
+        type_: "public-key".to_string(),
+        user_handle: Some(other_user_handle.to_string()),
+        response: AuthenticatorAttestationResponse {
+            client_data_json: crate::utils::base64url_encode(client_data_json.into_bytes())
+                .unwrap(),
+            attestation_object: build_none_attestation_object(cred_id_bytes),
+        },
+    };
+
+    let result =
+        super::finish_registration(UserId::new(other_user_id.to_string()).unwrap(), &reg_data)
+            .await;
+
+    // The stored credential must be untouched regardless of the result
+    let stored = PasskeyStore::get_credential(CredentialId::new(credential_id.clone()).unwrap())
+        .await
+        .expect("get_credential failed")
+        .expect("Owner credential should still exist");
+
+    // Cleanup before asserting
+    let _ = passkey_test_utils::cleanup_test_credential(
+        CredentialId::new(credential_id.clone()).unwrap(),
+    )
+    .await;
+    let _ = passkey_test_utils::remove_from_cache(
+        CachePrefix::reg_challenge(),
+        CacheKey::new(other_user_handle.to_string()).unwrap(),
+    )
+    .await;
+
+    assert!(
+        result.is_err(),
+        "Registration with an already-registered credential ID must be rejected"
+    );
+    assert_eq!(
+        stored.user_id, owner_user_id,
+        "Credential owner was overwritten"
+    );
+    assert_eq!(
+        stored.public_key, owner_public_key,
+        "Credential public key was overwritten"
+    );
 }

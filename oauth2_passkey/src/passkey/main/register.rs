@@ -326,6 +326,20 @@ pub(crate) async fn validate_registration_challenge(
     // Extract credential ID
     let credential_id = reg_data.raw_id.clone();
 
+    // Reject a credential ID that is already registered for any user (WebAuthn §7.1).
+    // Checked here, before any side effects, so the create-user path does not leave
+    // an orphaned user behind. The UNIQUE constraint on credential_id is the backstop.
+    let existing = PasskeyStore::get_credential(
+        CredentialId::new(credential_id.clone())
+            .map_err(|e| PasskeyError::Validation(format!("Invalid credential ID: {e}")))?,
+    )
+    .await?;
+    if existing.is_some() {
+        return Err(PasskeyError::Registration(
+            "Credential ID already registered".to_string(),
+        ));
+    }
+
     // Parse and validate attestation object
     let attestation_obj = parse_attestation_object(&reg_data.response.attestation_object)?;
     let aaguid = extract_aaguid(&attestation_obj)?;

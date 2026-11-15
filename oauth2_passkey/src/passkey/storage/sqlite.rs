@@ -106,7 +106,7 @@ pub(super) async fn store_credential_sqlite(
 
     sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
-        INSERT OR REPLACE INTO {passkey_table}
+        INSERT INTO {passkey_table}
         (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, rp_id, created_at, updated_at, last_used_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#
