@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (17)
+### Open (19)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -27,6 +27,8 @@ This directory contains issue/task tracking files for the project.
 | `20261117-0729` | low | small | [deployment-patterns.md Example Sends an Ignored Field to auth/start](open/20261117-0729-deployment-patterns-auth-start-body.md) |
 | `20261117-0730` | low | small | [Allow Overriding the Listen Port in Demo Applications](open/20261117-0730-demo-port-override.md) |
 | `20261117-0731` | low | small | [Make It Clear How to Access Demos from Other Devices](open/20261117-0731-demo-access-from-other-devices-docs.md) |
+| `20261117-0835` | low | small | [PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true No Longer Allows Multiple Credentials per Authenticator](open/20261117-0835-user-handle-unique-setting-vs-exclude-credentials.md) |
+| `20261117-0836` | low | small | [Show Friendly Messages for WebAuthn Browser Errors](open/20261117-0836-friendly-webauthn-error-messages.md) |
 
 ### Completed (78)
 
