@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (10)
+### Open (17)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -16,10 +16,17 @@ This directory contains issue/task tracking files for the project.
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
+| `20261117-0732` | medium | small | [Fix Google OAuth2 Setup Instructions (Callback URL, FedCM JavaScript Origins)](open/20261117-0732-google-oauth2-setup-docs.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
 | `20261116-0111` | low | large | [Re-authentication (Step-up) Design Policy](open/20261116-0111-reauthentication-design.md) |
 | `20261116-0112` | low | small | [Passkey Login While Logged In Silently Switches Account](open/20261116-0112-passkey-login-silently-switches-account.md) |
+| `20261117-0726` | low | small | [Unify Credential ID Format in Test Data](open/20261117-0726-unify-test-credential-id-format.md) |
+| `20261117-0727` | low | small | [Filtered Test Runs Fail with "ORIGIN must be set"](open/20261117-0727-filtered-test-run-origin-panic.md) |
+| `20261117-0728` | low | small | [Attestation Object Is Parsed Twice per Registration](open/20261117-0728-attestation-object-parsed-twice.md) |
+| `20261117-0729` | low | small | [deployment-patterns.md Example Sends an Ignored Field to auth/start](open/20261117-0729-deployment-patterns-auth-start-body.md) |
+| `20261117-0730` | low | small | [Allow Overriding the Listen Port in Demo Applications](open/20261117-0730-demo-port-override.md) |
+| `20261117-0731` | low | small | [Make It Clear How to Access Demos from Other Devices](open/20261117-0731-demo-access-from-other-devices-docs.md) |
 
 ### Completed (78)
 
