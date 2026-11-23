@@ -16,7 +16,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     let users_table = DB_TABLE_USERS.as_str();
 
     // Create oauth2_accounts table
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE TABLE IF NOT EXISTS {oauth2_table} (
             sequence_number BIGSERIAL PRIMARY KEY,
@@ -33,19 +33,19 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             UNIQUE(provider, provider_user_id)
         )
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     // Create index on user_id for faster lookups
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id)
         "#,
         oauth2_table.replace(".", "_"),
         oauth2_table
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
@@ -110,7 +110,7 @@ pub(super) async fn get_oauth2_accounts_by_field_postgres(
         ),
     };
 
-    sqlx::query_as::<_, OAuth2Account>(query)
+    sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(query.as_str()))
         .bind(value)
         .fetch_all(pool)
         .await
@@ -124,12 +124,12 @@ pub(super) async fn get_oauth2_account_by_provider_postgres(
 ) -> Result<Option<OAuth2Account>, OAuth2Error> {
     let table_name = DB_TABLE_OAUTH2_ACCOUNTS.as_str();
 
-    sqlx::query_as::<_, OAuth2Account>(&format!(
+    sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name}
         WHERE provider = $1 AND provider_user_id = $2
         "#
-    ))
+    )))
     .bind(provider.as_str())
     .bind(provider_user_id.as_str())
     .fetch_optional(pool)
@@ -150,12 +150,12 @@ pub(super) async fn upsert_oauth2_account_postgres(
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     // Check if the account already exists
-    let existing = sqlx::query_as::<_, OAuth2Account>(&format!(
+    let existing = sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name}
         WHERE provider = $1 AND provider_user_id = $2
         "#
-    ))
+    )))
     .bind(&account.provider)
     .bind(&account.provider_user_id)
     .fetch_optional(&mut *tx)
@@ -164,7 +164,7 @@ pub(super) async fn upsert_oauth2_account_postgres(
 
     let account_id = if let Some(existing) = existing {
         // Update existing account
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             r#"
             UPDATE {table_name} SET
                 name = $1,
@@ -174,7 +174,7 @@ pub(super) async fn upsert_oauth2_account_postgres(
                 updated_at = $5
             WHERE id = $6
             "#
-        ))
+        )))
         .bind(&account.name)
         .bind(&account.email)
         .bind(&account.picture)
@@ -193,13 +193,13 @@ pub(super) async fn upsert_oauth2_account_postgres(
         // Insert new account
         let id = account.id.clone();
         sqlx::query(
-            &format!(
+            sqlx::AssertSqlSafe(format!(
             r#"
             INSERT INTO {table_name}
             (id, user_id, provider, provider_user_id, name, email, picture, metadata, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             "#
-            )
+            ))
         )
         .bind(&id)
         .bind(&account.user_id)
@@ -219,11 +219,11 @@ pub(super) async fn upsert_oauth2_account_postgres(
     };
 
     // Fetch inside the transaction for read-your-writes consistency
-    let updated_account = sqlx::query_as::<_, OAuth2Account>(&format!(
+    let updated_account = sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name} WHERE id = $1
         "#
-    ))
+    )))
     .bind(account_id)
     .fetch_one(&mut *tx)
     .await
@@ -268,7 +268,7 @@ pub(super) async fn delete_oauth2_accounts_by_field_postgres(
         ),
     };
 
-    sqlx::query(query)
+    sqlx::query(sqlx::AssertSqlSafe(query.as_str()))
         .bind(value)
         .execute(pool)
         .await

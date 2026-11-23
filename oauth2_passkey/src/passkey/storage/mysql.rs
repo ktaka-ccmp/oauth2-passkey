@@ -15,7 +15,7 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), Passke
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
     let users_table = DB_TABLE_USERS.as_str();
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE TABLE IF NOT EXISTS {passkey_table} (
             sequence_number BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -34,7 +34,7 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), Passke
             FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE
         )
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -43,15 +43,15 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), Passke
     let idx_user_name = format!("idx_{}_user_name", passkey_table.replace('.', "_"));
     let idx_user_id = format!("idx_{}_user_id", passkey_table.replace('.', "_"));
 
-    let _ = sqlx::query(&format!(
+    let _ = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"CREATE INDEX {idx_user_name} ON {passkey_table}(user_name)"#,
-    ))
+    )))
     .execute(pool)
     .await;
 
-    let _ = sqlx::query(&format!(
+    let _ = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"CREATE INDEX {idx_user_id} ON {passkey_table}(user_id)"#,
-    ))
+    )))
     .execute(pool)
     .await;
 
@@ -104,16 +104,16 @@ pub(super) async fn store_credential_mysql(
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    let existing = sqlx::query_as::<_, PasskeyCredential>(&format!(
+    let existing = sqlx::query_as::<_, PasskeyCredential>(sqlx::AssertSqlSafe(format!(
         r#"SELECT * FROM {passkey_table} WHERE credential_id = ? FOR UPDATE"#
-    ))
+    )))
     .bind(credential_id.as_str())
     .fetch_optional(&mut *tx)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
     if existing.is_some() {
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             r#"
             UPDATE {passkey_table} SET
                 user_id = ?, public_key = ?, counter = ?,
@@ -122,7 +122,7 @@ pub(super) async fn store_credential_mysql(
                 updated_at = CURRENT_TIMESTAMP(6), last_used_at = CURRENT_TIMESTAMP(6)
             WHERE credential_id = ?
             "#
-        ))
+        )))
         .bind(&credential.user_id)
         .bind(&credential.public_key)
         .bind(counter_i32)
@@ -136,13 +136,13 @@ pub(super) async fn store_credential_mysql(
         .await
         .map_err(|e| PasskeyError::Storage(e.to_string()))?;
     } else {
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             r#"
             INSERT INTO {passkey_table}
             (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, rp_id, created_at, updated_at, last_used_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#
-        ))
+        )))
         .bind(credential_id.as_str())
         .bind(&credential.user_id)
         .bind(&credential.public_key)
@@ -173,9 +173,9 @@ pub(super) async fn get_credential_mysql(
 ) -> Result<Option<PasskeyCredential>, PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query_as::<_, PasskeyCredential>(&format!(
+    sqlx::query_as::<_, PasskeyCredential>(sqlx::AssertSqlSafe(format!(
         r#"SELECT * FROM {passkey_table} WHERE credential_id = ?"#
-    ))
+    )))
     .bind(credential_id.as_str())
     .fetch_optional(pool)
     .await
@@ -206,7 +206,7 @@ pub(super) async fn get_credentials_by_field_mysql(
         ),
     };
 
-    sqlx::query_as::<_, PasskeyCredential>(query)
+    sqlx::query_as::<_, PasskeyCredential>(sqlx::AssertSqlSafe(query.as_str()))
         .bind(value)
         .fetch_all(pool)
         .await
@@ -221,13 +221,13 @@ pub(super) async fn atomic_update_credential_counter_mysql(
     let counter_i64 = new_counter as i64;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    let result = sqlx::query(&format!(
+    let result = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         UPDATE {passkey_table}
         SET counter = ?, updated_at = CURRENT_TIMESTAMP(6)
         WHERE credential_id = ? AND counter < ?
         "#
-    ))
+    )))
     .bind(counter_i64)
     .bind(credential_id.as_str())
     .bind(counter_i64)
@@ -262,7 +262,7 @@ pub(super) async fn delete_credential_by_field_mysql(
         ),
     };
 
-    sqlx::query(query)
+    sqlx::query(sqlx::AssertSqlSafe(query.as_str()))
         .bind(value)
         .execute(pool)
         .await
@@ -279,9 +279,9 @@ pub(super) async fn update_credential_user_details_mysql(
 ) -> Result<(), PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"UPDATE {passkey_table} SET user_name = ?, user_display_name = ? WHERE credential_id = ?"#
-    ))
+    )))
     .bind(name)
     .bind(display_name)
     .bind(credential_id.as_str())
@@ -336,9 +336,9 @@ pub(super) async fn update_credential_last_used_at_mysql(
 ) -> Result<(), PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"UPDATE {passkey_table} SET last_used_at = ? WHERE credential_id = ?"#
-    ))
+    )))
     .bind(last_used_at)
     .bind(credential_id.as_str())
     .execute(pool)

@@ -1388,7 +1388,7 @@ impl MockOAuth2Responses {
             "email_verified": true
         });
 
-        let key = EncodingKey::from_secret("test_secret".as_ref());
+        let key = EncodingKey::from_secret("test_secret".as_ref()).unwrap();
         encode(&Header::default(), &claims, &key)
             .unwrap_or_else(|_| format!("mock.jwt.token.{}", user.id))
     }
