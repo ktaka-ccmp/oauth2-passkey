@@ -343,13 +343,13 @@ pub(crate) async fn restore_first_user_after_deletion() {
         let table_name = DB_TABLE_USERS.as_str();
         let now = chrono::Utc::now();
 
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             r#"
             INSERT OR REPLACE INTO {table_name}
                 (sequence_number, id, account, label, is_admin, created_at, updated_at)
             VALUES (1, 'first-user', 'first-user@example.com', 'First User', true, ?, ?)
             "#
-        ))
+        )))
         .bind(now)
         .bind(now)
         .execute(pool)

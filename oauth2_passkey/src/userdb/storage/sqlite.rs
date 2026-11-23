@@ -14,7 +14,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), User
     let table_name = DB_TABLE_USERS.as_str();
 
     // Create users table
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE TABLE IF NOT EXISTS {table_name} (
             sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +26,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), User
             updated_at TIMESTAMP NOT NULL
         )
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
@@ -58,11 +58,11 @@ pub(super) async fn get_all_users_sqlite(pool: &Pool<Sqlite>) -> Result<Vec<User
 
     let table_name = DB_TABLE_USERS.as_str();
 
-    sqlx::query_as::<_, User>(&format!(
+    sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name} ORDER BY sequence_number ASC
         "#
-    ))
+    )))
     .fetch_all(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))
@@ -78,24 +78,26 @@ pub(super) async fn get_user_by_field_sqlite(
     let table_name = DB_TABLE_USERS.as_str();
 
     match field {
-        UserSearchField::Id(id) => sqlx::query_as::<_, User>(&format!(
+        UserSearchField::Id(id) => sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
             r#"
                 SELECT * FROM {table_name} WHERE id = ?
                 "#
-        ))
+        )))
         .bind(id)
         .fetch_optional(pool)
         .await
         .map_err(|e| UserError::Storage(e.to_string())),
-        UserSearchField::SequenceNumber(sequence_number) => sqlx::query_as::<_, User>(&format!(
-            r#"
+        UserSearchField::SequenceNumber(sequence_number) => {
+            sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
+                r#"
                 SELECT * FROM {table_name} WHERE sequence_number = ?
                 "#
-        ))
-        .bind(sequence_number)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| UserError::Storage(e.to_string())),
+            )))
+            .bind(sequence_number)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| UserError::Storage(e.to_string()))
+        }
     }
 }
 
@@ -109,7 +111,7 @@ pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Resul
     updated_user.updated_at = now;
 
     // Upsert user with a single query
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         INSERT INTO {table_name} (id, account, label, is_admin, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -119,7 +121,7 @@ pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Resul
             is_admin = excluded.is_admin,
             updated_at = ?
         "#
-    ))
+    )))
     .bind(&updated_user.id)
     .bind(&updated_user.account)
     .bind(&updated_user.label)
@@ -132,11 +134,11 @@ pub(super) async fn upsert_user_sqlite(pool: &Pool<Sqlite>, user: User) -> Resul
     .map_err(|e| UserError::Storage(e.to_string()))?;
 
     // Fetch the user to get the sequence_number
-    sqlx::query_as::<_, User>(&format!(
+    sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name} WHERE id = ?
         "#
-    ))
+    )))
     .bind(&updated_user.id)
     .fetch_one(pool)
     .await
@@ -151,13 +153,13 @@ pub(super) async fn insert_demo_placeholder_sqlite(pool: &Pool<Sqlite>) -> Resul
     let table_name = DB_TABLE_USERS.as_str();
     let now = chrono::Utc::now();
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         INSERT OR IGNORE INTO {table_name}
             (sequence_number, id, account, label, is_admin, created_at, updated_at)
         VALUES (1, ?, ?, ?, true, ?, ?)
         "#
-    ))
+    )))
     .bind(crate::config::DEMO_PLACEHOLDER_USER_ID)
     .bind("system@demo.local")
     .bind("[Demo Placeholder]")
@@ -180,12 +182,12 @@ pub(super) async fn demote_user_if_not_last_admin_sqlite(
 
     let table_name = DB_TABLE_USERS.as_str();
 
-    let result = sqlx::query(&format!(
+    let result = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         UPDATE {table_name} SET is_admin = false, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND (SELECT COUNT(*) FROM {table_name} WHERE is_admin = true) > 1
         "#
-    ))
+    )))
     .bind(id.as_str())
     .execute(pool)
     .await
@@ -204,12 +206,12 @@ pub(super) async fn delete_user_if_not_last_admin_sqlite(
 
     let table_name = DB_TABLE_USERS.as_str();
 
-    let result = sqlx::query(&format!(
+    let result = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         DELETE FROM {table_name}
         WHERE id = ? AND (SELECT COUNT(*) FROM {table_name} WHERE is_admin = true) > 1
         "#
-    ))
+    )))
     .bind(id.as_str())
     .execute(pool)
     .await
@@ -224,11 +226,11 @@ pub(super) async fn delete_user_sqlite(pool: &Pool<Sqlite>, id: UserId) -> Resul
 
     let table_name = DB_TABLE_USERS.as_str();
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         DELETE FROM {table_name} WHERE id = ?
         "#
-    ))
+    )))
     .bind(id.as_str())
     .execute(pool)
     .await

@@ -292,7 +292,7 @@ fn convert_jwk_to_decoding_key(jwk: &Jwk) -> Result<DecodingKey, TokenVerificati
                     .as_ref()
                     .ok_or(TokenVerificationError::MissingKeyComponent("k".to_string()))?,
             )?;
-            Ok(DecodingKey::from_secret(&k))
+            Ok(DecodingKey::from_secret(&k)?)
         }
         alg => Err(TokenVerificationError::UnsupportedAlgorithm(
             alg.to_string(),
@@ -389,7 +389,7 @@ pub(super) async fn verify_idtoken_with_algorithm(
                         "client_secret (empty)".to_string(),
                     ));
                 }
-                DecodingKey::from_secret(ctx.client_secret.as_bytes())
+                DecodingKey::from_secret(ctx.client_secret.as_bytes())?
             }
             _ => {
                 return Err(TokenVerificationError::MissingKeyComponent(

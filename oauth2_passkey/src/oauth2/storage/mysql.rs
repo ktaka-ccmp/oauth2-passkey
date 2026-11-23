@@ -16,7 +16,7 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), OAuth2
     let users_table = DB_TABLE_USERS.as_str();
 
     // Create oauth2_accounts table
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE TABLE IF NOT EXISTS {oauth2_table} (
             sequence_number BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -34,7 +34,7 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), OAuth2
             FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE
         )
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
@@ -42,9 +42,9 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), OAuth2
     // Create index on user_id for faster lookups
     // MySQL: use CREATE INDEX IF NOT EXISTS equivalent via ignoring errors
     let index_name = format!("idx_{}_user_id", oauth2_table.replace('.', "_"));
-    let _ = sqlx::query(&format!(
+    let _ = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"CREATE INDEX {index_name} ON {oauth2_table}(user_id)"#,
-    ))
+    )))
     .execute(pool)
     .await;
 
@@ -109,7 +109,7 @@ pub(super) async fn get_oauth2_accounts_by_field_mysql(
         ),
     };
 
-    sqlx::query_as::<_, OAuth2Account>(query)
+    sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(query.as_str()))
         .bind(value)
         .fetch_all(pool)
         .await
@@ -126,12 +126,12 @@ pub(super) async fn get_oauth2_account_by_provider_mysql(
     // Ensure tables exist before any operations
     create_tables_mysql(pool).await?;
 
-    sqlx::query_as::<_, OAuth2Account>(&format!(
+    sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name}
         WHERE provider = ? AND provider_user_id = ?
         "#
-    ))
+    )))
     .bind(provider.as_str())
     .bind(provider_user_id.as_str())
     .fetch_optional(pool)
@@ -155,13 +155,13 @@ pub(super) async fn upsert_oauth2_account_mysql(
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     // Check if the account already exists (FOR UPDATE to prevent concurrent insert race)
-    let existing = sqlx::query_as::<_, OAuth2Account>(&format!(
+    let existing = sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name}
         WHERE provider = ? AND provider_user_id = ?
         FOR UPDATE
         "#
-    ))
+    )))
     .bind(&account.provider)
     .bind(&account.provider_user_id)
     .fetch_optional(&mut *tx)
@@ -170,7 +170,7 @@ pub(super) async fn upsert_oauth2_account_mysql(
 
     let account_id = if let Some(existing) = existing {
         // Update existing account
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             r#"
             UPDATE {table_name} SET
                 name = ?,
@@ -180,7 +180,7 @@ pub(super) async fn upsert_oauth2_account_mysql(
                 updated_at = ?
             WHERE id = ?
             "#
-        ))
+        )))
         .bind(&account.name)
         .bind(&account.email)
         .bind(&account.picture)
@@ -199,13 +199,13 @@ pub(super) async fn upsert_oauth2_account_mysql(
         // Insert new account
         let id = account.id.clone();
         sqlx::query(
-            &format!(
+            sqlx::AssertSqlSafe(format!(
             r#"
             INSERT INTO {table_name}
             (id, user_id, provider, provider_user_id, name, email, picture, metadata, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#
-            )
+            ))
         )
         .bind(&id)
         .bind(&account.user_id)
@@ -225,11 +225,11 @@ pub(super) async fn upsert_oauth2_account_mysql(
     };
 
     // Fetch inside the transaction for read-your-writes consistency
-    let updated_account = sqlx::query_as::<_, OAuth2Account>(&format!(
+    let updated_account = sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name} WHERE id = ?
         "#
-    ))
+    )))
     .bind(account_id)
     .fetch_one(&mut *tx)
     .await
@@ -278,7 +278,7 @@ pub(super) async fn delete_oauth2_accounts_by_field_mysql(
         ),
     };
 
-    sqlx::query(query)
+    sqlx::query(sqlx::AssertSqlSafe(query.as_str()))
         .bind(value)
         .execute(pool)
         .await

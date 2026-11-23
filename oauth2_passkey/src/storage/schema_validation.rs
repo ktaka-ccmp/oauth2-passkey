@@ -193,7 +193,7 @@ pub(crate) async fn validate_sqlite_table_schema<E>(
     // Query actual schema from database
     let pragma_sql = format!("PRAGMA table_info('{table_name}');");
 
-    let rows = sqlx::query(pragma_sql.as_str())
+    let rows = sqlx::query(sqlx::AssertSqlSafe(pragma_sql))
         .fetch_all(pool)
         .await
         .map_err(|e| error_mapper(e.to_string()))?;
