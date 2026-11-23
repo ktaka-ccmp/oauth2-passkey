@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (19)
+### Open (22)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -17,6 +17,7 @@ This directory contains issue/task tracking files for the project.
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
 | `20261117-0732` | medium | small | [Fix Google OAuth2 Setup Instructions (Callback URL, FedCM JavaScript Origins)](open/20261117-0732-google-oauth2-setup-docs.md) |
+| `20261123-2151` | medium | small | [Periodic Dependency Updates and Security Audit](open/20261123-2151-periodic-dependency-updates.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
 | `20261116-0111` | low | large | [Re-authentication (Step-up) Design Policy](open/20261116-0111-reauthentication-design.md) |
@@ -29,6 +30,8 @@ This directory contains issue/task tracking files for the project.
 | `20261117-0731` | low | small | [Make It Clear How to Access Demos from Other Devices](open/20261117-0731-demo-access-from-other-devices-docs.md) |
 | `20261117-0835` | low | small | [PASSKEY_USER_HANDLE_UNIQUE_FOR_EVERY_CREDENTIAL=true No Longer Allows Multiple Credentials per Authenticator](open/20261117-0835-user-handle-unique-setting-vs-exclude-credentials.md) |
 | `20261117-0836` | low | small | [Show Friendly Messages for WebAuthn Browser Errors](open/20261117-0836-friendly-webauthn-error-messages.md) |
+| `20261123-2152` | low | small | [Validate Configured DB Table Names and Centralize AssertSqlSafe](open/20261123-2152-validate-db-table-names.md) |
+| `20261123-2153` | low | small | [Upgrade tower-http to 0.7](open/20261123-2153-upgrade-tower-http-0.7.md) |
 
 ### Completed (78)
 
