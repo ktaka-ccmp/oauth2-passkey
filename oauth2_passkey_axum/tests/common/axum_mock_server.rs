@@ -510,7 +510,7 @@ fn create_mock_id_token(
 
     let mut header = Header::new(jsonwebtoken::Algorithm::HS256);
     header.kid = Some("mock_key_id".to_string());
-    let key = EncodingKey::from_secret("test_secret".as_ref());
+    let key = EncodingKey::from_secret("test_secret".as_ref()).unwrap();
 
     encode(&header, &claims, &key).unwrap_or_else(|_| "mock.jwt.token".to_string())
 }

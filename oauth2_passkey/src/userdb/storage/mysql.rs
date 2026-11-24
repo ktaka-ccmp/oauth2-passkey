@@ -14,7 +14,7 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), UserEr
     let table_name = DB_TABLE_USERS.as_str();
 
     // Create users table
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE TABLE IF NOT EXISTS {table_name} (
             sequence_number BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -26,7 +26,7 @@ pub(super) async fn create_tables_mysql(pool: &Pool<MySql>) -> Result<(), UserEr
             updated_at DATETIME(6) NOT NULL
         )
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
@@ -59,11 +59,11 @@ pub(super) async fn get_all_users_mysql(pool: &Pool<MySql>) -> Result<Vec<User>,
 
     let table_name = DB_TABLE_USERS.as_str();
 
-    sqlx::query_as::<_, User>(&format!(
+    sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name} ORDER BY sequence_number ASC
         "#
-    ))
+    )))
     .fetch_all(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))
@@ -79,24 +79,26 @@ pub(super) async fn get_user_by_field_mysql(
     let table_name = DB_TABLE_USERS.as_str();
 
     match field {
-        UserSearchField::Id(id) => sqlx::query_as::<_, User>(&format!(
+        UserSearchField::Id(id) => sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
             r#"
                 SELECT * FROM {table_name} WHERE id = ?
                 "#
-        ))
+        )))
         .bind(id)
         .fetch_optional(pool)
         .await
         .map_err(|e| UserError::Storage(e.to_string())),
-        UserSearchField::SequenceNumber(sequence_number) => sqlx::query_as::<_, User>(&format!(
-            r#"
+        UserSearchField::SequenceNumber(sequence_number) => {
+            sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
+                r#"
                 SELECT * FROM {table_name} WHERE sequence_number = ?
                 "#
-        ))
-        .bind(sequence_number)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| UserError::Storage(e.to_string())),
+            )))
+            .bind(sequence_number)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| UserError::Storage(e.to_string()))
+        }
     }
 }
 
@@ -114,16 +116,16 @@ pub(super) async fn upsert_user_mysql(pool: &Pool<MySql>, user: User) -> Result<
         .await
         .map_err(|e| UserError::Storage(e.to_string()))?;
 
-    let existing = sqlx::query_as::<_, User>(&format!(
+    let existing = sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
         r#"SELECT * FROM {table_name} WHERE id = ? FOR UPDATE"#
-    ))
+    )))
     .bind(&updated_user.id)
     .fetch_optional(&mut *tx)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
 
     if existing.is_some() {
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             r#"
             UPDATE {table_name} SET
                 account = ?,
@@ -132,7 +134,7 @@ pub(super) async fn upsert_user_mysql(pool: &Pool<MySql>, user: User) -> Result<
                 updated_at = ?
             WHERE id = ?
             "#
-        ))
+        )))
         .bind(&updated_user.account)
         .bind(&updated_user.label)
         .bind(updated_user.is_admin)
@@ -142,12 +144,12 @@ pub(super) async fn upsert_user_mysql(pool: &Pool<MySql>, user: User) -> Result<
         .await
         .map_err(|e| UserError::Storage(e.to_string()))?;
     } else {
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             r#"
             INSERT INTO {table_name} (id, account, label, is_admin, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?)
             "#
-        ))
+        )))
         .bind(&updated_user.id)
         .bind(&updated_user.account)
         .bind(&updated_user.label)
@@ -160,11 +162,13 @@ pub(super) async fn upsert_user_mysql(pool: &Pool<MySql>, user: User) -> Result<
     }
 
     // Fetch the user to get the sequence_number
-    let result = sqlx::query_as::<_, User>(&format!(r#"SELECT * FROM {table_name} WHERE id = ?"#))
-        .bind(&updated_user.id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| UserError::Storage(e.to_string()))?;
+    let result = sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
+        r#"SELECT * FROM {table_name} WHERE id = ?"#
+    )))
+    .bind(&updated_user.id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|e| UserError::Storage(e.to_string()))?;
 
     tx.commit()
         .await
@@ -189,13 +193,13 @@ pub(super) async fn insert_demo_placeholder_mysql(pool: &Pool<MySql>) -> Result<
         .map_err(|e| UserError::Storage(e.to_string()))?;
 
     // MySQL: INSERT IGNORE skips if duplicate key (sequence_number=1 or id conflict)
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         INSERT IGNORE INTO {table_name}
             (sequence_number, id, account, label, is_admin, created_at, updated_at)
         VALUES (1, ?, ?, ?, true, ?, ?)
         "#
-    ))
+    )))
     .bind(crate::config::DEMO_PLACEHOLDER_USER_ID)
     .bind("system@demo.local")
     .bind("[Demo Placeholder]")
@@ -206,17 +210,17 @@ pub(super) async fn insert_demo_placeholder_mysql(pool: &Pool<MySql>) -> Result<
     .map_err(|e| UserError::Storage(e.to_string()))?;
 
     // Reset AUTO_INCREMENT to avoid conflicts with the explicitly inserted value
-    let max_seq: (i64,) = sqlx::query_as(&format!(
+    let max_seq: (i64,) = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         r#"SELECT COALESCE(MAX(sequence_number), 0) FROM {table_name}"#
-    ))
+    )))
     .fetch_one(&mut *tx)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"ALTER TABLE {table_name} AUTO_INCREMENT = {}"#,
         max_seq.0 + 1
-    ))
+    )))
     .execute(&mut *tx)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
@@ -238,12 +242,12 @@ pub(super) async fn demote_user_if_not_last_admin_mysql(
 
     let table_name = DB_TABLE_USERS.as_str();
 
-    let result = sqlx::query(&format!(
+    let result = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         UPDATE {table_name} SET is_admin = false, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND (SELECT COUNT(*) FROM {table_name} WHERE is_admin = true) > 1
         "#
-    ))
+    )))
     .bind(id.as_str())
     .execute(pool)
     .await
@@ -262,12 +266,12 @@ pub(super) async fn delete_user_if_not_last_admin_mysql(
 
     let table_name = DB_TABLE_USERS.as_str();
 
-    let result = sqlx::query(&format!(
+    let result = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         DELETE FROM {table_name}
         WHERE id = ? AND (SELECT COUNT(*) FROM {table_name} WHERE is_admin = true) > 1
         "#
-    ))
+    )))
     .bind(id.as_str())
     .execute(pool)
     .await
@@ -282,11 +286,11 @@ pub(super) async fn delete_user_mysql(pool: &Pool<MySql>, id: UserId) -> Result<
 
     let table_name = DB_TABLE_USERS.as_str();
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         DELETE FROM {table_name} WHERE id = ?
         "#
-    ))
+    )))
     .bind(id.as_str())
     .execute(pool)
     .await

@@ -564,8 +564,12 @@ fn create_mock_jwt(email: &str, sub: &str, name: &str, nonce: Option<&str>) -> S
 
     let mut header = Header::new(jsonwebtoken::Algorithm::HS256);
     header.kid = Some("mock_key_id".to_string());
-    encode(&header, &claims, &EncodingKey::from_secret(JWT_SECRET))
-        .expect("Failed to create mock JWT")
+    encode(
+        &header,
+        &claims,
+        &EncodingKey::from_secret(JWT_SECRET).unwrap(),
+    )
+    .expect("Failed to create mock JWT")
 }
 
 // =============================================================================

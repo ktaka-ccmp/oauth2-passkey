@@ -15,7 +15,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Logi
     // Create login_history table
     // Note: user_id intentionally has NO FK constraint to users table.
     // Login history is retained as an audit trail even after user deletion.
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE TABLE IF NOT EXISTS {table_name} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,27 +33,27 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), Logi
             email TEXT
         )
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
 
     // Create index for user_id lookups
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE INDEX IF NOT EXISTS idx_{table_name}_user_id ON {table_name}(user_id)
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
 
     // Create index for timestamp-based queries
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE INDEX IF NOT EXISTS idx_{table_name}_timestamp ON {table_name}(timestamp DESC)
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
@@ -115,7 +115,7 @@ pub(super) async fn insert_login_history_sqlite(
         .await
         .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         INSERT INTO {table_name} (
             user_id, timestamp, auth_method, ip_address, user_agent,
@@ -124,7 +124,7 @@ pub(super) async fn insert_login_history_sqlite(
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#
-    ))
+    )))
     .bind(&entry.user_id)
     .bind(entry.timestamp)
     .bind(&entry.auth_method)
@@ -142,11 +142,11 @@ pub(super) async fn insert_login_history_sqlite(
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
 
     // Fetch within the same transaction to guarantee last_insert_rowid() consistency
-    let result = sqlx::query_as::<_, LoginHistoryEntry>(&format!(
+    let result = sqlx::query_as::<_, LoginHistoryEntry>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name} WHERE id = last_insert_rowid()
         "#
-    ))
+    )))
     .fetch_one(&mut *tx)
     .await
     .map_err(|e| LoginHistoryError::Storage(e.to_string()))?;
@@ -169,14 +169,14 @@ pub(super) async fn get_login_history_by_user_sqlite(
 
     let table_name = DB_TABLE_LOGIN_HISTORY.as_str();
 
-    sqlx::query_as::<_, LoginHistoryEntry>(&format!(
+    sqlx::query_as::<_, LoginHistoryEntry>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name}
         WHERE user_id = ?
         ORDER BY timestamp DESC
         LIMIT ? OFFSET ?
         "#
-    ))
+    )))
     .bind(user_id)
     .bind(limit)
     .bind(offset)
@@ -250,7 +250,8 @@ pub(super) async fn get_login_history_by_user_with_date_range_sqlite(
         ),
     };
 
-    let mut query_builder = sqlx::query_as::<_, LoginHistoryEntry>(&query).bind(user_id);
+    let mut query_builder =
+        sqlx::query_as::<_, LoginHistoryEntry>(sqlx::AssertSqlSafe(query)).bind(user_id);
 
     if has_from {
         query_builder = query_builder.bind(from.unwrap());
@@ -311,7 +312,7 @@ pub(super) async fn query_login_history_admin_sqlite(
         "#
     );
 
-    let mut query_builder = sqlx::query_as::<_, LoginHistoryEntry>(&query);
+    let mut query_builder = sqlx::query_as::<_, LoginHistoryEntry>(sqlx::AssertSqlSafe(query));
 
     if let Some(uid) = user_id {
         query_builder = query_builder.bind(uid);
@@ -343,12 +344,12 @@ pub(super) async fn delete_old_entries_sqlite(
 
     let table_name = DB_TABLE_LOGIN_HISTORY.as_str();
 
-    let result = sqlx::query(&format!(
+    let result = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         DELETE FROM {table_name}
         WHERE timestamp < ?
         "#
-    ))
+    )))
     .bind(cutoff)
     .execute(pool)
     .await

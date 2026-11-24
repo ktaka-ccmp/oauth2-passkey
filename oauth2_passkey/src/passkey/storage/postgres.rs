@@ -15,7 +15,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
     let users_table = DB_TABLE_USERS.as_str();
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE TABLE IF NOT EXISTS {passkey_table} (
             sequence_number BIGSERIAL PRIMARY KEY,
@@ -34,29 +34,29 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             FOREIGN KEY (user_id) REFERENCES {users_table}(id) ON DELETE CASCADE
         )
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE INDEX IF NOT EXISTS idx_{}_user_name ON {}(user_name);
         "#,
         passkey_table.replace(".", "_"),
         passkey_table
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id);
         "#,
         passkey_table.replace(".", "_"),
         passkey_table
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
@@ -114,16 +114,13 @@ pub(super) async fn store_credential_postgres(
     let last_used_at = &credential.last_used_at;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query_as::<_, (i32,)>(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         INSERT INTO {passkey_table}
         (credential_id, user_id, public_key, counter, user_handle, user_name, user_display_name, aaguid, rp_id, created_at, updated_at, last_used_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        ON CONFLICT (credential_id) DO UPDATE
-        SET user_id = $2, public_key = $3, counter = $4, user_handle = $5, user_name = $6, user_display_name = $7, aaguid = $8, rp_id = $9, updated_at = CURRENT_TIMESTAMP, last_used_at = CURRENT_TIMESTAMP
-        RETURNING 1
         "#
-    ))
+    )))
     .bind(credential_id.as_str())
     .bind(user_id)
     .bind(public_key)
@@ -136,7 +133,7 @@ pub(super) async fn store_credential_postgres(
     .bind(created_at)
     .bind(updated_at)
     .bind(last_used_at)
-    .fetch_optional(pool)
+    .execute(pool)
     .await
     .map_err(|e| PasskeyError::Storage(e.to_string()))?;
 
@@ -149,9 +146,9 @@ pub(super) async fn get_credential_postgres(
 ) -> Result<Option<PasskeyCredential>, PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query_as::<_, PasskeyCredential>(&format!(
+    sqlx::query_as::<_, PasskeyCredential>(sqlx::AssertSqlSafe(format!(
         r#"SELECT * FROM {passkey_table} WHERE credential_id = $1"#
-    ))
+    )))
     .bind(credential_id.as_str())
     .fetch_optional(pool)
     .await
@@ -182,7 +179,7 @@ pub(super) async fn get_credentials_by_field_postgres(
         ),
     };
 
-    sqlx::query_as::<_, PasskeyCredential>(query)
+    sqlx::query_as::<_, PasskeyCredential>(sqlx::AssertSqlSafe(query.as_str()))
         .bind(value)
         .fetch_all(pool)
         .await
@@ -197,13 +194,13 @@ pub(super) async fn atomic_update_credential_counter_postgres(
     let counter_i64 = new_counter as i64;
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    let result = sqlx::query(&format!(
+    let result = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         UPDATE {passkey_table}
         SET counter = $1, updated_at = CURRENT_TIMESTAMP
         WHERE credential_id = $2 AND counter < $1
         "#
-    ))
+    )))
     .bind(counter_i64)
     .bind(credential_id.as_str())
     .execute(pool)
@@ -237,7 +234,7 @@ pub(super) async fn delete_credential_by_field_postgres(
         ),
     };
 
-    sqlx::query(query)
+    sqlx::query(sqlx::AssertSqlSafe(query.as_str()))
         .bind(value)
         .execute(pool)
         .await
@@ -254,9 +251,9 @@ pub(super) async fn update_credential_user_details_postgres(
 ) -> Result<(), PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"UPDATE {passkey_table} SET user_name = $1, user_display_name = $2 WHERE credential_id = $3"#
-    ))
+    )))
     .bind(name)
     .bind(display_name)
     .bind(credential_id.as_str())
@@ -350,9 +347,9 @@ pub(super) async fn update_credential_last_used_at_postgres(
 ) -> Result<(), PasskeyError> {
     let passkey_table = DB_TABLE_PASSKEY_CREDENTIALS.as_str();
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"UPDATE {passkey_table} SET last_used_at = $1 WHERE credential_id = $2"#
-    ))
+    )))
     .bind(last_used_at)
     .bind(credential_id.as_str())
     .execute(pool)
