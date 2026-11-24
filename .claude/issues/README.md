@@ -6,20 +6,24 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (22)
+### Open (27)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
 | `20260226-2025` | high | large | [E2E Tests](open/20260226-2025-e2e-tests.md) |
 | `20260226-1814` | high | large | [Device Bound Session Credentials (DBSC) Support](open/20260226-1814-device-bound-session-credentials.md) |
+| `20261124-2136` | high | medium | [Stop Returning Credential IDs from Unauthenticated auth/start; Require Discoverable Credentials](open/20261124-2136-auth-start-no-credential-ids.md) |
 | `20260226-2019` | medium | large | [Finalize Public API for 1.0 Release](open/20260226-2019-finalize-public-api.md) |
 | `2026-02-08-02` | medium | medium | [Login History DB Spam Risk from Brute-Force Attacks](open/2026-02-08-login-history-db-spam.md) |
 | `20260226-2024` | medium | medium | [Rate Limiting](open/20260226-2024-rate-limiting.md) |
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
+| `20261120-0852` | medium | medium | [MySQL/MariaDB Compare Identifiers Case-Insensitively](open/20261120-0852-mysql-case-insensitive-collation.md) |
+| `20261124-2137` | medium | medium | [Parse Registration authData into a Typed Structure](open/20261124-2137-registration-auth-data-typed-parsing.md) |
 | `20261117-0732` | medium | small | [Fix Google OAuth2 Setup Instructions (Callback URL, FedCM JavaScript Origins)](open/20261117-0732-google-oauth2-setup-docs.md) |
 | `20261123-2151` | medium | small | [Periodic Dependency Updates and Security Audit](open/20261123-2151-periodic-dependency-updates.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
+| `20261120-0851` | low | medium | [Core Crate Tests Hang on PostgreSQL When Several Run Together](open/20261120-0851-postgres-multi-test-run-hangs.md) |
 | `20261116-0111` | low | large | [Re-authentication (Step-up) Design Policy](open/20261116-0111-reauthentication-design.md) |
 | `20261116-0112` | low | small | [Passkey Login While Logged In Silently Switches Account](open/20261116-0112-passkey-login-silently-switches-account.md) |
 | `20261117-0726` | low | small | [Unify Credential ID Format in Test Data](open/20261117-0726-unify-test-credential-id-format.md) |
@@ -32,11 +36,13 @@ This directory contains issue/task tracking files for the project.
 | `20261117-0836` | low | small | [Show Friendly Messages for WebAuthn Browser Errors](open/20261117-0836-friendly-webauthn-error-messages.md) |
 | `20261123-2152` | low | small | [Validate Configured DB Table Names and Centralize AssertSqlSafe](open/20261123-2152-validate-db-table-names.md) |
 | `20261123-2153` | low | small | [Upgrade tower-http to 0.7](open/20261123-2153-upgrade-tower-http-0.7.md) |
+| `20261124-1130` | low | small | [Login History Retention Tests Fail on a Reused Database](open/20261124-1130-login-history-retention-tests-leave-rows.md) |
 
-### Completed (78)
+### Completed (79)
 
 | ID | Title |
 |----|-------|
+| `20261124-2138` | [Passkey Registration Could Overwrite Another User's Credential](completed/20261124-2138-passkey-registration-credential-overwrite.md) |
 | `20260512-0457` | [Standardize Rust code block markers in mdBook docs to `rust,ignore`](completed/20260512-0457-standardize-rust-block-markers.md) |
 | `20260512-0350` | [Use constant-time comparison in verify_page_session_token](completed/20260512-0350-constant-time-page-session-token.md) |
 | `20260512-0351` | [Correct status labeling for archived design proposals](completed/20260512-0351-archived-design-proposals-status-labeling.md) |
