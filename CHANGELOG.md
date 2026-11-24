@@ -5,6 +5,38 @@ All notable changes to oauth2-passkey will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-11-24
+
+### Security
+
+- Passkey registration could replace a credential registered by another
+  user ([GHSA-f7r7-vc8j-f293](https://github.com/ktaka-ccmp/oauth2-passkey/security/advisories/GHSA-f7r7-vc8j-f293), #358).
+  Reported by Rathnadeepan (HotWater, @HotWater-015).
+  - Registration now rejects a credential ID that is already registered
+    for any user, as required by WebAuthn §7.1. The check runs before
+    any user or credential is created
+  - The credential ID is now taken from the attested credential data in
+    the authenticator data, and the response is rejected unless the
+    client-supplied `id` and `rawId` both match it
+  - Credential storage now uses a plain `INSERT` on all backends
+    (previously an upsert), so the `UNIQUE` constraint on
+    `credential_id` also rejects duplicates
+- `verify_page_session_token` now compares tokens in constant time
+- Dependency updates for RustSec advisories: sqlx 0.8 -> 0.9,
+  jsonwebtoken 10 -> 12, cookie 0.18.3; minimum versions raised to
+  rustls 0.23.46, webpki-roots 1.0.12 and tokio 1.54.1. The
+  RUSTSEC-2023-0071 (`rsa`) exception is no longer needed
+
+### Changed
+
+- **MSRV raised to 1.94** (required by sqlx 0.9)
+- Other dependencies: base64 0.22 -> 0.23; declared minimum versions
+  raised to the latest compatible releases
+- Security documentation: `page-session.md` renamed to
+  `oauth2-linking-protection.md` and restructured; new page
+  `passkey-registration-protection.md`
+- Rust code blocks in the mdBook docs are marked `rust,ignore`
+
 ## [0.6.1] - 2026-05-11
 
 ### Changed
