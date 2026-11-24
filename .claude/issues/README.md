@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (30)
+### Open (31)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -19,6 +19,7 @@ This directory contains issue/task tracking files for the project.
 | `20260321-1245` | medium | medium | [Multi-Database Integration Tests](open/20260321-1245-multi-db-integration-tests.md) |
 | `20261120-0852` | medium | medium | [MySQL/MariaDB Compare Identifiers Case-Insensitively](open/20261120-0852-mysql-case-insensitive-collation.md) |
 | `20261124-2137` | medium | medium | [Parse Registration authData into a Typed Structure](open/20261124-2137-registration-auth-data-typed-parsing.md) |
+| `20261125-0018` | medium | medium | [Database-Backed Cache Store (Persistent Sessions Without Redis)](open/20261125-0018-database-backed-cache-store.md) |
 | `20261117-0732` | medium | small | [Fix Google OAuth2 Setup Instructions (Callback URL, FedCM JavaScript Origins)](open/20261117-0732-google-oauth2-setup-docs.md) |
 | `20261123-2151` | medium | small | [Periodic Dependency Updates and Security Audit](open/20261123-2151-periodic-dependency-updates.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
