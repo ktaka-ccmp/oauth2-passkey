@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (24)
+### Open (25)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -34,6 +34,7 @@ This directory contains issue/task tracking files for the project.
 | `20261117-0836` | low | small | [Show Friendly Messages for WebAuthn Browser Errors](open/20261117-0836-friendly-webauthn-error-messages.md) |
 | `20261123-2152` | low | small | [Validate Configured DB Table Names and Centralize AssertSqlSafe](open/20261123-2152-validate-db-table-names.md) |
 | `20261123-2153` | low | small | [Upgrade tower-http to 0.7](open/20261123-2153-upgrade-tower-http-0.7.md) |
+| `20261124-1130` | low | small | [Login History Retention Tests Fail on a Reused Database](open/20261124-1130-login-history-retention-tests-leave-rows.md) |
 
 ### Completed (78)
 
