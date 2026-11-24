@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (32)
+### Open (33)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -42,6 +42,7 @@ This directory contains issue/task tracking files for the project.
 | `20261124-2345` | low | small | [signalAllAcceptedCredentials Sends a userId That Does Not Match the Registered User ID](open/20261124-2345-signal-all-accepted-credentials-user-id.md) |
 | `20261124-2346` | low | small | [is_discoverable() Uses the Backup Eligibility Flag](open/20261124-2346-is-discoverable-uses-be-flag.md) |
 | `20261125-0003` | low | small | [Registration Offers RS256 but Only ES256 Credential Keys Can Be Stored and Verified](open/20261125-0003-rs256-offered-but-unsupported.md) |
+| `20261125-0133` | low | small | [Correct the Rationale in the Storage Pattern Appendix](open/20261125-0133-storage-pattern-doc-rationale.md) |
 
 ### Completed (79)
 
