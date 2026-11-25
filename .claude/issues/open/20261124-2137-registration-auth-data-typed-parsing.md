@@ -10,6 +10,7 @@
 - Difficulty: medium
 - Related Issues:
   - `20261124-2138` Passkey Registration Could Overwrite Another User's Credential (completed)
+  - `20261125-1002` Registration Checks rpIdHash, UP and UV Only for the "none" Attestation Format
 
 ## Problem
 
@@ -71,7 +72,9 @@ reported issue. The branch is based on the pre-rebase
 ## Latest Plan
 
 Replace raw indexing with a parsed structure, without changing
-verification behavior (rpIdHash / UP / UV checks stay where they are).
+verification behavior. Note: rpIdHash / UP / UV are currently checked
+only for the `none` format; `20261125-1002` moves them to a check
+shared by all formats and should be done first.
 
 1. Extend `AuthenticatorData` with
    `attested_credential_data: Option<AttestedCredentialData>`

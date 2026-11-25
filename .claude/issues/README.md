@@ -6,7 +6,7 @@ This directory contains issue/task tracking files for the project.
 
 <!-- AUTO-UPDATED: Do not edit manually. Updated by /issue command. -->
 
-### Open (33)
+### Open (36)
 
 | ID | Priority | Difficulty | Title |
 |----|----------|------------|-------|
@@ -23,6 +23,7 @@ This directory contains issue/task tracking files for the project.
 | `20261125-0121` | medium | medium | [Global Store Mutex Serializes All Database and Cache Access](open/20261125-0121-global-store-mutex-serializes-access.md) |
 | `20261117-0732` | medium | small | [Fix Google OAuth2 Setup Instructions (Callback URL, FedCM JavaScript Origins)](open/20261117-0732-google-oauth2-setup-docs.md) |
 | `20261123-2151` | medium | small | [Periodic Dependency Updates and Security Audit](open/20261123-2151-periodic-dependency-updates.md) |
+| `20261125-1002` | medium | small | [Registration Checks rpIdHash, UP and UV Only for the "none" Attestation Format](open/20261125-1002-registration-flag-checks-only-for-none-attestation.md) |
 | `2026-01-24-01` | low | medium | [Documentation Improvement Planning](open/2026-01-24-docs-improvement-planning.md) |
 | `20260323-1338` | low | medium | [Test Coverage Improvement for Non-DB Code Paths](open/20260323-1338-test-coverage-improvement.md) |
 | `20261120-0851` | low | medium | [Core Crate Tests Hang on PostgreSQL When Several Run Together](open/20261120-0851-postgres-multi-test-run-hangs.md) |
@@ -43,6 +44,8 @@ This directory contains issue/task tracking files for the project.
 | `20261124-2346` | low | small | [is_discoverable() Uses the Backup Eligibility Flag](open/20261124-2346-is-discoverable-uses-be-flag.md) |
 | `20261125-0003` | low | small | [Registration Offers RS256 but Only ES256 Credential Keys Can Be Stored and Verified](open/20261125-0003-rs256-offered-but-unsupported.md) |
 | `20261125-0133` | low | small | [Correct the Rationale in the Storage Pattern Appendix](open/20261125-0133-storage-pattern-doc-rationale.md) |
+| `20261125-1003` | low | small | [Review the Default PASSKEY_USER_VERIFICATION=discouraged](open/20261125-1003-review-default-user-verification-discouraged.md) |
+| `20261125-1004` | low | small | [AuthUser CSRF Check Compares Content-Type Case-Sensitively](open/20261125-1004-auth-user-csrf-content-type-case.md) |
 
 ### Completed (79)
 
