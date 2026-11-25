@@ -45,10 +45,10 @@ Runs `cargo audit` to check for known vulnerabilities in dependencies.
 
 ```yaml
 - name: Run security audit
-  run: cargo audit --ignore RUSTSEC-2023-0071
+  run: cargo audit
 ```
 
-The `--ignore` flag excludes known advisories that have been reviewed and accepted.
+No advisories are currently ignored. If an advisory has been reviewed and accepted, it can be excluded with `--ignore <ID>`.
 
 #### Documentation Build
 
@@ -65,13 +65,13 @@ Verifies that rustdoc builds without warnings:
 
 #### MSRV Check
 
-Verifies compatibility with the Minimum Supported Rust Version (currently 1.88):
+Verifies compatibility with the Minimum Supported Rust Version (currently 1.94):
 
 ```yaml
-- name: Install Rust 1.88
+- name: Install Rust 1.94
   uses: dtolnay/rust-toolchain@stable
   with:
-    toolchain: "1.88"
+    toolchain: "1.94"
 
 - name: Check MSRV compatibility
   run: |

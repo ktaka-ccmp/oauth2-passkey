@@ -509,7 +509,7 @@ fn test_decode_token_aud_empty_array_rejected() {
 #[test]
 fn test_verify_signature_invalid_token_format() {
     let token = "header.payload"; // Only 2 parts instead of 3
-    let decoding_key = DecodingKey::from_secret(b"secret");
+    let decoding_key = DecodingKey::from_secret(b"secret").unwrap();
     let result = verify_signature(token, &decoding_key, Algorithm::HS256);
     assert!(result.is_err());
     assert!(matches!(
@@ -526,7 +526,7 @@ fn test_verify_signature_invalid_token_format() {
 #[test]
 fn test_verify_signature_invalid_base64_signature() {
     let token = "header.payload.invalid@base64";
-    let decoding_key = DecodingKey::from_secret(b"secret");
+    let decoding_key = DecodingKey::from_secret(b"secret").unwrap();
     let result = verify_signature(token, &decoding_key, Algorithm::HS256);
     assert!(result.is_err());
     assert!(matches!(
@@ -555,11 +555,11 @@ fn test_verify_signature_valid_hs256() {
     let token = jsonwebtoken::encode(
         &header,
         &claims,
-        &jsonwebtoken::EncodingKey::from_secret(secret),
+        &jsonwebtoken::EncodingKey::from_secret(secret).unwrap(),
     )
     .expect("Failed to encode JWT");
 
-    let decoding_key = DecodingKey::from_secret(secret);
+    let decoding_key = DecodingKey::from_secret(secret).unwrap();
     let result = verify_signature(&token, &decoding_key, Algorithm::HS256);
     assert!(result.is_ok(), "Verification should succeed: {result:?}");
     assert!(
@@ -591,11 +591,11 @@ fn test_verify_signature_wrong_key_hs256() {
     let token = jsonwebtoken::encode(
         &header,
         &claims,
-        &jsonwebtoken::EncodingKey::from_secret(signing_secret),
+        &jsonwebtoken::EncodingKey::from_secret(signing_secret).unwrap(),
     )
     .expect("Failed to encode JWT");
 
-    let wrong_key = DecodingKey::from_secret(wrong_secret);
+    let wrong_key = DecodingKey::from_secret(wrong_secret).unwrap();
     let result = verify_signature(&token, &wrong_key, Algorithm::HS256);
     assert!(
         result.is_ok(),
@@ -828,7 +828,8 @@ fn create_hmac_jwt_without_kid(
         "name": "Test User",
     });
     let header = Header::new(alg);
-    encode(&header, &claims, &EncodingKey::from_secret(secret)).expect("Failed to encode JWT")
+    encode(&header, &claims, &EncodingKey::from_secret(secret).unwrap())
+        .expect("Failed to encode JWT")
 }
 
 fn create_hs256_jwt_without_kid(secret: &[u8], client_id: &str, issuer: &str) -> String {

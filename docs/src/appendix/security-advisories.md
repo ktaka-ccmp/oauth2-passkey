@@ -4,7 +4,7 @@
 
 ### RUSTSEC-2023-0071 - RSA Marvin Attack
 
-**Status:** Eliminated from Direct Dependencies
+**Status:** Resolved (all dependents now use `rsa` 0.10.0, the patched version)
 **Advisory:** [RUSTSEC-2023-0071](https://rustsec.org/advisories/RUSTSEC-2023-0071)
 **Severity:** Medium (5.9)
 **Date:** 2023-11-22
@@ -21,7 +21,14 @@ The Marvin Attack is a potential key recovery attack through timing side-channel
 - No longer performing any RSA operations in our codebase
 - Removed `pkcs1` crate dependency used for PEM conversion
 
-**Remaining Exposure:**
+**✅ Resolved (November 2026):**
+- Upgrading to `sqlx` 0.9 and `jsonwebtoken` 12 moved every transitive
+  dependent (`sqlx-mysql` via the `mysql-rsa` feature, and `jsonwebtoken`
+  via `rust_crypto`) to `rsa` 0.10.0, which is listed as patched for this
+  advisory
+- **CI Status:** No longer ignored; `cargo audit` runs without `--ignore`
+
+**Previous Exposure (before the upgrade, kept for reference):**
 - Transitive dependency through `sqlx-mysql` → `rsa` crate
 - Pulled in two ways:
   1. SQLx's macro system (`sqlx-macros-core`) includes all database drivers at compile time
@@ -32,7 +39,7 @@ The Marvin Attack is a potential key recovery attack through timing side-channel
   authentication handshake. The client never holds an RSA private key, so
   no decryption oracle exists in this code path
 - **Risk:** Minimal - vulnerability not in our execution path
-- **CI Status:** Advisory ignored (RUSTSEC-2023-0071)
+- **CI Status (at that time):** Advisory ignored (RUSTSEC-2023-0071)
 
 **Technical Details:**
 - Even with MySQL backend selected (`GENERIC_DATA_STORE_TYPE=mysql`), the
@@ -69,15 +76,15 @@ Ok(DecodingKey::from_rsa_components(n, e)?)
 
 #### Mitigation
 - Regular monitoring of RustSec advisories for RSA crate updates
-- Consider migration when rsa 0.10+ becomes stable with security fixes
+- Done: all dependents use rsa 0.10.0 (November 2026)
 - Current usage pattern remains secure for intended public key operations
 
 #### Review Schedule
-- **Next Review:** When rsa 0.10.0 stable is released
+- **Next Review:** Not needed unless a new advisory affects `rsa` 0.10
 - **Trigger for Action:** If vulnerability scope expands to affect public key operations
 - **Alternative:** Monitor for JWT libraries that don't depend on RSA crate
 
 ---
 
-*Last Updated: 2026-05-11 (revised for v0.5.0 MySQL support)*
+*Last Updated: 2026-11-20 (resolved by the sqlx 0.9 / jsonwebtoken 12 upgrade)*
 *Review Frequency: Quarterly or upon new RSA crate releases*

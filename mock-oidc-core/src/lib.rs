@@ -327,7 +327,7 @@ fn create_mock_id_token(state: &AppState, user: &TestUser, nonce: Option<&str>) 
     }
     let mut header = Header::new(jsonwebtoken::Algorithm::HS256);
     header.kid = Some("mock_key_id".to_string());
-    let key = EncodingKey::from_secret("test_secret".as_ref());
+    let key = EncodingKey::from_secret("test_secret".as_ref()).unwrap();
     encode(&header, &claims, &key).expect("failed to encode mock ID token")
 }
 

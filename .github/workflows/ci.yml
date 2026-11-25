@@ -2,11 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [ master, dev ]
     paths-ignore:
       - '.claude/**'
   pull_request:
-    branches: [ master, develop ]
+    branches: [ master, dev ]
     paths-ignore:
       - '.claude/**'
 
@@ -32,7 +32,7 @@ jobs:
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
       with:
-        save-if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' }}
+        save-if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' }}
         cache-on-failure: true
 
     - name: Check formatting
@@ -54,7 +54,7 @@ jobs:
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
       with:
-        save-if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' }}
+        save-if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' }}
         cache-on-failure: true
 
     - name: Test core library
@@ -85,7 +85,7 @@ jobs:
       uses: taiki-e/install-action@cargo-audit
 
     - name: Run security audit
-      run: cargo audit --ignore RUSTSEC-2023-0071
+      run: cargo audit
 
   docs:
     name: Documentation
@@ -100,7 +100,7 @@ jobs:
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
       with:
-        save-if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' }}
+        save-if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' }}
         cache-on-failure: true
 
     - name: Build documentation
@@ -116,15 +116,15 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Rust 1.88
+    - name: Install Rust 1.94
       uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: "1.88"
+        toolchain: "1.94"
 
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
       with:
-        save-if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' }}
+        save-if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' }}
         cache-on-failure: true
 
     - name: Check MSRV compatibility

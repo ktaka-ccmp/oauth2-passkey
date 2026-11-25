@@ -165,21 +165,21 @@ impl MockWebAuthnCredentials {
     }
 
     /// Helper function to create a valid test attestation object with "none" format
-    fn create_valid_attestation_object() -> String {
-        Self::create_attestation_object_with_format("none")
+    fn create_valid_attestation_object(credential_id: &[u8]) -> String {
+        Self::create_attestation_object_with_format("none", credential_id)
     }
 
     /// Helper function to create a valid test attestation object with specified format
-    fn create_attestation_object_with_format(fmt: &str) -> String {
+    fn create_attestation_object_with_format(fmt: &str, credential_id: &[u8]) -> String {
         match fmt {
-            "packed" => Self::create_packed_attestation_with_valid_signature(),
-            "tpm" => Self::create_tpm_attestation_with_valid_signature(),
-            _ => Self::create_basic_attestation_object_with_format(fmt),
+            "packed" => Self::create_packed_attestation_with_valid_signature(credential_id),
+            "tpm" => Self::create_tpm_attestation_with_valid_signature(credential_id),
+            _ => Self::create_basic_attestation_object_with_format(fmt, credential_id),
         }
     }
 
     /// Create a packed attestation with a valid self-attestation signature
-    fn create_packed_attestation_with_valid_signature() -> String {
+    fn create_packed_attestation_with_valid_signature(credential_id: &[u8]) -> String {
         use ring::{rand, signature};
 
         // Use a fixed seed for deterministic key generation in tests
@@ -208,7 +208,7 @@ impl MockWebAuthnCredentials {
         let y_coord = public_key_bytes[33..65].to_vec();
 
         // Create authenticator data
-        let auth_data = Self::create_auth_data_with_coords(&x_coord, &y_coord);
+        let auth_data = Self::create_auth_data_with_coords(&x_coord, &y_coord, credential_id);
 
         // For packed self-attestation, we'll create a signature that will work with any client data hash
         // The key insight is that we need to modify the client data JSON to match our expected hash
@@ -259,7 +259,7 @@ impl MockWebAuthnCredentials {
     }
 
     /// Create a TPM attestation with valid signature and certificate chain
-    fn create_tpm_attestation_with_valid_signature() -> String {
+    fn create_tpm_attestation_with_valid_signature(credential_id: &[u8]) -> String {
         use ring::{rand, signature};
 
         let rng = rand::SystemRandom::new();
@@ -286,7 +286,7 @@ impl MockWebAuthnCredentials {
         let y_coord = public_key_bytes[33..65].to_vec();
 
         // Create authenticator data
-        let auth_data = Self::create_auth_data_with_coords(&x_coord, &y_coord);
+        let auth_data = Self::create_auth_data_with_coords(&x_coord, &y_coord, credential_id);
 
         // Create TPM certificate with AIK extension
         let certificate = Self::create_test_certificate(&key_pair, &rng);
@@ -354,9 +354,9 @@ impl MockWebAuthnCredentials {
     }
 
     /// Create basic attestation object for non-packed formats
-    fn create_basic_attestation_object_with_format(fmt: &str) -> String {
+    fn create_basic_attestation_object_with_format(fmt: &str, credential_id: &[u8]) -> String {
         // Create standard auth data with fixed public key coordinates
-        let auth_data = Self::create_standard_auth_data();
+        let auth_data = Self::create_standard_auth_data(credential_id);
 
         // Create attestation statement based on format
         let att_stmt = match fmt {
@@ -412,7 +412,11 @@ impl MockWebAuthnCredentials {
     }
 
     /// Create authenticator data with specific coordinates
-    fn create_auth_data_with_coords(x_coord: &[u8], y_coord: &[u8]) -> Vec<u8> {
+    fn create_auth_data_with_coords(
+        x_coord: &[u8],
+        y_coord: &[u8],
+        credential_id: &[u8],
+    ) -> Vec<u8> {
         let mut auth_data = Vec::new();
 
         // Get the RP ID from test origin
@@ -438,14 +442,9 @@ impl MockWebAuthnCredentials {
         // AAGUID (16 bytes)
         auth_data.extend_from_slice(&[0x00; 16]);
 
-        // Credential ID length (2 bytes) - using 16 bytes for simplicity
-        auth_data.extend_from_slice(&[0x00, 0x10]);
-
-        // Credential ID (16 bytes)
-        auth_data.extend_from_slice(&[
-            0x6d, 0x6f, 0x63, 0x6b, 0x5f, 0x63, 0x72, 0x65, 0x64, 0x5f, 0x69, 0x64, 0x5f, 0x31,
-            0x32, 0x33,
-        ]);
+        // Credential ID length (2 bytes) + credential ID; must match rawId
+        auth_data.extend_from_slice(&(credential_id.len() as u16).to_be_bytes());
+        auth_data.extend_from_slice(credential_id);
 
         // Create COSE key for EC2 P-256 public key
         let cose_key_map = vec![
@@ -487,7 +486,7 @@ impl MockWebAuthnCredentials {
     }
 
     /// Create standard authenticator data with fixed public key
-    fn create_standard_auth_data() -> Vec<u8> {
+    fn create_standard_auth_data(credential_id: &[u8]) -> Vec<u8> {
         // Use fixed coordinates for standard tests
         let x_coord = vec![
             0x61, 0xed, 0x47, 0x49, 0x2c, 0xc7, 0x46, 0x7e, 0x14, 0x30, 0x05, 0x8c, 0x1f, 0x87,
@@ -500,7 +499,7 @@ impl MockWebAuthnCredentials {
             0x4d, 0x68, 0x58, 0xe4,
         ];
 
-        Self::create_auth_data_with_coords(&x_coord, &y_coord)
+        Self::create_auth_data_with_coords(&x_coord, &y_coord, credential_id)
     }
 
     /// Create a test X.509 certificate for TPM attestation
@@ -754,12 +753,13 @@ impl MockWebAuthnCredentials {
         let user_handle =
             general_purpose::URL_SAFE_NO_PAD.encode(format!("user_handle_{username}"));
         let credential_id = Self::generate_unique_credential_id();
+        let raw_id = general_purpose::URL_SAFE_NO_PAD.encode(&credential_id);
         json!({
-            "id": credential_id,
-            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(&credential_id),
+            "id": raw_id,
+            "raw_id": raw_id,
             "response": {
                 "client_data_json": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoibW9ja19jaGFsbGVuZ2UiLCJvcmlnaW4iOiJodHRwOi8vbG9jYWxob3N0OjMwMDAifQ",
-                "attestation_object": Self::create_valid_attestation_object(),
+                "attestation_object": Self::create_valid_attestation_object(credential_id.as_bytes()),
                 "transports": ["internal"]
             },
             "type": "public-key",
@@ -791,12 +791,13 @@ impl MockWebAuthnCredentials {
         let client_data_json = general_purpose::URL_SAFE_NO_PAD.encode(client_data.to_string());
 
         let credential_id = Self::generate_unique_credential_id();
+        let raw_id = general_purpose::URL_SAFE_NO_PAD.encode(&credential_id);
         json!({
-            "id": credential_id,
-            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(&credential_id),
+            "id": raw_id,
+            "raw_id": raw_id,
             "response": {
                 "client_data_json": client_data_json,
-                "attestation_object": Self::create_valid_attestation_object(),
+                "attestation_object": Self::create_valid_attestation_object(credential_id.as_bytes()),
                 "transports": ["internal"]
             },
             "type": "public-key",
@@ -834,9 +835,16 @@ impl MockWebAuthnCredentials {
         // Use the actual test origin to match LazyLock ORIGIN configuration
         let test_origin = crate::common::test_server::get_test_origin();
 
+        let credential_id = Self::generate_unique_credential_id();
+        let raw_id = general_purpose::URL_SAFE_NO_PAD.encode(&credential_id);
+
         // For packed attestation, we need to create a matching client data JSON
         let (client_data_json, attestation_object) = if fmt == "packed" {
-            Self::create_packed_attestation_with_matching_client_data(challenge, &test_origin)
+            Self::create_packed_attestation_with_matching_client_data(
+                challenge,
+                &test_origin,
+                credential_id.as_bytes(),
+            )
         } else {
             // Create standard client data JSON for other formats
             let client_data = json!({
@@ -845,14 +853,14 @@ impl MockWebAuthnCredentials {
                 "origin": test_origin
             });
             let client_data_json = general_purpose::URL_SAFE_NO_PAD.encode(client_data.to_string());
-            let attestation_object = Self::create_attestation_object_with_format(fmt);
+            let attestation_object =
+                Self::create_attestation_object_with_format(fmt, credential_id.as_bytes());
             (client_data_json, attestation_object)
         };
 
-        let credential_id = Self::generate_unique_credential_id();
         json!({
-            "id": credential_id,
-            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(&credential_id),
+            "id": raw_id,
+            "raw_id": raw_id,
             "response": {
                 "client_data_json": client_data_json,
                 "attestation_object": attestation_object,
@@ -876,10 +884,16 @@ impl MockWebAuthnCredentials {
         // Use the actual test origin to match LazyLock ORIGIN configuration
         let test_origin = crate::common::test_server::get_test_origin();
 
+        let credential_id = Self::generate_unique_credential_id();
+        let raw_id = general_purpose::URL_SAFE_NO_PAD.encode(&credential_id);
+
         // For packed attestation, we need to create a matching client data JSON
         let (client_data_json, attestation_object, key_pair_bytes) = if fmt == "packed" {
-            let (cdj, ao, kpb) =
-                Self::create_packed_attestation_with_key_pair(challenge, &test_origin);
+            let (cdj, ao, kpb) = Self::create_packed_attestation_with_key_pair(
+                challenge,
+                &test_origin,
+                credential_id.as_bytes(),
+            );
             (cdj, ao, Some(kpb))
         } else {
             // Create standard client data JSON for other formats
@@ -889,14 +903,14 @@ impl MockWebAuthnCredentials {
                 "origin": test_origin
             });
             let client_data_json = general_purpose::URL_SAFE_NO_PAD.encode(client_data.to_string());
-            let attestation_object = Self::create_attestation_object_with_format(fmt);
+            let attestation_object =
+                Self::create_attestation_object_with_format(fmt, credential_id.as_bytes());
             (client_data_json, attestation_object, None)
         };
 
-        let credential_id = Self::generate_unique_credential_id();
         let response = json!({
-            "id": credential_id,
-            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(&credential_id),
+            "id": raw_id,
+            "raw_id": raw_id,
             "response": {
                 "client_data_json": client_data_json,
                 "attestation_object": attestation_object,
@@ -915,6 +929,7 @@ impl MockWebAuthnCredentials {
     fn create_packed_attestation_with_matching_client_data(
         challenge: &str,
         origin: &str,
+        credential_id: &[u8],
     ) -> (String, String) {
         use ring::{rand, signature};
 
@@ -942,7 +957,7 @@ impl MockWebAuthnCredentials {
         let y_coord = public_key_bytes[33..65].to_vec();
 
         // Create authenticator data
-        let auth_data = Self::create_auth_data_with_coords(&x_coord, &y_coord);
+        let auth_data = Self::create_auth_data_with_coords(&x_coord, &y_coord, credential_id);
 
         // Create client data JSON
         let client_data = json!({
@@ -1002,6 +1017,7 @@ impl MockWebAuthnCredentials {
     pub fn create_packed_attestation_with_key_pair(
         challenge: &str,
         origin: &str,
+        credential_id: &[u8],
     ) -> (String, String, Vec<u8>) {
         use ring::{rand, signature};
 
@@ -1033,7 +1049,7 @@ impl MockWebAuthnCredentials {
         let y_coord = public_key_bytes[33..65].to_vec();
 
         // Create authenticator data
-        let auth_data = Self::create_auth_data_with_coords(&x_coord, &y_coord);
+        let auth_data = Self::create_auth_data_with_coords(&x_coord, &y_coord, credential_id);
 
         // Create client data JSON
         let client_data = json!({
@@ -1109,12 +1125,13 @@ impl MockWebAuthnCredentials {
         let client_data_json = general_purpose::URL_SAFE_NO_PAD.encode(client_data.to_string());
 
         let credential_id = Self::generate_unique_credential_id();
+        let raw_id = general_purpose::URL_SAFE_NO_PAD.encode(&credential_id);
         json!({
-            "id": credential_id.clone(),
-            "raw_id": general_purpose::URL_SAFE_NO_PAD.encode(&credential_id),
+            "id": raw_id,
+            "raw_id": raw_id,
             "response": {
                 "client_data_json": client_data_json,
-                "attestation_object": Self::create_valid_attestation_object(),
+                "attestation_object": Self::create_valid_attestation_object(credential_id.as_bytes()),
                 "transports": ["internal"]
             },
             "type": "public-key",
@@ -1388,7 +1405,7 @@ impl MockOAuth2Responses {
             "email_verified": true
         });
 
-        let key = EncodingKey::from_secret("test_secret".as_ref());
+        let key = EncodingKey::from_secret("test_secret".as_ref()).unwrap();
         encode(&Header::default(), &claims, &key)
             .unwrap_or_else(|_| format!("mock.jwt.token.{}", user.id))
     }

@@ -14,7 +14,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
     let table_name = DB_TABLE_USERS.as_str();
 
     // Create users table
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE TABLE IF NOT EXISTS {table_name} (
             sequence_number BIGSERIAL PRIMARY KEY,
@@ -26,7 +26,7 @@ pub(super) async fn create_tables_postgres(pool: &Pool<Postgres>) -> Result<(), 
             updated_at TIMESTAMPTZ NOT NULL
         )
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
@@ -55,11 +55,11 @@ pub(super) async fn validate_user_tables_postgres(pool: &Pool<Postgres>) -> Resu
 pub(super) async fn get_all_users_postgres(pool: &Pool<Postgres>) -> Result<Vec<User>, UserError> {
     let table_name = DB_TABLE_USERS.as_str();
 
-    sqlx::query_as::<_, User>(&format!(
+    sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name} ORDER BY sequence_number ASC
         "#
-    ))
+    )))
     .fetch_all(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))
@@ -72,24 +72,26 @@ pub(super) async fn get_user_by_field_postgres(
     let table_name = DB_TABLE_USERS.as_str();
 
     match field {
-        UserSearchField::Id(id) => sqlx::query_as::<_, User>(&format!(
+        UserSearchField::Id(id) => sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
             r#"
                 SELECT * FROM {table_name} WHERE id = $1
                 "#
-        ))
+        )))
         .bind(id)
         .fetch_optional(pool)
         .await
         .map_err(|e| UserError::Storage(e.to_string())),
-        UserSearchField::SequenceNumber(sequence_number) => sqlx::query_as::<_, User>(&format!(
-            r#"
+        UserSearchField::SequenceNumber(sequence_number) => {
+            sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
+                r#"
                 SELECT * FROM {table_name} WHERE sequence_number = $1
                 "#
-        ))
-        .bind(sequence_number)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| UserError::Storage(e.to_string())),
+            )))
+            .bind(sequence_number)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| UserError::Storage(e.to_string()))
+        }
     }
 }
 
@@ -103,7 +105,7 @@ pub(super) async fn upsert_user_postgres(
     updated_user.updated_at = now;
 
     // Upsert user with a single query and RETURNING to get the sequence_number
-    let result = sqlx::query_as::<_, User>(&format!(
+    let result = sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(format!(
         r#"
         INSERT INTO {table_name} (id, account, label, is_admin, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6)
@@ -114,7 +116,7 @@ pub(super) async fn upsert_user_postgres(
             updated_at = $7
         RETURNING *
         "#
-    ))
+    )))
     .bind(&updated_user.id)
     .bind(&updated_user.account)
     .bind(&updated_user.label)
@@ -140,14 +142,14 @@ pub(super) async fn insert_demo_placeholder_postgres(
     let table_name = DB_TABLE_USERS.as_str();
     let now = chrono::Utc::now();
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         INSERT INTO {table_name}
             (sequence_number, id, account, label, is_admin, created_at, updated_at)
         VALUES (1, $1, $2, $3, true, $4, $5)
         ON CONFLICT (sequence_number) DO NOTHING
         "#
-    ))
+    )))
     .bind(crate::config::DEMO_PLACEHOLDER_USER_ID)
     .bind("system@demo.local")
     .bind("[Demo Placeholder]")
@@ -159,14 +161,14 @@ pub(super) async fn insert_demo_placeholder_postgres(
 
     // Advance the BIGSERIAL sequence past any explicitly inserted values
     // Without this, the next auto-generated sequence_number could conflict with 1
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT setval(
             pg_get_serial_sequence('{table_name}', 'sequence_number'),
             GREATEST(1, (SELECT COALESCE(MAX(sequence_number), 0) FROM {table_name}))
         )
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| UserError::Storage(e.to_string()))?;
@@ -182,12 +184,12 @@ pub(super) async fn demote_user_if_not_last_admin_postgres(
 ) -> Result<bool, UserError> {
     let table_name = DB_TABLE_USERS.as_str();
 
-    let result = sqlx::query(&format!(
+    let result = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         UPDATE {table_name} SET is_admin = false, updated_at = CURRENT_TIMESTAMP
         WHERE id = $1 AND (SELECT COUNT(*) FROM {table_name} WHERE is_admin = true) > 1
         "#
-    ))
+    )))
     .bind(id.as_str())
     .execute(pool)
     .await
@@ -204,12 +206,12 @@ pub(super) async fn delete_user_if_not_last_admin_postgres(
 ) -> Result<bool, UserError> {
     let table_name = DB_TABLE_USERS.as_str();
 
-    let result = sqlx::query(&format!(
+    let result = sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         DELETE FROM {table_name}
         WHERE id = $1 AND (SELECT COUNT(*) FROM {table_name} WHERE is_admin = true) > 1
         "#
-    ))
+    )))
     .bind(id.as_str())
     .execute(pool)
     .await
@@ -224,11 +226,11 @@ pub(super) async fn delete_user_postgres(
 ) -> Result<(), UserError> {
     let table_name = DB_TABLE_USERS.as_str();
 
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         DELETE FROM {table_name} WHERE id = $1
         "#
-    ))
+    )))
     .bind(id.as_str())
     .execute(pool)
     .await

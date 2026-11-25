@@ -16,7 +16,7 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), OAut
     let users_table = DB_TABLE_USERS.as_str();
 
     // Create oauth2_accounts table
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE TABLE IF NOT EXISTS {oauth2_table} (
             sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,19 +33,19 @@ pub(super) async fn create_tables_sqlite(pool: &Pool<Sqlite>) -> Result<(), OAut
             UNIQUE(provider, provider_user_id)
         )
         "#
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     // Create index on user_id for faster lookups
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         r#"
         CREATE INDEX IF NOT EXISTS idx_{}_user_id ON {}(user_id)
         "#,
         oauth2_table.replace(".", "_"),
         oauth2_table
-    ))
+    )))
     .execute(pool)
     .await
     .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
@@ -111,7 +111,7 @@ pub(super) async fn get_oauth2_accounts_by_field_sqlite(
         ),
     };
 
-    sqlx::query_as::<_, OAuth2Account>(query)
+    sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(query.as_str()))
         .bind(value)
         .fetch_all(pool)
         .await
@@ -128,12 +128,12 @@ pub(super) async fn get_oauth2_account_by_provider_sqlite(
     // Ensure tables exist before any operations
     create_tables_sqlite(pool).await?;
 
-    sqlx::query_as::<_, OAuth2Account>(&format!(
+    sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name}
         WHERE provider = ? AND provider_user_id = ?
         "#
-    ))
+    )))
     .bind(provider.as_str())
     .bind(provider_user_id.as_str())
     .fetch_optional(pool)
@@ -158,12 +158,12 @@ pub(super) async fn upsert_oauth2_account_sqlite(
         .map_err(|e| OAuth2Error::Storage(e.to_string()))?;
 
     // Check if the account already exists
-    let existing = sqlx::query_as::<_, OAuth2Account>(&format!(
+    let existing = sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name}
         WHERE provider = ? AND provider_user_id = ?
         "#
-    ))
+    )))
     .bind(&account.provider)
     .bind(&account.provider_user_id)
     .fetch_optional(&mut *tx)
@@ -172,7 +172,7 @@ pub(super) async fn upsert_oauth2_account_sqlite(
 
     let account_id = if let Some(existing) = existing {
         // Update existing account
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             r#"
             UPDATE {table_name} SET
                 name = ?,
@@ -182,7 +182,7 @@ pub(super) async fn upsert_oauth2_account_sqlite(
                 updated_at = ?
             WHERE id = ?
             "#
-        ))
+        )))
         .bind(&account.name)
         .bind(&account.email)
         .bind(&account.picture)
@@ -201,13 +201,13 @@ pub(super) async fn upsert_oauth2_account_sqlite(
         // Insert new account
         let id = account.id.clone();
         sqlx::query(
-            &format!(
+            sqlx::AssertSqlSafe(format!(
             r#"
             INSERT INTO {table_name}
             (id, user_id, provider, provider_user_id, name, email, picture, metadata, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#
-            )
+            ))
         )
         .bind(&id)
         .bind(&account.user_id)
@@ -227,11 +227,11 @@ pub(super) async fn upsert_oauth2_account_sqlite(
     };
 
     // Fetch inside the transaction for read-your-writes consistency
-    let updated_account = sqlx::query_as::<_, OAuth2Account>(&format!(
+    let updated_account = sqlx::query_as::<_, OAuth2Account>(sqlx::AssertSqlSafe(format!(
         r#"
         SELECT * FROM {table_name} WHERE id = ?
         "#
-    ))
+    )))
     .bind(account_id)
     .fetch_one(&mut *tx)
     .await
@@ -280,7 +280,7 @@ pub(super) async fn delete_oauth2_accounts_by_field_sqlite(
         ),
     };
 
-    sqlx::query(query)
+    sqlx::query(sqlx::AssertSqlSafe(query.as_str()))
         .bind(value)
         .execute(pool)
         .await
