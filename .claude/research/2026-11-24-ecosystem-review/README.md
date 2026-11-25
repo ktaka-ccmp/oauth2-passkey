@@ -145,6 +145,8 @@ verification pure functions (input -> verified result) with
 `coordination` wiring storage, users and sessions; then pass stores and
 configuration explicitly, keeping `init()` + env vars as a convenience
 layer; then decouple credential tables from the users table.
+Section 11 revisits the "pass stores explicitly" step and keeps the
+global stores.
 
 ## 6. Building on webauthn-rs
 
@@ -224,6 +226,11 @@ Findings checked against source:
 | `20261124-2346` | is_discoverable() Uses the Backup Eligibility Flag |
 | `20261125-0003` | Registration Offers RS256 but Only ES256 Credential Keys Can Be Stored and Verified |
 | `20261125-0018` | Database-Backed Cache Store (Persistent Sessions Without Redis) |
+| `20261125-0121` | Global Store Mutex Serializes All Database and Cache Access |
+| `20261125-0133` | Correct the Rationale in the Storage Pattern Appendix |
+| `20261125-1002` | Registration Checks rpIdHash, UP and UV Only for the "none" Attestation Format |
+| `20261125-1003` | Review the Default PASSKEY_USER_VERIFICATION=discouraged |
+| `20261125-1004` | AuthUser CSRF Check Compares Content-Type Case-Sensitively |
 
 Related existing issues: `20261124-2136` (no credential IDs from
 unauthenticated auth/start), `20261124-2137` (typed authData parsing),
@@ -241,4 +248,118 @@ unauthenticated auth/start), `20261124-2137` (typed authData parsing),
   release on `rsa` 0.10, or a goal of wider adoption.
 - Ideas considered and not pursued now: splitting into an auth API
   server or OIDC provider (crowded space: SuperTokens, Ory Kratos,
-  Hanko, Kanidm, Rauthy), and a builder-based configuration API.
+  Hanko, Kanidm, Rauthy), and a builder-based configuration API (see
+  section 11 for a smaller `init_with(Config)` option).
+
+## 11. Follow-up: global stores vs Axum State (2026-11-25)
+
+Question: should the global stores and configuration be replaced by
+state passed through Axum (`State`) or an explicit context?
+
+History (git log, daily journal 2025-02-11):
+
+- Until 2025-02-11 the library used Axum State: `router(state)` with
+  `.with_state(state)`, the state built from environment variables
+  (`4a00b72`). The singleton replaced it in `0456239`; combining state
+  from several internal crates was the original pain.
+- The global stores were `Mutex`-wrapped so they could be replaced at
+  runtime. Replacement ended the same day (`90a2596`), and the setter
+  was removed on 2025-03-04 (`27476a5`).
+
+Findings (origin/dev 13fde6c):
+
+- Axum does not force applications to merge a library's state into
+  their own: a router can carry its own state. Two reasons given in
+  `docs/src/appendix/storage-pattern.md` do not hold (State requires
+  merging with the app state; State prevents env-var-only
+  configuration), and the appendix describes code that no longer
+  exists (issue `20261125-0133`).
+- Reasons that do hold: the public API assumes process-global state
+  (about 40 functions without a handle, public statics,
+  `AuthUser`), internal layers need no state threading, an auth system
+  is one per process, and integration is `init()` plus `merge`.
+  Moving to State would change the public API and every internal call
+  path.
+- Costs of the global design: one configuration per process, tests
+  share stores and configuration (`20261117-0727`), no programmatic
+  configuration, and the store mutex.
+- The mutex is held across awaits, so only one database operation and
+  one cache operation run at a time in the process. It is not needed
+  for the data store and only serves `&mut self` cache methods
+  (issue `20261125-0121`; impact not measured).
+
+Decision:
+
+- Keep the global stores. Do not move to Axum State or an explicit
+  context; this replaces the "pass stores explicitly" step in
+  section 5.
+- Remove the store mutex within the current design (`20261125-0121`,
+  measure first).
+- Correct the rationale in the appendix (`20261125-0133`).
+- Optional, later: a programmatic entry point such as
+  `init_with(Config)` alongside `init()`, without changing how stores
+  are reached.
+
+## 12. Decoupling sessions and users, and an external review (2026-11-25)
+
+Thought experiment: what if sessions and the user database were taken
+out of the library, so that it could be used with `tower-sessions` /
+`axum-login` or with an application's own users table?
+
+Current coupling (origin/dev 13fde6c): the coordination functions
+verify, map to a user and issue a session cookie in one call
+(`handle_finish_authentication_core` calls `new_session_header`,
+`coordination/passkey.rs:264-330`); `oauth2` and `passkey` read the
+session for linking and CSRF (`oauth2/main/utils.rs:9`,
+`passkey/main/register.rs:5`); credential tables reference the users
+table with `ON DELETE CASCADE`; `UserId::new` accepts only
+`[A-Za-z0-9-_.@+()]` (`session/types.rs:247-260`), so IDs such as
+`auth0|...` are rejected.
+
+Options compared:
+
+| | Option |
+|---|---|
+| A | Keep the all-in-one design |
+| B | Pluggable user directory (trait), drop credential FKs; keep own sessions, CSRF, admin UI |
+| C | Publish a verification core (pure functions, serializable pending state) and rebuild the all-in-one layer on it; the core works with `axum-login` / `tower-sessions` |
+| D | Core only |
+
+Own assessment: for own use A > B > C > D; for wider adoption C > B >
+A > D, with B as a lower-risk part of C.
+
+External review (Gemini 4 Hydrogen via `agy`, two rounds, the second
+with access to this repository and the reports above):
+
+- Ranking: B > A > C > D for wider adoption, A > B > C > D for own use.
+  Publishing a verification core (C) was judged premature: teams on
+  `axum-login` would keep `webauthn-rs` / `openidconnect` rather than
+  switch to a single-maintainer verifier; the unserved segment is new
+  apps that want a working all-in-one (Torii's released code does not
+  implement OIDC or WebAuthn, section 8).
+- Suggested path for adoption: fix correctness and the UV default; ship
+  the DB-backed session store (`20261125-0018`), remove the store mutex
+  (`20261125-0121`) and add `init_with(Config)`; do the core split
+  internally only, then B; add an `axum-login` / `tower-sessions`
+  adapter only when users ask for it.
+- Design points for delegating sessions: OIDC `form_post` callbacks
+  are cross-site POSTs, so pending OIDC state cannot live only in a
+  `SameSite=Lax` session cookie (the library uses `SameSite=None` for
+  its CSRF cookie in that mode, `oauth2/main/core.rs:160-170`); stock
+  `tower-sessions` has no user -> session index, so active-session
+  counts and the session conflict policy are lost, while force logout
+  can use `axum-login`'s `session_auth_hash`; page session tokens and
+  CSRF need a redesign; B also needs a cleanup hook and must never
+  reuse user IDs once FKs are dropped.
+- Its line-count estimates were not checked.
+
+Defects found in the review, checked against the code and filed:
+`20261125-1002` (registration flag checks only for `none`),
+`20261125-1003` (UV default `discouraged`; WebAuthn L3, passkeys.dev
+and web.dev recommend `preferred`), `20261125-1004` (Content-Type case
+in the `AuthUser` CSRF check).
+
+After the review, the own assessment agrees that the internal
+separation needed for C can be done without publishing a second API.
+No decision has been made on options A-D or on wider adoption as a
+goal.
