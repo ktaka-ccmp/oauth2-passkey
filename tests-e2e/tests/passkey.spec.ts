@@ -31,7 +31,7 @@ test('register passkey, log out, sign back in with passkey', async ({
   // The frontend calls `location.reload()` after /register/finish succeeds.
   // Start waiting for that load before clicking, otherwise page.goto below
   // races with the reload (networkidle returns at once on an idle page).
-  const reloadedAfterRegister = page.waitForEvent('load');
+  const reloadedAfterRegister = page.waitForEvent('load', { timeout: 10_000 });
   await modal.getByRole('button', { name: 'Register', exact: true }).click();
   await registrationFinish;
   await reloadedAfterRegister;
@@ -51,7 +51,7 @@ test('register passkey, log out, sign back in with passkey', async ({
     (resp) =>
       resp.url().endsWith('/o2p/passkey/auth/finish') && resp.status() === 200,
   );
-  const reloadedAfterAuth = page.waitForEvent('load');
+  const reloadedAfterAuth = page.waitForEvent('load', { timeout: 10_000 });
   await page.getByRole('button', { name: /Sign in with Passkey/i }).click();
   await authFinish;
   await reloadedAfterAuth;

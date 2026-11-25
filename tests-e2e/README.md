@@ -34,6 +34,9 @@ E2E_BROWSER_LOG=1 npx playwright test # forward browser console to terminal
 E2E_REUSE_SERVER=1 npx playwright test # reuse already-running services (keeps their state)
 ```
 
+`E2E_BROWSER_LOG` and `E2E_REUSE_SERVER` are enabled by any non-empty value
+(including `0`); leave them unset to disable.
+
 Playwright's `webServer` config starts the two background services
 automatically and shuts them down at the end:
 

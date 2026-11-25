@@ -14,7 +14,9 @@ test('OAuth2 login via mock-oidc creates session', async ({ page, context }) => 
   const popupPromise = context.waitForEvent('page');
   // The opener reloads itself after the popup closes; start waiting for that
   // load event before triggering the flow so it cannot be missed.
-  const openerReloaded = page.waitForEvent('load');
+  // The timeout starts now, so it must cover the popup flow (up to 15 s below)
+  // plus the reload; a missing reload then fails here with a clear message.
+  const openerReloaded = page.waitForEvent('load', { timeout: 20_000 });
   await page
     .getByRole('button', { name: /Register \/ Sign in with Google/i })
     .click();
