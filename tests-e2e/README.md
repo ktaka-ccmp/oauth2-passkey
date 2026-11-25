@@ -35,7 +35,7 @@ E2E_REUSE_SERVER=1 npx playwright test # reuse already-running services (keeps t
 ```
 
 `E2E_BROWSER_LOG` and `E2E_REUSE_SERVER` are enabled by any non-empty value
-(including `0`); leave them unset to disable.
+(including `0`); leave them unset or empty to disable.
 
 Playwright's `webServer` config starts the two background services
 automatically and shuts them down at the end:
@@ -123,6 +123,8 @@ in registration options: `authenticator_attachment: platform`,
    Tests create a `page.waitForEvent('load')` promise before the action that
    triggers the reload and await it afterwards. `waitForLoadState('networkidle')`
    returns at once on an already idle page, so it does not wait for the reload.
+   Give the wait an explicit `timeout` that covers everything between creating
+   the promise and the reload, so a missing reload fails with a clear message.
 4. **Passkey promotion is disabled.** `O2P_PASSKEY_PROMOTION=disabled` so
    the OAuth2 test doesn't have to dismiss a second popup. Promotion has
    its own (future) test.

@@ -23,17 +23,17 @@ test('register passkey, log out, sign back in with passkey', async ({
   await modal.locator('#reg-username').fill('e2e-user');
   await modal.locator('#reg-displayname').fill('E2E User');
 
-  const registrationFinish = page.waitForResponse(
-    (resp) =>
-      resp.url().endsWith('/o2p/passkey/register/finish') &&
-      resp.status() === 200,
+  // Match on the URL only and check the status below, so a failed finish
+  // request is reported as such rather than as a missing reload.
+  const registrationFinish = page.waitForResponse((resp) =>
+    resp.url().endsWith('/o2p/passkey/register/finish'),
   );
   // The frontend calls `location.reload()` after /register/finish succeeds.
   // Start waiting for that load before clicking, otherwise page.goto below
   // races with the reload (networkidle returns at once on an idle page).
-  const reloadedAfterRegister = page.waitForEvent('load', { timeout: 10_000 });
+  const reloadedAfterRegister = page.waitForEvent('load', { timeout: 20_000 });
   await modal.getByRole('button', { name: 'Register', exact: true }).click();
-  await registrationFinish;
+  expect((await registrationFinish).status()).toBe(200);
   await reloadedAfterRegister;
 
   // Verify auth by visiting a protected route.
@@ -47,13 +47,12 @@ test('register passkey, log out, sign back in with passkey', async ({
   await expect(page).toHaveURL(/\/o2p\/user\/login/);
 
   // --- Sign back in ---
-  const authFinish = page.waitForResponse(
-    (resp) =>
-      resp.url().endsWith('/o2p/passkey/auth/finish') && resp.status() === 200,
+  const authFinish = page.waitForResponse((resp) =>
+    resp.url().endsWith('/o2p/passkey/auth/finish'),
   );
-  const reloadedAfterAuth = page.waitForEvent('load', { timeout: 10_000 });
+  const reloadedAfterAuth = page.waitForEvent('load', { timeout: 20_000 });
   await page.getByRole('button', { name: /Sign in with Passkey/i }).click();
-  await authFinish;
+  expect((await authFinish).status()).toBe(200);
   await reloadedAfterAuth;
 
   await page.goto('/');
