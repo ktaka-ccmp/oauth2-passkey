@@ -34,7 +34,9 @@ export default defineConfig({
       command: `cargo run -p mock-oidc`,
       url: `${MOCK_OIDC_URL}/test/healthz`,
       timeout: 120_000,
-      reuseExistingServer: !process.env.CI,
+      // Reuse a running server only when explicitly requested; otherwise a
+      // stale process (old code, old in-memory DB) could make tests pass.
+      reuseExistingServer: !!process.env.E2E_REUSE_SERVER,
       stdout: 'pipe',
       stderr: 'pipe',
       env: {
@@ -49,7 +51,9 @@ export default defineConfig({
       command: `cargo run -p demo-both`,
       url: `${DEMO_BASE_URL}/o2p/user/login`,
       timeout: 180_000,
-      reuseExistingServer: !process.env.CI,
+      // Reuse a running server only when explicitly requested; otherwise a
+      // stale process (old code, old in-memory DB) could make tests pass.
+      reuseExistingServer: !!process.env.E2E_REUSE_SERVER,
       stdout: 'pipe',
       stderr: 'pipe',
       env: {

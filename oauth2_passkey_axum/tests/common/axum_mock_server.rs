@@ -9,7 +9,7 @@
 use mock_oidc_core::{AppState, TestUser, build_router};
 use std::{
     sync::{
-        Arc, LazyLock, Mutex,
+        Arc, LazyLock,
         atomic::{AtomicBool, Ordering},
     },
     thread,
@@ -23,12 +23,6 @@ pub const MOCK_OAUTH2_URL: &str = "http://127.0.0.1:9876";
 pub struct TestServerContext {
     pub base_url: String,
     pub state: AppState,
-    /// Origin URL stashed by `configure_mock_for_test` for tests that need
-    /// to know which RP they were configured against. Mock-oidc-core itself
-    /// does not consume this; callers that always pass `redirect_uri` on the
-    /// authorize request never hit the fallback path.
-    #[allow(dead_code)]
-    pub origin_url: Arc<Mutex<String>>,
     #[allow(dead_code)]
     shutdown: Arc<AtomicBool>,
     _thread_handle: thread::JoinHandle<()>,
@@ -100,7 +94,6 @@ impl TestServerContext {
         TestServerContext {
             base_url,
             state,
-            origin_url: Arc::new(Mutex::new(String::new())),
             shutdown,
             _thread_handle: thread_handle,
         }
@@ -135,18 +128,17 @@ async fn wait_for_shutdown(shutdown: Arc<AtomicBool>) {
 
 /// Configure the mock server for a specific test.
 ///
-/// Updates the active user identity. The `origin_url` parameter is retained
-/// for signature compatibility with existing callers; it is recorded on the
-/// context but not consumed by mock-oidc-core (which uses the issuer URL as
-/// the fallback when an authorize request omits `redirect_uri`, and all
-/// callers pass it explicitly).
+/// Updates the active user identity. The `_origin_url` parameter is kept for
+/// signature compatibility with existing callers and is ignored:
+/// mock-oidc-core falls back to the issuer URL when an authorize request
+/// omits `redirect_uri`, and all callers pass it explicitly.
 pub fn configure_mock_for_test(
     user_email: String,
     user_id: String,
     user_name: String,
     user_given_name: String,
     user_family_name: String,
-    origin_url: String,
+    _origin_url: String,
 ) {
     let server = get_oidc_mock_server();
     {
@@ -157,6 +149,5 @@ pub fn configure_mock_for_test(
         user.given_name = user_given_name;
         user.family_name = user_family_name;
     }
-    *server.origin_url.lock().unwrap() = origin_url;
     println!("🔧 Mock server configured for test");
 }

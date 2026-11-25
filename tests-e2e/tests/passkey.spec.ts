@@ -28,12 +28,13 @@ test('register passkey, log out, sign back in with passkey', async ({
       resp.url().endsWith('/o2p/passkey/register/finish') &&
       resp.status() === 200,
   );
+  // The frontend calls `location.reload()` after /register/finish succeeds.
+  // Start waiting for that load before clicking, otherwise page.goto below
+  // races with the reload (networkidle returns at once on an idle page).
+  const reloadedAfterRegister = page.waitForEvent('load');
   await modal.getByRole('button', { name: 'Register', exact: true }).click();
   await registrationFinish;
-  // The frontend calls `location.reload()` after /register/finish succeeds.
-  // Wait for that reload to settle before our next navigation, otherwise
-  // page.goto races with the reload.
-  await page.waitForLoadState('networkidle');
+  await reloadedAfterRegister;
 
   // Verify auth by visiting a protected route.
   await page.goto('/');
@@ -50,9 +51,10 @@ test('register passkey, log out, sign back in with passkey', async ({
     (resp) =>
       resp.url().endsWith('/o2p/passkey/auth/finish') && resp.status() === 200,
   );
+  const reloadedAfterAuth = page.waitForEvent('load');
   await page.getByRole('button', { name: /Sign in with Passkey/i }).click();
   await authFinish;
-  await page.waitForLoadState('networkidle');
+  await reloadedAfterAuth;
 
   await page.goto('/');
   await expect(page.locator('body')).toContainText(/protected page/i);

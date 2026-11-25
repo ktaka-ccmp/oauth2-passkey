@@ -31,6 +31,7 @@ npx playwright test                  # headless, all tests
 npx playwright test --headed         # watch in a real browser window
 npx playwright test --ui             # Playwright's interactive UI
 E2E_BROWSER_LOG=1 npx playwright test # forward browser console to terminal
+E2E_REUSE_SERVER=1 npx playwright test # reuse already-running services (keeps their state)
 ```
 
 Playwright's `webServer` config starts the two background services
@@ -38,7 +39,7 @@ automatically and shuts them down at the end:
 
 | Service | Bin | Port | Purpose |
 |---------|-----|------|---------|
-| `mock-oidc` | workspace member `mock-oidc` | 19876 | Standalone OIDC provider — discovery, /authorize, /token, /userinfo, JWKS |
+| `mock-oidc` | workspace member `mock-oidc` | 19877 | Standalone OIDC provider — discovery, /authorize, /token, /userinfo, JWKS |
 | `demo-both` | workspace member `demo-both` | 13001 | System under test — `oauth2-passkey-axum` integrated into a small Axum app |
 
 Both bind to `127.0.0.1` and are reached via `localhost:<port>` from the
@@ -74,7 +75,7 @@ ports are taken on your machine.
                           ▼
               ┌───────────────────┐
               │ mock-oidc (Rust)  │
-              │ port 19876        │
+              │ port 19877        │
               └───────────────────┘
 ```
 
@@ -115,9 +116,10 @@ in registration options: `authenticator_attachment: platform`,
    Firefox / Safari WebAuthn must still be tested manually.
 2. **Sequential, not parallel.** Tests share a single in-memory SQLite
    database. `fullyParallel: false` and `workers: 1` keep them deterministic.
-3. **Network idle waits.** Many flows end with `location.reload()` in JS.
-   Tests use `page.waitForLoadState('networkidle')` rather than racing a
-   subsequent `page.goto`.
+3. **Waiting for reloads.** Many flows end with `location.reload()` in JS.
+   Tests create a `page.waitForEvent('load')` promise before the action that
+   triggers the reload and await it afterwards. `waitForLoadState('networkidle')`
+   returns at once on an already idle page, so it does not wait for the reload.
 4. **Passkey promotion is disabled.** `O2P_PASSKEY_PROMOTION=disabled` so
    the OAuth2 test doesn't have to dismiss a second popup. Promotion has
    its own (future) test.

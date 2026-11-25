@@ -4,7 +4,7 @@
 //! parses env vars, builds an `AppState`, and serves the router.
 //!
 //! Environment variables:
-//! - `MOCK_OIDC_BIND` (default `127.0.0.1:9876`)
+//! - `MOCK_OIDC_BIND` (default `127.0.0.1:19877`)
 //! - `MOCK_OIDC_ISSUER` (default `http://{bind}`)
 //! - `MOCK_OIDC_CLIENT_ID` (default `test-client-id.apps.googleusercontent.com`)
 //! - `MOCK_OIDC_USER_{EMAIL,SUB,NAME,GIVEN_NAME,FAMILY_NAME}` to override
@@ -22,7 +22,7 @@ async fn main() {
         )
         .init();
 
-    let bind = env::var("MOCK_OIDC_BIND").unwrap_or_else(|_| "127.0.0.1:9876".to_string());
+    let bind = env::var("MOCK_OIDC_BIND").unwrap_or_else(|_| "127.0.0.1:19877".to_string());
     let issuer = env::var("MOCK_OIDC_ISSUER").unwrap_or_else(|_| format!("http://{bind}"));
     let client_id = env::var("MOCK_OIDC_CLIENT_ID")
         .unwrap_or_else(|_| "test-client-id.apps.googleusercontent.com".to_string());
