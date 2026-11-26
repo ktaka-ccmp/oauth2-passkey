@@ -15,12 +15,17 @@ test('OAuth2 login via mock-oidc creates session', async ({ page, context }) => 
   // The Google button opens a popup that drives the authorization-code flow
   // against mock-oidc; the popup messages the opener and self-closes.
   const popupPromise = context.waitForEvent('page', { timeout: 10_000 });
+  // Avoid unhandled rejections if an earlier step fails; awaiting the
+  // original promises below still reports their own failures.
+  popupPromise.catch(() => {});
   // The opener reloads itself after the popup closes; start waiting for that
   // load event before triggering the flow so it cannot be missed.
-  // The timeout starts now, so it covers the popup opening (up to 10 s), the
-  // popup closing (up to 15 s) and the reload; a missing reload then fails
-  // here with a clear message.
+  // The timeout starts now and spans the whole flow: the popup opening (up to
+  // 10 s) and closing (up to 15 s, counted from when it opens) leave at least
+  // 5 s for the reload itself; a missing reload then fails here with a clear
+  // message.
   const openerReloaded = page.waitForEvent('load', { timeout: 30_000 });
+  openerReloaded.catch(() => {});
   await page
     .getByRole('button', { name: /Register \/ Sign in with Google/i })
     .click();
