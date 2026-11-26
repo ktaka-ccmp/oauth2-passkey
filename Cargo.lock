@@ -700,7 +700,7 @@ checksum = "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
 
 [[package]]
 name = "demo-both"
-version = "0.6.2-dev"
+version = "0.6.3-dev"
 dependencies = [
  "askama",
  "axum",
@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "demo-cross-origin"
-version = "0.6.2-dev"
+version = "0.6.3-dev"
 dependencies = [
  "askama",
  "axum",
@@ -732,7 +732,7 @@ dependencies = [
 
 [[package]]
 name = "demo-custom-login"
-version = "0.6.2-dev"
+version = "0.6.3-dev"
 dependencies = [
  "askama",
  "axum",
@@ -745,7 +745,7 @@ dependencies = [
 
 [[package]]
 name = "demo-live"
-version = "0.6.2-dev"
+version = "0.6.3-dev"
 dependencies = [
  "askama",
  "axum",
@@ -759,7 +759,7 @@ dependencies = [
 
 [[package]]
 name = "demo-oauth2"
-version = "0.6.2-dev"
+version = "0.6.3-dev"
 dependencies = [
  "askama",
  "axum",
@@ -773,7 +773,7 @@ dependencies = [
 
 [[package]]
 name = "demo-passkey"
-version = "0.6.2-dev"
+version = "0.6.3-dev"
 dependencies = [
  "askama",
  "axum",
@@ -788,7 +788,7 @@ dependencies = [
 
 [[package]]
 name = "demo-profile"
-version = "0.6.2-dev"
+version = "0.6.3-dev"
 dependencies = [
  "askama",
  "axum",
@@ -806,7 +806,7 @@ dependencies = [
 
 [[package]]
 name = "demo-todo"
-version = "0.6.2-dev"
+version = "0.6.3-dev"
 dependencies = [
  "askama",
  "axum",
@@ -1809,6 +1809,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock-oidc"
+version = "0.6.3-dev"
+dependencies = [
+ "axum",
+ "mock-oidc-core",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "mock-oidc-core"
+version = "0.6.3-dev"
+dependencies = [
+ "axum",
+ "base64 0.23.1",
+ "jsonwebtoken",
+ "serde",
+ "serde_json",
+ "sha2",
+ "uuid",
+]
+
+[[package]]
 name = "multer"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1896,7 +1920,7 @@ dependencies = [
 
 [[package]]
 name = "oauth2-passkey"
-version = "0.6.2-dev"
+version = "0.6.3-dev"
 dependencies = [
  "async-trait",
  "axum",
@@ -1932,7 +1956,7 @@ dependencies = [
 
 [[package]]
 name = "oauth2-passkey-axum"
-version = "0.6.2-dev"
+version = "0.6.3-dev"
 dependencies = [
  "askama",
  "axum",
@@ -1944,6 +1968,7 @@ dependencies = [
  "dotenvy",
  "http",
  "jsonwebtoken",
+ "mock-oidc-core",
  "oauth2-passkey",
  "regex",
  "reqwest",

@@ -43,6 +43,7 @@ base64 = { workspace = true }
 ciborium = { workspace = true }
 dotenvy = { workspace = true }
 jsonwebtoken = { workspace = true }
+mock-oidc-core = { path = "../mock-oidc-core" }
 regex = { workspace = true }
 reqwest = { workspace = true }
 ring = { workspace = true }
